@@ -464,7 +464,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 return new EmptyIteration<BindingSet, QueryEvaluationException>();
             }
 
-            return execute(query);
+            return execute(query, bindings);
             
         } catch (UnknownOperatorException ex) {
             
@@ -575,7 +575,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 return new EmptyIteration<BindingSet, QueryEvaluationException>();
             }
 
-            return execute(query);
+            return execute(query, bindings);
             
         } catch (UnknownOperatorException ex) {
             
@@ -681,7 +681,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 return new EmptyIteration<BindingSet, QueryEvaluationException>();
             }
             
-            return execute(query);
+            return execute(query, bindings);
             
         } catch (UnknownOperatorException ex) {
             
@@ -1546,7 +1546,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 }
                 return null;
             }
-            result = new Constant<IV>(iv);
+            if (var.isAnonymous())
+                result = new Constant<IV>(iv);
+            else 
+                result = new Constant<IV>(com.bigdata.bop.Var.var(name), iv);
         }
         return result;
     }
@@ -1663,8 +1666,16 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
      * 
      * @throws QueryEvaluationException
      */
+//    protected CloseableIteration<BindingSet, QueryEvaluationException> execute(
+//            final IStep step)
+//            throws Exception {
+//        
+//        return execute(step, null);
+//        
+//    }
+        
     protected CloseableIteration<BindingSet, QueryEvaluationException> execute(
-            final IStep step)
+            final IStep step, final BindingSet constants)
             throws Exception {
         
         final QueryEngine queryEngine = tripleSource.getSail().getQueryEngine();
@@ -1706,7 +1717,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         CloseableIteration<BindingSet, QueryEvaluationException> result = 
             new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
                 new BigdataBindingSetResolverator(database, it2).start(database
-                        .getExecutorService()));
+                        .getExecutorService()), constants);
 
         try {
             // Wait for the Future (checks for errors).
@@ -1882,7 +1893,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
         try {
         
-            return execute(query);
+            return execute(query, bindings);
 
         } catch (Exception ex) {
             

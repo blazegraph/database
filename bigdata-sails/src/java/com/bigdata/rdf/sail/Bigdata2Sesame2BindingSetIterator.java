@@ -42,6 +42,8 @@ public class Bigdata2Sesame2BindingSetIterator<E extends Exception> implements
      */
     private final ICloseableIterator<IBindingSet> src;
     
+    private final BindingSet constants;
+    
     /**
      * 
      * @param src
@@ -49,12 +51,19 @@ public class Bigdata2Sesame2BindingSetIterator<E extends Exception> implements
      *            closed). All bound values in the visited {@link IBindingSet}s
      *            MUST be {@link BigdataValue}s.
      */
-    public Bigdata2Sesame2BindingSetIterator(ICloseableIterator<IBindingSet> src) {
+    public Bigdata2Sesame2BindingSetIterator(final ICloseableIterator<IBindingSet> src) {
 
+        this(src, null);
+    }
+        
+    public Bigdata2Sesame2BindingSetIterator(final ICloseableIterator<IBindingSet> src, final BindingSet constants) {
+        
         if (src == null)
             throw new IllegalArgumentException();
 
         this.src = src;
+        
+        this.constants = constants;
 
     }
     
@@ -104,6 +113,17 @@ public class Bigdata2Sesame2BindingSetIterator<E extends Exception> implements
 
             bindingSet.addBinding(entry.getKey().getName(),
                     (BigdataValue) entry.getValue().get());
+            
+        }
+        
+        if (constants != null) {
+            
+            final Iterator<Binding> it = constants.iterator();
+            while (it.hasNext()) {
+                final Binding b = it.next();
+                bindingSet.addBinding(b.getName(), b.getValue());
+//                bindingSet.addBinding(b);
+            }
             
         }
         
