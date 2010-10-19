@@ -99,8 +99,17 @@ public class TestMultiGraphs extends ProxyBigdataSailTestCase {
          * You'll get the same answer whether you run with Bigdata or Sesame. 
          */
         if (true) {
-            sail = getSail();
-            repo = new BigdataSailRepository((BigdataSail) sail);
+            
+            final BigdataSail bdSail = getSail();
+            sail = bdSail;
+            
+            if (bdSail.getDatabase().isQuads() == false) {
+                bdSail.__tearDownUnitTest();
+                return;
+            }
+            
+            repo = new BigdataSailRepository(bdSail);
+            
         } else {
             sail = new MemoryStore();
             repo = new SailRepository(sail);
@@ -156,17 +165,17 @@ public class TestMultiGraphs extends ProxyBigdataSailTestCase {
                     
                     "select ?p ?o " +
                     "WHERE { " +
-                    "  ?s rdf:type ns:Person . " +
-                    "  ?s ?p ?o . " +
+//                    "  ?s rdf:type ns:Person . " +
+                    "  ns:Mike ?p ?o . " +
                     "}";
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 TupleQueryResult result = tupleQuery.evaluate();
                 
-                while (result.hasNext()) {
-                    System.err.println(result.next());
-                }
+//                while (result.hasNext()) {
+//                    System.err.println(result.next());
+//                }
  
                 Collection<BindingSet> solution = new LinkedList<BindingSet>();
                 solution.add(createBindingSet(new Binding[] {
@@ -181,20 +190,8 @@ public class TestMultiGraphs extends ProxyBigdataSailTestCase {
                     new BindingImpl("p", RDFS.LABEL),
                     new BindingImpl("o", l1),
                 }));
-                solution.add(createBindingSet(new Binding[] {
-                    new BindingImpl("p", RDF.TYPE),
-                    new BindingImpl("o", person),
-                }));
-                solution.add(createBindingSet(new Binding[] {
-                    new BindingImpl("p", likes),
-                    new BindingImpl("o", rdf),
-                }));
-                solution.add(createBindingSet(new Binding[] {
-                    new BindingImpl("p", RDFS.LABEL),
-                    new BindingImpl("o", l1),
-                }));
                 
-//                compare(result, solution);
+                compare(result, solution);
                 
             }
             
@@ -216,9 +213,9 @@ public class TestMultiGraphs extends ProxyBigdataSailTestCase {
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 TupleQueryResult result = tupleQuery.evaluate();
                 
-                while (result.hasNext()) {
-                    System.err.println(result.next());
-                }
+//                while (result.hasNext()) {
+//                    System.err.println(result.next());
+//                }
  
                 Collection<BindingSet> solution = new LinkedList<BindingSet>();
                 solution.add(createBindingSet(new Binding[] {
@@ -233,20 +230,8 @@ public class TestMultiGraphs extends ProxyBigdataSailTestCase {
                     new BindingImpl("p", RDFS.LABEL),
                     new BindingImpl("o", l1),
                 }));
-                solution.add(createBindingSet(new Binding[] {
-                    new BindingImpl("p", RDF.TYPE),
-                    new BindingImpl("o", person),
-                }));
-                solution.add(createBindingSet(new Binding[] {
-                    new BindingImpl("p", likes),
-                    new BindingImpl("o", rdf),
-                }));
-                solution.add(createBindingSet(new Binding[] {
-                    new BindingImpl("p", RDFS.LABEL),
-                    new BindingImpl("o", l1),
-                }));
                 
-//                compare(result, solution);
+                compare(result, solution);
                 
             }
             

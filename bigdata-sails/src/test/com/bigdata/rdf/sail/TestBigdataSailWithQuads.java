@@ -97,6 +97,8 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
         
         suite.addTestSuite(TestDescribe.class);
         
+        suite.addTestSuite(TestMultiGraphs.class);
+        
         // The Sesame TCK, including the SPARQL test suite.
         {
 
