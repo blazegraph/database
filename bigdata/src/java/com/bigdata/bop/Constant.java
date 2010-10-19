@@ -37,6 +37,16 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
     private static final long serialVersionUID = -2967861242470442497L;
     
     final private E value;
+
+    public interface Annotations extends ImmutableBOp.Annotations {
+
+        /**
+         * The {@link IVariable} which is bound to that constant value
+         * (optional).
+         */
+        String VAR = Constant.class.getName() + ".var";
+
+    }
     
     final public boolean isVar() {
         
@@ -72,18 +82,32 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
         this.value = op.value;
         
     }
-    
-    public Constant(final E value) {
-        
-        super(NOARGS, NOANNS);
-        
+
+    public Constant(final IVariable<E> var, final E value) {
+
+        super(NOARGS, NV.asMap(new NV(Annotations.VAR, var)));
+
+        if (var == null)
+            throw new IllegalArgumentException();
+
         if (value == null)
             throw new IllegalArgumentException();
-        
+
         this.value = value;
-        
+
     }
-    
+
+    public Constant(final E value) {
+
+        super(NOARGS, NOANNS);
+
+        if (value == null)
+            throw new IllegalArgumentException();
+
+        this.value = value;
+
+    }
+
     /**
      * Clone is overridden to reduce heap churn.
      */
