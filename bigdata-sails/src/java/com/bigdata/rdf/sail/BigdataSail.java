@@ -923,7 +923,7 @@ public class BigdataSail extends SailBase implements Sail {
         namespaces = 
             Collections.synchronizedMap(new LinkedHashMap<String, String>());
 
-        queryEngine = QueryEngineFactory.newQueryController(database
+        queryEngine = QueryEngineFactory.getQueryController(database
                 .getIndexManager());
         
     }
@@ -996,8 +996,13 @@ public class BigdataSail extends SailBase implements Sail {
     public void shutDown() throws SailException {
         
         assertOpen();
-        
-        queryEngine.shutdown();
+
+        /*
+         * Note: DO NOT shutdown the query engine. It is shared by all
+         * operations against the same backing Journal or IBigdataFederation
+         * within this JVM!
+         */
+//        queryEngine.shutdown();
         
         super.shutDown();
         
