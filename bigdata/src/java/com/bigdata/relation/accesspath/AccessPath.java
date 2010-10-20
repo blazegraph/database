@@ -425,11 +425,21 @@ public class AccessPath<R> implements IAccessPath<R> {
             // The predicate is not constrained to an index partition.
             pmd = null;
 
-            // Obtain the index.
-            final String fqn = AbstractRelation.getFQN(relation, keyOrder);
-
-            ndx = AbstractRelation.getIndex(indexManager, fqn, timestamp);
-
+            /*
+             * Obtain the index.
+             * 
+             * FIXME The getIndex(IKeyOrder) code path is optimized by
+             * SPORelation and LexiconRelation. However, we should have
+             * automatic caching of the index references to avoid the
+             * significant penalty of going down to the commitRecordIndex and
+             * Name2Addr each time we need to resolve an index. (Scale-out has
+             * separate caching for this in IndexManager.)
+             */
+            ndx = relation.getIndex(keyOrder);
+//            final String fqn = AbstractRelation.getFQN(relation, keyOrder);
+//
+//            ndx = AbstractRelation.getIndex(indexManager, fqn, timestamp);
+            
             if (ndx == null) {
 
                 throw new RuntimeException("No such index: relation="
