@@ -2117,7 +2117,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * The {@link ILexiconConfiguration} instance, which will determine how
      * terms are encoded and decoded in the key space.
      */
-    private final ILexiconConfiguration lexiconConfiguration;
+    private final ILexiconConfiguration<BigdataValue> lexiconConfiguration;
 
     /**
      * Constant for the {@link LexiconRelation} namespace component.
