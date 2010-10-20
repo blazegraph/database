@@ -1801,7 +1801,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         if (!_bufferStrategy.isOpen()) {
 
-            throw new IllegalStateException("file=" + getFile());
+            throw new IllegalStateException((getFile()==null?"transient":"file=" + getFile()));
 
         }
 
