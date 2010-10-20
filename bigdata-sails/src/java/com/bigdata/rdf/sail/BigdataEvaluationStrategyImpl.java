@@ -1829,46 +1829,6 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         }
     }
     
-//    /**
-//     * Override evaluation of StatementPatterns to recognize magic search 
-//     * predicate.
-//     */
-//    @Override
-//    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
-//            final StatementPattern sp, final BindingSet bindings)
-//            throws QueryEvaluationException {
-//        
-//        if (log.isDebugEnabled()) {
-//            log.debug("evaluating statement pattern:\n" + sp);
-//        }
-//        
-//        // check for magic search
-//        final Var predVar = sp.getPredicateVar();
-//        final Value predValue = getVarValue(predVar, bindings);
-//        if (BD.SEARCH.equals(predValue)) {
-//            final Var ovar = sp.getObjectVar();
-//            final Value oval = getVarValue(ovar, bindings);
-//            if (oval == null) {
-//                throw new QueryEvaluationException(BD.SEARCH
-//                        + " : object must be bound.");
-//            }
-//            if (!(oval instanceof Literal)) {
-//                throw new QueryEvaluationException(BD.SEARCH
-//                        + " : object must be literal.");
-//            }
-//            final Literal lit = (Literal) oval;
-//            if (lit.getDatatype() != null) {
-//                throw new QueryEvaluationException(BD.SEARCH
-//                        + " : object is datatype literal.");
-//            }
-//            return search(sp.getSubjectVar(), lit.getLanguage(),
-//                    lit.getLabel(), bindings, sp.getScope());
-//        }
-//        
-//        return super.evaluate(sp, bindings);
-//        
-//    }
-     
     /**
      * Override evaluation of StatementPatterns to recognize magic search 
      * predicate.
@@ -1878,30 +1838,70 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             final StatementPattern sp, final BindingSet bindings)
             throws QueryEvaluationException {
         
-        // no check against the nativeJoins property here because we are simply
-        // using the native execution model to take care of magic searches.
-        
         if (log.isDebugEnabled()) {
             log.debug("evaluating statement pattern:\n" + sp);
         }
         
-        final IStep query = createNativeQuery(sp);
-        
-        if (query == null) {
-            return new EmptyIteration<BindingSet, QueryEvaluationException>();
+        // check for magic search
+        final Var predVar = sp.getPredicateVar();
+        final Value predValue = getVarValue(predVar, bindings);
+        if (BD.SEARCH.equals(predValue)) {
+            final Var ovar = sp.getObjectVar();
+            final Value oval = getVarValue(ovar, bindings);
+            if (oval == null) {
+                throw new QueryEvaluationException(BD.SEARCH
+                        + " : object must be bound.");
+            }
+            if (!(oval instanceof Literal)) {
+                throw new QueryEvaluationException(BD.SEARCH
+                        + " : object must be literal.");
+            }
+            final Literal lit = (Literal) oval;
+            if (lit.getDatatype() != null) {
+                throw new QueryEvaluationException(BD.SEARCH
+                        + " : object is datatype literal.");
+            }
+            return search(sp.getSubjectVar(), lit.getLanguage(),
+                    lit.getLabel(), bindings, sp.getScope());
         }
-
-        try {
         
-            return execute(query, bindings);
-
-        } catch (Exception ex) {
-            
-            throw new QueryEvaluationException(ex);
-            
-        }
+        return super.evaluate(sp, bindings);
         
     }
+     
+//    /**
+//     * Override evaluation of StatementPatterns to recognize magic search 
+//     * predicate.
+//     */
+//    @Override
+//    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
+//            final StatementPattern sp, final BindingSet bindings)
+//            throws QueryEvaluationException {
+//        
+//        // no check against the nativeJoins property here because we are simply
+//        // using the native execution model to take care of magic searches.
+//        
+//        if (log.isDebugEnabled()) {
+//            log.debug("evaluating statement pattern:\n" + sp);
+//        }
+//        
+//        final IStep query = createNativeQuery(sp);
+//        
+//        if (query == null) {
+//            return new EmptyIteration<BindingSet, QueryEvaluationException>();
+//        }
+//
+//        try {
+//        
+//            return execute(query, bindings);
+//
+//        } catch (Exception ex) {
+//            
+//            throw new QueryEvaluationException(ex);
+//            
+//        }
+//        
+//    }
      
 
     /**
