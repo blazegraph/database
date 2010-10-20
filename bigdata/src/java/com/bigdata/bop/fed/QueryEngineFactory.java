@@ -34,16 +34,18 @@ import java.util.Properties;
 import java.util.UUID;
 
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
+import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.ResourceService;
 import com.bigdata.util.config.NicUtil;
 
 /**
- * Factory for a query controller.
+ * Singleton factory for a query controller.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -51,34 +53,84 @@ import com.bigdata.util.config.NicUtil;
 public class QueryEngineFactory {
 
     /**
-     * New instance for standalone or scale-out.
+     * Weak value cache to enforce the singleton pattern for standalone
+     * journals.
+     */
+    private static ConcurrentWeakValueCache<Journal, QueryEngine> standaloneQECache = new ConcurrentWeakValueCache<Journal, QueryEngine>();
+
+    /**
+     * Weak value cache to enforce the singleton pattern for
+     * {@link IBigdataClient}s (the data services are query engine peers rather
+     * than controllers and handle their own query engine initialization so as
+     * to expose their resources to other peers).
+     */
+    private static ConcurrentWeakValueCache<IBigdataFederation<?>, FederatedQueryEngine> federationQECache = new ConcurrentWeakValueCache<IBigdataFederation<?>, FederatedQueryEngine>();
+
+    /**
+     * Singleton factory for standalone or scale-out.
      * 
      * @param indexManager
      *            The database.
      *            
      * @return The query controller.
      */
-    static public QueryEngine newQueryController(final IIndexManager indexManager) {
+    static public QueryEngine getQueryController(final IIndexManager indexManager) {
 
         if (indexManager instanceof IBigdataFederation<?>) {
 
-            return newFederatedQueryController((IBigdataFederation<?>) indexManager);
+            return getFederatedQueryController((IBigdataFederation<?>) indexManager);
             
         }
         
-        return newStandaloneQueryController((Journal) indexManager);
+        return getStandaloneQueryController((Journal) indexManager);
         
     }
 
     /**
-     * New query controller for standalone.
+     * Singleton factory for standalone.
      * 
      * @param indexManager
      *            The journal.
      *            
      * @return The query controller.
      */
-    static public QueryEngine newStandaloneQueryController(
+    static public QueryEngine getStandaloneQueryController(
+            final Journal indexManager) {
+
+        if (indexManager == null)
+            throw new IllegalArgumentException();
+
+        QueryEngine queryEngine = standaloneQECache.get(indexManager);
+
+        if (queryEngine == null) {
+
+            synchronized (standaloneQECache) {
+
+                if ((queryEngine = standaloneQECache.get(indexManager)) == null) {
+
+                    queryEngine = newStandaloneQueryEngine(indexManager);
+                    
+                    standaloneQECache.put(indexManager, queryEngine);
+                    
+                }
+
+            }
+
+        }
+
+        return queryEngine;
+
+    }
+
+    /**
+     * Initialize a new query engine for the journal.
+     * 
+     * @param indexManager
+     *            The journal.
+     *            
+     * @return The new query engine.
+     */
+    private static QueryEngine newStandaloneQueryEngine(
             final Journal indexManager) {
 
         final QueryEngine queryEngine = new QueryEngine(indexManager);
@@ -88,7 +140,7 @@ public class QueryEngineFactory {
         return queryEngine;
 
     }
-
+    
     /**
      * New query controller for scale-out.
      * 
@@ -99,16 +151,53 @@ public class QueryEngineFactory {
      * 
      * @todo parameterize the local resource service and temporary storage.
      */
-    static public FederatedQueryEngine newFederatedQueryController(
+    static public FederatedQueryEngine getFederatedQueryController(
             final IBigdataFederation<?> fed) {
 
+        if (fed == null)
+            throw new IllegalArgumentException();
+        
+        FederatedQueryEngine queryEngine = federationQECache.get(fed);
+
+        if (queryEngine == null) {
+
+            synchronized (federationQECache) {
+
+                if ((queryEngine = federationQECache.get(fed)) == null) {
+
+                    queryEngine = newFederatedQueryEngine(fed);
+                    
+                    federationQECache.put(fed, queryEngine);
+                    
+                }
+
+            }
+
+        }
+
+        return queryEngine;
+
+    }
+
+    /**
+     * Initialize a new query engine for the federation.
+     * 
+     * @param fed
+     *            The federation.
+     *            
+     * @return The new query engine.
+     */
+    private static FederatedQueryEngine newFederatedQueryEngine(
+            final IBigdataFederation<?> fed) {
+
+        final FederatedQueryEngine queryEngine;
+        
         // The local resource service for the query controller.
         ManagedResourceService queryEngineResourceService = null;
 
         // The local persistence store for the query controller.
         Journal queryEngineStore = null;
 
-        final FederatedQueryEngine queryEngine;
         try {
 
             // Create index manager for the query controller.
@@ -116,10 +205,11 @@ public class QueryEngineFactory {
 
                 final Properties p = new Properties();
 
-                p.setProperty(Journal.Options.BUFFER_MODE, BufferMode.Temporary
-                        .toString());
+                p.setProperty(Journal.Options.BUFFER_MODE,
+                        BufferMode.Temporary.toString());
 
-                p.setProperty(Journal.Options.CREATE_TEMP_FILE, "true");
+                p.setProperty(Journal.Options.CREATE_TEMP_FILE,
+                        "true");
 
                 queryEngineStore = new Journal(p);
 
@@ -129,12 +219,14 @@ public class QueryEngineFactory {
             {
                 queryEngineResourceService = new ManagedResourceService(
                         new InetSocketAddress(InetAddress
-                                .getByName(NicUtil.getIpAddress("default.nic",
-                                        "default", true/* loopbackOk */)), 0/* port */
+                                .getByName(NicUtil.getIpAddress(
+                                        "default.nic", "default",
+                                        true/* loopbackOk */)), 0/* port */
                         ), 0/* requestServicePoolSize */) {
 
                     @Override
-                    protected File getResource(UUID uuid) throws Exception {
+                    protected File getResource(UUID uuid)
+                            throws Exception {
                         // Will not serve up files.
                         return null;
                     }
@@ -142,8 +234,9 @@ public class QueryEngineFactory {
             }
 
             // create the query controller.
-            queryEngine = new FederatedQueryController(fed.getServiceUUID(),
-                    fed, queryEngineStore, queryEngineResourceService);
+            queryEngine = new FederatedQueryController(fed
+                    .getServiceUUID(), fed, queryEngineStore,
+                    queryEngineResourceService);
 
         } catch (Throwable t) {
 
@@ -160,9 +253,9 @@ public class QueryEngineFactory {
         queryEngine.init();
 
         return queryEngine;
-
+        
     }
-
+    
     /**
      * Implementation manages its own local storage and resource service.
      */
