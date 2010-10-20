@@ -41,12 +41,12 @@ public class BSBundle {
     public final int shardId;
 
     public String toString() {
-        
+
         return super.toString() + "{bopId=" + bopId + ",shardId=" + shardId
                 + "}";
-        
+
     }
-    
+
     public BSBundle(final int bopId, final int shardId) {
 
         this.bopId = bopId;
@@ -65,16 +65,17 @@ public class BSBundle {
     }
 
     public boolean equals(final Object o) {
-        
+
         if (this == o)
             return true;
-        
+
         if (!(o instanceof BSBundle))
             return false;
-        
-        return bopId == ((BSBundle) o).bopId
-                && shardId == ((BSBundle) o).shardId;
-        
+
+        final BSBundle t = (BSBundle) o;
+
+        return bopId == t.bopId && shardId == t.shardId;
+
     }
 
 }
