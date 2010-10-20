@@ -38,7 +38,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
@@ -366,6 +365,16 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     }
 
     /**
+     * {@link QueryEngine}s are using with a singleton pattern. They must be
+     * torn down automatically once they are no longer reachable.
+     */
+    @Override
+    protected void finalize() throws Throwable {
+        shutdownNow();
+        super.finalize();
+    }
+    
+    /**
      * The service on which we run the query engine.  This is started by {@link #init()}.
      */
     private final AtomicReference<ExecutorService> engineService = new AtomicReference<ExecutorService>();
@@ -430,35 +439,12 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     private class QueryEngineTask implements Runnable {
         public void run() {
             if(log.isInfoEnabled())
-                log.info("running: " + this);
+                log.info("Running: " + this);
             while (true) {
                 try {
                     final RunningQuery q = priorityQueue.take();
-                    final UUID queryId = q.getQueryId();
-                    if (q.isCancelled())
-                        continue;
-                    final IChunkMessage<IBindingSet> chunk = q.chunksIn.poll();
-                    if (chunk == null)
-                        continue;
-                    if (log.isTraceEnabled())
-                        log.trace("Accepted chunk: " + chunk);
-                    try {
-                        // create task.
-                        final FutureTask<?> ft = q.newChunkTask(chunk);
-                        if (log.isDebugEnabled())
-                            log.debug("Running chunk: " + chunk);
-                        // execute task.
-                        execute(ft);
-                    } catch (RejectedExecutionException ex) {
-                        // shutdown of the pool (should be an unbounded
-                        // pool).
-                        log.warn("Dropping chunk: queryId=" + queryId);
-                        continue;
-                    } catch (Throwable ex) {
-                        // halt that query.
-                        q.halt(ex);
-                        continue;
-                    }
+                    if (!q.isDone())
+                        q.consumeChunk();
                 } catch (InterruptedException e) {
                     /*
                      * Note: Uncomment the stack trace here if you want to find

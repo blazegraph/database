@@ -190,7 +190,7 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
 //            
 //        }
 
-        queryEngine = QueryEngineFactory.newFederatedQueryController(fed);
+        queryEngine = QueryEngineFactory.getFederatedQueryController(fed);
 
         /*
          * Discover the data services. We need their UUIDs in order to create

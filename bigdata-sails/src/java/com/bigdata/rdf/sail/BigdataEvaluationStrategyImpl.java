@@ -114,6 +114,8 @@ import com.bigdata.relation.rule.eval.RuleStats;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.IHit;
 import com.bigdata.striterator.ChunkedArraysIterator;
+import com.bigdata.striterator.ChunkedWrappedIterator;
+import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.DistinctFilter;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
@@ -1711,8 +1713,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         final IAsynchronousIterator<IBindingSet[]> it1 = 
             runningQuery.iterator();
         
-        final IChunkedOrderedIterator<IBindingSet> it2 =
-            new ChunkedArraysIterator<IBindingSet>(it1);
+//        final IChunkedOrderedIterator<IBindingSet> it2 =
+//            new ChunkedArraysIterator<IBindingSet>(it1);
+        final IChunkedOrderedIterator<IBindingSet> it2 = new ChunkedWrappedIterator<IBindingSet>(
+                new Dechunkerator<IBindingSet>(it1));
         
         CloseableIteration<BindingSet, QueryEvaluationException> result = 
             new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
@@ -1817,7 +1821,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 //    }
 
     @SuppressWarnings("serial")
-    private class UnknownOperatorException extends RuntimeException {
+    static private class UnknownOperatorException extends RuntimeException {
         private TupleExpr operator;
 
         public UnknownOperatorException(TupleExpr operator) {
