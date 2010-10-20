@@ -54,14 +54,14 @@
 				<exclude name="**/*.java" />
 				<exclude name="**/package.html" />
 			</fileset>
-			<!-- copy log4j configuration file. -->
-			<fileset dir="${lubm.dir}/src/resources/logging" />
 		</copy>
 		<copy toDir="${build.dir}/bin">
 			<!-- copy benchmark data and queries. -->
 			<fileset dir="${lubm.dir}/src/resources/config" />
 			<!-- copy the journal configuration file. -->
 			<fileset file="${lubm.dir}/*.properties" />
+			<!-- copy log4j configuration file. -->
+			<fileset dir="${lubm.dir}/src/resources/logging" />
 		</copy>
 	</target>
 
