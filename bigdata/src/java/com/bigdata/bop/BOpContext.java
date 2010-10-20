@@ -32,14 +32,14 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.relation.accesspath.IMultiSourceAsynchronousIterator;
+import com.bigdata.relation.accesspath.MultiSourceSequentialAsynchronousIterator;
 import com.bigdata.service.IBigdataFederation;
-import com.ibm.icu.impl.ByteBuffer;
 
 /**
  * The evaluation context for the operator (NOT serializable).
@@ -57,7 +57,7 @@ public class BOpContext<E> extends BOpContextBase {
 
     private final BOpStats stats;
 
-    private final IAsynchronousIterator<E[]> source;
+    private final IMultiSourceAsynchronousIterator<E[]> source;
 
     private final IBlockingBuffer<E[]> sink;
 
@@ -93,25 +93,28 @@ public class BOpContext<E> extends BOpContextBase {
 
     /**
      * Where to read the data to be consumed by the operator.
-     * 
-     * @todo Since joins now run from locally materialized data in all cases the
-     *       API could be simplified somewhat given that we know that there will
-     *       be a single "source" chunk of binding sets. Also, the reason for
-     *       the {@link IAsynchronousIterator} here is that a downstream join
-     *       could error (or satisfy a slice) and halt the upstream joins. That
-     *       is being coordinated through the {@link RunningQuery} now.
-     *       <p>
-     *       It is not yet clear what the right API is for the source. The
-     *       iterator model might be just fine, but might not need to be
-     *       asynchronous and does not need to be closeable.
-     *       <p>
-     *       Perhaps the right thing is to expose an object with a richer API
-     *       for obtaining various kinds of iterators or even access to the
-     *       direct {@link ByteBuffer}s backing the data (for high volume joins,
-     *       external merge sorts, etc).
      */
     public final IAsynchronousIterator<E[]> getSource() {
         return source;
+    }
+
+    /**
+     * Attach another source. The decision to attach the source is mutex with
+     * respect to the decision that the source reported by {@link #getSource()}
+     * is exhausted.
+     * 
+     * @param source
+     *            The source.
+     *            
+     * @return <code>true</code> iff the source was attached.
+     */
+    public boolean addSource(IAsynchronousIterator<E[]> source) {
+
+        if (source == null)
+            throw new IllegalArgumentException();
+        
+        return this.source.add(source);
+        
     }
 
     /**
@@ -199,7 +202,7 @@ public class BOpContext<E> extends BOpContextBase {
             throw new IllegalArgumentException();
         this.partitionId = partitionId;
         this.stats = stats;
-        this.source = source;
+        this.source = new MultiSourceSequentialAsynchronousIterator<E[]>(source);
         this.sink = sink;
         this.sink2 = sink2; // may be null
     }

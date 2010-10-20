@@ -183,7 +183,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 //            System.err.println("controller: " + queryEngine);
 //
 //        }
-        queryEngine = QueryEngineFactory.newFederatedQueryController(fed);
+        queryEngine = QueryEngineFactory.getFederatedQueryController(fed);
         
 //        dataService0 = fed.getDataService(dataServices[0]); 
 //        dataService1 = fed.getDataService(dataServices[1]); 

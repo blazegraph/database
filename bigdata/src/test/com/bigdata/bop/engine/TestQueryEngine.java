@@ -445,6 +445,9 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
+//                        new NV(
+//                                QueryEngineTestAnnotations.COMBINE_RECEIVED_CHUNKS,
+//                                false),//
                         })//
         );
         

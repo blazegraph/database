@@ -60,6 +60,11 @@ public class BOpContextBase {
      */
     private final IIndexManager indexManager;
 
+    /** 
+     * The executor service.
+     */
+    private final Executor executor;
+    
     /**
      * The <strong>local</strong> {@link IIndexManager}. Query evaluation occurs
      * against the local indices. In scale-out, query evaluation proceeds shard
@@ -88,13 +93,13 @@ public class BOpContextBase {
      * <em>local</em> {@link #getIndexManager() index manager}.
      */
     public final Executor getExecutorService() {
-        return indexManager.getExecutorService();
+        return executor;
     }
 
     public BOpContextBase(final QueryEngine queryEngine) {
         
         this(queryEngine.getFederation(), queryEngine.getIndexManager());
-        
+
     }
 
     /**
@@ -119,6 +124,9 @@ public class BOpContextBase {
         this.fed = fed;
         
         this.indexManager = indexManager;
+     
+        this.executor = indexManager == null ? null : indexManager
+                .getExecutorService();
         
     }
     

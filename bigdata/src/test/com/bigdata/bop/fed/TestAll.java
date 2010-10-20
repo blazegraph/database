@@ -88,8 +88,7 @@ public class TestAll extends TestCase {
          * bigdata-jini module since they must be executed against a full
          * federation.
          */
-//        FIXME This is hanging for some reason.  Fix it and reenable.
-//        suite.addTestSuite(TestFederatedQueryEngine.class);
+        suite.addTestSuite(TestFederatedQueryEngine.class);
         
         return suite;
         
