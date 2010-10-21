@@ -1623,12 +1623,259 @@ public class TestQueryEngine extends TestCase2 {
     }
 
     /**
-     * @todo Write unit tests for the {@link ConditionalRoutingOp}?
+     * Unit test for {@link ConditionalRoutingOp}. This test case tests when the
+     * condition is true (the joins are not skipped) in which case the test
+     * (and results) are essentially identical to test_query_join2(). 
      */
-    public void test_query_join2_conditionalRouting() {
+    public void test_query_join2_conditionalRoutingTrue() throws Exception {
+        int startId = 1;
+        int joinId1 = 2;
+        int joinId2 = 3;
+        
+        IConstraint condition = new EQConstant(Var.var("x"), new Constant<String>("Mary"));
+        RunningQuery runningQuery = initQueryWithConditionalRoutingOp(condition, startId, joinId1, joinId2);
 
-        fail("write test");
+        // verify solutions.
+        {
+            // the expected solution.
+            final IBindingSet[] expected = new IBindingSet[] {//
+            new ArrayBindingSet(//
+                    new IVariable[] { Var.var("x"), Var.var("y"), Var.var("z")},//
+                    new IConstant[] { new Constant<String>("Mary"),
+                            new Constant<String>("Paul"),
+                            new Constant<String>("Leon")}//
+            ) };
 
+            assertSameSolutions(expected, runningQuery.iterator());
+        
+        }
+
+        // Wait until the query is done.
+        runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
+        {
+            // validate the stats map.
+            assertNotNull(statsMap);
+            log.info(statsMap.toString());
+            assertEquals(5, statsMap.size());
+        }
+
+        // validate the stats for the start operator.
+        {
+            final BOpStats stats = statsMap.get(startId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("start: " + stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+        // validate the stats for the 1st join operator.
+        {
+            final BOpStats stats = statsMap.get(joinId1);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("join1: " + stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+        // validate the stats for the 2nd join operator.
+        {
+            final BOpStats stats = statsMap.get(joinId2);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("join2: " + stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+    }
+    
+    /**
+     * Unit test for {@link ConditionalRoutingOp}. This test case tests when the
+     * condition is false (the joins are skipped).
+     */
+    public void test_query_join2_conditionalRoutingFalse() throws Exception {
+        int startId = 1;
+        int joinId1 = 2;
+        int joinId2 = 3;
+        
+        // 'x' is actually bound to "Mary" so this condition will be false.
+        IConstraint condition = new EQConstant(Var.var("x"), new Constant<String>("Fred"));
+        
+        RunningQuery runningQuery = initQueryWithConditionalRoutingOp(condition, startId, joinId1, joinId2);
+
+        // verify solutions.
+        {
+            // the expected solution.
+            final IBindingSet[] expected = new IBindingSet[] {//
+            new ArrayBindingSet(//
+                    new IVariable[] { Var.var("x")},//
+                    new IConstant[] { new Constant<String>("Mary")}//
+            ) };
+
+            assertSameSolutions(expected, runningQuery.iterator());
+        
+        }
+
+        // Wait until the query is done.
+        runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
+        {
+            // validate the stats map.
+            assertNotNull(statsMap);
+            log.info(statsMap.toString());
+            assertEquals(5, statsMap.size());
+        }
+
+        // validate the stats for the start operator.
+        {
+            final BOpStats stats = statsMap.get(startId);
+            assertNotNull(stats);
+            
+            if (log.isInfoEnabled())
+                log.info("start: " + stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+        
+        // validate the stats for the 1st join operator. This will have been skipped
+        // and so the counts will be 0.
+        {
+            final BOpStats stats = statsMap.get(joinId1);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("join1: " + stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(0L, stats.chunksIn.get());
+            assertEquals(0L, stats.unitsIn.get());
+            assertEquals(0L, stats.unitsOut.get());
+            assertEquals(0L, stats.chunksOut.get());
+        }
+
+        // validate the stats for the 2nd join operator.  This will have been skipped
+        // and so the counts will be 0.
+        {
+            final BOpStats stats = statsMap.get(joinId2);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("join2: " + stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(0L, stats.chunksIn.get());
+            assertEquals(0L, stats.unitsIn.get());
+            assertEquals(0L, stats.unitsOut.get());
+            assertEquals(0L, stats.chunksOut.get());
+        }
+    }
+    
+    /**
+     * Helper method to initialize a BOp tree that includes a ConditionalRoutinOp
+     * 
+     * @param condition the condition to be tested in the ConditionalalRoutingOp
+     * @param startId   the bopId of the startOp
+     * @param joinId1   the bopId of the first join
+     * @param joinId2   the bopId of the second join
+     * 
+     * @return          the RunningQuery created
+     * 
+     * @throws Exception
+     */
+    private RunningQuery initQueryWithConditionalRoutingOp(IConstraint condition, int startId, int joinId1, int joinId2) throws Exception {
+        final int predId1 = 10;
+        final int predId2 = 11;
+        final int condId = 12;
+        final int sliceId = 13;
+
+        final PipelineOp startOp = new StartOp(new BOp[] {},
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, startId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
+                        }));
+        
+        final Predicate<?> pred1Op = new Predicate<E>(new IVariableOrConstant[] {
+                Var.var("x"), Var.var("y") }, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId1),//
+                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                }));
+        
+        final Predicate<?> pred2Op = new Predicate<E>(new IVariableOrConstant[] {
+                Var.var("y"), Var.var("z") }, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId2),//
+                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                }));
+        
+        final ConditionalRoutingOp cond = new ConditionalRoutingOp(new BOp[]{startOp},
+                        NV.asMap(new NV[]{//
+                            new NV(BOp.Annotations.BOP_ID,condId),
+                            new NV(PipelineOp.Annotations.SINK_REF, joinId1),
+                            new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId),
+                            new NV(ConditionalRoutingOp.Annotations.CONDITION, condition),
+                        }));
+        
+        final PipelineOp join1Op = new PipelineJoin<E>(//
+                cond, pred1Op,//
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, joinId1),//
+                        }));
+        
+        final PipelineOp join2Op = new PipelineJoin<E>(//
+                join1Op, pred2Op, //
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, joinId2),//
+                        }));
+        
+        final PipelineOp sliceOp = new SliceOp(//
+                        new BOp[]{join2Op},
+                        NV.asMap(new NV[] {//
+                                new NV(BOp.Annotations.BOP_ID, sliceId),//
+                                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                        BOpEvaluationContext.CONTROLLER),//
+                                }));
+
+        final PipelineOp query = sliceOp;
+
+        // start the query.
+        final UUID queryId = UUID.randomUUID();
+        final IChunkMessage<IBindingSet> initialChunkMessage;
+        {            
+            final IBindingSet initialBindings = new HashBindingSet();
+            initialBindings.set(Var.var("x"), new Constant<String>("Mary"));
+
+            initialChunkMessage = new LocalChunkMessage<IBindingSet>(queryEngine,
+                    queryId, startId,//
+                    -1, // partitionId
+                    newBindingSetIterator(initialBindings));
+        }
+        
+        RunningQuery runningQuery = queryEngine.eval(queryId, query,initialChunkMessage);
+        
+        return runningQuery;
     }
 
     /**
