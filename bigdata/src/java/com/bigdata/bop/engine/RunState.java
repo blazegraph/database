@@ -185,7 +185,7 @@ class RunState {
      * readily exposed as {@link Map} object. If we were to expose the map, it
      * would have to be via a get(key) style interface.
      */
-    /* private */final Map<Integer/* bopId */, AtomicLong/* availableChunkCount */> availableMap = new ConcurrentHashMap<Integer, AtomicLong>();
+    /* private */final Map<Integer/* bopId */, AtomicLong/* availableChunkCount */> availableMap = new LinkedHashMap<Integer, AtomicLong>();
 
     /**
      * A collection reporting on the #of instances of a given {@link BOp} which
@@ -412,71 +412,71 @@ class RunState {
 
     }
 
-    /**
-     * Update the {@link RunState} to indicate that the data in the
-     * {@link IChunkMessage} was attached to an already running task for the
-     * target operator.
-     * 
-     * @param msg
-     * @param runningOnServiceId
-     * @return <code>true</code> if this is the first time we will evaluate the
-     *         op.
-     * 
-     * @throws IllegalArgumentException
-     *             if the argument is <code>null</code>.
-     * @throws TimeoutException
-     *             if the deadline for the query has passed.
-     */
-    synchronized 
-    public void addSource(final IChunkMessage<?> msg,
-            final UUID runningOnServiceId) throws TimeoutException {
-
-        if (msg == null)
-            throw new IllegalArgumentException();
-
-        if (allDone.get())
-            throw new IllegalStateException(ERR_QUERY_HALTED);
-
-        if (deadline < System.currentTimeMillis())
-            throw new TimeoutException(ERR_DEADLINE);
-
-        nsteps.incrementAndGet();
-
-        final int bopId = msg.getBOpId();
-        final int nmessages = 1;
-
-        if (runningMap.get(bopId) == null) {
-            /*
-             * Note: There is a race condition in RunningQuery such that it is
-             * possible to add a 2nd source to an operator task before the task
-             * has begun to execute. Since the task calls startOp() once it
-             * begins to execute, this means that addSource() can be ordered
-             * before startOp() for the same task. This code block explicitly
-             * allows this condition and sets a 0L in the runningMap for the
-             * [bopId].
-             */
-            AtomicLong n = runningMap.get(bopId);
-            if (n == null)
-                runningMap.put(bopId, n = new AtomicLong());
-//          throw new AssertionError(ERR_OP_NOT_STARTED + " msg=" + msg
-//          + ", this=" + this);
-        }
-
-        messagesConsumed(bopId, nmessages);
-
-        if (TableLog.tableLog.isInfoEnabled()) {
-            TableLog.tableLog.info(getTableRow("addSrc", runningOnServiceId,
-                    bopId, msg.getPartitionId(), nmessages/* fanIn */,
-                    null/* cause */, null/* stats */));
-        }
-
-        if (log.isInfoEnabled())
-            log.info("startOp: " + toString() + " : bop=" + bopId);
-
-        if (log.isTraceEnabled())
-            log.trace(msg.toString());
-
-    }
+//    /**
+//     * Update the {@link RunState} to indicate that the data in the
+//     * {@link IChunkMessage} was attached to an already running task for the
+//     * target operator.
+//     * 
+//     * @param msg
+//     * @param runningOnServiceId
+//     * @return <code>true</code> if this is the first time we will evaluate the
+//     *         op.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if the argument is <code>null</code>.
+//     * @throws TimeoutException
+//     *             if the deadline for the query has passed.
+//     */
+//    synchronized 
+//    public void addSource(final IChunkMessage<?> msg,
+//            final UUID runningOnServiceId) throws TimeoutException {
+//
+//        if (msg == null)
+//            throw new IllegalArgumentException();
+//
+//        if (allDone.get())
+//            throw new IllegalStateException(ERR_QUERY_HALTED);
+//
+//        if (deadline < System.currentTimeMillis())
+//            throw new TimeoutException(ERR_DEADLINE);
+//
+//        nsteps.incrementAndGet();
+//
+//        final int bopId = msg.getBOpId();
+//        final int nmessages = 1;
+//
+//        if (runningMap.get(bopId) == null) {
+//            /*
+//             * Note: There is a race condition in RunningQuery such that it is
+//             * possible to add a 2nd source to an operator task before the task
+//             * has begun to execute. Since the task calls startOp() once it
+//             * begins to execute, this means that addSource() can be ordered
+//             * before startOp() for the same task. This code block explicitly
+//             * allows this condition and sets a 0L in the runningMap for the
+//             * [bopId].
+//             */
+//            AtomicLong n = runningMap.get(bopId);
+//            if (n == null)
+//                runningMap.put(bopId, n = new AtomicLong());
+////          throw new AssertionError(ERR_OP_NOT_STARTED + " msg=" + msg
+////          + ", this=" + this);
+//        }
+//
+//        messagesConsumed(bopId, nmessages);
+//
+//        if (TableLog.tableLog.isInfoEnabled()) {
+//            TableLog.tableLog.info(getTableRow("addSrc", runningOnServiceId,
+//                    bopId, msg.getPartitionId(), nmessages/* fanIn */,
+//                    null/* cause */, null/* stats */));
+//        }
+//
+//        if (log.isInfoEnabled())
+//            log.info("startOp: " + toString() + " : bop=" + bopId);
+//
+//        if (log.isTraceEnabled())
+//            log.trace(msg.toString());
+//
+//    }
     
     /**
      * Update the {@link RunState} to reflect the post-condition of the

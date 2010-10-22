@@ -40,6 +40,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -126,7 +127,7 @@ public class TestMemorySortOp extends TestCase2 {
 
         IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]> ( new IBindingSet [][] { data } ) ;
 
-        IBlockingBuffer<IBindingSet[]> sink = query.newBuffer ( stats ) ;
+        IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
 
         BOpContext<IBindingSet> context = new BOpContext<IBindingSet> ( new MockRunningQuery ( null/* fed */
                                                                                              , null/* indexManager */

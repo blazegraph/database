@@ -46,7 +46,6 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.io.DirectBufferPoolAllocator.IAllocation;
 import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.ResourceService;
 
@@ -153,7 +152,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
     public NIOChunkMessage(final IQueryClient queryController,
             final UUID queryId, final int sinkId, final int partitionId,
             final IAllocationContext allocationContext,
-            final IBlockingBuffer<E[]> source,
+            final E[] source,
             final InetSocketAddress addr) {
 
         if (queryController == null)
@@ -206,7 +205,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
      */
     static private <E> List<IAllocation> moveToNIOBuffers(
             final IAllocationContext allocationContext,
-            final IBlockingBuffer<E[]> source,
+            final E[] source,
             final AtomicInteger nsolutions) {
         
         int nbytes = 0;
@@ -215,14 +214,14 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
         
         final List<IAllocation> allocations = new LinkedList<IAllocation>();
         
-        final IAsynchronousIterator<E[]> itr = source.iterator();
-        
-        try {
-
-            while (itr.hasNext()) {
+//        final IAsynchronousIterator<E[]> itr = source.iterator();
+//        
+//        try {
+//
+//            while (itr.hasNext()) {
 
                 // Next chunk to be serialized.
-                final E[] chunk = itr.next();
+                final E[] chunk = source;//itr.next();
                 
                 // track #of solutions.
                 n += chunk.length;
@@ -254,17 +253,17 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
                 }
                 
-            }
+//            }
             
             nsolutions.addAndGet(n);
 
             return allocations;
             
-        } finally {
-
-            itr.close();
-
-        }
+//        } finally {
+//
+//            itr.close();
+//
+//        }
 
     }
 

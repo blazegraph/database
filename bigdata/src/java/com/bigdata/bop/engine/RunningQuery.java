@@ -28,6 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
@@ -36,7 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -55,13 +58,12 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NoSuchBOpException;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.solutions.SliceOp;
-import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.relation.accesspath.MultiplexBlockingBuffer;
+import com.bigdata.relation.accesspath.IMultiSourceAsynchronousIterator;
+import com.bigdata.relation.accesspath.MultiSourceSequentialAsynchronousIterator;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.Haltable;
@@ -85,6 +87,12 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
      * controller is attempted on some other {@link IQueryPeer}.
      */
     static protected final String ERR_NOT_CONTROLLER = "Operator only permitted on the query controller";
+
+    /**
+     * Error message used when a request is made after the query has stopped
+     * executing.
+     */
+    static protected final String ERR_QUERY_DONE = "Query is no longer running";
     
     /**
      * The class executing the query on this node.
@@ -141,67 +149,66 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
      * A collection of (bopId,partitionId) keys mapped onto a collection of
      * operator task evaluation contexts for currently executing operators for
      * this query.
-     * 
-     * @todo Futures are not being cleared from this collection as operators
-     *       complete. This should be done systematically in order to ensure
-     *       that any allocations associated with an operator task execution are
-     *       released in a timely manner for long-running operators. (In fact,
-     *       the {@link IAllocationContext} should take care of most of the
-     *       issues here but we could still wind up with a lot of entries in
-     *       this map in scale-out where there can be up to one per bop per
-     *       shard in a given query.)
      */
     private final ConcurrentHashMap<BSBundle, ChunkFutureTask> operatorFutures;
 
+    /**
+     * A map of unbounded work queues for each (bopId,partitionId). Empty queues
+     * are removed from the map.
+     * <p>
+     * The map is guarded by the {@link #lock}.
+     */
+    private final Map<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>> operatorQueues;
+    
     /**
      * The runtime statistics for each {@link BOp} in the query and
      * <code>null</code> unless this is the query controller.
      */
     final private ConcurrentHashMap<Integer/* bopId */, BOpStats> statsMap;
 
-    /**
-     * When running in stand alone, we can chain together the operators and have
-     * much higher throughput. Each operator has an {@link BlockingBuffer} which
-     * is essentially its input queue. The operator will drain its input queue
-     * using {@link BlockingBuffer#iterator()}.
-     * <p>
-     * Each operator closes its {@link IBlockingBuffer} sink(s) once its own
-     * source has been closed and it has finished processing that source. Since
-     * multiple producers can target the same operator, we need a means to
-     * ensure that the source for the target operator is not closed until each
-     * producer which targets that operator has closed its corresponding sink.
-     * <p>
-     * In order to support this many-to-one producer/consumer pattern, we wrap
-     * the input queue (a {@link BlockingBuffer}) for each operator having
-     * multiple sources with a {@link MultiplexBlockingBuffer}. This class gives
-     * each producer their own view on the underlying {@link BlockingBuffer}.
-     * The underlying {@link BlockingBuffer} will not be closed until all
-     * source(s) have closed their view of that buffer. This collection keeps
-     * track of the {@link MultiplexBlockingBuffer} wrapping the
-     * {@link BlockingBuffer} which is the input queue for each operator.
-     * <p>
-     * The input queues themselves are {@link BlockingBuffer} objects. Those
-     * objects are available from this map using
-     * {@link MultiplexBlockingBuffer#getBackingBuffer()}. These buffers are
-     * pre-allocated by {@link #populateInputBufferMap(BOp)}.
-     * {@link #startTasks(BOp)} is responsible for starting the operator tasks
-     * in a "back-to-front" order. {@link #startQuery(IChunkMessage)} kicks off
-     * the query and invokes {@link #startTasks(BOp)} to chain the input queues
-     * and output queues together (when so chained, the output queues are skins
-     * over the input queues obtained from {@link MultiplexBlockingBuffer}).
-     * 
-     * FIXME The inputBufferMap will let us construct consumer producer chains
-     * where the consumer _waits_ for all producer(s) which target the consumer
-     * to close the sink associated with that consumer. Unlike when attaching an
-     * {@link IChunkMessage} to an already running operator, the consumer will
-     * NOT terminate (due to lack up input) until each running producer
-     * terminating that consumer terminates. This will improve concurrency,
-     * result in fewer task instances, and have better throughput than attaching
-     * a chunk to an already running task. However, in scale-out we will have
-     * tasks running on different nodes so we can not always chain together the
-     * producer and consumer in this tightly integrated manner.
-     */
-    final private ConcurrentHashMap<Integer/*operator*/, MultiplexBlockingBuffer<IBindingSet[]>/*inputQueue*/> inputBufferMap;
+//    /**
+//     * When running in stand alone, we can chain together the operators and have
+//     * much higher throughput. Each operator has an {@link BlockingBuffer} which
+//     * is essentially its input queue. The operator will drain its input queue
+//     * using {@link BlockingBuffer#iterator()}.
+//     * <p>
+//     * Each operator closes its {@link IBlockingBuffer} sink(s) once its own
+//     * source has been closed and it has finished processing that source. Since
+//     * multiple producers can target the same operator, we need a means to
+//     * ensure that the source for the target operator is not closed until each
+//     * producer which targets that operator has closed its corresponding sink.
+//     * <p>
+//     * In order to support this many-to-one producer/consumer pattern, we wrap
+//     * the input queue (a {@link BlockingBuffer}) for each operator having
+//     * multiple sources with a {@link MultiplexBlockingBuffer}. This class gives
+//     * each producer their own view on the underlying {@link BlockingBuffer}.
+//     * The underlying {@link BlockingBuffer} will not be closed until all
+//     * source(s) have closed their view of that buffer. This collection keeps
+//     * track of the {@link MultiplexBlockingBuffer} wrapping the
+//     * {@link BlockingBuffer} which is the input queue for each operator.
+//     * <p>
+//     * The input queues themselves are {@link BlockingBuffer} objects. Those
+//     * objects are available from this map using
+//     * {@link MultiplexBlockingBuffer#getBackingBuffer()}. These buffers are
+//     * pre-allocated by {@link #populateInputBufferMap(BOp)}.
+//     * {@link #startTasks(BOp)} is responsible for starting the operator tasks
+//     * in a "back-to-front" order. {@link #startQuery(IChunkMessage)} kicks off
+//     * the query and invokes {@link #startTasks(BOp)} to chain the input queues
+//     * and output queues together (when so chained, the output queues are skins
+//     * over the input queues obtained from {@link MultiplexBlockingBuffer}).
+//     * 
+//     * FIXME The inputBufferMap will let us construct consumer producer chains
+//     * where the consumer _waits_ for all producer(s) which target the consumer
+//     * to close the sink associated with that consumer. Unlike when attaching an
+//     * {@link IChunkMessage} to an already running operator, the consumer will
+//     * NOT terminate (due to lack up input) until each running producer
+//     * terminating that consumer terminates. This will improve concurrency,
+//     * result in fewer task instances, and have better throughput than attaching
+//     * a chunk to an already running task. However, in scale-out we will have
+//     * tasks running on different nodes so we can not always chain together the
+//     * producer and consumer in this tightly integrated manner.
+//     */
+//    final private ConcurrentHashMap<Integer/*operator*/, MultiplexBlockingBuffer<IBindingSet[]>/*inputQueue*/> inputBufferMap;
 
     /**
      * The buffer used for the overall output of the query pipeline.
@@ -244,14 +251,14 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
      */
     final AtomicBoolean didQueryTearDown = new AtomicBoolean(false);
 
-    /**
-     * The chunks available for immediate processing (they must have been
-     * materialized).
-     * <p>
-     * Note: This is package private so it will be visible to the
-     * {@link QueryEngine}.
-     */
-    final/* private */BlockingQueue<IChunkMessage<IBindingSet>> chunksIn = new LinkedBlockingDeque<IChunkMessage<IBindingSet>>();
+//    /**
+//     * The chunks available for immediate processing (they must have been
+//     * materialized).
+//     * <p>
+//     * Note: This is package private so it will be visible to the
+//     * {@link QueryEngine}.
+//     */
+//    final/* private */BlockingQueue<IChunkMessage<IBindingSet>> chunksIn = new LinkedBlockingDeque<IChunkMessage<IBindingSet>>();
 
     /**
      * Set the query deadline. The query will be cancelled when the deadline is
@@ -368,6 +375,21 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
     }
 
     /**
+     * Lookup and return the {@link BOp} with that identifier using an index.
+     * 
+     * @param bopId
+     *            The identifier.
+     *            
+     * @return The {@link BOp} -or- <code>null</code> if no {@link BOp} was
+     *         found in the query with for that identifier.
+     */
+    public BOp getBOp(final int bopId) {
+        
+        return bopIndex.get(bopId);
+        
+    }
+    
+    /**
      * @param queryEngine
      *            The {@link QueryEngine} on which the query is running. In
      *            scale-out, a query is typically instantiated on many
@@ -430,6 +452,8 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
         this.operatorFutures = new ConcurrentHashMap<BSBundle, ChunkFutureTask>();
         
+        this.operatorQueues = new LinkedHashMap<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>>();
+        
         /*
          * Setup the BOpStats object for each pipeline operator in the query.
          */
@@ -445,7 +469,8 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
                 final BOpStats queryStats = statsMap.get(query.getId());
 
-                queryBuffer = query.newBuffer(queryStats);
+                queryBuffer = new BlockingBufferWithStats<IBindingSet[]>(query,
+                        queryStats);
 
                 queryIterator = new QueryResultIterator<IBindingSet[]>(this,
                         queryBuffer.iterator());
@@ -467,31 +492,31 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
             
         }
 
-        if(!queryEngine.isScaleOut()) {
-            /*
-             * Since the query engine is using the stand alone database mode we
-             * will now setup the input queues for each operator. Those queues
-             * will be used by each operator which targets a given operator.
-             * Each operator will start once and will run until all of its
-             * source(s) are closed.
-             * 
-             * This allocates the buffers in a top-down manner (this is the
-             * reverse of the pipeline evaluation order). Allocation halts at if
-             * we reach an operator without children (e.g., StartOp) or an
-             * operator which is a CONTROLLER (Union). (If allocation does not
-             * halt at those boundaries then we can allocate buffers which will
-             * not be used. On the one hand, the StartOp receives a message
-             * containing the chunk to be evaluated. On the other hand, the
-             * buffers are not shared between the parent and a subquery so
-             * allocation within the subquery is wasted. This is also true for
-             * the [statsMap].)
-             */
-            inputBufferMap = null;
-//            inputBufferMap = new ConcurrentHashMap<Integer, MultiplexBlockingBuffer<IBindingSet[]>>();
-//            populateInputBufferMap(query);
-        } else {
-            inputBufferMap = null;
-        }
+//        if(!queryEngine.isScaleOut()) {
+//            /*
+//             * Since the query engine is using the stand alone database mode we
+//             * will now setup the input queues for each operator. Those queues
+//             * will be used by each operator which targets a given operator.
+//             * Each operator will start once and will run until all of its
+//             * source(s) are closed.
+//             * 
+//             * This allocates the buffers in a top-down manner (this is the
+//             * reverse of the pipeline evaluation order). Allocation halts at if
+//             * we reach an operator without children (e.g., StartOp) or an
+//             * operator which is a CONTROLLER (Union). (If allocation does not
+//             * halt at those boundaries then we can allocate buffers which will
+//             * not be used. On the one hand, the StartOp receives a message
+//             * containing the chunk to be evaluated. On the other hand, the
+//             * buffers are not shared between the parent and a subquery so
+//             * allocation within the subquery is wasted. This is also true for
+//             * the [statsMap].)
+//             */
+//            inputBufferMap = null;
+////            inputBufferMap = new ConcurrentHashMap<Integer, MultiplexBlockingBuffer<IBindingSet[]>>();
+////            populateInputBufferMap(query);
+//        } else {
+//            inputBufferMap = null;
+//        }
         
     }
 
@@ -562,138 +587,95 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 //
 //    }
 
-    /**
-     * Take a chunk generated by some pass over an operator and make it
-     * available to the target operator. How this is done depends on whether the
-     * query is running against a standalone database or the scale-out database.
-     * <p>
-     * Note: The return value is used as part of the termination criteria for
-     * the query.
-     * <p>
-     * The default implementation supports a standalone database. The generated
-     * chunk is left on the Java heap and handed off synchronously using
-     * {@link QueryEngine#acceptChunk(IChunkMessage)}. That method will queue
-     * the chunk for asynchronous processing.
-     * 
-     * @param bop
-     *            The operator which wrote on the sink.
-     * @param sinkId
-     *            The identifier of the target operator.
-     * @param sink
-     *            The intermediate results to be passed to that target operator.
-     * 
-     * @return The #of {@link IChunkMessage} sent. This will always be ONE (1)
-     *         for scale-up. For scale-out, there will be at least one
-     *         {@link IChunkMessage} per index partition over which the
-     *         intermediate results were mapped.
-     */
-    protected <E> int handleOutputChunk(final BOp bop, final int sinkId,
-            final IBlockingBuffer<IBindingSet[]> sink) {
-
-        if (bop == null)
-            throw new IllegalArgumentException();
-
-        if (sink == null)
-            throw new IllegalArgumentException();
-
-        if (inputBufferMap != null && inputBufferMap.get(sinkId) != null) {
-            /*
-             * FIXME The sink is just a wrapper for the input buffer so we do
-             * not need to do anything to propagate the data from one operator
-             * to the next.
-             */
-            return 0;
-        }
-        
-        /*
-         * Note: The partitionId will always be -1 in scale-up.
-         */
-        final int partitionId = -1;
-
-        final boolean oneMessagePerChunk = bop.getProperty(
-                QueryEngineTestAnnotations.ONE_MESSAGE_PER_CHUNK,
-                QueryEngineTestAnnotations.DEFAULT_ONE_MESSAGE_PER_CHUNK);
-
-        if (oneMessagePerChunk) {
-
-            final IAsynchronousIterator<IBindingSet[]> itr = sink.iterator();
-
-            int nchunks = 0;
-
-            while (itr.hasNext()) {
-
-                final IBlockingBuffer<IBindingSet[]> tmp = new BlockingBuffer<IBindingSet[]>(
-                        1);
-
-                tmp.add(itr.next());
-
-                tmp.close();
-
-                final LocalChunkMessage<IBindingSet> chunk = new LocalChunkMessage<IBindingSet>(
-                        clientProxy, queryId, sinkId, partitionId, tmp
-                                .iterator());
-
-                queryEngine.acceptChunk(chunk);
-
-                nchunks++;
-
-            }
-
-            return nchunks;
-
-        }
-
-        final LocalChunkMessage<IBindingSet> chunk = new LocalChunkMessage<IBindingSet>(
-                clientProxy, queryId, sinkId, partitionId, sink.iterator());
-
-        queryEngine.acceptChunk(chunk);
-
-        return 1;
-
-    }
-
-    /**
-     * Make a chunk of binding sets available for consumption by the query.
-     * <p>
-     * Note: this is invoked by {@link QueryEngine#acceptChunk(IChunkMessage)}
-     * 
-     * @param msg
-     *            The chunk.
-     * 
-     * @todo Does this method really need the {@link #lock}? I doubt it since
-     *       {@link #chunksIn} is thread-safe.
-     */
-    protected void acceptChunk(final IChunkMessage<IBindingSet> msg) {
-
-        if (msg == null)
-            throw new IllegalArgumentException();
-
-        if (!msg.isMaterialized())
-            throw new IllegalStateException();
-
-        lock.lock();
-        
-        try {
-
-            // verify still running.
-            if (future.isDone()) {
-                throw new RuntimeException("Query is done", future.getCause());
-            }
-
-            // add chunk to be consumed.
-            chunksIn.add(msg);
-
-            if (log.isDebugEnabled())
-                log
-                        .debug("chunksIn.size()=" + chunksIn.size() + ", msg="
-                                + msg);
-        } finally {
-
-            lock.unlock();
-
-        }
-
-    }
+//    /**
+//     * Take a chunk generated by some pass over an operator and make it
+//     * available to the target operator. How this is done depends on whether the
+//     * query is running against a standalone database or the scale-out database.
+//     * <p>
+//     * Note: The return value is used as part of the termination criteria for
+//     * the query.
+//     * <p>
+//     * The default implementation supports a standalone database. The generated
+//     * chunk is left on the Java heap and handed off synchronously using
+//     * {@link QueryEngine#acceptChunk(IChunkMessage)}. That method will queue
+//     * the chunk for asynchronous processing.
+//     * 
+//     * @param bop
+//     *            The operator which wrote on the sink.
+//     * @param sinkId
+//     *            The identifier of the target operator.
+//     * @param sink
+//     *            The intermediate results to be passed to that target operator.
+//     * 
+//     * @return The #of {@link IChunkMessage} sent. This will always be ONE (1)
+//     *         for scale-up. For scale-out, there will be at least one
+//     *         {@link IChunkMessage} per index partition over which the
+//     *         intermediate results were mapped.
+//     */
+//    protected <E> int handleOutputChunk(final BOp bop, final int sinkId,
+//            final IBlockingBuffer<IBindingSet[]> sink) {
+//
+//        if (bop == null)
+//            throw new IllegalArgumentException();
+//
+//        if (sink == null)
+//            throw new IllegalArgumentException();
+//
+//        if (inputBufferMap != null && inputBufferMap.get(sinkId) != null) {
+//            /*
+//             * FIXME The sink is just a wrapper for the input buffer so we do
+//             * not need to do anything to propagate the data from one operator
+//             * to the next.
+//             */
+//            return 0;
+//        }
+//        
+//        /*
+//         * Note: The partitionId will always be -1 in scale-up.
+//         */
+//        final int partitionId = -1;
+//
+//        final boolean oneMessagePerChunk = bop.getProperty(
+//                QueryEngineTestAnnotations.ONE_MESSAGE_PER_CHUNK,
+//                QueryEngineTestAnnotations.DEFAULT_ONE_MESSAGE_PER_CHUNK);
+//
+//        if (oneMessagePerChunk) {
+//
+//            final IAsynchronousIterator<IBindingSet[]> itr = sink.iterator();
+//
+//            int nchunks = 0;
+//
+//            while (itr.hasNext()) {
+//
+//                final IBlockingBuffer<IBindingSet[]> tmp = new BlockingBuffer<IBindingSet[]>(
+//                        1);
+//
+//                tmp.add(itr.next());
+//
+//                tmp.close();
+//
+//                final LocalChunkMessage<IBindingSet> chunk = new LocalChunkMessage<IBindingSet>(
+//                        clientProxy, queryId, sinkId, partitionId, tmp
+//                                .iterator());
+//
+//                queryEngine.acceptChunk(chunk);
+//
+//                nchunks++;
+//
+//            }
+//
+//            return nchunks;
+//
+//        }
+//
+//        final LocalChunkMessage<IBindingSet> chunk = new LocalChunkMessage<IBindingSet>(
+//                clientProxy, queryId, sinkId, partitionId, sink.iterator());
+//
+//        queryEngine.acceptChunk(chunk);
+//
+//        return 1;
+//
+//    }
 
     /**
      * Invoked once by the query controller with the initial
@@ -949,155 +931,254 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
     }
 
+//    /**
+//     * Consume zero or more chunks in the input queue for this query. The
+//     * chunk(s) will either be assigned to an already running task for the
+//     * target operator or they will be assigned to new tasks.
+//     * 
+//     * FIXME Drain the input queue, assigning any chunk waiting to a task. If
+//     * the task is already running, then add the chunk to that task. Otherwise
+//     * start a new task.
+//     */
+//    protected void consumeChunk() {
+//        final IChunkMessage<IBindingSet> msg = chunksIn.poll();
+//        if (msg == null)
+//            return;
+//        try {
+//            if (!msg.isMaterialized())
+//                throw new IllegalStateException();
+//            if (log.isTraceEnabled())
+//                log.trace("Accepted chunk: " + msg);
+//            final BSBundle bundle = new BSBundle(msg.getBOpId(), msg
+//                    .getPartitionId());
+////            /*
+////             * Look for instance of this task which is already running.
+////             */
+////            final ChunkFutureTask chunkFutureTask = operatorFutures.get(bundle);
+////            if (!queryEngine.isScaleOut() && chunkFutureTask != null) {
+////                /*
+////                 * Attempt to atomically attach the message as another src.
+////                 */
+////                if (chunkFutureTask.chunkTask.context.addSource(msg
+////                        .getChunkAccessor().iterator())) {
+////                    /*
+////                     * @todo I've commented this out for now. I am not convinced
+////                     * that we need to update the RunState when accepting
+////                     * another message into a running task. This would only
+////                     * matter if haltOp() reported the #of consumed messages,
+////                     * but RunState.haltOp() just decrements the #of available
+////                     * messages by one which balances startOp(). Just because we
+////                     * attach more messages dynamically does not mean that we
+////                     * need to report that back to the query controller as long
+////                     * as haltOp() balances startOp().
+////                     */
+//////                    lock.lock();
+//////                    try {
+//////                        /*
+//////                         * message was added to a running task.
+//////                         * 
+//////                         * FIXME This needs to be an RMI in scale-out back to
+//////                         * the query controller so it can update the #of
+//////                         * messages which are being consumed by this task.
+//////                         * However, doing RMI here will add latency into the
+//////                         * thread submitting tasks for evaluation and the
+//////                         * coordination overhead of addSource() in scale-out may
+//////                         * be too high. However, if we do not combine sources in
+//////                         * scale-out then we may have too much overhead in terms
+//////                         * of the #of running tasks with few tuples per task.
+//////                         * Another approach is the remote async iterator with
+//////                         * multiple sources (parallel multi source iterator).
+//////                         * 
+//////                         * FIXME This code path is NOT being taken in scale-out
+//////                         * right now since it would not get the message to the
+//////                         * query controller. We will need to add addSource() to
+//////                         * IQueryClient parallel to startOp() and haltOp() for
+//////                         * this to work.
+//////                         */
+//////                        runState.addSource(msg, queryEngine.getServiceUUID());
+//////                        return;
+//////                    } finally {
+//////                        lock.unlock();
+//////                    }
+////                }
+////            }
+//            // wrap runnable.
+//            final ChunkFutureTask ft = new ChunkFutureTask(new ChunkTask(msg));
+//            /*
+//             * FIXME Rather than queue up a bunch of operator tasks for the same
+//             * (bopId,partitionId), this blocks until the current operator task
+//             * is done and then submits the new one. This prevents us from
+//             * allocating 100s of threads for complex queries and prevents us
+//             * from losing track of the Futures of those tasks. However, since
+//             * this is happening in the caller's thread the QueryEngine is not
+//             * making any progress while we are blocked. A pattern which hooks
+//             * the Future and then submits the next task (such as the
+//             * LatchedExecutor) would fix this. This might have to be one
+//             * LatchedExecutor per pipeline operator.
+//             */
+//            FutureTask<Void> existing = operatorFutures.putIfAbsent(bundle, ft);
+//            if (existing != null) {
+//                existing.get();
+//                if (!operatorFutures.remove(bundle, existing))
+//                    throw new AssertionError();
+//                if (operatorFutures.put(bundle, ft) != null)
+//                    throw new AssertionError();
+//            }
+////            // add to list of active futures for this query.
+////            if (operatorFutures.put(bundle, ft) != null) {
+////                /*
+////                 * Note: This can cause the FutureTask to be accessible (above)
+////                 * before startOp() has been called for that ChunkTask (the
+////                 * latter occurs when the chunk task actually runs.) This a race
+////                 * condition has been resolved in RunState by allowing
+////                 * addSource() even when there is no registered task running for
+////                 * that [bopId].
+////                 * 
+////                 * FIXME This indicates that we have more than one future for
+////                 * the same (bopId,shardId). When this is true we are losing
+////                 * track of Futures with the consequence that we can not
+////                 * properly cancel them. Instead of losing track like this, we
+////                 * should be targeting the running operator instance with the
+////                 * new chunk. This needs to be done atomically, e.g., using the
+////                 * [lock].
+////                 * 
+////                 * Even if we only have one task per operator in standalone and
+////                 * we attach chunks to an already running task in scale-out,
+////                 * there is still the possibility in scale-out that a task may
+////                 * have closed its source but still be running, in which case we
+////                 * would lose the Future for the already running task when we
+////                 * start a new task for the new chunk for the target operator.
+////                 */
+////                // throw new AssertionError();
+////            }
+//            // submit task for execution (asynchronous).
+//            queryEngine.execute(ft);
+//        } catch (Throwable ex) {
+//            // halt query.
+//            throw new RuntimeException(halt(ex));
+//        }
+//    }
+
     /**
-     * Consume zero or more chunks in the input queue for this query. The
-     * chunk(s) will either be assigned to an already running task for the
-     * target operator or they will be assigned to new tasks.
+     * Make a chunk of binding sets available for consumption by the query.
+     * <p>
+     * Note: this is invoked by {@link QueryEngine#acceptChunk(IChunkMessage)}
      * 
-     * FIXME Drain the input queue, assigning any chunk waiting to a task. If
-     * the task is already running, then add the chunk to that task. Otherwise
-     * start a new task.
+     * @param msg
+     *            The chunk.
+     */
+    protected void acceptChunk(final IChunkMessage<IBindingSet> msg) {
+
+        if (msg == null)
+            throw new IllegalArgumentException();
+
+        if (!msg.isMaterialized())
+            throw new IllegalStateException();
+
+        final BSBundle bundle = new BSBundle(msg.getBOpId(), msg
+                .getPartitionId());
+
+        lock.lock();
+
+        try {
+
+            // verify still running.
+            if (future.isDone())
+                throw new RuntimeException(ERR_QUERY_DONE, future.getCause());
+
+            BlockingQueue<IChunkMessage<IBindingSet>> queue = operatorQueues
+                    .get(bundle);
+
+            if (queue == null) {
+
+                queue = new LinkedBlockingQueue<IChunkMessage<IBindingSet>>(/* unbounded */);
+
+                operatorQueues.put(bundle, queue);
+
+            }
+
+            queue.add(msg);
+
+        } finally {
+
+            lock.unlock();
+
+        }
+
+    }
+
+    /**
+     * Examines the input queue for each (bopId,partitionId). If there is work
+     * available and no task is currently running, then drain the work queue and
+     * submit a task to consume that work.
      */
     protected void consumeChunk() {
-        final IChunkMessage<IBindingSet> msg = chunksIn.poll();
-        if (msg == null)
-            return;
+        lock.lock();
         try {
-            if (!msg.isMaterialized())
-                throw new IllegalStateException();
-            if (log.isTraceEnabled())
-                log.trace("Accepted chunk: " + msg);
-            final BSBundle bundle = new BSBundle(msg.getBOpId(), msg
-                    .getPartitionId());
-            /*
-             * Look for instance of this task which is already running.
-             */
-            final ChunkFutureTask chunkFutureTask = operatorFutures.get(bundle);
-            if (!queryEngine.isScaleOut() && chunkFutureTask != null) {
-                /*
-                 * Attempt to atomically attach the message as another src.
-                 */
-                if (chunkFutureTask.chunkTask.context.addSource(msg
-                        .getChunkAccessor().iterator())) {
-                    lock.lock();
-                    try {
-                        /*
-                         * message was added to a running task.
-                         * 
-                         * FIXME This needs to be an RMI in scale-out back to
-                         * the query controller so it can update the #of
-                         * messages which are being consumed by this task.
-                         * However, doing RMI here will add latency into the
-                         * thread submitting tasks for evaluation and the
-                         * coordination overhead of addSource() in scale-out may
-                         * be too high. However, if we do not combine sources in
-                         * scale-out then we may have too much overhead in terms
-                         * of the #of running tasks with few tuples per task.
-                         * Another approach is the remote async iterator with
-                         * multiple sources (parallel multi source iterator).
-                         * 
-                         * FIXME This code path is NOT being taken in scale-out
-                         * right now since it would not get the message to the
-                         * query controller. We will need to add addSource() to
-                         * IQueryClient parallel to startOp() and haltOp() for
-                         * this to work.
-                         */
-                        runState.addSource(msg, queryEngine.getServiceUUID());
-                        return;
-                    } finally {
-                        lock.unlock();
-                    }
-                }
+            for(BSBundle bundle : operatorQueues.keySet()) {
+                scheduleNext(bundle);
             }
-            // wrap runnable.
-            final ChunkFutureTask ft = new ChunkFutureTask(new ChunkTask(msg));
-            // add to list of active futures for this query.
-            if (operatorFutures.put(bundle, ft) != null) {
-                /*
-                 * Note: This can cause the FutureTask to be accessible (above)
-                 * before startOp() has been called for that ChunkTask (the
-                 * latter occurs when the chunk task actually runs.) This a race
-                 * condition has been resolved in RunState by allowing
-                 * addSource() even when there is no registered task running for
-                 * that [bopId].
-                 * 
-                 * FIXME This indicates that we have more than one future for
-                 * the same (bopId,shardId). When this is true we are losing
-                 * track of Futures with the consequence that we can not
-                 * properly cancel them. Instead of losing track like this, we
-                 * should be targeting the running operator instance with the
-                 * new chunk. This needs to be done atomically, e.g., using the
-                 * [lock].
-                 * 
-                 * Even if we only have one task per operator in standalone and
-                 * we attach chunks to an already running task in scale-out,
-                 * there is still the possibility in scale-out that a task may
-                 * have closed its source but still be running, in which case we
-                 * would lose the Future for the already running task when we
-                 * start a new task for the new chunk for the target operator.
-                 */
-                // throw new AssertionError();
-            }
-            // submit task for execution (asynchronous).
-            queryEngine.execute(ft);
-        } catch (Throwable ex) {
-            // halt query.
-            throw new RuntimeException(halt(ex));
+        } finally {
+            lock.unlock();
         }
     }
-    
-//    /**
-//     * Return a {@link FutureTask} which will consume the binding set chunk. The
-//     * caller must run the {@link FutureTask}.
-//     * 
-//     * @param chunk
-//     *            A chunk to be consumed.
-//     */
-//    private FutureTask<Void> newChunkTask(
-//            final IChunkMessage<IBindingSet> chunk) {
-//
-//        if (!chunk.isMaterialized())
-//            throw new IllegalStateException();
-//
-//        // create runnable to evaluate a chunk for an operator and partition.
-//        final ChunkTask chunkTask = new ChunkTask(chunk);
-//
-////        return wrapChunkTask(chunkTask);
-////
-////    }
-////    
-////    protected FutureTask<Void> wrapChunkTask(final ChunkTask chunkTask) {
-//
-//        final BSBundle bundle = new BSBundle(chunkTask.bopId,
-//                chunkTask.partitionId);
-//        
-//        // wrap runnable.
-//        final ChunkFutureTask f2 = new ChunkFutureTask(chunkTask);
-//
-//        // add to list of active futures for this query.
-//        if (operatorFutures.put(bundle, f2) != null) {
-//            /*
-//             * FIXME This indicates that we have more than one future for the
-//             * same (bopId,shardId). When this is true we are losing track of
-//             * Futures with the consequence that we can not properly cancel
-//             * them. Instead of losing track like this, we should be targeting
-//             * the running operator instance with the new chunk. This needs to
-//             * be done atomically, e.g., using the [lock].
-//             * 
-//             * Even if we only have one task per operator in standalone and we
-//             * attach chunks to an already running task in scale-out, there is
-//             * still the possibility in scale-out that a task may have closed
-//             * its source but still be running, in which case we would lose the
-//             * Future for the already running task when we start a new task for
-//             * the new chunk for the target operator.
-//             */
-////            throw new AssertionError();
-//        }
-//
-//        // return : caller will execute.
-//        return f2;
-//
-//    }
+
+    /**
+     * Examine the input queue for the (bopId,partitionId). If there is work
+     * available and no task is currently running, then drain the work queue and
+     * submit a task to consume that work.
+     * 
+     * @param bundle
+     *            The (bopId,partitionId).
+     *            
+     * @return <code>true</code> if a new task was started.
+     */
+    private boolean scheduleNext(final BSBundle bundle) {
+        if (bundle == null)
+            throw new IllegalArgumentException();
+        lock.lock();
+        try {
+            // Make sure the query is still running.
+            future.halted();
+            // Is there a Future for this (bopId,partitionId)?
+            final ChunkFutureTask cft = operatorFutures.get(bundle);
+            if (cft != null && !cft.isDone()) {
+                // already running.
+                return false;
+            }
+            // Remove the work queue for that (bopId,partitionId).
+            final BlockingQueue<IChunkMessage<IBindingSet>> queue = operatorQueues
+                    .remove(bundle);
+            if (queue == null || queue.isEmpty()) {
+                // no work
+                return false;
+            }
+            // Drain the work queue.
+            final List<IChunkMessage<IBindingSet>> messages = new LinkedList<IChunkMessage<IBindingSet>>();
+            queue.drainTo(messages);
+            final int nmessages = messages.size();
+            /*
+             * Combine the messages into a single source to be consumed by a
+             * task.
+             */
+            final IMultiSourceAsynchronousIterator<IBindingSet[]> source = new MultiSourceSequentialAsynchronousIterator<IBindingSet[]>(messages.remove(0).getChunkAccessor().iterator());
+            for (IChunkMessage<IBindingSet> msg : messages) {
+                source.add(msg.getChunkAccessor().iterator());
+            }
+            /*
+             * Create task to consume that source.
+             */
+            final ChunkFutureTask ft = new ChunkFutureTask(new ChunkTask(
+                    bundle.bopId, bundle.shardId, nmessages, source));
+            /*
+             * Submit task for execution (asynchronous).
+             */
+            queryEngine.execute(ft);
+            return true;
+        } finally {
+            lock.unlock();
+        }
+    }
 
     /**
      * A {@link FutureTask} which exposes the {@link ChunkTask} which is being
@@ -1142,20 +1223,41 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
         }
         
         public void run() {
+
+            // Run the task.
+            runOnce();
+            
+            // Schedule another task if any messages are waiting.
+            RunningQuery.this.scheduleNext(new BSBundle(
+                    t.bopId, t.partitionId));
+        }
+        
+        private void runOnce() {
+        
             final UUID serviceId = queryEngine.getServiceUUID();
-            final int messagesIn = 1; // accepted one IChunkMessage. FIXME
-                                      // Problem when chaining buffers?
             try {
+
                 /*
+                 * Notify query controller that operator task will start (sync
+                 * notification).
+                 * 
                  * Note: This is potentially an RMI back to the controller. It
                  * is invoked from within the running task in order to remove
                  * the latency for that RMI from the thread which submits tasks
                  * to consume chunks.
                  */
                 clientProxy.startOp(new StartOpMessage(queryId, t.bopId,
-                        t.partitionId, serviceId, messagesIn));
+                        t.partitionId, serviceId, t.messagesIn));
+
+                /*
+                 * Run the operator task.
+                 */
                 t.call();
-                // Send message to controller.
+
+                /*
+                 * Queue task to notify the query controller that operator task
+                 * did run (async notification).
+                 */
                 final HaltOpMessage msg = new HaltOpMessage(queryId, t.bopId,
                         t.partitionId, serviceId, null/* cause */, t.sinkId,
                         t.sinkMessagesOut.get(), t.altSinkId,
@@ -1168,6 +1270,7 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                     // e.g., service is shutting down.
                     log.error("Could not send message: " + msg, ex);
                 }
+                
             } catch (Throwable ex1) {
 
                 // Log an error.
@@ -1190,7 +1293,7 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                 try {
                     /*
                      * Queue a task to send the halt message to the query
-                     * controller.
+                     * controller (async notification).
                      */
                     t.context.getExecutorService().execute(
                             new SendHaltMessageTask(clientProxy, msg,
@@ -1205,19 +1308,10 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                 }
 
             }
-
-        }
+        
+        } // runOnce()
         
     }
-    
-//  final BOpContext<?> context = chunkTask.context;
-//  context.getSource().close();
-//  if (context.getSink() != null) {
-//      context.getSink().close();
-//  }
-//  if (context.getSink2() != null) {
-//      context.getSink2().close();
-//  }
 
     /**
      * Runnable evaluates an operator for some chunk of inputs. In scale-out,
@@ -1228,12 +1322,6 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
         /** Alias for the {@link ChunkTask}'s logger. */
         private final Logger log = chunkTaskLog;
-
-//        /**
-//         * The message with the materialized chunk to be consumed by the
-//         * operator.
-//         */
-//        final IChunkMessage<IBindingSet> msg;
 
         /** The index of the bop which is being evaluated. */
         private final int bopId;
@@ -1290,6 +1378,11 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
          */
         private final FutureTask<Void> ft;
 
+        /**
+         * The #of input messages.
+         */
+        final int messagesIn;
+        
         /** #of chunk messages out to sink. */
         final AtomicInteger sinkMessagesOut = new AtomicInteger(0);
 
@@ -1310,37 +1403,6 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
         }
 
         /**
-         * Create a task to consume a chunk. 
-         * 
-         * @param msg
-         *            A message containing the materialized chunk and metadata
-         *            about the operator which will consume that chunk.
-         * 
-         * @throws IllegalStateException
-         *             unless {@link IChunkMessage#isMaterialized()} is
-         *             <code>true</code>.
-         */
-        public ChunkTask(final IChunkMessage<IBindingSet> msg) {
-
-            this(msg.getBOpId(), msg.getPartitionId(), msg.getChunkAccessor()
-                    .iterator());
-
-        }
-
-//        /**
-//         * Alternative constructor used when chaining the operators together in
-//         * standalone. The input queue of an operator is wrapped and used as the
-//         * output queue of each operator which targets that operator as either
-//         * its default or alternative sink.
-//         */
-//        public ChunkTask(final int bopId) {
-//         
-//            this(bopId, -1/* partitionId */, inputBufferMap.get(bopId)
-//                    .getBackingBuffer().iterator());
-//            
-//        }
-
-        /**
          * Core implementation.
          * <p>
          * This looks up the {@link BOp} which is the target for the message in
@@ -1354,15 +1416,21 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
          * @param partitionId
          *            The partition identifier to which the message was
          *            addressed.
+         * @param messagesIn
+         *            The number of {@link IChunkMessage} to be consumed by this
+         *            task.
          * @param source
          *            Where the task will read its inputs.
          */
         public ChunkTask(final int bopId, final int partitionId,
+                final int messagesIn,
                 final IAsynchronousIterator<IBindingSet[]> src) {
 
             this.bopId = bopId;
             
             this.partitionId = partitionId;
+         
+            this.messagesIn = messagesIn;
             
             bop = bopIndex.get(bopId);
             
@@ -1425,11 +1493,12 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
             }
             assert stats != null;
 
-            sink = (p == null ? queryBuffer : newBuffer(op, sinkId, stats));
+            sink = (p == null ? queryBuffer : newBuffer(op, sinkId,
+                    sinkMessagesOut, stats));
 
             altSink = altSinkId == null ? null
-                    : altSinkId.equals(sinkId) ? sink : newBuffer(op, sinkId,
-                            stats);
+                    : altSinkId.equals(sinkId) ? sink : newBuffer(op,
+                            altSinkId, altSinkMessagesOut, stats);
 
             // context : @todo pass in IChunkMessage or IChunkAccessor
             context = new BOpContext<IBindingSet>(RunningQuery.this,
@@ -1458,18 +1527,32 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
          *         target that sink.
          */
         private IBlockingBuffer<IBindingSet[]> newBuffer(final PipelineOp op,
-                final int sinkId, final BOpStats stats) {
+                final int sinkId, final AtomicInteger sinkMessagesOut, final BOpStats stats) {
 
-            final MultiplexBlockingBuffer<IBindingSet[]> factory = inputBufferMap == null ? null
-                    : inputBufferMap.get(sinkId);
+//            final MultiplexBlockingBuffer<IBindingSet[]> factory = inputBufferMap == null ? null
+//                    : inputBufferMap.get(sinkId);
+//
+//            if (factory != null) {
+//
+//                return factory.newInstance();
+//
+//            }
 
-            if (factory != null) {
+//            return new HandleChunkBuffer(sinkId, sinkMessagesOut, op
+//                    .newBuffer(stats));
 
-                return factory.newInstance();
-
-            }
-
-            return op.newBuffer(stats);
+            /*
+             * FIXME THe buffer allocated here is useless unless we play games
+             * in HandleChunkBuffer to combine chunks or run a thread which
+             * drains chunks from all operator tasks (but the task can not
+             * complete until it is fully drained).
+             */
+//            final IBlockingBuffer<IBindingSet[]> b = new BlockingBuffer<IBindingSet[]>(
+//                    op.getChunkOfChunksCapacity(), op.getChunkCapacity(), op
+//                            .getChunkTimeout(),
+//                    BufferAnnotations.chunkTimeoutUnit);
+  
+            return new HandleChunkBuffer(sinkId, sinkMessagesOut, /*b,*/ stats);
             
         }
 
@@ -1481,34 +1564,208 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                 log.debug("Running chunk: " + this);
             ft.run(); // run
             ft.get(); // verify success
-            if (sink != null && sink != queryBuffer && !sink.isEmpty()) {
-                if (sinkId == null)
-                    throw new RuntimeException("sinkId not defined: bopId="
-                            + bopId + ", query=" + BOpUtility.toString(query));
-                /*
-                 * Handle sink output, sending appropriate chunk message(s).
-                 * 
-                 * Note: This maps output over shards/nodes in s/o.
-                 */
-                sinkMessagesOut.addAndGet(handleOutputChunk(bop, sinkId, sink));
-            }
-            if (altSink != null && altSink != queryBuffer && !altSink.isEmpty()) {
-                if (altSinkId == null)
-                    throw new RuntimeException("altSinkId not defined: bopId="
-                            + bopId + ", query=" + BOpUtility.toString(query));
-                /*
-                 * Handle alt sink output, sending appropriate chunk message(s).
-                 * 
-                 * Note: This maps output over shards/nodes in s/o.
-                 */
-                altSinkMessagesOut.addAndGet(handleOutputChunk(bop, altSinkId,
-                        altSink));
-            }
+//            if (sink != null && sink != queryBuffer && !sink.isEmpty()) {
+//                if (sinkId == null)
+//                    throw new RuntimeException("sinkId not defined: bopId="
+//                            + bopId + ", query=" + BOpUtility.toString(query));
+//                /*
+//                 * Handle sink output, sending appropriate chunk message(s).
+//                 * 
+//                 * Note: This maps output over shards/nodes in s/o.
+//                 */
+//                sinkMessagesOut.addAndGet(handleOutputChunk(bop, sinkId, sink));
+//            }
+//            if (altSink != null && altSink != queryBuffer && !altSink.isEmpty()) {
+//                if (altSinkId == null)
+//                    throw new RuntimeException("altSinkId not defined: bopId="
+//                            + bopId + ", query=" + BOpUtility.toString(query));
+//                /*
+//                 * Handle alt sink output, sending appropriate chunk message(s).
+//                 * 
+//                 * Note: This maps output over shards/nodes in s/o.
+//                 */
+//                altSinkMessagesOut.addAndGet(handleOutputChunk(bop, altSinkId,
+//                        altSink));
+//            }
             // Done.
             return null;
         } // call()
 
+        /**
+         * Class traps {@link #add(IBindingSet[])} to handle the IBindingSet[]
+         * chunks as they are generated by the running operator task, invoking
+         * {@link RunningQuery#handleOutputChunk(BOp, int, IBlockingBuffer)} for
+         * each generated chunk to synchronously emit {@link IChunkMessage}s.
+         */
+        private class HandleChunkBuffer implements IBlockingBuffer<IBindingSet[]> {
+            
+            private final int sinkId;
+            private final AtomicInteger sinkMessagesOut;
+//            private final IBlockingBuffer<IBindingSet[]> sink;
+            private final BOpStats stats;
+            private volatile boolean open = true;
+            
+            public HandleChunkBuffer(final int sinkId,
+                    final AtomicInteger sinkMessagesOut,
+//                    final IBlockingBuffer<IBindingSet[]> b,
+                    final BOpStats stats
+                    ) {
+                this.sinkId = sinkId;
+                this.sinkMessagesOut = sinkMessagesOut;
+//                this.sink = b;
+                this.stats = stats;
+            }
+
+            /**
+             * Handle sink output, sending appropriate chunk message(s).
+             * <p>
+             * Note: This maps output over shards/nodes in s/o.
+             */
+            public void add(final IBindingSet[] e) {
+//                if (e.getClass().getComponentType() != null) {
+                    stats.unitsOut.add(((Object[]) e).length);
+//                } else {
+//                    stats.unitsOut.increment();
+//                }
+                stats.chunksOut.increment();
+                /*
+                 * FIXME Combine together when possible and final evict in
+                 * flush(). The logic here MUST NOT block since that will
+                 * deadlock the caller. The safest thing to do is to emit each
+                 * chunk as it arrives, but that does not let us combine them
+                 * together when an operator generates small chunks.
+                 */
+//                sink.add(e);
+                sinkMessagesOut.addAndGet(getChunkHandler().handleChunk(
+                        RunningQuery.this, bopId, sinkId, e));
+            }
+
+            public long flush() {
+              return 0L;
+//              return sink.flush();
+          }
+
+            public void abort(Throwable cause) {
+                open = false;
+                RunningQuery.this.halt(cause);
+//                sink.abort(cause);
+            }
+
+            public void close() {
+//                sink.close();
+                open = false;
+            }
+
+            public Future getFuture() {
+//                return sink.getFuture();
+                return null;
+            }
+
+            public boolean isEmpty() {
+                return true;
+//                return sink.isEmpty();
+            }
+
+            public boolean isOpen() {
+                return open && !RunningQuery.this.isDone();
+//                return sink.isOpen();
+            }
+
+            public IAsynchronousIterator<IBindingSet[]> iterator() {
+                throw new UnsupportedOperationException();
+//                return sink.iterator();
+            }
+
+            public void reset() {
+//                sink.reset();
+            }
+
+            public void setFuture(Future future) {
+                throw new UnsupportedOperationException();
+//                sink.setFuture(future);
+            }
+
+            public int size() {
+                return 0;
+//                return sink.size();
+            }
+
+        } // class HandleChunkBuffer
+        
     } // class ChunkTask
+    
+//    private static class BlockingBufferWithStats<E> extends BlockingBuffer<E> {
+//
+//        private final BOpStats stats;
+//
+//        /**
+//         * @param chunkOfChunksCapacity
+//         * @param chunkCapacity
+//         * @param chunkTimeout
+//         * @param chunkTimeoutUnit
+//         * @param stats
+//         */
+//        public BlockingBufferWithStats(int chunkOfChunksCapacity,
+//                int chunkCapacity, long chunkTimeout,
+//                TimeUnit chunkTimeoutUnit, final BOpStats stats) {
+//
+//            super(chunkOfChunksCapacity, chunkCapacity, chunkTimeout,
+//                    chunkTimeoutUnit);
+//            
+//            this.stats = stats;
+//            
+//        }
+//
+//        /**
+//         * Overridden to track {@link BOpStats#unitsOut} and
+//         * {@link BOpStats#chunksOut}.
+//         * <p>
+//         * Note: {@link BOpStats#chunksOut} will report the #of chunks added to
+//         * this buffer. However, the buffer MAY combine chunks either on add()
+//         * or when drained by the iterator so the actual #of chunks read back
+//         * from the iterator MAY differ.
+//         * <p>
+//         * {@inheritDoc}
+//         */
+//        @Override
+//        public boolean add(final E e, final long timeout, final TimeUnit unit)
+//                throws InterruptedException {
+//
+//            final boolean ret = super.add(e, timeout, unit);
+//
+//            if (e.getClass().getComponentType() != null) {
+//
+//                stats.unitsOut.add(((Object[]) e).length);
+//
+//            } else {
+//
+//                stats.unitsOut.increment();
+//
+//            }
+//
+//            stats.chunksOut.increment();
+//
+//            return ret;
+//
+//        }
+//
+//        /**
+//         * You can uncomment a line in this method to see who is closing the
+//         * buffer.
+//         * <p>
+//         * {@inheritDoc}
+//         */
+//        @Override
+//        public void close() {
+//
+////            if (isOpen())
+////                log.error(toString(), new RuntimeException("STACK TRACE"));
+//
+//            super.close();
+//            
+//        }
+//        
+//    }
 
     /**
      * {@link Runnable} sends the {@link IQueryClient} a message indicating that
@@ -1792,4 +2049,10 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
         return sb.toString();
     }
 
+    public IChunkHandler getChunkHandler() {
+        
+        return StandaloneChunkHandler.INSTANCE;
+        
+    }
+    
 }

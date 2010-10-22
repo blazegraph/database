@@ -34,9 +34,9 @@ import java.util.UUID;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.engine.HaltOpMessage;
@@ -44,8 +44,6 @@ import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryDecl;
 import com.bigdata.bop.engine.StartOpMessage;
-import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.striterator.Dechunkerator;
 
 /**
@@ -84,14 +82,16 @@ public class TestThickChunkMessage extends TestCase2 {
         final UUID queryId = UUID.randomUUID();
         final int bopId = 1;
         final int partitionId = 2;
-        final IBlockingBuffer<IBindingSet[]> source = new BlockingBuffer<IBindingSet[]>(
-                10);
-
-        // populate the source.
-        source.add(data.toArray(new IBindingSet[0]));
+//        final IBlockingBuffer<IBindingSet[]> source = new BlockingBuffer<IBindingSet[]>(
+//                10);
+//
+//        // populate the source.
+//        source.add(data.toArray(new IBindingSet[0]));
+//        
+//        // close the source.
+//        source.close();
         
-        // close the source.
-        source.close();
+        final IBindingSet[] source = data.toArray(new IBindingSet[0]);
         
         // build the chunk.
         final IChunkMessage<IBindingSet> msg = new ThickChunkMessage<IBindingSet>(
@@ -169,14 +169,16 @@ public class TestThickChunkMessage extends TestCase2 {
         final UUID queryId = UUID.randomUUID();
         final int bopId = 1;
         final int partitionId = 2;
-        final IBlockingBuffer<IBindingSet[]> source = new BlockingBuffer<IBindingSet[]>(
-                10);
-
-        // populate the source.
-        source.add(data.toArray(new IBindingSet[0]));
-        
-        // close the source.
-        source.close();
+//        final IBlockingBuffer<IBindingSet[]> source = new BlockingBuffer<IBindingSet[]>(
+//                10);
+//
+//        // populate the source.
+//        source.add(data.toArray(new IBindingSet[0]));
+//        
+//        // close the source.
+//        source.close();
+//        
+        final IBindingSet[] source = data.toArray(new IBindingSet[0]);
         
         // build the chunk.
         final IChunkMessage<IBindingSet> msg = new ThickChunkMessage<IBindingSet>(

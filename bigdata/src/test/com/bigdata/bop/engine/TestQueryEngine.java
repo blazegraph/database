@@ -395,9 +395,14 @@ public class TestQueryEngine extends TestCase2 {
      * submitted as the initial input. The access path associated with the join
      * does not have any constants but the join picks up bindings from the input
      * binding sets and uses them to constrain the access path.
+     * 
+     * @todo Support for this test is no longer present. It was lost when the
+     *       {@link StandaloneChunkHandler} was written (ONE_MESSAGE_PER_CHUNK).
      */
     public void test_query_join1_multipleChunksIn() throws Exception {
 
+//        fail("reenable this test");
+        
         final Var<?> x = Var.var("x");
         final Var<?> y = Var.var("y");
         

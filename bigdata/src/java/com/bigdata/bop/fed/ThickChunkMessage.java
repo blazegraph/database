@@ -43,7 +43,6 @@ import com.bigdata.bop.engine.IChunkAccessor;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 
 /**
@@ -119,7 +118,7 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
      */
     public ThickChunkMessage(final IQueryClient queryController,
             final UUID queryId, final int bopId, final int partitionId,
-            final IBlockingBuffer<IBindingSet[]> source) {
+            final IBindingSet[] source) {
 
         if (queryController == null)
             throw new IllegalArgumentException();
@@ -131,7 +130,7 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
             throw new IllegalArgumentException();
 
         // do not send empty chunks.
-        if (source.isEmpty())
+        if (source.length == 0)
             throw new IllegalArgumentException();
 
         this.queryController = queryController;
@@ -150,19 +149,19 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
             final ObjectOutputStream oos = new ObjectOutputStream(baos);
 
-            final IAsynchronousIterator<IBindingSet[]> itr = source.iterator();
+//            final IAsynchronousIterator<IBindingSet[]> itr = source.iterator();
             
             int solutionCount = 0;
             
-            while(itr.hasNext()) {
+//            while(source.hasNext()) {
             
-                final IBindingSet[] a = itr.next();
+                final IBindingSet[] a = source;//.next();
                 
                 oos.writeObject(a);
                 
                 solutionCount += a.length;
                 
-            }
+//            }
             
             oos.flush();
             baos.flush();

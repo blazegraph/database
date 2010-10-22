@@ -161,30 +161,30 @@ abstract public class PipelineOp extends BOpBase {
 
     }
 
-    /**
-     * Instantiate a buffer suitable as a sink for this operator. The buffer
-     * will be provisioned based on the operator annotations.
-     * <p>
-     * Note: if the operation swallows binding sets from the pipeline (such as
-     * operators which write on the database) then the operator MAY return an
-     * immutable empty buffer.
-     * 
-     * @param stats
-     *            The statistics on this object will automatically be updated as
-     *            elements and chunks are output onto the returned buffer.
-     * 
-     * @return The buffer.
-     */
-    public IBlockingBuffer<IBindingSet[]> newBuffer(final BOpStats stats) {
-
-        if (stats == null)
-            throw new IllegalArgumentException();
-        
-        return new BlockingBufferWithStats<IBindingSet[]>(
-                getChunkOfChunksCapacity(), getChunkCapacity(),
-                getChunkTimeout(), Annotations.chunkTimeoutUnit, stats);
-
-    }
+//    /**
+//     * Instantiate a buffer suitable as a sink for this operator. The buffer
+//     * will be provisioned based on the operator annotations.
+//     * <p>
+//     * Note: if the operation swallows binding sets from the pipeline (such as
+//     * operators which write on the database) then the operator MAY return an
+//     * immutable empty buffer.
+//     * 
+//     * @param stats
+//     *            The statistics on this object will automatically be updated as
+//     *            elements and chunks are output onto the returned buffer.
+//     * 
+//     * @return The buffer.
+//     */
+//    public IBlockingBuffer<IBindingSet[]> newBuffer(final BOpStats stats) {
+//
+//        if (stats == null)
+//            throw new IllegalArgumentException();
+//        
+//        return new BlockingBufferWithStats<IBindingSet[]>(
+//                getChunkOfChunksCapacity(), getChunkCapacity(),
+//                getChunkTimeout(), Annotations.chunkTimeoutUnit, stats);
+//
+//    }
 
     /**
      * Return a {@link FutureTask} which computes the operator against the
@@ -205,77 +205,4 @@ abstract public class PipelineOp extends BOpBase {
      */
     abstract public FutureTask<Void> eval(BOpContext<IBindingSet> context);
     
-    private static class BlockingBufferWithStats<E> extends BlockingBuffer<E> {
-
-        private final BOpStats stats;
-
-        /**
-         * @param chunkOfChunksCapacity
-         * @param chunkCapacity
-         * @param chunkTimeout
-         * @param chunkTimeoutUnit
-         * @param stats
-         */
-        public BlockingBufferWithStats(int chunkOfChunksCapacity,
-                int chunkCapacity, long chunkTimeout,
-                TimeUnit chunkTimeoutUnit, final BOpStats stats) {
-
-            super(chunkOfChunksCapacity, chunkCapacity, chunkTimeout,
-                    chunkTimeoutUnit);
-            
-            this.stats = stats;
-            
-        }
-
-        /**
-         * Overridden to track {@link BOpStats#unitsOut} and
-         * {@link BOpStats#chunksOut}.
-         * <p>
-         * Note: {@link BOpStats#chunksOut} will report the #of chunks added to
-         * this buffer. However, the buffer MAY combine chunks either on add()
-         * or when drained by the iterator so the actual #of chunks read back
-         * from the iterator MAY differ.
-         * <p>
-         * {@inheritDoc}
-         */
-        @Override
-        public boolean add(final E e, final long timeout, final TimeUnit unit)
-                throws InterruptedException {
-
-            final boolean ret = super.add(e, timeout, unit);
-
-            if (e.getClass().getComponentType() != null) {
-
-                stats.unitsOut.add(((Object[]) e).length);
-
-            } else {
-
-                stats.unitsOut.increment();
-
-            }
-
-            stats.chunksOut.increment();
-
-            return ret;
-
-        }
-
-        /**
-         * You can uncomment a line in this method to see who is closing the
-         * buffer.
-         * <p>
-         * {@inheritDoc}
-         */
-        @Override
-        public void close() {
-
-//            if (isOpen())
-//                log.error(toString(), new RuntimeException("STACK TRACE"));
-
-            super.close();
-            
-        }
-        
-    }
-
 }
