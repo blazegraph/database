@@ -35,9 +35,9 @@ import junit.framework.TestCase2;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.EmptyBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.bindingSet.EmptyBindingSet;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SliceOp.SliceStats;
 import com.bigdata.journal.BufferMode;

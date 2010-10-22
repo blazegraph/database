@@ -11,11 +11,11 @@ import org.openrdf.query.QueryEvaluationException;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
-import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURIImpl;

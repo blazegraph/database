@@ -36,9 +36,9 @@ import junit.framework.TestCase2;
 
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Constant;
-import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.engine.HaltOpMessage;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;

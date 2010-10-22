@@ -38,7 +38,6 @@ import java.util.concurrent.ExecutionException;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
-import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NV;
@@ -46,6 +45,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
+import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.IKeyBuilder;

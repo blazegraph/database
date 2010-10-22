@@ -32,44 +32,9 @@ import java.io.Serializable;
 import java.util.Iterator;
 import java.util.Map;
 
-import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.Rule;
-import com.bigdata.relation.rule.eval.RuleState;
-
 /**
  * Interface for a set of bindings. The set of variables values is extensible
  * and the bound values are loosely typed.
- * 
- * @todo The variable positions in a binding set can be assigned an index by the
- *       order in which they are encountered across the predicates when the
- *       predicates are considered in execution order. This gives us a dense
- *       index in [0:nvars-1]. The index can be into an array. When the bindings
- *       are of a primitive type, as they are for the RDF DB, that array can be
- *       an array of the primitive type, e.g., long[nvars].
- *       <p>
- *       This change would require that the singleton factory for a variable was
- *       on the {@link Rule} (different rules would have different index
- *       assignments), it would require predicates to be cloned into a
- *       {@link Rule} so that the variables possessed the necessary index
- *       assignment, and that index assignment would have to be late - once the
- *       evaluation order was determined, so maybe the Rule is cloned into the
- *       {@link RuleState} once we have the evaluation order.
- *       <p>
- *       There would also need to be a type-specific means for copying bindings
- *       from a visited element into a bindingSet if a want to avoid autoboxing.
- *       <p>
- *       The {@link IConstant} interface might have to disappear for this as
- *       well. I am not convinced that it adds much.
- *       <p>
- *       To obtain a {@link Var} you MUST go to the {@link IVariable} factory on
- *       the {@link IRule}.  (It is easy to find violators since all vars are
- *       currently assigned by a single factory.)
- *       <p>
- *       Since we sometimes do not have access to the rule that generated the
- *       bindings, we would also require the ability to retrieve a binding by
- *       the name of the variable (this case arises when the rule is generated
- *       dynamically in a manner that is not visible to the consumer of the
- *       bindings, e.g., the match rule of the RDF DB). 
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -177,9 +142,6 @@ public interface IBindingSet extends Cloneable, Serializable {
      * does not dependent on the order in which the bindings are iterated over.
      * The hash code reflects the current state of the bindings and must be
      * recomputed if the bindings are changed.
-     * 
-     * @todo the test suites should be enhanced to verify the contract for
-     *       {@link IBindingSet#hashCode()}
      */
     public int hashCode();
     

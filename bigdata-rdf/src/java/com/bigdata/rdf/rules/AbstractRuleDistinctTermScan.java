@@ -29,11 +29,11 @@ package com.bigdata.rdf.rules;
 
 import java.io.Serializable;
 
-import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOPredicate;

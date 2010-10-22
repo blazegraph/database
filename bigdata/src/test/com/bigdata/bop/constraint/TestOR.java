@@ -29,13 +29,13 @@ package com.bigdata.bop.constraint;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.bindingSet.ArrayBindingSet;
 
 /**
  * Unit tests for {@link OR}.

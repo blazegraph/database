@@ -70,18 +70,7 @@ import com.bigdata.service.ResourceService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: FederatedRunningQuery.java 3511 2010-09-06 20:45:37Z
  *          thompsonbry $
- * 
- * @todo SCALEOUT: Life cycle management of the operators and the query implies
- *       both a per-query bop:NodeList map on the query coordinator identifying
- *       the nodes on which the query has been executed and a per-query
- *       bop:ResourceList map identifying the resources associated with the
- *       execution of that bop on that node. In fact, this could be the same
- *       {@link #resourceMap} except that we would lose type information about
- *       the nature of the resource so it is better to have distinct maps for
- *       this purpose.
- * 
- * @todo HA aspects of running queries? Checkpoints for long running queries?
- * */
+ */
 public class FederatedRunningQuery extends RunningQuery {
 
     private final static transient Logger log = Logger

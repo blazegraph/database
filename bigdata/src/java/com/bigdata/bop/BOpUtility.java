@@ -516,6 +516,40 @@ public class BOpUtility {
     }
 
     /**
+     * Return the effective default sink.
+     * 
+     * @param bop
+     *            The operator.
+     * @param p
+     *            The parent of that operator, if any.
+     * 
+     * @todo unit tests.
+     */
+    static public Integer getEffectiveDefaultSink(final BOp bop, final BOp p) {
+
+        if (bop == null)
+            throw new IllegalArgumentException();
+
+        Integer sink;
+
+        // Explicitly specified sink?
+        sink = (Integer) bop.getProperty(PipelineOp.Annotations.SINK_REF);
+
+        if (sink == null) {
+            if (p == null) {
+                // No parent, so no sink.
+                return null;
+            }
+            // The parent is the sink.
+            sink = (Integer) p
+                    .getRequiredProperty(BOp.Annotations.BOP_ID);
+        }
+
+        return sink;
+
+    }
+
+    /**
      * Combine chunks drawn from an iterator into a single chunk. This is useful
      * when materializing intermediate results for an all-at-once operator.
      * 
