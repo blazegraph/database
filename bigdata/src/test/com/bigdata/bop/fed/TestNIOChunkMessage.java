@@ -37,9 +37,9 @@ import java.util.UUID;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.engine.HaltOpMessage;
@@ -48,8 +48,6 @@ import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryDecl;
 import com.bigdata.bop.engine.StartOpMessage;
 import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
-import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.util.config.NicUtil;
@@ -162,14 +160,15 @@ public class TestNIOChunkMessage extends TestCase2 {
         final UUID queryId = UUID.randomUUID();
         final int bopId = 1;
         final int partitionId = 2;
-        final IBlockingBuffer<IBindingSet[]> source = new BlockingBuffer<IBindingSet[]>(
-                10);
-
-        // populate the source.
-        source.add(data.toArray(new IBindingSet[0]));
-        
-        // close the source.
-        source.close();
+//        final IBlockingBuffer<IBindingSet[]> source = new BlockingBuffer<IBindingSet[]>(
+//                10);
+//
+//        // populate the source.
+//        source.add(data.toArray(new IBindingSet[0]));
+//        
+//        // close the source.
+//        source.close();
+        final IBindingSet[] source = data.toArray(new IBindingSet[0]);
 
         /*
          * Note: The allocations made when the data are received are 
@@ -281,7 +280,7 @@ public class TestNIOChunkMessage extends TestCase2 {
         public MyNIOChunkMessage(IQueryClient queryController, UUID queryId,
                 int sinkId, int partitionId,
                 IAllocationContext allocationContext,
-                IBlockingBuffer<E[]> source, InetSocketAddress addr) {
+                E[] source, InetSocketAddress addr) {
 
             super(queryController, queryId, sinkId, partitionId,
                     allocationContext, source, addr);

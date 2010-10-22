@@ -2268,7 +2268,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * 
      * @return The combined chunks.
      */
-    private E combineChunks(final E chunk1, final E chunk2) {
+    public static <E> E combineChunks(final E chunk1, final E chunk2) {
         
         final Object[] e1 = (Object[]) chunk1;
         

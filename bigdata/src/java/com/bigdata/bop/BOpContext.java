@@ -37,8 +37,6 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.relation.accesspath.IMultiSourceAsynchronousIterator;
-import com.bigdata.relation.accesspath.MultiSourceSequentialAsynchronousIterator;
 import com.bigdata.service.IBigdataFederation;
 
 /**
@@ -57,7 +55,8 @@ public class BOpContext<E> extends BOpContextBase {
 
     private final BOpStats stats;
 
-    private final IMultiSourceAsynchronousIterator<E[]> source;
+//    private final IMultiSourceAsynchronousIterator<E[]> source;
+    private final IAsynchronousIterator<E[]> source;
 
     private final IBlockingBuffer<E[]> sink;
 
@@ -98,24 +97,24 @@ public class BOpContext<E> extends BOpContextBase {
         return source;
     }
 
-    /**
-     * Attach another source. The decision to attach the source is mutex with
-     * respect to the decision that the source reported by {@link #getSource()}
-     * is exhausted.
-     * 
-     * @param source
-     *            The source.
-     *            
-     * @return <code>true</code> iff the source was attached.
-     */
-    public boolean addSource(IAsynchronousIterator<E[]> source) {
-
-        if (source == null)
-            throw new IllegalArgumentException();
-        
-        return this.source.add(source);
-        
-    }
+//    /**
+//     * Attach another source. The decision to attach the source is mutex with
+//     * respect to the decision that the source reported by {@link #getSource()}
+//     * is exhausted.
+//     * 
+//     * @param source
+//     *            The source.
+//     *            
+//     * @return <code>true</code> iff the source was attached.
+//     */
+//    public boolean addSource(IAsynchronousIterator<E[]> source) {
+//
+//        if (source == null)
+//            throw new IllegalArgumentException();
+//        
+//        return this.source.add(source);
+//        
+//    }
 
     /**
      * Where to write the output of the operator.
@@ -202,7 +201,8 @@ public class BOpContext<E> extends BOpContextBase {
             throw new IllegalArgumentException();
         this.partitionId = partitionId;
         this.stats = stats;
-        this.source = new MultiSourceSequentialAsynchronousIterator<E[]>(source);
+        this.source = source;
+//        this.source = new MultiSourceSequentialAsynchronousIterator<E[]>(source);
         this.sink = sink;
         this.sink2 = sink2; // may be null
     }
