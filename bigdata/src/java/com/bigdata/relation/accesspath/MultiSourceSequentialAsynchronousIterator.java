@@ -133,6 +133,14 @@ public class MultiSourceSequentialAsynchronousIterator<E> implements
         }
     }
 
+    /**
+     * {@inheritDoc}
+     * 
+     * @todo Due to the inherent non-atomicity of the while(hasNext()) next()
+     *       idiom, it is possible for {@link #hasNext()} to report true and for
+     *       {@link #next()} to throw {@link NoSuchElementException} if the
+     *       iterator has been concurrently closed.
+     */
     public E next() {
         while (true) {
             final IAsynchronousIterator<E> tmp = nextSource();
