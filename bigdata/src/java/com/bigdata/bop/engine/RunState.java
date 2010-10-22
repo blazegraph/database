@@ -397,7 +397,7 @@ class RunState {
         messagesConsumed(msg.bopId, msg.nmessages);
 
         if (TableLog.tableLog.isInfoEnabled()) {
-            TableLog.tableLog.info(getTableRow("startOp", msg.runningOnServiceId,
+            TableLog.tableLog.info(getTableRow("startOp", msg.serviceId,
                     msg.bopId, msg.partitionId, msg.nmessages/* fanIn */,
                     null/* cause */, null/* stats */));
         }

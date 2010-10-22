@@ -30,9 +30,7 @@ package com.bigdata.bop.ap;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.Constant;
-import com.bigdata.bop.EmptyBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
@@ -40,6 +38,8 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.bindingSet.EmptyBindingSet;
 
 /**
  * Test suite for {@link Predicate}.

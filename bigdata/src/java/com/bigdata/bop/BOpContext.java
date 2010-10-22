@@ -315,6 +315,8 @@ public class BOpContext<E> extends BOpContextBase {
      *            The element.
      * @param bindingSet
      *            The binding set, which is modified as a side-effect.
+     * 
+     * @todo This appears to be unused, in which case it should be dropped. 
      */
     final public void bind(final IVariable<?>[] vars, final IElement e,
             final IBindingSet bindingSet) {

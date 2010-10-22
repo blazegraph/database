@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 20, 2008
  */
 
-package com.bigdata.bop;
+package com.bigdata.bop.bindingSet;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,6 +35,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IVariable;
 
 /**
  * An {@link IBindingSet} backed by an dense array (no gaps). This

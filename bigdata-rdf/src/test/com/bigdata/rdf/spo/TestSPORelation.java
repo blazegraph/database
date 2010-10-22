@@ -31,7 +31,6 @@ package com.bigdata.rdf.spo;
 import java.util.Map;
 import java.util.Properties;
 
-import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
@@ -40,6 +39,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;

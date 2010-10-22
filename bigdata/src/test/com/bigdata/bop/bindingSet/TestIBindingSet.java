@@ -26,10 +26,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 19, 2008
  */
 
-package com.bigdata.bop;
+package com.bigdata.bop.bindingSet;
 
 import java.util.Iterator;
 import java.util.Map;
+
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
 
 import junit.framework.TestCase2;
 

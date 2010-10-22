@@ -4,7 +4,6 @@ import java.util.UUID;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.fed.FederatedRunningQuery;
-import com.bigdata.btree.raba.IRaba;
 import com.bigdata.service.ResourceService;
 
 /**
@@ -16,12 +15,6 @@ import com.bigdata.service.ResourceService;
  * @param <E>
  *            The generic type of the elements in the chunk (binding sets,
  *            elements from a relation, etc).
- * 
- * @todo Compressed representations of binding sets with the ability to read
- *       them in place or materialize them onto the java heap. The
- *       representation should be amenable to processing in C since we want to
- *       use them on GPUs as well. See {@link IChunkMessage} and perhaps
- *       {@link IRaba}.
  */
 public interface IChunkMessage<E> {
 

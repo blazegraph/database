@@ -31,7 +31,6 @@ package com.bigdata.bop.ap;
 import java.util.Map;
 
 import com.bigdata.bop.AbstractAccessPathOp;
-import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
@@ -41,6 +40,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IAccessPathExpander;

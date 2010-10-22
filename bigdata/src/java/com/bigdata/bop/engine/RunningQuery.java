@@ -1384,7 +1384,7 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
              * target it with a message. (The sink will be null iff there is no
              * parent for this operator.)
              */
-            sinkId = getEffectiveDefaultSink(bop, p);
+            sinkId = BOpUtility.getEffectiveDefaultSink(bop, p);
 
             // altSink (null when not specified).
             altSinkId = (Integer) op
@@ -1471,38 +1471,6 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
             return op.newBuffer(stats);
             
-        }
-
-        /**
-         * Return the effective default sink.
-         * 
-         * @param bop
-         *            The operator.
-         * @param p
-         *            The parent of that operator, if any.
-         */
-        private Integer getEffectiveDefaultSink(final BOp bop, final BOp p) {
-
-            if (bop == null)
-                throw new IllegalArgumentException();
-
-            Integer sink;
-
-            // Explicitly specified sink?
-            sink = (Integer) bop.getProperty(PipelineOp.Annotations.SINK_REF);
-
-            if (sink == null) {
-                if (p == null) {
-                    // No parent, so no sink.
-                    return null;
-                }
-                // The parent is the sink.
-                sink = (Integer) p
-                        .getRequiredProperty(BOp.Annotations.BOP_ID);
-            }
-
-            return sink;
-
         }
 
         /**
