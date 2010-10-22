@@ -53,8 +53,11 @@ public class LatchedExecutor implements Executor {
     
     /**
      * A thread-safe blocking queue of pending tasks.
+     * 
+     * @todo The capacity of this queue does not of necessity need to be
+     *       unbounded.
      */
-    private final BlockingQueue<Runnable> queue = new LinkedBlockingDeque<Runnable>();
+    private final BlockingQueue<Runnable> queue = new LinkedBlockingDeque<Runnable>(/*unbounded*/);
 
     private final int nparallel;
     
