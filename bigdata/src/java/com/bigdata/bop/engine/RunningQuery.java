@@ -452,7 +452,7 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
         this.operatorFutures = new ConcurrentHashMap<BSBundle, ChunkFutureTask>();
         
-        this.operatorQueues = new LinkedHashMap<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>>();
+        this.operatorQueues = new ConcurrentHashMap<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>>();
         
         /*
          * Setup the BOpStats object for each pipeline operator in the query.
