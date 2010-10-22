@@ -24,8 +24,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.ap;
 
 
-import com.bigdata.bop.ap.filter.TestDistinctFilter;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -72,12 +70,9 @@ public class TestAll extends TestCase {
         /*
          * Sampling an access path.
          */
-        
-        // test sampling from an AbstractBTree.
-        suite.addTestSuite(TestSampleLocalBTree.class);
 
-        // test sampling from an FusedView.
-        suite.addTestSuite(TestSampleLocalBTree.class);
+        // test sampling form an index.
+        suite.addTestSuite(TestSampleIndex.class);
 
         return suite;
         
