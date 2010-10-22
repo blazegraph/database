@@ -1583,11 +1583,15 @@ public class AccessPath<R> implements IAccessPath<R> {
 
         if (partitionCount == 0) {
 
-            /*
-             * SWAG in case zero partition count is reported (I am not sure that
-             * this code path is possible).
-             */
-            return new ScanCostReport(0L/* rangeCount */, partitionCount, 100/* millis */);
+//            /*
+//             * SWAG in case zero partition count is reported (I am not sure that
+//             * this code path is possible).
+//             */
+//            return new ScanCostReport(0L/* rangeCount */, partitionCount, 100/* millis */);
+        	/*
+        	 * Should never be "zero" partition count.
+        	 */
+        	throw new AssertionError();
 
         }
 
