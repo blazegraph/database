@@ -39,15 +39,6 @@ import com.bigdata.counters.CAT;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Add time per bop. This can not be directly aggregated into wall time
- *       since there are concurrent processes. However, this will be useful
- *       since we tend to process materialized chunks with the new
- *       {@link QueryEngine} such that the operator evaluation time now more or
- *       less directly corresponds to the time it takes to act on local data,
- *       producing local outputs. The {@link QueryEngine} itself now handles the
- *       transportation of data between the nodes so that time can be factored
- *       out of the local aspects of query execution.
  */
 public class BOpStats implements Serializable {
 
@@ -56,12 +47,12 @@ public class BOpStats implements Serializable {
      */
     private static final long serialVersionUID = 1L;
 
-//    /**
-//     * The timestamp (milliseconds) associated with the start of execution for
-//     * the join dimension. This is not aggregated. It should only be used to
-//     * compute the elapsed time for the operator.
-//     */
-//    private final long startTime;
+//	/**
+//	 * The timestamp (nanoseconds) assigned when this {@link BOpStats} object
+//	 * was creatred. This can not be directly aggregated into wall time since
+//	 * concurrent processes are nearly always used during query evaluation.
+//	 */
+//    private final long startTime = System.nanoTime();
     
     /**
      * #of chunks in.

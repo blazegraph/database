@@ -453,40 +453,44 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
         final int joinId = 2;
         final int predId = 3;
         final int sliceId = 4;
-        final PipelineOp query = 
-            new SliceOp(new BOp[]{new PipelineJoin<E>(
-        // left
-                new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, startId),//
-                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.CONTROLLER),//
-                        })),
-                // right
-                new Predicate<E>(new IVariableOrConstant[] {
-                        new Constant<String>("Mary"), Var.var("value") }, NV
-                        .asMap(new NV[] {//
-                                new NV(Predicate.Annotations.RELATION_NAME,
-                                        new String[] { namespace }),//
-                                // Note: local access path!
-                                new NV( Predicate.Annotations.REMOTE_ACCESS_PATH,false),
-                                new NV(Predicate.Annotations.BOP_ID, predId),//
-                                new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
-                        })),
-                // join annotations
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId),//
-                        // Note: shard-partitioned joins!
-                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.SHARDED),//
-                        })//
-        )},
-        // slice annotations
-        NV.asMap(new NV[] {//
-                new NV(Predicate.Annotations.BOP_ID, sliceId),//
-                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
-                        BOpEvaluationContext.CONTROLLER),//
-                })//
-        );
+
+		final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
+						new NV(Predicate.Annotations.BOP_ID, startId),//
+						new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+								BOpEvaluationContext.CONTROLLER),//
+				}));
+
+		final Predicate<E> predOp = new Predicate<E>(
+				new IVariableOrConstant[] { new Constant<String>("Mary"),
+						Var.var("value") },
+				NV.asMap(new NV[] {//
+								new NV(Predicate.Annotations.RELATION_NAME,
+										new String[] { namespace }),//
+								// Note: local access path!
+								new NV(
+										Predicate.Annotations.REMOTE_ACCESS_PATH,
+										false),
+								new NV(Predicate.Annotations.BOP_ID, predId),//
+								new NV(Predicate.Annotations.TIMESTAMP,
+										ITx.READ_COMMITTED),//
+						}));
+
+		final PipelineJoin<E> joinOp = new PipelineJoin<E>(
+				new BOp[] { startOp },//
+				new NV(Predicate.Annotations.BOP_ID, joinId),//
+				new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
+				// Note: shard-partitioned joins!
+				new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+						BOpEvaluationContext.SHARDED));
+
+		final PipelineOp query = new SliceOp(new BOp[] { joinOp },
+				// slice annotations
+				NV.asMap(new NV[] {//
+						new NV(Predicate.Annotations.BOP_ID, sliceId),//
+						new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+								BOpEvaluationContext.CONTROLLER),//
+				})//
+		);
 
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
@@ -659,24 +663,22 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.BOP_ID, predId2),//
                         new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
-        
-        final PipelineOp join1Op = new PipelineJoin<E>(//
-                startOp, pred1Op,//
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId1),//
-                        // Note: shard-partitioned joins!
-                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.SHARDED),//
-                        }));
 
-        final PipelineOp join2Op = new PipelineJoin<E>(//
-                join1Op, pred2Op,//
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId2),//
-                        // Note: shard-partitioned joins!
-                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.SHARDED),//
-                        }));
+		final PipelineOp join1Op = new PipelineJoin<E>(//
+				new BOp[] { startOp },//
+				new NV(Predicate.Annotations.BOP_ID, joinId1),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred1Op),//
+				// Note: shard-partitioned joins!
+				new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+						BOpEvaluationContext.SHARDED));
+
+		final PipelineOp join2Op = new PipelineJoin<E>(//
+				new BOp[] { join1Op },//
+				new NV(Predicate.Annotations.BOP_ID, joinId2),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op),//
+				// Note: shard-partitioned joins!
+				new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+						BOpEvaluationContext.SHARDED));
 
         final PipelineOp query = new SliceOp(new BOp[] { join2Op },
                 NV.asMap(new NV[] {//

@@ -52,7 +52,7 @@ public interface BufferAnnotations {
     /**
      * Default for {@link #CHUNK_OF_CHUNKS_CAPACITY}
      */
-    int DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = 100;
+    int DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = 100;//trunk=1000
 
     /**
      * Sets the capacity of the {@link IBuffer}[]s used to accumulate a chunk of
@@ -66,7 +66,7 @@ public interface BufferAnnotations {
     /**
      * Default for {@link #CHUNK_CAPACITY}
      */
-    int DEFAULT_CHUNK_CAPACITY = 100;
+    int DEFAULT_CHUNK_CAPACITY = 100;//trunk=100
 
     /**
      * The timeout in milliseconds that the {@link BlockingBuffer} will wait for
@@ -81,7 +81,7 @@ public interface BufferAnnotations {
      * 
      * @todo this is probably much larger than we want. Try 10ms.
      */
-    int DEFAULT_CHUNK_TIMEOUT = 20;
+    int DEFAULT_CHUNK_TIMEOUT = 20;//trunk=1000
 
     /**
      * The {@link TimeUnit}s in which the {@link #CHUNK_TIMEOUT} is measured.

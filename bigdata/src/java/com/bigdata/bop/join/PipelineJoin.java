@@ -79,15 +79,14 @@ import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**
  * Pipelined join operator for online (selective) queries. The pipeline join
- * accepts chunks of binding sets from its left operand, combines each binding
- * set in turn with the right operand to produce an "asBound" predicate, and
- * then executes a nested indexed subquery against that asBound predicate,
- * writing out a new binding set for each element returned by the asBound
- * predicate which satisfies the join constraint.
+ * accepts chunks of binding sets from its operand, combines each binding set in
+ * turn with its {@link IPredicate} annotation to produce an "asBound"
+ * predicate, and then executes a nested indexed subquery against that asBound
+ * predicate, writing out a new binding set for each element returned by the
+ * asBound predicate which satisfies the join constraint.
  * <p>
  * Note: In order to support pipelining, query plans need to be arranged in a
- * "left-deep" manner and there may not be intervening operators between the
- * pipeline join operator and the {@link IPredicate} on which it will read.
+ * "left-deep" manner.
  * <p>
  * Note: In scale-out, the {@link PipelineJoin} is generally annotated as a
  * {@link BOpEvaluationContext#SHARDED} or {@link BOpEvaluationContext#HASHED}
@@ -113,6 +112,12 @@ public class PipelineJoin<E> extends PipelineOp implements
 
     public interface Annotations extends PipelineOp.Annotations {
 
+		/**
+		 * The {@link IPredicate} which is used to generate the
+		 * {@link IAccessPath}s during the join.
+		 */
+		String PREDICATE = PipelineJoin.class.getName() + ".predicate";
+    	
         /**
          * An optional {@link IVariable}[] identifying the variables to be
          * retained in the {@link IBindingSet}s written out by the operator.
@@ -249,7 +254,7 @@ public class PipelineJoin<E> extends PipelineOp implements
      * @param args
      * @param annotations
      */
-    public PipelineJoin(final BOp[] args, NV[] annotations) {
+    public PipelineJoin(final BOp[] args, NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
@@ -265,37 +270,17 @@ public class PipelineJoin<E> extends PipelineOp implements
 
         super(args, annotations);
 
-        if (arity() != 2)
+        if (arity() != 1)
             throw new IllegalArgumentException();
 
         if (left() == null)
             throw new IllegalArgumentException();
 
-        if (right() == null)
-            throw new IllegalArgumentException();
-
     }
     
-    /**
-     * @param left
-     *            The left operand, which must be an {@link IBindingSet}
-     *            pipeline operator, such as another {@link PipelineJoin}.
-     * @param right
-     *            The right operand, which must be an {@link IPredicate}.
-     * 
-     * @param annotations
-     */
-    public PipelineJoin(final PipelineOp left,
-            final IPredicate<?> right, final Map<String, Object> annotations) {
-
-        this(new BOp[] { left, right }, annotations);
-
-    }
-
-    /**
-     * The left hand operator, which is the previous join in the pipeline join
-     * path.
-     */
+	/**
+	 * The sole operand, which is the previous join in the pipeline join path.
+	 */
     public PipelineOp left() {
 
         return (PipelineOp) get(0);
@@ -303,28 +288,14 @@ public class PipelineJoin<E> extends PipelineOp implements
     }
 
     /**
-     * The right hand operator, which is the {@link IPredicate}.
+     * {@inheritDoc}
+     * 
+     * @see Annotations#PREDICATE
      */
     @SuppressWarnings("unchecked")
-    public IPredicate<E> right() {
-
-        return (IPredicate<E>) get(1);
-
-    }
-
-    //    /**
-    //     * Returns {@link BOpEvaluationContext#SHARDED}
-    //     */
-    //    @Override
-    //    final public BOpEvaluationContext getEvaluationContext() {
-    //        
-    //        return BOpEvaluationContext.SHARDED;
-    //        
-    //    }
-
-    public IPredicate<E> getPredicate() {
+	public IPredicate<E> getPredicate() {
         
-        return right();
+		return (IPredicate<E>) getRequiredProperty(Annotations.PREDICATE);
         
     }
 
@@ -408,7 +379,7 @@ public class PipelineJoin<E> extends PipelineOp implements
         final private Executor service;
 
         /**
-         * True iff the {@link #right} operand is an optional pattern (aka if
+         * True iff the {@link #predicate} operand is an optional pattern (aka if
          * this is a SPARQL style left join).
          */
         final private boolean optional;
@@ -420,18 +391,13 @@ public class PipelineJoin<E> extends PipelineOp implements
          */
         final private IVariable<?>[] variablesToKeep;
 
-//        /**
-//         * The source for the binding sets.
-//         */
-//        final BindingSetPipelineOp left;
-
         /**
          * The source for the elements to be joined.
          */
-        final private IPredicate<E> right;
+        final private IPredicate<E> predicate;
 
         /**
-         * The relation associated with the {@link #right} operand.
+         * The relation associated with the {@link #predicate} operand.
          */
         final private IRelation<E> relation;
         
@@ -519,10 +485,8 @@ public class PipelineJoin<E> extends PipelineOp implements
             if (context == null)
                 throw new IllegalArgumentException();
 
-//            this.fed = context.getFederation();
             this.joinOp = joinOp;
-//            this.left = joinOp.left();
-            this.right = joinOp.right();
+            this.predicate = joinOp.getPredicate();
             this.constraints = joinOp.constraints();
             this.maxParallel = joinOp.getMaxParallel();
             if (maxParallel > 0) {
@@ -536,7 +500,7 @@ public class PipelineJoin<E> extends PipelineOp implements
             this.optional = joinOp.isOptional();
             this.variablesToKeep = joinOp.variablesToKeep();
             this.context = context;
-            this.relation = context.getRelation(right);
+            this.relation = context.getRelation(predicate);
             this.source = context.getSource();
             this.sink = context.getSink();
             this.sink2 = context.getSink2();
@@ -932,7 +896,7 @@ public class PipelineJoin<E> extends PipelineOp implements
                 final IBindingSet bindingSet = chunk[0];
 
                 // constrain the predicate to the given bindings.
-                IPredicate<E> predicate = right.asBound(bindingSet);
+                IPredicate<E> asBound = predicate.asBound(bindingSet);
 
                 if (partitionId != -1) {
 
@@ -947,11 +911,11 @@ public class PipelineJoin<E> extends PipelineOp implements
                      * for an index partition.
                      */
 
-                    predicate = predicate.setPartitionId(partitionId);
+                    asBound = asBound.setPartitionId(partitionId);
 
                 }
 
-                new JoinTask.AccessPathTask(predicate, Arrays.asList(chunk))
+                new JoinTask.AccessPathTask(asBound, Arrays.asList(chunk))
                         .call();
 
             }
@@ -986,7 +950,7 @@ public class PipelineJoin<E> extends PipelineOp implements
                     halted();
 
                     // constrain the predicate to the given bindings.
-                    IPredicate<E> predicate = right.asBound(bindingSet);
+                    IPredicate<E> asBound = predicate.asBound(bindingSet);
 
                     if (partitionId != -1) {
 
@@ -1001,12 +965,12 @@ public class PipelineJoin<E> extends PipelineOp implements
                          * for an index partition.
                          */
 
-                        predicate = predicate.setPartitionId(partitionId);
+                        asBound = asBound.setPartitionId(partitionId);
 
                     }
 
                     // lookup the asBound predicate in the map.
-                    Collection<IBindingSet> values = map.get(predicate);
+                    Collection<IBindingSet> values = map.get(asBound);
 
                     if (values == null) {
 
@@ -1019,7 +983,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
                         values = new LinkedList<IBindingSet>();
 
-                        map.put(predicate, values);
+                        map.put(asBound, values);
 
                     } else {
 
@@ -1793,7 +1757,7 @@ public class PipelineJoin<E> extends PipelineOp implements
                             bset = bset.clone();
 
                             // propagate bindings from the visited element.
-                            if (context.bind(right, constraints, e, bset)) {
+                            if (context.bind(predicate, constraints, e, bset)) {
 
                                 // optionally strip off unnecessary variables.
                                 bset = variablesToKeep == null ? bset : bset

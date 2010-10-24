@@ -171,26 +171,25 @@ public class TestPipelineJoin extends TestCase2 {
         final int startId = 1;
         final int joinId = 2;
         final int predId = 3;
-        final PipelineJoin<E> query = new PipelineJoin<E>(
-        // left
-                new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, startId),//
-                        })),
-                // right
-                new Predicate<E>(new IVariableOrConstant[] {
-                        new Constant<String>("Mary"), Var.var("x") }, NV
-                        .asMap(new NV[] {//
-                                new NV(Predicate.Annotations.RELATION_NAME,
-                                        new String[] { namespace }),//
-                                new NV(Predicate.Annotations.BOP_ID, predId),//
-                                new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
-                        })),
-                // join annotations
-                NV
-                        .asMap(new NV[] { new NV(Predicate.Annotations.BOP_ID,
-                                joinId),//
-                        })//
-        );
+        
+        final BOp startOp =                 new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
+				new NV(Predicate.Annotations.BOP_ID, startId),//
+				}));
+
+		final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
+				new Constant<String>("Mary"), Var.var("x") }, NV
+				.asMap(new NV[] {//
+						new NV(Predicate.Annotations.RELATION_NAME,
+								new String[] { namespace }),//
+						new NV(Predicate.Annotations.BOP_ID, predId),//
+						new NV(Predicate.Annotations.TIMESTAMP,
+								ITx.READ_COMMITTED),//
+				}));
+
+		final PipelineJoin<E> query = new PipelineJoin<E>(
+				new BOp[] { startOp },//
+				new NV(Predicate.Annotations.BOP_ID, joinId),//
+				new NV(PipelineJoin.Annotations.PREDICATE, predOp));
 
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
@@ -260,29 +259,28 @@ public class TestPipelineJoin extends TestCase2 {
         final int startId = 1;
         final int joinId = 2;
         final int predId = 3;
-        final PipelineJoin<E> query = new PipelineJoin<E>(
-        // left
-                new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
-                        new NV(BOpBase.Annotations.BOP_ID, startId),//
-                        })),
-                // right
-                new Predicate<E>(
-                        new IVariableOrConstant[] { new Constant<String>("Mary"), y },//
-                        NV.asMap(new NV[] {//
-                                        new NV(
-                                                Predicate.Annotations.RELATION_NAME,
-                                                new String[] { namespace }),//
-                                        new NV(Predicate.Annotations.BOP_ID,
-                                                predId),//
-                                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
-                                })),
-                // join annotations
+
+		final BOp startOp = new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
+				new NV(BOpBase.Annotations.BOP_ID, startId),//
+				})); 
+        
+		final Predicate<E> predOp =                 new Predicate<E>(
+                new IVariableOrConstant[] { new Constant<String>("Mary"), y },//
                 NV.asMap(new NV[] {//
-                                new NV(BOpBase.Annotations.BOP_ID, joinId),//
-                                new NV( PipelineJoin.Annotations.CONSTRAINTS,
-                                        new IConstraint[] { new INBinarySearch<String>(
-                                                y, set) }) })//
-        );
+                                new NV(
+                                        Predicate.Annotations.RELATION_NAME,
+                                        new String[] { namespace }),//
+                                new NV(Predicate.Annotations.BOP_ID,
+                                        predId),//
+                                new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                        })); 
+		
+		final PipelineJoin<E> query = new PipelineJoin<E>(
+				new BOp[] { startOp },//
+				new NV(BOpBase.Annotations.BOP_ID, joinId),//
+				new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
+				new NV( PipelineJoin.Annotations.CONSTRAINTS,
+						new IConstraint[] { new INBinarySearch<String>(y, set) }));
 
         // the expected solution (just one).
         final IBindingSet[] expected = new IBindingSet[] {//
@@ -352,31 +350,28 @@ public class TestPipelineJoin extends TestCase2 {
         final Var<String> y = Var.var("y");
         
         final int startId = 1;
-        final int joinId = 2;
-        final int predId = 3;
-        final PipelineJoin<E> query = new PipelineJoin<E>(
-        // left
-                new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
-                        new NV(BOpBase.Annotations.BOP_ID, startId),//
-                        })),
-                // right
-                new Predicate<E>(
-                        new IVariableOrConstant[] { x, y },//
-                        NV.asMap(new NV[] {//
-                                        new NV(
-                                                Predicate.Annotations.RELATION_NAME,
-                                                new String[] { namespace }),//
-                                        new NV(Predicate.Annotations.BOP_ID,
-                                                predId),//
-                                        new NV(Predicate.Annotations.TIMESTAMP,
-                                                ITx.READ_COMMITTED),//
-                                })),
-                // join annotations
-                NV.asMap(new NV[] {//
-                        new NV(BOpBase.Annotations.BOP_ID, joinId),//
-                        new NV(PipelineJoin.Annotations.SELECT,new IVariable[]{y})//
-                        })//
-        );
+		final int joinId = 2;
+		final int predId = 3;
+
+		final BOp startOp = new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
+				new NV(BOpBase.Annotations.BOP_ID, startId),//
+				}));
+
+		final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
+				x, y },//
+				NV.asMap(new NV[] {//
+								new NV(Predicate.Annotations.RELATION_NAME,
+										new String[] { namespace }),//
+								new NV(Predicate.Annotations.BOP_ID, predId),//
+								new NV(Predicate.Annotations.TIMESTAMP,
+										ITx.READ_COMMITTED),//
+						})); 
+		
+		final PipelineJoin<E> query = new PipelineJoin<E>(
+				new BOp[] { startOp },//
+				new NV(BOpBase.Annotations.BOP_ID, joinId),//
+				new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
+				new NV(PipelineJoin.Annotations.SELECT, new IVariable[] { y }));
 
         /*
          * The expected solutions.
@@ -458,30 +453,24 @@ public class TestPipelineJoin extends TestCase2 {
         final int joinId = 2;
         final int predId = 3;
 
-        final PipelineJoin<E> query = new PipelineJoin<E>(
-        // left
-                new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, startId),//
-                        })),
-                // right
-                new Predicate<E>(new IVariableOrConstant[] {
-                        new Constant<String>("Mary"), x }, NV
-                        .asMap(new NV[] {//
-                                new NV(Predicate.Annotations.RELATION_NAME,
-                                        new String[] { namespace }),//
-                                new NV(Predicate.Annotations.BOP_ID, predId),//
-                                new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
-                        })),
-                // join annotations
-                NV
-                        .asMap(new NV[] { //
-                                new NV(BOpBase.Annotations.BOP_ID,
-                                joinId),
-                                new NV(PipelineJoin.Annotations.OPTIONAL,
-                                        Boolean.TRUE),//
-//
-                        })//
-        );
+		final BOp startOp = new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
+				new NV(Predicate.Annotations.BOP_ID, startId),//
+				}));
+
+		final Predicate<E> pred = new Predicate<E>(new IVariableOrConstant[] {
+				new Constant<String>("Mary"), x }, NV.asMap(new NV[] {//
+						new NV(Predicate.Annotations.RELATION_NAME,
+								new String[] { namespace }),//
+						new NV(Predicate.Annotations.BOP_ID, predId),//
+						new NV(Predicate.Annotations.TIMESTAMP,
+								ITx.READ_COMMITTED),//
+				})); 
+		
+		final PipelineJoin<E> query = new PipelineJoin<E>(
+				new BOp[] { startOp }, //
+				new NV(BOpBase.Annotations.BOP_ID, joinId),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred),//
+				new NV(PipelineJoin.Annotations.OPTIONAL, Boolean.TRUE));
 
         /*
          * Setup the source with two initial binding sets. One has nothing bound
@@ -565,32 +554,26 @@ public class TestPipelineJoin extends TestCase2 {
         
         final int startId = 1;
         final int joinId = 2;
-        final int predId = 3;
+		final int predId = 3;
 
-        final PipelineJoin<E> query = new PipelineJoin<E>(
-        // left
-                new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, startId),//
-                        })),
-                // right
-                new Predicate<E>(new IVariableOrConstant[] {
-                        new Constant<String>("Mary"), x }, NV
-                        .asMap(new NV[] {//
-                                new NV(Predicate.Annotations.RELATION_NAME,
-                                        new String[] { namespace }),//
-                                new NV(Predicate.Annotations.BOP_ID, predId),//
-                                new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
-                        })),
-                // join annotations
-                NV
-                        .asMap(new NV[] { //
-                                new NV(BOpBase.Annotations.BOP_ID,
-                                joinId),
-                                new NV(PipelineJoin.Annotations.OPTIONAL,
-                                        Boolean.TRUE),//
-//
-                        })//
-        );
+		final BOp startOp = new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
+				new NV(Predicate.Annotations.BOP_ID, startId),//
+				}));
+
+		final Predicate<E> pred = new Predicate<E>(new IVariableOrConstant[] {
+				new Constant<String>("Mary"), x }, NV.asMap(new NV[] {//
+						new NV(Predicate.Annotations.RELATION_NAME,
+								new String[] { namespace }),//
+						new NV(Predicate.Annotations.BOP_ID, predId),//
+						new NV(Predicate.Annotations.TIMESTAMP,
+								ITx.READ_COMMITTED),//
+				}));
+
+		final PipelineJoin<E> query = new PipelineJoin<E>(
+				new BOp[] { startOp },//
+				new NV(BOpBase.Annotations.BOP_ID, joinId),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred),//
+				new NV(PipelineJoin.Annotations.OPTIONAL, Boolean.TRUE));
 
         /*
          * Setup the source with two initial binding sets. One has nothing bound

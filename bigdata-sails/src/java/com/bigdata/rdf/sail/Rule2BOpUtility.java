@@ -188,6 +188,17 @@ public class Rule2BOpUtility {
         String ORIGINAL_INDEX = Rule2BOpUtility.class.getName()
                 + ".originalIndex";
 
+		/**
+		 * The estimated cardinality of an access path as determined during
+		 * static query optimization. This is the fast range count if the
+		 * predicate and {@link Long#MAX_VALUE} if the predicate is part of an
+		 * optional join (this is used by the query optimized to order the
+		 * optional joins to the end since they can not increase the selectivity
+		 * of the query).
+		 */
+		String ESTIMATED_CARDINALITY = Rule2BOpUtility.class.getName()
+				+ ".estimatedCardinality";
+
         /**
          * The estimated cost of a SCAN + FILTER approach to a default graph or
          * named graph query.
@@ -305,7 +316,15 @@ public class Rule2BOpUtility {
         // the #of variables in each tail of the rule.
         final int[] nvars = new int[rule.getTailCount()];
 
-        // the index assigned to each tail of the rule.
+		/*
+		 * The index assigned to each tail of the rule by static analysis (this
+		 * is often not the index which is actually used when we evaluate a
+		 * given predicate since we always choose the best index and that can
+		 * depend on whether or not we are binding the context position for a
+		 * default or named graph query. When optional joins are involved, some
+		 * variables may not become bound for some solutions. A different index
+		 * will often be chosen for access paths using the unbound variable.
+		 */
         final IKeyOrder[] keyOrder = computeKeyOrderForEachTail(rule, context,
                 order, nvars);
 
@@ -364,6 +383,10 @@ public class Rule2BOpUtility {
 //            pred = pred.setKeyOrder(keyOrder[order[i]]);
             pred.setProperty(Annotations.ORIGINAL_INDEX, keyOrder[order[i]]);
 
+            // decorate the predicate with the cardinality estimate.
+			pred.setProperty(Annotations.ESTIMATED_CARDINALITY, plan
+					.cardinality(order[i]));
+            
             /*
              * Collect all the constraints for this predicate based on which
              * variables make their first appearance in this tail
@@ -468,8 +491,10 @@ public class Rule2BOpUtility {
                     anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.ANY));
 
-                    left = new PipelineJoin(new BOp[] { left, pred }, anns
-                            .toArray(new NV[anns.size()]));
+                    anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
+                    
+					left = new PipelineJoin(new BOp[] { left }, anns
+							.toArray(new NV[anns.size()]));
 
                 }
 
@@ -522,7 +547,9 @@ public class Rule2BOpUtility {
                     BOpEvaluationContext.ANY));
         }
 
-        return new PipelineJoin(new BOp[] { left, pred }, anns
+        anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
+
+        return new PipelineJoin(new BOp[] { left }, anns
                 .toArray(new NV[anns.size()]));
 
     }
@@ -572,7 +599,9 @@ public class Rule2BOpUtility {
              * access path is used.
              */
 
-            return new PipelineJoin(new BOp[] { left, pred }, anns
+            anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
+
+            return new PipelineJoin(new BOp[] { left }, anns
                     .toArray(new NV[anns.size()]));
 
         }
@@ -583,8 +612,10 @@ public class Rule2BOpUtility {
              * C is already bound.  The unmodified access path is used. 
              */
 
-            return new PipelineJoin(new BOp[] { left, pred }, anns
-                    .toArray(new NV[anns.size()]));
+            anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
+
+			return new PipelineJoin(new BOp[] { left }, anns
+					.toArray(new NV[anns.size()]));
 
         }
 
@@ -611,7 +642,9 @@ public class Rule2BOpUtility {
                     IPredicate.Annotations.ACCESS_PATH_EXPANDER,
                     EmptyAccessPathExpander.INSTANCE);
 
-            return new PipelineJoin(new BOp[] { left, pred }, anns
+            anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
+
+            return new PipelineJoin(new BOp[] { left }, anns
                     .toArray(new NV[anns.size()]));
 
         }
@@ -625,7 +658,9 @@ public class Rule2BOpUtility {
             pred = pred.asBound((IVariable<?>) pred.get(3),
                     new Constant<IV<?, ?>>(summary.firstContext));
 
-            return new PipelineJoin(new BOp[] { left, pred }, anns
+            anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
+
+            return new PipelineJoin(new BOp[] { left }, anns
                     .toArray(new NV[anns.size()]));
 
         }
@@ -675,7 +710,9 @@ public class Rule2BOpUtility {
             // layer filter onto the predicate.
             pred = pred.addIndexLocalFilter(ElementFilter.newInstance(test));
 
-            return new PipelineJoin(new BOp[] { left, pred }, anns
+            anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
+
+            return new PipelineJoin(new BOp[] { left }, anns
                     .toArray(new NV[anns.size()]));
 
         } else {
@@ -721,7 +758,9 @@ public class Rule2BOpUtility {
 //                        BOpEvaluationContext.ANY));
 //            }
 
-            return new PipelineJoin(new BOp[] { dataSetJoin, pred }, anns
+            anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
+
+            return new PipelineJoin(new BOp[] { dataSetJoin }, anns
                     .toArray(new NV[anns.size()]));
 
         }
@@ -770,8 +809,10 @@ public class Rule2BOpUtility {
                     IPredicate.Annotations.ACCESS_PATH_EXPANDER,
                     EmptyAccessPathExpander.INSTANCE);
 
-            return new PipelineJoin(new BOp[] { left, pred }, anns
-                    .toArray(new NV[anns.size()]));
+            anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
+
+			return new PipelineJoin(new BOp[] { left }, anns
+					.toArray(new NV[anns.size()]));
 
         }
         
@@ -797,8 +838,10 @@ public class Rule2BOpUtility {
             // Strip of the context position.
             pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
             
-            return new PipelineJoin(new BOp[] { left, pred }, anns
-                    .toArray(new NV[anns.size()]));
+			anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
+
+			return new PipelineJoin(new BOp[] { left }, anns
+					.toArray(new NV[anns.size()]));
 
         }
 
@@ -940,8 +983,10 @@ public class Rule2BOpUtility {
                         BOpEvaluationContext.ANY));
             }
             
-            return new PipelineJoin(new BOp[] { left, pred }, anns
-                    .toArray(new NV[anns.size()]));
+			anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
+
+			return new PipelineJoin(new BOp[] { left }, anns
+					.toArray(new NV[anns.size()]));
 
         } else {
 
@@ -988,9 +1033,11 @@ public class Rule2BOpUtility {
                         BOpEvaluationContext.ANY));
             }
             
-            return new PipelineJoin(new BOp[] { left, pred }, anns
-                    .toArray(new NV[anns.size()]));
-            
+            anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
+
+			return new PipelineJoin(new BOp[] { left }, anns
+					.toArray(new NV[anns.size()]));
+
         }
 
     }

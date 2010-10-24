@@ -37,7 +37,6 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -46,6 +45,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
@@ -756,7 +756,12 @@ class RunState {
 
             final Integer id = bopIds[i];
 
-            sb.append("\tnavail(id=" + id + ")");
+        	final BOp bop = bopIndex.get(id);
+        	
+        	if(!(bop instanceof PipelineOp)) 
+    			continue; // skip non-pipeline operators.
+
+        	sb.append("\tnavail(id=" + id + ")");
 
             sb.append("\tnrun(id=" + id + ")");
 
@@ -853,6 +858,11 @@ class RunState {
 
             final Integer id = bopIds[i];
 
+        	final BOp bop = bopIndex.get(id);
+        	
+        	if(!(bop instanceof PipelineOp)) 
+    			continue; // skip non-pipeline operators.
+        	
             final AtomicLong nrunning = runningMap.get(id);
 
             final AtomicLong navailable = availableMap.get(id);
