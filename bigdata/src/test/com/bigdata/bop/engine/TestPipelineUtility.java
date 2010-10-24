@@ -104,17 +104,17 @@ public class TestPipelineUtility extends TestCase2 {
                 }));
         
         @SuppressWarnings("unchecked")
-        final PipelineOp join1Op = new PipelineJoin(startOp, pred1Op,
-                NV.asMap(new NV[] { new NV(Predicate.Annotations.BOP_ID,
-                        joinId1),//
-                        }));
+		final PipelineOp join1Op = new PipelineJoin(new BOp[] { startOp },
+				new NV(Predicate.Annotations.BOP_ID, joinId1),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred1Op) //
+		);
 
         @SuppressWarnings("unchecked")
-        final PipelineOp join2Op = new PipelineJoin(join1Op, pred2Op,
-                NV.asMap(new NV[] { new NV(Predicate.Annotations.BOP_ID,
-                        joinId2),//
-                        }));
-        
+		final PipelineOp join2Op = new PipelineJoin(new BOp[] { join1Op }, //
+				new NV(Predicate.Annotations.BOP_ID, joinId2),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op) //
+		);
+
         final PipelineOp queryPlan = join2Op;
 
         final Map<Integer,BOp> queryIndex = BOpUtility.getIndex(queryPlan);

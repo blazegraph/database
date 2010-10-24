@@ -69,4 +69,9 @@ public interface QueryEngineTestAnnotations {
 
     boolean DEFAULT_ONE_MESSAGE_PER_CHUNK = false;
 
+    String MAX_CONCURRENT_TASKS_PER_OPERATOR_AND_SHARD = QueryEngineTestAnnotations.class.getName()
+            + ".maxConcurrentTasksPerOperatorAndShard";
+
+    int DEFAULT_MAX_CONCURRENT_TASKS_PER_OPERATOR_AND_SHARD = Integer.MAX_VALUE; 
+    
 }

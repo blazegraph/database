@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -145,12 +144,18 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
      */
     final private Haltable<Void> future = new Haltable<Void>();
 
+	/**
+	 * The maximum number of operator tasks which may be concurrently executor
+	 * for a given (bopId,shardId).
+	 */
+    final private int maxConcurrentTasksPerOperatorAndShard;
+    
     /**
      * A collection of (bopId,partitionId) keys mapped onto a collection of
      * operator task evaluation contexts for currently executing operators for
      * this query.
      */
-    private final ConcurrentHashMap<BSBundle, ChunkFutureTask> operatorFutures;
+    private final ConcurrentHashMap<BSBundle, ConcurrentHashMap<ChunkFutureTask,ChunkFutureTask>> operatorFutures;
 
     /**
      * A map of unbounded work queues for each (bopId,partitionId). Empty queues
@@ -450,7 +455,12 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
         this.bopIndex = BOpUtility.getIndex(query);
 
-        this.operatorFutures = new ConcurrentHashMap<BSBundle, ChunkFutureTask>();
+		this.maxConcurrentTasksPerOperatorAndShard = query
+				.getProperty(
+						QueryEngineTestAnnotations.MAX_CONCURRENT_TASKS_PER_OPERATOR_AND_SHARD,
+						QueryEngineTestAnnotations.DEFAULT_MAX_CONCURRENT_TASKS_PER_OPERATOR_AND_SHARD);
+        
+        this.operatorFutures = new ConcurrentHashMap<BSBundle, ConcurrentHashMap<ChunkFutureTask,ChunkFutureTask>>();
         
         this.operatorQueues = new ConcurrentHashMap<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>>();
         
@@ -520,11 +530,12 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
         
     }
 
-    /**
-     * Pre-populate a map with {@link BOpStats} objects for the query.  Operators
-     * in subqueries are not visited since they will be assigned {@link BOpStats}
-     * objects when they are run as a subquery.
-     */
+	/**
+	 * Pre-populate a map with {@link BOpStats} objects for the query. Only the
+	 * child operands are visited. Operators in subqueries are not visited since
+	 * they will be assigned {@link BOpStats} objects when they are run as a
+	 * subquery.
+	 */
     private void populateStatsMap(final BOp op) {
 
         if(!(op instanceof PipelineOp))
@@ -1139,14 +1150,26 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
         lock.lock();
         try {
             // Make sure the query is still running.
-            future.halted();
-            // Is there a Future for this (bopId,partitionId)?
-            final ChunkFutureTask cft = operatorFutures.get(bundle);
-            if (cft != null && !cft.isDone()) {
-                // already running.
-                return false;
-            }
-            // Remove the work queue for that (bopId,partitionId).
+			if(future.isDone())
+				return false;
+			// Is there a Future for this (bopId,partitionId)?
+			ConcurrentHashMap<ChunkFutureTask, ChunkFutureTask> map = operatorFutures
+					.get(bundle);
+			if (map != null) {
+				int nrunning = 0;
+				for (ChunkFutureTask cft : map.keySet()) {
+					if (cft.isDone())
+						map.remove(cft);
+					nrunning++;
+				}
+				if (map.isEmpty())
+					operatorFutures.remove(bundle);
+				if (nrunning > maxConcurrentTasksPerOperatorAndShard) {
+					// Too many already running.
+					return false;
+				}
+			}
+			// Remove the work queue for that (bopId,partitionId).
             final BlockingQueue<IChunkMessage<IBindingSet>> queue = operatorQueues
                     .remove(bundle);
             if (queue == null || queue.isEmpty()) {
@@ -1165,16 +1188,26 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
             for (IChunkMessage<IBindingSet> msg : messages) {
                 source.add(msg.getChunkAccessor().iterator());
             }
-            /*
-             * Create task to consume that source.
-             */
-            final ChunkFutureTask ft = new ChunkFutureTask(new ChunkTask(
-                    bundle.bopId, bundle.shardId, nmessages, source));
-            /*
-             * Submit task for execution (asynchronous).
-             */
-            queryEngine.execute(ft);
-            return true;
+			/*
+			 * Create task to consume that source.
+			 */
+			final ChunkFutureTask cft = new ChunkFutureTask(new ChunkTask(
+					bundle.bopId, bundle.shardId, nmessages, source));
+			/*
+			 * Save the Future for this task. Together with the logic above this
+			 * may be used to limit the #of concurrent tasks per (bopId,shardId)
+			 * to one for a given query.
+			 */
+			if (map == null) {
+				map = new ConcurrentHashMap<ChunkFutureTask, ChunkFutureTask>();
+				operatorFutures.put(bundle, map);
+			}
+			map.put(cft, cft);
+			/*
+			 * Submit task for execution (asynchronous).
+			 */
+			queryEngine.execute(cft);
+			return true;
         } finally {
             lock.unlock();
         }
@@ -1199,6 +1232,29 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
             
         }
 
+        public void run() {
+
+        	final ChunkTask t = chunkTask;
+        	
+        	super.run();
+        	
+			/*
+			 * This task is done executing so remove its Future before we
+			 * attempt to schedule another task for the same
+			 * (bopId,partitionId).
+			 */
+			final ConcurrentHashMap<ChunkFutureTask, ChunkFutureTask> map = operatorFutures
+					.get(new BSBundle(t.bopId, t.partitionId));
+			if (map != null) {
+				map.remove(this, this);
+			}
+            
+            // Schedule another task if any messages are waiting.
+            RunningQuery.this.scheduleNext(new BSBundle(
+                    t.bopId, t.partitionId));
+        
+        }
+        
     }
 
     /**
@@ -1224,16 +1280,6 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
         
         public void run() {
 
-            // Run the task.
-            runOnce();
-            
-            // Schedule another task if any messages are waiting.
-            RunningQuery.this.scheduleNext(new BSBundle(
-                    t.bopId, t.partitionId));
-        }
-        
-        private void runOnce() {
-        
             final UUID serviceId = queryEngine.getServiceUUID();
             try {
 
@@ -1467,24 +1513,25 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                                 + bop);
             }
 
-            /*
-             * Setup the BOpStats object. For some operators, e.g., SliceOp,
-             * this MUST be the same object across all invocations of that
-             * instance of that operator for this query. This is marked by the
-             * PipelineOp#isSharedState() method and is handled by a
-             * putIfAbsent() pattern when that method returns true.
-             * 
-             * Note: RunState#haltOp() avoids adding a BOpStats object to itself
-             * since that would cause double counting when the same object is
-             * used for each invocation of the operator.
-             * 
-             * Note: By using a shared stats object we have live reporting on
-             * all instances of the task which are being evaluated on the query
-             * controller (tasks running on peers always have distinct stats
-             * objects and those stats are aggregated when the task finishes).
-             */
+			/*
+			 * Setup the BOpStats object. For some operators, e.g., SliceOp,
+			 * this MUST be the same object across all invocations of that
+			 * instance of that operator for this query. This is marked by the
+			 * PipelineOp#isSharedState() method and is handled by a
+			 * putIfAbsent() pattern when that method returns true.
+			 * 
+			 * Note: RunState#haltOp() avoids adding a BOpStats object to itself
+			 * since that would cause double counting when the same object is
+			 * used for each invocation of the operator.
+			 * 
+			 * Note: It tends to be more useful to have distinct BOpStats
+			 * objects for each operator task instance that we run as this makes
+			 * it possible to see how much work was performed by that task
+			 * instance. The data are aggregated in the [statsMap] across the
+			 * entire run of the query.
+			 */
             final BOpStats stats;
-            if (((PipelineOp) bop).isSharedState() || statsMap != null) {
+            if (((PipelineOp) bop).isSharedState()) {//|| statsMap != null) {
                 // shared stats object.
                 stats = statsMap.get(bopId);
             } else {
@@ -1947,23 +1994,19 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
         
         boolean cancelled = false;
         
-        final Iterator<ChunkFutureTask> fitr = operatorFutures.values().iterator();
+        final Iterator<ConcurrentHashMap<ChunkFutureTask,ChunkFutureTask>> fitr = operatorFutures.values().iterator();
         
         while (fitr.hasNext()) {
         
-            final ChunkFutureTask f = fitr.next();
-            
-            try {
-            
-                if (f.cancel(mayInterruptIfRunning))
-                    cancelled = true;
+        	final ConcurrentHashMap<ChunkFutureTask,ChunkFutureTask> set = fitr.next();
 
-            } finally {
-                
-//                fitr.remove();
-                
-            }
+        	for(ChunkFutureTask f : set.keySet()) {
 
+        		if (f.cancel(mayInterruptIfRunning))
+        			cancelled = true;
+        		
+        	}
+        	
         }
      
         return cancelled;

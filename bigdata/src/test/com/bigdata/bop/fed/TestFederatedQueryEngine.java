@@ -544,17 +544,14 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV( Predicate.Annotations.REMOTE_ACCESS_PATH,false),
                 }));
 
-        final PipelineJoin<E> joinOp = new PipelineJoin<E>(startOp/* left */,
-                predOp/* right */,
-                // join annotations
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId),//
-                        // Note: shard-partitioned joins!
-                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.SHARDED),//
-                        })//
-        );
-        
+		final PipelineJoin<E> joinOp = new PipelineJoin<E>(
+				new BOp[] { startOp },//
+				new NV(Predicate.Annotations.BOP_ID, joinId),//
+				new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
+				// Note: shard-partitioned joins!
+				new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+						BOpEvaluationContext.SHARDED));
+
         final PipelineOp query = new SliceOp(new BOp[] { joinOp },
         // slice annotations
                 NV.asMap(new NV[] {//
@@ -712,20 +709,17 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV( Predicate.Annotations.REMOTE_ACCESS_PATH,false),
                 }));
 
-        final PipelineJoin<E> joinOp = new PipelineJoin<E>(startOp/* left */,
-                predOp/* right */,
-                // join annotations
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId),//
-                        // Note: shard-partitioned joins!
-                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.SHARDED),//
-                        // impose constraint on the join.
-                        new NV(PipelineJoin.Annotations.CONSTRAINTS,
-                                new IConstraint[] { new EQConstant(y,
-                                        new Constant<String>("Paul")) }),//
-                        })//
-        );
+		final PipelineJoin<E> joinOp = new PipelineJoin<E>(
+				new BOp[] { startOp },//
+				new NV(Predicate.Annotations.BOP_ID, joinId),//
+				new NV(PipelineJoin.Annotations.PREDICATE, predOp),
+				// Note: shard-partitioned joins!
+				new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+						BOpEvaluationContext.SHARDED),//
+				// impose constraint on the join.
+				new NV(PipelineJoin.Annotations.CONSTRAINTS,
+						new IConstraint[] { new EQConstant(y,
+								new Constant<String>("Paul")) }));
         
         final PipelineOp query = new SliceOp(new BOp[] { joinOp },
         // slice annotations
@@ -865,17 +859,14 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                                 ITx.READ_COMMITTED),//
                 }));
 
-        final PipelineJoin<E> joinOp = new PipelineJoin<E>(startOp/* left */,
-                predOp/* right */,
-                // join annotations
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId),//
-                        // Note: shard-partitioned joins!
-                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.SHARDED),//
-                        })//
-        );
-        
+		final PipelineJoin<E> joinOp = new PipelineJoin<E>(
+				new BOp[] { startOp },//
+				new NV(Predicate.Annotations.BOP_ID, joinId),//
+				new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
+				// Note: shard-partitioned joins!
+				new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+						BOpEvaluationContext.SHARDED));
+
         final PipelineOp query = new SliceOp(new BOp[] { joinOp },
                 // slice annotations
                 NV.asMap(new NV[] {//
@@ -1030,22 +1021,20 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 }));
         
         final PipelineOp join1Op = new PipelineJoin<E>(//
-                startOp, pred1Op,//
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId1),//
-                        // Note: shard-partitioned joins!
-                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.SHARDED),//
-                        }));
+        		new BOp[]{startOp},//
+                new NV(Predicate.Annotations.BOP_ID, joinId1),//
+                new NV(PipelineJoin.Annotations.PREDICATE,pred1Op),//
+                // Note: shard-partitioned joins!
+                new NV( Predicate.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.SHARDED));
 
-        final PipelineOp join2Op = new PipelineJoin<E>(//
-                join1Op, pred2Op,//
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId2),//
-                        // Note: shard-partitioned joins!
-                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.SHARDED),//
-                        }));
+		final PipelineOp join2Op = new PipelineJoin<E>(//
+				new BOp[] { join1Op },//
+				new NV(Predicate.Annotations.BOP_ID, joinId2),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op),//
+				// Note: shard-partitioned joins!
+				new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+						BOpEvaluationContext.SHARDED));
 
         final PipelineOp query = new SliceOp(new BOp[] { join2Op },
                 NV.asMap(new NV[] {//
@@ -1228,31 +1217,28 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
         
-        final PipelineOp join1Op = new PipelineJoin<E>(//
-                startOp, pred1Op,//
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId1),//
-                        // Note: shard-partitioned joins!
-                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.SHARDED),//
-                        }));
+		final PipelineOp join1Op = new PipelineJoin<E>(//
+				new BOp[] { startOp },//
+				new NV(Predicate.Annotations.BOP_ID, joinId1),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred1Op),//
+				// Note: shard-partitioned joins!
+				new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+						BOpEvaluationContext.SHARDED));
 
-        final PipelineOp join2Op = new PipelineJoin<E>(//
-                join1Op, pred2Op,//
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId2),//
-                        // Note: shard-partitioned joins!
-                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.SHARDED),//
-                        // constraint x == z
-                        new NV(PipelineJoin.Annotations.CONSTRAINTS,new IConstraint[]{
-                                new EQ(x,z)
-                        }),
-                        // join is optional.
-                        new NV(PipelineJoin.Annotations.OPTIONAL,true),//
-                        // optional target is the same as the default target.
-                        new NV(PipelineOp.Annotations.ALT_SINK_REF,sliceId),//
-                        }));
+		final PipelineOp join2Op = new PipelineJoin<E>(//
+				new BOp[] { join1Op },//
+				new NV(Predicate.Annotations.BOP_ID, joinId2),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op),//
+				// Note: shard-partitioned joins!
+				new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+						BOpEvaluationContext.SHARDED),//
+				// constraint x == z
+				new NV(PipelineJoin.Annotations.CONSTRAINTS,
+						new IConstraint[] { new EQ(x, z) }),
+				// join is optional.
+				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
+				// optional target is the same as the default target.
+				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
 
         final PipelineOp sliceOp = new SliceOp(//
                 new BOp[]{join2Op},

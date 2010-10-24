@@ -309,29 +309,28 @@ public class TestQueryEngine extends TestCase2 {
     public void test_query_join1() throws Exception {
 
         final int startId = 1;
-        final int joinId = 2;
-        final int predId = 3;
-        final PipelineOp query = new PipelineJoin<E>(
-        // left
-                new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, startId),//
-                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.CONTROLLER),//
-                        })),
-                // right
-                new Predicate<E>(new IVariableOrConstant[] {
-                        new Constant<String>("Mary"), Var.var("value") }, NV
-                        .asMap(new NV[] {//
-                                new NV(Predicate.Annotations.RELATION_NAME,
-                                        new String[] { namespace }),//
-                                new NV(Predicate.Annotations.BOP_ID, predId),//
-                                new NV(Predicate.Annotations.TIMESTAMP,ITx.READ_COMMITTED),//
-                        })),
-                // join annotations
-                NV.asMap(new NV[] { //
-                        new NV(Predicate.Annotations.BOP_ID, joinId),//
-                        })//
-        );
+		final int joinId = 2;
+		final int predId = 3;
+
+		final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
+						new NV(Predicate.Annotations.BOP_ID, startId),//
+						new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+								BOpEvaluationContext.CONTROLLER),//
+				}));
+
+		final Predicate<E> pred = new Predicate<E>(new IVariableOrConstant[] {
+				new Constant<String>("Mary"), Var.var("value") }, NV
+				.asMap(new NV[] {//
+						new NV(Predicate.Annotations.RELATION_NAME,
+								new String[] { namespace }),//
+						new NV(Predicate.Annotations.BOP_ID, predId),//
+						new NV(Predicate.Annotations.TIMESTAMP,
+								ITx.READ_COMMITTED),//
+				}));
+
+		final PipelineOp query = new PipelineJoin<E>(new BOp[] { startOp },//
+				new NV(Predicate.Annotations.BOP_ID, joinId),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
         // the expected solution.
         final IBindingSet[] expected = new IBindingSet[] {//
@@ -434,15 +433,10 @@ public class TestQueryEngine extends TestCase2 {
                                 ITx.READ_COMMITTED),//
                 }));
         
-        final PipelineJoin<E> joinOp = new PipelineJoin<E>(
-                startOp/* left */, predOp/* right */,
-                // join annotations
-                NV.asMap(new NV[] { //
-                        new NV(Predicate.Annotations.BOP_ID, joinId),//
-//                        new NV(PipelineOp.Annotations.CHUNK_CAPACITY, 1),//
-//                        new NV(PipelineOp.Annotations.CHUNK_OF_CHUNKS_CAPACITY, 1),//
-                        })//
-        );
+		final PipelineJoin<E> joinOp = new PipelineJoin<E>(
+				new BOp[] { startOp },//
+				new NV(Predicate.Annotations.BOP_ID, joinId),//
+				new NV(PipelineJoin.Annotations.PREDICATE, predOp));
         
         final SliceOp sliceOp = new SliceOp(new BOp[] { joinOp },
                 // slice annotations
@@ -868,13 +862,10 @@ public class TestQueryEngine extends TestCase2 {
                                 ITx.READ_COMMITTED),//
                 }));
 
-        final PipelineJoin<E> joinOp = new PipelineJoin<E>(startOp/* left */,
-                predOp/* right */,
-                // join annotations
-                NV.asMap(new NV[] { //
-                        new NV(Predicate.Annotations.BOP_ID, joinId),//
-                        })//
-        );
+		final PipelineJoin<E> joinOp = new PipelineJoin<E>(
+				new BOp[] { startOp },//
+				new NV(Predicate.Annotations.BOP_ID, joinId),//
+				new NV(PipelineJoin.Annotations.PREDICATE, predOp));
 
         final PipelineOp query = new SliceOp(new BOp[] { joinOp },
         // slice annotations
@@ -1002,18 +993,16 @@ public class TestQueryEngine extends TestCase2 {
 //                                R.primaryKeyOrder),//
                 }));
 
-        final PipelineJoin<E> joinOp = new PipelineJoin<E>(startOp/* left */,
-                predOp/* right */,
-                // join annotations
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId),//
-                        // impose constraint on the join.
-                        new NV(PipelineJoin.Annotations.CONSTRAINTS,
-                                new IConstraint[] { new EQConstant(y,
-                                        new Constant<String>("Paul")) }),//
-                        })//
-        );
-        
+		final PipelineJoin<E> joinOp = new PipelineJoin<E>(
+				new BOp[] { startOp },//
+				new NV(Predicate.Annotations.BOP_ID, joinId),//
+				new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
+				// impose constraint on the join.
+				new NV(PipelineJoin.Annotations.CONSTRAINTS,
+						new IConstraint[] { new EQConstant(y,
+								new Constant<String>("Paul")) })//
+		);
+
         final PipelineOp query = new SliceOp(new BOp[] { joinOp },
         // slice annotations
                 NV.asMap(new NV[] {//
@@ -1170,19 +1159,17 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
         
-        final PipelineOp join1Op = new PipelineJoin<E>(//
-                startOp, pred1Op,//
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId1),//
-                        }));
+		final PipelineOp join1Op = new PipelineJoin<E>(//
+				new BOp[] { startOp },//
+				new NV(Predicate.Annotations.BOP_ID, joinId1),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred1Op));
 
-        final PipelineOp join2Op = new PipelineJoin<E>(//
-                join1Op, pred2Op,//
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId2),//
-                        }));
+		final PipelineOp join2Op = new PipelineJoin<E>(//
+				new BOp[] { join1Op },//
+				new NV(Predicate.Annotations.BOP_ID, joinId2),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op));
 
-        final PipelineOp query = join2Op;
+		final PipelineOp query = join2Op;
 
         // start the query.
         final UUID queryId = UUID.randomUUID();
@@ -1472,24 +1459,21 @@ public class TestQueryEngine extends TestCase2 {
                 }));
         
         final PipelineOp join1Op = new PipelineJoin<E>(//
-                startOp, pred1Op,//
-                NV.asMap(new NV[] {//
+                new BOp[]{startOp},// 
                         new NV(Predicate.Annotations.BOP_ID, joinId1),//
-                        }));
+                        new NV(PipelineJoin.Annotations.PREDICATE,pred1Op));
 
-        final PipelineOp join2Op = new PipelineJoin<E>(//
-                join1Op, pred2Op,//
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId2),//
-                        // constraint x == z
-                        new NV(PipelineJoin.Annotations.CONSTRAINTS,new IConstraint[]{
-                                new EQ(x,z)
-                        }),
-                        // join is optional.
-                        new NV(PipelineJoin.Annotations.OPTIONAL,true),//
-                        // optional target is the same as the default target.
-                        new NV(PipelineOp.Annotations.ALT_SINK_REF,sliceId),//
-                        }));
+		final PipelineOp join2Op = new PipelineJoin<E>(//
+				new BOp[] { join1Op },//
+				new NV(Predicate.Annotations.BOP_ID, joinId2),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op),//
+				// constraint x == z
+				new NV(PipelineJoin.Annotations.CONSTRAINTS,
+						new IConstraint[] { new EQ(x, z) }),
+				// join is optional.
+				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
+				// optional target is the same as the default target.
+				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
 
         final PipelineOp sliceOp = new SliceOp(//
                 new BOp[]{join2Op},
@@ -1843,17 +1827,15 @@ public class TestQueryEngine extends TestCase2 {
                             new NV(ConditionalRoutingOp.Annotations.CONDITION, condition),
                         }));
         
-        final PipelineOp join1Op = new PipelineJoin<E>(//
-                cond, pred1Op,//
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId1),//
-                        }));
-        
-        final PipelineOp join2Op = new PipelineJoin<E>(//
-                join1Op, pred2Op, //
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId2),//
-                        }));
+		final PipelineOp join1Op = new PipelineJoin<E>(//
+				new BOp[] { cond }, //
+				new NV(Predicate.Annotations.BOP_ID, joinId1),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred1Op));
+
+		final PipelineOp join2Op = new PipelineJoin<E>(//
+				new BOp[] { join1Op },//
+				new NV(Predicate.Annotations.BOP_ID, joinId2),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op));
         
         final PipelineOp sliceOp = new SliceOp(//
                         new BOp[]{join2Op},
