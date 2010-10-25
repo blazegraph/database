@@ -435,7 +435,7 @@ public abstract class SPARQLQueryTest extends TestCase {
 		}
 	}
 
-	private String readQueryString()
+	protected String readQueryString()
 		throws IOException
 	{
 		InputStream stream = new URL(queryFileURL).openStream();

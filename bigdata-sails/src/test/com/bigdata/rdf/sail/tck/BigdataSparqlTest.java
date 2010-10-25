@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.tck;
 
 import info.aduna.io.IOUtil;
+import info.aduna.iteration.Iterations;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -36,15 +37,27 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.Properties;
+import java.util.Set;
 
 import junit.framework.Test;
 import junit.framework.TestSuite;
 
+import org.apache.log4j.Logger;
+import org.openrdf.model.Statement;
+import org.openrdf.query.BooleanQuery;
 import org.openrdf.query.Dataset;
+import org.openrdf.query.GraphQuery;
+import org.openrdf.query.GraphQueryResult;
+import org.openrdf.query.Query;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQuery;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.parser.sparql.ManifestTest;
 import org.openrdf.query.parser.sparql.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
+import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.RepositoryResult;
 import org.openrdf.repository.dataset.DatasetRepository;
 import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.sail.memory.MemoryStore;
@@ -65,6 +78,9 @@ import com.bigdata.rdf.sail.BigdataSail.Options;
  */
 public class BigdataSparqlTest extends SPARQLQueryTest {
 
+    static protected final Logger log = Logger.getLogger(BigdataSparqlTest.class);
+    
+    
     /**
      * We cannot use inlining for these test because we do normalization on
      * numeric values and these tests test for syntatic differences, i.e.
@@ -168,22 +184,22 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
      * run.
      */
     static final Collection<String> testURIs = Arrays.asList(new String[] {
-/*
+
 //      busted with EvalStrategy1
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-2",
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#filter-scope-1",
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#join-scope-1",
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional/manifest#dawg-optional-complex-4",
+//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-2",
+//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#filter-scope-1",
+//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#join-scope-1",
+//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional/manifest#dawg-optional-complex-4",
         
 //      busted with EvalStrategy2 with LeftJoin enabled
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-12",
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-1",
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#opt-filter-1",
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#opt-filter-2",
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional/manifest#dawg-optional-complex-3",
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-001",
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-004",
-*/        
+//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-12",
+//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-1",
+//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#opt-filter-1",
+//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#opt-filter-2",
+//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional/manifest#dawg-optional-complex-3",
+//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-001",
+//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-004",
+        
 //      Dataset crap
 //         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/i18n/manifest#normalization-1",
             
@@ -207,6 +223,7 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
 //    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/basic/manifest#prefix-name-1",//OK
 //    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/basic/manifest#spoo-1",//BOOM
     		
+//          "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/graph/manifest#dawg-graph-05",
     });
 
     /**
@@ -424,11 +441,6 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         super.setUp();
     }
     
-    @Override
-    public void runTest() throws Exception {
-        super.runTest();
-    }
-    
     public Repository getRepository() {
         return dataRep;
     }
@@ -446,6 +458,44 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         }
         return queryString;
     }
+    
+    
+//    @Override
+//    protected void runTest()
+//        throws Exception
+//    {
+//        RepositoryConnection con = getQueryConnection(dataRep);
+//        try {
+//
+//            log.info("database dump:");
+//            RepositoryResult<Statement> stmts = con.getStatements(null, null, null, false);
+//            while (stmts.hasNext()) {
+//                log.info(stmts.next());
+//            }
+//            log.info("dataset:\n" + dataset);
+//
+//            String queryString = readQueryString();
+//            log.info("query:\n" + getQueryString());
+//            
+//            Query query = con.prepareQuery(QueryLanguage.SPARQL, queryString, queryFileURL);
+//            if (dataset != null) {
+//                query.setDataset(dataset);
+//            }
+//
+//            if (query instanceof TupleQuery) {
+//                TupleQueryResult queryResult = ((TupleQuery)query).evaluate();
+//                while (queryResult.hasNext()) {
+//                    log.info("query result:\n" + queryResult.next());
+//                }
+//            }
+//
+//        }
+//        finally {
+//            con.close();
+//        }
+//        
+//        super.runTest();
+//    }
     
     
 
