@@ -466,7 +466,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 return new EmptyIteration<BindingSet, QueryEvaluationException>();
             }
 
-            return execute(query, bindings);
+            return execute(query);
             
         } catch (UnknownOperatorException ex) {
             
@@ -577,7 +577,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 return new EmptyIteration<BindingSet, QueryEvaluationException>();
             }
 
-            return execute(query, bindings);
+            return execute(query);
             
         } catch (UnknownOperatorException ex) {
             
@@ -683,7 +683,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 return new EmptyIteration<BindingSet, QueryEvaluationException>();
             }
             
-            return execute(query, bindings);
+            return execute(query);
             
         } catch (UnknownOperatorException ex) {
             
@@ -1668,16 +1668,8 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
      * 
      * @throws QueryEvaluationException
      */
-//    protected CloseableIteration<BindingSet, QueryEvaluationException> execute(
-//            final IStep step)
-//            throws Exception {
-//        
-//        return execute(step, null);
-//        
-//    }
-        
     protected CloseableIteration<BindingSet, QueryEvaluationException> execute(
-            final IStep step, final BindingSet constants)
+            final IStep step)
             throws Exception {
         
         final QueryEngine queryEngine = tripleSource.getSail().getQueryEngine();
@@ -1721,7 +1713,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         CloseableIteration<BindingSet, QueryEvaluationException> result = 
             new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
                 new BigdataBindingSetResolverator(database, it2).start(database
-                        .getExecutorService()), constants);
+                        .getExecutorService()));
 
         try {
             // Wait for the Future (checks for errors).
@@ -1842,6 +1834,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             final StatementPattern sp, final BindingSet bindings)
             throws QueryEvaluationException {
         
+        if (sp.getParentNode() instanceof Projection) {
+            return evaluateSingleTailRule(sp, bindings);
+        }
+        
         if (log.isDebugEnabled()) {
             log.debug("evaluating statement pattern:\n" + sp);
         }
@@ -1873,39 +1869,38 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         
     }
      
-//    /**
-//     * Override evaluation of StatementPatterns to recognize magic search 
-//     * predicate.
-//     */
-//    @Override
-//    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
-//            final StatementPattern sp, final BindingSet bindings)
-//            throws QueryEvaluationException {
-//        
-//        // no check against the nativeJoins property here because we are simply
-//        // using the native execution model to take care of magic searches.
-//        
-//        if (log.isDebugEnabled()) {
-//            log.debug("evaluating statement pattern:\n" + sp);
-//        }
-//        
-//        final IStep query = createNativeQuery(sp);
-//        
-//        if (query == null) {
-//            return new EmptyIteration<BindingSet, QueryEvaluationException>();
-//        }
-//
-//        try {
-//        
-//            return execute(query, bindings);
-//
-//        } catch (Exception ex) {
-//            
-//            throw new QueryEvaluationException(ex);
-//            
-//        }
-//        
-//    }
+    /**
+     * Override evaluation of StatementPatterns to recognize magic search 
+     * predicate.
+     */
+    public CloseableIteration<BindingSet, QueryEvaluationException> evaluateSingleTailRule(
+            final StatementPattern sp, final BindingSet bindings)
+            throws QueryEvaluationException {
+        
+        // no check against the nativeJoins property here because we are simply
+        // using the native execution model to take care of magic searches.
+        
+        if (log.isDebugEnabled()) {
+            log.debug("evaluating statement pattern:\n" + sp);
+        }
+        
+        final IStep query = createNativeQuery(sp);
+        
+        if (query == null) {
+            return new EmptyIteration<BindingSet, QueryEvaluationException>();
+        }
+
+        try {
+        
+            return execute(query);
+
+        } catch (Exception ex) {
+            
+            throw new QueryEvaluationException(ex);
+            
+        }
+        
+    }
      
 
     /**

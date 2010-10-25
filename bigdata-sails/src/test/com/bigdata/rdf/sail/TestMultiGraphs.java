@@ -163,7 +163,7 @@ public class TestMultiGraphs extends ProxyBigdataSailTestCase {
                     "PREFIX rdfs: <"+RDFS.NAMESPACE+"> " +
                     "PREFIX ns: <"+ns+"> " +
                     
-                    "select ?p ?o " +
+                    "select distinct ?p ?o " +
                     "WHERE { " +
 //                    "  ?s rdf:type ns:Person . " +
                     "  ns:Mike ?p ?o . " +
