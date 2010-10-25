@@ -91,53 +91,44 @@ public class MockRunningQuery implements IRunningQuery {
         throw new UnsupportedOperationException();
     }
 
-	@Override
 	public Map<Integer, BOp> getBOpIndex() {
 		return null;
 	}
 
-	@Override
 	public Map<Integer, BOpStats> getStats() {
 		return null;
 	}
 
-	@Override
 	public long getDeadline() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public long getDoneTime() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public long getElapsed() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public long getStartTime() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public Throwable getCause() {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	@Override
 	public BOp getQuery() {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	@Override
 	public UUID getQueryId() {
 		// TODO Auto-generated method stub
 		return null;
