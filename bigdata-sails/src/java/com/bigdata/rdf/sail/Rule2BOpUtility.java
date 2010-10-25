@@ -381,11 +381,13 @@ public class Rule2BOpUtility {
 
             // decorate the predicate with the assigned index.
 //            pred = pred.setKeyOrder(keyOrder[order[i]]);
-            pred.setProperty(Annotations.ORIGINAL_INDEX, keyOrder[order[i]]);
+			pred = (Predicate<?>) pred.setProperty(Annotations.ORIGINAL_INDEX,
+					keyOrder[order[i]]);
 
-            // decorate the predicate with the cardinality estimate.
-			pred.setProperty(Annotations.ESTIMATED_CARDINALITY, plan
-					.cardinality(order[i]));
+			// decorate the predicate with the cardinality estimate.
+			pred = (Predicate<?>) pred.setProperty(
+					Annotations.ESTIMATED_CARDINALITY, plan
+							.cardinality(order[i]));
             
             /*
              * Collect all the constraints for this predicate based on which
@@ -510,7 +512,7 @@ public class Rule2BOpUtility {
 
         }
         
-        if (true||log.isInfoEnabled()) {
+        if (log.isInfoEnabled()) {
             // just for now while i'm debugging
             log.info("rule=" + rule + ":::query="
                     + BOpUtility.toString(left));

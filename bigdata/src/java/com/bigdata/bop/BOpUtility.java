@@ -549,6 +549,49 @@ public class BOpUtility {
 
     }
 
+	/**
+	 * Return a list containing the evaluation order for the pipeline. Only the
+	 * child operands are visited. Operators in subqueries are not visited since
+	 * they will be assigned {@link BOpStats} objects when they are run as a
+	 * subquery. The evaluation order is given by the depth-first left-deep
+	 * traversal of the query.
+	 * 
+	 * @todo unit tests.
+	 */
+    public static Integer[] getEvaluationOrder(final BOp op) {
+
+    	final List<Integer> order = new LinkedList<Integer>();
+    	
+    	getEvaluationOrder(op, order, 0/*depth*/);
+    	
+    	return order.toArray(new Integer[order.size()]);
+    	
+    }
+    
+    private static void getEvaluationOrder(final BOp op, final List<Integer> order, final int depth) {
+    	
+        if(!(op instanceof PipelineOp))
+            return;
+        
+        final int bopId = op.getId();
+
+		if (depth == 0
+				|| !op.getProperty(BOp.Annotations.CONTROLLER,
+						BOp.Annotations.DEFAULT_CONTROLLER)) {
+
+			if (op.arity() > 0) {
+
+				// left-deep recursion
+				getEvaluationOrder(op.get(0), order, depth + 1);
+
+			}
+
+		}
+
+        order.add(bopId);
+
+    }
+    
     /**
      * Combine chunks drawn from an iterator into a single chunk. This is useful
      * when materializing intermediate results for an all-at-once operator.

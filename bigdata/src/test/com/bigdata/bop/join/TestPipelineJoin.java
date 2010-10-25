@@ -62,6 +62,7 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.Dechunkerator;
 
 /**
  * Unit tests for the {@link PipelineJoin} operator.
@@ -231,8 +232,106 @@ public class TestPipelineJoin extends TestCase2 {
         // access path
         assertEquals(0L, stats.accessPathDups.get());
         assertEquals(1L, stats.accessPathCount.get());
-        assertEquals(1L, stats.chunkCount.get());
-        assertEquals(2L, stats.elementCount.get());
+        assertEquals(1L, stats.accessPathChunksIn.get());
+        assertEquals(2L, stats.accessPathUnitsIn.get());
+        
+        assertTrue(ft.isDone());
+        assertFalse(ft.isCancelled());
+        ft.get(); // verify nothing thrown.
+
+    }
+
+    /**
+     * Unit test for a pipeline join in which we expect duplicate access paths to
+     * be eliminated.
+     * 
+     * @throws ExecutionException 
+     * @throws InterruptedException 
+     */
+    public void test_join_duplicateElimination() throws InterruptedException, ExecutionException {
+
+        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+        
+        final BOp startOp =                 new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
+				new NV(Predicate.Annotations.BOP_ID, startId),//
+				}));
+
+		final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
+				new Constant<String>("Mary"), Var.var("x") }, NV
+				.asMap(new NV[] {//
+						new NV(Predicate.Annotations.RELATION_NAME,
+								new String[] { namespace }),//
+						new NV(Predicate.Annotations.BOP_ID, predId),//
+						new NV(Predicate.Annotations.TIMESTAMP,
+								ITx.READ_COMMITTED),//
+				}));
+
+		final PipelineJoin<E> query = new PipelineJoin<E>(
+				new BOp[] { startOp },//
+				new NV(Predicate.Annotations.BOP_ID, joinId),//
+				new NV(PipelineJoin.Annotations.PREDICATE, predOp));
+
+        // the expected solutions (each solution appears twice since we feed two empty binding sets in).
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { Var.var("x") },//
+                        new IConstant[] { new Constant<String>("John") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { Var.var("x") },//
+                        new IConstant[] { new Constant<String>("Paul") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { Var.var("x") },//
+                        new IConstant[] { new Constant<String>("John") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { Var.var("x") },//
+                        new IConstant[] { new Constant<String>("Paul") }//
+                ),//
+        };
+
+        final PipelineJoinStats stats = query.newStats();
+
+        // submit TWO (2) empty binding sets in ONE (1) chunk.
+        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { new IBindingSet[] { new HashBindingSet(), new HashBindingSet()} });
+
+        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
+
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                new MockRunningQuery(null/* fed */, jnl/* indexManager */
+                ), -1/* partitionId */, stats,
+                source, sink, null/* sink2 */);
+
+        // get task.
+        final FutureTask<Void> ft = query.eval(context);
+        
+        // execute task.
+        jnl.getExecutorService().execute(ft);
+
+        ft.get();// wait for completion (before showing stats), then look for errors.
+
+        // show stats.
+        System.err.println("stats: "+stats);
+
+        // verify solutions.
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, new Dechunkerator<IBindingSet>(sink.iterator()));
+        
+        // verify stats.
+        
+        // join task
+        assertEquals(1L, stats.chunksIn.get());
+        assertEquals(2L, stats.unitsIn.get());
+        assertEquals(4L, stats.unitsOut.get());
+        assertEquals(1L, stats.chunksOut.get());
+        // access path
+        assertEquals(1L, stats.accessPathDups.get());
+        assertEquals(1L, stats.accessPathCount.get());
+        assertEquals(1L, stats.accessPathChunksIn.get());
+        assertEquals(2L, stats.accessPathUnitsIn.get());
         
         assertTrue(ft.isDone());
         assertFalse(ft.isCancelled());
@@ -316,8 +415,8 @@ public class TestPipelineJoin extends TestCase2 {
         // access path
         assertEquals(0L, stats.accessPathDups.get());
         assertEquals(1L, stats.accessPathCount.get());
-        assertEquals(1L, stats.chunkCount.get());
-        assertEquals(2L, stats.elementCount.get());
+        assertEquals(1L, stats.accessPathChunksIn.get());
+        assertEquals(2L, stats.accessPathUnitsIn.get());
 
         assertTrue(ft.isDone());
         assertFalse(ft.isCancelled());
@@ -426,8 +525,8 @@ public class TestPipelineJoin extends TestCase2 {
         // access path
         assertEquals(0L, stats.accessPathDups.get());
         assertEquals(1L, stats.accessPathCount.get());
-        assertEquals(1L, stats.chunkCount.get());
-        assertEquals(5L, stats.elementCount.get());
+        assertEquals(1L, stats.accessPathChunksIn.get());
+        assertEquals(5L, stats.accessPathUnitsIn.get());
 
         assertTrue(ft.isDone());
         assertFalse(ft.isCancelled());
@@ -531,8 +630,8 @@ public class TestPipelineJoin extends TestCase2 {
         // access path
         assertEquals(0L, stats.accessPathDups.get());
         assertEquals(2L, stats.accessPathCount.get());
-        assertEquals(1L, stats.chunkCount.get());
-        assertEquals(2L, stats.elementCount.get());
+        assertEquals(1L, stats.accessPathChunksIn.get());
+        assertEquals(2L, stats.accessPathUnitsIn.get());
         
         assertTrue(ft.isDone());
         assertFalse(ft.isCancelled());
@@ -641,8 +740,8 @@ public class TestPipelineJoin extends TestCase2 {
         // access path
         assertEquals(0L, stats.accessPathDups.get());
         assertEquals(2L, stats.accessPathCount.get());
-        assertEquals(1L, stats.chunkCount.get());
-        assertEquals(2L, stats.elementCount.get());
+        assertEquals(1L, stats.accessPathChunksIn.get());
+        assertEquals(2L, stats.accessPathUnitsIn.get());
         
         assertTrue(ft.isDone());
         assertFalse(ft.isCancelled());

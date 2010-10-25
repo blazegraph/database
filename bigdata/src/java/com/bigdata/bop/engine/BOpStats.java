@@ -47,13 +47,13 @@ public class BOpStats implements Serializable {
      */
     private static final long serialVersionUID = 1L;
 
-//	/**
-//	 * The timestamp (nanoseconds) assigned when this {@link BOpStats} object
-//	 * was creatred. This can not be directly aggregated into wall time since
-//	 * concurrent processes are nearly always used during query evaluation.
-//	 */
-//    private final long startTime = System.nanoTime();
-    
+	/**
+	 * The elapsed time (milliseconds) for the corresponding operation. When
+	 * aggregated, this will generally exceed the wall time since concurrent
+	 * processes are nearly always used during query evaluation.
+	 */
+    final public CAT elapsed = new CAT();
+
     /**
      * #of chunks in.
      */
@@ -97,6 +97,7 @@ public class BOpStats implements Serializable {
             // Do not add to self!
             return;
         }
+        elapsed.add(o.elapsed.get());
         chunksIn.add(o.chunksIn.get());
         unitsIn.add(o.unitsIn.get());
         unitsOut.add(o.unitsOut.get());
@@ -111,7 +112,8 @@ public class BOpStats implements Serializable {
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append(super.toString());
-        sb.append("{chunksIn=" + chunksIn.get());
+        sb.append("{elapsed=" + elapsed.get());
+        sb.append(",chunksIn=" + chunksIn.get());
         sb.append(",unitsIn=" + unitsIn.get());
         sb.append(",chunksOut=" + chunksOut.get());
         sb.append(",unitsOut=" + unitsOut.get());

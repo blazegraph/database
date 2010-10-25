@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop.engine;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -108,6 +109,18 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
      * interpreted by the query controller.
      */
     final private AtomicLong deadline = new AtomicLong(Long.MAX_VALUE);
+
+	/**
+	 * The timestamp(ms) when the query begins to execute.
+	 */
+	final private AtomicLong startTime = new AtomicLong(System
+			.currentTimeMillis());
+
+	/**
+	 * The timestamp (ms) when the query is done executing and ZERO (0L) if the
+	 * query is not done.
+	 */
+	final private AtomicLong doneTime = new AtomicLong(0L);
 
     /**
      * <code>true</code> iff the outer {@link QueryEngine} is the controller for
@@ -304,17 +317,23 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
     }
 
-    /**
-     * Return the query deadline (the time at which it will terminate regardless
-     * of its run state).
-     * 
-     * @return The query deadline (milliseconds since the epoch) and
-     *         {@link Long#MAX_VALUE} if no explicit deadline was specified.
-     */
     public long getDeadline() {
-
         return deadline.get();
+    }
 
+    public long getStartTime() {
+    	return startTime.get();
+    }
+
+    public long getDoneTime() {
+    	return doneTime.get();
+    }
+
+    public long getElapsed() {
+		long mark = doneTime.get();
+		if (mark == 0L)
+			mark = System.currentTimeMillis();
+    	return mark - startTime.get();
     }
 
     /**
@@ -366,31 +385,15 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
     }
 
-    /**
-     * Return the current statistics for the query and <code>null</code> unless
-     * this is the query controller. There will be a single entry in the map for
-     * each distinct {@link PipelineOp}. The map entries are inserted when we
-     * first begin to run an instance of that operator on some
-     * {@link IChunkMessage}.
-     */
     public Map<Integer/* bopId */, BOpStats> getStats() {
 
-        return statsMap;
+        return Collections.unmodifiableMap(statsMap);
 
     }
 
-    /**
-     * Lookup and return the {@link BOp} with that identifier using an index.
-     * 
-     * @param bopId
-     *            The identifier.
-     *            
-     * @return The {@link BOp} -or- <code>null</code> if no {@link BOp} was
-     *         found in the query with for that identifier.
-     */
-    public BOp getBOp(final int bopId) {
+    public Map<Integer,BOp> getBOpIndex() {
         
-        return bopIndex.get(bopId);
+        return bopIndex;
         
     }
     
@@ -1295,10 +1298,16 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                 clientProxy.startOp(new StartOpMessage(queryId, t.bopId,
                         t.partitionId, serviceId, t.messagesIn));
 
-                /*
-                 * Run the operator task.
-                 */
-                t.call();
+				/*
+				 * Run the operator task.
+				 */
+				final long begin = System.currentTimeMillis();
+				try {
+					t.call();
+				} finally {
+					t.context.getStats().elapsed.add(System.currentTimeMillis()
+							- begin);
+				}
 
                 /*
                  * Queue task to notify the query controller that operator task
@@ -1972,6 +1981,11 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                 }
                 // life cycle hook for the end of the query.
                 lifeCycleTearDownQuery();
+                // mark done time.
+                doneTime.set(System.currentTimeMillis());
+                // log summary statistics for the query.
+				if (isController())
+					QueryLog.log(this);
             }
             // remove from the collection of running queries.
             queryEngine.halt(this);
@@ -2066,6 +2080,12 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
     }
 
+    final public Throwable getCause() {
+    	
+    	return future.getCause();
+    	
+    }
+    
     public IBigdataFederation<?> getFederation() {
 
         return queryEngine.getFederation();
@@ -2097,5 +2117,5 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
         return StandaloneChunkHandler.INSTANCE;
         
     }
-    
+
 }

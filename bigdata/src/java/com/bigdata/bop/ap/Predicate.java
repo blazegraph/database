@@ -543,70 +543,91 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
     }
 
-    /*
-     * Intentionally removed. See BOpBase.
-     * 
-     * hashCode() and equals() for Predicate were once used to cache access
-     * paths, but that code was history long before we developed the bop model.
-     */
-    
-//    public boolean equals(final Object other) {
-//        
-//        if (this == other)
-//            return true;
-//
-//        if(!(other instanceof IPredicate<?>))
-//            return false;
-//        
-//        final IPredicate<?> o = (IPredicate<?>)other;
-//        
-//        final int arity = arity();
-//        
-//        if(arity != o.arity()) return false;
-//
-//        for (int i = 0; i < arity; i++) {
-//
-//            final IVariableOrConstant<?> x = get(i);
-//
-//            final IVariableOrConstant<?> y = o.get(i);
-//            
-//            if (x != y && !(x.equals(y))) {
-//                
-//                return false;
-//            
-//            }
-//            
-//        }
-//        
-//        return true;
-//        
-//    }
-//    
-//    public int hashCode() {
-//        
-//        int h = hash;
-//
-//        if (h == 0) {
-//
-//            final int n = arity();
-//
-//            for (int i = 0; i < n; i++) {
-//        
-//                h = 31 * h + get(i).hashCode();
-//                
-//            }
-//            
-//            hash = h;
-//            
-//        }
-//        
-//        return h;
-//
-//    }
-//
-//    /**
-//     * Caches the hash code.
-//     */
-//    private int hash = 0;
+	/**
+	 * This class may be used to insert instances of {@link IPredicate}s into a
+	 * hash map where equals is decided based solely on the pattern of variables
+	 * and constants found on the {@link IPredicate}. This may be used to create
+	 * access path caches or to identify and eliminate duplicate requests for
+	 * the same access path.
+	 */
+    public static class HashedPredicate<E> {
+
+    	/**
+    	 * The predicate.
+    	 */
+		public final IPredicate<E> pred;
+    	
+		/**
+		 * The cached hash code.
+		 */
+		final private int hash;
+	
+		public HashedPredicate(final IPredicate<E> pred) {
+
+			if (pred == null)
+				throw new IllegalArgumentException();
+    		
+    		this.pred = pred;
+
+    		this.hash = computeHash();
+    		
+		}
+
+		public boolean equals(final Object other) {
+
+			if (this == other)
+				return true;
+
+			if (!(other instanceof HashedPredicate<?>))
+				return false;
+
+			final IPredicate<?> o = ((HashedPredicate<?>) other).pred;
+
+			final int arity = pred.arity();
+
+			if (arity != o.arity())
+				return false;
+
+			for (int i = 0; i < arity; i++) {
+
+				final IVariableOrConstant<?> x = pred.get(i);
+
+				final IVariableOrConstant<?> y = o.get(i);
+
+				if (x != y && !(x.equals(y))) {
+
+					return false;
+
+				}
+
+			}
+
+			return true;
+
+		}
+
+		public int hashCode() {
+
+			return hash;
+			
+		}
+
+		private final int computeHash() {
+
+			int h = 0;
+
+			final int n = pred.arity();
+
+			for (int i = 0; i < n; i++) {
+
+				h = 31 * h + pred.get(i).hashCode();
+
+			}
+
+			return h;
+
+		}
+		
+    }
 
 }

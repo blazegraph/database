@@ -27,8 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
+import java.util.Map;
+import java.util.UUID;
+
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.service.IBigdataFederation;
 
@@ -86,5 +90,57 @@ public class MockRunningQuery implements IRunningQuery {
     public QueryEngine getQueryEngine() {
         throw new UnsupportedOperationException();
     }
+
+	@Override
+	public Map<Integer, BOp> getBOpIndex() {
+		return null;
+	}
+
+	@Override
+	public Map<Integer, BOpStats> getStats() {
+		return null;
+	}
+
+	@Override
+	public long getDeadline() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	@Override
+	public long getDoneTime() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	@Override
+	public long getElapsed() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	@Override
+	public long getStartTime() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	@Override
+	public Throwable getCause() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public BOp getQuery() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public UUID getQueryId() {
+		// TODO Auto-generated method stub
+		return null;
+	}
 
 }

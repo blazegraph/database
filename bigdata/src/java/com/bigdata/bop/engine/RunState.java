@@ -45,7 +45,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
@@ -744,6 +746,8 @@ class RunState {
         sb.append("\tlabel");
         sb.append("\tbopId");
         sb.append("\tserviceId");
+        sb.append("\tevalContext");
+        sb.append("\tcontroller");
         sb.append("\tcause");
         sb.append("\tbop");
         sb.append("\tshardId");
@@ -767,7 +771,16 @@ class RunState {
 
         }
 
-        sb.append("\tstats");
+        sb.append("\telapsed");
+        sb.append("\tchunksIn");
+        sb.append("\tunitsIn");
+        sb.append("\tchunksOut");
+        sb.append("\tunitsOut");
+        sb.append("\taccessPathDups");
+        sb.append("\taccessPathCount");
+        sb.append("\taccessPathChunksIn");
+        sb.append("\taccessPathUnitsIn");
+        //{chunksIn=1,unitsIn=100,chunksOut=4,unitsOut=313,accessPathDups=0,accessPathCount=100,chunkCount=100,elementCount=313}
 
         sb.append('\n');
 
@@ -830,14 +843,34 @@ class RunState {
         sb.append('\t');
         sb.append(serviceId == null ? "N/A" : serviceId.toString());
 
+		{
+			final BOp bop = bopIndex.get(bopId);
+			sb.append('\t');
+			sb.append(bop.getEvaluationContext());
+			sb.append('\t');
+			sb.append(bop.getProperty(BOp.Annotations.CONTROLLER,
+					BOp.Annotations.DEFAULT_CONTROLLER));
+		}
+
         // the thrown cause.
         sb.append('\t');
         if (cause != null)
             sb.append(cause.getLocalizedMessage());
 
-        // the operator.
-        sb.append('\t');
-        sb.append(bopIndex.get(bopId));
+		// the operator.
+		sb.append('\t');
+		if (nsteps.get() == 1) {
+			/*
+			 * For the startQ row @ nsteps==1, show the entire query. This is
+			 * the only way people will be able to see the detailed annotations
+			 * on predicates used in joins. New line characters are translated
+			 * out to keep things in the table format.
+			 */
+			sb.append(BOpUtility.toString(query).replace('\n', ' '));
+        } else {
+        	// Otherwise how just this bop.
+            sb.append(bopIndex.get(bopId).toString());
+        }
 
         sb.append('\t');
         sb.append(Integer.toString(shardId));
@@ -873,11 +906,33 @@ class RunState {
 
         }
 
-        // the statistics : this is at the end to keep the table pretty.
-        sb.append('\t');
+		/*
+		 * The statistics. This is at the end to keep the table pretty.
+		 * Different kinds of operators may have additional statistics. They
+		 * have to be explicitly handled here to format them into a table.
+		 */
         if (stats != null) {
-            // @todo use a multi-column version of stats.
-            sb.append(stats.toString());
+            sb.append('\t');
+        	sb.append(stats.elapsed.get());
+            sb.append('\t');
+        	sb.append(stats.chunksIn.get());
+            sb.append('\t');
+        	sb.append(stats.unitsIn.get());
+            sb.append('\t');
+        	sb.append(stats.chunksOut.get());
+			sb.append('\t');
+			sb.append(stats.unitsOut.get());
+			if (stats instanceof PipelineJoinStats) {
+				final PipelineJoinStats t = (PipelineJoinStats) stats;
+				sb.append('\t');
+				sb.append(t.accessPathDups.get());
+				sb.append('\t');
+				sb.append(t.accessPathCount.get());
+				sb.append('\t');
+				sb.append(t.accessPathChunksIn.get());
+				sb.append('\t');
+				sb.append(t.accessPathUnitsIn.get());
+        	}
         }
 
         sb.append('\n');
