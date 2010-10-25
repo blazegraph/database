@@ -46,13 +46,14 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.NV;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.ap.Predicate.HashedPredicate;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -179,35 +180,35 @@ public class PipelineJoin<E> extends PipelineOp implements
         /**
          * The #of chunks read from an {@link IAccessPath}.
          */
-        public final CAT chunkCount = new CAT();
+        public final CAT accessPathChunksIn = new CAT();
         
         /**
          * The #of elements read from an {@link IAccessPath}.
          */
-        public final CAT elementCount = new CAT();
+        public final CAT accessPathUnitsIn = new CAT();
 
-        /**
-         * The maximum observed fan in for this join dimension (maximum #of
-         * sources observed writing on any join task for this join dimension).
-         * Since join tasks may be closed and new join tasks re-opened for the
-         * same query, join dimension and index partition, and since each join
-         * task for the same join dimension could, in principle, have a
-         * different fan in based on the actual binding sets propagated this is
-         * not necessarily the "actual" fan in for the join dimension. You would
-         * have to track the #of distinct partitionId values to track that.
-         */
-        public int fanIn;
-
-        /**
-         * The maximum observed fan out for this join dimension (maximum #of
-         * sinks on which any join task is writing for this join dimension).
-         * Since join tasks may be closed and new join tasks re-opened for the
-         * same query, join dimension and index partition, and since each join
-         * task for the same join dimension could, in principle, have a
-         * different fan out based on the actual binding sets propagated this is
-         * not necessarily the "actual" fan out for the join dimension.
-         */
-        public int fanOut;
+//        /**
+//         * The maximum observed fan in for this join dimension (maximum #of
+//         * sources observed writing on any join task for this join dimension).
+//         * Since join tasks may be closed and new join tasks re-opened for the
+//         * same query, join dimension and index partition, and since each join
+//         * task for the same join dimension could, in principle, have a
+//         * different fan in based on the actual binding sets propagated this is
+//         * not necessarily the "actual" fan in for the join dimension. You would
+//         * have to track the #of distinct partitionId values to track that.
+//         */
+//        public int fanIn;
+//
+//        /**
+//         * The maximum observed fan out for this join dimension (maximum #of
+//         * sinks on which any join task is writing for this join dimension).
+//         * Since join tasks may be closed and new join tasks re-opened for the
+//         * same query, join dimension and index partition, and since each join
+//         * task for the same join dimension could, in principle, have a
+//         * different fan out based on the actual binding sets propagated this is
+//         * not necessarily the "actual" fan out for the join dimension.
+//         */
+//        public int fanOut;
 
         public void add(final BOpStats o) {
 
@@ -221,18 +222,18 @@ public class PipelineJoin<E> extends PipelineOp implements
 
                 accessPathCount.add(t.accessPathCount.get());
 
-                chunkCount.add(t.chunkCount.get());
+                accessPathChunksIn.add(t.accessPathChunksIn.get());
 
-                elementCount.add(t.elementCount.get());
+                accessPathUnitsIn.add(t.accessPathUnitsIn.get());
 
-                if (t.fanIn > this.fanIn) {
-                    // maximum reported fanIn for this join dimension.
-                    this.fanIn = t.fanIn;
-                }
-                if (t.fanOut > this.fanOut) {
-                    // maximum reported fanOut for this join dimension.
-                    this.fanOut += t.fanOut;
-                }
+//                if (t.fanIn > this.fanIn) {
+//                    // maximum reported fanIn for this join dimension.
+//                    this.fanIn = t.fanIn;
+//                }
+//                if (t.fanOut > this.fanOut) {
+//                    // maximum reported fanOut for this join dimension.
+//                    this.fanOut += t.fanOut;
+//                }
 
             }
             
@@ -242,8 +243,8 @@ public class PipelineJoin<E> extends PipelineOp implements
         protected void toString(final StringBuilder sb) {
             sb.append(",accessPathDups=" + accessPathDups.estimate_get());
             sb.append(",accessPathCount=" + accessPathCount.estimate_get());
-            sb.append(",chunkCount=" + chunkCount.estimate_get());
-            sb.append(",elementCount=" + elementCount.estimate_get());
+            sb.append(",accessPathChunksIn=" + accessPathChunksIn.estimate_get());
+            sb.append(",accessPathUnitsIn=" + accessPathUnitsIn.estimate_get());
         }
         
     }
@@ -530,6 +531,8 @@ public class PipelineJoin<E> extends PipelineOp implements
          */
         public Void call() throws Exception {
 
+//			final long begin = System.currentTimeMillis();
+        	
             if (log.isDebugEnabled())
                 log.debug("joinOp=" + joinOp);
 
@@ -597,6 +600,10 @@ public class PipelineJoin<E> extends PipelineOp implements
 
                 throw new RuntimeException(t);
 
+//            } finally {
+//            	
+//            	stats.elapsed.add(System.currentTimeMillis() - begin);
+            	
             }
 
         }
@@ -849,7 +856,7 @@ public class PipelineJoin<E> extends PipelineOp implements
                      * Aggregate the source bindingSets that license the same
                      * asBound predicate.
                      */
-                    final Map<IPredicate<E>, Collection<IBindingSet>> map = combineBindingSets(chunk);
+                    final Map<HashedPredicate<E>, Collection<IBindingSet>> map = combineBindingSets(chunk);
 
                     /*
                      * Generate an AccessPathTask from each distinct asBound
@@ -936,13 +943,13 @@ public class PipelineJoin<E> extends PipelineOp implements
              *         bindingSets in the chunk from which the predicate was
              *         generated.
              */
-            protected Map<IPredicate<E>, Collection<IBindingSet>> combineBindingSets(
+            protected Map<HashedPredicate<E>, Collection<IBindingSet>> combineBindingSets(
                     final IBindingSet[] chunk) {
 
                 if (log.isDebugEnabled())
                     log.debug("chunkSize=" + chunk.length);
 
-                final Map<IPredicate<E>, Collection<IBindingSet>> map = new LinkedHashMap<IPredicate<E>, Collection<IBindingSet>>(
+                final Map<HashedPredicate<E>, Collection<IBindingSet>> map = new LinkedHashMap<HashedPredicate<E>, Collection<IBindingSet>>(
                         chunk.length);
 
                 for (IBindingSet bindingSet : chunk) {
@@ -970,7 +977,8 @@ public class PipelineJoin<E> extends PipelineOp implements
                     }
 
                     // lookup the asBound predicate in the map.
-                    Collection<IBindingSet> values = map.get(asBound);
+                    final HashedPredicate<E> hashedPred = new HashedPredicate<E>(asBound);
+                    Collection<IBindingSet> values = map.get(hashedPred);
 
                     if (values == null) {
 
@@ -983,7 +991,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
                         values = new LinkedList<IBindingSet>();
 
-                        map.put(asBound, values);
+                        map.put(hashedPred, values);
 
                     } else {
 
@@ -1024,7 +1032,7 @@ public class PipelineJoin<E> extends PipelineOp implements
              * @throws Exception
              */
             protected AccessPathTask[] getAccessPathTasks(
-                    final Map<IPredicate<E>, Collection<IBindingSet>> map) {
+                    final Map<HashedPredicate<E>, Collection<IBindingSet>> map) {
 
                 final int n = map.size();
 
@@ -1033,7 +1041,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
                 final AccessPathTask[] tasks = new JoinTask.AccessPathTask[n];
 
-                final Iterator<Map.Entry<IPredicate<E>, Collection<IBindingSet>>> itr = map
+                final Iterator<Map.Entry<HashedPredicate<E>, Collection<IBindingSet>>> itr = map
                         .entrySet().iterator();
 
                 int i = 0;
@@ -1042,10 +1050,10 @@ public class PipelineJoin<E> extends PipelineOp implements
 
                     halted();
 
-                    final Map.Entry<IPredicate<E>, Collection<IBindingSet>> entry = itr
+                    final Map.Entry<HashedPredicate<E>, Collection<IBindingSet>> entry = itr
                             .next();
 
-                    tasks[i++] = new AccessPathTask(entry.getKey(), entry
+                    tasks[i++] = new AccessPathTask(entry.getKey().pred, entry
                             .getValue());
 
                 }
@@ -1363,7 +1371,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
                         final Object[] chunk = itr.nextChunk();
 
-                        stats.chunkCount.increment();
+                        stats.accessPathChunksIn.increment();
 
                         // process the chunk in the caller's thread.
                         final boolean somethingAccepted = new ChunkTask(
@@ -1460,7 +1468,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
                             numElements += chunk.length;
 
-                            stats.chunkCount.increment();
+                            stats.accessPathChunksIn.increment();
 
                             nchunks++;
 
@@ -1493,7 +1501,7 @@ public class PipelineJoin<E> extends PipelineOp implements
                                 }
                             }
                         }
-                        stats.elementCount.add(numElements);
+                        stats.accessPathUnitsIn.add(numElements);
 
                     }
 
@@ -1746,7 +1754,7 @@ public class PipelineJoin<E> extends PipelineOp implements
                         // naccepted for the current element (trace only).
                         int naccepted = 0;
 
-                        stats.elementCount.increment();
+                        stats.accessPathUnitsIn.increment();
 
                         for (IBindingSet bset : bindingSets) {
 

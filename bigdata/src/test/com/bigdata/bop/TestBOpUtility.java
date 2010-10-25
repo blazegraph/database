@@ -29,6 +29,7 @@ package com.bigdata.bop;
 
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.FutureTask;
 
 import junit.framework.TestCase2;
 
@@ -662,4 +663,55 @@ public class TestBOpUtility extends TestCase2 {
 
     }
 
+	/**
+	 * Unit tests for extracting the left-deep evaluation order for the query
+	 * pipeline.
+	 * <p>
+	 * - test when the 1st operator is a control operator.
+	 * <p>
+	 * - test when there is an embedded control operator (subquery).
+	 * <p>
+	 * Note: this is not testing with left/right branches in the query plan.
+	 * That sort of plan is not currently supported by pipeline evaluation.
+	 */
+    public void test_getEvaluationOrder() {
+    	
+    	final BOp op2 = new MyPipelineOp(new BOp[]{},NV.asMap(//
+    			new NV(BOp.Annotations.BOP_ID,1)//
+//    			new NV(BOp.Annotations.CONTROLLER,false)//
+    			));
+    	final BOp op1 = new MyPipelineOp(new BOp[]{op2},NV.asMap(//
+    			new NV(BOp.Annotations.BOP_ID,2)//
+//    			new NV(BOp.Annotations.CONTROLLER,false)//
+    			));
+    	final BOp op3 = new MyPipelineOp(new BOp[]{op1},NV.asMap(//
+    			new NV(BOp.Annotations.BOP_ID,3),//
+    			new NV(BOp.Annotations.CONTROLLER,true)//
+    			));
+ 
+    	assertEquals(new Integer[]{1,2,3},BOpUtility.getEvaluationOrder(op3));
+    	
+	}
+
+    private static class MyPipelineOp extends PipelineOp {
+
+		private static final long serialVersionUID = 1L;
+
+		/** Deep copy constructor. */
+		protected MyPipelineOp(MyPipelineOp op) {
+			super(op);
+		}
+		
+		/** Shallow copy constructor. */
+		protected MyPipelineOp(BOp[] args, Map<String, Object> annotations) {
+			super(args, annotations);
+		}
+
+		@Override
+		public FutureTask<Void> eval(BOpContext<IBindingSet> context) {
+			return null;
+		}
+    	
+    }
+    
 }

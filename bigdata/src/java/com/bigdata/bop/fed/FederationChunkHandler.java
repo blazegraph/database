@@ -108,7 +108,7 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
 
         final FederatedRunningQuery q = (FederatedRunningQuery) query; 
         
-        final BOp targetOp = q.getBOp(sinkId);
+        final BOp targetOp = q.getBOpIndex().get(sinkId);
 
         if (targetOp == null)
             throw new IllegalStateException("Not found: " + sinkId);

@@ -1866,7 +1866,6 @@ public class TestQueryEngine extends TestCase2 {
     }
 
     /**
->>>>>>> .r3835
      * Verify the expected solutions.
      * 
      * @param expected

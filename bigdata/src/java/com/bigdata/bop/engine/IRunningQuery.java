@@ -27,18 +27,35 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
+import java.util.Map;
+import java.util.UUID;
+
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.service.IBigdataFederation;
 
 /**
- * Interface exposing a limited set of the state of an executing query.
+ * Non-Remote interface exposing a limited set of the state of an executing
+ * query.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public interface IRunningQuery {
     
+	/**
+	 * The query.
+	 */
+	BOp getQuery();
+
+	/**
+	 * The unique identifier for this query.
+	 */
+	UUID getQueryId();
+	
     /**
      * The {@link IBigdataFederation} IFF the operator is being evaluated on an
      * {@link IBigdataFederation}. When evaluating operations against an
@@ -59,6 +76,49 @@ public interface IRunningQuery {
      * The query engine.  This may be used to submit subqueries for evaluation.
      */
     QueryEngine getQueryEngine();
+
+	/**
+	 * Return an unmodifiable index from {@link BOp.Annotations#BOP_ID} to
+	 * {@link BOp}. This index may contain operators which are not part of the
+	 * pipeline evaluation, such as {@link IPredicate}s.
+	 */
+    Map<Integer/*bopId*/,BOp> getBOpIndex();
+
+	/**
+	 * Return an unmodifiable map exposing the statistics for the operators in
+	 * the query and <code>null</code> unless this is the query controller.
+	 * There will be a single entry in the map for each distinct
+	 * {@link PipelineOp}. Entries might not appear until that operator has
+	 * either begun or completed at least one evaluation phase. This index only
+	 * contains operators which are actually part of the pipeline evaluation.
+	 */
+    Map<Integer/* bopId */, BOpStats> getStats();
+    
+    /**
+     * Return the query deadline (the time at which it will terminate regardless
+     * of its run state).
+     * 
+     * @return The query deadline (milliseconds since the epoch) and
+     *         {@link Long#MAX_VALUE} if no explicit deadline was specified.
+     */
+    public long getDeadline();
+
+    /**
+     * The timestamp (ms) when the query began execution.
+     */
+    public long getStartTime();
+
+    /**
+     * The timestamp (ms) when the query was done and ZERO (0) if the query is
+     * not yet done.
+     */
+    public long getDoneTime();
+
+    /**
+     * The elapsed time (ms) for the query. This will be updated for each call
+     * until the query is done executing.
+     */
+    public long getElapsed();
     
     /**
      * Cancel the running query (normal termination).
@@ -84,5 +144,11 @@ public interface IRunningQuery {
      *             if the argument is <code>null</code>.
      */
     Throwable halt(final Throwable t);
+
+    /**
+     * Return the cause if the query was terminated by an exception.
+     * @return
+     */
+    Throwable getCause();
     
 }
