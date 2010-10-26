@@ -1501,6 +1501,7 @@ ${postInstallMessage}</echo>
         <src path="${bigdata.dir}/bigdata-jini/src/test" />
         <src path="${bigdata.dir}/bigdata-rdf/src/test" />
         <src path="${bigdata.dir}/bigdata-sails/src/test" />
+        <src path="${bigdata.dir}/ctc-striterators/src/test" />
 <!--
         <src path="${bigdata.dir}/bigdata-gom/src/test" />
 -->
@@ -1846,7 +1847,7 @@ ${postInstallMessage}</echo>
 
         <!-- Test suites to run when -DtestName is not set -->
 
-        <test name="cutthecrap.utils.striterator.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="cutthecrap.utils.striterators.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.cache.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.io.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.net.TestAll" todir="${test.results.dir}" unless="testName" />
