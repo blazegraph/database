@@ -71,7 +71,6 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IRelation;
 import com.bigdata.service.AbstractClient;
@@ -1583,15 +1582,15 @@ public class AccessPath<R> implements IAccessPath<R> {
 
         if (partitionCount == 0) {
 
-//            /*
-//             * SWAG in case zero partition count is reported (I am not sure that
-//             * this code path is possible).
-//             */
-//            return new ScanCostReport(0L/* rangeCount */, partitionCount, 100/* millis */);
+            /*
+             * SWAG in case zero partition count is reported (I am not sure that
+             * this code path is possible).
+             */
+            return new ScanCostReport(0L/* rangeCount */, partitionCount, 100/* millis */);
         	/*
         	 * Should never be "zero" partition count.
         	 */
-        	throw new AssertionError();
+//        	throw new AssertionError();
 
         }
 
