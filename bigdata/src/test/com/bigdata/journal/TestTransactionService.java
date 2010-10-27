@@ -40,7 +40,6 @@ import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.CommitTimeIndex;
 import com.bigdata.service.TxServiceRunState;
-import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
  * Unit tests of the {@link AbstractTransactionService} using a mock client.
@@ -271,11 +270,8 @@ public class TestTransactionService extends TestCase2 {
         @Override
         public long nextTimestamp() {
 
-            // skip at least one millisecond.
-            MillisecondTimestampFactory.nextMillis();
-            
-            return MillisecondTimestampFactory.nextMillis();
-            
+            super.nextTimestamp () ;
+            return super.nextTimestamp () ;
         }
 
     }
@@ -909,7 +905,12 @@ public class TestTransactionService extends TestCase2 {
              */
 
             try {
-                service.newTx(10);
+                /**
+                 * FIXME Modified to be compatible with changes made to AbstractTransactionService, revision 3804.
+                 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/187">Trac 187</a>
+                 */
+//              service.newTx(10);
+              service.newTx(service.nextTimestamp () + 10);
                 fail("Expecting: "+IllegalStateException.class);
             } catch(IllegalStateException ex) {
                 log.info("Ignoring expected exception: "+ex);
