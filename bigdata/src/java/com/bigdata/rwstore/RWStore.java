@@ -2139,7 +2139,7 @@ public class RWStore implements IStore {
 			str.append("Allocation: " + stats[i].m_blockSize);
 			str.append(", slots: "  + stats[i].m_filledSlots + "/" + stats[i].m_reservedSlots);
 			str.append(", storage: "  + filled + "/" + reserved);
-			str.append(", usage: "  + (filled * 100 / reserved) + "%");
+			str.append(", usage: "  + (reserved==0?0:(filled * 100 / reserved)) + "%");
 			str.append("\n");
 		}
 		str.append("Total - file: " + convertAddr(m_fileSize) + ", slots: " + tfilledSlots + "/" + treservedSlots + ", storage: " + tfilled + "/"  + treserved + "\n");
