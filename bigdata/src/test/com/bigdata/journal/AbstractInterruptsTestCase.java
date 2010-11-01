@@ -314,7 +314,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
                 
             } else if (store instanceof RWStrategy) {
             	RWStrategy rws = (RWStrategy)store;
-            	rws.commit();
+            	rws.commit(null);
             }
 
             try {

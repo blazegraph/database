@@ -628,7 +628,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
     }
 
     /** The default is a NOP. */
-    public void commit() {
+	public void commit(IJournal journal) {
 
         // NOP for WORM.
 

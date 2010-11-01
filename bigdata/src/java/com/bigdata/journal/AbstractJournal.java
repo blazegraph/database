@@ -1045,8 +1045,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			ResourceManager.openJournal(getFile() == null ? null : getFile().toString(), size(), getBufferStrategy()
 					.getBufferMode());
 			
-			this._bufferStrategy.setCommitRecordIndex(_commitRecordIndex);
-
 		} finally {
 
 			lock.unlock();
@@ -2103,8 +2101,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			// clear reference and reload from the store.
 			_commitRecordIndex = _getCommitRecordIndex();
 			
-			_bufferStrategy.setCommitRecordIndex(_commitRecordIndex);
-
 			// clear the array of committers.
 			_committers = new ICommitter[_committers.length];
 
@@ -2358,7 +2354,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * until commit, leading to invalid addresses for recent store
 			 * allocations.
 			 */
-			_bufferStrategy.commit();
+			_bufferStrategy.commit(this);
 
 			/*
 			 *  next offset at which user data would be written.
@@ -2875,7 +2871,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 *       {@link #getCommitRecord(long)} to obtain a distinct instance
 	 *       suitable for read-only access.
 	 */
-	protected CommitRecordIndex getCommitRecordIndex() {
+	public CommitRecordIndex getCommitRecordIndex() {
 
 		final ReadLock lock = _fieldReadWriteLock.readLock();
 

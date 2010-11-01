@@ -30,6 +30,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.locks.ReentrantLock;
@@ -525,10 +526,10 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 * 
 	 * Must pass in earliestTxnTime to commitChanges to enable
 	 */
-	public void commit() {
+	public void commit(IJournal journal) {
 		m_commitLock.lock();
 		try {
-			m_store.commitChanges(); // includes a force(false)
+			m_store.commitChanges((Journal) journal); // includes a force(false)
 		} finally {
 			m_commitLock.unlock();
 		}
@@ -546,6 +547,12 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	public void force(boolean metadata) {
 		try {
 			m_store.flushWrites(metadata);
+		} catch (ClosedByInterruptException e) {
+			m_needsReopen = true;
+			
+			reopen(); // FIXME
+			
+			throw new RuntimeException(e);
 		} catch (IOException e) {
 			m_needsReopen = true;
 			
@@ -716,11 +723,6 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
         
 	}
 
-	public void setTransactionManager(AbstractLocalTransactionManager localTransactionManager) {
-		this.localTransactionManager = localTransactionManager;
-		m_store.setTransactionService((JournalTransactionService) localTransactionManager.getTransactionService());
-	}
-
 	public long getPhysicalAddress(long addr) {
 		int rwaddr = decodeAddr(addr);		
 		
@@ -737,9 +739,4 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	public long saveDeleteBlocks() {
 		return m_store.saveDeferrals();
 	}
-
-	public void setCommitRecordIndex(CommitRecordIndex commitRecordIndex) {
-		m_store.setCommitRecordIndex(commitRecordIndex);
-	}
-
 }

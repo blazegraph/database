@@ -240,7 +240,7 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
             properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
                     + writeCacheEnabled);
 
-            return new Journal(properties).getBufferStrategy();
+            return new Journal(properties);
 
         }
 

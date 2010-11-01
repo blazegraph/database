@@ -216,8 +216,9 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
      * A method that removes assumptions of how a specific strategy commits data.  For most strategies the action is void
      * since the client WORM DISK strategy writes data as allocated.  For the Read Write Strategy more data must be managed
      * as part of the protocol outside of the RootBlock, and this is the method that triggers that management.
+     * @param abstractJournal 
      */
-	public void commit();
+	public void commit(IJournal journal);
 
     /**
      * A method that requires the implementation to discard its buffered write
@@ -257,30 +258,5 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
      * the disk. Those bytes contain the checksum of the record.
      */
     public boolean useChecksums();
-
-    /**
-     * Needed to enable transaction support for standalone buffer strategies.
-     * 
-     * The WORMStrategy does not need this since no data is ever deleted, but
-     * the RWStrategy must manage deletions such that no data is deleted until
-     * it can be guaranteed not to be accessed by existing transactions.
-     * 
-     * @param localTransactionManager
-     * 	The transaction manager for the owning Journal
-     */
-	public void setTransactionManager(AbstractLocalTransactionManager localTransactionManager);
-
-
-    /**
-     * Needed to enable transaction support for standalone buffer strategies.
-     * 
-     * The WORMStrategy does not need this since no data is ever deleted, but
-     * the RWStrategy must manage deletions and needs access to the historical
-     * commitRecords which reference the blocks of deferred deleted addresses.
-     * 
-     * @param commitRecordIndex
-     * 	The CommitRecordIndex for the owning Journal
-     */
-	public void setCommitRecordIndex(CommitRecordIndex commitRecordIndex);
 
 }
