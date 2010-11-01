@@ -1695,10 +1695,11 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
         private volatile boolean open = true;
 
-        /**
-         * An internal buffer which is used if chunkCapacity != ZERO.
-         */
-        private IBindingSet[] chunk = null;
+//        /**
+//         * An internal buffer which is used if chunkCapacity != ZERO.
+//         */
+//        private IBindingSet[] chunk = null;
+        private List<IBindingSet[]> smallChunks = null;
         
         /**
          * The #of elements in the internal {@link #chunk} buffer.
@@ -1739,37 +1740,65 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
             if(!open)
                 throw new BufferClosedException();
 
-            if (chunkCapacity != 0 && e.length < (chunkCapacity >> 1)) {
-                /*
-                 * The caller's array is significantly smaller than the target
-                 * chunk size. Append the caller's array to the internal buffer
-                 * and return immediately. The internal buffer will be copied
-                 * through either in a subsequent add() or in flush().
-                 */
-                synchronized (this) {
+//            if (chunkCapacity != 0 && e.length < (chunkCapacity >> 1)) {
+//                /*
+//                 * The caller's array is significantly smaller than the target
+//                 * chunk size. Append the caller's array to the internal buffer
+//                 * and return immediately. The internal buffer will be copied
+//                 * through either in a subsequent add() or in flush().
+//                 */
+//                synchronized (this) {
+//
+//                    if (chunk == null)
+//                        chunk = new IBindingSet[chunkCapacity];
+//
+//                    if (chunkSize + e.length > chunkCapacity) {
+//
+//                        // flush the buffer first.
+//                        outputBufferedChunk();
+//
+//                    }
+//
+//                    // copy the chunk into the buffer.
+//                    System.arraycopy(e/* src */, 0/* srcPos */,
+//                                    chunk/* dest */, chunkSize/* destPos */,
+//                                    e.length/* length */);
+//
+//                    chunkSize += e.length;
+//
+//                    return;
+//
+//                }
+//
+//            }
 
-                    if (chunk == null)
-                        chunk = new IBindingSet[chunkCapacity];
+			if (chunkCapacity != 0 && e.length < (chunkCapacity >> 1)) {
+				/*
+				 * The caller's array is significantly smaller than the target
+				 * chunk size. Append the caller's array to the internal list
+				 * and return immediately. The buffered chunks will be copied
+				 * through either in a subsequent add() or in flush().
+				 */
+				synchronized (this) {
 
-                    if (chunkSize + e.length > chunk.length) {
+					if (smallChunks == null)
+						smallChunks = new LinkedList<IBindingSet[]>();
 
-                        // flush the buffer first.
-                        outputBufferedChunk();
+					if (chunkSize + e.length > chunkCapacity) {
 
-                    }
+						// flush the buffer first.
+						outputBufferedChunk();
 
-                    // copy the chunk into the buffer.
-                    System.arraycopy(e/* src */, 0/* srcPos */,
-                                    chunk/* dest */, chunkSize/* destPos */,
-                                    e.length/* length */);
+					}
+					
+					smallChunks.add(e);
 
-                    chunkSize += e.length;
+					chunkSize += e.length;
 
-                    return;
+					return;
 
-                }
-
-            }
+				}
+			}
 
             // output the caller's chunk immediately.
             outputChunk(e);
@@ -1798,15 +1827,36 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
          */
         synchronized // Note: has side-effect on internal buffer. 
         private void outputBufferedChunk() {
-            if (chunk == null || chunkSize == 0)
+//            if (chunk == null || chunkSize == 0)
+//                return;
+//            if (chunkSize != chunk.length) {
+//                // truncate the array.
+//                chunk = Arrays.copyOf(chunk, chunkSize);
+//            }
+//            outputChunk(chunk);
+//            chunkSize = 0;
+//            chunk = null;
+            if (smallChunks == null || chunkSize == 0)
                 return;
-            if (chunkSize != chunk.length) {
-                // truncate the array.
-                chunk = Arrays.copyOf(chunk, chunkSize);
-            }
+			if (smallChunks.size() == 1) {
+				// directly output a single small chunk.
+				outputChunk(smallChunks.get(0));
+				chunkSize = 0;
+				smallChunks = null;
+				return;
+			}
+            // exact fit buffer.
+            final IBindingSet[] chunk = new IBindingSet[chunkSize];
+			// copy the small chunks into the buffer.
+			int destPos = 0;
+			for (IBindingSet[] e : smallChunks) {
+				System.arraycopy(e/* src */, 0/* srcPos */, chunk/* dest */,
+						destPos, e.length/* length */);
+				destPos += e.length;
+			}
             outputChunk(chunk);
             chunkSize = 0;
-            chunk = null;
+            smallChunks = null;
         }
         
         synchronized // Note: possible side-effect on internal buffer.

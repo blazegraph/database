@@ -237,7 +237,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * Default for {@link #CHUNK_OF_CHUNKS_CAPACITY}
          * @deprecated by {@link BOp} annotations.
          */
-        String DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = "1000";
+        String DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = "10"; // was 1000
 
         /**
          * <p>
@@ -260,7 +260,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * 
          * @deprecated by {@link BOp} annotations.
          */
-        String DEFAULT_CHUNK_CAPACITY = "100";
+        String DEFAULT_CHUNK_CAPACITY = "1000"; // was 100
 
         /**
          * The timeout in milliseconds that the {@link BlockingBuffer} will wait
@@ -278,7 +278,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * @todo this is probably much larger than we want. Try 10ms.
          * @deprecated by {@link BOp} annotations.
          */
-        String DEFAULT_CHUNK_TIMEOUT = "1000";
+        String DEFAULT_CHUNK_TIMEOUT = "10"; // was 1000
 
         /**
          * If the estimated rangeCount for an
