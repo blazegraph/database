@@ -482,7 +482,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * Note that the internal call to flush the writeCache must be synchronized
      * or concurrent writers to the cache will cause problems.
      */
-    public void commit() {
+    public void commit(IJournal journal) {
     	if (writeCache != null) {
 	    	synchronized(this) {
 	    		flushWriteCache();
