@@ -158,27 +158,28 @@ public class PSOutputStream extends OutputStream {
 	 * resets private state variables for reuse of stream
 	 **/
 	void init(IStore store, int maxAlloc, IAllocationContext context) {
+		m_store = store;
+		m_context = context;
+
+		m_blobThreshold = maxAlloc-4; // allow for checksum
+		if (m_buf == null || m_buf.length != m_blobThreshold)
+			m_buf = new byte[m_blobThreshold];
+
+		reset();
+	}
+	
+	public void reset() {
 		m_isSaved = false;
 		
 		m_headAddr = 0;
 		m_prevAddr = 0;
 		m_count = 0;
 		m_bytesWritten = 0;
-		m_store = store;
 		m_isSaved = false;
-		// m_blobThreshold = m_store.bufferChainOffset();
-		m_blobThreshold = maxAlloc-4; // allow for checksum
-		m_buf = new byte[maxAlloc-4];
 		
 		m_blobHeader = null;
 		m_blobHdrIdx = 0;
-		
-		m_context = context;
-
-		
-		// FIXME: if autocommit then we should provide start/commit via init and save
-		// m_store.startTransaction();
-	}			
+	}
 
 	/****************************************************************
 	 * write a single byte

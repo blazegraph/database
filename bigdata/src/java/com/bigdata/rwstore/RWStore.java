@@ -52,6 +52,7 @@ import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.BufferedWrite;
 import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.ForceEnum;
@@ -323,8 +324,7 @@ public class RWStore implements IStore {
 	private static final int MAX_DEFERRED_FREE = 4094; // fits in 16k block
 	volatile long m_lastDeferredReleaseTime = 23; // zero is invalid time
 	final ArrayList<Integer> m_currentTxnFreeList = new ArrayList<Integer>();
-	
-	volatile long deferredFreeCount = 0;
+	final PSOutputStream m_deferredFreeOut;
 
 	private ReopenFileChannel m_reopener = null;
 
@@ -490,7 +490,7 @@ public class RWStore implements IStore {
 				m_maxFixedAlloc = m_allocSizes[m_allocSizes.length-1]*64;
 				m_minFixedAlloc = m_allocSizes[0]*64;
 
-				commitChanges();
+				commitChanges(null);
 				
 			} else {
 				
@@ -502,6 +502,7 @@ public class RWStore implements IStore {
 			
 			assert m_maxFixedAlloc > 0;
 			
+			m_deferredFreeOut = PSOutputStream.getNew(this, m_maxFixedAlloc, null);
 		} catch (IOException e) {
 			throw new StorageTerminalError("Unable to initialize store", e);
 		}
@@ -1213,8 +1214,6 @@ public class RWStore implements IStore {
 
 	private volatile long m_maxAllocation = 0;
 	private volatile long m_spareAllocation = 0;
-
-	private CommitRecordIndex m_commitRecordIndex;
 	
 	public int alloc(final int size, IAllocationContext context) {
 		if (size > m_maxFixedAlloc) {
@@ -1569,7 +1568,7 @@ public class RWStore implements IStore {
 		return "RWStore " + s_version;
 	}
 
-	public void commitChanges() {
+	public void commitChanges(Journal journal) {
 		checkCoreAllocations();
 
 		// take allocation lock to prevent other threads allocating during commit
@@ -1577,7 +1576,7 @@ public class RWStore implements IStore {
 		
 		try {
 			
-				checkDeferredFrees(true); // free now if possible
+				checkDeferredFrees(true, journal); // free now if possible
 
 				// Allocate storage for metaBits
 				long oldMetaBits = m_metaBitsAddr;
@@ -1653,30 +1652,26 @@ public class RWStore implements IStore {
 	 * Called prior to commit, so check whether storage can be freed and then
 	 * whether the deferredheader needs to be saved.
 	 */
-	private void checkDeferredFrees(boolean freeNow) {
-		if (freeNow) checkFreeable();
-		
-		// Commit can be called prior to Journal initialisation, in which case
-		// the commitRecordIndex will not be set.
-		if (m_commitRecordIndex == null) {
-			return;
+	public void checkDeferredFrees(boolean freeNow, Journal journal) {
+		if (journal != null) {
+			final JournalTransactionService transactionService = (JournalTransactionService) journal.getLocalTransactionManager().getTransactionService();
+	
+			// Commit can be called prior to Journal initialisation, in which case
+			// the commitRecordIndex will not be set.
+			final CommitRecordIndex commitRecordIndex = journal.getCommitRecordIndex();
+	
+			long latestReleasableTime = System.currentTimeMillis();
+			
+			if (transactionService != null) {
+				latestReleasableTime -= transactionService.getMinReleaseAge();
+			}
+			
+			Iterator<ICommitRecord> records = commitRecordIndex.getCommitRecords(m_lastDeferredReleaseTime, latestReleasableTime);
+			
+			freeDeferrals(records);
 		}
-		
-		long latestReleasableTime = System.currentTimeMillis();
-		
-		if (m_transactionService != null) {
-			latestReleasableTime -= m_transactionService.getMinReleaseAge();
-		}
-		
-		Iterator<ICommitRecord> records = m_commitRecordIndex.getCommitRecords(m_lastDeferredReleaseTime, latestReleasableTime);
-		
-		freeDeferrals(records);
 	}
 
-
-	public void setCommitRecordIndex(CommitRecordIndex commitRecordIndex) {
-		m_commitRecordIndex = commitRecordIndex;
-	}
 	/**
 	 * 
 	 * @return conservative requirement for metabits storage, mindful that the
@@ -2654,45 +2649,39 @@ public class RWStore implements IStore {
 	 * 
 	 * The deferred list is checked on AllocBlock and prior to commit.
 	 * 
-	 * There is also a possibility to check for deferral at this point, since
-	 * we are passed both the currentCommitTime - against which this free
-	 * will be deferred and the earliest tx start time against which we
-	 * can check to see if
+	 * DeferredFrees are written to the deferred PSOutputStream
 	 */
 	public void deferFree(int rwaddr, int sze) {
 		m_deferFreeLock.lock();
 		try {
-			deferredFreeCount++;
-			m_currentTxnFreeList.add(rwaddr);
+			m_deferredFreeOut.writeInt(rwaddr);
 
 			final Allocator alloc = getBlockByAddress(rwaddr);
 			if (alloc instanceof BlobAllocator) {
-				m_currentTxnFreeList.add(sze);
+				m_deferredFreeOut.writeInt(sze);
 			}
-			
-			// every so many deferrals, check for free
-			if (false && deferredFreeCount % 1000 == 0) {
-				checkFreeable();				
-			}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		} finally {
 			m_deferFreeLock.unlock();
 		}
 	}
 	
-	private void checkFreeable() {
-		if (m_transactionService == null) {
+	private void checkFreeable(final JournalTransactionService transactionService) {
+		if (transactionService == null) {
 			return;
 		}
 		
 		try {
-			Long freeTime = m_transactionService.tryCallWithLock(new Callable<Long>() {
+			Long freeTime = transactionService.tryCallWithLock(new Callable<Long>() {
 	
 				public Long call() throws Exception {
 					long now = System.currentTimeMillis();
-					long earliest =  m_transactionService.getEarliestTxStartTime();
-					long aged = now - m_transactionService.getMinReleaseAge();
+					long earliest =  transactionService.getEarliestTxStartTime();
+					long aged = now - transactionService.getMinReleaseAge();
 					
-					if (m_transactionService.getActiveCount() == 0) {
+					if (transactionService.getActiveCount() == 0) {
 						return aged;
 					} else {
 						return aged < earliest ? aged : earliest;
@@ -2700,8 +2689,6 @@ public class RWStore implements IStore {
 				}
 				
 			}, 5L, TimeUnit.MILLISECONDS);
-			
-			freeCurrentDeferrals(freeTime);
 		} catch (RuntimeException e) {
 			// fine, will try again later
 		} catch (Exception e) {
@@ -2711,38 +2698,6 @@ public class RWStore implements IStore {
 
 	
 	/**
-	 * Frees all storage deferred against a txn release time less than that
-	 * passed in.
-	 * 
-	 * @param txnRelease - the max release time
-	 */
-	protected void freeCurrentDeferrals(long txnRelease) {
-		
-		m_deferFreeLock.lock();
-		try {
-			if (m_rb.getLastCommitTime() <= txnRelease) {
-//				System.out.println("freeCurrentDeferrals");
-				final Iterator<Integer> curdefers = m_currentTxnFreeList.iterator();
-				while (curdefers.hasNext()) {
-					final int rwaddr = curdefers.next();
-					Allocator alloc = getBlock(rwaddr);
-					if (alloc instanceof BlobAllocator) {
-						// if this is a Blob then the size is required
-						assert curdefers.hasNext();
-						
-						immediateFree(rwaddr, curdefers.next());
-					} else {
-						immediateFree(rwaddr, 0); // size ignored for FixedAllocators
-					}
-				}
-				m_currentTxnFreeList.clear();
-			}
-		} finally {
-			m_deferFreeLock.unlock();
-		}
-	}
-
-	/**
 	 * Writes the content of currentTxnFreeList to the store.
 	 * 
 	 * These are the current buffered frees that have yet been saved into
@@ -2751,39 +2706,27 @@ public class RWStore implements IStore {
 	 * @return the address of the deferred addresses saved on the store
 	 */
 	public long saveDeferrals() {
-		final byte[] buf;
 		m_deferFreeLock.lock();
 		try {
-			int addrCount = m_currentTxnFreeList.size();
-
-			if (addrCount == 0) {
-				return 0L;
+			if (m_deferredFreeOut.getBytesWritten() == 0) {
+				return 0;
 			}
+			m_deferredFreeOut.writeInt(0); // terminate!
+			int outlen = m_deferredFreeOut.getBytesWritten();
+			
+			long addr = m_deferredFreeOut.save();
+			
+			addr <<= 32;
+			addr += outlen;
+			
+			m_deferredFreeOut.reset();
 
-			buf = new byte[4 * (addrCount + 1)];
-			ByteBuffer out = ByteBuffer.wrap(buf);
-			out.putInt(addrCount);
-			for (int i = 0; i < addrCount; i++) {
-				out.putInt(m_currentTxnFreeList.get(i));
-			}
-
-			// now we've saved it to the store, clear the list
-			m_currentTxnFreeList.clear();
-
+			return addr;			
+		} catch (IOException e) {
+			throw new RuntimeException("Cannot write to deferred free", e);
 		} finally {
 			m_deferFreeLock.unlock();
 		}
-		
-		long rwaddr = alloc(buf, buf.length, null);
-		if (log.isTraceEnabled()) {
-			long paddr = physicalAddress((int) rwaddr);
-			log.trace("Saving deferred free block at " + paddr);
-		}
-
-		rwaddr <<= 32;
-		rwaddr += buf.length;
-
-		return rwaddr;
 	}
 
 	/**
@@ -2802,19 +2745,21 @@ public class RWStore implements IStore {
 		final DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
 		m_allocationLock.lock();
 		try {
-			int addrs = strBuf.readInt();
+			int nxtAddr = strBuf.readInt();
 			
-			while (addrs-- > 0) { // while (false && addrs-- > 0) {
-				int nxtAddr = strBuf.readInt();
+			while (nxtAddr != 0) { // while (false && addrs-- > 0) {
 				
 				Allocator alloc = getBlock(nxtAddr);
 				if (alloc instanceof BlobAllocator) {
-					assert addrs > 0; // a Blob address MUST have a size
-					--addrs;
-					immediateFree(nxtAddr, strBuf.readInt());
+					int bloblen = strBuf.readInt();
+					assert bloblen > 0; // a Blob address MUST have a size
+
+					immediateFree(nxtAddr, bloblen);
 				} else {
 					immediateFree(nxtAddr, 0); // size ignored for FreeAllocators
 				}
+				
+				nxtAddr = strBuf.readInt();
 			}
 			m_lastDeferredReleaseTime = lastReleaseTime;
 		} catch (IOException e) {
@@ -2838,11 +2783,6 @@ public class RWStore implements IStore {
 				freeDeferrals(blockAddr, record.getTimestamp());
 			}
 		}
-	}
-
-	private JournalTransactionService m_transactionService = null;
-	public void setTransactionService(final JournalTransactionService transactionService) {
-		this.m_transactionService = transactionService;
 	}
 
 	/**

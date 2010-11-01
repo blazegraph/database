@@ -849,7 +849,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 
                 // since deferred frees, we must commit in order to ensure the
                 //	address in invalid, indicating it is available for
-                bs.commit();
+                store.commit();
+                
+                rw.checkDeferredFrees(true, store);
                 
                 try {
                 	rdBuf = bs.read(faddr); // should fail with illegal state
@@ -1147,7 +1149,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
             properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
                     + writeCacheEnabled);
 
-            return new Journal(properties).getBufferStrategy();
+            // return new Journal(properties).getBufferStrategy();
+            return new Journal(properties);
 
         }
 

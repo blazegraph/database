@@ -221,9 +221,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         concurrencyManager = new ConcurrencyManager(properties,
                 localTransactionManager, this);
         
-        getBufferStrategy().setTransactionManager(localTransactionManager);
-
-    }
+     }
 
 //    public void init() {
 //        
