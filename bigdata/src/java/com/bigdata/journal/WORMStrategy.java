@@ -1048,7 +1048,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * @todo Should be a NOP for the WORM? Check
      *       {@link AbstractJournal#commitNow(long)}
      */
-    public void commit() {
+    public void commit(IJournal journal) {
 
         flushWriteCache();
 
