@@ -38,7 +38,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -48,21 +47,25 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.BufferedWrite;
 import com.bigdata.io.writecache.WriteCache;
-import com.bigdata.journal.Journal;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.CommitRecordIndex;
+import com.bigdata.journal.CommitRecordSerializer;
 import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.JournalTransactionService;
 import com.bigdata.journal.Options;
 import com.bigdata.journal.RWStrategy.FileMetadataView;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -322,7 +325,7 @@ public class RWStore implements IStore {
 	 * the same txReleaseTime.
 	 */
 	private static final int MAX_DEFERRED_FREE = 4094; // fits in 16k block
-	volatile long m_lastDeferredReleaseTime = 23; // zero is invalid time
+	volatile long m_lastDeferredReleaseTime = 0L;// = 23; // zero is invalid time
 	final ArrayList<Integer> m_currentTxnFreeList = new ArrayList<Integer>();
 	final PSOutputStream m_deferredFreeOut;
 
@@ -1568,7 +1571,7 @@ public class RWStore implements IStore {
 		return "RWStore " + s_version;
 	}
 
-	public void commitChanges(Journal journal) {
+	public void commitChanges(final Journal journal) {
 		checkCoreAllocations();
 
 		// take allocation lock to prevent other threads allocating during commit
@@ -1651,34 +1654,55 @@ public class RWStore implements IStore {
 	/**
 	 * Called prior to commit, so check whether storage can be freed and then
 	 * whether the deferredheader needs to be saved.
+	 * <p>
+	 * Note: The caller MUST be holding the {@link #m_allocationLock}.
 	 */
-	public void checkDeferredFrees(boolean freeNow, Journal journal) {
-		if (journal != null) {
-			final JournalTransactionService transactionService = (JournalTransactionService) journal.getLocalTransactionManager().getTransactionService();
-	
-			// Commit can be called prior to Journal initialisation, in which case
-			// the commitRecordIndex will not be set.
-			final CommitRecordIndex commitRecordIndex = journal.getCommitRecordIndex();
-	
-			long latestReleasableTime = System.currentTimeMillis();
-			
-			if (transactionService != null) {
-				latestReleasableTime -= transactionService.getMinReleaseAge();
-			}
-			
-			Iterator<ICommitRecord> records = commitRecordIndex.getCommitRecords(m_lastDeferredReleaseTime, latestReleasableTime);
-			
-			freeDeferrals(records);
-		}
-	}
+    /* public */void checkDeferredFrees(final boolean freeNow,
+            final Journal journal) {
 
-	/**
-	 * 
-	 * @return conservative requirement for metabits storage, mindful that the
-	 *         request to allocate the metabits may require an increase in the
-	 *         number of allocation blocks and therefore an extension to the
-	 *         number of metabits.
-	 */
+        // Note: Invoked from unit test w/o the lock...
+//        if (!m_allocationLock.isHeldByCurrentThread())
+//            throw new IllegalMonitorStateException();
+		
+        if (journal != null) {
+		
+            final JournalTransactionService transactionService = (JournalTransactionService) journal
+                    .getLocalTransactionManager().getTransactionService();
+
+            // the previous commit point.
+            long latestReleasableTime = journal.getLastCommitTime(); 
+
+            if (latestReleasableTime == 0L) {
+                // Nothing committed.
+                return;
+            }
+            
+            // subtract out the retention period.
+            latestReleasableTime -= transactionService.getMinReleaseAge();
+
+            // add one to give this inclusive upper bound semantics.
+            latestReleasableTime++;
+
+            /*
+             * Free deferrals.
+             * 
+             * Note: This adds one to the lastDeferredReleaseTime to give
+             * exclusive lower bound semantics.
+             */
+            freeDeferrals(journal, m_lastDeferredReleaseTime+1,
+                    latestReleasableTime);
+            
+        }
+        
+    }
+
+    /**
+     * 
+     * @return conservative requirement for metabits storage, mindful that the
+     *         request to allocate the metabits may require an increase in the
+     *         number of allocation blocks and therefore an extension to the
+     *         number of metabits.
+     */
 	private int getRequiredMetaBitsStorage() {
 		int ints = 1 + m_allocSizes.length; // length prefixed alloc sizes
 		ints += m_metaBits.length;
@@ -2674,12 +2698,12 @@ public class RWStore implements IStore {
 		}
 		
 		try {
-			Long freeTime = transactionService.tryCallWithLock(new Callable<Long>() {
+			final Long freeTime = transactionService.tryCallWithLock(new Callable<Long>() {
 	
 				public Long call() throws Exception {
-					long now = System.currentTimeMillis();
-					long earliest =  transactionService.getEarliestTxStartTime();
-					long aged = now - transactionService.getMinReleaseAge();
+					final long now = transactionService.nextTimestamp();
+					final long earliest =  transactionService.getEarliestTxStartTime();
+					final long aged = now - transactionService.getMinReleaseAge();
 					
 					if (transactionService.getActiveCount() == 0) {
 						return aged;
@@ -2733,14 +2757,14 @@ public class RWStore implements IStore {
 	 * Provided with the address of a block of addresses to be freed
 	 * @param blockAddr
 	 */
-	protected void freeDeferrals(long blockAddr, long lastReleaseTime) {
-		int addr = (int) (blockAddr >> 32);
-		int sze = (int) blockAddr & 0xFFFFFF;
+	private void freeDeferrals(final long blockAddr, final long lastReleaseTime) {
+		final int addr = (int) (blockAddr >> 32);
+		final int sze = (int) blockAddr & 0xFFFFFF;
 		
 		if (log.isTraceEnabled())
 			log.trace("freeDeferrals at " + physicalAddress(addr) + ", size: " + sze + " releaseTime: " + lastReleaseTime);
 		
-		byte[] buf = new byte[sze+4]; // allow for checksum
+		final byte[] buf = new byte[sze+4]; // allow for checksum
 		getData(addr, buf);
 		final DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
 		m_allocationLock.lock();
@@ -2749,9 +2773,9 @@ public class RWStore implements IStore {
 			
 			while (nxtAddr != 0) { // while (false && addrs-- > 0) {
 				
-				Allocator alloc = getBlock(nxtAddr);
+				final Allocator alloc = getBlock(nxtAddr);
 				if (alloc instanceof BlobAllocator) {
-					int bloblen = strBuf.readInt();
+					final int bloblen = strBuf.readInt();
 					assert bloblen > 0; // a Blob address MUST have a size
 
 					immediateFree(nxtAddr, bloblen);
@@ -2761,28 +2785,76 @@ public class RWStore implements IStore {
 				
 				nxtAddr = strBuf.readInt();
 			}
-			m_lastDeferredReleaseTime = lastReleaseTime;
+            m_lastDeferredReleaseTime = lastReleaseTime;
+            if (log.isTraceEnabled())
+                log.trace("Updated m_lastDeferredReleaseTime="
+                        + m_lastDeferredReleaseTime);
 		} catch (IOException e) {
 			throw new RuntimeException("Problem freeing deferrals", e);
 		} finally {
 			m_allocationLock.unlock();
 		}
 	}
-	
-	/**
-	 * Provided with an iterator of CommitRecords, process each and free
-	 * any deferred deletes associated with each.
-	 * 
-	 * @param commitRecords
-	 */
-	public void freeDeferrals(Iterator<ICommitRecord> commitRecords) {
-		while (commitRecords.hasNext()) {
-			ICommitRecord record = commitRecords.next();
-			long blockAddr = record.getRootAddr(AbstractJournal.DELETEBLOCK);
-			if (blockAddr != 0) {
-				freeDeferrals(blockAddr, record.getTimestamp());
+
+    /**
+     * Provided with an iterator of CommitRecords, process each and free any
+     * deferred deletes associated with each.
+     * 
+     * @param journal
+     * @param fromTime
+     *            The inclusive lower bound.
+     * @param toTime
+     *            The exclusive upper bound.
+     */
+    private void freeDeferrals(final AbstractJournal journal,
+            final long fromTime,
+            final long toTime) {
+
+        final ITupleIterator<CommitRecordIndex.Entry> commitRecords;
+	    {
+            /*
+             * Commit can be called prior to Journal initialisation, in which
+             * case the commitRecordIndex will not be set.
+             */
+            final IIndex commitRecordIndex = journal.getReadOnlyCommitRecordIndex();
+    
+            final IndexMetadata metadata = commitRecordIndex
+                    .getIndexMetadata();
+
+            final byte[] fromKey = metadata.getTupleSerializer()
+                    .serializeKey(fromTime);
+
+            final byte[] toKey = metadata.getTupleSerializer()
+                    .serializeKey(toTime);
+
+            commitRecords = commitRecordIndex
+                    .rangeIterator(fromKey, toKey);
+            
+        }
+
+        if(log.isTraceEnabled())
+            log.trace("fromTime=" + fromTime + ", toTime=" + toTime);
+
+        while (commitRecords.hasNext()) {
+            
+            final ITuple<CommitRecordIndex.Entry> tuple = commitRecords.next();
+
+            final CommitRecordIndex.Entry entry = tuple.getObject();
+
+            final ICommitRecord record = CommitRecordSerializer.INSTANCE
+                    .deserialize(journal.read(entry.addr));
+
+            final long blockAddr = record
+                    .getRootAddr(AbstractJournal.DELETEBLOCK);
+			
+            if (blockAddr != 0) {
+			
+                freeDeferrals(blockAddr, record.getTimestamp());
+                
 			}
-		}
+
+        }
+        
 	}
 
 	/**

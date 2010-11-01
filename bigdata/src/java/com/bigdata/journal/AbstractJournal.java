@@ -2855,6 +2855,35 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
+    /**
+     * Return a read-only view of the last committed state of the
+     * {@link CommitRecordIndex}.
+     * 
+     * @return The read-only view of the {@link CommitRecordIndex}.
+     */
+	public IIndex getReadOnlyCommitRecordIndex() {
+
+	    final ReadLock lock = _fieldReadWriteLock.readLock();
+
+        lock.lock();
+
+        try {
+
+            assertOpen();
+
+            final CommitRecordIndex commitRecordIndex = getCommitRecordIndex(_rootBlock
+                    .getCommitRecordIndexAddr());
+
+            return new ReadOnlyIndex(commitRecordIndex);
+
+        } finally {
+
+            lock.unlock();
+
+        }
+ 
+	}
+	
 	/**
 	 * Return the current state of the index that resolves timestamps to
 	 * {@link ICommitRecord}s.
@@ -2871,7 +2900,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 *       {@link #getCommitRecord(long)} to obtain a distinct instance
 	 *       suitable for read-only access.
 	 */
-	public CommitRecordIndex getCommitRecordIndex() {
+	protected CommitRecordIndex getCommitRecordIndex() {
 
 		final ReadLock lock = _fieldReadWriteLock.readLock();
 
