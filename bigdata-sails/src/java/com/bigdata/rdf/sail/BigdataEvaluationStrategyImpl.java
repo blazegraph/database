@@ -1834,7 +1834,13 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             final StatementPattern sp, final BindingSet bindings)
             throws QueryEvaluationException {
         
-        if (sp.getParentNode() instanceof Projection) {
+        if (database.isQuads() && sp.getParentNode() instanceof Projection) {
+			/*
+			 * Note: This is required in order to get the correct semantics for
+			 * named graph or default graph access paths in quads mode. However,
+			 * doing this in triples more imposes a significant performance
+			 * penalty.
+			 */
             return evaluateSingleTailRule(sp, bindings);
         }
         
