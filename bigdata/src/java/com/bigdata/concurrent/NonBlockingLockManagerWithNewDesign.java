@@ -29,7 +29,6 @@ package com.bigdata.concurrent;
 
 import static com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.ServiceRunState.Running;
 import static com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.ServiceRunState.Shutdown;
-import static com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.ServiceRunState.ShutdownNow;
 import static com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.ServiceRunState.Starting;
 
 import java.lang.ref.WeakReference;
@@ -59,8 +58,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
-import com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.LockFutureTask;
-import com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.ResourceQueue;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractTask;
@@ -2100,8 +2097,8 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                             if (INFO)
                                 log.info(lockManager.serviceRunState);
                         }
-                        // Done.
-                        awaitStateChange(ShutdownNow);
+                        // One more time through the loop to exit @ Halted. 
+                        continue;
                     } finally {
                         lockManager.lock.unlock();
                     }
