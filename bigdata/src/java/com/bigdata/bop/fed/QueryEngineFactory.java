@@ -87,6 +87,22 @@ public class QueryEngineFactory {
     }
 
     /**
+     * Removes a QueryEngine instance from the cache if it is present, returning it to the caller. This
+     * method is unlikely to be useful in applications but the unit test framework requires it in order
+     * to avoid resource starvation as each test typically creates a unique IIndexManager.
+     * 
+     * @param indexManager the database
+     * @return the query controller if present, null otherwise.
+     */
+    public static QueryEngine removeQueryController ( final IIndexManager indexManager )
+    {
+        if (indexManager instanceof IBigdataFederation<?>) {
+            return federationQECache.remove ( ( IBigdataFederation<?> )indexManager ) ;
+        }
+        return standaloneQECache.remove ( ( Journal )indexManager ) ;
+    }
+
+    /**
      * Singleton factory for standalone.
      * 
      * @param indexManager

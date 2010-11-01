@@ -130,6 +130,8 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.BackchainAccessPath;
 import com.bigdata.rdf.rules.InferenceEngine;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InferredSPOFilter;
@@ -1049,7 +1051,9 @@ public class BigdataSail extends SailBase implements Sail {
         try {
 
             shutDown();
-
+            QueryEngine qe = QueryEngineFactory.getQueryController(database.getIndexManager());
+            if ( null != qe )
+                qe.shutdownNow () ;
             database.__tearDownUnitTest();
 
         } catch (Throwable t) {

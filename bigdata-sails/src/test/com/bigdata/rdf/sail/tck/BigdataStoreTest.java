@@ -37,6 +37,8 @@ import org.openrdf.sail.Sail;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.IIndexManager;
@@ -123,7 +125,12 @@ public class BigdataStoreTest extends RDFStoreTest {
         super.tearDown();
 
         if (backend != null)
+        {
+            QueryEngine qe = QueryEngineFactory.removeQueryController ( backend ) ;
+            if ( null != qe )
+                qe.shutdownNow () ;
             backend.destroy();
+        }
 
     }
     

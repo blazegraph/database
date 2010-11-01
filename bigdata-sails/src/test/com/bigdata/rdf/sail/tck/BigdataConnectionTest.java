@@ -35,12 +35,14 @@ import org.apache.log4j.Logger;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnectionTest;
 
+import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSail.Options;
+import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.store.LocalTripleStore;
 
 public class BigdataConnectionTest extends RepositoryConnectionTest {
@@ -172,7 +174,12 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
         super.tearDown();
 
         if (backend != null)
+        {
+            QueryEngine qe = QueryEngineFactory.removeQueryController ( backend ) ;
+            if ( null != qe )
+                qe.shutdownNow () ;
             backend.destroy();
+        }
 
     }
 
