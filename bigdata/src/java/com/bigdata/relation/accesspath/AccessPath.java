@@ -1585,11 +1585,14 @@ public class AccessPath<R> implements IAccessPath<R> {
             /*
              * SWAG in case zero partition count is reported (I am not sure that
              * this code path is possible).
+             * 
+             * @todo This is proven possible. Now figure out why. Maybe this is
+             * fromKey==toKey, in which case we can optimize that out.
              */
             return new ScanCostReport(0L/* rangeCount */, partitionCount, 100/* millis */);
-        	/*
-        	 * Should never be "zero" partition count.
-        	 */
+//        	/*
+//        	 * Should never be "zero" partition count.
+//        	 */
 //        	throw new AssertionError();
 
         }

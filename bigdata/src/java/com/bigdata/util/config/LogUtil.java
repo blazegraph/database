@@ -30,47 +30,84 @@ import org.apache.log4j.PropertyConfigurator;
 import org.apache.log4j.xml.DOMConfigurator;
 
 /**
- * Utility class that provides a set of static convenience methods related
- * to the initialization and configuration of the logging mechanism(s)
- * employed by the components of the system. The methods of this class
- * can be useful both in Jini configuration files, as well as in the
- * system components themselves.
+ * Utility class that provides a set of static convenience methods related to
+ * the initialization and configuration of the logging mechanism(s) employed by
+ * the components of the system. The methods of this class can be useful both in
+ * Jini configuration files, as well as in the system components themselves.
+ * <p>
+ * This class relies on the presence of either the
+ * <code>log4j.configuration</code> or the
+ * <code>log4j.primary.configuration</code> property and understands files with
+ * any of the following extensions {<code>.properties</code>,
+ * <code>.logging</code>, <code>.xml</code> . It will log a message on
+ * <em>stderr</em> if neither of those properties is defined. The class
+ * deliberately does not search the CLASSPATH for a log4j configuration in an
+ * effort to discourage the inadvertent use of hidden configuration files when
+ * deploying bigdata.
+ * <p>
+ * A watcher is setup on the log4j configuration if one is found.
  * <p>
  * This class cannot be instantiated.
  */
 public class LogUtil {
 
+    /**
+     * Examine the various log4j configuration properties and return the name of
+     * the log4j configuration resource if one was configured.
+     * 
+     * @return The log4j configuration resource -or- <code>null</code> if the
+     *         resource was not configured properly.
+     */
+    static String getConfigPropertyValue() {
+
+        final String log4jConfig = System
+                .getProperty("log4j.primary.configuration");
+        
+        if (log4jConfig != null)
+            return log4jConfig;
+        
+        final String log4jDefaultConfig = System
+                .getProperty("log4j.configuration");
+        
+        if (log4jDefaultConfig != null)
+            return log4jDefaultConfig;
+        
+        return null;
+        
+    }
+    
     // Static initialization block that retrieves and initializes 
     // the log4j logger configuration for the given VM in which this
     // class resides. Note that this block is executed only once
     // during the life of the associated VM.
     static {
-        final String log4jConfig = 
-            System.getProperty("log4j.primary.configuration");
+
+        final String log4jConfig = getConfigPropertyValue();
+        
         if( log4jConfig != null && (log4jConfig.endsWith(".properties") ||
                                     log4jConfig.endsWith(".logging"))) {
+
             PropertyConfigurator.configureAndWatch(log4jConfig);
+        
         } else if ( log4jConfig != null && log4jConfig.endsWith(".xml") ) {
+        
             DOMConfigurator.configureAndWatch(log4jConfig);
+            
         } else {
-            final String log4jDefaultConfig =
-                    System.getProperty("log4j.configuration");
-            if (log4jDefaultConfig != null ) {
-                PropertyConfigurator.configureAndWatch(log4jDefaultConfig);
-            } else {
-                System.out.println
-                        ("ERROR: could not initialize Log4J logging utility");
-                System.out.println
-                ("       set system property "
-                         +"'-Dlog4j.configuration="
-                         +"file:bigdata/src/resources/logging/log4j.properties"
-                         +"\n       and/or \n"
-                         +"      set system property "
-                         +"'-Dlog4j.primary.configuration="
-                         +"file:<installDir>/"
-                         +"bigdata/src/resources/logging/log4j.properties'");
-            }
+        
+            System.err.println("ERROR: " + LogUtil.class.getName()
+                     + " : Could not initialize Log4J logging utility.  "
+                     + "Set system property "
+                     +"'-Dlog4j.configuration="
+                     +"file:bigdata/src/resources/logging/log4j.properties"
+                     +"\n       and/or \n"
+                     +"      set system property "
+                     +"'-Dlog4j.primary.configuration="
+                     +"file:<installDir>/"
+                     +"bigdata/src/resources/logging/log4j.properties'");
+        
         }
+        
     }
 
     public static Logger getLog4jLogger(String componentName) {

@@ -628,6 +628,12 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
 		}
 		
+        public String toString() {
+
+            return super.toString() + "{pred=" + pred + ",hash=" + hash + "}";
+            
+		}
+		
     }
 
 }

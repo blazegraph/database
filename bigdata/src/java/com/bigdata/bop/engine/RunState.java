@@ -271,7 +271,7 @@ class RunState {
     public RunState(final RunningQuery query) {
 
         this(query.getQuery(), query.getQueryId(), query.getDeadline(),
-                query.bopIndex);
+                query.getBOpIndex());
 
     }
 
