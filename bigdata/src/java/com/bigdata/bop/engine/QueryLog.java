@@ -257,8 +257,10 @@ public class QueryLog {
 				stats.add(t);
 			}
 		} else {
-			// Just this operator.
-			stats.add(statsMap.get(bopId));
+            // Just this operator.
+            final BOpStats tmp = statsMap.get(bopId);
+            if (tmp != null)
+                stats.add(tmp);
 		}
 		final long unitsIn = stats.unitsIn.get();
 		final long unitsOut = stats.unitsOut.get();
