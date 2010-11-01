@@ -26,8 +26,6 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
@@ -698,34 +696,34 @@ public class CommitRecordIndex extends BTree {
 
     } // CommitRecordIndexTupleSerializer
 
-	public Iterator<ICommitRecord> getCommitRecords(final long fromTime, final long toTime) {
-		return new Iterator<ICommitRecord>() {
-			ICommitRecord m_next = findNext(fromTime);
-			
-			public boolean hasNext() {
-				return m_next != null;
-			}
-
-			public ICommitRecord next() {
-				if (m_next == null) {
-					throw new NoSuchElementException();
-				}
-				
-				ICommitRecord ret = m_next;
-				m_next = findNext(ret.getTimestamp());
-				
-				if (m_next != null && m_next.getTimestamp() > toTime) {
-					m_next = null;
-				}
-				
-				return ret;
-			}
-
-			public void remove() {
-				throw new RuntimeException("Invalid Operation");
-			}
-			
-		};
-	}
+//	public Iterator<ICommitRecord> getCommitRecords(final long fromTime, final long toTime) {
+//		return new Iterator<ICommitRecord>() {
+//			ICommitRecord m_next = findNext(fromTime);
+//			
+//			public boolean hasNext() {
+//				return m_next != null;
+//			}
+//
+//			public ICommitRecord next() {
+//				if (m_next == null) {
+//					throw new NoSuchElementException();
+//				}
+//				
+//				ICommitRecord ret = m_next;
+//				m_next = findNext(ret.getTimestamp());
+//				
+//				if (m_next != null && m_next.getTimestamp() > toTime) {
+//					m_next = null;
+//				}
+//				
+//				return ret;
+//			}
+//
+//			public void remove() {
+//				throw new RuntimeException("Invalid Operation");
+//			}
+//			
+//		};
+//	}
 
 }

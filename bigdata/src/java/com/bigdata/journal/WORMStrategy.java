@@ -299,7 +299,6 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      * @param <T>
      * 
      * @todo report elapsed time and average latency for force, reopen, and
@@ -1048,6 +1047,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * @todo Should be a NOP for the WORM? Check
      *       {@link AbstractJournal#commitNow(long)}
      */
+    @Override
     public void commit(IJournal journal) {
 
         flushWriteCache();
@@ -1060,6 +1060,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * Note: This assumes the caller is synchronized appropriately otherwise
      * writes belonging to other threads will be discarded from the cache!
      */
+    @Override
     public void abort() {
 
         if (writeCacheService != null) {
@@ -2239,9 +2240,5 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         truncate(extent);
 
     }
-
-	public void setCommitRecordIndex(CommitRecordIndex commitRecordIndex) {
-		// NOP		
-	}
 
 }
