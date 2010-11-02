@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop.engine;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -1342,7 +1341,8 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
             } catch (Throwable ex1) {
 
                 // Log an error.
-                log.error("queryId=" + queryId + ", bopId=" + t.bopId, ex1);
+                log.error("queryId=" + queryId + ", bopId=" + t.bopId
+                        + ", bop=" + t.bop, ex1);
 
                 /*
                  * Mark the query as halted on this node regardless of whether
