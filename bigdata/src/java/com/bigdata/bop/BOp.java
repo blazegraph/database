@@ -198,6 +198,13 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
      *             if {@link Annotations#TIMESTAMP} was not specified.
      */
     long getTimestamp();
+
+//    /**
+//     * Compare this {@link BOp} with another {@link BOp}.
+//     * 
+//     * @return <code>true</code> if all arguments and annotations are the same.
+//     */
+//    boolean sameData(final BOp o);
     
     /**
      * Interface declaring well known annotations.

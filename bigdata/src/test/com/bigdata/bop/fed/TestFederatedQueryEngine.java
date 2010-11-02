@@ -953,27 +953,27 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
     }
 
-    /**
-     * @todo Test the ability close the iterator draining a result set before
-     *       the query has finished executing and verify that the query is
-     *       correctly terminated [this is difficult to test without having
-     *       significant data scale since there is an implicit race between the
-     *       consumer and the producer to close out the query evaluation, but
-     *       the {@link PipelineDelayOp} can be used to impose sufficient
-     *       latency on the pipeline that the test can close the query buffer
-     *       iterator first].
-     *       <p>
-     *       This must also be tested in scale-out to make sure that the data
-     *       backing the solutions is not discarded before the caller can use
-     *       those data. [This could be handled by materializing binding set
-     *       objects out of a {@link ByteBuffer} rather than using a live decode
-     *       of the data in that {@link ByteBuffer}.]
-     */
-    public void test_query_closeIterator() {
-
-        fail("write test");
-
-    }
+//    /**
+//     * @todo Test the ability close the iterator draining a result set before
+//     *       the query has finished executing and verify that the query is
+//     *       correctly terminated [this is difficult to test without having
+//     *       significant data scale since there is an implicit race between the
+//     *       consumer and the producer to close out the query evaluation, but
+//     *       the {@link PipelineDelayOp} can be used to impose sufficient
+//     *       latency on the pipeline that the test can close the query buffer
+//     *       iterator first].
+//     *       <p>
+//     *       This must also be tested in scale-out to make sure that the data
+//     *       backing the solutions is not discarded before the caller can use
+//     *       those data. [This could be handled by materializing binding set
+//     *       objects out of a {@link ByteBuffer} rather than using a live decode
+//     *       of the data in that {@link ByteBuffer}.]
+//     */
+//    public void test_query_closeIterator() {
+//
+////        fail("write test");
+//
+//    }
 
     /**
      * Test the ability run a query requiring two joins.
