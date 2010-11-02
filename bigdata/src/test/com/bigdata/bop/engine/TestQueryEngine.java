@@ -911,19 +911,27 @@ public class TestQueryEngine extends TestCase2 {
                 log.info(statsMap.toString());
         }
 
-        // validate the stats for the start operator.
-        {
-            final BOpStats stats = statsMap.get(startId);
-            assertNotNull(stats);
-            if (log.isInfoEnabled())
-                log.info("start: " + stats.toString());
-
-            // verify query solution stats details.
-            assertEquals(1L, stats.chunksIn.get());
-            assertEquals(1L, stats.unitsIn.get());
-            assertEquals(1L, stats.unitsOut.get());
-            assertEquals(1L, stats.chunksOut.get());
-        }
+        /*
+         * Note: SliceOp can cause the Start operator to be interrupted. If this
+         * occurs, the BOpStats for the join are not reported and aggregated
+         * reliably (there is a race between the completion of the Start and its
+         * interrupt by the slice). Since this unit test has a slice which will
+         * interrupt the running query, we can not test the stats on the Start
+         * reliably for this unit test.
+         */
+//        // validate the stats for the start operator.
+//        {
+//            final BOpStats stats = statsMap.get(startId);
+//            assertNotNull(stats);
+//            if (log.isInfoEnabled())
+//                log.info("start: " + stats.toString());
+//
+//            // verify query solution stats details.
+//            assertEquals(1L, stats.chunksIn.get());
+//            assertEquals(1L, stats.unitsIn.get());
+//            assertEquals(1L, stats.unitsOut.get());
+//            assertEquals(1L, stats.chunksOut.get());
+//        }
 
         /*
          * Note: SliceOp can cause the Join operator to be interrupted. If this
