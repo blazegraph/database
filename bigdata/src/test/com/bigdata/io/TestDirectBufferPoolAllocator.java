@@ -181,20 +181,20 @@ public class TestDirectBufferPoolAllocator extends TestCase2 {
 
     }
 
-    /**
-     * @todo Write a unit test to look for a memory leak in the backing
-     *       {@link DirectBufferPool} as allocations are released from the
-     *       {@link DirectBufferPoolAllocator}. However, not that the
-     *       {@link DirectBufferPool} DOES NOT release buffers back to the JVM
-     *       so the pool size will not decrease. Instead, what you have to do is
-     *       look to see that alloc/free alloc/free patterns do not cause the
-     *       #of allocated buffers on the {@link DirectBufferPool} to increase.
-     */
-    public void test_memoryLeak() {
-
-        fail("write test");
-
-    }
+//    /**
+//     * @todo Write a unit test to look for a memory leak in the backing
+//     *       {@link DirectBufferPool} as allocations are released from the
+//     *       {@link DirectBufferPoolAllocator}. However, not that the
+//     *       {@link DirectBufferPool} DOES NOT release buffers back to the JVM
+//     *       so the pool size will not decrease. Instead, what you have to do is
+//     *       look to see that alloc/free alloc/free patterns do not cause the
+//     *       #of allocated buffers on the {@link DirectBufferPool} to increase.
+//     */
+//    public void test_memoryLeak() {
+//
+//        fail("write test");
+//
+//    }
 
     /**
      * Unit tests for multiple allocations within the same. This verifies both
@@ -243,12 +243,12 @@ public class TestDirectBufferPoolAllocator extends TestCase2 {
 
     }
 
-    /**
-     * @todo write a unit test for
-     *       {@link DirectBufferPoolAllocator#put(byte[], IAllocation[])}.
-     */
-    public void test_put() {
-        fail("write tests");
-    }
+//    /**
+//     * @todo write a unit test for
+//     *       {@link DirectBufferPoolAllocator#put(byte[], IAllocation[])}.
+//     */
+//    public void test_put() {
+//        fail("write tests");
+//    }
 
 }
