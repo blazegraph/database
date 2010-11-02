@@ -67,6 +67,7 @@ import com.bigdata.relation.accesspath.IMultiSourceAsynchronousIterator;
 import com.bigdata.relation.accesspath.MultiSourceSequentialAsynchronousIterator;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ICloseableIterator;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Haltable;
 import com.bigdata.util.concurrent.Memoizer;
 
@@ -1340,9 +1341,16 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                 
             } catch (Throwable ex1) {
 
-                // Log an error.
-                log.error("queryId=" + queryId + ", bopId=" + t.bopId
-                        + ", bop=" + t.bop, ex1);
+                /*
+                 * Note: SliceOp will cause other operators to be interrupted
+                 * during normal evaluation so it is not useful to log an
+                 * InterruptedException @ ERROR.
+                 */
+                if (!InnerCause.isInnerCause(ex1, InterruptedException.class)) {
+                    // Log an error.
+                    log.error("queryId=" + queryId + ", bopId=" + t.bopId
+                            + ", bop=" + t.bop, ex1);
+                }
 
                 /*
                  * Mark the query as halted on this node regardless of whether
