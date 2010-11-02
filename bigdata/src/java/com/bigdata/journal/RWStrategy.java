@@ -24,15 +24,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
@@ -45,7 +42,6 @@ import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.RWStore;
-import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -68,7 +64,8 @@ import com.bigdata.util.ChecksumUtility;
  * @author Martyn Cutcher
  */
 public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHABufferStrategy {
-    protected static final Logger log = Logger.getLogger(RWStrategy.class);
+
+    private static final transient Logger log = Logger.getLogger(RWStrategy.class);
 
 	final private FileMetadata m_fileMetadata;
 	
@@ -88,14 +85,20 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	private volatile IRootBlockView m_rb;
 	private volatile IRootBlockView m_rb0;
 	private volatile IRootBlockView m_rb1;
-	
-	final ReentrantLock m_commitLock = new ReentrantLock();
-	
+
     /**
-     * Access to the transaction manager of any owning Journal, needed by
-     * RWStrategy to manager deleted data.
+     * @todo The use of this lock is suspicious. It is only used by
+     *       {@link #commit(IJournal)} and that method is invoked by the
+     *       {@link AbstractJournal#commitNow(long)} which is already protected
+     *       by a lock.
      */
-    private AbstractLocalTransactionManager localTransactionManager = null;
+	private final ReentrantLock m_commitLock = new ReentrantLock();
+	
+//    /**
+//     * Access to the transaction manager of any owning Journal, needed by
+//     * RWStrategy to manager deleted data.
+//     */
+//    private AbstractLocalTransactionManager localTransactionManager = null;
     
 //	CounterSet m_counters = new CounterSet();
 
@@ -125,15 +128,25 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	}
 
     /**
+     * Return a copy of the current {@link IRootBlockView}.
+     * 
      * @param rb0
-     * @return
+     *            When <code>true</code> the view will be flagged as root block
+     *            ZERO (0). Otherwise it is flagged as root block ONE (1).
+     * 
+     * @return The {@link IRootBlockView}.
      */
-	IRootBlockView copyRootBlock(boolean rb0) {
-		IRootBlockView rbv = new RootBlockView(rb0, m_rb.getOffsetBits(), m_rb.getNextOffset(), m_rb.getFirstCommitTime(), m_rb.getLastCommitTime(),
-				m_rb.getCommitCounter(), m_rb.getCommitRecordAddr(), m_rb.getCommitRecordIndexAddr(), m_fileMetadata.rootBlock.getUUID(),
-				m_rb.getQuorumToken(),
-				m_rb.getMetaStartAddr(), m_rb.getMetaBitsAddr(), StoreTypeEnum.RW, m_fileMetadata.rootBlock.getCreateTime(), m_rb.getCloseTime(),
-				s_ckutil);
+	private IRootBlockView copyRootBlock(final boolean rb0) {
+
+        final IRootBlockView rbv = new RootBlockView(rb0, m_rb.getOffsetBits(),
+                m_rb.getNextOffset(), m_rb.getFirstCommitTime(), m_rb
+                        .getLastCommitTime(), m_rb.getCommitCounter(), m_rb
+                        .getCommitRecordAddr(),
+                m_rb.getCommitRecordIndexAddr(), m_fileMetadata.rootBlock
+                        .getUUID(), m_rb.getQuorumToken(), m_rb
+                        .getMetaStartAddr(), m_rb.getMetaBitsAddr(),
+                StoreTypeEnum.RW, m_fileMetadata.rootBlock.getCreateTime(),
+                m_rb.getCloseTime(), s_ckutil);
 
 		return rbv;
 	}
@@ -192,14 +205,19 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 			return m_fileMetadata.raf;
 		}
 
-		public IRootBlockView newRootBlockView(boolean rootBlock0, int offsetBits, long nextOffset,
-				long firstCommitTime, long lastCommitTime, long commitCounter, long commitRecordAddr,
-				long commitRecordIndexAddr, long metaStartAddr, long metaBitsAddr, long closeTime) {
+        public IRootBlockView newRootBlockView(boolean rootBlock0,
+                int offsetBits, long nextOffset, long firstCommitTime,
+                long lastCommitTime, long commitCounter, long commitRecordAddr,
+                long commitRecordIndexAddr, long metaStartAddr,
+                long metaBitsAddr, long closeTime) {
 
-			IRootBlockView rbv = new RootBlockView(rootBlock0, offsetBits, nextOffset, firstCommitTime, lastCommitTime,
-					commitCounter, commitRecordAddr, commitRecordIndexAddr, m_fileMetadata.rootBlock.getUUID(), -1 /* FIXME: quorumToken */,
-					metaStartAddr, metaBitsAddr, StoreTypeEnum.RW, m_fileMetadata.rootBlock.getCreateTime(), closeTime,
-					s_ckutil);
+            final IRootBlockView rbv = new RootBlockView(rootBlock0,
+                    offsetBits, nextOffset, firstCommitTime, lastCommitTime,
+                    commitCounter, commitRecordAddr, commitRecordIndexAddr,
+                    m_fileMetadata.rootBlock.getUUID(),
+                    -1 /* FIXME: quorumToken */, metaStartAddr, metaBitsAddr,
+                    StoreTypeEnum.RW, m_fileMetadata.rootBlock.getCreateTime(),
+                    closeTime, s_ckutil);
 
 			// writeRootBlock(rbv, ForceEnum.Force); // not sure if this is really needed now!
 
@@ -211,16 +229,18 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		}
 	}
 
-	public ByteBuffer readRootBlock(boolean rootBlock0) {
-		checkReopen();
+	public ByteBuffer readRootBlock(final boolean rootBlock0) {
+
+	    checkReopen();
 		
 		IRootBlockView rbv = rootBlock0 ? m_rb0 : m_rb1;
 		
 		return rbv.asReadOnlyBuffer();
 	}
 
-	public ByteBuffer read(long addr) {
-		checkReopen();
+	public ByteBuffer read(final long addr) {
+		
+	    checkReopen();
 		
 		int rwaddr = decodeAddr(addr);		
 		int sze = decodeSize(addr);
@@ -239,12 +259,15 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		return ByteBuffer.wrap(buf, 0, sze);
 	}
 
-	public long write(ByteBuffer data) {
-		return write(data, null);
+	public long write(final ByteBuffer data) {
+		
+	    return write(data, null);
+	    
 	}
 
-	public long write(ByteBuffer data, IAllocationContext context) {
-		checkReopen();
+	public long write(final ByteBuffer data, final IAllocationContext context) {
+
+	    checkReopen();
 		
 		if (data == null) {
 			throw new IllegalArgumentException();
@@ -291,7 +314,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 //		return encodeAddr(m_store.alloc(nbytes), nbytes);
 //	}
 
-	private long encodeAddr(long alloc, int nbytes) {
+	private long encodeAddr(long alloc, final int nbytes) {
 		alloc <<= 32;
 		alloc += nbytes;
 
@@ -304,52 +327,70 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		return (int) addr;
 	}
 
-	private int decodeSize(long addr) {
+	private int decodeSize(final long addr) {
 		return (int) (addr & 0xFFFFFFFF);
 	}
 
-	public void delete(long addr) {
-		delete(addr, null);
+	public void delete(final long addr) {
+    
+	    delete(addr, null/* IAllocationContext */);
+	    
 	}
 
 	/**
 	 * Must check whether there are existing transactions which may access
 	 * this data, and if not free immediately, otherwise defer.
 	 */
-	public void delete(long addr, IAllocationContext context) {
+	public void delete(final long addr, final IAllocationContext context) {
 		
 		final int rwaddr = decodeAddr(addr);
 		final int sze = decodeSize(addr);
 		
 		m_store.free(rwaddr, sze, context);
+		
 	}
 	
-	public void detachContext(IAllocationContext context) {
-		m_store.detachContext(context);
+	public void detachContext(final IAllocationContext context) {
+		
+	    m_store.detachContext(context);
+	    
 	}
 
-
+	/*
+	 * FIXME Reconcile this class with the methods on the outer class.
+	 */
 	public static class RWAddressManager implements IAddressManager {
 
-		public int getByteCount(long addr) {
-			return (int) addr & 0xFFFFFF;
+		public int getByteCount(final long addr) {
+			
+		    return (int) addr & 0xFFFFFF;
+		    
 		}
 
-		public long getOffset(long addr) {
-			return -(addr >> 32);
+		public long getOffset(final long addr) {
+			
+		    return -(addr >> 32);
+		    
 		}
 
-		public long toAddr(int nbytes, long offset) {
-			offset <<= 32;
+		public long toAddr(final int nbytes, long offset) {
+
+		    offset <<= 32;
 			
 			return offset + nbytes;
+
 		}
 
-		public String toString(long addr) {
-	        return "{off="+getOffset(addr)+",len="+getByteCount(addr)+"}";
+		public String toString(final long addr) {
+	        
+            return "{off=" + getOffset(addr) + ",len=" + getByteCount(addr)
+                    + "}";
+
 		}
+	
 	}
-	IAddressManager m_am = new RWAddressManager();
+
+	final private IAddressManager m_am = new RWAddressManager();
 	
 	public IAddressManager getAddressManager() {
 		return m_am;
@@ -382,9 +423,9 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		return 0;
 	}
 
-	long m_initialExtent = 0;
+	private long m_initialExtent = 0;
 
-	private boolean m_needsReopen = false;
+	private volatile boolean m_needsReopen = false;
 	
 	public long getInitialExtent() {
 		return m_initialExtent;
@@ -485,19 +526,33 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	}
 
 	public void deleteResources() {
-		if (m_fileMetadata.raf != null && m_fileMetadata.raf.getChannel().isOpen()) {
-			throw new IllegalStateException("Backing store is open");
-		}
 		
-		if (m_fileMetadata.file.exists()) {
-			try {
-				if (!m_fileMetadata.file.delete()) {
-					log.warn("Unable to delete file: " + m_fileMetadata.file);
-				}
-			} catch (SecurityException e) {
-				log.warn("Problem deleting file", e);
-			}
-		}
+        if (m_fileMetadata.raf != null
+                && m_fileMetadata.raf.getChannel().isOpen()) {
+
+            throw new IllegalStateException("Backing store is open: "
+                    + m_fileMetadata.file);
+            
+        }
+
+        if (m_fileMetadata.file.exists()) {
+            
+            try {
+            
+                if (!m_fileMetadata.file.delete()) {
+                
+                    log.warn("Unable to delete file: " + m_fileMetadata.file);
+                    
+                }
+
+            } catch (SecurityException e) {
+            
+                log.warn("Problem deleting file", e);
+                
+            }
+
+        }
+	
 	}
 
 	public void destroy() {
@@ -515,10 +570,18 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	}
 
 	public IRootBlockView getRootBlock() {
-		return m_fmv.newRootBlockView(! m_rb.isRootBlock0(), m_rb.getOffsetBits(), getNextOffset(), 
-				m_rb.getFirstCommitTime(), m_rb.getLastCommitTime(), m_rb.getCommitCounter(), 
-				m_rb.getCommitRecordAddr(), m_rb.getCommitRecordIndexAddr(), getMetaStartAddr(), getMetaBitsAddr(), m_rb.getCloseTime() );
-		
+        return m_fmv.newRootBlockView(!m_rb.isRootBlock0(), //
+                m_rb.getOffsetBits(),//
+                getNextOffset(), //
+                m_rb.getFirstCommitTime(),//
+                m_rb.getLastCommitTime(), //
+                m_rb.getCommitCounter(),//
+                m_rb.getCommitRecordAddr(), //
+                m_rb.getCommitRecordIndexAddr(), //
+                getMetaStartAddr(),//
+                getMetaBitsAddr(), //
+                m_rb.getCloseTime()//
+                );
 	}
 	
 	/**
@@ -526,7 +589,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 * 
 	 * Must pass in earliestTxnTime to commitChanges to enable
 	 */
-	public void commit(IJournal journal) {
+	public void commit(final IJournal journal) {
 		m_commitLock.lock();
 		try {
 			m_store.commitChanges((Journal) journal); // includes a force(false)
@@ -544,7 +607,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	    m_store.reset();
 	}
 	
-	public void force(boolean metadata) {
+	public void force(final boolean metadata) {
 		try {
 			m_store.flushWrites(metadata);
 		} catch (ClosedByInterruptException e) {
@@ -572,7 +635,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 			log.warn("Request to reopen store after interrupt");
 
 			m_store.close();
-			m_fileMetadata.raf = new RandomAccessFile(m_fileMetadata.file, m_fileMetadata.fileMode);
+            m_fileMetadata.raf = new RandomAccessFile(m_fileMetadata.file,
+                    m_fileMetadata.fileMode);
 			m_store = new RWStore(m_fmv, false, m_environment); // never read-only for now
 			m_needsReopen = false;
 			m_open = true;
@@ -592,11 +656,19 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		
 		return m_fileMetadata.raf;		
 	}
-	public IResourceMetadata getResourceMetadata() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
+    
+	/**
+     * Not supported - this is available on the {@link AbstractJournal}.
+     * 
+     * @throws UnsupportedOperationException
+     *             always
+     */
+    public IResourceMetadata getResourceMetadata() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
 	public UUID getUUID() {
 		return m_fileMetadata.rootBlock.getUUID();
 	}
@@ -631,23 +703,12 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		return addr >> 32;
 	}
 
-	public void packAddr(DataOutput out, long addr) throws IOException {
-		// TODO Auto-generated method stub
-
-	}
-
-	public long toAddr(int nbytes, long offset) {
+	public long toAddr(final int nbytes, final long offset) {
 		return (offset << 32) + nbytes;
 	}
 
-	public String toString(long addr) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	public long unpackAddr(DataInput in) throws IOException {
-		// TODO Auto-generated method stub
-		return 0;
+	public String toString(final long addr) {
+		return m_am.toString(addr);
 	}
 
 	/**

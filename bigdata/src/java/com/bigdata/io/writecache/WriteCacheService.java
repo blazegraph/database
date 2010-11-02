@@ -325,10 +325,10 @@ abstract public class WriteCacheService implements IWriteCache {
 	int addrsUsedCurs = 0;
 	final char[] addrActions = new char[addrsUsed.length];
 	final int[] addrLens = new int[addrsUsed.length];
-*/	final long[] addrsUsed = null;
-	int addrsUsedCurs = 0;
-	final char[] addrActions = null;
-	final int[] addrLens = null;
+*/	private final long[] addrsUsed = null;
+	private int addrsUsedCurs = 0;
+	private final char[] addrActions = null;
+	private final int[] addrLens = null;
 	
 	/**
 	 * The current file extent.
@@ -1989,7 +1989,7 @@ abstract public class WriteCacheService implements IWriteCache {
 	 * An array of writeCache actions is maintained that can be used
 	 * to provide a breadcrumb of how that address has been written, saved,
 	 * freed or removed.
-	 * 
+	 * <p>
 	 * Write errors often show up as a checksum error, so the length of
 	 * data written to the address cab be crucial information in determining the
 	 * root of any problem.
@@ -2002,9 +2002,9 @@ abstract public class WriteCacheService implements IWriteCache {
 			return "No WriteCache debug info";
 		}
 		
-		StringBuffer ret = new StringBuffer();
-		// first see if address was ever written
-		boolean written = false;
+		final StringBuffer ret = new StringBuffer();
+//		// first see if address was ever written
+//		boolean written = false;
 		for (int i = 0; i < addrsUsed.length; i++) {
 			if (i == addrsUsedCurs) {
 				ret.append("|...|");
