@@ -35,14 +35,12 @@ import org.apache.log4j.Logger;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnectionTest;
 
-import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.LocalTripleStore;
 
 public class BigdataConnectionTest extends RepositoryConnectionTest {
@@ -53,29 +51,6 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
 	public BigdataConnectionTest(String name) {
 		super(name);
 	}
-
-//    /**
-//     * Return a test suite using the {@link LocalTripleStore} and nested
-//     * subquery joins.
-//     */
-//    public static class LTSWithNestedSubquery extends BigdataConnectionTest {
-//
-//        public LTSWithNestedSubquery(String name) {
-//            super(name);
-//        }
-//
-//        @Override
-//        protected Properties getProperties() {
-//            
-//            final Properties p = new Properties(super.getProperties());
-//            
-//            p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,"true");
-//            
-//            return p;
-//            
-//        }
-//
-//    }
     
     /**
      * Return a test suite using the {@link LocalTripleStore} and pipeline
@@ -93,8 +68,6 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
         protected Properties getProperties() {
             
             final Properties p = new Properties(super.getProperties());
-            
-//            p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,"false");
             
             return p;
             
@@ -174,12 +147,7 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
         super.tearDown();
 
         if (backend != null)
-        {
-            QueryEngine qe = QueryEngineFactory.removeQueryController ( backend ) ;
-            if ( null != qe )
-                qe.shutdownNow () ;
             backend.destroy();
-        }
 
     }
 

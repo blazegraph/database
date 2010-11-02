@@ -50,15 +50,13 @@ import org.openrdf.repository.dataset.DatasetRepository;
 import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.sail.memory.MemoryStore;
 
-import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSail.Options;
 
 /**
  * Test harness for running the SPARQL test suites.
@@ -416,9 +414,7 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
     protected void tearDownBackend(IIndexManager backend) {
         
         backend.destroy();
-        QueryEngine qe = QueryEngineFactory.removeQueryController ( backend ) ;
-        if ( null != qe )
-            qe.shutdownNow () ;
+        
     }
     
     @Override

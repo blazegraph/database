@@ -1250,7 +1250,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     /**
      * Closes out the journal iff it is still open.
      */
-    protected void finalize() throws Exception {
+    protected void finalize() throws Throwable {
         
         if(_bufferStrategy.isOpen()) {
             
@@ -1258,7 +1258,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 log.info("Closing journal: " + getFile());
             
             shutdownNow();
-            
+
         }
         
     }

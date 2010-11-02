@@ -81,6 +81,9 @@ public class TestAll extends TestCase {
         // unit tests for a remote access path.
         suite.addTestSuite(TestRemoteAccessPath.class);
         
+        // look for memory leaks in the query engine factory.
+        suite.addTestSuite(TestQueryEngineFactory.class);
+        
         /*
          * Unit tests for the federated query engine against an embedded
          * federation with a single data service.

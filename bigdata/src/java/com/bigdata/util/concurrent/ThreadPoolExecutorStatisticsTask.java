@@ -1,5 +1,6 @@
 package com.bigdata.util.concurrent;
 
+import java.lang.ref.WeakReference;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -38,7 +39,23 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
     /**
      * The executor service that is being monitored.
      */
-    private final ThreadPoolExecutor service;
+//    private final ThreadPoolExecutor service;
+    private final WeakReference<ThreadPoolExecutor> serviceRef;
+    
+    private ThreadPoolExecutor getService() {
+        
+        final ThreadPoolExecutor service = serviceRef.get();
+
+        if (service == null) {
+
+            // Throw exception which should cause the task to stop executing.
+            throw new RuntimeException("Service was shutdown.");
+
+        }
+
+        return service;
+        
+    }
 
 //    /**
 //     * The time when we started to collect data about the {@link #service} (set by the ctor).
@@ -207,7 +224,8 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
         
         this.serviceName = serviceName;
         
-        this.service = service;
+//        this.service = service;
+        this.serviceRef = new WeakReference<ThreadPoolExecutor>(service);
         
 //        this.startNanos = System.nanoTime();
         
@@ -243,7 +261,7 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
     private final MovingAverageTask queueSizeTask = new MovingAverageTask(
             "queueSize", new Callable<Integer>() {
                 public Integer call() {
-                    return service.getQueue().size();
+                    return getService().getQueue().size();
                 }
             });
 
@@ -280,6 +298,15 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
      */
     public void run() {
 
+        /*
+         * Note: This will throw a RuntimeException if the weak reference has
+         * been cleared. This decouples the task from the monitored service
+         * which let's the monitored service shutdown when it is no longer
+         * referenced by the application (assuming that it implements a
+         * finalize() method).
+         */
+        final ThreadPoolExecutor service = getService();
+        
         try {
 
             {
@@ -553,6 +580,9 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
     public CounterSet getCounters() {
 
         final CounterSet counterSet = new CounterSet();
+
+        // Reference to the service : MAY have been cleared by GC.
+        final ThreadPoolExecutor service = serviceRef.get();
         
         /*
          * Defined for ThreadPoolExecutor.
@@ -605,6 +635,7 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
          */
         {
 
+            if(service != null) {
             if (taskCounters == null) {
 
                 /*
@@ -634,7 +665,8 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
                             setValue(service.getLargestPoolSize());
                         }
                     });
-
+            }
+            
             counterSet.addCounter(
                     IThreadPoolExecutorCounters.AverageActiveCount,
                     new Instrument<Double>() {
