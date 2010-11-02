@@ -38,16 +38,14 @@ import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.dataset.DatasetRepository;
 
-import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
@@ -98,24 +96,29 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
     }
 
     /**
-     * Return the entire test suite. 
+     * Return the entire test suite.
      */
     public static TestSuite fullSuite() throws Exception {
-        return ManifestTest.suite
-        (
-            new Factory ()
-            {
-                public SPARQLQueryTest createSPARQLQueryTest ( String URI, String name, String query, String results, Dataset dataSet, boolean laxCardinality)
-                {
-                    return new BigdataFederationSparqlTest ( URI, name, query, results, dataSet, laxCardinality ) ;
-                }
+        
+        return ManifestTest.suite(new Factory() {
+        
+            public SPARQLQueryTest createSPARQLQueryTest(String URI,
+                    String name, String query, String results, Dataset dataSet,
+                    boolean laxCardinality) {
+            
+                return new BigdataFederationSparqlTest(URI, name, query,
+                        results, dataSet, laxCardinality);
+            
             }
-        ) ;
+        });
+        
     }
 
-    public BigdataFederationSparqlTest ( String URI, String name, String query, String results, Dataset dataSet, boolean laxCardinality )
-    {
-        super ( URI, name, query, results, dataSet, laxCardinality ) ;
+    public BigdataFederationSparqlTest(String URI, String name, String query,
+            String results, Dataset dataSet, boolean laxCardinality) {
+
+        super(URI, name, query, results, dataSet, laxCardinality);
+        
     }
 
     @Override public void runTest ()
@@ -130,12 +133,6 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
         throws Exception
     {
         super.tearDown () ;
-        if ( null != _sail )
-        {
-            QueryEngine qe = QueryEngineFactory.removeQueryController ( _sail.getDatabase ().getIndexManager () ) ;
-            if ( null != qe )
-                qe.shutdownNow () ;
-        }
 		if (_ts != null) {
 			_ts.destroy();
 			_ts = null;

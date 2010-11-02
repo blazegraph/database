@@ -133,6 +133,9 @@ public class TestAll extends TestCase {
 
         suite.addTest( com.bigdata.rwstore.TestAll.suite() );
 
+        // test suite for memory leaks in the journal shutdown protocol.
+        suite.addTestSuite(TestJournalShutdown.class);
+        
         return suite;
 
     }

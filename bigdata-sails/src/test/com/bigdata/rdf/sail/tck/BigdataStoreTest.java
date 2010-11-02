@@ -37,8 +37,6 @@ import org.openrdf.sail.Sail;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.IIndexManager;
@@ -49,30 +47,7 @@ import com.bigdata.rdf.store.LocalTripleStore;
 public class BigdataStoreTest extends RDFStoreTest {
 
     protected static final Logger log = Logger.getLogger(BigdataStoreTest.class);
-    
-//    /**
-//     * Return a test suite using the {@link LocalTripleStore} and nested
-//     * subquery joins.
-//     */
-//    public static class LTSWithNestedSubquery extends BigdataStoreTest {
-//
-//        public LTSWithNestedSubquery(String name) {
-//            super(name);
-//        }
-//        
-//        @Override
-//        protected Properties getProperties() {
-//            
-//            final Properties p = new Properties(super.getProperties());
-//            
-//            p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,"true");
-//            
-//            return p;
-//            
-//        }
-//
-//    }
-    
+ 
     /**
      * Return a test suite using the {@link LocalTripleStore} and pipeline
      * joins.
@@ -89,8 +64,6 @@ public class BigdataStoreTest extends RDFStoreTest {
         protected Properties getProperties() {
             
             final Properties p = new Properties(super.getProperties());
-            
-//            p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,"false");
        
             return p;
             
@@ -125,12 +98,7 @@ public class BigdataStoreTest extends RDFStoreTest {
         super.tearDown();
 
         if (backend != null)
-        {
-            QueryEngine qe = QueryEngineFactory.removeQueryController ( backend ) ;
-            if ( null != qe )
-                qe.shutdownNow () ;
             backend.destroy();
-        }
 
     }
     

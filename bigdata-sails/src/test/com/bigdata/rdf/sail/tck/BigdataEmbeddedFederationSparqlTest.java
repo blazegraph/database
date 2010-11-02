@@ -41,13 +41,13 @@ import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.dataset.DatasetRepository;
 
-import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.btree.keys.CollatorEnum;
+import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.resources.ResourceManager;
@@ -202,6 +202,12 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
         if (cannotInlineTests.contains(testURI))
             properties.setProperty(Options.INLINE_LITERALS, "false");
 
+        if(unicodeStrengthIdentical.contains(testURI)) {
+            // Force identical Unicode comparisons.
+            properties.setProperty(Options.COLLATOR, CollatorEnum.JDK.toString());
+            properties.setProperty(Options.STRENGTH, StrengthEnum.Identical.toString());
+        }
+
         client = new EmbeddedClient(properties);
 
         fed = client.connect();
@@ -222,10 +228,7 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
     }
 
     protected void tearDownBackend(IIndexManager backend) {
-        QueryEngine qe = QueryEngineFactory.removeQueryController ( backend ) ;
-        if ( null != qe )
-            qe.shutdownNow () ;
-
+        
         backend.destroy();
         
         if (client != null) {

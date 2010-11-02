@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
+import java.lang.ref.WeakReference;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
@@ -220,7 +221,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     private static class MyLockManager<R extends Comparable<R>> extends
             NonBlockingLockManagerWithNewDesign<R> {
 
-        private final WriteExecutorService service;
+//        private final WriteExecutorService service;
+        private final WeakReference<WriteExecutorService> serviceRef;
 
         public MyLockManager(final int capacity, final int maxLockTries,
                 final boolean predeclareLocks,
@@ -228,12 +230,20 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             super(capacity, maxLockTries, predeclareLocks);
 
-            this.service = service;
+//            this.service = service;
+            this.serviceRef = new WeakReference<WriteExecutorService>(service);
 
         }
 
         protected void ready(final Runnable r) {
 
+//            service.execute(r);
+            
+            final WriteExecutorService service = serviceRef.get();
+            
+            if(service == null)
+                throw new RejectedExecutionException();
+            
             service.execute(r);
 
         }

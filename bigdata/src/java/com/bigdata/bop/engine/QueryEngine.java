@@ -47,6 +47,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.view.FusedView;
@@ -344,9 +345,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     public void init() {
 
-        final FutureTask<Void> ft = new FutureTask<Void>(new QueryEngineTask(),
-                (Void) null);
-        
+        final FutureTask<Void> ft = new FutureTask<Void>(new QueryEngineTask(
+                priorityQueue), (Void) null);
+
         if (engineFuture.compareAndSet(null/* expect */, ft)) {
         
             engineService.set(Executors
@@ -365,13 +366,18 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     }
 
     /**
-     * {@link QueryEngine}s are using with a singleton pattern. They must be
-     * torn down automatically once they are no longer reachable.
+     * {@link QueryEngine}s are used with a singleton pattern managed by the
+     * {@link QueryEngineFactory}. They are torn down automatically once they
+     * are no longer reachable. This behavior depends on not having any hard
+     * references back to the {@link QueryEngine}.
      */
     @Override
     protected void finalize() throws Throwable {
+        
         shutdownNow();
+        
         super.finalize();
+        
     }
     
     /**
@@ -414,6 +420,12 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     
     /**
      * Runnable submits chunks available for evaluation against running queries.
+     * <p>
+     * Note: This is a static inner class in order to avoid a hard reference 
+     * back to the outer {@link QueryEngine} object.  This makes it possible
+     * for the JVM to finalize the {@link QueryEngine} if the application no
+     * longer holds a hard reference to it.  The {@link QueryEngine} is then
+     * automatically closed from within its finalizer method.
      * 
      * @todo Handle priority for selective queries based on the time remaining
      *       until the timeout.
@@ -436,13 +448,25 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *       the same target ByteBuffer, or when we add the chunk to the
      *       RunningQuery.]
      */
-    private class QueryEngineTask implements Runnable {
+    static private class QueryEngineTask implements Runnable {
+        
+        final private BlockingQueue<RunningQuery> queue;
+
+        public QueryEngineTask(final BlockingQueue<RunningQuery> queue) {
+
+            if (queue == null)
+                throw new IllegalArgumentException();
+            
+            this.queue = queue;
+            
+        }
+        
         public void run() {
             if(log.isInfoEnabled())
                 log.info("Running: " + this);
             while (true) {
                 try {
-                    final RunningQuery q = priorityQueue.take();
+                    final RunningQuery q = queue.take();
                     if (!q.isDone())
                         q.consumeChunk();
                 } catch (InterruptedException e) {
@@ -454,7 +478,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
                      * then you can instrument BlockingBuffer#close() in
                      * PipelineOp#newBuffer(stats).
                      */
-                    log.warn("Interrupted."
+                    if (log.isInfoEnabled())
+                        log.info("Interrupted."
 //                            ,e
                             );
                     return;
