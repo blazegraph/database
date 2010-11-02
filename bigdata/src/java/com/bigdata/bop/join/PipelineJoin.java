@@ -1206,6 +1206,17 @@ public class PipelineJoin<E> extends PipelineOp implements
             final private IBindingSet[] bindingSets;
 
             /**
+             * An array correlated with the {@link #bindingSets} whose values
+             * are the #of solutions generated for each of the source binding
+             * sets consumed by this {@link AccessPathTask}. This array is used
+             * to determine, whether or not any solutions were produced for a
+             * given {@link IBindingSet}. When the join is optional and no
+             * solutions were produced for a given {@link IBindingSet}, the
+             * {@link IBindingSet} is output anyway.
+             */
+            final private int[] naccepted;
+
+            /**
              * The {@link IAccessPath} corresponding to the asBound
              * {@link IPredicate} for this join dimension. The asBound
              * {@link IPredicate} is {@link IAccessPath#getPredicate()}.
@@ -1301,6 +1312,8 @@ public class PipelineJoin<E> extends PipelineOp implements
 
                 // convert to array for thread-safe traversal.
                 this.bindingSets = bindingSets.toArray(new IBindingSet[n]);
+                
+                this.naccepted = new int[n];
 
             }
 
@@ -1352,7 +1365,7 @@ public class PipelineJoin<E> extends PipelineOp implements
              */
             protected void handleJoin() {
 
-                boolean nothingAccepted = true;
+//                boolean nothingAccepted = true;
 
                 // Obtain the iterator for the current join dimension.
                 final IChunkedOrderedIterator<?> itr = accessPath.iterator();
@@ -1363,10 +1376,6 @@ public class PipelineJoin<E> extends PipelineOp implements
                     final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer = threadLocalBufferFactory
                             .get();
 
-                    // Thread-local buffer iff optional sink is in use.
-                    final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = threadLocalBufferFactory2 == null ? null
-                            : threadLocalBufferFactory2.get();
-                    
                     while (itr.hasNext()) {
 
                         final Object[] chunk = itr.nextChunk();
@@ -1374,19 +1383,45 @@ public class PipelineJoin<E> extends PipelineOp implements
                         stats.accessPathChunksIn.increment();
 
                         // process the chunk in the caller's thread.
-                        final boolean somethingAccepted = new ChunkTask(
-                                bindingSets, unsyncBuffer, chunk).call();
+//                        final boolean somethingAccepted = 
+                        new ChunkTask(bindingSets, naccepted, unsyncBuffer,
+                                chunk).call();
 
-                        if (somethingAccepted) {
-
-                            // something in the chunk was accepted.
-                            nothingAccepted = false;
-
-                        }
+//                        if (somethingAccepted) {
+//
+//                            // something in the chunk was accepted.
+//                            nothingAccepted = false;
+//
+//                        }
 
                     } // next chunk.
 
-                    if (nothingAccepted && optional) {
+//                    if (nothingAccepted && optional) {
+//
+//                        /*
+//                         * Note: when NO binding sets were accepted AND the
+//                         * predicate is OPTIONAL then we output the _original_
+//                         * binding set(s) to the sink join task(s).
+//                         */
+//
+//                        // Thread-local buffer iff optional sink is in use.
+//                        final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = threadLocalBufferFactory2 == null ? null
+//                                : threadLocalBufferFactory2.get();
+//                        
+//                        for (IBindingSet bs : this.bindingSets) {
+//
+//                            if (unsyncBuffer2 == null) {
+//                                // use the default sink.
+//                                unsyncBuffer.add(bs);
+//                            } else {
+//                                // use the alternative sink.
+//                                unsyncBuffer2.add(bs);
+//                            }
+//
+//                        }
+//
+//                    }
+                    if (optional) {
 
                         /*
                          * Note: when NO binding sets were accepted AND the
@@ -1394,7 +1429,21 @@ public class PipelineJoin<E> extends PipelineOp implements
                          * binding set(s) to the sink join task(s).
                          */
 
-                        for (IBindingSet bs : this.bindingSets) {
+                        // Thread-local buffer iff optional sink is in use.
+                        final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = threadLocalBufferFactory2 == null ? null
+                                : threadLocalBufferFactory2.get();
+
+                        for (int bindex = 0; bindex < bindingSets.length; bindex++) {
+
+                            if (naccepted[bindex] > 0)
+                                continue;
+                            
+                            final IBindingSet bs = bindingSets[bindex];
+                            
+                            if (log.isTraceEnabled())
+                                log
+                                        .trace("Passing on solution which fails an optional join: "
+                                                + bs);
 
                             if (unsyncBuffer2 == null) {
                                 // use the default sink.
@@ -1407,7 +1456,6 @@ public class PipelineJoin<E> extends PipelineOp implements
                         }
 
                     }
-
                     return;
 
                 } catch (Throwable t) {
@@ -1655,7 +1703,7 @@ public class PipelineJoin<E> extends PipelineOp implements
          *         Thompson</a>
          * @version $Id$
          */
-        protected class ChunkTask implements Callable<Boolean> {
+        protected class ChunkTask implements Callable<Void> {
 
             /**
              * The {@link IBindingSet}s which the each element in the chunk will
@@ -1664,6 +1712,11 @@ public class PipelineJoin<E> extends PipelineOp implements
              */
             private final IBindingSet[] bindingSets;
 
+            /**
+             * The #of solutions accepted for each of the {@link #bindingSets}.
+             */
+            private final int[] naccepted;
+            
             /**
              * A per-{@link Thread} buffer that is used to collect
              * {@link IBindingSet}s into chunks before handing them off to the
@@ -1684,35 +1737,39 @@ public class PipelineJoin<E> extends PipelineOp implements
              *            The bindings with which the each element in the chunk
              *            will be paired to create the bindings for the
              *            downstream join dimension.
+             * @param naccepted
+             *            An array used to indicate as a side-effect the #of
+             *            solutions accepted for each of the {@link IBindingSet}
+             *            s.
              * @param unsyncBuffer
              *            A per-{@link Thread} buffer used to accumulate chunks
-             *            of generated {@link IBindingSet}s (optional). When the
-             *            {@link ChunkTask} will be run in its own thread, pass
-             *            <code>null</code> and the buffer will be obtained in
-             *            {@link #call()}.
+             *            of generated {@link IBindingSet}s.
              * @param chunk
              *            A chunk of elements read from the {@link IAccessPath}
              *            for the current join dimension.
              */
             public ChunkTask(
                     final IBindingSet[] bindingSet,
+                    final int[] naccepted,
                     final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer,
                     final Object[] chunk) {
 
                 if (bindingSet == null)
                     throw new IllegalArgumentException();
 
-                // Allow null!
-                // if (unsyncBuffer == null)
-                // throw new IllegalArgumentException();
+                if (naccepted== null)
+                    throw new IllegalArgumentException();
+                
+                if (unsyncBuffer == null)
+                    throw new IllegalArgumentException();
 
                 if (chunk == null)
                     throw new IllegalArgumentException();
 
-//                this.tailIndex = getTailIndex(orderIndex);
-
                 this.bindingSets = bindingSet;
 
+                this.naccepted = naccepted;
+                
                 this.chunk = chunk;
 
                 this.unsyncBuffer = unsyncBuffer;
@@ -1720,10 +1777,6 @@ public class PipelineJoin<E> extends PipelineOp implements
             }
 
             /**
-             * @return <code>true</code> iff NO elements in the chunk (as read
-             *         from the access path by the caller) were accepted when
-             *         combined with the {@link #bindingSets} from the source
-             *         {@link JoinTask}.
              * 
              * @throws BufferClosedException
              *             if there is an attempt to output a chunk of
@@ -1733,29 +1786,31 @@ public class PipelineJoin<E> extends PipelineOp implements
              *             true for query on the lastJoin) and that
              *             {@link IBlockingBuffer} has been closed.
              */
-            public Boolean call() throws Exception {
+            public Void call() throws Exception {
 
                 try {
 
 //                    ChunkTrace.chunk(orderIndex, chunk);
 
-                    boolean nothingAccepted = true;
+//                    boolean nothingAccepted = true;
 
-                    // Use caller's or obtain our own as necessary.
-                    final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer = (this.unsyncBuffer == null) ? threadLocalBufferFactory
-                            .get()
-                            : this.unsyncBuffer;
+//                    // Use caller's or obtain our own as necessary.
+//                    final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer = (this.unsyncBuffer == null) ? threadLocalBufferFactory
+//                            .get()
+//                            : this.unsyncBuffer;
 
                     for (Object e : chunk) {
 
                         if (isDone())
-                            return nothingAccepted;
+                            return null;
+//                            return nothingAccepted;
 
                         // naccepted for the current element (trace only).
                         int naccepted = 0;
 
                         stats.accessPathUnitsIn.increment();
 
+                        int bindex = 0;
                         for (IBindingSet bset : bindingSets) {
 
                             /*
@@ -1774,12 +1829,19 @@ public class PipelineJoin<E> extends PipelineOp implements
                                 // Accept this binding set.
                                 unsyncBuffer.add(bset);
 
+                                // #of binding sets accepted.
                                 naccepted++;
+                                
+                                // #of elements accepted for this binding set.
+                                this.naccepted[bindex]++;
 
-                                nothingAccepted = false;
+//                                // something was accepted.
+//                                nothingAccepted = false;
 
                             }
 
+                            bindex++;
+                            
                         }
 
                         if (log.isDebugEnabled())
@@ -1793,9 +1855,12 @@ public class PipelineJoin<E> extends PipelineOp implements
                             }
                     }
 
-                    // if something is accepted in the chunk return true.
-                    return nothingAccepted ? Boolean.FALSE : Boolean.TRUE;
+//                    // if something is accepted in the chunk return true.
+//                    return nothingAccepted ? Boolean.FALSE : Boolean.TRUE;
 
+                    // Done.
+                    return null;
+                    
                 } catch (Throwable t) {
 
                     halt(t);
