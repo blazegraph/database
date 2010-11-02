@@ -912,11 +912,11 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             this._checkbuf = useChecksums ? ByteBuffer.allocateDirect(4) : null;
         }
 
-        System.err.println("WARNING: alpha impl: "
-                + this.getClass().getName()
-                + (writeCacheService != null ? " : writeCacheBuffers="
-                        + fileMetadata.writeCacheBufferCount : " : No cache")
-                + ", useChecksums=" + useChecksums);
+//        System.err.println("WARNING: alpha impl: "
+//                + this.getClass().getName()
+//                + (writeCacheService != null ? " : writeCacheBuffers="
+//                        + fileMetadata.writeCacheBufferCount : " : No cache")
+//                + ", useChecksums=" + useChecksums);
 
     }
 
