@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package cutthecrap.utils.striterators;
 
-import junit.framework.TestCase;
+import junit.framework.TestCase2;
 
 /**
  * Test suite for {@link Filter}.
@@ -35,7 +35,7 @@ import junit.framework.TestCase;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestFilter extends TestCase {
+public class TestFilter extends TestCase2 {
 
     /**
      * 
@@ -48,6 +48,13 @@ public class TestFilter extends TestCase {
      */
     public TestFilter(String name) {
         super(name);
+    }
+    
+    /**
+     * FIXME Write unit tests for the ctc-striterators package.
+     */
+    public void test_something() {
+        log.error("Write unit tests");
     }
 
 }
