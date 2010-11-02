@@ -625,6 +625,8 @@ abstract public class AbstractTransactionService extends AbstractService
     private volatile long lastTimestamp;
     
     /**
+     * {@inheritDoc}
+     * <p>
      * Note: There is an upper bound of one read-write transaction that may be
      * created per millisecond (the resolution of {@link #nextTimestamp()}) and
      * requests for new read-write transactions contend with other requests for
@@ -1234,20 +1236,20 @@ abstract public class AbstractTransactionService extends AbstractService
 
         final long lastCommitTime = getLastCommitTime();
 
-//        if (timestamp > lastCommitTime) {
-		if (timestamp > lastTimestamp) {
-
-            /*
-             * You can't request a historical read for a timestamp which has not
-             * yet been issued by this service!
-             */
-            
-			throw new IllegalStateException(
-					"Timestamp is in the future: timestamp=" + timestamp
-							+ ", lastCommitTime=" + lastCommitTime
-							+ ", lastTimestamp=" + lastTimestamp);
-
-        } else if (timestamp == lastCommitTime) {
+//		if (timestamp > lastTimestamp) {
+//
+//            /*
+//             * You can't request a historical read for a timestamp which has not
+//             * yet been issued by this service!
+//             */
+//            
+//			throw new IllegalStateException(
+//					"Timestamp is in the future: timestamp=" + timestamp
+//							+ ", lastCommitTime=" + lastCommitTime
+//							+ ", lastTimestamp=" + lastTimestamp);
+//
+//        } else 
+            if (timestamp == lastCommitTime) {
             
             /*
              * Special case. We just return the next timestamp.
@@ -1325,11 +1327,22 @@ abstract public class AbstractTransactionService extends AbstractService
         if (commitTime == -1L) {
 
             /*
-             * @todo I believe that this can only arise when there are no commit
-             * points in the log.
+             * There are no commit points in the log.
+             * 
+             * Note: Just return the next timestamp. It is guaranteed to be GT
+             * the desired commit time (which does not exist) and LT the next
+             * commit point.
              */
-            throw new RuntimeException(
-                    "No data for that commit time: timestamp=" + timestamp);
+
+            return nextTimestamp();
+
+//            /*
+//             * Note: I believe that this can only arise when there are no commit
+//             * points in the log. The thrown exception is per the top-level api
+//             * for ITransactionService#newTx(long).
+//             */
+//            throw new IllegalStateException(
+//                    "No data for that commit time: timestamp=" + timestamp);
 
         }
 

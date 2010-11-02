@@ -152,9 +152,6 @@ public interface ITransactionService extends ITimestampService {
      * @return The unique transaction identifier.
      * 
      * @throws IllegalStateException
-     *             if the requested timestamp is greater than
-     *             {@link #getLastCommitTime()}.
-     * @throws IllegalStateException
      *             if the requested timestamp is for a commit point that is no
      *             longer preserved by the database (the resources for that
      *             commit point have been released).
@@ -164,6 +161,9 @@ public interface ITransactionService extends ITimestampService {
      * @todo specialize exception for a timestamp that is no longer preserved
      *       and for one that is in the future?
      */
+//    * @throws IllegalStateException
+//    *             if the requested timestamp is greater than
+//    *             {@link #getLastCommitTime()}.
     public long newTx(long timestamp) throws IOException;
     
     /**

@@ -270,8 +270,15 @@ public class TestTransactionService extends TestCase2 {
         @Override
         public long nextTimestamp() {
 
-            super.nextTimestamp () ;
-            return super.nextTimestamp () ;
+            // skip at least one millisecond.
+            super.nextTimestamp();
+            
+            /*
+             * Invoke the behavior on the base class, which has a side-effect on
+             * the private [lastTimestamp] method.
+             */
+            return super.nextTimestamp();
+            
         }
 
     }
@@ -889,10 +896,73 @@ public class TestTransactionService extends TestCase2 {
         }
 
     }
-        
+
     /**
-     * Verify that you can not create a read-only transaction using a timestamp
-     * that is in the future.
+     * Verify the behavior of the {@link AbstractTransactionService} when there
+     * are no commit points and a read-only transaction is requested. Since
+     * there are no commit points, the transaction service will return the next
+     * timestamp. That value will be GT the requested timestamp and LT any
+     * commit point (all commit points are in the future).
+     */
+    public void test_newTx_nothingCommitted_readOnlyTx() {
+        
+        final MockTransactionService service = newFixture();
+
+        try {
+
+            /*
+             * Note: The commit time log is empty.
+             */
+            final long timestamp = service.nextTimestamp();
+
+            /*
+             * Request a read-only view which is in the past based on the
+             * transaction server's clock. However, there are no commit points
+             * which cover that timestamp since there are no commit points in
+             * the database.
+             */
+            service.newTx(timestamp - 1);
+            
+        } finally {
+
+            service.destroy();
+
+        }
+
+    }
+
+    /**
+     * Verify the behavior of the {@link AbstractTransactionService} when there
+     * are no commit points and a read-write transaction is requested. You can
+     * always obtain a read-write transaction, even when there are no commit
+     * points on the database.
+     */
+    public void test_newTx_nothingCommitted_readWriteTx() {
+        
+        final MockTransactionService service = newFixture();
+
+        try {
+
+            /*
+             * Note: The commit time log is empty.
+             */
+            service.newTx(ITx.UNISOLATED);
+            
+        } finally {
+
+            service.destroy();
+
+        }
+
+    }
+
+    /**
+     * Verify that you can create a read-only transaction using a timestamp that
+     * is in the future. A commit point is generated and a read-only tx is
+     * requested which is beyond that commit point. The returned tx will be
+     * assigned using nextTimestamp() which is guaranteed to be less than the
+     * next commit point on the database (which in this case would be the first
+     * commit point as well).
      */
     public void test_newTx_readOnly_timestampInFuture() {
         
@@ -900,21 +970,21 @@ public class TestTransactionService extends TestCase2 {
 
         try {
 
-            /*
-             * Note: The commit time log is empty so anything is in the future.
-             */
+            // request a timestamp.
+            final long timestamp1 = service.nextTimestamp();
+            
+            // make that timestamp a valid commit time.
+            service.notifyCommit(timestamp1);
 
-            try {
-                /**
-                 * FIXME Modified to be compatible with changes made to AbstractTransactionService, revision 3804.
-                 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/187">Trac 187</a>
-                 */
-//              service.newTx(10);
-              service.newTx(service.nextTimestamp () + 10);
-                fail("Expecting: "+IllegalStateException.class);
-            } catch(IllegalStateException ex) {
-                log.info("Ignoring expected exception: "+ex);
-            }
+//            try {
+                // request a timestamp in the future.
+                final long tx = service.newTx(timestamp1 * 2);
+                System.err.println("ts="+timestamp1);
+                System.err.println("tx="+tx);
+//                fail("Expecting: "+IllegalStateException.class);
+//            } catch(IllegalStateException ex) {
+//                log.info("Ignoring expected exception: "+ex);
+//            }
             
         } finally {
 
