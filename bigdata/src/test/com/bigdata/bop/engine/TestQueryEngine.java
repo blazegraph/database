@@ -675,21 +675,21 @@ public class TestQueryEngine extends TestCase2 {
 
     }
 
-    /**
-     * Test the ability of the query engine to defer the evaluation of a one
-     * shot operator until all inputs are available for that operator.
-     * 
-     * @todo We could do this using a mock operator and feeding a bunch of
-     *       chunks into the query by controlling the chunk size, as we do in
-     *       {@link #test_query_join1_multipleChunksIn()}. Make sure that the
-     *       mock operator is not evaluated until all inputs are available for
-     *       that operator.
-     */
-    public void test_oneShot_operator() {
-
-        fail("write test");
-
-    }
+//    /**
+//     * Test the ability of the query engine to defer the evaluation of a one
+//     * shot operator until all inputs are available for that operator.
+//     * 
+//     * @todo We could do this using a mock operator and feeding a bunch of
+//     *       chunks into the query by controlling the chunk size, as we do in
+//     *       {@link #test_query_join1_multipleChunksIn()}. Make sure that the
+//     *       mock operator is not evaluated until all inputs are available for
+//     *       that operator.
+//     */
+//    public void test_oneShot_operator() {
+//
+//        fail("write test");
+//
+//    }
 
     /**
      * Unit test runs chunks into a slice without a limit. This verifies that

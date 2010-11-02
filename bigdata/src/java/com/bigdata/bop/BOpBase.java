@@ -686,4 +686,42 @@ public class BOpBase implements BOp {
 //     */
 //    private int hash = 0;
 
+//    public boolean sameData(final BOp o) {
+//
+//        if (this == o)
+//            return true;
+//
+//        final int arity = arity();
+//
+//        if (arity != o.arity())
+//            return false;
+//
+//        for (int i = 0; i < arity; i++) {
+//
+//            final BOp x = get(i);
+//
+//            final BOp y = o.get(i);
+//
+//            /*
+//             * X Y same same : continue (includes null == null); null other :
+//             * return false; !null other : if(!x.equals(y)) return false.
+//             */
+//            if (x != y || x == null || !(x.equals(y))) {
+//                // && (//
+//                // (x != null && !(x.equals(y))) || //
+//                // (y != null && !(y.equals(x))))//
+//                // ) {
+//
+//                return false;
+//
+//            }
+//
+//        }
+//    
+//        // @todo This would have to recursively apply sameData when comparing
+//        // annotations which are bops.
+//        return annotations.equals(o.annotations());
+//
+//    }
+
 }
