@@ -130,7 +130,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
      */
     public void test_concurrentClients() throws InterruptedException {
 
-    	new Float("123.23");
+//    	new Float("123.23");
     	
         final Properties properties = getProperties();
 
