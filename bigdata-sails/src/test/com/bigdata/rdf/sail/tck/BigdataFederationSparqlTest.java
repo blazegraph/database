@@ -54,6 +54,15 @@ import com.bigdata.service.jini.JiniFederation;
  * Runs the SPARQL test suite against a {@link JiniFederation}, which must be
  * already deployed. Each test in the suite is run against a distinct quad store
  * in its own bigdata namespace.
+ * <p>
+ * To run this test suite, you need to have a deployed federation.  You then specify
+ * the configuration file for that deployed federation.  If sysstat is in a non-default
+ * location, then it is convenient (but not necessary) to also specify its path. For
+ * example:
+ * <pre>
+ * -Dbigdata.configuration=/nas/bigdata/benchmark/config/bigdataStandalone.config
+ * -Dcom.bigdata.counters.linux.sysstat.path=/usr/local/bin
+ * </pre>
  * 
  * @author <a href="mailto:dmacgbr@users.sourceforge.net">David MacMillan</a>
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
