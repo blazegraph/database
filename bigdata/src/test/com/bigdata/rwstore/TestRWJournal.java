@@ -1023,10 +1023,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
             
             Journal store = (Journal) getStore();
 
-            RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
-            RWStore rw = bs.getRWStore();
-            long realAddr = 0;
+            final RWStore rw = bs.getRWStore();
+//            long realAddr = 0;
             try {
             	// allocBatch(store, 1, 32, 650, 100000000);
             	allocBatch(store, 1, 32, 650, 5000000);

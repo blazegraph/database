@@ -218,7 +218,8 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
      * data. For most strategies the action is void since the client WORM DISK
      * strategy writes data as allocated. For the Read Write Strategy more data
      * must be managed as part of the protocol outside of the RootBlock, and
-     * this is the method that triggers that management.
+     * this is the method that triggers that management. The caller MUST provide
+     * appropriate synchronization.
      * 
      * @param abstractJournal
      */

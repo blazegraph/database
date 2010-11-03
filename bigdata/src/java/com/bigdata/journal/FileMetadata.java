@@ -974,50 +974,55 @@ public class FileMetadata {
 			 * Check root blocks (magic, timestamps), choose root block, read
 			 * constants (slotSize, segmentId).
 			 */
-			{
-				
-				final ChecksumUtility checker = validateChecksum ? ChecksumUtility.threadChk
-						.get()
-						: null;
-
-				// final FileChannel channel = raf.getChannel();
-				final ByteBuffer tmp0 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
-				final ByteBuffer tmp1 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
-				FileChannelUtility.readAll(opener, tmp0, OFFSET_ROOT_BLOCK0);
-				FileChannelUtility.readAll(opener, tmp1, OFFSET_ROOT_BLOCK1);
-				tmp0.position(0); // resets the position.
-				tmp1.position(0);
-				try {
-					rootBlock0 = new RootBlockView(true, tmp0, checker);
-				} catch (RootBlockException ex) {
-					log.warn("Bad root block zero: " + ex);
-				}
-				try {
-					rootBlock1 = new RootBlockView(false, tmp1, checker);
-				} catch (RootBlockException ex) {
-					log.warn("Bad root block one: " + ex);
-				}
-				if (rootBlock0 == null && rootBlock1 == null) {
-					throw new RuntimeException(
-							"Both root blocks are bad - journal is not usable: "
-									+ file);
-				}
-				if (alternateRootBlock)
-					log.warn("Using alternate root block");
-				/*
-				 * Choose the root block based on the commit counter.
-				 * 
-				 * Note: The commit counters MAY be equal. This will happen if
-				 * we rollback the journal and override the current root block
-				 * with the alternate root block.
-				 */
-				final long cc0 = rootBlock0.getCommitCounter();
-				final long cc1 = rootBlock1.getCommitCounter();
-				this.rootBlock = (cc0 > cc1 ? (alternateRootBlock ? rootBlock1
-						: rootBlock0) : (alternateRootBlock ? rootBlock0
-						: rootBlock1));
-
-			}
+            final RootBlockUtility tmp = new RootBlockUtility(opener, file,
+                    validateChecksum, alternateRootBlock);
+            this.rootBlock0 = tmp.rootBlock0;
+            this.rootBlock1 = tmp.rootBlock1;
+            this.rootBlock = tmp.rootBlock;
+//			{
+//				
+//				final ChecksumUtility checker = validateChecksum ? ChecksumUtility.threadChk
+//						.get()
+//						: null;
+//
+//				// final FileChannel channel = raf.getChannel();
+//				final ByteBuffer tmp0 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
+//				final ByteBuffer tmp1 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
+//				FileChannelUtility.readAll(opener, tmp0, OFFSET_ROOT_BLOCK0);
+//				FileChannelUtility.readAll(opener, tmp1, OFFSET_ROOT_BLOCK1);
+//				tmp0.position(0); // resets the position.
+//				tmp1.position(0);
+//				try {
+//					rootBlock0 = new RootBlockView(true, tmp0, checker);
+//				} catch (RootBlockException ex) {
+//					log.warn("Bad root block zero: " + ex);
+//				}
+//				try {
+//					rootBlock1 = new RootBlockView(false, tmp1, checker);
+//				} catch (RootBlockException ex) {
+//					log.warn("Bad root block one: " + ex);
+//				}
+//				if (rootBlock0 == null && rootBlock1 == null) {
+//					throw new RuntimeException(
+//							"Both root blocks are bad - journal is not usable: "
+//									+ file);
+//				}
+//				if (alternateRootBlock)
+//					log.warn("Using alternate root block");
+//				/*
+//				 * Choose the root block based on the commit counter.
+//				 * 
+//				 * Note: The commit counters MAY be equal. This will happen if
+//				 * we rollback the journal and override the current root block
+//				 * with the alternate root block.
+//				 */
+//				final long cc0 = rootBlock0==null?-1L:rootBlock0.getCommitCounter();
+//				final long cc1 = rootBlock1==null?-1L:rootBlock1.getCommitCounter();
+//				this.rootBlock = (cc0 > cc1 ? (alternateRootBlock ? rootBlock1
+//						: rootBlock0) : (alternateRootBlock ? rootBlock0
+//						: rootBlock1));
+//
+//			}
 
 			this.bufferMode = BufferMode.getDefaultBufferMode(rootBlock.getStoreType());
 
@@ -1113,7 +1118,7 @@ public class FileMetadata {
 
 		}
 
-	}
+    }
 
 	/**
 	 * Used to re-open the {@link FileChannel} in this class.
