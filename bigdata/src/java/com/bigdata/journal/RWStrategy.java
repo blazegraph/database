@@ -41,26 +41,25 @@ import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.RWStore;
-import com.bigdata.util.ChecksumUtility;
 
 /**
  * The hook that accesses the RWStore to provide read/write services as opposed
- * to the WORM characteristics of the DiskOnlyStrategy AddressManager
+ * to the WORM characteristics of the DiskOnlyStrategy AddressManager.
  * 
- * The intent behind this approach is to try to manage the protocol
- * differences between the IStore implementation, assumed as a backing
- * service to the CTC ObjectManager, and an IBufferStrategy service for a
- * BigData Journal.
+ * The intent behind this approach is to try to manage the protocol differences
+ * between the IStore implementation, assumed as a backing service to the CTC
+ * ObjectManager, and an IBufferStrategy service for a BigData Journal.
  * 
  * The most fundamental difference is with the root data, with RootBlock
- * including both low-level store data - such as metabits info - and
- * higher level, journal maintained data.
- * 
- * TODO: Rationalise rootBlock access - use rootblock held by RWStore
- * 
- * TODO: Implement use of IByteArraySlice as alternative to ByteBuffer
+ * including both low-level store data - such as metabits info - and higher
+ * level, journal maintained data.
  * 
  * @author Martyn Cutcher
+ * 
+ * @todo review life cycle state changes and refusal of methods when the backing
+ *       store is closed.
+ * 
+ * @todo Implement use of IByteArraySlice as alternative to ByteBuffer
  */
 public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHABufferStrategy {
 
@@ -68,24 +67,25 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
     private final IAddressManager m_am = new RWAddressManager();
 
-	final private FileMetadata m_fileMetadata;
-	
-//	final private Quorum<?,?> m_environment;
-
     /**
-     * The backing store impl.
-     * 
-     * @see #reopen().
+     * The backing store implementation.
      */
-	private volatile RWStore m_store = null;
+	private final RWStore m_store;
 	
-	final private FileMetadataView m_fmv = new FileMetadataView();
-	
+	/**
+	 * The {@link UUID} for the store.
+	 */
+	private final UUID m_uuid;
+
+	/**
+	 * <code>true</code> iff the backing store is open.
+	 */
 	private volatile boolean m_open = false;
-	
-	private volatile IRootBlockView m_rb;
-//	private volatile IRootBlockView m_rb0;
-//	private volatile IRootBlockView m_rb1;
+
+	/**
+	 * The size of the backing file when it was opened by the constructor.
+	 */
+    final private long m_initialExtent;
 
     /**
      * @todo The use of this lock is suspicious. It is only used by
@@ -103,124 +103,14 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 */
 	RWStrategy(final FileMetadata fileMetadata, final Quorum<?,?> quorum) {
 
-		m_fileMetadata = fileMetadata;
+	    m_uuid = fileMetadata.rootBlock.getUUID();
+	    
+		m_store = new RWStore(fileMetadata, quorum); 
 		
-//		m_environment = quorum;
-		
-		m_rb = fileMetadata.rootBlock;
-		
-		m_store = new RWStore(m_fmv, false/*readOnly*/, quorum); // not read-only for now
 		m_open = true;
-		
-		m_rb = getRootBlock(); // ensure values correct from create/reopen
-		
-//		m_rb0 = copyRootBlock(true);
-//		m_rb1 = copyRootBlock(false);
-		
-		m_initialExtent = m_fileMetadata.file.length();
+				
+		m_initialExtent = fileMetadata.file.length();
 	
-	}
-
-//    /**
-//     * Return a copy of the current {@link IRootBlockView}.
-//     * 
-//     * @param rb0
-//     *            When <code>true</code> the view will be flagged as root block
-//     *            ZERO (0). Otherwise it is flagged as root block ONE (1).
-//     * 
-//     * @return The {@link IRootBlockView}.
-//     */
-//	private IRootBlockView copyRootBlock(final boolean rb0) {
-//
-//        final IRootBlockView rbv = new RootBlockView(rb0, m_rb.getOffsetBits(),
-//                m_rb.getNextOffset(), m_rb.getFirstCommitTime(), m_rb
-//                        .getLastCommitTime(), m_rb.getCommitCounter(), m_rb
-//                        .getCommitRecordAddr(),
-//                m_rb.getCommitRecordIndexAddr(), m_fileMetadata.rootBlock
-//                        .getUUID(), m_rb.getQuorumToken(), m_rb
-//                        .getMetaStartAddr(), m_rb.getMetaBitsAddr(),
-//                StoreTypeEnum.RW, m_fileMetadata.rootBlock.getCreateTime(),
-//                m_rb.getCloseTime(), s_ckutil);
-//
-//		return rbv;
-//	}
-
-	/**
-	 * Create a wrapper to circumvent package visibility issues since we'd like
-	 * to keep RWStore in a separate package
-	 * 
-	 * @author mgc
-	 * 
-	 */
-	interface IFileMetadataView {
-		IRootBlockView getRootBlock();
-
-//		IRootBlockView getRootBlock0();
-//
-//		IRootBlockView getRootBlock1();
-
-		File getFile();
-
-		RandomAccessFile getRandomAccessFile();
-
-		public IRootBlockView newRootBlockView(boolean rootBlock0, int offsetBits, long nextOffset,
-				long firstCommitTime, long lastCommitTime, long commitCounter, long commitRecordAddr,
-				long commitRecordIndexAddr, long metaStartAddr, long metaBitsAddr, long closeTime);
-	}
-
-	static final private ChecksumUtility s_ckutil = new ChecksumUtility();
-
-	public class FileMetadataView implements IFileMetadataView {
-
-		private FileMetadataView() {
-		}
-
-		public IRootBlockView getRootBlock() {
-			return m_rb;
-		}
-
-//		public IRootBlockView getRootBlock0() {
-//			return m_rb0;
-//		}
-//
-//		public IRootBlockView getRootBlock1() {
-//			return m_rb1;
-//		}
-
-		public FileMetadata getFileMetadata() {
-			return m_fileMetadata;
-		}
-
-		public File getFile() {
-			return m_fileMetadata.file;
-		}
-
-		public RandomAccessFile getRandomAccessFile() {
-			return m_fileMetadata.raf;
-		}
-
-        public IRootBlockView newRootBlockView(boolean rootBlock0,
-                int offsetBits, long nextOffset, long firstCommitTime,
-                long lastCommitTime, long commitCounter, long commitRecordAddr,
-                long commitRecordIndexAddr, long metaStartAddr,
-                long metaBitsAddr, long closeTime) {
-
-            final IRootBlockView rbv = new RootBlockView(rootBlock0,
-                    offsetBits, nextOffset, firstCommitTime, lastCommitTime,
-                    commitCounter, commitRecordAddr, commitRecordIndexAddr,
-                    m_fileMetadata.rootBlock.getUUID(),
-                    -1 /* FIXME: quorumToken */, metaStartAddr, metaBitsAddr,
-                    StoreTypeEnum.RW, m_fileMetadata.rootBlock.getCreateTime(),
-                    closeTime, s_ckutil);
-
-			// writeRootBlock(rbv, ForceEnum.Force); // not sure if this is really needed now!
-
-			return rbv;
-		}
-
-		public String getProperty(String name, String defvalue) {
-			return m_fileMetadata.getProperty(name, defvalue);
-		}
 	}
 
     public ByteBuffer readRootBlock(final boolean rootBlock0) {
@@ -296,21 +186,6 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
     }
 
-//	private void checkReopen() {
-//		if (m_needsReopen) {
-//			assert false;
-//			
-//			if (m_needsReopen) {
-//				// reopen(); // should be handled by RWStore
-//				m_needsReopen = false;
-//			}
-//		}		
-//	}
-
-//	public long allocate(int nbytes) {
-//		return encodeAddr(m_store.alloc(nbytes), nbytes);
-//	}
-
 	private long encodeAddr(long alloc, final int nbytes) {
 		alloc <<= 32;
 		alloc += nbytes;
@@ -383,7 +258,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
 	public long getExtent() {
 
-	    return this.m_fileMetadata.file.length();
+	    return m_store.getStoreFile().length();
 	    
 	}
 
@@ -393,10 +268,6 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	    
 	}
 
-	final private long m_initialExtent;
-
-//	private volatile boolean m_needsReopen = false;
-	
 	public long getInitialExtent() {
 		
 	    return m_initialExtent;
@@ -450,13 +321,6 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
             final ForceEnum forceOnCommit) {
 
         m_store.writeRootBlock(rootBlock, forceOnCommit);
-		
-		// Current rootBlock is retained
-		m_rb = rootBlock;
-//		if (m_rb.isRootBlock0())
-//			m_rb0 = m_rb;
-//		else
-//			m_rb1 = m_rb;
 
 	}
 
@@ -464,81 +328,43 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 * Set close time in rootBlock, and close file
 	 */
 	public void close() {
-		if (m_fileMetadata.raf == null) {
+		if (!m_open) {
 			throw new IllegalStateException();
 		}
-		try {
-			m_open = false;
-			
-			m_store.close();
-			m_fileMetadata.raf.close();
-			m_fileMetadata.raf = null;
-		} catch (IOException e) {
-			log.error(e,e);//e.printStackTrace();
-		}
+		m_store.close();
+        m_open = false;
 	}
 
-	public void deleteResources() {
-		
-        if (m_fileMetadata.raf != null
-                && m_fileMetadata.raf.getChannel().isOpen()) {
+    public void deleteResources() {
 
-            throw new IllegalStateException("Backing store is open: "
-                    + m_fileMetadata.file);
-            
-        }
+        if (m_open)
+            throw new IllegalArgumentException();
 
-        if (m_fileMetadata.file.exists()) {
-            
-            try {
-            
-                if (!m_fileMetadata.file.delete()) {
-                
-                    log.warn("Unable to delete file: " + m_fileMetadata.file);
-                    
-                }
+        final File file = m_store.getStoreFile();
 
-            } catch (SecurityException e) {
-            
-                log.warn("Problem deleting file", e);
-                
+        if (file.exists()) {
+
+            if (!file.delete()) {
+
+                log.warn("Unable to delete file: " + file);
+
             }
 
         }
-	
+
 	}
 
 	public void destroy() {
-		m_store.close();
 
-		if (m_fileMetadata.raf != null && m_fileMetadata.raf.getChannel().isOpen()) {
-			try {
-				m_fileMetadata.raf.close();
-			} catch (IOException e) {
-				log.warn("Problem with file close", e);
-			}
-		}
-		
+	    m_store.close();
+        m_open = false;
+
 		deleteResources();
+		
 	}
 
-	private IRootBlockView getRootBlock() {
-        return m_fmv.newRootBlockView(!m_rb.isRootBlock0(), //
-                m_rb.getOffsetBits(),//
-                getNextOffset(), //
-                m_rb.getFirstCommitTime(),//
-                m_rb.getLastCommitTime(), //
-                m_rb.getCommitCounter(),//
-                m_rb.getCommitRecordAddr(), //
-                m_rb.getCommitRecordIndexAddr(), //
-                getMetaStartAddr(),//
-                getMetaBitsAddr(), //
-                m_rb.getCloseTime()//
-                );
-	}
-	
 	/**
-	 * commit must use a commit lock to synchronize the rootBlock with the commit.
+	 * Commit must use a commit lock to synchronize the rootBlock with the commit.
 	 * 
 	 * Must pass in earliestTxnTime to commitChanges to enable
 	 */
@@ -555,7 +381,9 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 * Calls through to store and then to WriteCacheService.reset
 	 */
 	public void abort() {
+
 	    m_store.reset();
+	    
 	}
 	
     public void force(final boolean metadata) {
@@ -571,39 +399,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
         }
         
 	}
-	
-//	/**
-//	 * Must ensure that the writeCacheService is reset and direct buffers released.
-//	 * TODO: Modify so that current WriteCacheService is reset and re-used by new
-//	 * store.
-//	 */
-//	public void reopen() {
-//		try {
-//			log.warn("Request to reopen store after interrupt");
-//
-//			m_store.close();
-//            m_fileMetadata.raf = new RandomAccessFile(m_fileMetadata.file,
-//                    m_fileMetadata.fileMode);
-//			m_store = new RWStore(m_fmv, false, m_environment); // never read-only for now
-//			m_needsReopen = false;
-//			m_open = true;
-//		} catch (Throwable t) {
-//			log.error(t,t);
-//			
-//			throw new RuntimeException(t);
-//		}		
-//	}
-
+    
 	public File getFile() {
 
-	    return m_fileMetadata.file;
+	    return m_store.getStoreFile();
 	    
-	}
-
-	public Object getRandomAccessFile() {
-		
-	    return m_fileMetadata.raf;
-		
 	}
     
 	/**
@@ -620,7 +420,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
     
 	public UUID getUUID() {
 		
-	    return m_fileMetadata.rootBlock.getUUID();
+	    return m_uuid;
 	    
 	}
 
