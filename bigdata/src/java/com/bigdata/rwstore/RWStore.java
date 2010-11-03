@@ -298,15 +298,6 @@ public class RWStore implements IStore {
 	 * significant contention may be avoided.
 	 */
     final private ReentrantLock m_allocationLock = new ReentrantLock();
-    
-    /**
-     * This lock controls access to the deferredFree structures used
-     * in deferFree.
-     * 
-     * The deferral of freeing storage supports processing of read-only
-     * transactions concurrent with modifying/mutation tasks
-     */
-    final private ReentrantLock m_deferFreeLock = new ReentrantLock();
 
 	/**
 	 * The deferredFreeList is simply an array of releaseTime,freeListAddrs
@@ -516,21 +507,18 @@ public class RWStore implements IStore {
 		}
 	}
 
-	public void close() {
-		try {
-			if (m_bufferedWrite != null) {
-				m_bufferedWrite.release();
-				m_bufferedWrite = null;
-			}
-			m_writeCache.close();
-			m_raf.close();
-		} catch (IOException e) {
-			// ..oooh err... only trying to help
-		} catch (InterruptedException e) {
-			// thrown from writeCache?
-			e.printStackTrace();
-		}
-	}
+    synchronized public void close() {
+        try {
+            if (m_bufferedWrite != null) {
+                m_bufferedWrite.release();
+                m_bufferedWrite = null;
+            }
+            m_writeCache.close();
+            m_raf.close();
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
 
 	/**
 	 * Basic check on key root block validity
@@ -1049,8 +1037,8 @@ public class RWStore implements IStore {
 					
 					m_diskReads++;
 				}
-			} catch (Exception e) {
-				e.printStackTrace();
+			} catch (Throwable e) {
+				log.error(e,e);
 				
 				throw new IllegalArgumentException("Unable to read data", e);
 			}
@@ -1504,19 +1492,22 @@ public class RWStore implements IStore {
 	    final int len = 4 * (2 + 1 + m_allocSizes.length + m_metaBits.length);
 		final byte buf[] = new byte[len];
 
-		final FixedOutputStream str = new FixedOutputStream(buf);
-		
-		str.writeLong(m_lastDeferredReleaseTime);
-				
-		str.writeInt(m_allocSizes.length);
-		for (int i = 0; i < m_allocSizes.length; i++) {
-			str.writeInt(m_allocSizes[i]);
-		}
-		for (int i = 0; i <  m_metaBits.length; i++) {
-			str.writeInt(m_metaBits[i]);
-		}
+        final FixedOutputStream str = new FixedOutputStream(buf);
+        try {
+            str.writeLong(m_lastDeferredReleaseTime);
 
-		str.flush();
+            str.writeInt(m_allocSizes.length);
+            for (int i = 0; i < m_allocSizes.length; i++) {
+                str.writeInt(m_allocSizes[i]);
+            }
+            for (int i = 0; i < m_metaBits.length; i++) {
+                str.writeInt(m_metaBits[i]);
+            }
+
+            str.flush();
+        } finally {
+            str.close();
+        }
 
 		final long addr = physicalAddress(m_metaBitsAddr);
 		if (addr == 0) {
@@ -1648,7 +1639,9 @@ public class RWStore implements IStore {
                                 + ", old addr: " + old + ", new addr: " + naddr);
 
 					try {
-						m_writeCache.write(metaBit2Addr(naddr), ByteBuffer.wrap(allocator.write()), 0, false); // do not use checksum
+					    // do not use checksum
+					    m_writeCache.write(metaBit2Addr(naddr), ByteBuffer
+                            .wrap(allocator.write()), 0, false);
 					} catch (InterruptedException e) {
 						throw new RuntimeException(e);
 					}
@@ -1678,9 +1671,12 @@ public class RWStore implements IStore {
 		} catch (IOException e) {
 			throw new StorageTerminalError("Unable to commit transaction", e);
 		} finally {
-//			m_committing = false;
-			m_recentAlloc = false;
-			m_allocationLock.unlock();
+            try {
+                // m_committing = false;
+                m_recentAlloc = false;
+            } finally {
+                m_allocationLock.unlock();
+            }
 		}
 
 		checkCoreAllocations();
@@ -2069,9 +2065,12 @@ public class RWStore implements IStore {
 		} catch (Throwable t) {
 			throw new RuntimeException("Force Reopen", t);
 		} finally {
-			m_extendingFile = false;
-			m_readsAtExtend = this.m_diskReads;
-			writeLock.unlock();
+            try {
+                m_extendingFile = false;
+                m_readsAtExtend = this.m_diskReads;
+            } finally {
+                writeLock.unlock();
+            }
 		}
 	}
 
@@ -2726,7 +2725,7 @@ public class RWStore implements IStore {
 	 * DeferredFrees are written to the deferred PSOutputStream
 	 */
 	public void deferFree(final int rwaddr, final int sze) {
-		m_deferFreeLock.lock();
+	    m_allocationLock.lock();
 		try {
 			m_deferredFreeOut.writeInt(rwaddr);
 
@@ -2738,7 +2737,7 @@ public class RWStore implements IStore {
             throw new RuntimeException("Could not free: rwaddr=" + rwaddr
                     + ", size=" + sze, e);
 		} finally {
-			m_deferFreeLock.unlock();
+			m_allocationLock.unlock();
 		}
 	}
 	
@@ -2779,7 +2778,7 @@ public class RWStore implements IStore {
 	 * @return the address of the deferred addresses saved on the store
 	 */
 	public long saveDeferrals() {
-		m_deferFreeLock.lock();
+	    m_allocationLock.lock();
 		try {
 			if (m_deferredFreeOut.getBytesWritten() == 0) {
 				return 0;
@@ -2798,7 +2797,7 @@ public class RWStore implements IStore {
 		} catch (IOException e) {
 			throw new RuntimeException("Cannot write to deferred free", e);
 		} finally {
-			m_deferFreeLock.unlock();
+		    m_allocationLock.unlock();
 		}
 	}
 
