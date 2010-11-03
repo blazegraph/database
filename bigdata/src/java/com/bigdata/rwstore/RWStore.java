@@ -137,7 +137,7 @@ import com.bigdata.util.ChecksumUtility;
  * with a minimum block allocation of 64K, and a minimum bit number per block of
  * 32.
  * <p>
- * Where possible lists and roving pointers will be used to minimise searching
+ * Where possible lists and roving pointers will be used to minimize searching
  * of the potentially large structures.
  * <p>
  * Since the memory is allocated on (at least) a 128 byte boundary, there is
@@ -187,18 +187,18 @@ public class RWStore implements IStore {
 
     private static final transient Logger log = Logger.getLogger(RWStore.class);
 
-	/**
-	 * The sizes of the slots managed by a {@link FixedAllocator} are 64 times
-	 * the values in this array.
-	 * 
-	 * @todo good to have 4k and 8k boundaries for better efficiency on SSD.
-	 * 		 NB A 1K boundary is % 16, so 4K % 64
-	 *       - can still use fibonacci base, but from 4K start
-	 * 
-	 * @todo This array should be configurable and must be written into the
-	 *       store so changing values does not break older stores.
-	 *       com.bigdata.rwstore.RWStore.allocSizes=1,2,3,5... 
-	 */
+    /**
+     * The sizes of the slots managed by a {@link FixedAllocator} are 64 times
+     * the values in this array. This array is written into the store so
+     * changing the values does not break older stores. This array is
+     * configurable using {@link com.bigdata.journal.Options#RW_ALLOCATIONS}.
+     * <p>
+     * Note: It is good to have 4k and 8k boundaries for better efficiency on
+     * SSD. A 1K boundary is expressed as <code>16</code> in the allocation
+     * sizes, so a 4K boundary is expressed as <code>64</code>. The default
+     * series of allocation sizes is based on the Fibonacci sequence, but is
+     * pegged to the closest 4K boundary for values larger than 4k.
+     */
 	private static final int[] DEFAULT_ALLOC_SIZES = { 1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128, 192, 320, 512, 832, 1344, 2176, 3520 };
 	// private static final int[] DEFAULT_ALLOC_SIZES = { 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181 };
 	// private static final int[] ALLOC_SIZES = { 1, 2, 4, 8, 16, 32, 64, 128 };
