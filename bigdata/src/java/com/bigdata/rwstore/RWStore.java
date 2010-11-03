@@ -64,6 +64,7 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.JournalTransactionService;
 import com.bigdata.journal.Options;
+import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.util.ChecksumUtility;
@@ -236,7 +237,7 @@ public class RWStore implements IStore {
 	// ///////////////////////////////////////////////////////////////////////////////////////
 
 	private final File m_fd;
-	private RandomAccessFile m_raf;
+//	private RandomAccessFile m_raf;
 //	protected FileMetadata m_metadata;
 //	protected int m_transactionCount;
 //	private boolean m_committing;
@@ -392,7 +393,7 @@ public class RWStore implements IStore {
 
 //	private final FileMetadataView m_fmv;
 
-	private IRootBlockView m_rb;
+//	private volatile IRootBlockView m_rb;
 
 //	volatile private long m_commitCounter;
 
@@ -417,17 +418,17 @@ public class RWStore implements IStore {
 		m_metaBitsSize = cDefaultMetaBitsSize;
 
 		m_metaBits = new int[m_metaBitsSize];
+		
 		m_metaTransientBits = new int[m_metaBitsSize];
-
+		
+		// @todo Review maximum file size constraints - is this old stuff?
 		m_maxFileSize = 2 * 1024 * 1024; // 1gb max (mult by 128)!!
 		
         m_quorum = quorum;
 		
 		m_fd = fileMetadata.file;
 		
-		m_raf = fileMetadata.getRandomAccessFile();
-
-		m_rb = fileMetadata.rootBlock;
+		final IRootBlockView m_rb = fileMetadata.rootBlock;
 
 		m_commitList = new ArrayList<Allocator>();
 
@@ -436,6 +437,7 @@ public class RWStore implements IStore {
 		m_freeBlobs = new ArrayList<BlobAllocator>();
 
 		try {
+	        final RandomAccessFile m_raf = fileMetadata.getRandomAccessFile();
 			m_reopener = new ReopenFileChannel(m_fd, m_raf, "rw");
 		} catch (IOException e1) {
 			throw new RuntimeException(e1);
@@ -453,7 +455,7 @@ public class RWStore implements IStore {
 		    log.info("RWStore using writeCacheService with buffers: " + buffers);
 
         try {
-            m_writeCache = new RWWriteCacheService(buffers, m_raf.length(),
+            m_writeCache = new RWWriteCacheService(buffers, m_fd.length(),
                     m_reopener, m_quorum) {
 				
 			            public WriteCache newWriteCache(final ByteBuffer buf,
@@ -511,7 +513,7 @@ public class RWStore implements IStore {
 					m_fileSize = m_nextAllocation;
 				}
 				
-				m_raf.setLength(convertAddr(m_fileSize));
+				m_reopener.raf.setLength(convertAddr(m_fileSize));
 
 				m_maxFixedAlloc = m_allocSizes[m_allocSizes.length-1]*64;
 				m_minFixedAlloc = m_allocSizes[0]*64;
@@ -520,7 +522,7 @@ public class RWStore implements IStore {
 				
 			} else {
 				
-				initfromRootBlock();
+				initfromRootBlock(m_rb);
 				
 				m_maxFixedAlloc = m_allocSizes[m_allocSizes.length-1]*64;
 				m_minFixedAlloc = m_allocSizes[0]*64;
@@ -541,7 +543,7 @@ public class RWStore implements IStore {
                 m_bufferedWrite = null;
             }
             m_writeCache.close();
-            m_raf.close();
+            m_reopener.raf.close();
         } catch (Throwable t) {
             throw new RuntimeException(t);
         }
@@ -583,12 +585,12 @@ public class RWStore implements IStore {
 			log.trace("m_allocation: " + nxtalloc + ", m_metaBitsAddr: "
 					+ metaBitsAddr + ", m_commitCounter: " + commitCounter);
 		
-		/**
-		 * Ensure rootblock is in sync with external request
-		 * 
-		 * FIXME No side-effect please.
-		 */
-		m_rb = rbv;
+//		/**
+//		 * Ensure rootblock is in sync with external request
+//		 * 
+//		 * FIXME No side-effect please.
+//		 */
+//		m_rb = rbv;
 	}
 
 	/**
@@ -609,7 +611,7 @@ public class RWStore implements IStore {
 	 * 
 	 * @throws IOException
 	 */
-	private void initfromRootBlock() throws IOException {
+	private void initfromRootBlock(final IRootBlockView m_rb) throws IOException {
 		// m_rb = m_fmv.getRootBlock();
 		assert(m_rb != null);
 
@@ -1334,7 +1336,7 @@ public class RWStore implements IStore {
 		}
 	}
 	
-	int fixedAllocatorIndex(final int size) {
+	private int fixedAllocatorIndex(final int size) {
 		int i = 0;
 
 		int cmp = m_minFixedAlloc;
@@ -1355,17 +1357,17 @@ public class RWStore implements IStore {
 
 		return PSOutputStream.getNew(this, m_maxFixedAlloc, null);
 	}
-	
-	/****************************************************************************
-	 * Called by PSOutputStream to make to actual allocation or directly by lower
-	 * level API clients.
-	 * <p>
-	 * If the allocation is for greater than MAX_FIXED_ALLOC, then a PSOutputStream
-	 * is used to manage the chained buffers.
-	 * 
-	 * TODO: Instead of using PSOutputStream instead manage allocations written
-	 * to the WriteCacheService, building BlobHeader as you go.
-	 **/
+
+    /****************************************************************************
+     * Called by PSOutputStream to make to actual allocation or directly by
+     * lower level API clients.
+     * <p>
+     * If the allocation is for greater than MAX_FIXED_ALLOC, then a
+     * PSOutputStream is used to manage the chained buffers.
+     * 
+     * TODO: Instead of using PSOutputStream, manage allocations written to the
+     * WriteCacheService, building BlobHeader as you go.
+     **/
 	public long alloc(final byte buf[], final int size, final IAllocationContext context) {
 		if (size > (m_maxFixedAlloc-4)) {
 			if (size > (BLOB_FIXED_ALLOCS * (m_maxFixedAlloc-4)))
@@ -1474,8 +1476,15 @@ public class RWStore implements IStore {
 		}
 	    m_allocationLock.lock();
 		try {
-	        checkRootBlock(m_rb);
-			m_commitList.clear();
+
+            final RootBlockUtility tmp = new RootBlockUtility(m_reopener, m_fd,
+                    true/* validateChecksum */, false/* alternateRootBlock */);
+
+            final IRootBlockView rootBlock = tmp.rootBlock;
+            
+	        checkRootBlock(rootBlock);
+
+	        m_commitList.clear();
 			m_allocs.clear();
 			m_freeBlobs.clear();
 			
@@ -1491,7 +1500,7 @@ public class RWStore implements IStore {
 			    throw new RuntimeException(e);
 			}
 	        			
-			initfromRootBlock();
+			initfromRootBlock(rootBlock);
 
 			// notify of current file length.
 			m_writeCache.setExtent(convertAddr(m_fileSize));
@@ -1550,80 +1559,6 @@ public class RWStore implements IStore {
 	}
 
 	static final float s_version = 3.0f;
-
-//	/**
-//	 * This must now update the root block which is managed by FileMetadata in
-//	 * almost guaranteed secure manner.
-//	 * 
-//	 * It is not the responsibility of the store to write this out, this is
-//	 * handled by whatever is managing the FileMetadata that this RWStore was
-//	 * initialised from and should be forced by newRootBlockView.
-//	 * 
-//	 * It should now only be called by extend file to ensure that the metaBits
-//	 * are set correctly.
-//	 * 
-//	 * In order to ensure that the new block is the one that would be chosen, we need to
-//	 * duplicate the rootBlock. This does mean that we lose the ability to roll
-//	 * back the commit.  It also means that until that point there is an invalid store state.
-//	 * Both rootBlocks would be valid but with different extents.  This is fine at
-//	 * that moment, but subsequent writes would effectively cause the initial rootBlock
-//	 * to reference invalid allocation blocks.
-//	 * 
-//	 * In any event we need to duplicate the rootblocks since any rootblock that references
-//	 * the old allocation area will be invalid.
-//	 * 
-//	 * TODO: Should be replaced with specific updateExtendedMetaData that will
-//	 * simply reset the metaBitsAddr
-//	 * @throws IOException 
-//	 */
-//    protected void writeFileSpec() throws IOException {
-//
-//        m_rb = m_fmv.newRootBlockView(//
-//                !m_rb.isRootBlock0(), //
-//                m_rb.getOffsetBits(), //
-//                getNextOffset(), //
-//                m_rb.getFirstCommitTime(),//
-//                m_rb.getLastCommitTime(), //
-//                m_rb.getCommitCounter(), //
-//                m_rb.getCommitRecordAddr(),//
-//                m_rb.getCommitRecordIndexAddr(), //
-//                getMetaStartAddr(),//
-//                getMetaBitsAddr(), //
-//                m_rb.getLastCommitTime()//
-//                );
-//
-//        m_fmv.getFileMetadata().writeRootBlock(m_rb, ForceEnum.Force);
-//
-//	}
-
-//	float m_vers = 0.0f;
-//
-//	protected void readFileSpec() {
-//		if (true) {
-//			throw new Error("Unexpected old format initialisation called");
-//		}
-//
-//		try {
-//			m_raf.seek(0);
-//			m_curHdrAddr = m_raf.readLong();
-//
-//			m_fileSize = m_raf.readInt();
-//			m_metaStartAddr = m_raf.readInt();
-//
-//			m_vers = m_raf.readFloat();
-//
-//			if (m_vers != s_version) {
-//				String msg = "Incorrect store version : " + m_vers + " expects : " + s_version;
-//
-//				throw new IOException(msg);
-//			} else {
-//				m_headerSize = m_raf.readInt();
-//			}
-//
-//		} catch (IOException e) {
-//			throw new StorageTerminalError("Unable to read file spec", e);
-//		}
-//	}
 
 	public String getVersionString() {
 		return "RWStore " + s_version;
@@ -1696,7 +1631,7 @@ public class RWStore implements IStore {
 //					m_commitCallback.commitComplete();
 //				}
 
-			m_raf.getChannel().force(false); // TODO, check if required!
+			m_reopener.reopenChannel().force(false); // TODO, check if required!
 		} catch (IOException e) {
 			throw new StorageTerminalError("Unable to commit transaction", e);
 		} finally {
@@ -2088,7 +2023,8 @@ public class RWStore implements IStore {
 			
 			if (log.isInfoEnabled()) log.info("Extending file to: " + toAddr);
 
-			m_raf.setLength(toAddr);
+			m_reopener.reopenChannel();
+			m_reopener.raf.setLength(toAddr);
 			
 			if (log.isInfoEnabled()) log.info("Extend file done");
 		} catch (Throwable t) {
@@ -2588,7 +2524,8 @@ public class RWStore implements IStore {
 	}
 
     /**
-     * Simple implementation for a {@link RandomAccessFile} to handle the direct backing store.
+     * Simple implementation for a {@link RandomAccessFile} to handle the direct
+     * backing store.
      */
     private static class ReopenFileChannel implements
             IReopenChannel<FileChannel> {
@@ -3107,18 +3044,6 @@ public class RWStore implements IStore {
              * Note: This uses the [opener] to automatically retry the operation
              * in case concurrent readers are interrupting, causing an
              * asynchronous close of the backing channel.
-             * 
-             * @todo Consider using the read lock vs the write lock of the
-             * extensionLock here. The advantage of the read lock is higher
-             * concurrency. The advantage of the write lock is that it locks out
-             * readers when we are writing the root blocks, which could help to
-             * ensure timely updates of the root blocks even if readers are
-             * behaving badly (lots of interrupts).
-             * 
-             * FIXME Modify AbstractInterruptsTestCase to test for correct
-             * handling of root block writes where concurrent readers cause the
-             * backing store to be closed asynchronously. This code block SHOULD
-             * cause the root block write to eventually succeed.
              */
             final Lock lock = m_extensionLock.readLock();
             lock.lock();
@@ -3133,13 +3058,6 @@ public class RWStore implements IStore {
                  * to the disk when we change the file size (unless the file
                  * system updates other aspects of file metadata during normal
                  * writes).
-                 * 
-                 * @todo make sure the journal has already forced the writes,
-                 * that forcing an empty cache buffer is a NOP, and that we want
-                 * to just force the channel after we write the root blocks
-                 * since writes were already forced on each node in the quorum
-                 * before we wrote the root blocks and the root blocks are
-                 * transmitted using RMI not the write pipeline.
                  */
 
                 // sync the disk.

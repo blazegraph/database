@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.UUID;
-import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
@@ -56,10 +55,9 @@ import com.bigdata.rwstore.RWStore;
  * 
  * @author Martyn Cutcher
  * 
- * @todo review life cycle state changes and refusal of methods when the backing
- *       store is closed.
- * 
- * @todo Implement use of IByteArraySlice as alternative to ByteBuffer
+ *       FIXME Review life cycle state changes and refusal of methods when the
+ *       backing store is closed. m_open should probably be moved into RWStore
+ *       which could then expose an isOpen() method to be used by this class.
  */
 public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHABufferStrategy {
 
@@ -87,21 +85,12 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 */
     final private long m_initialExtent;
 
-    /**
-     * @todo The use of this lock is suspicious. It is only used by
-     *       {@link #commit(IJournal)} and that method is invoked by the
-     *       {@link AbstractJournal#commitNow(long)} which is already protected
-     *       by a lock.
-     */
-	private final ReentrantLock m_commitLock = new ReentrantLock();
-	
 	/**
-	 * It is important to ensure that the RWStrategy keeps a check on the physical root blocks and uses
-	 * to manage re-opening of the store.
 	 * 
 	 * @param fileMetadata
+	 * @param quorum
 	 */
-	RWStrategy(final FileMetadata fileMetadata, final Quorum<?,?> quorum) {
+    RWStrategy(final FileMetadata fileMetadata, final Quorum<?, ?> quorum) {
 
 	    m_uuid = fileMetadata.rootBlock.getUUID();
 	    
@@ -143,6 +132,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		m_store.getData(rwaddr, buf);
 
 		return ByteBuffer.wrap(buf, 0, sze);
+
 	}
 
 	public long write(final ByteBuffer data) {
@@ -161,7 +151,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
         if (data.hasArray() && data.arrayOffset() != 0) {
             /*
-             * FIXME [data] is not always backed by an array, the array may not
+             * @todo [data] is not always backed by an array, the array may not
              * be visible (read-only), the array offset may not be zero, etc.
              * Try to drive the ByteBuffer into the RWStore.alloc() method
              * instead.
@@ -200,7 +190,9 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	}
 
 	private int decodeSize(final long addr) {
-		return (int) (addr & 0xFFFFFFFF);
+
+	    return (int) (addr & 0xFFFFFFFF);
+	    
 	}
 
 	public void delete(final long addr) {
@@ -246,9 +238,10 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	}
 
     /**
-     * FIXME Define and implement support for counters. The pattern for this
-     * method is to always return a new object so it may be attached to various
-     * points in hierarchies belonging to the caller.
+     * @todo Define and implement support for counters. The pattern for this
+     *       method is to always return a new object so it may be attached to
+     *       various points in hierarchies belonging to the caller.  See the
+     *       {@link WORMStrategy} for examples.
      */
 	public CounterSet getCounters() {
 
@@ -363,18 +356,10 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		
 	}
 
-	/**
-	 * Commit must use a commit lock to synchronize the rootBlock with the commit.
-	 * 
-	 * Must pass in earliestTxnTime to commitChanges to enable
-	 */
-	public void commit(final IJournal journal) {
-		m_commitLock.lock();
-		try {
-			m_store.commitChanges((Journal) journal); // includes a force(false)
-		} finally {
-			m_commitLock.unlock();
-		}
+    public void commit(final IJournal journal) {
+
+        m_store.commitChanges((Journal) journal); // includes a force(false)
+        
 	}
 	
 	/**
@@ -545,7 +530,9 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 * IHABufferStrategy
 	 */
 	
-    // FIXME writeRawBuffer
+    /**
+     * Operation is not supported.
+     */
     public void writeRawBuffer(HAWriteMessage msg, ByteBuffer b)
             throws IOException, InterruptedException {
 
@@ -553,7 +540,9 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
     }
 
-    // FIXME readFromLocalStore
+    /**
+     * Operation is not supported.
+     */
     public ByteBuffer readFromLocalStore(final long addr)
             throws InterruptedException {
 
