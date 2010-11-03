@@ -198,7 +198,6 @@ public class RWStore implements IStore {
 	 * @todo This array should be configurable and must be written into the
 	 *       store so changing values does not break older stores.
 	 *       com.bigdata.rwstore.RWStore.allocSizes=1,2,3,5... 
-	 *       
 	 */
 	private static final int[] DEFAULT_ALLOC_SIZES = { 1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128, 192, 320, 512, 832, 1344, 2176, 3520 };
 	// private static final int[] DEFAULT_ALLOC_SIZES = { 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181 };
@@ -206,6 +205,7 @@ public class RWStore implements IStore {
 
 	final int m_maxFixedAlloc;
 	final int m_minFixedAlloc;
+	
 	/**
 	 * The fixed size of any allocator on the disk in bytes. The #of allocations
 	 * managed by an allocator is this value times 8 because each slot uses one
@@ -214,15 +214,15 @@ public class RWStore implements IStore {
 	 * However, the {@link FixedAllocator} only incrementally allocates the
 	 * {@link AllocBlock}s.
 	 */
-	static final int ALLOC_BLOCK_SIZE = 1024;
+	static private final int ALLOC_BLOCK_SIZE = 1024;
 	
-	// from 32 bits, need 13 to hold max offset of 8 * 1024, leaving 19 for number of blocks: 256K
-	static final int BLOCK_INDEX_BITS = 19;
+//	// from 32 bits, need 13 to hold max offset of 8 * 1024, leaving 19 for number of blocks: 256K
+//	static final int BLOCK_INDEX_BITS = 19;
 	static final int OFFSET_BITS = 13;
 	static final int OFFSET_BITS_MASK = 0x1FFF; // was 0xFFFF
 	
 	static final int ALLOCATION_SCALEUP = 16; // multiplier to convert allocations based on minimum allocation of 32k
-	static final int META_ALLOCATION = 8; // 8 * 32K is size of meta Allocation
+	static private final int META_ALLOCATION = 8; // 8 * 32K is size of meta Allocation
 
 	static final int BLOB_FIXED_ALLOCS = 1024;
 //	private ICommitCallback m_commitCallback;
@@ -253,17 +253,19 @@ public class RWStore implements IStore {
      */
 	private final ArrayList<Allocator> m_allocs;
 
-	// lists of free alloc blocks
+	/** lists of free alloc blocks. */
 	private ArrayList<FixedAllocator> m_freeFixed[];
 	
-	// lists of free blob allocators
+	/** lists of free blob allocators. */
 	private final ArrayList<BlobAllocator> m_freeBlobs;
 
-	// lists of blocks requiring commitment
+	/** lists of blocks requiring commitment. */
 	private final ArrayList<Allocator> m_commitList;
 
-	private WriteBlock m_writes;
+//	private WriteBlock m_writes;
+	
 	private final Quorum<?,?> m_quorum;
+	
 	private final RWWriteCacheService m_writeCache;
 
 	private int[] m_allocSizes;
@@ -321,9 +323,13 @@ public class RWStore implements IStore {
 //	private final ArrayList<Integer> m_currentTxnFreeList = new ArrayList<Integer>();
 	private final PSOutputStream m_deferredFreeOut;
 
-	private ReopenFileChannel m_reopener = null;
+    /**
+     * Used to transparently re-open the backing channel if it has been closed
+     * by an interrupt during an IO.
+     */
+	private final ReopenFileChannel m_reopener;
 
-	private BufferedWrite m_bufferedWrite;
+	private volatile BufferedWrite m_bufferedWrite;
 	
 	class WriteCacheImpl extends WriteCache.FileChannelScatteredWriteCache {
         public WriteCacheImpl(final ByteBuffer buf,
@@ -332,8 +338,9 @@ public class RWStore implements IStore {
                 final IReopenChannel<FileChannel> opener)
                 throws InterruptedException {
 
-            super(buf, useChecksum, m_quorum!=null&&m_quorum
-                    .isHighlyAvailable(), bufferHasData, opener, m_bufferedWrite);
+            super(buf, useChecksum, m_quorum != null
+                    && m_quorum.isHighlyAvailable(), bufferHasData, opener,
+                    m_bufferedWrite);
 
         }
 
@@ -1523,14 +1530,14 @@ public class RWStore implements IStore {
 
 	/**
 	 * This must now update the root block which is managed by FileMetadata in
-	 * almost guaranteed secure manner
+	 * almost guaranteed secure manner.
 	 * 
 	 * It is not the responsibility of the store to write this out, this is
 	 * handled by whatever is managing the FileMetadata that this RWStore was
-	 * initialised from and should be forced by newRootBlockView
+	 * initialised from and should be forced by newRootBlockView.
 	 * 
 	 * It should now only be called by extend file to ensure that the metaBits
-	 * are set correctly
+	 * are set correctly.
 	 * 
 	 * In order to ensure that the new block is the one that would be chosen, we need to
 	 * duplicate the rootBlock. This does mean that we lose the ability to roll
