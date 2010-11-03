@@ -187,12 +187,12 @@ public class FileMetadata {
 	/**
 	 * Offset of the first root block in the file.
 	 */
-	static final int OFFSET_ROOT_BLOCK0 = SIZE_MAGIC + SIZE_VERSION;
+	public static final int OFFSET_ROOT_BLOCK0 = SIZE_MAGIC + SIZE_VERSION;
 
 	/**
 	 * Offset of the second root block in the file.
 	 */
-	static final int OFFSET_ROOT_BLOCK1 = SIZE_MAGIC + SIZE_VERSION + (SIZEOF_ROOT_BLOCK * 1);
+	public static final int OFFSET_ROOT_BLOCK1 = SIZE_MAGIC + SIZE_VERSION + (SIZEOF_ROOT_BLOCK * 1);
 
 	/**
 	 * The size of the journal header, including MAGIC, version, and both root
@@ -1225,31 +1225,31 @@ public class FileMetadata {
 
 	}
 
-	public void writeRootBlock(final IRootBlockView rootBlock,
-			final ForceEnum forceOnCommit) throws IOException {
-
-		if (rootBlock == null)
-			throw new IllegalArgumentException();
-
-		final ByteBuffer data = rootBlock.asReadOnlyBuffer();
-
-		final long pos = rootBlock.isRootBlock0() ? OFFSET_ROOT_BLOCK0 : OFFSET_ROOT_BLOCK1;
-
-		final FileChannel channel = raf.getChannel();
-
-		channel.write(data, pos);
-
-		if (forceOnCommit != ForceEnum.No) {
-
-			channel.force(forceOnCommit == ForceEnum.ForceMetadata);
-
-		}
-
-		if (log.isTraceEnabled())
-			log.trace("Writing ROOTBLOCK with commitCounter: " + rootBlock.getCommitCounter()
-					+ ", commitRecordIndexAddr: " + rootBlock.getCommitRecordIndexAddr()
-					+ ", commitRecordAddr: " + rootBlock.getCommitRecordAddr());
-	}
+//	public void writeRootBlock(final IRootBlockView rootBlock,
+//			final ForceEnum forceOnCommit) throws IOException {
+//
+//		if (rootBlock == null)
+//			throw new IllegalArgumentException();
+//
+//		final ByteBuffer data = rootBlock.asReadOnlyBuffer();
+//
+//		final long pos = rootBlock.isRootBlock0() ? OFFSET_ROOT_BLOCK0 : OFFSET_ROOT_BLOCK1;
+//
+//		final FileChannel channel = raf.getChannel();
+//
+//		channel.write(data, pos);
+//
+//		if (forceOnCommit != ForceEnum.No) {
+//
+//			channel.force(forceOnCommit == ForceEnum.ForceMetadata);
+//
+//		}
+//
+//		if (log.isTraceEnabled())
+//			log.trace("Writing ROOTBLOCK with commitCounter: " + rootBlock.getCommitCounter()
+//					+ ", commitRecordIndexAddr: " + rootBlock.getCommitRecordIndexAddr()
+//					+ ", commitRecordAddr: " + rootBlock.getCommitRecordAddr());
+//	}
 
 	/**
 	 * Prepare a journal file for use by an {@link IBufferStrategy}. The file

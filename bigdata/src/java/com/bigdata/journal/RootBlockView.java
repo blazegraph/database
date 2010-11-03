@@ -101,6 +101,7 @@ public class RootBlockView implements IRootBlockView {
     static final transient short OFFSET_UUID       = OFFSET_STORETYPE   + Bytes.SIZEOF_BYTE;
     static final transient short OFFSET_CHALLIS1   = OFFSET_UUID        + Bytes.SIZEOF_UUID;
     static final transient short OFFSET_CHECKSUM   = OFFSET_CHALLIS1    + SIZEOF_TIMESTAMP;  
+    public 
     static final transient short SIZEOF_ROOT_BLOCK = OFFSET_CHECKSUM    + SIZEOF_CHECKSUM;
     // Note: SIZEOF_ROOT_BLOCK := 340 Bytes.  This is an invariant.
 

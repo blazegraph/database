@@ -415,7 +415,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
          */
         public void test_allocations() {
             
-            final Journal store = (Journal) getStore();
+            Journal store = (Journal) getStore();
 
             try {
 
@@ -436,7 +436,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 store.commit();
                 
                 // Confirm that we can re-open the journal after commit
-                bufferStrategy.reopen();
+                store = (Journal) reopenStore(store);
+                
             } finally {
 
                 store.destroy();
