@@ -38,7 +38,6 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.io.IByteArrayBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.rwstore.IAllocationContext;
 
 /**
  * <p>

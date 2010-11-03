@@ -35,7 +35,6 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.FileChannelUtility;
-import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;

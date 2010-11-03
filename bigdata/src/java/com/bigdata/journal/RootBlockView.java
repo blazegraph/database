@@ -239,7 +239,7 @@ public class RootBlockView implements IRootBlockView {
         if(addr==0L) return;
         
         // TODO develop protocol to support address checking
-        if (am instanceof RWStrategy.RWAddressManager) return;
+        if (am instanceof RWAddressManager) return;
         
         final long offset = am.getOffset(addr);
         
@@ -382,7 +382,7 @@ public class RootBlockView implements IRootBlockView {
         case RW: {
             // @todo check metaStartAddr
             // @todo check metaBitsAddr
-            am = new RWStrategy.RWAddressManager();
+            am = new RWAddressManager();
             // @todo check nextOffset
             break;
         }
@@ -646,7 +646,7 @@ public class RootBlockView implements IRootBlockView {
         switch (getStoreType()) {
         case RW: {
          
-            am = new RWStrategy.RWAddressManager();
+            am = new RWAddressManager();
             
             break;
             

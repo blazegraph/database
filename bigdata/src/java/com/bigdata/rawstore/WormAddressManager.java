@@ -27,18 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rawstore;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
 import java.math.BigInteger;
 import java.text.NumberFormat;
 
-import org.CognitiveWeb.extser.LongPacker;
-import org.CognitiveWeb.extser.ShortPacker;
-
 import com.bigdata.btree.IndexSegmentAddressManager;
-import com.bigdata.io.DataInputBuffer;
-import com.bigdata.io.DataOutputBuffer;
 
 /**
  * Encapsulates logic for operations on an opaque long integer comprising an

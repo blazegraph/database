@@ -162,7 +162,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * Extent of the file. This value should be valid since we obtain an
      * exclusive lock on the file when we open it.
      * 
-     * @todo Atomic long to ensure visiblility of changes?
+     * @todo Atomic long to ensure visibility of changes?
      */
     private long extent;
 
