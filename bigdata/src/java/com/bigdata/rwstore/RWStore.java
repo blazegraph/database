@@ -1726,7 +1726,7 @@ public class RWStore implements IStore {
 
 	volatile private int m_fileSize;
 	volatile private int m_nextAllocation;
-	volatile private int m_maxFileSize;
+	final private int m_maxFileSize;
 
 //	private int m_headerSize = 2048;
 
