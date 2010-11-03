@@ -57,12 +57,14 @@ import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.CommitRecordSerializer;
+import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.JournalTransactionService;
 import com.bigdata.journal.Options;
+import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.RWStrategy.FileMetadataView;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.util.ChecksumUtility;
@@ -427,8 +429,6 @@ public class RWStore implements IStore {
 
 		m_rb = m_fmv.getRootBlock();
 
-//		m_filename = m_fd.getAbsolutePath();
-
 		m_commitList = new ArrayList<Allocator>();
 
 		m_allocs = new ArrayList<Allocator>();
@@ -551,7 +551,7 @@ public class RWStore implements IStore {
 	 * 
 	 * @param rbv
 	 */
-	public void checkRootBlock(final IRootBlockView rbv) {
+	private void checkRootBlock(final IRootBlockView rbv) {
 		final long nxtOffset = rbv.getNextOffset();
 		final int nxtalloc = -(int) (nxtOffset >> 32);
 
@@ -584,6 +584,8 @@ public class RWStore implements IStore {
 		
 		/**
 		 * Ensure rootblock is in sync with external request
+		 * 
+		 * FIXME No side-effect please.
 		 */
 		m_rb = rbv;
 	}
@@ -1471,6 +1473,7 @@ public class RWStore implements IStore {
 		}
 	    m_allocationLock.lock();
 		try {
+	        checkRootBlock(m_rb);
 			m_commitList.clear();
 			m_allocs.clear();
 			m_freeBlobs.clear();
@@ -1547,50 +1550,50 @@ public class RWStore implements IStore {
 
 	static final float s_version = 3.0f;
 
-	/**
-	 * This must now update the root block which is managed by FileMetadata in
-	 * almost guaranteed secure manner.
-	 * 
-	 * It is not the responsibility of the store to write this out, this is
-	 * handled by whatever is managing the FileMetadata that this RWStore was
-	 * initialised from and should be forced by newRootBlockView.
-	 * 
-	 * It should now only be called by extend file to ensure that the metaBits
-	 * are set correctly.
-	 * 
-	 * In order to ensure that the new block is the one that would be chosen, we need to
-	 * duplicate the rootBlock. This does mean that we lose the ability to roll
-	 * back the commit.  It also means that until that point there is an invalid store state.
-	 * Both rootBlocks would be valid but with different extents.  This is fine at
-	 * that moment, but subsequent writes would effectively cause the initial rootBlock
-	 * to reference invalid allocation blocks.
-	 * 
-	 * In any event we need to duplicate the rootblocks since any rootblock that references
-	 * the old allocation area will be invalid.
-	 * 
-	 * TODO: Should be replaced with specific updateExtendedMetaData that will
-	 * simply reset the metaBitsAddr
-	 * @throws IOException 
-	 */
-    protected void writeFileSpec() throws IOException {
-
-        m_rb = m_fmv.newRootBlockView(//
-                !m_rb.isRootBlock0(), //
-                m_rb.getOffsetBits(), //
-                getNextOffset(), //
-                m_rb.getFirstCommitTime(),//
-                m_rb.getLastCommitTime(), //
-                m_rb.getCommitCounter(), //
-                m_rb.getCommitRecordAddr(),//
-                m_rb.getCommitRecordIndexAddr(), //
-                getMetaStartAddr(),//
-                getMetaBitsAddr(), //
-                m_rb.getLastCommitTime()//
-                );
-
-        m_fmv.getFileMetadata().writeRootBlock(m_rb, ForceEnum.Force);
-
-	}
+//	/**
+//	 * This must now update the root block which is managed by FileMetadata in
+//	 * almost guaranteed secure manner.
+//	 * 
+//	 * It is not the responsibility of the store to write this out, this is
+//	 * handled by whatever is managing the FileMetadata that this RWStore was
+//	 * initialised from and should be forced by newRootBlockView.
+//	 * 
+//	 * It should now only be called by extend file to ensure that the metaBits
+//	 * are set correctly.
+//	 * 
+//	 * In order to ensure that the new block is the one that would be chosen, we need to
+//	 * duplicate the rootBlock. This does mean that we lose the ability to roll
+//	 * back the commit.  It also means that until that point there is an invalid store state.
+//	 * Both rootBlocks would be valid but with different extents.  This is fine at
+//	 * that moment, but subsequent writes would effectively cause the initial rootBlock
+//	 * to reference invalid allocation blocks.
+//	 * 
+//	 * In any event we need to duplicate the rootblocks since any rootblock that references
+//	 * the old allocation area will be invalid.
+//	 * 
+//	 * TODO: Should be replaced with specific updateExtendedMetaData that will
+//	 * simply reset the metaBitsAddr
+//	 * @throws IOException 
+//	 */
+//    protected void writeFileSpec() throws IOException {
+//
+//        m_rb = m_fmv.newRootBlockView(//
+//                !m_rb.isRootBlock0(), //
+//                m_rb.getOffsetBits(), //
+//                getNextOffset(), //
+//                m_rb.getFirstCommitTime(),//
+//                m_rb.getLastCommitTime(), //
+//                m_rb.getCommitCounter(), //
+//                m_rb.getCommitRecordAddr(),//
+//                m_rb.getCommitRecordIndexAddr(), //
+//                getMetaStartAddr(),//
+//                getMetaBitsAddr(), //
+//                m_rb.getLastCommitTime()//
+//                );
+//
+//        m_fmv.getFileMetadata().writeRootBlock(m_rb, ForceEnum.Force);
+//
+//	}
 
 //	float m_vers = 0.0f;
 //
@@ -2614,18 +2617,6 @@ public class RWStore implements IStore {
 
         }
 
-//        /**
-//         * Hook used by the unit tests to destroy their test files.
-//         */
-//        public void destroy() {
-//            try {
-//                raf.close();
-//            } catch (IOException e) {
-//                if (!file.delete())
-//                    log.warn("Could not delete file: " + file);
-//            }
-//        }
-
         synchronized public FileChannel reopenChannel() throws IOException {
 
             if (raf != null && raf.getChannel().isOpen()) {
@@ -2794,14 +2785,19 @@ public class RWStore implements IStore {
 //		}
 //	}
 
-	/**
-	 * Writes the content of currentTxnFreeList to the store.
-	 * 
-	 * These are the current buffered frees that have yet been saved into
-	 * a block referenced from the deferredFreeList
-	 * 
-	 * @return the address of the deferred addresses saved on the store
-	 */
+    /**
+     * Saves the current list of delete blocks, returning the address allocated.
+     * This can be used later to retrieve the addresses of allocations to be
+     * freed.
+     * 
+     * Writes the content of currentTxnFreeList to the store.
+     * 
+     * These are the current buffered frees that have yet been saved into a
+     * block referenced from the deferredFreeList
+     * 
+     * @return the address of the deferred addresses saved on the store, or zero
+     *         if none.
+     */
 	public long saveDeferrals() {
 	    m_allocationLock.lock();
 		try {
@@ -3082,4 +3078,119 @@ public class RWStore implements IStore {
 
     }
 
+    public void writeRootBlock(final IRootBlockView rootBlock,
+            final ForceEnum forceOnCommit) {
+
+        if (rootBlock == null)
+            throw new IllegalArgumentException();
+        
+        checkRootBlock(rootBlock);
+        
+        if (log.isTraceEnabled()) {
+            log.trace("Writing new rootblock with commitCounter: "
+                    + rootBlock.getCommitCounter() + ", commitRecordAddr: "
+                    + rootBlock.getCommitRecordAddr()
+                    + ", commitRecordIndexAddr: "
+                    + rootBlock.getCommitRecordIndexAddr());
+        }
+        
+        try {
+            
+            final ByteBuffer data = rootBlock.asReadOnlyBuffer();
+
+            final long pos = rootBlock.isRootBlock0()
+                    ? FileMetadata.OFFSET_ROOT_BLOCK0
+                    : FileMetadata.OFFSET_ROOT_BLOCK1;
+
+            /*
+             * Note: This uses the [opener] to automatically retry the operation
+             * in case concurrent readers are interrupting, causing an
+             * asynchronous close of the backing channel.
+             * 
+             * @todo Consider using the read lock vs the write lock of the
+             * extensionLock here. The advantage of the read lock is higher
+             * concurrency. The advantage of the write lock is that it locks out
+             * readers when we are writing the root blocks, which could help to
+             * ensure timely updates of the root blocks even if readers are
+             * behaving badly (lots of interrupts).
+             * 
+             * FIXME Modify AbstractInterruptsTestCase to test for correct
+             * handling of root block writes where concurrent readers cause the
+             * backing store to be closed asynchronously. This code block SHOULD
+             * cause the root block write to eventually succeed.
+             */
+            final Lock lock = m_extensionLock.readLock();
+            lock.lock();
+            try {
+
+                // Update the root block.
+                FileChannelUtility.writeAll(m_reopener, data, pos);
+
+                /*
+                 * Generally, you want to force the file data to the disk here.
+                 * The file metadata MIGHT not matter since we always force it
+                 * to the disk when we change the file size (unless the file
+                 * system updates other aspects of file metadata during normal
+                 * writes).
+                 * 
+                 * @todo make sure the journal has already forced the writes,
+                 * that forcing an empty cache buffer is a NOP, and that we want
+                 * to just force the channel after we write the root blocks
+                 * since writes were already forced on each node in the quorum
+                 * before we wrote the root blocks and the root blocks are
+                 * transmitted using RMI not the write pipeline.
+                 */
+
+                // sync the disk.
+                m_reopener.reopenChannel().force(forceOnCommit == ForceEnum.ForceMetadata);
+
+//                // Update counters.
+//                final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+//                        .acquire();
+//                try {
+//                    c.nwriteRootBlock++;
+//                } finally {
+//                    c.release();
+//                }
+                
+            } finally {
+
+                lock.unlock();
+                
+            }
+
+        } catch (IOException ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+        if (log.isDebugEnabled())
+            log.debug("wrote root block: "+rootBlock);
+        
+    }
+
+    public ByteBuffer readRootBlock(final boolean rootBlock0) {
+        
+        final ByteBuffer tmp = ByteBuffer
+                .allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
+
+        try {
+
+            FileChannelUtility.readAll(m_reopener, tmp,
+                rootBlock0 ? FileMetadata.OFFSET_ROOT_BLOCK0
+                        : FileMetadata.OFFSET_ROOT_BLOCK1);
+            
+            tmp.position(0); // resets the position.
+
+        } catch (IOException ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+        return tmp;
+
+    }
+    
 }

@@ -28,7 +28,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedByInterruptException;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -71,7 +70,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
 	final private FileMetadata m_fileMetadata;
 	
-	final private Quorum<?,?> m_environment;
+//	final private Quorum<?,?> m_environment;
 
     /**
      * The backing store impl.
@@ -85,8 +84,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	private volatile boolean m_open = false;
 	
 	private volatile IRootBlockView m_rb;
-	private volatile IRootBlockView m_rb0;
-	private volatile IRootBlockView m_rb1;
+//	private volatile IRootBlockView m_rb0;
+//	private volatile IRootBlockView m_rb1;
 
     /**
      * @todo The use of this lock is suspicious. It is only used by
@@ -96,14 +95,6 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
      */
 	private final ReentrantLock m_commitLock = new ReentrantLock();
 	
-//    /**
-//     * Access to the transaction manager of any owning Journal, needed by
-//     * RWStrategy to manager deleted data.
-//     */
-//    private AbstractLocalTransactionManager localTransactionManager = null;
-    
-//	CounterSet m_counters = new CounterSet();
-
 	/**
 	 * It is important to ensure that the RWStrategy keeps a check on the physical root blocks and uses
 	 * to manage re-opening of the store.
@@ -114,45 +105,45 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
 		m_fileMetadata = fileMetadata;
 		
-		m_environment = quorum;
+//		m_environment = quorum;
 		
 		m_rb = fileMetadata.rootBlock;
 		
-		m_store = new RWStore(m_fmv, false, quorum); // not read-only for now
+		m_store = new RWStore(m_fmv, false/*readOnly*/, quorum); // not read-only for now
 		m_open = true;
 		
 		m_rb = getRootBlock(); // ensure values correct from create/reopen
 		
-		m_rb0 = copyRootBlock(true);
-		m_rb1 = copyRootBlock(false);
+//		m_rb0 = copyRootBlock(true);
+//		m_rb1 = copyRootBlock(false);
 		
 		m_initialExtent = m_fileMetadata.file.length();
 	
 	}
 
-    /**
-     * Return a copy of the current {@link IRootBlockView}.
-     * 
-     * @param rb0
-     *            When <code>true</code> the view will be flagged as root block
-     *            ZERO (0). Otherwise it is flagged as root block ONE (1).
-     * 
-     * @return The {@link IRootBlockView}.
-     */
-	private IRootBlockView copyRootBlock(final boolean rb0) {
-
-        final IRootBlockView rbv = new RootBlockView(rb0, m_rb.getOffsetBits(),
-                m_rb.getNextOffset(), m_rb.getFirstCommitTime(), m_rb
-                        .getLastCommitTime(), m_rb.getCommitCounter(), m_rb
-                        .getCommitRecordAddr(),
-                m_rb.getCommitRecordIndexAddr(), m_fileMetadata.rootBlock
-                        .getUUID(), m_rb.getQuorumToken(), m_rb
-                        .getMetaStartAddr(), m_rb.getMetaBitsAddr(),
-                StoreTypeEnum.RW, m_fileMetadata.rootBlock.getCreateTime(),
-                m_rb.getCloseTime(), s_ckutil);
-
-		return rbv;
-	}
+//    /**
+//     * Return a copy of the current {@link IRootBlockView}.
+//     * 
+//     * @param rb0
+//     *            When <code>true</code> the view will be flagged as root block
+//     *            ZERO (0). Otherwise it is flagged as root block ONE (1).
+//     * 
+//     * @return The {@link IRootBlockView}.
+//     */
+//	private IRootBlockView copyRootBlock(final boolean rb0) {
+//
+//        final IRootBlockView rbv = new RootBlockView(rb0, m_rb.getOffsetBits(),
+//                m_rb.getNextOffset(), m_rb.getFirstCommitTime(), m_rb
+//                        .getLastCommitTime(), m_rb.getCommitCounter(), m_rb
+//                        .getCommitRecordAddr(),
+//                m_rb.getCommitRecordIndexAddr(), m_fileMetadata.rootBlock
+//                        .getUUID(), m_rb.getQuorumToken(), m_rb
+//                        .getMetaStartAddr(), m_rb.getMetaBitsAddr(),
+//                StoreTypeEnum.RW, m_fileMetadata.rootBlock.getCreateTime(),
+//                m_rb.getCloseTime(), s_ckutil);
+//
+//		return rbv;
+//	}
 
 	/**
 	 * Create a wrapper to circumvent package visibility issues since we'd like
@@ -164,9 +155,9 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	interface IFileMetadataView {
 		IRootBlockView getRootBlock();
 
-		IRootBlockView getRootBlock0();
-
-		IRootBlockView getRootBlock1();
+//		IRootBlockView getRootBlock0();
+//
+//		IRootBlockView getRootBlock1();
 
 		File getFile();
 
@@ -177,7 +168,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 				long commitRecordIndexAddr, long metaStartAddr, long metaBitsAddr, long closeTime);
 	}
 
-	static final ChecksumUtility s_ckutil = new ChecksumUtility();
+	static final private ChecksumUtility s_ckutil = new ChecksumUtility();
 
 	public class FileMetadataView implements IFileMetadataView {
 
@@ -188,13 +179,13 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 			return m_rb;
 		}
 
-		public IRootBlockView getRootBlock0() {
-			return m_rb0;
-		}
-
-		public IRootBlockView getRootBlock1() {
-			return m_rb1;
-		}
+//		public IRootBlockView getRootBlock0() {
+//			return m_rb0;
+//		}
+//
+//		public IRootBlockView getRootBlock1() {
+//			return m_rb1;
+//		}
 
 		public FileMetadata getFileMetadata() {
 			return m_fileMetadata;
@@ -232,21 +223,22 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		}
 	}
 
-	public ByteBuffer readRootBlock(final boolean rootBlock0) {
+    public ByteBuffer readRootBlock(final boolean rootBlock0) {
 
-	    checkReopen();
-		
-		IRootBlockView rbv = rootBlock0 ? m_rb0 : m_rb1;
-		
-		return rbv.asReadOnlyBuffer();
+        if (!isOpen())
+            throw new IllegalStateException();
+
+        return m_store.readRootBlock(rootBlock0);
+
 	}
 
 	public ByteBuffer read(final long addr) {
 		
-	    checkReopen();
+        if (!isOpen())
+            throw new IllegalStateException();
 		
-		int rwaddr = decodeAddr(addr);		
-		int sze = decodeSize(addr);
+		final int rwaddr = decodeAddr(addr);		
+		final int sze = decodeSize(addr);
 
 		if (rwaddr == 0L || sze == 0) {
 			throw new IllegalArgumentException();
@@ -256,7 +248,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		 * Allocate buffer to include checksum to allow single read
 		 * but then return ByteBuffer excluding those bytes
 		 */
-		byte buf[] = new byte[sze+4]; // 4 bytes for checksum
+		final byte buf[] = new byte[sze+4]; // 4 bytes for checksum
+		
 		m_store.getData(rwaddr, buf);
 
 		return ByteBuffer.wrap(buf, 0, sze);
@@ -270,7 +263,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
 	public long write(final ByteBuffer data, final IAllocationContext context) {
 
-	    checkReopen();
+        if (!isOpen())
+            throw new IllegalStateException();
 		
 		if (data == null)
 			throw new IllegalArgumentException();
@@ -287,43 +281,31 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
             throw new AssertionError();
         }
 
-		final int nbytes = data.remaining();
-		
-		if (nbytes == 0)
-			throw new IllegalArgumentException();
-		
-        try {
-            
-            final long rwaddr = m_store.alloc(data.array(), nbytes, context);
-			
-            data.position(nbytes); // update position to end of buffer
-	
-			final long retaddr =  encodeAddr(rwaddr, nbytes);
+        final int nbytes = data.remaining();
 
-			return retaddr;
+        if (nbytes == 0)
+            throw new IllegalArgumentException();
 
-        } catch (RuntimeException re) {
-			
-			log.error(re,re);//re.printStackTrace();
-			
-			m_needsReopen = true;			
-			
-			reopen(); // FIXME
+        final long rwaddr = m_store.alloc(data.array(), nbytes, context);
 
-			throw re;
-		}
-	}
+        data.position(nbytes); // update position to end of buffer
 
-	private void checkReopen() {
-		if (m_needsReopen) {
-			assert false;
-			
-			if (m_needsReopen) {
-				// reopen(); // should be handled by RWStore
-				m_needsReopen = false;
-			}
-		}		
-	}
+        final long retaddr = encodeAddr(rwaddr, nbytes);
+
+        return retaddr;
+
+    }
+
+//	private void checkReopen() {
+//		if (m_needsReopen) {
+//			assert false;
+//			
+//			if (m_needsReopen) {
+//				// reopen(); // should be handled by RWStore
+//				m_needsReopen = false;
+//			}
+//		}		
+//	}
 
 //	public long allocate(int nbytes) {
 //		return encodeAddr(m_store.alloc(nbytes), nbytes);
@@ -406,27 +388,37 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	}
 
 	public int getHeaderSize() {
+	 
 	    return FileMetadata.headerSize0;
+	    
 	}
 
 	final private long m_initialExtent;
 
-	private volatile boolean m_needsReopen = false;
+//	private volatile boolean m_needsReopen = false;
 	
 	public long getInitialExtent() {
-		return m_initialExtent;
+		
+	    return m_initialExtent;
+	    
 	}
 
 	public long getMaximumExtent() {
-		return 0L;
+		
+	    return 0L;
+	    
 	}
 
 	public boolean useChecksums() {
+	    
 	    return true;
+	    
 	}
 	
 	public long getNextOffset() {
-		return m_store.getNextOffset();
+		
+	    return m_store.getNextOffset();
+	    
 	}
 
 	public long getUserExtent() {
@@ -457,38 +449,14 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
     public void writeRootBlock(final IRootBlockView rootBlock,
             final ForceEnum forceOnCommit) {
 
-		if (rootBlock == null)
-			throw new IllegalArgumentException();
-
-		try {
-			m_store.checkRootBlock(rootBlock);
-			
-			if (log.isTraceEnabled()) {
-				log.trace("Writing new rootblock with commitCounter: " 
-						+ rootBlock.getCommitCounter()
-						+ ", commitRecordAddr: " + rootBlock.getCommitRecordAddr()
-						+ ", commitRecordIndexAddr: " + rootBlock.getCommitRecordIndexAddr());
-			}
-			
-			m_fileMetadata.writeRootBlock(rootBlock, forceOnCommit);
-			
-			// Current rootBlock is retained
-			m_rb = rootBlock;
-			if (m_rb.isRootBlock0())
-				m_rb0 = m_rb;
-			else
-				m_rb1 = m_rb;
-
-		}
-
-		catch (IOException ex) {
-			m_needsReopen = true;
-			
-			reopen(); // force immediate reopen
-			
-			throw new RuntimeException(ex);
-
-		}
+        m_store.writeRootBlock(rootBlock, forceOnCommit);
+		
+		// Current rootBlock is retained
+		m_rb = rootBlock;
+//		if (m_rb.isRootBlock0())
+//			m_rb0 = m_rb;
+//		else
+//			m_rb1 = m_rb;
 
 	}
 
@@ -554,7 +522,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		deleteResources();
 	}
 
-	public IRootBlockView getRootBlock() {
+	private IRootBlockView getRootBlock() {
         return m_fmv.newRootBlockView(!m_rb.isRootBlock0(), //
                 m_rb.getOffsetBits(),//
                 getNextOffset(), //
@@ -587,59 +555,55 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 * Calls through to store and then to WriteCacheService.reset
 	 */
 	public void abort() {
-		m_store.checkRootBlock(m_rb);
-		
 	    m_store.reset();
 	}
 	
-	public void force(final boolean metadata) {
-		try {
-			m_store.flushWrites(metadata);
-		} catch (ClosedByInterruptException e) {
-			m_needsReopen = true;
-			
-			reopen(); // FIXME
-			
-			throw new RuntimeException(e);
-		} catch (IOException e) {
-			m_needsReopen = true;
-			
-			reopen(); // FIXME
-			
-			throw new RuntimeException(e);
-		}
+    public void force(final boolean metadata) {
+        
+        try {
+        
+            m_store.flushWrites(metadata);
+        
+        } catch (IOException e) {
+
+            throw new RuntimeException(e);
+            
+        }
+        
 	}
 	
-	/**
-	 * Must ensure that the writeCacheService is reset and direct buffers released.
-	 * TODO: Modify so that current WriteCacheService is reset and re-used by new
-	 * store.
-	 */
-	public void reopen() {
-		try {
-			log.warn("Request to reopen store after interrupt");
-
-			m_store.close();
-            m_fileMetadata.raf = new RandomAccessFile(m_fileMetadata.file,
-                    m_fileMetadata.fileMode);
-			m_store = new RWStore(m_fmv, false, m_environment); // never read-only for now
-			m_needsReopen = false;
-			m_open = true;
-		} catch (Throwable t) {
-			log.error(t,t);
-			
-			throw new RuntimeException(t);
-		}		
-	}
+//	/**
+//	 * Must ensure that the writeCacheService is reset and direct buffers released.
+//	 * TODO: Modify so that current WriteCacheService is reset and re-used by new
+//	 * store.
+//	 */
+//	public void reopen() {
+//		try {
+//			log.warn("Request to reopen store after interrupt");
+//
+//			m_store.close();
+//            m_fileMetadata.raf = new RandomAccessFile(m_fileMetadata.file,
+//                    m_fileMetadata.fileMode);
+//			m_store = new RWStore(m_fmv, false, m_environment); // never read-only for now
+//			m_needsReopen = false;
+//			m_open = true;
+//		} catch (Throwable t) {
+//			log.error(t,t);
+//			
+//			throw new RuntimeException(t);
+//		}		
+//	}
 
 	public File getFile() {
-		return m_fileMetadata.file;
+
+	    return m_fileMetadata.file;
+	    
 	}
 
 	public Object getRandomAccessFile() {
-		checkReopen();
 		
-		return m_fileMetadata.raf;		
+	    return m_fileMetadata.raf;
+		
 	}
     
 	/**
@@ -655,24 +619,33 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
     }
     
 	public UUID getUUID() {
-		return m_fileMetadata.rootBlock.getUUID();
+		
+	    return m_fileMetadata.rootBlock.getUUID();
+	    
 	}
 
 	public boolean isFullyBuffered() {
-		return false;
+		
+	    return false;
+	    
 	}
 
 	public boolean isOpen() {
-		// return m_fileMetadata.raf != null && m_fileMetadata.raf.getChannel().isOpen();
-		return m_open;
+
+	    return m_open;
+	    
 	}
 
 	public boolean isReadOnly() {
-		return false;
+		
+	    return false;
+	    
 	}
 
 	public boolean isStable() {
-		return true;
+		
+	    return true;
+	    
 	}
 
 	/**
@@ -766,19 +739,6 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
         final int rwaddr = decodeAddr(addr);        
         
         return m_store.physicalAddress(rwaddr);
-    }
-
-    /**
-     * Saves the current list of delete blocks, returning the address allocated.
-     * This can be used later to retrieve the addresses of allocations to be
-     * freed.
-     * 
-     * @return the address of the delete blocks, or zero if none
-     */
-    public long saveDeleteBlocks() {
-
-        return m_store.saveDeferrals();
-        
     }
 
 	/*

@@ -33,13 +33,18 @@ package com.bigdata.journal;
  */
 public class DeleteBlockCommitter implements ICommitter {
 
-	private RWStrategy m_strategy;
+	private final RWStrategy m_strategy;
 	
-	public DeleteBlockCommitter(RWStrategy strategy) {
-		m_strategy = strategy;
+	public DeleteBlockCommitter(final RWStrategy strategy) {
+	
+	    m_strategy = strategy;
+	    
 	}
-	public long handleCommit(long commitTime) {
-		return m_strategy.saveDeleteBlocks();
+
+	public long handleCommit(final long commitTime) {
+		
+	    return m_strategy.getRWStore().saveDeferrals();
+	    
 	}
 
 }
