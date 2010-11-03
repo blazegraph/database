@@ -116,7 +116,8 @@ public class TestJournalShutdown extends TestCase2 {
 
         if (nalive.get() == ncreated.get()) {
 
-            fail("No journals were finalized.");
+            fail("Created " + ncreated
+                    + " journals.  No journals were finalized.");
 
         }
 
