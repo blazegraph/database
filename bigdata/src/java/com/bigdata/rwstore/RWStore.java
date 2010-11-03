@@ -65,7 +65,6 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.JournalTransactionService;
 import com.bigdata.journal.Options;
 import com.bigdata.journal.RootBlockView;
-import com.bigdata.journal.RWStrategy.FileMetadataView;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.util.ChecksumUtility;
 
@@ -391,7 +390,7 @@ public class RWStore implements IStore {
 	
 //	private String m_filename;
 
-	private final FileMetadataView m_fmv;
+//	private final FileMetadataView m_fmv;
 
 	private IRootBlockView m_rb;
 
@@ -407,11 +406,14 @@ public class RWStore implements IStore {
      * @param readOnly
      * @param quorum
      * @throws InterruptedException
+     * 
+     * @todo support read-only open.
      */
+    public RWStore(final FileMetadata fileMetadata, final Quorum<?, ?> quorum) {
 
-    public RWStore(final FileMetadataView fileMetadataView,
-            final boolean readOnly, final Quorum<?, ?> quorum) {
-
+        if (fileMetadata == null)
+            throw new IllegalArgumentException();
+        
 		m_metaBitsSize = cDefaultMetaBitsSize;
 
 		m_metaBits = new int[m_metaBitsSize];
@@ -420,14 +422,12 @@ public class RWStore implements IStore {
 		m_maxFileSize = 2 * 1024 * 1024; // 1gb max (mult by 128)!!
 		
         m_quorum = quorum;
-
-		m_fmv = fileMetadataView;
 		
-		m_fd = m_fmv.getFile();
+		m_fd = fileMetadata.file;
 		
-		m_raf = m_fmv.getRandomAccessFile();
+		m_raf = fileMetadata.getRandomAccessFile();
 
-		m_rb = m_fmv.getRootBlock();
+		m_rb = fileMetadata.rootBlock;
 
 		m_commitList = new ArrayList<Allocator>();
 
@@ -447,7 +447,7 @@ public class RWStore implements IStore {
 			m_bufferedWrite = null;
 		}
 
-		final int buffers = m_fmv.getFileMetadata().writeCacheBufferCount;
+		final int buffers = fileMetadata.writeCacheBufferCount;
 		
 		if(log.isInfoEnabled())
 		    log.info("RWStore using writeCacheService with buffers: " + buffers);
@@ -474,16 +474,17 @@ public class RWStore implements IStore {
 		
 
 		try {
-			if (m_rb.getNextOffset() == 0) { // if zero then new file
-				String buckets = m_fmv.getProperty(Options.RW_ALLOCATIONS, null);
+            if (m_rb.getNextOffset() == 0) { // if zero then new file
+                final String buckets = fileMetadata.getProperty(
+                        Options.RW_ALLOCATIONS, null/* default */);
 				if (buckets == null) {				
 					m_allocSizes = DEFAULT_ALLOC_SIZES;
 				} else {
-					String[] specs = buckets.split(",");
+					final String[] specs = buckets.split(",");
 					m_allocSizes = new int[specs.length];
 					int prevSize = 0;
 					for (int i = 0; i < specs.length; i++) {
-						int nxtSize = Integer.parseInt(specs[i]);
+						final int nxtSize = Integer.parseInt(specs[i]);
 						if (nxtSize <= prevSize)
 							throw new IllegalArgumentException("Invalid AllocSizes property");
 						m_allocSizes[i] = nxtSize;
@@ -595,7 +596,7 @@ public class RWStore implements IStore {
 	 * 
 	 * Rather than reading from file, instead reads from the current root block.
 	 * 
-	 * We use the rootBlock fields, nextOffset, metaStartAddr, metaBitsAddr
+	 * We use the rootBlock fields, nextOffset, metaStartAddr, metaBitsAddr.
 	 * 
 	 * metaBitsAddr indicates where the meta allocation bits are.
 	 * 

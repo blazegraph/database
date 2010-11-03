@@ -39,19 +39,26 @@ import com.bigdata.util.ChecksumUtility;
  * Maintains List of AllocBlock(s)
  */
 public class FixedAllocator implements Allocator {
-    protected static final Logger log = Logger.getLogger(FixedAllocator.class);
+    
+    private static final Logger log = Logger.getLogger(FixedAllocator.class);
 
-	private RWWriteCacheService m_writeCache = null;
+	final private RWWriteCacheService m_writeCache;
 	volatile private int m_freeBits;
 	volatile private int m_freeTransients;
 
-	private int m_diskAddr;
-	int m_index;
+    /**
+     * Address of the {@link FixedAllocator} within the meta allocation space on
+     * the disk.
+     */
+	volatile private int m_diskAddr;
+	volatile private int m_index;
 
-	public void setIndex(int index) {
-		AllocBlock fb = (AllocBlock) m_allocBlocks.get(0);
-		if (log.isDebugEnabled())
-			log.debug("Restored index " + index + " with " + getStartAddr() + "[" + fb.m_bits[0] + "] from " + m_diskAddr);
+	public void setIndex(final int index) {
+		final AllocBlock fb = (AllocBlock) m_allocBlocks.get(0);
+		
+        if (log.isDebugEnabled())
+            log.debug("Restored index " + index + " with " + getStartAddr()
+                    + "[" + fb.m_bits[0] + "] from " + m_diskAddr);
 
 		m_index = index;
 	}
@@ -60,12 +67,16 @@ public class FixedAllocator implements Allocator {
 		return RWStore.convertAddr(m_startAddr);
 	}
 
-	public int compareTo(Object o) {
-		Allocator other = (Allocator) o;
+    /*
+     * Note: Object#equals() is fine with this compareTo() implementation. It is
+     * only used to sort the allocators.
+     */
+	public int compareTo(final Object o) {
+		final Allocator other = (Allocator) o;
 		if (other.getStartAddr() == 0) {
 			return -1;
 		} else {
-			long val = getStartAddr() - other.getStartAddr();
+			final long val = getStartAddr() - other.getStartAddr();
 
 			if (val == 0) {
 				throw new Error("Two allocators at same address");
@@ -79,30 +90,32 @@ public class FixedAllocator implements Allocator {
 		return m_diskAddr;
 	}
 
-	public void setDiskAddr(int addr) {
+	public void setDiskAddr(final int addr) {
 		m_diskAddr = addr;
 	}
 
-	/**
-	 * The tweek of 3 to the offset is to ensure 1, that no address is zero and 2 to enable
-	 * the values 1 & 2 to be special cased (this aspect is now historical).
-	 */
+    /**
+     * The tweak of 3 to the offset is to ensure 1, that no address is zero and
+     * 2 to enable the values 1 & 2 to be special cased (this aspect is now
+     * historical).
+     */
 	public long getPhysicalAddress(int offset) {
 	  	offset -= 3;
 
-		int allocBlockRange = 32 * m_bitSize;
+		final int allocBlockRange = 32 * m_bitSize;
 
-		AllocBlock block = (AllocBlock) m_allocBlocks.get(offset / allocBlockRange);
-		int bit = offset % allocBlockRange;
+		final AllocBlock block = (AllocBlock) m_allocBlocks.get(offset / allocBlockRange);
+		
+		final int bit = offset % allocBlockRange;
 		
 		if (RWStore.tstBit(block.m_bits, bit)) {		
-			return RWStore.convertAddr(block.m_addr) + m_size * bit;
+			return RWStore.convertAddr(block.m_addr) + ((long)m_size * bit);
 		} else {
 			return 0L;
 		}
 	}
 
-	public int getPhysicalSize(int offset) {
+	public int getPhysicalSize(final int offset) {
 		return m_size;
 	}
 
@@ -122,7 +135,7 @@ public class FixedAllocator implements Allocator {
 	}
 
 	volatile private IAllocationContext m_context;
-	public void setAllocationContext(IAllocationContext context) {
+	public void setAllocationContext(final IAllocationContext context) {
 		if (context == null && m_context != null) {
 			// restore commit bits in AllocBlocks
 			for (AllocBlock allocBlock : m_allocBlocks) {
@@ -150,39 +163,43 @@ public class FixedAllocator implements Allocator {
 				log.debug("writing allocator " + m_index + " for " + getStartAddr() + " with " + fb.m_bits[0]);
 			final byte[] buf = new byte[1024];
 			final DataOutputStream str = new DataOutputStream(new FixedOutputStream(buf));
+			try {
+                str.writeInt(m_size);
 
-			str.writeInt(m_size);
+                final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
+                while (iter.hasNext()) {
+                    final AllocBlock block = iter.next();
 
-			final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
-			while (iter.hasNext()) {
-				final AllocBlock block = iter.next();
+                    str.writeInt(block.m_addr);
+                    for (int i = 0; i < m_bitSize; i++) {
+                        str.writeInt(block.m_bits[i]);
+                    }
 
-				str.writeInt(block.m_addr);
-				for (int i = 0; i < m_bitSize; i++) {
-					str.writeInt(block.m_bits[i]);
-				}
+                    if (!m_store.isSessionPreserved()) {
+                        block.m_transients = block.m_bits.clone();
+                    }
 
-				if (!m_store.isSessionPreserved()) {
-					block.m_transients = block.m_bits.clone();
-				}
+                    /**
+                     * If this allocator is shadowed then copy the new committed
+                     * state to m_saveCommit
+                     */
+                    if (m_context != null) {
+                        assert block.m_saveCommit != null;
 
-				/**
-				 * If this allocator is shadowed then copy the new
-				 * committed state to m_saveCommit
-				 */
-				if (m_context != null) {
-					assert block.m_saveCommit != null;
-					
-					block.m_saveCommit = block.m_bits.clone();
-				} else if (m_store.isSessionPreserved()) {
-					block.m_commit = block.m_transients.clone();
-				} else {
-					block.m_commit = block.m_bits.clone();
-				}
+                        block.m_saveCommit = block.m_bits.clone();
+                    } else if (m_store.isSessionPreserved()) {
+                        block.m_commit = block.m_transients.clone();
+                    } else {
+                        block.m_commit = block.m_bits.clone();
+                    }
+                }
+                // add checksum
+                final int chk = ChecksumUtility.getCHK().checksum(buf,
+                        str.size());
+                str.writeInt(chk);
+			} finally {
+			    str.close();
 			}
-			// add checksum
-			final int chk = ChecksumUtility.getCHK().checksum(buf, str.size());
-			str.writeInt(chk);
 
 			if (!m_store.isSessionPreserved()) {
 				m_freeBits += m_freeTransients;
@@ -205,14 +222,14 @@ public class FixedAllocator implements Allocator {
 
 	// read does not read in m_size since this is read to determine the class of
 	// allocator
-	public void read(DataInputStream str) {
+	public void read(final DataInputStream str) {
 		try {
 			m_freeBits = 0;
 
-			Iterator iter = m_allocBlocks.iterator();
-			int blockSize = m_bitSize * 32 * m_size;
+			final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
+			final int blockSize = m_bitSize * 32 * m_size;
 			while (iter.hasNext()) {
-				AllocBlock block = (AllocBlock) iter.next();
+				final AllocBlock block = iter.next();
 
 				block.m_addr = str.readInt();
 				for (int i = 0; i < m_bitSize; i++) {
@@ -220,7 +237,7 @@ public class FixedAllocator implements Allocator {
 
 					/**
 					 * Need to calc how many free blocks are available, minor
-					 * optimisation by checking against either empty or full to
+					 * optimization by checking against either empty or full to
 					 * avoid scanning every bit unnecessarily
 					 **/
 					if (block.m_bits[i] == 0) { // empty
@@ -252,11 +269,11 @@ public class FixedAllocator implements Allocator {
 
 	}
 
-	/**The size of the allocation slots in bytes.*/
-	private final int m_size;
+    /** The size of the allocation slots in bytes. */
+    private final int m_size;
 
-	int m_startAddr = 0;
-	int m_endAddr = 0;
+	private int m_startAddr = 0;
+	private int m_endAddr = 0;
 
 	/**
 	 * The #of ints in the {@link AllocBlock}'s internal arrays.
@@ -265,12 +282,12 @@ public class FixedAllocator implements Allocator {
 
 	private final ArrayList<AllocBlock> m_allocBlocks;
 
-	private RWStore m_store;
+	final private RWStore m_store;
 
 	/**
 	 * Calculating the number of ints (m_bitSize) cannot rely on a power of 2.  Previously this
 	 * assumption was sufficient to guarantee a rounding on to an 64k boundary.  However, now
-	 * nints * 32 * 64 = 64K, so need multiple of 32 ints
+	 * nints * 32 * 64 = 64K, so need multiple of 32 ints.
 	 * <p>
 	 * So, whatever multiple of 64, if we allocate a multiple of 32 ints we are guaranteed to be 
 	 * on an 64K boundary.
@@ -337,7 +354,7 @@ public class FixedAllocator implements Allocator {
 			}
             sb.append(block.getStats(null) + "\r\n");
             if (counter != null)
-            	counter.addAndGet(block.getAllocBits() * m_size);
+                counter.addAndGet(block.getAllocBits() * (long) m_size);
 		}
 
 		return sb.toString();
@@ -561,7 +578,8 @@ public class FixedAllocator implements Allocator {
 	 * all reserved allocation blocks.
 	 */
 	public long getFileStorage() {
-		final long blockSize = 32 * m_bitSize * m_size;
+		
+	    final long blockSize = 32L * m_bitSize * m_size;
 		
 		long allocated = getAllocatedBlocks();
 

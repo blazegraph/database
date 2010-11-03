@@ -157,7 +157,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
             assertEquals(Options.MAXIMUM_EXTENT,
                     0L/* soft limit for disk mode */, bufferStrategy
                             .getMaximumExtent());
-            assertNotNull("raf", bufferStrategy.getRandomAccessFile());
+//            assertNotNull("raf", bufferStrategy.getRandomAccessFile());
             assertEquals(Options.BUFFER_MODE, BufferMode.DiskRW, bufferStrategy
                     .getBufferMode());
 

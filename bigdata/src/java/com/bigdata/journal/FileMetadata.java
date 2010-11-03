@@ -83,7 +83,7 @@ public class FileMetadata {
 	/**
 	 * The file that was opened.
 	 */
-	final File file;
+	public final File file;
 
 	/**
 	 * The mode used to open the file.
@@ -103,6 +103,17 @@ public class FileMetadata {
      * directly or by an interrupt during an IO operation.
      */
 	RandomAccessFile raf;
+
+    /**
+     * The interface for IO performed on that file.
+     * <p>
+     * Note: this method is only safe for use during the initial file
+     * create/open. It is not safe to use once a file has been closed, whether
+     * directly or by an interrupt during an IO operation.
+     */
+	public RandomAccessFile getRandomAccessFile() {
+	    return raf;
+	}
 
 	/**
 	 * The 32-bit magic value at offset 0L in the file.
@@ -172,7 +183,7 @@ public class FileMetadata {
 	/**
 	 * True iff the file was opened in a read-only mode.
 	 */
-	final boolean readOnly;
+	public final boolean readOnly;
 
 	/**
 	 * The timestamp from the createTime field in the root block.
@@ -233,13 +244,13 @@ public class FileMetadata {
 	 * The current root block. For a new file, this is "rootBlock0". For an
 	 * existing file it is based on an examination of both root blocks.
 	 */
-	final IRootBlockView rootBlock;
+	public final IRootBlockView rootBlock;
 	
 	/**
 	 * Properties used to initialize this FileMetadata object
 	 */
 	final Properties properties;
-
+	
 	/**
 	 * This constructor handles the case where the file does not exist or exists
 	 * but is empty (including files created by the temporary file creation
