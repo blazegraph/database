@@ -221,7 +221,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     private static class MyLockManager<R extends Comparable<R>> extends
             NonBlockingLockManagerWithNewDesign<R> {
 
-//        private final WriteExecutorService service;
+        /*
+         * FIXME restored hard reference since introducing just a weak reference
+         * here appears to be causing some odd behaviors.  Track these behaviors
+         * down and sort this all out.
+         */
+        private final WriteExecutorService service;
         private final WeakReference<WriteExecutorService> serviceRef;
 
         public MyLockManager(final int capacity, final int maxLockTries,
@@ -230,7 +235,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             super(capacity, maxLockTries, predeclareLocks);
 
-//            this.service = service;
+            this.service = service;
             this.serviceRef = new WeakReference<WriteExecutorService>(service);
 
         }
