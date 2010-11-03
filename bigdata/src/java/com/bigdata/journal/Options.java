@@ -484,11 +484,15 @@ public interface Options {
     String TMP_DIR = AbstractJournal.class.getName()+".tmpDir";
 
     /**
-     * The property whose value is the name of the directory in which temporary
-     * files will be created. When not specified the default is governed by the
-     * value of the System property named <code>java.io.tmpdir</code>. There
-     * are several kinds of temporary files that can be created, including
-     * temporary journals, intermediate files from an index merge process, etc.
+     * The following option provides the Allocation block sizes for the
+     * RWStore. The values defined are multiplied by 64 to provide the
+     * actual allocations.  The list of allocaitons should be ',' delimited
+     * and in increasing order.  eg:
+     * "1,2,4,8,116,32,64" defines allocaitons from 64 to 4K in size.
+     * The default allocations are:
+     * "1,2,3,5,8,12,16,32,48,64,128,192,320,512,832,1344,2176,3520" providing
+     * blocks up to 220K aligned on 4K boundaries as soon as possible to
+     * optimise IO - particularly relevant for SSDs.
      */
     String RW_ALLOCATIONS = RWStore.class.getName()+".allocSizes";
 
