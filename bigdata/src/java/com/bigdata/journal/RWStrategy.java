@@ -67,6 +67,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
     private static final transient Logger log = Logger.getLogger(RWStrategy.class);
 
+    private final IAddressManager m_am = new RWAddressManager();
+
 	final private FileMetadata m_fileMetadata;
 	
 	final private Quorum<?,?> m_environment;
@@ -125,6 +127,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		m_rb1 = copyRootBlock(false);
 		
 		m_initialExtent = m_fileMetadata.file.length();
+	
 	}
 
     /**
@@ -368,53 +371,21 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	    
 	}
 
-	/*
-	 * FIXME Reconcile this class with the methods on the outer class.
-	 */
-	public static class RWAddressManager implements IAddressManager {
-
-		public int getByteCount(final long addr) {
-			
-		    return (int) addr & 0xFFFFFF;
-		    
-		}
-
-		public long getOffset(final long addr) {
-			
-		    return -(addr >> 32);
-		    
-		}
-
-		public long toAddr(final int nbytes, long offset) {
-
-		    offset <<= 32;
-			
-			return offset + nbytes;
-
-		}
-
-		public String toString(final long addr) {
-	        
-            return "{off=" + getOffset(addr) + ",len=" + getByteCount(addr)
-                    + "}";
-
-		}
-	
-	}
-
-	final private IAddressManager m_am = new RWAddressManager();
-	
-	public IAddressManager getAddressManager() {
-		return m_am;
-	}
-
+    /**
+     * Operation is not supported.
+     * 
+     * @throws UnsupportedOperationException
+     *             always.
+     */
 	public void closeForWrites() {
-		// TODO Auto-generated method stub
+		// @todo could be implemented at some point.
 	    throw new UnsupportedOperationException();
 	}
 
 	public BufferMode getBufferMode() {
-		return BufferMode.DiskRW;
+
+	    return BufferMode.DiskRW;
+	    
 	}
 
     /**
@@ -423,19 +394,22 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
      * points in hierarchies belonging to the caller.
      */
 	public CounterSet getCounters() {
-		return new CounterSet();
+
+	    return new CounterSet();
+	    
 	}
 
 	public long getExtent() {
-		return this.m_fileMetadata.file.length();
+
+	    return this.m_fileMetadata.file.length();
+	    
 	}
 
 	public int getHeaderSize() {
-		// TODO Auto-generated method stub
-		return 0;
+	    return FileMetadata.headerSize0;
 	}
 
-	private long m_initialExtent = 0;
+	final private long m_initialExtent;
 
 	private volatile boolean m_needsReopen = false;
 	
@@ -454,31 +428,30 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	public long getNextOffset() {
 		return m_store.getNextOffset();
 	}
-	/**
-	 * TODO: Should this mean the same
-	 */
+
 	public long getUserExtent() {
-		// TODO Auto-generated method stub
-		return 0;
+	
+	    return m_store.getFileStorage();
+	    
 	}
 
+    /**
+     * Operation is not supported.
+     * 
+     * @throws UnsupportedOperationException
+     *             always.
+     */
 	public long transferTo(RandomAccessFile out) throws IOException {
-		// TODO Auto-generated method stub
-		return 0;
+	    
+	    // @todo could perhaps be implemented at some point.
+	    throw new UnsupportedOperationException();
+	    
 	}
 
-	/**
-	 * This method means more to a WORM than a RW since it assumes an allocation strategy
-	 */
-    public long ensureMinFree(final long minFree) {
-
-        throw new UnsupportedOperationException();
-
-    }
-
-    public void truncate(long extent) {
-		// TODO Auto-generated method stub
-
+    public void truncate(final long extent) {
+        
+        m_store.establishExtent(extent);
+        
 	}
 
     public void writeRootBlock(final IRootBlockView rootBlock,
@@ -702,61 +675,80 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		return true;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * This implementation returns the amount of utilized storage.
+	 */
 	public long size() {
-		// TODO Auto-generated method stub
-		return 0;
+		return m_store.getFileStorage();
 	}
 
-	public int getByteCount(long addr) {
-		return (int) addr & 0xFFFFFFFF;
-	}
+    /*
+     * IAddressManager
+     */
 
-	public long getOffset(long addr) {
-		return addr >> 32;
-	}
+    public IAddressManager getAddressManager() {
+        return m_am;
+    }
 
-	public long toAddr(final int nbytes, final long offset) {
-		return (offset << 32) + nbytes;
-	}
+    public int getByteCount(final long addr) {
+        return m_am.getByteCount(addr);
+    }
 
-	public String toString(final long addr) {
-		return m_am.toString(addr);
-	}
+    public long getOffset(final long addr) {
+        return m_am.getOffset(addr);
+    }
 
-	/**
-	 * The state of the provided block is not relevant since it does not hold
-	 * information on recent allocations (the meta allocations will only effect the
-	 * root block after a commit)
-	 */
-	public boolean requiresCommit(IRootBlockView block) {
-		return m_store.requiresCommit();
-	}
+    public long toAddr(final int nbytes, final long offset) {
+        return m_am.toAddr(nbytes, offset);
+    }
 
-	public long getMetaBitsAddr() {
-		return m_store.getMetaBitsAddr();
-	}
+    public String toString(final long addr) {
+        return m_am.toString(addr);
+    }
+    
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The state of the provided block is not relevant since it does not hold
+     * information on recent allocations (the meta allocations will only effect
+     * the root block after a commit). This is passed through to the
+     * {@link RWStore} which examines its internal state.
+     */
+    public boolean requiresCommit(final IRootBlockView block) {
 
-	public long getMetaStartAddr() {
-		return m_store.getMetaStartAddr();
-	}
+        return m_store.requiresCommit();
+        
+    }
 
-	/**
-	 * Appears only to be used in unit tests.  Return current max fix allocation block of 8K.
-	 * 
-	 * FIXME: need to provide configurable allocation block sizes for the RWStore and this should access the same
-	 * information.
-	 */
+    public long getMetaBitsAddr() {
+        
+        return m_store.getMetaBitsAddr();
+        
+    }
+
+    public long getMetaStartAddr() {
+
+        return m_store.getMetaStartAddr();
+        
+    }
+
 	public int getMaxRecordSize() {
-		return 8 * 1024;
+
+	    return m_store.getMaxAllocSize() - 4/* checksum */;
+	    
 	}
 
-	/**
-	 * Although the RW Store uses a latched addressing strategy it is not meaningful to make this available 
-	 * in this interface.
-	 */
-	public int getOffsetBits() {
-		return 0;
-	}
+    /**
+     * Although the RW Store uses a latched addressing strategy it is not
+     * meaningful to make this available in this interface.
+     */
+    public int getOffsetBits() {
+
+        return 0;
+        
+    }
 	
 	/**
 	 * Used for unit tests, could also be used to access raw statistics.
@@ -764,9 +756,35 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 * @return the associated RWStore
 	 */
 	public RWStore getRWStore() {
-		return m_store;
+		
+	    return m_store;
+	    
 	}
 
+    public long getPhysicalAddress(final long addr) {
+
+        final int rwaddr = decodeAddr(addr);        
+        
+        return m_store.physicalAddress(rwaddr);
+    }
+
+    /**
+     * Saves the current list of delete blocks, returning the address allocated.
+     * This can be used later to retrieve the addresses of allocations to be
+     * freed.
+     * 
+     * @return the address of the delete blocks, or zero if none
+     */
+    public long saveDeleteBlocks() {
+
+        return m_store.saveDeferrals();
+        
+    }
+
+	/*
+	 * IHABufferStrategy
+	 */
+	
     // FIXME writeRawBuffer
     public void writeRawBuffer(HAWriteMessage msg, ByteBuffer b)
             throws IOException, InterruptedException {
@@ -776,40 +794,26 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
     }
 
     // FIXME readFromLocalStore
-    public ByteBuffer readFromLocalStore(long addr) throws InterruptedException {
-        
+    public ByteBuffer readFromLocalStore(final long addr)
+            throws InterruptedException {
+
         throw new UnsupportedOperationException();
-        
+
     }
 
-	/**
-	 * Called from HAGlue.receiveAndReplicate to ensure the correct file extent
-	 * prior to any writes.
-	 * For RW this is essential as the allocaiton blocks for current committed data
-	 * could otherwise be overwritten and the store invalidated.
-	 * 
-	 * @see com.bigdata.journal.IHABufferStrategy#setExtentForLocalStore(long)
-	 */
-	public void setExtentForLocalStore(long extent) throws IOException, InterruptedException {
-        
-        m_store.establishHAExtent(extent);
-        
-	}
+    /**
+     * Called from HAGlue.receiveAndReplicate to ensure the correct file extent
+     * prior to any writes. For RW this is essential as the allocation blocks
+     * for current committed data could otherwise be overwritten and the store
+     * invalidated.
+     * 
+     * @see com.bigdata.journal.IHABufferStrategy#setExtentForLocalStore(long)
+     */
+    public void setExtentForLocalStore(final long extent) throws IOException,
+            InterruptedException {
 
-	public long getPhysicalAddress(long addr) {
-		int rwaddr = decodeAddr(addr);		
-		
-		return m_store.physicalAddress(rwaddr);
-	}
+        m_store.establishExtent(extent);
 
-	/**
-	 * Saves the current list of delete blocks, returning the address allocated.
-	 * This can be used later to retrieve the addresses of allocations to be
-	 * freed.
-	 * 
-	 * @return the address of the delete blocks, or zero if none
-	 */
-	public long saveDeleteBlocks() {
-		return m_store.saveDeferrals();
-	}
+    }
+
 }

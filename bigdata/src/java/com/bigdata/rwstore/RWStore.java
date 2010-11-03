@@ -96,7 +96,7 @@ import com.bigdata.util.ChecksumUtility;
  * ready to be freed.
  * <p>
  * The method of storing the allocation headers has been changed from always
- * allocating at the end of the file (and moving them on fle extend) to
+ * allocating at the end of the file (and moving them on file extend) to
  * allocation of fixed areas.  The meta-allocation data, containing the bitmap
  * that controls these allocations, is itself stored in the heap, and is now
  * structured to include both the bit data and the list of meta-storage
@@ -198,14 +198,13 @@ public class RWStore implements IStore {
      * sizes, so a 4K boundary is expressed as <code>64</code>. The default
      * series of allocation sizes is based on the Fibonacci sequence, but is
      * pegged to the closest 4K boundary for values larger than 4k.
+     * 
+     * @see #m_allocSizes
      */
 	private static final int[] DEFAULT_ALLOC_SIZES = { 1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128, 192, 320, 512, 832, 1344, 2176, 3520 };
 	// private static final int[] DEFAULT_ALLOC_SIZES = { 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181 };
 	// private static final int[] ALLOC_SIZES = { 1, 2, 4, 8, 16, 32, 64, 128 };
 
-	final int m_maxFixedAlloc;
-	final int m_minFixedAlloc;
-	
 	/**
 	 * The fixed size of any allocator on the disk in bytes. The #of allocations
 	 * managed by an allocator is this value times 8 because each slot uses one
@@ -241,6 +240,10 @@ public class RWStore implements IStore {
 //	protected int m_transactionCount;
 //	private boolean m_committing;
 
+    /**
+     * FIXME This is initially true and is never set to false. Should this all
+     * go away?
+     */
 	private boolean m_preserveSession = true;
 //	private boolean m_readOnly;
 
@@ -268,7 +271,22 @@ public class RWStore implements IStore {
 	
 	private final RWWriteCacheService m_writeCache;
 
+	/**
+	 * The actual allocation sizes as read from the store.
+	 * 
+	 * @see #DEFAULT_ALLOC_SIZES
+	 */
 	private int[] m_allocSizes;
+
+	/**
+	 * The maximum allocation size (bytes).
+	 */
+    final int m_maxFixedAlloc;
+
+    /**
+     * The minimum allocation size (bytes).
+     */
+    final int m_minFixedAlloc;
 	
     /**
      * This lock is used to exclude readers when the extent of the backing file
@@ -404,6 +422,7 @@ public class RWStore implements IStore {
 		m_fmv = fileMetadataView;
 		
 		m_fd = m_fmv.getFile();
+		
 		m_raf = m_fmv.getRandomAccessFile();
 
 		m_rb = m_fmv.getRootBlock();
@@ -2279,12 +2298,12 @@ public class RWStore implements IStore {
 		return alloc;
 	}
 
-	private int blockIndex(int addr) {
-		return (-addr) >>> OFFSET_BITS;
-	}
+//	private int blockIndex(int addr) {
+//		return (-addr) >>> OFFSET_BITS;
+//	}
 
 	private Allocator getBlock(final int addr) {
-		int index = (-addr) >>> OFFSET_BITS;
+		final int index = (-addr) >>> OFFSET_BITS;
 
 		return (Allocator) m_allocs.get(index);
 	}
@@ -2293,23 +2312,23 @@ public class RWStore implements IStore {
 		return (-addr) & OFFSET_BITS_MASK; // OFFSET_BITS
 	}
 
-	public int addr2Size(final int addr) {
-		if (addr > 0) {
-			int size = 0;
-
-			final int index = ((int) addr) % 16;
-
-			if (index == 15) { // blob
-				throw new Error("FIX ME : legacy BLOB code being accessed somehow");
-			} else {
-				size = m_minFixedAlloc * m_allocSizes[index];
-			}
-
-			return size;
-		} else {
-			return getBlock(addr).getPhysicalSize(getOffset(addr));
-		}
-	}
+//	public int addr2Size(final int addr) {
+//		if (addr > 0) {
+//			int size = 0;
+//
+//			final int index = ((int) addr) % 16;
+//
+//			if (index == 15) { // blob
+//				throw new Error("FIX ME : legacy BLOB code being accessed somehow");
+//			} else {
+//				size = m_minFixedAlloc * m_allocSizes[index];
+//			}
+//
+//			return size;
+//		} else {
+//			return getBlock(addr).getPhysicalSize(getOffset(addr));
+//		}
+//	}
 
 	public boolean isNativeAddress(final long addr) {
 		return addr <= 0;
@@ -2636,14 +2655,15 @@ public class RWStore implements IStore {
     }
 
     /**
-     * Delegated to from setExtentForLocalStore after expected call from HAGlue.replicateAndReceive.
+     * Delegated to from setExtentForLocalStore after expected call from
+     * HAGlue.replicateAndReceive.
      * 
-     * If the current file extent is different from the required extent then the call is made to move
-     * the allocation blocks.
+     * If the current file extent is different from the required extent then the
+     * call is made to move the allocation blocks.
      * 
      * @param extent
      */
-	public void establishHAExtent(final long extent) {
+	public void establishExtent(final long extent) {
 		
 	    final long currentExtent = convertAddr(m_fileSize);
 		
@@ -3052,5 +3072,14 @@ public class RWStore implements IStore {
 		
 		return ret;
 	}
+
+    /**
+     * The maximum allocation size (bytes).
+     */
+    public int getMaxAllocSize() {
+
+        return m_maxFixedAlloc;
+
+    }
 
 }

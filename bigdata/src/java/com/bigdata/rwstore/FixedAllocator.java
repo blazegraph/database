@@ -153,9 +153,9 @@ public class FixedAllocator implements Allocator {
 
 			str.writeInt(m_size);
 
-			final Iterator iter = m_allocBlocks.iterator();
+			final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
 			while (iter.hasNext()) {
-				final AllocBlock block = (AllocBlock) iter.next();
+				final AllocBlock block = iter.next();
 
 				str.writeInt(block.m_addr);
 				for (int i = 0; i < m_bitSize; i++) {
@@ -465,8 +465,9 @@ public class FixedAllocator implements Allocator {
 
 				// Should have been first on list, now check for first
 				if (m_freeList.size() > 0) {
-					FixedAllocator nxt = (FixedAllocator) m_freeList.get(0);
-					System.out.println("Freelist head: " + nxt.getSummaryStats());
+					final FixedAllocator nxt = (FixedAllocator) m_freeList.get(0);
+                    if (log.isInfoEnabled())
+                        log.info("Freelist head: " + nxt.getSummaryStats());
 				}
 			}
 
@@ -494,7 +495,7 @@ public class FixedAllocator implements Allocator {
 		int baseAddr = -(m_index << 16); // bit adjust??
 
 		while (blocks.hasNext()) {
-			AllocBlock block = (AllocBlock) blocks.next();
+		    final AllocBlock block = (AllocBlock) blocks.next();
 
 			block.addAddresses(addrs, baseAddr);
 
@@ -513,7 +514,8 @@ public class FixedAllocator implements Allocator {
 		return m_index;
 	}
 
-	public void appendShortStats(StringBuilder str, AllocationStats[] stats) {
+    public void appendShortStats(final StringBuilder str,
+            final AllocationStats[] stats) {
 
 		int si = -1;
 
@@ -528,9 +530,9 @@ public class FixedAllocator implements Allocator {
 			}
 		}
 		
-		Iterator<AllocBlock> blocks = m_allocBlocks.iterator();
+		final Iterator<AllocBlock> blocks = m_allocBlocks.iterator();
 		while (blocks.hasNext()) {
-			AllocBlock block = blocks.next();
+			final AllocBlock block = blocks.next();
 			if (block.m_addr != 0) {
 				str.append(block.getStats(si == -1 ? null : stats[si]));
 			} else {
@@ -542,7 +544,7 @@ public class FixedAllocator implements Allocator {
 	
 	public int getAllocatedBlocks() {
 		int allocated = 0;
-		Iterator<AllocBlock> blocks = m_allocBlocks.iterator();
+		final Iterator<AllocBlock> blocks = m_allocBlocks.iterator();
 		while (blocks.hasNext()) {
 			if (blocks.next().m_addr != 0) {
 				allocated++;
@@ -569,18 +571,18 @@ public class FixedAllocator implements Allocator {
 	}
 	
 	/**
-	 * Computes the amount of staorge allocated using the freeBits count.
+	 * Computes the amount of storage allocated using the freeBits count.
 	 * 
 	 * @return the amount of storage to alloted slots in the allocation blocks
 	 */
 	public long getAllocatedSlots() {
-		int allocBlocks = getAllocatedBlocks();
+		final int allocBlocks = getAllocatedBlocks();
 		int xtraFree = m_allocBlocks.size() - allocBlocks;
 		xtraFree *= 32 * m_bitSize;
 		
-		int freeBits = m_freeBits - xtraFree;
+		final int freeBits = m_freeBits - xtraFree;
 		
-		long alloted = (allocBlocks * 32 * m_bitSize) - freeBits;
+		final long alloted = (allocBlocks * 32 * m_bitSize) - freeBits;
 		
 		return alloted * m_size;		
 	}
@@ -588,10 +590,11 @@ public class FixedAllocator implements Allocator {
 	public boolean isAllocated(int offset) {
 	  	offset -= 3;
 
-		int allocBlockRange = 32 * m_bitSize;
+	  	final int allocBlockRange = 32 * m_bitSize;
 
-		AllocBlock block = (AllocBlock) m_allocBlocks.get(offset / allocBlockRange);
-		int bit = offset % allocBlockRange;
+		final AllocBlock block = (AllocBlock) m_allocBlocks.get(offset / allocBlockRange);
+		
+		final int bit = offset % allocBlockRange;
 		
 		return RWStore.tstBit(block.m_bits, bit);
 	}
@@ -599,10 +602,11 @@ public class FixedAllocator implements Allocator {
 	public boolean isCommitted(int offset) {
 	  	offset -= 3;
 
-		int allocBlockRange = 32 * m_bitSize;
+	  	final int allocBlockRange = 32 * m_bitSize;
 
-		AllocBlock block = (AllocBlock) m_allocBlocks.get(offset / allocBlockRange);
-		int bit = offset % allocBlockRange;
+		final AllocBlock block = (AllocBlock) m_allocBlocks.get(offset / allocBlockRange);
+		
+		final int bit = offset % allocBlockRange;
 		
 		return RWStore.tstBit(block.m_commit, bit);
 	}
@@ -611,7 +615,8 @@ public class FixedAllocator implements Allocator {
 	 * If the context is this allocators context AND it is not in the commit bits
 	 * then we can immediately free.
 	 */
-	public boolean canImmediatelyFree(int addr, int size, IAllocationContext context) {
+    public boolean canImmediatelyFree(final int addr, final int size,
+            final IAllocationContext context) {
 		if (context == m_context) {
 			final int offset = ((-addr) & RWStore.OFFSET_BITS_MASK); // bit adjust
 
