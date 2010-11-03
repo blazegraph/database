@@ -269,27 +269,39 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
 	    checkReopen();
 		
-		if (data == null) {
+		if (data == null)
 			throw new IllegalArgumentException();
-		}
-		
+
+        if (data.hasArray() && data.arrayOffset() != 0) {
+            /*
+             * FIXME [data] is not always backed by an array, the array may not
+             * be visible (read-only), the array offset may not be zero, etc.
+             * Try to drive the ByteBuffer into the RWStore.alloc() method
+             * instead.
+             * 
+             * See https://sourceforge.net/apps/trac/bigdata/ticket/151
+             */
+            throw new AssertionError();
+        }
+
 		final int nbytes = data.remaining();
 		
-		if (nbytes == 0) {
+		if (nbytes == 0)
 			throw new IllegalArgumentException();
-		}
 		
-		try { /* FIXME [data] is not always backed by an array, the array may not be visible (read-only), the array offset may not be zero, etc.  Try to drive the ByteBuffer into the RWStore.alloc() method instead. */
-		    if(data.hasArray()&&data.arrayOffset()!=0)throw new AssertionError();
-			final long rwaddr = m_store.alloc(data.array(), nbytes, context);
-			data.position(nbytes); // update position to end of buffer
+        try {
+            
+            final long rwaddr = m_store.alloc(data.array(), nbytes, context);
+			
+            data.position(nbytes); // update position to end of buffer
 	
 			final long retaddr =  encodeAddr(rwaddr, nbytes);
 
 			return retaddr;
-		} catch (RuntimeException re) {
+
+        } catch (RuntimeException re) {
 			
-			re.printStackTrace();
+			log.error(re,re);//re.printStackTrace();
 			
 			m_needsReopen = true;			
 			
@@ -521,7 +533,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 			m_fileMetadata.raf.close();
 			m_fileMetadata.raf = null;
 		} catch (IOException e) {
-			e.printStackTrace();
+			log.error(e,e);//e.printStackTrace();
 		}
 	}
 
@@ -641,7 +653,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 			m_needsReopen = false;
 			m_open = true;
 		} catch (Throwable t) {
-			t.printStackTrace();
+			log.error(t,t);
 			
 			throw new RuntimeException(t);
 		}		

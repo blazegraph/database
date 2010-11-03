@@ -235,7 +235,7 @@ public class RWStore implements IStore {
 	// RWStore Data
 	// ///////////////////////////////////////////////////////////////////////////////////////
 
-	private File m_fd;
+	private final File m_fd;
 	private RandomAccessFile m_raf;
 //	protected FileMetadata m_metadata;
 //	protected int m_transactionCount;
@@ -967,7 +967,7 @@ public class RWStore implements IStore {
 					return;
 					
 				} catch (IOException e) {
-					e.printStackTrace();
+					log.error(e,e);
 					
 					throw new IllegalStateException("Unable to restore Blob allocation", e);
 				}
@@ -1435,11 +1435,10 @@ public class RWStore implements IStore {
 //		}
 //	}
 
-	// --------------------------------------------------------------------------------------------
-	// reset
-	//
-	// Similar to rollbackTransaction but will force a re-initialization if transactions are not being
-	//	used - update w/o commit protocol.
+    /**
+     * Toss away all buffered writes and then reload from the current root
+     * block.
+     */
 	public void reset() {
 		if (log.isInfoEnabled()) {
 			log.info("RWStore Reset");
@@ -1459,13 +1458,13 @@ public class RWStore implements IStore {
 			try {
 				m_writeCache.reset();
 			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+			    throw new RuntimeException(e);
 			}
 	        			
 			initfromRootBlock();
 
-			m_writeCache.setExtent(convertAddr(m_fileSize)); // notify of current file length.
+			// notify of current file length.
+			m_writeCache.setExtent(convertAddr(m_fileSize));
 		} catch (Exception e) {
 			throw new IllegalStateException("Unable reset the store", e);
 		} finally {
@@ -1607,67 +1606,67 @@ public class RWStore implements IStore {
 		m_allocationLock.lock();
 		
 		try {
-			
-				checkDeferredFrees(true, journal); // free now if possible
+		
+			checkDeferredFrees(true, journal); // free now if possible
 
-				// Allocate storage for metaBits
-				final long oldMetaBits = m_metaBitsAddr;
-				final int oldMetaBitsSize = (m_metaBits.length + m_allocSizes.length + 1) * 4;
-				m_metaBitsAddr = alloc(getRequiredMetaBitsStorage(), null);
+			// Allocate storage for metaBits
+			final long oldMetaBits = m_metaBitsAddr;
+			final int oldMetaBitsSize = (m_metaBits.length + m_allocSizes.length + 1) * 4;
+			m_metaBitsAddr = alloc(getRequiredMetaBitsStorage(), null);
 
-				// DEBUG SANITY CHECK!
-				if (physicalAddress(m_metaBitsAddr) == 0) {
-					throw new IllegalStateException("Returned MetaBits Address not valid!");
-				}
+			// DEBUG SANITY CHECK!
+			if (physicalAddress(m_metaBitsAddr) == 0) {
+				throw new IllegalStateException("Returned MetaBits Address not valid!");
+			}
 
-				// Call immediateFree - no need to defer freeof metaBits, this
-				//	has to stop somewhere!
-				immediateFree((int) oldMetaBits, oldMetaBitsSize);
+			// Call immediateFree - no need to defer freeof metaBits, this
+			//	has to stop somewhere!
+			immediateFree((int) oldMetaBits, oldMetaBitsSize);
 
-				// save allocation headers
-				final Iterator<Allocator> iter = m_commitList.iterator();
-				while (iter.hasNext()) {
-					final Allocator allocator = iter.next();
-					final int old = allocator.getDiskAddr();
-					metaFree(old);
-					
-					final int naddr = metaAlloc();
-					allocator.setDiskAddr(naddr);
-					
-                    if (log.isTraceEnabled())
-                        log.trace("Update allocator " + allocator.getIndex()
-                                + ", old addr: " + old + ", new addr: " + naddr);
-
-					try {
-					    // do not use checksum
-					    m_writeCache.write(metaBit2Addr(naddr), ByteBuffer
-                            .wrap(allocator.write()), 0, false);
-					} catch (InterruptedException e) {
-						throw new RuntimeException(e);
-					}
-				}
-				m_commitList.clear();
-
-				writeMetaBits();
+			// save allocation headers
+			final Iterator<Allocator> iter = m_commitList.iterator();
+			while (iter.hasNext()) {
+				final Allocator allocator = iter.next();
+				final int old = allocator.getDiskAddr();
+				metaFree(old);
+				
+				final int naddr = metaAlloc();
+				allocator.setDiskAddr(naddr);
+				
+                if (log.isTraceEnabled())
+                    log.trace("Update allocator " + allocator.getIndex()
+                            + ", old addr: " + old + ", new addr: " + naddr);
 
 				try {
-					m_writeCache.flush(true);
+				    // do not use checksum
+				    m_writeCache.write(metaBit2Addr(naddr), ByteBuffer
+                        .wrap(allocator.write()), 0, false);
 				} catch (InterruptedException e) {
-					e.printStackTrace();
 					throw new RuntimeException(e);
 				}
+			}
+			m_commitList.clear();
 
-				// Should not write rootBlock, this is responsibility of client
-				// to provide control
-				// writeFileSpec();
+			writeMetaBits();
 
-				m_metaTransientBits = (int[]) m_metaBits.clone();
+			try {
+				m_writeCache.flush(true);
+			} catch (InterruptedException e) {
+			    log.error(e, e);
+				throw new RuntimeException(e);
+			}
+
+			// Should not write rootBlock, this is responsibility of client
+			// to provide control
+			// writeFileSpec();
+
+			m_metaTransientBits = (int[]) m_metaBits.clone();
 
 //				if (m_commitCallback != null) {
 //					m_commitCallback.commitComplete();
 //				}
 
-				m_raf.getChannel().force(false); // TODO, check if required!
+			m_raf.getChannel().force(false); // TODO, check if required!
 		} catch (IOException e) {
 			throw new StorageTerminalError("Unable to commit transaction", e);
 		} finally {
@@ -2385,33 +2384,33 @@ public class RWStore implements IStore {
 //		}
 //	}
 
-	/***************************************************************************************
-	 * Needed by PSOutputStream for BLOB buffer chaining.
-	 **/
-	public void absoluteWriteInt(final int addr, final int offset, final int value) {
-		try {
-			// must check write cache!!, or the write may be overwritten - just
-			// flush for now
-			m_writes.flush();
+//	/***************************************************************************************
+//	 * Needed by PSOutputStream for BLOB buffer chaining.
+//	 **/
+//	public void absoluteWriteInt(final int addr, final int offset, final int value) {
+//		try {
+//			// must check write cache!!, or the write may be overwritten - just
+//			// flush for now
+//			m_writes.flush();
+//
+//			m_raf.seek(physicalAddress(addr) + offset);
+//			m_raf.writeInt(value);
+//		} catch (IOException e) {
+//			throw new StorageTerminalError("Unable to write integer", e);
+//		}
+//	}
 
-			m_raf.seek(physicalAddress(addr) + offset);
-			m_raf.writeInt(value);
-		} catch (IOException e) {
-			throw new StorageTerminalError("Unable to write integer", e);
-		}
-	}
-
-	/***************************************************************************************
-	 * Needed to free Blob chains.
-	 **/
-	public int absoluteReadInt(final int addr, final int offset) {
-		try {
-			m_raf.seek(physicalAddress(addr) + offset);
-			return m_raf.readInt();
-		} catch (IOException e) {
-			throw new StorageTerminalError("Unable to write integer", e);
-		}
-	}
+//	/***************************************************************************************
+//	 * Needed to free Blob chains.
+//	 **/
+//	public int absoluteReadInt(final int addr, final int offset) {
+//		try {
+//			m_raf.seek(physicalAddress(addr) + offset);
+//			return m_raf.readInt();
+//		} catch (IOException e) {
+//			throw new StorageTerminalError("Unable to write integer", e);
+//		}
+//	}
 
 	/***************************************************************************************
 	 * Needed by PSOutputStream for BLOB buffer chaining.
@@ -2429,30 +2428,29 @@ public class RWStore implements IStore {
 		return false;
 	}
 
-	public int absoluteReadLong(long addr, int offset) {
-		throw new UnsupportedOperationException();
-	}
+//	public int absoluteReadLong(long addr, int offset) {
+//		throw new UnsupportedOperationException();
+//	}
+//
+//	public void absoluteWriteLong(long addr, int threshold, long value) {
+//		throw new UnsupportedOperationException();
+//	}
 
-	public void absoluteWriteLong(long addr, int threshold, long value) {
-		throw new UnsupportedOperationException();
-	}
-
-	public void absoluteWriteAddress(long addr, int threshold, long addr2) {
-		absoluteWriteInt((int) addr, threshold, (int) addr2);
-	}
+//	public void absoluteWriteAddress(long addr, int threshold, long addr2) {
+//		absoluteWriteInt((int) addr, threshold, (int) addr2);
+//	}
 
 	public int getAddressSize() {
 		return 4;
 	}
 
-	// DiskStrategy Support
-	public RandomAccessFile getRandomAccessFile() {
-		return m_raf;
-	}
+//	public RandomAccessFile getRandomAccessFile() {
+//		return m_raf;
+//	}
 
-	public FileChannel getChannel() {
-		return m_raf.getChannel();
-	}
+//	public FileChannel getChannel() {
+//		return m_raf.getChannel();
+//	}
 
 	public boolean requiresCommit() {
 		return m_recentAlloc;
