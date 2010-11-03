@@ -213,22 +213,22 @@ public interface IStore {
 	 **/
 	public int bufferChainOffset();
 	
-	public void absoluteWriteLong(long addr, int threshold, long value);
-
-	/***************************************************************************************
-	 * Needed by PSOutputStream for BLOB buffer chaining.
-	 **/
-	public void absoluteWriteInt(int addr, int offset, int value);
-	
-	/***************************************************************************************
-	 * Needed to free Blob chains.
-	 **/
-	public int absoluteReadInt(int addr, int offset);
-	
-	/***************************************************************************************
-	 * Needed to free Blob chains.
-	 **/
-	public int absoluteReadLong(long addr, int offset);
+//	public void absoluteWriteLong(long addr, int threshold, long value);
+//
+//	/***************************************************************************************
+//	 * Needed by PSOutputStream for BLOB buffer chaining.
+//	 **/
+//	public void absoluteWriteInt(int addr, int offset, int value);
+//	
+//	/***************************************************************************************
+//	 * Needed to free Blob chains.
+//	 **/
+//	public int absoluteReadInt(int addr, int offset);
+//	
+//	/***************************************************************************************
+//	 * Needed to free Blob chains.
+//	 **/
+//	public int absoluteReadLong(long addr, int offset);
 	
 //	/***************************************************************************************
 //	 * copies the store to a new file, this is not necessarily a byte for byte copy
@@ -264,7 +264,7 @@ public interface IStore {
    **/
 	public File getStoreFile();
 
-	public void absoluteWriteAddress(long addr, int threshold, long addr2);
+//	public void absoluteWriteAddress(long addr, int threshold, long addr2);
 
 	public int getAddressSize();
 

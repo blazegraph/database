@@ -1149,8 +1149,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
             properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
                     + writeCacheEnabled);
 
-            // return new Journal(properties).getBufferStrategy();
-            return new Journal(properties);
+             return new Journal(properties).getBufferStrategy();
+//            return new Journal(properties);
 
         }
 
