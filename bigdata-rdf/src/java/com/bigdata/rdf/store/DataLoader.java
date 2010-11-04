@@ -49,6 +49,7 @@ import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.RWStrategy;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -1190,7 +1191,7 @@ public class DataLoader {
      * support multiple data files within a single archive.
      * 
      * @param args
-     *            [-closure][-namespace <i>namespace</i>] propertyFile (fileOrDir)+
+     *            [-closure][-verbose][-namespace <i>namespace</i>] propertyFile (fileOrDir)+
      * 
      * @throws IOException
      */
@@ -1199,6 +1200,7 @@ public class DataLoader {
         // default namespace.
         String namespace = "kb";
         boolean doClosure = false;
+        boolean verbose = false;
         RDFFormat rdfFormat = null;
         String baseURI = null;
         
@@ -1225,6 +1227,10 @@ public class DataLoader {
                 } else if (arg.equals("-closure")) {
 
                     doClosure = true;
+
+                } else if (arg.equals("-verbose")) {
+
+                    verbose = true;
 
                 } else {
 
@@ -1335,8 +1341,10 @@ public class DataLoader {
         	
             jnl = new Journal(properties);
             
-            final long firstOffset = jnl.getRootBlockView().getNextOffset();
-            
+            // #of bytes on the journal before (user extent).
+//            final long firstOffset = jnl.getRootBlockView().getNextOffset();
+            final long userData0 = jnl.getBufferStrategy().size();
+
             System.out.println("Journal file: "+jnl.getFile());
 
             AbstractTripleStore kb = (AbstractTripleStore) jnl
@@ -1368,8 +1376,18 @@ public class DataLoader {
             dataLoader.endSource();
 
 			System.out.println("Load: " + totals);
-            
-			if (dataLoader.closureEnum == ClosureEnum.None && doClosure) {
+			
+        	if (dataLoader.closureEnum == ClosureEnum.None && doClosure) {
+
+				if (verbose) {
+
+					System.out.println(jnl.getCounters().toString());
+
+					System.out
+							.println(((AbstractLocalTripleStore) dataLoader.database)
+									.getLocalBTreeBytesWritten(
+											new StringBuilder()).toString());
+				}
 
 				System.out.println("Computing closure.");
 
@@ -1378,13 +1396,38 @@ public class DataLoader {
                 System.out.println("Closure: "+stats.toString());
 
 			}
-            
-            jnl.commit();
-            
-            final long lastOffset = jnl.getRootBlockView().getNextOffset();
 
-			System.out.println("Wrote: " + (lastOffset - firstOffset)
-					+ " bytes.");
+			jnl.commit();
+
+			if (verbose) {
+
+				System.out.println(jnl.getCounters().toString());
+
+				System.out
+						.println(((AbstractLocalTripleStore) dataLoader.database)
+								.getLocalBTreeBytesWritten(new StringBuilder())
+								.toString());
+
+				if (jnl.getBufferStrategy() instanceof RWStrategy) {
+
+					final StringBuilder sb = new StringBuilder();
+
+					((RWStrategy) jnl.getBufferStrategy()).getRWStore()
+							.showAllocators(sb);
+
+					System.out.println(sb);
+
+				}
+
+			}
+
+            // #of bytes on the journal (user data only).
+            final long userData1 = jnl.getBufferStrategy().size();
+            
+            // #of bytes written (user data only)
+            final long bytesWritten = (userData1 - userData0);
+
+			System.out.println("Wrote: " + bytesWritten + " bytes.");
 
 			final long elapsedTotal = System.currentTimeMillis() - begin;
 			
@@ -1404,7 +1447,7 @@ public class DataLoader {
 
     private static void usage() {
         
-        System.err.println("usage: [-namespace namespace] propertyFile (fileOrDir)+");
+        System.err.println("usage: [-closure][-verbose][-namespace namespace] propertyFile (fileOrDir)+");
 
         System.exit(1);
         

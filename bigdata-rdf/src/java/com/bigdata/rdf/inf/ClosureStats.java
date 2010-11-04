@@ -73,10 +73,16 @@ public class ClosureStats {
         
     }
     
+    public long triplesPerSecond() {
+
+        return ((long) (((double) mutationCount.get()) / ((double) elapsed.get()) * 1000d));
+
+    }
+
     public String toString() {
 
         return getClass().getSimpleName() + "{mutationCount=" + mutationCount.estimate_get()
-                + ", elapsed=" + elapsed.estimate_get() + "ms}";
+                + ", elapsed=" + elapsed.estimate_get() + "ms, rate="+triplesPerSecond()+"}";
         
     }
     

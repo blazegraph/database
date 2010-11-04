@@ -293,7 +293,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
 	public CounterSet getCounters() {
 
-	    return m_store.getStoreCounters().getCounters();
+	    return m_store.getCounters();
 	    
 	}
 

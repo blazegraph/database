@@ -283,20 +283,15 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     public CounterSet getCounters() {
 
-//        if (counters == null) {
-
         final CounterSet counters = super.getCounters();
             
         counters.attach(concurrencyManager.getCounters());
 
         counters.attach(localTransactionManager.getCounters());
             
-//        }
-        
         return counters;
         
     }
-//    private CounterSet counters;
     
     /*
      * IResourceManager

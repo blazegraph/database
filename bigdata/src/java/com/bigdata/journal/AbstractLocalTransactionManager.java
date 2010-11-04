@@ -308,27 +308,22 @@ abstract public class AbstractLocalTransactionManager implements
         throw new RuntimeException(msg, cause);
         
     }
-    
-    /**
-     * Return interesting statistics about the transaction manager.
-     */
-    synchronized public CounterSet getCounters() {
-        
-        if (countersRoot == null) {
 
-            countersRoot = new CounterSet();
+	/**
+	 * Return interesting statistics about the transaction manager.
+	 */
+	public CounterSet getCounters() {
 
-            countersRoot.addCounter("#active", new Instrument<Integer>() {
-                protected void sample() {
-                    setValue(activeTx.size());
-                }
-            });
+		final CounterSet countersRoot = new CounterSet();
 
-        }
-        
-        return countersRoot;
-        
-    }
-    private CounterSet countersRoot;
-    
+		countersRoot.addCounter("#active", new Instrument<Integer>() {
+			protected void sample() {
+				setValue(activeTx.size());
+			}
+		});
+
+		return countersRoot;
+
+	}
+
 }
