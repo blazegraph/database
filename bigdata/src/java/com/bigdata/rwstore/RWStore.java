@@ -59,6 +59,8 @@ import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.BufferedWrite;
 import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.io.writecache.WriteCacheService;
+import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.CommitRecordSerializer;
@@ -71,7 +73,7 @@ import com.bigdata.journal.JournalTransactionService;
 import com.bigdata.journal.Options;
 import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.RootBlockView;
-import com.bigdata.journal.WORMStrategy.StoreCounters;
+import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.ChecksumUtility;
@@ -376,31 +378,23 @@ public class RWStore implements IStore {
 
         }
 
-        /*
-         * FIXME Update counters when writing on the disk.
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Note: The performance counters for writes to the disk are reported by
+         * the {@link WriteCacheService}. The {@link RWStore} never writes
+         * directly onto the disk (other than the root blocks).
          */
         @Override
         protected boolean writeOnChannel(final ByteBuffer data,
                 final long firstOffsetignored,
                 final Map<Long, RecordMetadata> recordMap,
                 final long nanos) throws InterruptedException, IOException {
-//            final long begin = System.nanoTime();
             final Lock readLock = m_extensionLock.readLock();
             readLock.lock();
             try {
                 boolean ret = super.writeOnChannel(data, firstOffsetignored,
                         recordMap, nanos);
-//                // Update counters.
-//                final long elapsed = (System.nanoTime() - begin);
-//                final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
-//                        .acquire();
-//                try {
-//                    c.ndiskWrite += nwrites;
-//                    c.bytesWrittenOnDisk += nbytes;
-//                    c.elapsedDiskWriteNanos += elapsed;
-//                } finally {
-//                    c.release();
-//                }
                 return ret;
             } finally {
                 readLock.unlock();
@@ -416,14 +410,6 @@ public class RWStore implements IStore {
 		
 	};
 	
-//	private String m_filename;
-
-//	private final FileMetadataView m_fmv;
-
-//	private volatile IRootBlockView m_rb;
-
-//	volatile private long m_commitCounter;
-
 	volatile private int m_metaBitsAddr;
 
     /**
@@ -571,8 +557,10 @@ public class RWStore implements IStore {
     }
     
     private void assertOpen() {
-        if(!m_open)
-            throw new IllegalStateException();
+    
+        if (!m_open)
+            throw new IllegalStateException(AbstractBufferStrategy.ERR_NOT_OPEN);
+        
     }
     
     synchronized public void close() {
@@ -987,7 +975,9 @@ public class RWStore implements IStore {
      * address of the BlobHeader record.
      */
 	public void getData(final long addr, final byte buf[]) {
-		getData(addr, buf, 0, buf.length);
+		
+	    getData(addr, buf, 0, buf.length);
+	    
 	}
 	
     public void getData(final long addr, final byte buf[], final int offset,
@@ -998,6 +988,8 @@ public class RWStore implements IStore {
         if (addr == 0) {
 			return;
 		}
+
+        final long begin = System.nanoTime();
 
         final Lock readLock = m_extensionLock.readLock();
 
@@ -1048,23 +1040,43 @@ public class RWStore implements IStore {
 				}
 			}
 
-			try {
-				final long paddr = physicalAddress((int) addr);
-				if (paddr == 0) {
-					assertAllocators();
-					
-					log.warn("Address " + addr + " did not resolve to physical address");
-					
-					throw new IllegalArgumentException("Address " + addr + " did not resolve to physical address");
+	        {
+	            final StoreCounters<?> storeCounters = (StoreCounters<?>) this.storeCounters
+	                    .get().acquire();
+	            try {
+	                final int nbytes = length;
+	                if (nbytes > storeCounters.maxReadSize) {
+	                    storeCounters.maxReadSize = nbytes;
+	                }
+	            } finally {
+	                storeCounters.release();
+	            }
+	        }
+
+	        try {
+
+	            final long paddr = physicalAddress((int) addr);
+                
+	            if (paddr == 0) {
+                
+	                assertAllocators();
+
+                    final String msg = "Address did not resolve to physical address: "
+                            + addr;
+
+                    log.warn(msg);
+
+                    throw new IllegalArgumentException(msg);
+                    
 				}
 
-				/**
-				 * Check WriteCache first
-				 * 
-				 * Note that the buffer passed in should include the checksum 
-				 * value, so the cached data is 4 bytes less than the
-				 * buffer size.
-				 */
+                /**
+                 * Check WriteCache first
+                 * 
+                 * Note that the buffer passed in should include the checksum
+                 * value, so the cached data is 4 bytes less than the buffer
+                 * size.
+                 */
 				final ByteBuffer bbuf;
 				try {
 					bbuf = m_writeCache.read(paddr);
@@ -1089,7 +1101,24 @@ public class RWStore implements IStore {
 						buf[offset+i] = in[i];
 					}
 					m_cacheReads++;
+	                /*
+	                 * Hit on the write cache.
+	                 * 
+	                 * Update the store counters.
+	                 */
+	                final StoreCounters<?> c = (StoreCounters<?>) storeCounters
+	                        .get().acquire();
+	                try {
+	                    final int nbytes = length;
+	                    c.nreads++;
+	                    c.bytesRead += nbytes;
+	                    c.elapsedReadNanos += (System.nanoTime() - begin);
+	                } finally {
+	                    c.release();
+	                }
 				} else {
+		            // Read through to the disk.
+		            final long beginDisk = System.nanoTime();
 					// If checksum is required then the buffer should be sized to include checksum in final 4 bytes
 				    final ByteBuffer bb = ByteBuffer.wrap(buf, offset, length);
 					FileChannelUtility.readAll(m_reopener, bb, paddr);
@@ -1111,6 +1140,19 @@ public class RWStore implements IStore {
 					}
 					
 					m_diskReads++;
+		            // Update counters.
+		            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+		                    .acquire();
+		            try {
+		                final int nbytes = length;
+		                c.nreads++;
+		                c.bytesRead += nbytes;
+		                c.bytesReadFromDisk += nbytes;
+		                c.elapsedReadNanos += (System.nanoTime() - begin);
+		                c.elapsedDiskReadNanos += (System.nanoTime() - beginDisk);
+		            } finally {
+		                c.release();
+		            }
 				}
 			} catch (Throwable e) {
 				log.error(e,e);
@@ -3232,10 +3274,14 @@ public class RWStore implements IStore {
         return tmp;
 
     }
-    
+
     /**
      * Striped performance counters for {@link IRawStore} access, including
      * operations that read or write through to the underlying media.
+     * <p>
+     * Note: The performance counters for writes to the disk are reported by the
+     * {@link WriteCacheService}. The {@link RWStore} never writes directly onto
+     * the disk (other than the root blocks).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
@@ -3243,8 +3289,8 @@ public class RWStore implements IStore {
      * 
      * @todo report elapsed time and average latency for force, reopen, and
      *       writeRootBlock.
-     *       
-     * FIXME  CAT may be much faster than striped locks (2-3x faster).
+     * 
+     *       FIXME CAT may be much faster than striped locks (2-3x faster).
      */
     static public class StoreCounters<T extends StoreCounters<T>> extends
             StripedCounters<T> {
@@ -3289,10 +3335,11 @@ public class RWStore implements IStore {
          */
         public volatile long nwrites;
         
-        /**
-         * #of write requests that write through to the backing file.
-         */
-        public volatile long ndiskWrite;
+        // This is reported by the WriteCacheService.
+//        /**
+//         * #of write requests that write through to the backing file.
+//         */
+//        public volatile long ndiskWrite;
 
         /**
          * The size of the largest record read.
@@ -3308,21 +3355,23 @@ public class RWStore implements IStore {
          * #of bytes written.
          */
         public volatile long bytesWritten;
-        
-        /**
-         * #of bytes that have been written on the disk.
-         */
-        public volatile long bytesWrittenOnDisk;
+
+        // This is reported by the WriteCacheService.
+//        /**
+//         * #of bytes that have been written on the disk.
+//         */
+//        public volatile long bytesWrittenOnDisk;
         
         /**
          * Total elapsed time for writes.
          */
         public volatile long elapsedWriteNanos;
         
-        /**
-         * Total elapsed time for writing on the disk.
-         */
-        public volatile long elapsedDiskWriteNanos;
+        // This is reported by the WriteCacheService.
+//        /**
+//         * Total elapsed time for writing on the disk.
+//         */
+//        public volatile long elapsedDiskWriteNanos;
         
         /**
          * #of times the data were forced to the disk.
@@ -3381,12 +3430,12 @@ public class RWStore implements IStore {
             checksumErrorCount += o.checksumErrorCount;
 
             nwrites += o.nwrites;
-            ndiskWrite += o.ndiskWrite;
+//            ndiskWrite += o.ndiskWrite;
             maxWriteSize = Math.max(maxWriteSize, o.maxWriteSize);
             bytesWritten += o.bytesWritten;
-            bytesWrittenOnDisk += o.bytesWrittenOnDisk;
+//            bytesWrittenOnDisk += o.bytesWrittenOnDisk;
             elapsedWriteNanos += o.elapsedWriteNanos;
-            elapsedDiskWriteNanos += o.elapsedDiskWriteNanos;
+//            elapsedDiskWriteNanos += o.elapsedDiskWriteNanos;
 
             nforce += o.nforce;
             ntruncate += o.ntruncate;
@@ -3412,12 +3461,12 @@ public class RWStore implements IStore {
             t.checksumErrorCount -= o.checksumErrorCount;
 
             t.nwrites -= o.nwrites;
-            t.ndiskWrite -= o.ndiskWrite;
+//            t.ndiskWrite -= o.ndiskWrite;
             t.maxWriteSize -= o.maxWriteSize; // @todo report max? min?
             t.bytesWritten -= o.bytesWritten;
-            t.bytesWrittenOnDisk -= o.bytesWrittenOnDisk;
+//            t.bytesWrittenOnDisk -= o.bytesWrittenOnDisk;
             t.elapsedWriteNanos -= o.elapsedWriteNanos;
-            t.elapsedDiskWriteNanos -= o.elapsedDiskWriteNanos;
+//            t.elapsedDiskWriteNanos -= o.elapsedDiskWriteNanos;
 
             t.nforce -= o.nforce;
             t.ntruncate -= o.ntruncate;
@@ -3442,12 +3491,12 @@ public class RWStore implements IStore {
             checksumErrorCount = 0;
 
             nwrites = 0;
-            ndiskWrite = 0;
+//            ndiskWrite = 0;
             maxWriteSize = 0;
             bytesWritten = 0;
-            bytesWrittenOnDisk = 0;
+//            bytesWrittenOnDisk = 0;
             elapsedWriteNanos = 0;
-            elapsedDiskWriteNanos = 0;
+//            elapsedDiskWriteNanos = 0;
 
             nforce = 0;
             ntruncate = 0;
@@ -3605,50 +3654,50 @@ public class RWStore implements IStore {
                  * write
                  */
 
-                disk.addCounter("nwrites", new Instrument<Long>() {
-                    public void sample() {
-                        setValue(ndiskWrite);
-                    }
-                });
-
-                disk.addCounter("bytesWritten", new Instrument<Long>() {
-                    public void sample() {
-                        setValue(bytesWrittenOnDisk);
-                    }
-                });
-
-                disk.addCounter("bytesPerWrite", new Instrument<Double>() {
-                    public void sample() {
-                        final double bytesPerDiskWrite = (ndiskWrite == 0 ? 0d
-                                : (bytesWrittenOnDisk / (double) ndiskWrite));
-                        setValue(bytesPerDiskWrite);
-                    }
-                });
-
-                disk.addCounter("writeSecs", new Instrument<Double>() {
-                    public void sample() {
-                        final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
-                        setValue(diskWriteSecs);
-                    }
-                });
-
-                disk.addCounter("bytesWrittenPerSec", new Instrument<Double>() {
-                    public void sample() {
-                        final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
-                        final double bytesWrittenPerSec = (diskWriteSecs == 0L ? 0d
-                                : bytesWrittenOnDisk / diskWriteSecs);
-                        setValue(bytesWrittenPerSec);
-                    }
-                });
-
-                disk.addCounter("secsPerWrite", new Instrument<Double>() {
-                    public void sample() {
-                        final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
-                        final double writeLatency = (diskWriteSecs == 0 ? 0d
-                                : diskWriteSecs / ndiskWrite);
-                        setValue(writeLatency);
-                    }
-                });
+//                disk.addCounter("nwrites", new Instrument<Long>() {
+//                    public void sample() {
+//                        setValue(ndiskWrite);
+//                    }
+//                });
+//
+//                disk.addCounter("bytesWritten", new Instrument<Long>() {
+//                    public void sample() {
+//                        setValue(bytesWrittenOnDisk);
+//                    }
+//                });
+//
+//                disk.addCounter("bytesPerWrite", new Instrument<Double>() {
+//                    public void sample() {
+//                        final double bytesPerDiskWrite = (ndiskWrite == 0 ? 0d
+//                                : (bytesWrittenOnDisk / (double) ndiskWrite));
+//                        setValue(bytesPerDiskWrite);
+//                    }
+//                });
+//
+//                disk.addCounter("writeSecs", new Instrument<Double>() {
+//                    public void sample() {
+//                        final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
+//                        setValue(diskWriteSecs);
+//                    }
+//                });
+//
+//                disk.addCounter("bytesWrittenPerSec", new Instrument<Double>() {
+//                    public void sample() {
+//                        final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
+//                        final double bytesWrittenPerSec = (diskWriteSecs == 0L ? 0d
+//                                : bytesWrittenOnDisk / diskWriteSecs);
+//                        setValue(bytesWrittenPerSec);
+//                    }
+//                });
+//
+//                disk.addCounter("secsPerWrite", new Instrument<Double>() {
+//                    public void sample() {
+//                        final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
+//                        final double writeLatency = (diskWriteSecs == 0 ? 0d
+//                                : diskWriteSecs / ndiskWrite);
+//                        setValue(writeLatency);
+//                    }
+//                });
 
                 /*
                  * other
@@ -3749,6 +3798,14 @@ public class RWStore implements IStore {
         }
         
         return root;
+
+    }
+
+    public void writeRawBuffer(final HAWriteMessage msg, final ByteBuffer b)
+            throws IOException, InterruptedException {
+
+        m_writeCache.newWriteCache(b, true/* useChecksums */,
+                true/* bufferHasData */, m_reopener).flush(false/* force */);
 
     }
 

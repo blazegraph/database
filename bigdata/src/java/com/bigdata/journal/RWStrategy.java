@@ -33,7 +33,7 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
-import com.bigdata.journal.WORMStrategy.StoreCounters;
+import com.bigdata.ha.QuorumRead;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.quorum.Quorum;
@@ -41,6 +41,8 @@ import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.RWStore;
+import com.bigdata.rwstore.RWStore.StoreCounters;
+import com.bigdata.util.ChecksumError;
 
 /**
  * A highly scalable persistent {@link IBufferStrategy} wrapping the
@@ -89,14 +91,25 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 */
     final private long m_initialExtent;
 
+    /**
+     * The HA {@link Quorum} (optional).
+     */
+    private final Quorum<?,?> m_quorum;
+
 	/**
 	 * 
 	 * @param fileMetadata
-	 * @param quorum
+	 * @param quorum The HA {@link Quorum} (optional).
 	 */
     RWStrategy(final FileMetadata fileMetadata, final Quorum<?, ?> quorum) {
 
+        if (fileMetadata == null)
+            throw new IllegalArgumentException();
+        
 	    m_uuid = fileMetadata.rootBlock.getUUID();
+	    
+	    // MAY be null.
+	    m_quorum = quorum;
 	    
 		m_store = new RWStore(fileMetadata, quorum); 
 		
@@ -110,30 +123,49 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
 	}
 
-    /*
-     * FIXME This does not handle the read-from-peer HA integration. See
-     * WORMStrategy#read().
-     * 
-     * FIXME This does not update the StoreCounters.
-     */
 	public ByteBuffer read(final long addr) {
 		
-		final int rwaddr = decodeAddr(addr);		
-		final int sze = decodeSize(addr);
-
-		if (rwaddr == 0L || sze == 0) {
-			throw new IllegalArgumentException();
-		}
-		
-		/**
-		 * Allocate buffer to include checksum to allow single read
-		 * but then return ByteBuffer excluding those bytes
-		 */
-		final byte buf[] = new byte[sze+4]; // 4 bytes for checksum
-		
-		m_store.getData(rwaddr, buf);
-
-		return ByteBuffer.wrap(buf, 0, sze);
+        try {
+            // Try reading from the local store.
+            return readFromLocalStore(addr);
+        } catch (InterruptedException e) {
+            // wrap and rethrow.
+            throw new RuntimeException(e);
+        } catch (ChecksumError e) {
+            /*
+             * Note: This assumes that the ChecksumError is not wrapped by
+             * another exception. If it is, then the ChecksumError would not be
+             * caught.
+             */
+            // log the error.
+            try {
+                log.error(e + " : addr=" + toString(addr), e);
+            } catch (Throwable ignored) {
+                // ignore error in logging system.
+            }
+            // update the performance counters.
+            final StoreCounters<?> c = (StoreCounters<?>) m_store.getStoreCounters()
+                    .acquire();
+            try {
+                c.checksumErrorCount++;
+            } finally {
+                c.release();
+            }
+            if (m_quorum != null && m_quorum.isHighlyAvailable()) {
+                if (m_quorum.isQuorumMet()) {
+                    try {
+                        // Read on another node in the quorum.
+                        final byte[] a = ((QuorumRead<?>) m_quorum.getMember())
+                                .readFromQuorum(m_uuid, addr);
+                        return ByteBuffer.wrap(a);
+                    } catch (Throwable t) {
+                        throw new RuntimeException("While handling: " + e, t);
+                    }
+                }
+            }
+            // Otherwise rethrow the checksum error.
+            throw e;
+        }
 
 	}
 
@@ -145,11 +177,9 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
 	public long write(final ByteBuffer data, final IAllocationContext context) {
 
-        if (!isOpen())
-            throw new IllegalStateException();
-		
-		if (data == null)
-			throw new IllegalArgumentException();
+        if (data == null)
+            throw new IllegalArgumentException(
+                    AbstractBufferStrategy.ERR_BUFFER_NULL);
 
         if (data.hasArray() && data.arrayOffset() != 0) {
             /*
@@ -166,7 +196,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
         final int nbytes = data.remaining();
 
         if (nbytes == 0)
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException(
+                    AbstractBufferStrategy.ERR_BUFFER_EMPTY);
 
         final long rwaddr = m_store.alloc(data.array(), nbytes, context);
 
@@ -208,9 +239,18 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 * this data, and if not free immediately, otherwise defer.
 	 */
 	public void delete(final long addr, final IAllocationContext context) {
-		
+
 		final int rwaddr = decodeAddr(addr);
+		
 		final int sze = decodeSize(addr);
+
+        if (rwaddr == 0L)
+            throw new IllegalArgumentException(
+                    AbstractBufferStrategy.ERR_ADDRESS_IS_NULL);
+
+        if (sze == 0)
+            throw new IllegalArgumentException(
+                    AbstractBufferStrategy.ERR_BAD_RECORD_SIZE);
 		
 		m_store.free(rwaddr, sze, context);
 		
@@ -316,10 +356,10 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
     private void assertOpen() {
 
         if (!m_store.isOpen())
-            throw new IllegalStateException();
-        
+            throw new IllegalStateException(AbstractBufferStrategy.ERR_NOT_OPEN);
+
     }
-    
+
 	public void close() {
 	    
 	    // throw exception if open per the API.
@@ -332,7 +372,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
     public void deleteResources() {
 
         if (m_store.isOpen())
-            throw new IllegalStateException();
+            throw new IllegalStateException(AbstractBufferStrategy.ERR_OPEN);
 
         final File file = m_store.getStoreFile();
 
@@ -534,24 +574,38 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	/*
 	 * IHABufferStrategy
 	 */
-	
-    /**
-     * Operation is not supported.
-     */
-    public void writeRawBuffer(HAWriteMessage msg, ByteBuffer b)
+
+    public void writeRawBuffer(final HAWriteMessage msg, final ByteBuffer b)
             throws IOException, InterruptedException {
 
-        throw new UnsupportedOperationException();
+        m_store.writeRawBuffer(msg, b);
 
     }
 
-    /**
-     * Operation is not supported.
-     */
     public ByteBuffer readFromLocalStore(final long addr)
             throws InterruptedException {
 
-        throw new UnsupportedOperationException();
+        final int rwaddr = decodeAddr(addr);
+
+        final int sze = decodeSize(addr);
+
+        if (rwaddr == 0L)
+            throw new IllegalArgumentException(
+                    AbstractBufferStrategy.ERR_ADDRESS_IS_NULL);
+
+        if (sze == 0)
+            throw new IllegalArgumentException(
+                    AbstractBufferStrategy.ERR_BAD_RECORD_SIZE);
+
+        /**
+         * Allocate buffer to include checksum to allow single read but then
+         * return ByteBuffer excluding those bytes
+         */
+        final byte buf[] = new byte[sze + 4]; // 4 bytes for checksum
+
+        m_store.getData(rwaddr, buf);
+
+        return ByteBuffer.wrap(buf, 0, sze);
 
     }
 
