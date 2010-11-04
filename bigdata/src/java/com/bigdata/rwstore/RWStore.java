@@ -2618,14 +2618,21 @@ public class RWStore implements IStore {
 
     }
 
-	public long getTotalAllocations() {
+    /** The # of allocation requests made. */
+    public long getTotalAllocations() {
 		return m_allocations;
 	}
 
+    /**
+     * The # of free requests made
+     */
 	public long getTotalFrees() {
 		return m_frees;
 	}
 	
+    /**
+     * The # of bytes requested - as opposed to the size of the slots allocated.
+     */
 	public long getTotalAllocationsSize() {
 		return m_nativeAllocBytes;
 	}
