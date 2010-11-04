@@ -2633,12 +2633,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         assertCanWrite();
 
-        ((RWStrategy)_bufferStrategy).delete(addr, context);
+        ((RWStrategy) _bufferStrategy).delete(addr, context);
 
     }
     
-    public void detachContext(IAllocationContext context) {
-    	((RWStrategy)_bufferStrategy).detachContext(context);
+    public void detachContext(final IAllocationContext context) {
+        
+        ((RWStrategy) _bufferStrategy).detachContext(context);
+    	
     }
 
 	final public long getRootAddr(final int index) {
