@@ -70,7 +70,6 @@ import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.JournalTransactionService;
-import com.bigdata.journal.Options;
 import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.ha.HAWriteMessage;
@@ -199,22 +198,69 @@ public class RWStore implements IStore {
     private static final transient Logger log = Logger.getLogger(RWStore.class);
 
     /**
-     * The sizes of the slots managed by a {@link FixedAllocator} are 64 times
-     * the values in this array. This array is written into the store so
-     * changing the values does not break older stores. This array is
-     * configurable using {@link com.bigdata.journal.Options#RW_ALLOCATIONS}.
-     * <p>
-     * Note: It is good to have 4k and 8k boundaries for better efficiency on
-     * SSD. A 1K boundary is expressed as <code>16</code> in the allocation
-     * sizes, so a 4K boundary is expressed as <code>64</code>. The default
-     * series of allocation sizes is based on the Fibonacci sequence, but is
-     * pegged to the closest 4K boundary for values larger than 4k.
-     * 
-     * @see #m_allocSizes
+     * Options understood by the {@link RWStore}.
      */
-	private static final int[] DEFAULT_ALLOC_SIZES = { 1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128, 192, 320, 512, 832, 1344, 2176, 3520 };
-	// private static final int[] DEFAULT_ALLOC_SIZES = { 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181 };
-	// private static final int[] ALLOC_SIZES = { 1, 2, 4, 8, 16, 32, 64, 128 };
+    public interface Options {
+
+        /**
+         * Option defines the Allocation block sizes for the RWStore. The values
+         * defined are multiplied by 64 to provide the actual allocations. The
+         * list of allocations should be ',' delimited and in increasing order.
+         * For example,
+         * 
+         * <pre>
+         * &quot;1,2,4,8,116,32,64&quot;
+         * </pre>
+         * 
+         * defines allocations from 64 to 4K in size. The default allocations
+         * are:
+         * 
+         * <pre>
+         * &quot;1,2,3,5,8,12,16,32,48,64,128,192,320,512,832,1344,2176,3520&quot;
+         * </pre>
+         * 
+         * providing blocks up to 220K aligned on 4K boundaries as soon as
+         * possible to optimize IO - particularly relevant for SSDs.
+         * 
+         * @see #DEFAULT_ALLOCATION_SIZES
+         */
+        String ALLOCATION_SIZES = RWStore.class.getName() + ".allocationSizes";
+
+        /**
+         * The sizes of the slots managed by a {@link FixedAllocator} are 64 times
+         * the values in this array. This array is written into the store so
+         * changing the values does not break older stores. This array is
+         * configurable using {@link com.bigdata.journal.Options#ALLOCATION_SIZES}.
+         * <p>
+         * Note: It is good to have 4k and 8k boundaries for better efficiency on
+         * SSD. A 1K boundary is expressed as <code>16</code> in the allocation
+         * sizes, so a 4K boundary is expressed as <code>64</code>. The default
+         * series of allocation sizes is based on the Fibonacci sequence, but is
+         * pegged to the closest 4K boundary for values larger than 4k.
+         */
+        String DEFAULT_ALLOCATION_SIZES = "1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128, 192, 320, 512, 832, 1344, 2176, 3520";
+        // private static final int[] DEFAULT_ALLOC_SIZES = { 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181 };
+        // private static final int[] ALLOC_SIZES = { 1, 2, 4, 8, 16, 32, 64, 128 };
+
+        /**
+         * Option defines the initial size of the meta bits region and effects
+         * how rapidly this region will grow (default
+         * {@value #DEFAULT_META_BITS_SIZE}).
+         * <p>
+         * Note: A value of <code>9</code> may be used to stress the logic which
+         * is responsible for the growth in the meta bits region.
+         */
+        String META_BITS_SIZE = RWStore.class.getName() + ".metaBitsSize";
+
+        String DEFAULT_META_BITS_SIZE = "9";
+
+    }
+
+    /*
+     * Error messages.
+     */
+    
+    private static final String ERR_WRITE_CACHE_CREATE = "Unable to create write cache service";
 
 	/**
 	 * The fixed size of any allocator on the disk in bytes. The #of allocations
@@ -252,8 +298,12 @@ public class RWStore implements IStore {
 //	private boolean m_committing;
 
     /**
-     * FIXME This is initially true and is never set to false. Should this all
-     * go away?
+     * When <code>true</code> the allocations will not actually be recycled
+     * until after a store restart. When <code>false</code>, the allocations are
+     * recycled once they satisfy the history retention requirement.
+     * 
+     * FIXME Should this go away or be raised as an option for unlimited
+     * retention until restart?
      */
 	private boolean m_preserveSession = false;
 //	private boolean m_readOnly;
@@ -285,7 +335,7 @@ public class RWStore implements IStore {
 	/**
 	 * The actual allocation sizes as read from the store.
 	 * 
-	 * @see #DEFAULT_ALLOC_SIZES
+	 * @see #DEFAULT_ALLOCATION_SIZES
 	 */
 	private int[] m_allocSizes;
 
@@ -410,8 +460,6 @@ public class RWStore implements IStore {
 		
 	};
 	
-	volatile private int m_metaBitsAddr;
-
     /**
      * The ALLOC_SIZES must be initialized from either the file or the
      * properties associated with the fileMetadataView
@@ -427,8 +475,16 @@ public class RWStore implements IStore {
 
         if (fileMetadata == null)
             throw new IllegalArgumentException();
+
+        cDefaultMetaBitsSize = Integer.valueOf(fileMetadata.getProperty(
+                Options.META_BITS_SIZE,
+                Options.DEFAULT_META_BITS_SIZE));
+
+        if (cDefaultMetaBitsSize < 9)
+            throw new IllegalArgumentException(Options.META_BITS_SIZE
+                    + " : Must be GTE 9");
         
-		m_metaBitsSize = cDefaultMetaBitsSize;
+        m_metaBitsSize = cDefaultMetaBitsSize;
 
 		m_metaBits = new int[m_metaBitsSize];
 		
@@ -474,6 +530,7 @@ public class RWStore implements IStore {
             m_writeCache = new RWWriteCacheService(buffers, m_fd.length(),
                     m_reopener, m_quorum) {
 				
+                        @SuppressWarnings("unchecked")
 			            public WriteCache newWriteCache(final ByteBuffer buf,
 			                    final boolean useChecksum,
 			                    final boolean bufferHasData,
@@ -485,11 +542,10 @@ public class RWStore implements IStore {
 			            }
 				};
 		} catch (InterruptedException e) {
-			throw new IllegalStateException("Unable to create write cache service", e);
+			throw new IllegalStateException(ERR_WRITE_CACHE_CREATE, e);
 		} catch (IOException e) {
-			throw new IllegalStateException("Unable to create write cache service", e);
-		}
-		
+			throw new IllegalStateException(ERR_WRITE_CACHE_CREATE, e);
+		}		
 
 		try {
             if (m_rb.getNextOffset() == 0) { // if zero then new file
@@ -517,26 +573,25 @@ public class RWStore implements IStore {
 		}
 	}
     
-    private void setAllocations(final FileMetadata fileMetadata) throws IOException {
+    private void setAllocations(final FileMetadata fileMetadata)
+            throws IOException {
+        
         final String buckets = fileMetadata.getProperty(
-                Options.RW_ALLOCATIONS, null/* default */);
-		if (buckets == null) {				
-			m_allocSizes = DEFAULT_ALLOC_SIZES;
-		} else {
-			final String[] specs = buckets.split(",");
-			m_allocSizes = new int[specs.length];
-			int prevSize = 0;
-			for (int i = 0; i < specs.length; i++) {
-				final int nxtSize = Integer.parseInt(specs[i]);
-				if (nxtSize <= prevSize)
-					throw new IllegalArgumentException("Invalid AllocSizes property");
-				m_allocSizes[i] = nxtSize;
-				prevSize = nxtSize;
-			}
-		}
+                Options.ALLOCATION_SIZES, Options.DEFAULT_ALLOCATION_SIZES);
+        final String[] specs = buckets.split("\\s*,\\s*");
+        m_allocSizes = new int[specs.length];
+        int prevSize = 0;
+        for (int i = 0; i < specs.length; i++) {
+            final int nxtSize = Integer.parseInt(specs[i]);
+            if (nxtSize <= prevSize)
+                throw new IllegalArgumentException(
+                        "Invalid AllocSizes property");
+            m_allocSizes[i] = nxtSize;
+            prevSize = nxtSize;
+        }
     }
     
-	private void defaultInit() throws IOException {
+    private void defaultInit() throws IOException {
 		final int numFixed = m_allocSizes.length;
 
 		m_freeFixed = new ArrayList[numFixed];
@@ -621,12 +676,6 @@ public class RWStore implements IStore {
 			log.trace("m_allocation: " + nxtalloc + ", m_metaBitsAddr: "
 					+ metaBitsAddr + ", m_commitCounter: " + commitCounter);
 		
-//		/**
-//		 * Ensure rootblock is in sync with external request
-//		 * 
-//		 * FIXME No side-effect please.
-//		 */
-//		m_rb = rbv;
 	}
 
 	/**
@@ -1829,7 +1878,7 @@ public class RWStore implements IStore {
              * Note: This adds one to the lastDeferredReleaseTime to give
              * exclusive lower bound semantics.
              */
-            freeDeferrals(journal, m_lastDeferredReleaseTime+1,
+            freeDeferrals(journal, m_lastDeferredReleaseTime + 1,
                     latestReleasableTime);
             
         }
@@ -1867,12 +1916,22 @@ public class RWStore implements IStore {
 
 //	private int m_headerSize = 2048;
 
-	// Meta Allocator
-	private static int cDefaultMetaBitsSize = 9; // DEBUG FIX ME
+    /*
+     * Meta Allocator
+     */
+	
+	/**
+	 * @see Options#META_BITS_SIZE
+	 */
+	private final int cDefaultMetaBitsSize;
+	/**
+	 * @see Options#META_BITS_SIZE
+	 */
+    volatile private int m_metaBitsSize;
 	private int m_metaBits[];
-	volatile private int m_metaBitsSize = cDefaultMetaBitsSize;
 	private int m_metaTransientBits[];
 	// volatile private int m_metaStartAddr;
+    private volatile int m_metaBitsAddr;
 
 	volatile private boolean m_recentAlloc = false;
 
@@ -1985,11 +2044,12 @@ public class RWStore implements IStore {
 		return bit;
 	}
 
-	private int fndMetabit() {
-		final int blocks = m_metaBits.length/9;
-		for (int b = 0; b < blocks; b++) {
-			final int ret = fndBit(m_metaTransientBits, (b*9)+1, 8);
-			if (ret != -1) {
+    private int fndMetabit() {
+        final int blocks = m_metaBits.length / cDefaultMetaBitsSize;
+        for (int b = 0; b < blocks; b++) {
+            final int ret = fndBit(m_metaTransientBits,
+                    (b * cDefaultMetaBitsSize) + 1, 8);
+            if (ret != -1) {
 				return ret;
 			}
 		}
@@ -3082,7 +3142,8 @@ public class RWStore implements IStore {
 		private final ContextAllocation m_parent;
 		private final IAllocationContext m_context;
 		
-        ContextAllocation(RWStore store,
+        @SuppressWarnings("unchecked")
+        ContextAllocation(final RWStore store,
                 final int fixedBlocks,
                 final ContextAllocation parent,
                 final IAllocationContext acontext) {
@@ -3760,6 +3821,7 @@ public class RWStore implements IStore {
     /**
      * Striped performance counters for this class.
      */
+    @SuppressWarnings("unchecked")
     private final AtomicReference<StoreCounters> storeCounters = new AtomicReference<StoreCounters>();
 
     /**

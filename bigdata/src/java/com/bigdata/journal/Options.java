@@ -41,7 +41,6 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager.ManagedJournal;
-import com.bigdata.rwstore.RWStore;
 
 /**
  * Options for the {@link Journal}. Options are specified as property values to
@@ -482,19 +481,6 @@ public interface Options {
      * temporary journals, intermediate files from an index merge process, etc.
      */
     String TMP_DIR = AbstractJournal.class.getName()+".tmpDir";
-
-    /**
-     * The following option provides the Allocation block sizes for the
-     * RWStore. The values defined are multiplied by 64 to provide the
-     * actual allocations.  The list of allocaitons should be ',' delimited
-     * and in increasing order.  eg:
-     * "1,2,4,8,116,32,64" defines allocaitons from 64 to 4K in size.
-     * The default allocations are:
-     * "1,2,3,5,8,12,16,32,48,64,128,192,320,512,832,1344,2176,3520" providing
-     * blocks up to 220K aligned on 4K boundaries as soon as possible to
-     * optimise IO - particularly relevant for SSDs.
-     */
-    String RW_ALLOCATIONS = RWStore.class.getName()+".allocSizes";
 
     /**
      * When <code>true</code> (default {@value #DEFAULT_FILE_LOCK_ENABLED}) a
