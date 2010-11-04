@@ -55,8 +55,8 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.journal.AbstractBufferStrategy;
-import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.StoreTypeEnum;
+import com.bigdata.journal.WORMStrategy;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -75,7 +75,7 @@ import com.bigdata.util.concurrent.Memoizer;
  * <ol>
  * <li>Gathered writes. This case is used by the {@link RWStore}.</li>
  * <li>Pure append of sequentially allocated records. This case is used by the
- * {@link DiskOnlyStrategy} (WORM) and by the {@link IndexSegmentBuilder}.</li>
+ * {@link WORMStrategy} (WORM) and by the {@link IndexSegmentBuilder}.</li>
  * <li>Write of a single large buffer owned by the caller. This case may be used
  * when the caller wants to manage the buffers or when the caller's buffer is
  * larger than the write cache.</li>
@@ -1482,7 +1482,7 @@ abstract public class WriteCache implements IWriteCache {
 
 	/**
 	 * A {@link WriteCache} implementation suitable for an append-only file such
-	 * as the {@link DiskOnlyStrategy} or the output file of the
+	 * as the {@link WORMStrategy} or the output file of the
 	 * {@link IndexSegmentBuilder}.
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
@@ -1622,10 +1622,12 @@ abstract public class WriteCache implements IWriteCache {
 		 * Called by WriteCacheService to process a direct write for large
 		 * blocks and also to flush data from dirty caches.
 		 */
-		protected boolean writeOnChannel(final ByteBuffer data, final long firstOffsetIgnored,
-				final Map<Long, RecordMetadata> recordMap, final long nanos) throws InterruptedException, IOException {
+        protected boolean writeOnChannel(final ByteBuffer data,
+                final long firstOffsetIgnored,
+                final Map<Long, RecordMetadata> recordMap, final long nanos)
+                throws InterruptedException, IOException {
 
-			final long begin = System.nanoTime();
+            final long begin = System.nanoTime();
 
 			final int nbytes = data.remaining();
 
