@@ -255,7 +255,7 @@ public class RWStore implements IStore {
      * FIXME This is initially true and is never set to false. Should this all
      * go away?
      */
-	private boolean m_preserveSession = true;
+	private boolean m_preserveSession = false;
 //	private boolean m_readOnly;
 
     /**
@@ -493,49 +493,14 @@ public class RWStore implements IStore {
 
 		try {
             if (m_rb.getNextOffset() == 0) { // if zero then new file
-                final String buckets = fileMetadata.getProperty(
-                        Options.RW_ALLOCATIONS, null/* default */);
-				if (buckets == null) {				
-					m_allocSizes = DEFAULT_ALLOC_SIZES;
-				} else {
-					final String[] specs = buckets.split(",");
-					m_allocSizes = new int[specs.length];
-					int prevSize = 0;
-					for (int i = 0; i < specs.length; i++) {
-						final int nxtSize = Integer.parseInt(specs[i]);
-						if (nxtSize <= prevSize)
-							throw new IllegalArgumentException("Invalid AllocSizes property");
-						m_allocSizes[i] = nxtSize;
-						prevSize = nxtSize;
-					}
-				}
+            	setAllocations(fileMetadata);
+            	
+            	defaultInit();
+            	
+        		m_maxFixedAlloc = m_allocSizes[m_allocSizes.length-1]*64;
+        		m_minFixedAlloc = m_allocSizes[0]*64;
 
-				final int numFixed = m_allocSizes.length;
-
-				m_freeFixed = new ArrayList[numFixed];
-
-				for (int i = 0; i < numFixed; i++) {
-					m_freeFixed[i] = new ArrayList<FixedAllocator>();
-				}
-
-				m_fileSize = convertFromAddr(m_fd.length());
-				
-				// make space for meta-allocators
-				m_metaBits[0] = -1;
-				m_metaTransientBits[0] = -1;
-				m_nextAllocation = -(1 + META_ALLOCATION); // keep on a minimum 8K boundary
-				
-				if (m_fileSize > m_nextAllocation) {
-					m_fileSize = m_nextAllocation;
-				}
-				
-				m_reopener.raf.setLength(convertAddr(m_fileSize));
-
-				m_maxFixedAlloc = m_allocSizes[m_allocSizes.length-1]*64;
-				m_minFixedAlloc = m_allocSizes[0]*64;
-
-				commitChanges(null);
-				
+        		// commitChanges(null);
 			} else {
 				
 				initfromRootBlock(m_rb);
@@ -551,6 +516,49 @@ public class RWStore implements IStore {
 			throw new StorageTerminalError("Unable to initialize store", e);
 		}
 	}
+    
+    private void setAllocations(final FileMetadata fileMetadata) throws IOException {
+        final String buckets = fileMetadata.getProperty(
+                Options.RW_ALLOCATIONS, null/* default */);
+		if (buckets == null) {				
+			m_allocSizes = DEFAULT_ALLOC_SIZES;
+		} else {
+			final String[] specs = buckets.split(",");
+			m_allocSizes = new int[specs.length];
+			int prevSize = 0;
+			for (int i = 0; i < specs.length; i++) {
+				final int nxtSize = Integer.parseInt(specs[i]);
+				if (nxtSize <= prevSize)
+					throw new IllegalArgumentException("Invalid AllocSizes property");
+				m_allocSizes[i] = nxtSize;
+				prevSize = nxtSize;
+			}
+		}
+    }
+    
+	private void defaultInit() throws IOException {
+		final int numFixed = m_allocSizes.length;
+
+		m_freeFixed = new ArrayList[numFixed];
+
+		for (int i = 0; i < numFixed; i++) {
+			m_freeFixed[i] = new ArrayList<FixedAllocator>();
+		}
+
+		m_fileSize = convertFromAddr(m_fd.length());
+		
+		// make space for meta-allocators
+		m_metaBits[0] = -1;
+		m_metaTransientBits[0] = -1;
+		m_nextAllocation = -(1 + META_ALLOCATION); // keep on a minimum 8K boundary
+		
+		if (m_fileSize > m_nextAllocation) {
+			m_fileSize = m_nextAllocation;
+		}
+		
+		m_reopener.raf.setLength(convertAddr(m_fileSize));
+
+    }
 
     public boolean isOpen() {
         return m_open;
@@ -643,83 +651,89 @@ public class RWStore implements IStore {
 		// m_rb = m_fmv.getRootBlock();
 		assert(m_rb != null);
 
-//		m_commitCounter = m_rb.getCommitCounter();
-
-		final long nxtOffset = m_rb.getNextOffset();
-		m_nextAllocation = -(int) (nxtOffset >> 32);
-
-		m_metaBitsAddr = -(int) nxtOffset;
-		
-		if (log.isInfoEnabled()) {
-			log.info("MetaBitsAddr: " + m_metaBitsAddr);
-		}
-
-		final long metaAddr = m_rb.getMetaStartAddr();
-		m_fileSize = (int) -(metaAddr & 0xFFFFFFFF);
-
-		long rawmbaddr = m_rb.getMetaBitsAddr();
-		
-        /*
-         * Take bottom 16 bits (even 1K of metabits is more than sufficient)
-         */
-		final int metaBitsStore = (int) (rawmbaddr & 0xFFFF);
-		
-		if (metaBitsStore > 0) {
-			rawmbaddr >>= 16;
-	
-			// RWStore now restore metabits
-			final byte[] buf = new byte[metaBitsStore * 4];
-
-			FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(buf), rawmbaddr);
-	
-			final DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
+		if (m_rb.getNextOffset() == 0) {
+			defaultInit();
+		} else {		
+			final long nxtOffset = m_rb.getNextOffset();
+			m_nextAllocation = -(int) (nxtOffset >> 32);
 			
-			m_lastDeferredReleaseTime = strBuf.readLong();
-			
-			final int allocBlocks = strBuf.readInt();
-			m_allocSizes = new int[allocBlocks];
-			for (int i = 0; i < allocBlocks; i++) {
-				m_allocSizes[i] = strBuf.readInt();
+			if (m_nextAllocation == 0) {
+				m_nextAllocation = -(1 + META_ALLOCATION);
 			}
-			m_metaBitsSize = metaBitsStore - allocBlocks - 3; // allow for deferred free
-			m_metaBits = new int[m_metaBitsSize];
+	
+			m_metaBitsAddr = -(int) nxtOffset;
+			
 			if (log.isInfoEnabled()) {
-				log.info("Raw MetaBitsAddr: " + rawmbaddr);
+				log.info("MetaBitsAddr: " + m_metaBitsAddr);
 			}
-			for (int i = 0; i < m_metaBitsSize; i++) {
-				m_metaBits[i] = strBuf.readInt();
-			}
-			m_metaTransientBits = (int[]) m_metaBits.clone();
 	
-			final int numFixed = m_allocSizes.length;
-
-			m_freeFixed = new ArrayList[numFixed];
-
-			for (int i = 0; i < numFixed; i++) {
-				m_freeFixed[i] = new ArrayList<FixedAllocator>();
-			}
-
-			checkCoreAllocations();
+			final long metaAddr = m_rb.getMetaStartAddr();
+			m_fileSize = (int) -(metaAddr & 0xFFFFFFFF);
 	
-			readAllocationBlocks();
+			long rawmbaddr = m_rb.getMetaBitsAddr();
 			
-			// clearOutstandingDeferrels(deferredFreeListAddr, deferredFreeListEntries);
-
-			if (log.isTraceEnabled()) {
-				final StringBuilder str = new StringBuilder();
-				this.showAllocators(str);
-				log.trace(str);
-			}
+	        /*
+	         * Take bottom 16 bits (even 1K of metabits is more than sufficient)
+	         */
+			final int metaBitsStore = (int) (rawmbaddr & 0xFFFF);
 			
-			if (physicalAddress(m_metaBitsAddr) == 0) {
-				throw new IllegalStateException("Free/Invalid metaBitsAddr on load");
-			}
-
-		}
+			if (metaBitsStore > 0) {
+				rawmbaddr >>= 16;
 		
-		if (log.isInfoEnabled())
-			log.info("restored from RootBlock: " + m_nextAllocation 
-					+ ", " + m_metaBitsAddr);
+				// RWStore now restore metabits
+				final byte[] buf = new byte[metaBitsStore * 4];
+	
+				FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(buf), rawmbaddr);
+		
+				final DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
+				
+				m_lastDeferredReleaseTime = strBuf.readLong();
+				
+				final int allocBlocks = strBuf.readInt();
+				m_allocSizes = new int[allocBlocks];
+				for (int i = 0; i < allocBlocks; i++) {
+					m_allocSizes[i] = strBuf.readInt();
+				}
+				m_metaBitsSize = metaBitsStore - allocBlocks - 3; // allow for deferred free
+				m_metaBits = new int[m_metaBitsSize];
+				if (log.isInfoEnabled()) {
+					log.info("Raw MetaBitsAddr: " + rawmbaddr);
+				}
+				for (int i = 0; i < m_metaBitsSize; i++) {
+					m_metaBits[i] = strBuf.readInt();
+				}
+				m_metaTransientBits = (int[]) m_metaBits.clone();
+		
+				final int numFixed = m_allocSizes.length;
+	
+				m_freeFixed = new ArrayList[numFixed];
+	
+				for (int i = 0; i < numFixed; i++) {
+					m_freeFixed[i] = new ArrayList<FixedAllocator>();
+				}
+	
+				checkCoreAllocations();
+		
+				readAllocationBlocks();
+				
+				// clearOutstandingDeferrels(deferredFreeListAddr, deferredFreeListEntries);
+	
+				if (log.isTraceEnabled()) {
+					final StringBuilder str = new StringBuilder();
+					this.showAllocators(str);
+					log.trace(str);
+				}
+				
+				if (physicalAddress(m_metaBitsAddr) == 0) {
+					throw new IllegalStateException("Free/Invalid metaBitsAddr on load");
+				}
+	
+			}
+			
+			if (log.isInfoEnabled())
+				log.info("restored from RootBlock: " + m_nextAllocation 
+						+ ", " + m_metaBitsAddr);
+		}
 	}
 
 //	/*
@@ -3281,6 +3295,7 @@ public class RWStore implements IStore {
         return tmp;
 
     }
+
 
     /**
      * Striped performance counters for {@link IRawStore} access, including
