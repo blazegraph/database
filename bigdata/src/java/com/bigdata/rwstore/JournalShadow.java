@@ -109,7 +109,7 @@ public class JournalShadow extends JournalDelegate implements IAllocationContext
      * @return The shadowed journal if necessary and otherwise the
      *         <i>journal</i>.
      */
-    public static IJournal newShadow(AbstractJournal journal) {
+    public static IJournal newShadow(final AbstractJournal journal) {
 
         if (journal.getBufferStrategy() instanceof RWStrategy) {
         
