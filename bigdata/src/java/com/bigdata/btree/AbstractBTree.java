@@ -3393,11 +3393,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          * block if the fence post was fixed.
          */
 
-        synchronized (this) {
+//        synchronized (this) {
 
             doTouch(node);
 
-        }
+//        }
 
     }
     
