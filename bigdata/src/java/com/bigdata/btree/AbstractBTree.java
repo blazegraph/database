@@ -3391,13 +3391,15 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          * @todo Actually, I think that this is just a fence post in ringbuffer
          * beforeOffer() method and the code might work without the synchronized
          * block if the fence post was fixed.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/201
          */
 
-//        synchronized (this) {
+        synchronized (this) {
 
             doTouch(node);
 
-//        }
+        }
 
     }
     
