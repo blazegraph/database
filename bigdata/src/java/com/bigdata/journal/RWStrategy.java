@@ -40,6 +40,7 @@ import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.JournalShadow;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.rwstore.RWStore.StoreCounters;
 import com.bigdata.util.ChecksumError;
@@ -175,6 +176,15 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	    
 	}
 
+    /**
+     * Overridden to integrate with the shadow allocator support of the
+     * {@link RWStore}. Shadow allocators may be used to isolate allocation
+     * changes (both allocating slots and releasing slots) across different
+     * processes.  
+     * 
+     * @see JournalShadow
+     */
+	@Override
 	public long write(final ByteBuffer data, final IAllocationContext context) {
 
         if (data == null)
