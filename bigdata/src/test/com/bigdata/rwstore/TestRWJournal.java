@@ -756,9 +756,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 long startAllocations = rw.getTotalAllocationsSize();
                 int startBlob = 1024 * 256;
                 int endBlob = 1024 * 1256;
-                int[] faddrs = allocBatchBuffer(rw, 500, startBlob, endBlob);
+                int[] faddrs = allocBatchBuffer(rw, 100, startBlob, endBlob);
                 
-                System.out.println("Final allocation: " + rw.physicalAddress(faddrs[499])
+                System.out.println("Final allocation: " + rw.physicalAddress(faddrs[99])
                 		+ ", allocations: " + (rw.getTotalAllocations() - numAllocs)
                 		+ ", allocated bytes: " + (rw.getTotalAllocationsSize() - startAllocations));
             } finally {
@@ -1036,7 +1036,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 //            long realAddr = 0;
             try {
             	// allocBatch(store, 1, 32, 650, 100000000);
-            	allocBatch(store, 1, 32, 650, 5000000);
+            	allocBatch(store, 1, 32, 650, 50000);
             	store.commit();
 				System.out.println("Final allocations: " + rw.getTotalAllocations()
 						+ ", allocated bytes: " + rw.getTotalAllocationsSize() + ", file length: "
