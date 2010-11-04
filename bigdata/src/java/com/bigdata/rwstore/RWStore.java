@@ -3853,6 +3853,8 @@ public class RWStore implements IStore {
 
     /**
      * Return interesting information about the write cache and file operations.
+     * 
+     * @todo allocations data? user extent allocated? user extent used? etc.
      */
     public CounterSet getCounters() {
 
