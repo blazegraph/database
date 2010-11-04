@@ -69,6 +69,8 @@ import com.bigdata.util.ChecksumError;
  * the WORM store such as the metabits info. In addition, some of the root block
  * fields defined by the WORM store are not used by the {@link RWStore}.
  * 
+ * @see RWStore.Options
+ * 
  * @author Martyn Cutcher
  */
 public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHABufferStrategy {

@@ -246,7 +246,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
             properties.setProperty(Options.CREATE_TEMP_FILE, "true");
             
             // properties.setProperty(Options.FILE, "/Volumes/SSDData/TestRW/tmp.rw");
-            properties.setProperty(Options.RW_ALLOCATIONS, "1,2,3,5,8,12,16,32,48,64,128,192,320,512,832,1344,2176,3520");
+//            properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,5,8,12,16,32,48,64,128,192,320,512,832,1344,2176,3520");
             // properties.setProperty(Options.RW_ALLOCATIONS, "1,2,3,5,8,12,16,32,48,64");
 
             properties.setProperty(Options.DELETE_ON_EXIT, "true");
