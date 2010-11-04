@@ -138,6 +138,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
      */
     public void test_create_disk01() throws IOException {
 
+        File file = null;
+
         final Properties properties = getProperties();
 
         final Journal journal = new Journal(properties);
@@ -161,12 +163,17 @@ public class TestRWJournal extends AbstractJournalTestCase {
             assertEquals(Options.BUFFER_MODE, BufferMode.DiskRW, bufferStrategy
                     .getBufferMode());
 
+            file = journal.getFile();
+            
         } finally {
 
             journal.destroy();
 
         }
 
+        if(file != null && file.exists())
+            fail("Did not delete the backing file: "+file);
+        
     }
     
     /**

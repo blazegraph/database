@@ -33,6 +33,7 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.journal.WORMStrategy.StoreCounters;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.quorum.Quorum;
@@ -42,22 +43,30 @@ import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.RWStore;
 
 /**
- * The hook that accesses the RWStore to provide read/write services as opposed
- * to the WORM characteristics of the DiskOnlyStrategy AddressManager.
+ * A highly scalable persistent {@link IBufferStrategy} wrapping the
+ * {@link RWStore} which may be used as the backing store for a {@link Journal}.
+ * <p>
+ * The {@link RWStore} manages allocation slots. This can translate into an
+ * enormous space savings on the disk for large data sets (when compared to the
+ * WORM) since old revisions of B+Tree nodes and leaves may be recycled
+ * efficiently.
  * 
- * The intent behind this approach is to try to manage the protocol differences
- * between the IStore implementation, assumed as a backing service to the CTC
- * ObjectManager, and an IBufferStrategy service for a BigData Journal.
+ * <h2>History</h2>
  * 
- * The most fundamental difference is with the root data, with RootBlock
- * including both low-level store data - such as metabits info - and higher
- * level, journal maintained data.
+ * The {@link RWStrategy} supports access to historical commit states in
+ * combination with the history retention policy of the
+ * {@link ITransactionService}.
+ * 
+ * <h2>Compatibility</h2>
+ * 
+ * The {@link RWStore} uses a distinct binary layout on the disk based which is
+ * not directly compatible with the WORM binary storage layer. The WORM and the
+ * {@link RWStore} uses the same file header and root blocks. However, the
+ * {@link RWStore} defines some fields in the root blocks which are not used by
+ * the WORM store such as the metabits info. In addition, some of the root block
+ * fields defined by the WORM store are not used by the {@link RWStore}.
  * 
  * @author Martyn Cutcher
- * 
- *       FIXME Review life cycle state changes and refusal of methods when the
- *       backing store is closed. m_open should probably be moved into RWStore
- *       which could then expose an isOpen() method to be used by this class.
  */
 public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHABufferStrategy {
 
@@ -76,11 +85,6 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	private final UUID m_uuid;
 
 	/**
-	 * <code>true</code> iff the backing store is open.
-	 */
-	private volatile boolean m_open = false;
-
-	/**
 	 * The size of the backing file when it was opened by the constructor.
 	 */
     final private long m_initialExtent;
@@ -96,25 +100,23 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	    
 		m_store = new RWStore(fileMetadata, quorum); 
 		
-		m_open = true;
-				
 		m_initialExtent = fileMetadata.file.length();
 	
 	}
 
     public ByteBuffer readRootBlock(final boolean rootBlock0) {
 
-        if (!isOpen())
-            throw new IllegalStateException();
-
         return m_store.readRootBlock(rootBlock0);
 
 	}
 
+    /*
+     * FIXME This does not handle the read-from-peer HA integration. See
+     * WORMStrategy#read().
+     * 
+     * FIXME This does not update the StoreCounters.
+     */
 	public ByteBuffer read(final long addr) {
-		
-        if (!isOpen())
-            throw new IllegalStateException();
 		
 		final int rwaddr = decodeAddr(addr);		
 		final int sze = decodeSize(addr);
@@ -237,15 +239,9 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	    
 	}
 
-    /**
-     * @todo Define and implement support for counters. The pattern for this
-     *       method is to always return a new object so it may be attached to
-     *       various points in hierarchies belonging to the caller.  See the
-     *       {@link WORMStrategy} for examples.
-     */
 	public CounterSet getCounters() {
 
-	    return new CounterSet();
+	    return m_store.getStoreCounters().getCounters();
 	    
 	}
 
@@ -317,21 +313,26 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
 	}
 
-	/**
-	 * Set close time in rootBlock, and close file
-	 */
+    private void assertOpen() {
+
+        if (!m_store.isOpen())
+            throw new IllegalStateException();
+        
+    }
+    
 	public void close() {
-		if (!m_open) {
-			throw new IllegalStateException();
-		}
+	    
+	    // throw exception if open per the API.
+	    assertOpen();
+	    
 		m_store.close();
-        m_open = false;
+		
 	}
 
     public void deleteResources() {
 
-        if (m_open)
-            throw new IllegalArgumentException();
+        if (m_store.isOpen())
+            throw new IllegalStateException();
 
         final File file = m_store.getStoreFile();
 
@@ -339,6 +340,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
             if (!file.delete()) {
 
+//                throw new RuntimeException("Unable to delete file: " + file);
                 log.warn("Unable to delete file: " + file);
 
             }
@@ -349,9 +351,10 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
 	public void destroy() {
 
+	    // close w/o exception throw.
 	    m_store.close();
-        m_open = false;
 
+	    // delete the backing store.
 		deleteResources();
 		
 	}
@@ -417,7 +420,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
 	public boolean isOpen() {
 
-	    return m_open;
+	    return m_store.isOpen();
 	    
 	}
 
@@ -439,7 +442,9 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 * This implementation returns the amount of utilized storage.
 	 */
 	public long size() {
-		return m_store.getFileStorage();
+
+	    return m_store.getFileStorage();
+	    
 	}
 
     /*
