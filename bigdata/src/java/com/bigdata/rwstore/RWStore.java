@@ -202,42 +202,33 @@ public class RWStore implements IStore {
      */
     public interface Options {
 
-        /**
-         * Option defines the Allocation block sizes for the RWStore. The values
-         * defined are multiplied by 64 to provide the actual allocations. The
-         * list of allocations should be ',' delimited and in increasing order.
-         * For example,
-         * 
-         * <pre>
-         * &quot;1,2,4,8,116,32,64&quot;
-         * </pre>
-         * 
-         * defines allocations from 64 to 4K in size. The default allocations
-         * are:
-         * 
-         * <pre>
-         * &quot;1,2,3,5,8,12,16,32,48,64,128,192,320,512,832,1344,2176,3520&quot;
-         * </pre>
-         * 
-         * providing blocks up to 220K aligned on 4K boundaries as soon as
-         * possible to optimize IO - particularly relevant for SSDs.
-         * 
-         * @see #DEFAULT_ALLOCATION_SIZES
-         */
+		/**
+		 * Option defines the Allocation block sizes for the RWStore. The values
+		 * defined are multiplied by 64 to provide the actual allocations. The
+		 * list of allocations should be ',' delimited and in increasing order.
+		 * This array is written into the store so changing the values does not
+		 * break older stores. For example,
+		 * 
+		 * <pre>
+		 * &quot;1,2,4,8,116,32,64&quot;
+		 * </pre>
+		 * 
+		 * defines allocations from 64 to 4K in size. It is a good to define
+		 * block sizes on 4K boundaries as soon as possible to optimize IO. This
+		 * is particularly relevant for SSDs. A 1K boundary is expressed as
+		 * <code>16</code> in the allocation sizes, so a 4K boundary is
+		 * expressed as <code>64</code> and an 8k boundary as <code>128</code>.
+		 * <p>
+		 * The default allocations are {@value #DEFAULT_ALLOCATION_SIZES}.
+		 * 
+		 * @see #DEFAULT_ALLOCATION_SIZES
+		 */
         String ALLOCATION_SIZES = RWStore.class.getName() + ".allocationSizes";
 
         /**
-         * The sizes of the slots managed by a {@link FixedAllocator} are 64 times
-         * the values in this array. This array is written into the store so
-         * changing the values does not break older stores. This array is
-         * configurable using {@link com.bigdata.journal.Options#ALLOCATION_SIZES}.
-         * <p>
-         * Note: It is good to have 4k and 8k boundaries for better efficiency on
-         * SSD. A 1K boundary is expressed as <code>16</code> in the allocation
-         * sizes, so a 4K boundary is expressed as <code>64</code>. The default
-         * series of allocation sizes is based on the Fibonacci sequence, but is
-         * pegged to the closest 4K boundary for values larger than 4k.
+         * @see #ALLOCATION_SIZES
          */
+        //String DEFAULT_ALLOCATION_SIZES = "1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128";
         String DEFAULT_ALLOCATION_SIZES = "1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128, 192, 320, 512, 832, 1344, 2176, 3520";
         // private static final int[] DEFAULT_ALLOC_SIZES = { 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181 };
         // private static final int[] ALLOC_SIZES = { 1, 2, 4, 8, 16, 32, 64, 128 };
