@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.rwstore.RWStore.AllocationStats;
 import com.bigdata.util.ChecksumUtility;
 
@@ -27,17 +29,21 @@ import com.bigdata.util.ChecksumUtility;
  *
  */
 public class BlobAllocator implements Allocator {
-	int[] m_hdrs = new int[254];
-	RWStore m_store;
+	
+    private static final transient Logger log = Logger.getLogger(BlobAllocator.class);
+
+	final private int[] m_hdrs = new int[254];
+	final private RWStore m_store;
 	private int m_diskAddr;
 	private int m_index;
 	private int m_sortAddr;
 	
-	public BlobAllocator(RWStore store, int sortAddr) {
+	public BlobAllocator(final RWStore store, final int sortAddr) {
 		m_store = store;
 		m_sortAddr = sortAddr;
 		
-		System.out.println("New BlobAllocator");
+		if (log.isInfoEnabled())
+			log.info("New BlobAllocator");
 	}
 	
 	public void addAddresses(ArrayList addrs) {
