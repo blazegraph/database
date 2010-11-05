@@ -2612,13 +2612,38 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         
     }
 
-	public long write(ByteBuffer data, final long oldAddr, IAllocationContext context) {
-        return ((RWStrategy)_bufferStrategy).write(data, oldAddr, context);
-	}
+    public long write(final ByteBuffer data, final long oldAddr,
+            final IAllocationContext context) {
 
-	public long write(ByteBuffer data, IAllocationContext context) {
-        return ((RWStrategy)_bufferStrategy).write(data, context);
-	}
+        assertCanWrite();
+
+        if (_bufferStrategy instanceof RWStrategy) {
+
+            return ((RWStrategy) _bufferStrategy).write(data, oldAddr, context);
+
+        } else {
+
+            return _bufferStrategy.write(data, oldAddr);
+
+        }
+
+    }
+
+    public long write(final ByteBuffer data, final IAllocationContext context) {
+
+        assertCanWrite();
+
+        if (_bufferStrategy instanceof RWStrategy) {
+
+            return ((RWStrategy) _bufferStrategy).write(data, context);
+            
+        } else {
+
+            return _bufferStrategy.write(data);
+
+        }
+        
+    }
 
 	// Note: NOP for WORM. Used by RW for eventual recycle protocol.
     public void delete(final long addr) {
@@ -2629,17 +2654,31 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     }
 
-    public void delete(final long addr, IAllocationContext context) {
+    public void delete(final long addr, final IAllocationContext context) {
 
         assertCanWrite();
 
-        ((RWStrategy) _bufferStrategy).delete(addr, context);
+        if(_bufferStrategy instanceof RWStrategy) {
+        
+            ((RWStrategy) _bufferStrategy).delete(addr, context);
+            
+        } else {
+            
+            _bufferStrategy.delete(addr);
+            
+        }
 
     }
     
     public void detachContext(final IAllocationContext context) {
         
-        ((RWStrategy) _bufferStrategy).detachContext(context);
+        assertCanWrite();
+
+        if(_bufferStrategy instanceof RWStrategy) {
+
+            ((RWStrategy) _bufferStrategy).detachContext(context);
+            
+        }
     	
     }
 

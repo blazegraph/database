@@ -38,7 +38,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.relation.locator.IResourceLocator;
-import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.sparse.SparseRowStore;
 
 public class JournalDelegate implements IJournal {

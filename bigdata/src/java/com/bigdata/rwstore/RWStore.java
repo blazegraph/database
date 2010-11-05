@@ -3228,8 +3228,15 @@ public class RWStore implements IStore {
         
             ret = new ContextAllocation(this, m_freeFixed.length, null, context);
 
-            m_contexts.put(context, ret);
+            if (m_contexts.put(context, ret) != null) {
+                
+                throw new AssertionError();
+                
+            }
         
+//            log.warn("Context: ncontexts=" + m_contexts.size() + ", context="
+//                    + context);
+            
         }
 
         return ret;
