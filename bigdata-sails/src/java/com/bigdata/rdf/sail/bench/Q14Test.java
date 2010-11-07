@@ -116,6 +116,11 @@ public class Q14Test {
 
 			/*
 			 * Open the sail and run Q14.
+			 * 
+			 * @todo It would be interesting to run this using a lexicon join.
+			 * Also, given the changes in the various defaults which were
+			 * recently made, it is worth while to again explore the parameter
+			 * space for this query.
 			 */
 			if(true){
 				final BigdataSail sail = new BigdataSail(database);
