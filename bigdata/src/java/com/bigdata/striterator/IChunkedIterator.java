@@ -59,7 +59,7 @@ public interface IChunkedIterator<E> extends ICloseableIterator<E> {
     /**
      * The default chunk size.
      */
-    int DEFAULT_CHUNK_SIZE = 10000;
+    int DEFAULT_CHUNK_SIZE = 100;//was 10000;
     
     /**
      * The next element available from the iterator.

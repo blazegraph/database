@@ -33,6 +33,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
@@ -1027,7 +1028,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
          * once the elements were materialized on the client.
          */
         final BlockingBuffer<R[]> buffer = new BlockingBuffer<R[]>(
-                chunkOfChunksCapacity);
+                chunkOfChunksCapacity,chunkCapacity,10,TimeUnit.MILLISECONDS);
 
         final ExecutorService executorService = indexManager
                 .getExecutorService();

@@ -90,7 +90,9 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
             final long nodesWritten = btreeCounters.getNodesWritten();
             final long leavesWritten = btreeCounters.getLeavesWritten();
             final long bytesWritten = btreeCounters.getBytesWritten();
-            final long bytesPerRecord = bytesWritten/(nodesWritten+leavesWritten);
+			final long totalWritten = (nodesWritten + leavesWritten);
+			final long bytesPerRecord = totalWritten == 0 ? 0 : bytesWritten
+					/ (nodesWritten + leavesWritten);
 
 			sb.append((first ? "" : ", ") + fqn + "{nodes=" + nodesWritten
 					+ ",leaves=" + leavesWritten + ", bytes=" + bytesWritten

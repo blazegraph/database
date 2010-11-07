@@ -167,12 +167,14 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * The default capacity for the internal {@link Queue} on which elements (or
      * chunks of elements) are buffered.
      */
-    public static transient final int DEFAULT_PRODUCER_QUEUE_CAPACITY = 5000;
+//    public static transient final int DEFAULT_PRODUCER_QUEUE_CAPACITY = 5000;
+    public static transient final int DEFAULT_PRODUCER_QUEUE_CAPACITY = 10; // was 5000
 
     /**
      * The default minimum chunk size for the chunk combiner.
      */
-    public static transient final int DEFAULT_MINIMUM_CHUNK_SIZE = 10000;
+//    public static transient final int DEFAULT_MINIMUM_CHUNK_SIZE = 10000;
+    public static transient final int DEFAULT_MINIMUM_CHUNK_SIZE = 100; // was 10000
 
     /**
      * The default timeout in milliseconds during which chunks of elements may
@@ -381,7 +383,12 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             final int minimumChunkSize, final long chunkTimeout,
             final TimeUnit chunkTimeoutUnit, final boolean ordered) {
     
-        if (queue == null)
+		if (minimumChunkSize >= 1000 || queue.remainingCapacity() >= 1000)
+			log.fatal(new RuntimeException("queueCapacity="
+					+ queue.remainingCapacity() + ", minimumChunkSize="
+					+ minimumChunkSize));
+    	
+		if (queue == null)
             throw new IllegalArgumentException();
 
         if (minimumChunkSize < 0) {
