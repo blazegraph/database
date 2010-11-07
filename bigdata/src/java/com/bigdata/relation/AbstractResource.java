@@ -222,7 +222,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
         /**
          * Default for {@link #CHUNK_OF_CHUNKS_CAPACITY} 
          */
-        String DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = "1000";
+        String DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = "10"; // was 1000
 
         /**
          * <p>
@@ -275,7 +275,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * 
          * @todo figure out how good this value is.
          */
-        String DEFAULT_FULLY_BUFFERED_READ_THRESHOLD = ""+20*Bytes.kilobyte32;
+        String DEFAULT_FULLY_BUFFERED_READ_THRESHOLD = "200";//""+20*Bytes.kilobyte32;
 
         /**
          * When <code>true</code> ({@value #DEFAULT_FORCE_SERIAL_EXECUTION}),
