@@ -308,6 +308,12 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 		 *       Taking a clustered sample really requires knowing where the
 		 *       leaf boundaries are in the index, e.g., using
 		 *       {@link ILeafCursor}.
+		 * 
+		 * @todo Rather than evenly spaced samples, we should be taking a random
+		 *       sample. This could be achieved using a random initial offset
+		 *       and random increment as long as the initial offset was in the
+		 *       range of a single increment and we compute the increment such
+		 *       that N+1 intervals exist.
 		 */
 		@Override
 		protected void advance(final ITuple<E> tuple) {
