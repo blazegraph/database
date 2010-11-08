@@ -145,6 +145,8 @@ public class PSOutputStream extends OutputStream {
 	private PSOutputStream m_next = null;
 
 	private int m_blobHdrIdx;
+
+	private boolean m_writingHdr = false;
 	
 	private PSOutputStream next() {
 		return m_next;
@@ -162,8 +164,12 @@ public class PSOutputStream extends OutputStream {
 		m_context = context;
 
 		m_blobThreshold = maxAlloc-4; // allow for checksum
-		if (m_buf == null || m_buf.length != m_blobThreshold)
-			m_buf = new byte[m_blobThreshold];
+		
+		final int maxHdrSize = RWStore.BLOB_FIXED_ALLOCS * 4;
+		final int bufSize = m_blobThreshold > maxHdrSize ? m_blobThreshold : maxHdrSize;
+		
+		if (m_buf == null || m_buf.length != bufSize)
+			m_buf = new byte[bufSize];
 
 		reset();
 	}
@@ -199,9 +205,9 @@ public class PSOutputStream extends OutputStream {
   		throw new IllegalStateException("Writing to saved PSOutputStream");
   	}
   	
-  	if (m_count == m_blobThreshold) {
+  	if (m_count == m_blobThreshold && !m_writingHdr) {
   		if (m_blobHeader == null) {
-  			m_blobHeader = new int[RWStore.BLOB_FIXED_ALLOCS];
+  			m_blobHeader = new int[RWStore.BLOB_FIXED_ALLOCS]; // max 16K
   			m_blobHdrIdx = 0;
   		}
   		
@@ -305,27 +311,32 @@ public class PSOutputStream extends OutputStream {
   	int addr = (int) m_store.alloc(m_buf, m_count, m_context);
   	
   	if (m_blobHeader != null) {
-  		m_blobHeader[m_blobHdrIdx++] = addr;
-  		int precount = m_count;
-  		m_count = 0;
-		try {
-	  		writeInt(m_blobHdrIdx);
-	  		for (int i = 0; i < m_blobHdrIdx; i++) {
-					writeInt(m_blobHeader[i]);
-	 		}
-	  		addr = (int) m_store.alloc(m_buf, m_count, m_context);
-	  		
-	  		if (m_blobHdrIdx != ((m_blobThreshold - 1 + m_bytesWritten - m_count)/m_blobThreshold)) {	  		
-	  			throw new IllegalStateException("PSOutputStream.save at : " + addr + ", bytes: "+ m_bytesWritten + ", blocks: " + m_blobHdrIdx + ", last alloc: " + precount);
-	  		}
-	  		
-	  		if (log.isDebugEnabled())
-	  			log.debug("Writing BlobHdrIdx with " + m_blobHdrIdx + " allocations");
-	  		
-	  		addr = m_store.registerBlob(addr); // returns handle
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+  		try {
+  			m_writingHdr  = true; // ensure that header CAN be a BLOB
+	  		m_blobHeader[m_blobHdrIdx++] = addr;
+	  		int precount = m_count;
+	  		m_count = 0;
+			try {
+		  		writeInt(m_blobHdrIdx);
+		  		for (int i = 0; i < m_blobHdrIdx; i++) {
+						writeInt(m_blobHeader[i]);
+		 		}
+		  		addr = (int) m_store.alloc(m_buf, m_count, m_context);
+		  		
+		  		if (m_blobHdrIdx != ((m_blobThreshold - 1 + m_bytesWritten - m_count)/m_blobThreshold)) {	  		
+		  			throw new IllegalStateException("PSOutputStream.save at : " + addr + ", bytes: "+ m_bytesWritten + ", blocks: " + m_blobHdrIdx + ", last alloc: " + precount);
+		  		}
+		  		
+		  		if (log.isDebugEnabled())
+		  			log.debug("Writing BlobHdrIdx with " + m_blobHdrIdx + " allocations");
+		  		
+		  		addr = m_store.registerBlob(addr); // returns handle
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+  		} finally {
+  			m_writingHdr = false;
+  		}
    	}
   
   	m_isSaved = true;
