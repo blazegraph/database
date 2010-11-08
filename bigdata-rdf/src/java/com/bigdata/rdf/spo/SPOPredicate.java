@@ -41,6 +41,10 @@ import com.bigdata.relation.rule.IAccessPathExpander;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * 
+ * @todo Remove reliance on the {@link SPOPredicate}. It only adds the s(), p(),
+ *       o(), and c() methods.
  */
 public class SPOPredicate extends Predicate<ISPO> {
 

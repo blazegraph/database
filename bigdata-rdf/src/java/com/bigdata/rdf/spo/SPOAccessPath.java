@@ -132,6 +132,8 @@ public class SPOAccessPath extends AccessPath<ISPO> {
      * Strengthened return type.
      * <p>
      * {@inheritDoc}
+     * 
+     * @todo Remove reliance on the {@link SPOPredicate}. It only adds the s(), p(), o(), and c() methods. 
      */
     @Override
     public SPOPredicate getPredicate() {
