@@ -1373,7 +1373,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                 ));
                         
                 /*
-                 * Create the BTree to aborb writes for the target index
+                 * Create the BTree to absorb writes for the target index
                  * partition. The metadata for this BTree was configured above
                  * and is associated with a view that captures all data received
                  * from the source index partition.
