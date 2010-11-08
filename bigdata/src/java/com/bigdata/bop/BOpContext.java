@@ -261,9 +261,11 @@ public class BOpContext<E> extends BOpContextBase {
      *            The predicate.
      * @param bindingSet
      *            The binding set, which is modified as a side-effect.
+     *            
+     *            @todo move to {@link BOpUtility}?
      */
     @SuppressWarnings("unchecked")
-    final private void copyValues(final IElement e, final IPredicate<?> pred,
+    static public void copyValues(final IElement e, final IPredicate<?> pred,
             final IBindingSet bindingSet) {
 
         for (int i = 0; i < pred.arity(); i++) {

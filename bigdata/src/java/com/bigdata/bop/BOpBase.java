@@ -394,7 +394,8 @@ public class BOpBase implements BOp {
         final Object tmp = annotations.get(name);
 
         if (tmp == null)
-            throw new IllegalStateException("Required property: " + name);
+			throw new IllegalStateException("Required property: " + name
+					+ " : " + this);
 
         return tmp;
         
