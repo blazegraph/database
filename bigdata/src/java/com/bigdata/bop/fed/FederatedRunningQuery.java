@@ -288,9 +288,9 @@ public class FederatedRunningQuery extends RunningQuery {
      * {@inheritDoc}
      */
     @Override
-    protected void acceptChunk(final IChunkMessage<IBindingSet> msg) {
+    protected boolean acceptChunk(final IChunkMessage<IBindingSet> msg) {
 
-        super.acceptChunk(msg);
+        return super.acceptChunk(msg);
         
     }
 

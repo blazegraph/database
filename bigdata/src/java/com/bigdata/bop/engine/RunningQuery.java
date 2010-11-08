@@ -1076,15 +1076,17 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 //        }
 //    }
 
-    /**
-     * Make a chunk of binding sets available for consumption by the query.
-     * <p>
-     * Note: this is invoked by {@link QueryEngine#acceptChunk(IChunkMessage)}
-     * 
-     * @param msg
-     *            The chunk.
-     */
-    protected void acceptChunk(final IChunkMessage<IBindingSet> msg) {
+	/**
+	 * Make a chunk of binding sets available for consumption by the query.
+	 * <p>
+	 * Note: this is invoked by {@link QueryEngine#acceptChunk(IChunkMessage)}
+	 * 
+	 * @param msg
+	 *            The chunk.
+	 * 
+	 * @return <code>true</code> if the message was accepted.
+	 */
+    protected boolean acceptChunk(final IChunkMessage<IBindingSet> msg) {
 
         if (msg == null)
             throw new IllegalArgumentException();
@@ -1099,9 +1101,11 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
         try {
 
-            // verify still running.
-            if (future.isDone())
-                throw new RuntimeException(ERR_QUERY_DONE, future.getCause());
+            if (future.isDone()) {
+            	// The query is no longer running.
+            	return false;
+                //throw new RuntimeException(ERR_QUERY_DONE, future.getCause());
+            }
 
             BlockingQueue<IChunkMessage<IBindingSet>> queue = operatorQueues
                     .get(bundle);
@@ -1116,6 +1120,8 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
             queue.add(msg);
 
+            return true;
+            
         } finally {
 
             lock.unlock();
@@ -2092,8 +2098,9 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
         try {
 
-            log.error(toString(), t);
-
+            if (!InnerCause.isInnerCause(t, InterruptedException.class))
+            	log.error(toString(), t);
+            
             try {
 
                 // signal error condition.
