@@ -358,7 +358,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         /*
          * Note: getIndex() sets the listener on the BTree. That listener is
-         * reponsible for putting dirty indices onto the commit list.
+         * responsible for putting dirty indices onto the commit list.
          */
         commitList = new ConcurrentHashMap<String,DirtyListener>(resource.length);
         
@@ -1256,7 +1256,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                      * which the operation isolated by that transaction has
                      * requested. Transaction commits are placed into a partial
                      * order to avoid deadlocks where that ordered is determined
-                     * by sorting the resources declared by the tx througout its
+                     * by sorting the resources declared by the tx throughout its
                      * life cycle and the obtaining locks on all of those
                      * resources (in the distributed transaction service) before
                      * the commit may start. This is very similar to how we
