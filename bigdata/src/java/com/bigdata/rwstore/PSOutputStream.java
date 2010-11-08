@@ -24,12 +24,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore;
 
-import java.io.OutputStream;
-import java.io.ObjectOutputStream;
 import java.io.FilterOutputStream;
-import java.io.InputStream;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 import org.apache.log4j.Logger;
 
@@ -70,20 +68,21 @@ import org.apache.log4j.Logger;
  * To this end, the output stream has a fixed buffer size, and they are recycled
  *	from a pool of output streams.
  *
- * It is ** important **  that output streams are bound to the IStore they
+ * It is <em>important</em>  that output streams are bound to the IStore they
  *	are requested for.
  **/
 public class PSOutputStream extends OutputStream {
-    protected static final Logger log = Logger.getLogger(FixedAllocator.class);
+    
+    private static final Logger log = Logger.getLogger(FixedAllocator.class);
 
-	protected static java.util.logging.Logger cat = java.util.logging.Logger.getLogger(PSOutputStream.class.getName());
+//	protected static java.util.logging.Logger cat = java.util.logging.Logger.getLogger(PSOutputStream.class.getName());
 
-	static PSOutputStream m_poolHead = null;
-	static PSOutputStream m_poolTail = null;
-	static Integer m_lock = new Integer(42);
-	static int m_streamCount = 0;
+	private static PSOutputStream m_poolHead = null;
+	private static PSOutputStream m_poolTail = null;
+	private static Integer m_lock = new Integer(42);
+	private static int m_streamCount = 0;
 	
-	public static PSOutputStream getNew(IStore store, int maxAlloc, IAllocationContext context) {
+	public static PSOutputStream getNew(final IStore store, final int maxAlloc, final IAllocationContext context) {
 		synchronized (m_lock) {
 			PSOutputStream ret = m_poolHead;
 			if (ret != null) {
@@ -107,8 +106,8 @@ public class PSOutputStream extends OutputStream {
 	 * maintains pool of streams - in a normal situation there will only
 	 *	me a single stream continually re-used, but with some patterns
 	 *	there could be many streams.  For this reason it is worth checking
-	 *	that the pool is not maintained at an unnecessaily large value, so
-	 *	 maximum of 10 streams are maintained - adding upto 80K to the
+	 *	that the pool is not maintained at an unnecessarily large value, so
+	 *	 maximum of 10 streams are maintained - adding up to 80K to the
 	 *	 garbage collect copy.
 	 **/
 	static void returnStream(PSOutputStream stream) {
@@ -130,17 +129,17 @@ public class PSOutputStream extends OutputStream {
 		}
 	}
 	
-	int[] m_blobHeader = null;
-	byte[] m_buf = null;
-	boolean m_isSaved = false;
-	long m_headAddr = 0;
-	long m_prevAddr = 0;
-	int m_count = 0;
-	int m_bytesWritten = 0;
-	int m_blobThreshold = 0;
-	IStore m_store;
+	private int[] m_blobHeader = null;
+	private byte[] m_buf = null;
+	private boolean m_isSaved = false;
+//	private long m_headAddr = 0;
+//	private long m_prevAddr = 0;
+	private int m_count = 0;
+	private int m_bytesWritten = 0;
+	private int m_blobThreshold = 0;
+	private IStore m_store;
 	
-	IAllocationContext m_context = null;
+	private IAllocationContext m_context;
 	
 	private PSOutputStream m_next = null;
 
@@ -177,8 +176,8 @@ public class PSOutputStream extends OutputStream {
 	public void reset() {
 		m_isSaved = false;
 		
-		m_headAddr = 0;
-		m_prevAddr = 0;
+//		m_headAddr = 0;
+//		m_prevAddr = 0;
 		m_count = 0;
 		m_bytesWritten = 0;
 		m_isSaved = false;
@@ -190,7 +189,7 @@ public class PSOutputStream extends OutputStream {
 	/****************************************************************
 	 * write a single byte
 	 *
-	 * this is the one place where the blobthreshold is handled
+	 * this is the one place where the blob threshold is handled
 	 *	and its done one byte at a time so should be easy enough,
 	 *
 	 * We no longer store continuation addresses, instead we allocate
@@ -360,6 +359,7 @@ public class PSOutputStream extends OutputStream {
   
   protected void finalize() throws Throwable {
   	close();
+    super.finalize();
   }
   
   public OutputStream getFilterWrapper(final boolean saveBeforeClose) {
