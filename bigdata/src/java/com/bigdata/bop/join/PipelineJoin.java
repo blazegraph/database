@@ -271,22 +271,22 @@ public class PipelineJoin<E> extends PipelineOp implements
 
         super(args, annotations);
 
-        if (arity() != 1)
-            throw new IllegalArgumentException();
+//        if (arity() != 1)
+//            throw new IllegalArgumentException();
 
-        if (left() == null)
-            throw new IllegalArgumentException();
+//        if (left() == null)
+//            throw new IllegalArgumentException();
 
     }
     
-	/**
-	 * The sole operand, which is the previous join in the pipeline join path.
-	 */
-    public PipelineOp left() {
-
-        return (PipelineOp) get(0);
-
-    }
+//	/**
+//	 * The sole operand, which is the previous join in the pipeline join path.
+//	 */
+//    public PipelineOp left() {
+//
+//        return (PipelineOp) get(0);
+//
+//    }
 
     /**
      * {@inheritDoc}
