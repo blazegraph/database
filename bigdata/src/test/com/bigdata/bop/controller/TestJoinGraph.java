@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.controller;
 
-import com.bigdata.bop.controller.JoinGraph;
-
 import junit.framework.TestCase2;
 
 /**
@@ -52,8 +50,142 @@ public class TestJoinGraph extends TestCase2 {
         super(name);
     }
 
+//    @Override
+//    public Properties getProperties() {
+//
+//        final Properties p = new Properties(super.getProperties());
+//
+//        p.setProperty(Journal.Options.BUFFER_MODE, BufferMode.Transient
+//                .toString());
+//
+//        return p;
+//        
+//    }
+//
+//    static private final String namespace = "ns";
+//    
+//    Journal jnl;
+//    
+//    R rel;
+//    
+//    public void setUp() throws Exception {
+//        
+//        jnl = new Journal(getProperties());
+//
+//    }
+//    
+//    /**
+//     * Create and populate relation in the {@link #namespace}.
+//     * 
+//     * @return The #of distinct entries.
+//     */
+//    private int loadData(final int scale) {
+//
+//		final String[] names = new String[] { "John", "Mary", "Saul", "Paul",
+//				"Leon", "Jane", "Mike", "Mark", "Jill", "Jake", "Alex", "Lucy" };
+//
+//		final Random rnd = new Random();
+//		
+//		// #of distinct instances of each name.
+//		final int populationSize = Math.max(10, (int) Math.ceil(scale / 10.));
+//		
+//		// #of trailing zeros for each name.
+//		final int nzeros = 1 + (int) Math.ceil(Math.log10(populationSize));
+//		
+////		System.out.println("scale=" + scale + ", populationSize="
+////				+ populationSize + ", nzeros=" + nzeros);
+//
+//		final NumberFormat fmt = NumberFormat.getIntegerInstance();
+//		fmt.setMinimumIntegerDigits(nzeros);
+//		fmt.setMaximumIntegerDigits(nzeros);
+//		fmt.setGroupingUsed(false);
+//		
+//        // create the relation.
+//        final R rel = new R(jnl, namespace, ITx.UNISOLATED, new Properties());
+//        rel.create();
+//
+//        // data to insert.
+//		final E[] a = new E[scale];
+//
+//		for (int i = 0; i < scale; i++) {
+//
+//			final String n1 = names[rnd.nextInt(names.length)]
+//					+ fmt.format(rnd.nextInt(populationSize));
+//
+//			final String n2 = names[rnd.nextInt(names.length)]
+//					+ fmt.format(rnd.nextInt(populationSize));
+//
+////			System.err.println("i=" + i + ", n1=" + n1 + ", n2=" + n2);
+//			
+//			a[i] = new E(n1, n2);
+//			
+//        }
+//
+//		// sort before insert for efficiency.
+//		Arrays.sort(a,R.primaryKeyOrder.getComparator());
+//		
+//        // insert data (the records are not pre-sorted).
+//        final long ninserts = rel.insert(new ChunkedArrayIterator<E>(a.length, a, null/* keyOrder */));
+//
+//        // Do commit since not scale-out.
+//        jnl.commit();
+//
+//        // should exist as of the last commit point.
+//        this.rel = (R) jnl.getResourceLocator().locate(namespace,
+//                ITx.READ_COMMITTED);
+//
+//        assertNotNull(rel);
+//
+//        return (int) ninserts;
+//        
+//    }
+//
+//    public void tearDown() throws Exception {
+//
+//        if (jnl != null) {
+//            jnl.destroy();
+//            jnl = null;
+//        }
+//        
+//        // clear reference.
+//        rel = null;
+//
+//    }
+
     public void test_something() {
-     
+
+////    	final int scale = 10000;
+////    	
+////        final int nrecords = loadData(scale);
+//        
+//        final IVariable<?> x = Var.var("x");
+//
+//		final IVariable<?> y = Var.var("y");
+//
+//		final IPredicate<E> p1 = new Predicate<E>(new BOp[] { x, y },
+//				new NV(IPredicate.Annotations.RELATION_NAME,
+//						new String[] { namespace }),//
+//				new NV(IPredicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED)//
+//		);
+//
+//		final IPredicate<E> p2 = new Predicate<E>(new BOp[] { x, y },
+//				new NV(IPredicate.Annotations.RELATION_NAME,
+//						new String[] { namespace }),//
+//				new NV(IPredicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED)//
+//		);
+//
+//		final IPredicate<E> p3 = new Predicate<E>(new BOp[] { x, y },
+//				new NV(IPredicate.Annotations.RELATION_NAME,
+//						new String[] { namespace }),//
+//				new NV(IPredicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED)//
+//		);
+//
+//		new JoinGraph(//
+//    			new NV(BOp.Annotations.BOP_ID, 1),//
+//    			new NV(JoinGraph.Annotations.VERTICES,new IPredicate[]{}),//
+//    			new NV(JoinGraph.Annotations.SAMPLE_SIZE, 100)//
+//    			);
+    	
         fail("write tests");
         
     }
