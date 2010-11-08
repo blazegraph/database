@@ -245,6 +245,18 @@ public class RWStore implements IStore {
 
         String DEFAULT_META_BITS_SIZE = "9";
 
+        /**
+         * Defines the number of bits that must be free in a FixedAllocator for
+         * it to be added to the free list.  This is used to ensure a level
+         * of locality when making large numbers of allocations within a single
+         * commit.
+         * <p>
+         * The value should be >= 1 and <= 5000
+         */
+        String FREE_BITS_THRESHOLD = RWStore.class.getName() + ".freeBitsThreshold";
+
+        String DEFAULT_FREE_BITS_THRESHOLD = "300";
+
     }
 
     /*
@@ -339,6 +351,12 @@ public class RWStore implements IStore {
      * The minimum allocation size (bytes).
      */
     final int m_minFixedAlloc;
+	
+    /**
+     * Currently we do not support a Blob header to be a Blob, so the
+     * maximum possible Blob is ((maxFixed-4) * maxFixed) - 4.
+     */
+    final int m_maxBlobAllocSize;
 	
     /**
      * This lock is used to exclude readers when the extent of the backing file
@@ -477,7 +495,16 @@ public class RWStore implements IStore {
         
         m_metaBitsSize = cDefaultMetaBitsSize;
 
-		m_metaBits = new int[m_metaBitsSize];
+        cDefaultFreeBitsThreshold = Integer.valueOf(fileMetadata.getProperty(
+                Options.FREE_BITS_THRESHOLD,
+                Options.DEFAULT_FREE_BITS_THRESHOLD));
+        
+        if (cDefaultFreeBitsThreshold < 1 || cDefaultFreeBitsThreshold > 5000) {
+            throw new IllegalArgumentException(Options.FREE_BITS_THRESHOLD
+                    + " : Must be between 1 and 5000");
+        }
+
+        m_metaBits = new int[m_metaBitsSize];
 		
 		m_metaTransientBits = new int[m_metaBitsSize];
 		
@@ -556,6 +583,12 @@ public class RWStore implements IStore {
 				m_minFixedAlloc = m_allocSizes[0]*64;
 			}
 			
+            final int maxBlockLessChk = m_maxFixedAlloc-4;
+            // set this at blob header references max 4096 fixed allocs
+            // meaning that header may itself be a blob if max fixed is
+            // less than 16K
+            m_maxBlobAllocSize = (BLOB_FIXED_ALLOCS * maxBlockLessChk);
+            
 			assert m_maxFixedAlloc > 0;
 			
 			m_deferredFreeOut = PSOutputStream.getNew(this, m_maxFixedAlloc, null);
@@ -668,7 +701,7 @@ public class RWStore implements IStore {
 					+ metaBitsAddr + ", m_commitCounter: " + commitCounter);
 		
 	}
-
+	
 	/**
 	 * Should be called where previously initFileSpec was used.
 	 * 
@@ -728,13 +761,14 @@ public class RWStore implements IStore {
 				final DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
 				
 				m_lastDeferredReleaseTime = strBuf.readLong();
+				cDefaultMetaBitsSize = strBuf.readInt();
 				
 				final int allocBlocks = strBuf.readInt();
 				m_allocSizes = new int[allocBlocks];
 				for (int i = 0; i < allocBlocks; i++) {
 					m_allocSizes[i] = strBuf.readInt();
 				}
-				m_metaBitsSize = metaBitsStore - allocBlocks - 3; // allow for deferred free
+				m_metaBitsSize = metaBitsStore - allocBlocks - 4; // allow for deferred free
 				m_metaBits = new int[m_metaBitsSize];
 				if (log.isInfoEnabled()) {
 					log.info("Raw MetaBitsAddr: " + rawmbaddr);
@@ -854,10 +888,10 @@ public class RWStore implements IStore {
 		 * Meta-Allocations stored as {int address; int[8] bits}, so each block
 		 * holds 8*32=256 allocation slots of 1K totaling 256K.
 		 */
-		for (int b = 0; b < m_metaBits.length; b += 9) {
+		for (int b = 0; b < m_metaBits.length; b += cDefaultMetaBitsSize) {
 			final long blockStart = convertAddr(m_metaBits[b]);
 			final int startBit = (b * 32) + 32;
-			final int endBit = startBit + (8*32);
+			final int endBit = startBit + ((cDefaultMetaBitsSize-1)*32);
 			for (int i = startBit; i < endBit; i++) {
 				if (tstBit(m_metaBits, i)) {
 					final long addr = blockStart + ((i-startBit) * ALLOC_BLOCK_SIZE);
@@ -1061,8 +1095,19 @@ public class RWStore implements IStore {
                                         + m_maxFixedAlloc);
 
                     final byte[] hdrbuf = new byte[4 * (nblocks + 1) + 4]; // plus 4 bytes for checksum
-					final BlobAllocator ba = (BlobAllocator) getBlock((int) addr);
-					getData(ba.getBlobHdrAddress(getOffset((int) addr)), hdrbuf); // read in header 
+                    if (hdrbuf.length > m_maxFixedAlloc) {
+                    	if (log.isInfoEnabled()) {
+                    		log.info("LARGE BLOB - header is BLOB");
+                    	}
+                    }
+                    
+					final Allocator na = getBlock((int) addr);
+					if (! (na instanceof BlobAllocator)) {
+						throw new IllegalStateException("Invalid Allocator index");
+					}
+					final BlobAllocator ba = (BlobAllocator) na;
+					final int hdraddr = ba.getBlobHdrAddress(getOffset((int) addr));
+					getData(hdraddr, hdrbuf); // read in header - could itself be a blob!
 					final DataInputStream hdrstr = new DataInputStream(new ByteArrayInputStream(hdrbuf));
 					final int rhdrs = hdrstr.readInt();
                     if (rhdrs != nblocks) {
@@ -1703,13 +1748,16 @@ public class RWStore implements IStore {
 		// used to free the deferedFree allocations.  This is used to determine
 		//	which commitRecord to access to process the nextbatch of deferred
 		//	frees.
-	    final int len = 4 * (2 + 1 + m_allocSizes.length + m_metaBits.length);
+		// the cDefaultMetaBitsSize is also written since this can now be
+		//	parameterized.
+	    final int len = 4 * (2 + 1 + 1 + m_allocSizes.length + m_metaBits.length);
 		final byte buf[] = new byte[len];
 
         final FixedOutputStream str = new FixedOutputStream(buf);
         try {
             str.writeLong(m_lastDeferredReleaseTime);
-
+            str.writeInt(cDefaultMetaBitsSize);
+            
             str.writeInt(m_allocSizes.length);
             for (int i = 0; i < m_allocSizes.length; i++) {
                 str.writeInt(m_allocSizes[i]);
@@ -1914,11 +1962,18 @@ public class RWStore implements IStore {
 	/**
 	 * @see Options#META_BITS_SIZE
 	 */
-	private final int cDefaultMetaBitsSize;
+	private int cDefaultMetaBitsSize;
 	/**
 	 * @see Options#META_BITS_SIZE
 	 */
     volatile private int m_metaBitsSize;
+	/**
+	 * Package private since is uded by FixedAllocators
+	 * 
+	 * @see Options#META_BITS_SIZE
+	 */
+	final int cDefaultFreeBitsThreshold;
+	
 	private int m_metaBits[];
 	private int m_metaTransientBits[];
 	// volatile private int m_metaStartAddr;
@@ -2075,7 +2130,7 @@ public class RWStore implements IStore {
 //		final int bitsPerBlock = 9 * 32;
 		
 		final int intIndex = bit / 32; // divide 32;
-		final int addrIndex = (intIndex/9)*9;
+		final int addrIndex = (intIndex/cDefaultMetaBitsSize)*cDefaultMetaBitsSize;
 		final long addr = convertAddr(m_metaBits[addrIndex]);
 
 		final int intOffset = bit - ((addrIndex+1) * 32);
@@ -2620,8 +2675,8 @@ public class RWStore implements IStore {
 		long ret = physicalAddress((int) m_metaBitsAddr);
 		ret <<= 16;
 		
-		// include space for allocSizes and deferred free info
-		final int metaBitsSize = 2 + m_metaBits.length + m_allocSizes.length + 1;
+		// include space for allocSizes and deferred free info AND cDefaultMetaBitsSize
+		final int metaBitsSize = 2 + 1 + m_metaBits.length + m_allocSizes.length + 1;
 		ret += metaBitsSize;
 		
         if (log.isTraceEnabled())
@@ -3225,8 +3280,8 @@ public class RWStore implements IStore {
                 
             }
         
-//            log.warn("Context: ncontexts=" + m_contexts.size() + ", context="
-//                    + context);
+            log.warn("Context: ncontexts=" + m_contexts.size() + ", context="
+                    + context);
             
         }
 
@@ -3892,5 +3947,9 @@ public class RWStore implements IStore {
                 true/* bufferHasData */, m_reopener).flush(false/* force */);
 
     }
+
+	public int getMaxBlobSize() {
+		return this.m_maxBlobAllocSize-4;
+	}
 
 }

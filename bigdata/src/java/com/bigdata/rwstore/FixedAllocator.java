@@ -414,7 +414,7 @@ public class FixedAllocator implements Allocator {
 				if (m_freeBits++ == 0 && false) {
 					m_freeWaiting = false;
 					m_freeList.add(this);
-				} else if (m_freeWaiting && m_freeBits == 3000) {
+				} else if (m_freeWaiting && m_freeBits == m_store.cDefaultFreeBitsThreshold) {
 					m_freeWaiting = false;
 					m_freeList.add(this);
 				}
