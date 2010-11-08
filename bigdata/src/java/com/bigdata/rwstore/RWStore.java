@@ -2392,6 +2392,13 @@ public class RWStore implements IStore {
 		str.append("\n-------------------------\n");
 		str.append("RWStore Allocation Summary\n");
 		str.append("-------------------------\n");
+		str.append(padRight("Allocator", 10));
+		str.append(padLeft("Slots used", 12));
+		str.append(padLeft("available", 12));
+		str.append(padLeft("Store used", 14));
+		str.append(padLeft("available", 14));
+		str.append(padLeft("Usage", 8));
+		str.append("\n");
 		long treserved = 0;
 		long treservedSlots = 0;
 		long tfilled = 0;
@@ -2404,17 +2411,47 @@ public class RWStore implements IStore {
 			tfilled += filled;
 			tfilledSlots += stats[i].m_filledSlots;
 			
-			str.append("Allocation: " + stats[i].m_blockSize);
-			str.append(", slots: "  + stats[i].m_filledSlots + "/" + stats[i].m_reservedSlots);
-			str.append(", storage: "  + filled + "/" + reserved);
-			str.append(", usage: "  + (reserved==0?0:(filled * 100 / reserved)) + "%");
+			str.append(padRight("" + stats[i].m_blockSize, 10));
+			str.append(padLeft("" + stats[i].m_filledSlots, 12) + padLeft("" + stats[i].m_reservedSlots, 12));
+			str.append(padLeft("" + filled, 14) + padLeft("" + reserved, 14));
+			str.append(padLeft("" + (reserved==0?0:(filled * 100 / reserved)) + "%", 8));
 			str.append("\n");
 		}
-        str.append("Total - file: " + convertAddr(m_fileSize) + //
-                ", slots: " + tfilledSlots + "/" + treservedSlots + //
-                ", storage: " + tfilled + "/" + treserved + //
-                "\n");
+        str.append(padRight("Totals", 10));
+        str.append(padLeft("" + tfilledSlots, 12));
+        str.append(padLeft("" + treservedSlots, 12));
+        str.append(padLeft("" + tfilled, 14));
+        str.append(padLeft("" + treserved, 14));
+        str.append(padLeft("" + (treserved==0?0:(tfilled * 100 / treserved)) + "%", 8));
+        str.append("\nFile size: " + convertAddr(m_fileSize) + "bytes\n");
     }
+	
+	private String padLeft(String str, int minlen) {
+		if (str.length() >= minlen)
+			return str;
+		
+		StringBuffer out = new StringBuffer();
+		int pad = minlen - str.length();
+		while (pad-- > 0) {
+			out.append(' ');
+		}
+		out.append(str);
+		
+		return out.toString();
+	}
+	private String padRight(String str, int minlen) {
+		if (str.length() >= minlen)
+			return str;
+		
+		StringBuffer out = new StringBuffer();
+		out.append(str);
+		int pad = minlen - str.length();
+		while (pad-- > 0) {
+			out.append(' ');
+		}
+		
+		return out.toString();
+	}
 
 //	public ArrayList<Allocator> getStorageBlockAddresses() {
 //		final ArrayList<Allocator> addrs = new ArrayList<Allocator>(m_allocs.size());
