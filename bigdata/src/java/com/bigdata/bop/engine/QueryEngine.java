@@ -412,6 +412,12 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     }
 
+    protected boolean isRunning() {
+
+    	return engineFuture.get() != null && !shutdown;
+
+    }
+    
     protected void execute(final Runnable r) {
         
         localIndexManager.getExecutorService().execute(r);
@@ -492,20 +498,24 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         }
     } // QueryEngineTask
 
-    /**
-     * Add a chunk of intermediate results for consumption by some query. The
-     * chunk will be attached to the query and the query will be scheduled for
-     * execution.
-     * 
-     * @param msg
-     *            A chunk of intermediate results.
-     * 
-     * @throws IllegalArgumentException
-     *             if the chunk is <code>null</code>.
-     * @throws IllegalStateException
-     *             if the chunk is not materialized.
-     */
-    protected void acceptChunk(final IChunkMessage<IBindingSet> msg) {
+	/**
+	 * Add a chunk of intermediate results for consumption by some query. The
+	 * chunk will be attached to the query and the query will be scheduled for
+	 * execution.
+	 * 
+	 * @param msg
+	 *            A chunk of intermediate results.
+	 * 
+	 * @return <code>true</code> if the chunk was accepted. This will return
+	 *         <code>false</code> if the query is done (including cancelled) or
+	 *         the query engine is shutdown.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if the chunk is <code>null</code>.
+	 * @throws IllegalStateException
+	 *             if the chunk is not materialized.
+	 */
+    protected boolean acceptChunk(final IChunkMessage<IBindingSet> msg) {
         
         if (msg == null)
             throw new IllegalArgumentException();
@@ -515,16 +525,36 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
         final RunningQuery q = runningQueries.get(msg.getQueryId());
         
-        if(q == null)
+        if(q == null) {
+			/*
+			 * The query is not registered on this node.
+			 * 
+			 * FIXME We should recognize the difference between a query which
+			 * was never registered (and throw an error here) and a query which
+			 * is done and has been removed from runningQueries.  One way to do
+			 * this is with an LRU of recently completed queries.
+			 */
+//            return false;
             throw new IllegalStateException();
+        }
         
-        // add chunk to the query's input queue on this node.
-        q.acceptChunk(msg);
+		// add chunk to the query's input queue on this node.
+		if (!q.acceptChunk(msg)) {
+			// query is no longer running.
+			return false;
+			
+		}
 
-        assertRunning();
-        
-        // add query to the engine's task queue.
-        priorityQueue.add(q);
+		if(!isRunning()) {
+			// query engine is no longer running.
+			return false;
+			
+		}
+
+		// add query to the engine's task queue.
+		priorityQueue.add(q);
+
+		return true;
 
     }
 
