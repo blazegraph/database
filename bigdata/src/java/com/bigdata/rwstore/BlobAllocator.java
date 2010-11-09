@@ -56,13 +56,13 @@ public class BlobAllocator implements Allocator {
 	}
 
 	public int alloc(RWStore store, int size, IAllocationContext context) {
-		assert size > m_store.m_maxFixedAlloc;
+		assert size > (m_store.m_maxFixedAlloc-4);
 		
 		return 0;
 	}
 
 	public boolean free(int addr, int sze) {
-		if (sze < m_store.m_maxFixedAlloc)
+		if (sze < (m_store.m_maxFixedAlloc-4))
 			throw new IllegalArgumentException("Unexpected address size");
 		int alloc = m_store.m_maxFixedAlloc-4;
 		int blcks = (alloc - 1 + sze)/alloc;		
@@ -103,8 +103,8 @@ public class BlobAllocator implements Allocator {
 	}
 	
 	public int getFirstFixedForBlob(int addr, int sze) {
-		if (sze < m_store.m_maxFixedAlloc)
-			throw new IllegalArgumentException("Unexpected address size");
+		if (sze < (m_store.m_maxFixedAlloc-4))
+			throw new IllegalArgumentException("Unexpected address size: " + sze);
 
 		int alloc = m_store.m_maxFixedAlloc-4;
 		int blcks = (alloc - 1 + sze)/alloc;		
