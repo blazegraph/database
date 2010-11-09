@@ -79,27 +79,24 @@ public class PSOutputStream extends OutputStream {
 
 	private static PSOutputStream m_poolHead = null;
 	private static PSOutputStream m_poolTail = null;
-	private static Integer m_lock = new Integer(42);
 	private static int m_streamCount = 0;
 	
-	public static PSOutputStream getNew(final IStore store, final int maxAlloc, final IAllocationContext context) {
-		synchronized (m_lock) {
-			PSOutputStream ret = m_poolHead;
-			if (ret != null) {
-				m_streamCount--;
-				
-				m_poolHead = ret.next();
-				if (m_poolHead == null) {
-					m_poolTail = null;
-				}
-			} else {
-				ret = new PSOutputStream();
+	public static synchronized PSOutputStream getNew(final IStore store, final int maxAlloc, final IAllocationContext context) {
+		PSOutputStream ret = m_poolHead;
+		if (ret != null) {
+			m_streamCount--;
+			
+			m_poolHead = ret.next();
+			if (m_poolHead == null) {
+				m_poolTail = null;
 			}
-			
-			ret.init(store, maxAlloc, context);
-			
-			return ret;
+		} else {
+			ret = new PSOutputStream();
 		}
+		
+		ret.init(store, maxAlloc, context);
+		
+		return ret;
 	}
 	
 	/*******************************************************************
@@ -110,23 +107,21 @@ public class PSOutputStream extends OutputStream {
 	 *	 maximum of 10 streams are maintained - adding up to 80K to the
 	 *	 garbage collect copy.
 	 **/
-	static void returnStream(PSOutputStream stream) {
-		synchronized (m_lock) {
-			if (m_streamCount > 10) {
-				return;
-			}
-			
-			stream.m_count = 0; // avoid overflow
-			
-			if (m_poolTail != null) {
-				m_poolTail.setNext(stream);
-			} else {
-				m_poolHead = stream;
-			}
-			
-			m_poolTail = stream;
-			m_streamCount++;
+	static synchronized void returnStream(PSOutputStream stream) {
+		if (m_streamCount > 10) {
+			return;
 		}
+		
+		stream.m_count = 0; // avoid overflow
+		
+		if (m_poolTail != null) {
+			m_poolTail.setNext(stream);
+		} else {
+			m_poolHead = stream;
+		}
+		
+		m_poolTail = stream;
+		m_streamCount++;
 	}
 	
 	private int[] m_blobHeader = null;
@@ -161,6 +156,7 @@ public class PSOutputStream extends OutputStream {
 	void init(IStore store, int maxAlloc, IAllocationContext context) {
 		m_store = store;
 		m_context = context;
+		m_next = null;
 
 		m_blobThreshold = maxAlloc-4; // allow for checksum
 		
@@ -355,11 +351,6 @@ public class PSOutputStream extends OutputStream {
   
   public int getBytesWritten() {
   	return m_bytesWritten;
-  }
-  
-  protected void finalize() throws Throwable {
-  	close();
-    super.finalize();
   }
   
   public OutputStream getFilterWrapper(final boolean saveBeforeClose) {

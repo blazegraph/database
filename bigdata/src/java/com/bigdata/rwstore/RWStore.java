@@ -283,7 +283,7 @@ public class RWStore implements IStore {
 	static final int ALLOCATION_SCALEUP = 16; // multiplier to convert allocations based on minimum allocation of 32k
 	static private final int META_ALLOCATION = 8; // 8 * 32K is size of meta Allocation
 
-	static final int BLOB_FIXED_ALLOCS = 1024;
+	static final int BLOB_FIXED_ALLOCS = 2048;
 //	private ICommitCallback m_commitCallback;
 //
 //	public void setCommitCallback(final ICommitCallback callback) {
@@ -760,6 +760,10 @@ public class RWStore implements IStore {
 		
 				final DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
 				
+				final int storeVersion = strBuf.readInt();
+				if (storeVersion != cVersion) {
+					throw new IllegalStateException("Incompatible RWStore header version");
+				}
 				m_lastDeferredReleaseTime = strBuf.readLong();
 				cDefaultMetaBitsSize = strBuf.readInt();
 				
@@ -768,7 +772,7 @@ public class RWStore implements IStore {
 				for (int i = 0; i < allocBlocks; i++) {
 					m_allocSizes[i] = strBuf.readInt();
 				}
-				m_metaBitsSize = metaBitsStore - allocBlocks - 4; // allow for deferred free
+				m_metaBitsSize = metaBitsStore - allocBlocks - cMetaHdrFields; // allow for header fields
 				m_metaBits = new int[m_metaBitsSize];
 				if (log.isInfoEnabled()) {
 					log.info("Raw MetaBitsAddr: " + rawmbaddr);
@@ -1594,6 +1598,14 @@ public class RWStore implements IStore {
                 
                 throw new RuntimeException("Closed Store?", e);
                 
+            } finally {
+            	try {
+            		psout.close(); // return stream
+            	} catch (IOException ioe) {
+            		// should not happen, since this should only be
+            		// recycling
+            		log.warn("Unexpected error closing PSOutputStream", ioe);
+            	}
             }
 
         }
@@ -1750,11 +1762,12 @@ public class RWStore implements IStore {
 		//	frees.
 		// the cDefaultMetaBitsSize is also written since this can now be
 		//	parameterized.
-	    final int len = 4 * (2 + 1 + 1 + m_allocSizes.length + m_metaBits.length);
+	    final int len = 4 * (cMetaHdrFields + m_allocSizes.length + m_metaBits.length);
 		final byte buf[] = new byte[len];
 
         final FixedOutputStream str = new FixedOutputStream(buf);
         try {
+            str.writeInt(cVersion);
             str.writeLong(m_lastDeferredReleaseTime);
             str.writeInt(cDefaultMetaBitsSize);
             
@@ -1941,6 +1954,7 @@ public class RWStore implements IStore {
 		ints += 9 * allocBlocks;
 		
 		ints += 2; // for deferredFreeListAddr and size
+		ints += 1; // for version
 		
 		return ints*4; // return as bytes
 	}
@@ -1959,6 +1973,17 @@ public class RWStore implements IStore {
      * Meta Allocator
      */
 	
+	/**
+	 * MetaBits HEADER version must be changed when the header or allocator
+	 * serialization changes
+	 * 
+	 * Use BCD-style numbering so
+	 * 0x0200 == 2.00
+	 * 0x0320 == 3.20
+	 */
+	final private int cVersion = 0x0200;
+	
+	final private int cMetaHdrFields = 5; // version, deferredFree(long),
 	/**
 	 * @see Options#META_BITS_SIZE
 	 */
@@ -2393,11 +2418,12 @@ public class RWStore implements IStore {
 		str.append("RWStore Allocation Summary\n");
 		str.append("-------------------------\n");
 		str.append(padRight("Allocator", 10));
-		str.append(padLeft("Slots used", 12));
-		str.append(padLeft("available", 12));
-		str.append(padLeft("Store used", 14));
-		str.append(padLeft("available", 14));
+		str.append(padLeft("SlotsUsed", 12));
+		str.append(padLeft("reserved", 12));
+		str.append(padLeft("StoreUsed", 14));
+		str.append(padLeft("reserved", 14));
 		str.append(padLeft("Usage", 8));
+		str.append(padLeft("Store", 8));
 		str.append("\n");
 		long treserved = 0;
 		long treservedSlots = 0;
@@ -2410,11 +2436,16 @@ public class RWStore implements IStore {
 			final long filled = stats[i].m_filledSlots * stats[i].m_blockSize;
 			tfilled += filled;
 			tfilledSlots += stats[i].m_filledSlots;
+		}
+		for (int i = 0; i < stats.length; i++) {
+		    final long reserved = stats[i].m_reservedSlots * stats[i].m_blockSize;
+			final long filled = stats[i].m_filledSlots * stats[i].m_blockSize;
 			
 			str.append(padRight("" + stats[i].m_blockSize, 10));
 			str.append(padLeft("" + stats[i].m_filledSlots, 12) + padLeft("" + stats[i].m_reservedSlots, 12));
 			str.append(padLeft("" + filled, 14) + padLeft("" + reserved, 14));
 			str.append(padLeft("" + (reserved==0?0:(filled * 100 / reserved)) + "%", 8));
+			str.append(padLeft("" + (treserved==0?0:(reserved * 100 / treserved)) + "%", 8));
 			str.append("\n");
 		}
         str.append(padRight("Totals", 10));
@@ -2704,16 +2735,15 @@ public class RWStore implements IStore {
 	}
 
 	/**
-	 * Note that the representation of the
-	 * 
+	 * The 
 	 * @return long representation of metaBitsAddr PLUS the size
 	 */
 	public long getMetaBitsAddr() {
 		long ret = physicalAddress((int) m_metaBitsAddr);
 		ret <<= 16;
 		
-		// include space for allocSizes and deferred free info AND cDefaultMetaBitsSize
-		final int metaBitsSize = 2 + 1 + m_metaBits.length + m_allocSizes.length + 1;
+		// include space for version, allocSizes and deferred free info AND cDefaultMetaBitsSize
+		final int metaBitsSize = cMetaHdrFields + m_metaBits.length + m_allocSizes.length;
 		ret += metaBitsSize;
 		
         if (log.isTraceEnabled())
