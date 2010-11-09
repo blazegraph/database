@@ -75,8 +75,20 @@ public class PSOutputStream extends OutputStream {
     
     private static final Logger log = Logger.getLogger(FixedAllocator.class);
 
-//	protected static java.util.logging.Logger cat = java.util.logging.Logger.getLogger(PSOutputStream.class.getName());
+	private static final transient String ERR_NO_STORE = "PSOutputStream with unitilialized store";
 
+	private static final transient String ERR_ALREADY_SAVED = "Writing to saved PSOutputStream";
+
+	/*
+	 * PSOutputStream pooling.
+	 * 
+	 * @todo I would like to see this lifted into a class. The RWStore could
+	 * then use an instance of that class to have a per-store pool of a given
+	 * capacity. This should simplify this class (PSOutputStream), make the use
+	 * of pooling optional, and allow greater concurrency if more than one
+	 * RWStore is running since they will have distinct pools. (I also do not
+	 * like the notion of JVM wide pools where they can be readily avoided).
+	 */
 	private static PSOutputStream m_poolHead = null;
 	private static PSOutputStream m_poolTail = null;
 	private static int m_streamCount = 0;
@@ -123,6 +135,10 @@ public class PSOutputStream extends OutputStream {
 		m_poolTail = stream;
 		m_streamCount++;
 	}
+
+	/*
+	 * PSOutputStream impl.
+	 */
 	
 	private int[] m_blobHeader = null;
 	private byte[] m_buf = null;
@@ -153,7 +169,7 @@ public class PSOutputStream extends OutputStream {
 	/****************************************************************
 	 * resets private state variables for reuse of stream
 	 **/
-	void init(IStore store, int maxAlloc, IAllocationContext context) {
+	void init(final IStore store, final int maxAlloc, final IAllocationContext context) {
 		m_store = store;
 		m_context = context;
 		m_next = null;
@@ -191,13 +207,13 @@ public class PSOutputStream extends OutputStream {
 	 * We no longer store continuation addresses, instead we allocate
 	 * blob allocations via a blob header block.
 	 **/
-  public void write(int b) throws IOException {
+  public void write(final int b) throws IOException {
   	if (m_store == null) {
-  		throw new IllegalStateException("NULL store");
+  		throw new IllegalStateException(ERR_NO_STORE);
   	}
   	
   	if (m_isSaved) {
-  		throw new IllegalStateException("Writing to saved PSOutputStream");
+  		throw new IllegalStateException(ERR_ALREADY_SAVED);
   	}
   	
   	if (m_count == m_blobThreshold && !m_writingHdr) {
@@ -206,7 +222,7 @@ public class PSOutputStream extends OutputStream {
   			m_blobHdrIdx = 0;
   		}
   		
-  		int curAddr = (int) m_store.alloc(m_buf, m_count, m_context);
+  		final int curAddr = (int) m_store.alloc(m_buf, m_count, m_context);
   		m_blobHeader[m_blobHdrIdx++] = curAddr;
   		
   		m_count = 0;
@@ -220,16 +236,16 @@ public class PSOutputStream extends OutputStream {
 	/****************************************************************
 	 * write a single 4 byte integer
 	 **/
-  public void writeInt(int b) throws IOException {
+  public void writeInt(final int b) throws IOException {
   	write((b >>> 24) & 0xFF);
   	write((b >>> 16) & 0xFF);
   	write((b >>> 8) & 0xFF);
   	write(b & 0xFF);
   }
   
-  public void writeLong(long b) throws IOException {
-  	int hi = (int) (b >> 32);
-  	int lo = (int) (b & 0xFFFFFFFF);
+  public void writeLong(final long b) throws IOException {
+  	final int hi = (int) (b >> 32);
+  	final int lo = (int) (b & 0xFFFFFFFF);
    	writeInt(hi);
    	writeInt(lo);
   }
@@ -240,13 +256,13 @@ public class PSOutputStream extends OutputStream {
 	 * we need to be able to efficiently handle large arrays beyond size
 	 * of the blobThreshold, so
 	 **/
-  public void write(byte b[], int off, int len) throws IOException {
+  public void write(final byte b[], final int off, final int len) throws IOException {
   	if (m_store == null) {
-  		throw new IllegalStateException("PSOutputStream with unitilialized store");
+  		throw new IllegalStateException(ERR_NO_STORE);
   	}
   	
   	if (m_isSaved) {
-  		throw new IllegalStateException("PSOutputStream: already been saved");
+  		throw new IllegalStateException(ERR_ALREADY_SAVED);
   	}
   	
   	if ((m_count + len) > m_blobThreshold) {
@@ -270,12 +286,12 @@ public class PSOutputStream extends OutputStream {
 	 * This method can be used to stream external files into
 	 *	the store.
 	 **/
-  public void write(InputStream instr) throws IOException {
+  public void write(final InputStream instr) throws IOException {
   	if (m_isSaved) {
-  		throw new IllegalStateException("PSOutputStream: already been saved");
+  		throw new IllegalStateException(ERR_ALREADY_SAVED);
   	}
   	
-  	byte b[] = new byte[512];
+  	final byte b[] = new byte[512];
   	
   	int r = instr.read(b);
   	while (r == 512) {
@@ -296,7 +312,7 @@ public class PSOutputStream extends OutputStream {
    **/
   public long save() {
   	if (m_isSaved) {
-  		throw new IllegalStateException("PSOutputStream: already been saved");
+  		throw new IllegalStateException(ERR_ALREADY_SAVED);
   	}
   	
   	if (m_store == null) {
@@ -309,18 +325,22 @@ public class PSOutputStream extends OutputStream {
   		try {
   			m_writingHdr  = true; // ensure that header CAN be a BLOB
 	  		m_blobHeader[m_blobHdrIdx++] = addr;
-	  		int precount = m_count;
+	  		final int precount = m_count;
 	  		m_count = 0;
 			try {
 		  		writeInt(m_blobHdrIdx);
 		  		for (int i = 0; i < m_blobHdrIdx; i++) {
-						writeInt(m_blobHeader[i]);
+		  			writeInt(m_blobHeader[i]);
 		 		}
 		  		addr = (int) m_store.alloc(m_buf, m_count, m_context);
 		  		
-		  		if (m_blobHdrIdx != ((m_blobThreshold - 1 + m_bytesWritten - m_count)/m_blobThreshold)) {	  		
-		  			throw new IllegalStateException("PSOutputStream.save at : " + addr + ", bytes: "+ m_bytesWritten + ", blocks: " + m_blobHdrIdx + ", last alloc: " + precount);
-		  		}
+					if (m_blobHdrIdx != ((m_blobThreshold - 1 + m_bytesWritten - m_count) / m_blobThreshold)) {
+						throw new IllegalStateException(
+								"PSOutputStream.save at : " + addr
+										+ ", bytes: " + m_bytesWritten
+										+ ", blocks: " + m_blobHdrIdx
+										+ ", last alloc: " + precount);
+					}
 		  		
 		  		if (log.isDebugEnabled())
 		  			log.debug("Writing BlobHdrIdx with " + m_blobHdrIdx + " allocations");
