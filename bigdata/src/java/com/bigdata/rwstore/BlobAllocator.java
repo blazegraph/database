@@ -13,20 +13,21 @@ import com.bigdata.rwstore.RWStore.AllocationStats;
 import com.bigdata.util.ChecksumUtility;
 
 /**
- * BlobAllocator
+ * BlobAllocator.
  * 
- * Manages Blob allocations using a list of FixedAllocators.
+ * Manages Blob allocations using a list of {@link FixedAllocator}s.
  * 
- * The main advantage of this is for re-allocation, since the FixedAllocators can be
- * efficiently re-cycled where a fixed Blob creates issues of best fit and fragmentation.
+ * The main advantage of this is for re-allocation, since the
+ * {@link FixedAllocator}s can be efficiently re-cycled where a fixed Blob
+ * creates issues of best fit and fragmentation.
  * 
- * Some simple patterns would cause un-reallocatable storage, consider a Blob that always
- * re-allocated to a larger size, or a pattern where several blobs got larger together, in these
- * scenarios, smaller allocations would never be re-used, whilst the mechanism of component
- * based allocation is easily re-used.
+ * Some simple patterns would cause un-reallocatable storage, consider a Blob
+ * that always re-allocated to a larger size, or a pattern where several blobs
+ * got larger together, in these scenarios, smaller allocations would never be
+ * re-used, whilst the mechanism of component based allocation is easily
+ * re-used.
  * 
  * @author mgc
- *
  */
 public class BlobAllocator implements Allocator {
 	
@@ -37,6 +38,10 @@ public class BlobAllocator implements Allocator {
 	private int m_diskAddr;
 	private int m_index;
 	private int m_sortAddr;
+	private ArrayList m_freeList;
+	private long m_startAddr;
+	// @todo javadoc. why 254?
+	private int m_freeSpots = 254;
 	
 	public BlobAllocator(final RWStore store, final int sortAddr) {
 		m_store = store;
@@ -46,47 +51,49 @@ public class BlobAllocator implements Allocator {
 			log.info("New BlobAllocator");
 	}
 	
-	public void addAddresses(ArrayList addrs) {
+	public void addAddresses(final ArrayList addrs) {
 		// not relevant for BlobAllocators
 	}
 
-	public boolean addressInRange(int addr) {
+	public boolean addressInRange(final int addr) {
 		// not relevant for BlobAllocators
 		return false;
 	}
 
-	public int alloc(RWStore store, int size, IAllocationContext context) {
+	// @todo javadoc.  Why is this method a NOP (other than the assert).
+	public int alloc(final RWStore store, final int size, final IAllocationContext context) {
 		assert size > (m_store.m_maxFixedAlloc-4);
 		
 		return 0;
 	}
 
-	public boolean free(int addr, int sze) {
+	// @todo why does this return false on all code paths?
+	public boolean free(final int addr, final int sze) {
 		if (sze < (m_store.m_maxFixedAlloc-4))
 			throw new IllegalArgumentException("Unexpected address size");
-		int alloc = m_store.m_maxFixedAlloc-4;
-		int blcks = (alloc - 1 + sze)/alloc;		
+		final int alloc = m_store.m_maxFixedAlloc-4;
+		final int blcks = (alloc - 1 + sze)/alloc;		
 		
 		int hdr_idx = (-addr) & RWStore.OFFSET_BITS_MASK;
 		if (hdr_idx > m_hdrs.length)
 			throw new IllegalArgumentException("free BlobAllocation problem, hdr offset: " + hdr_idx + ", avail:" + m_hdrs.length);
 		
-		int hdr_addr = m_hdrs[hdr_idx];
+		final int hdr_addr = m_hdrs[hdr_idx];
 		
 		if (hdr_addr == 0) {
 			return false;
 		}
 		
 		// read in header block, then free each reference
-		byte[] hdr = new byte[(blcks+1) * 4 + 4]; // add space for checksum
+		final byte[] hdr = new byte[(blcks+1) * 4 + 4]; // add space for checksum
 		m_store.getData(hdr_addr, hdr);
 		
+		final DataInputStream instr = new DataInputStream(
+				new ByteArrayInputStream(hdr, 0, hdr.length-4) );
 		try {
-			DataInputStream instr = new DataInputStream(
-					new ByteArrayInputStream(hdr, 0, hdr.length-4) );
-			int allocs = instr.readInt();
+			final int allocs = instr.readInt();
 			for (int i = 0; i < allocs; i++) {
-				int nxt = instr.readInt();
+				final int nxt = instr.readInt();
 				m_store.free(nxt, m_store.m_maxFixedAlloc);
 			}
 			m_store.free(hdr_addr, hdr.length);
@@ -96,38 +103,38 @@ public class BlobAllocator implements Allocator {
 			}
 			
 		} catch (IOException ioe) {
-			
+			throw new RuntimeException(ioe);
 		}
 		
 		return false;
 	}
 	
-	public int getFirstFixedForBlob(int addr, int sze) {
+	public int getFirstFixedForBlob(final int addr, final int sze) {
 		if (sze < (m_store.m_maxFixedAlloc-4))
 			throw new IllegalArgumentException("Unexpected address size: " + sze);
 
-		int alloc = m_store.m_maxFixedAlloc-4;
-		int blcks = (alloc - 1 + sze)/alloc;		
+		final int alloc = m_store.m_maxFixedAlloc-4;
+		final int blcks = (alloc - 1 + sze)/alloc;		
 		
-		int hdr_idx = (-addr) & RWStore.OFFSET_BITS_MASK;
+		final int hdr_idx = (-addr) & RWStore.OFFSET_BITS_MASK;
 		if (hdr_idx > m_hdrs.length)
 			throw new IllegalArgumentException("free BlobAllocation problem, hdr offset: " + hdr_idx + ", avail:" + m_hdrs.length);
 		
-		int hdr_addr = m_hdrs[hdr_idx];
+		final int hdr_addr = m_hdrs[hdr_idx];
 		
 		if (hdr_addr == 0) {
 			throw new IllegalArgumentException("getFirstFixedForBlob called with unallocated address");
 		}
 		
 		// read in header block, then free each reference
-		byte[] hdr = new byte[(blcks+1) * 4 + 4]; // add space for checksum
+		final byte[] hdr = new byte[(blcks+1) * 4 + 4]; // add space for checksum
 		m_store.getData(hdr_addr, hdr);
 		
+		final DataInputStream instr = new DataInputStream(
+				new ByteArrayInputStream(hdr, 0, hdr.length-4) );
 		try {
-			DataInputStream instr = new DataInputStream(
-					new ByteArrayInputStream(hdr, 0, hdr.length-4) );
-			int nallocs = instr.readInt();
-			int faddr = instr.readInt();
+			final int nallocs = instr.readInt();
+			final int faddr = instr.readInt();
 			
 			return faddr;
 			
@@ -148,7 +155,7 @@ public class BlobAllocator implements Allocator {
 	/**
 	 * returns physical address of blob header if any.
 	 */
-	public long getPhysicalAddress(int offset) {
+	public long getPhysicalAddress(final int offset) {
 		return m_store.physicalAddress(m_hdrs[offset]);
 	}
 
@@ -156,7 +163,7 @@ public class BlobAllocator implements Allocator {
 	 * Since the Blob Allocator simply manages access to FixedAllocation blocks it does not manage any
 	 * allocations directly.
 	 */
-	public int getPhysicalSize(int offset) {
+	public int getPhysicalSize(final int offset) {
 		return 0;
 	}
 
@@ -183,36 +190,31 @@ public class BlobAllocator implements Allocator {
 		// all data held by fixed allocators
 	}
 
-	int m_freeSpots = 254;
-	
 	/**
 	 * FIXME: There is a symmetry problem with read/write where one takes a Stream and the other
 	 * return a byte[].  This is problematical with using the checksums.
 	 */
-	public void read(DataInputStream str) {
+	public void read(final DataInputStream str) {
 		m_freeSpots = 0;
 		try {
 			for (int i = 0; i < 254; i++) {
 				m_hdrs[i] = str.readInt();
 				if (m_hdrs[i] == 0) m_freeSpots++;
 			}
-			int chk = str.readInt();
+			final int chk = str.readInt();
 			// checksum int chk = ChecksumUtility.getCHK().checksum(buf, str.size());
 
 		} catch (IOException e) {
-			e.printStackTrace();
+			log.error(e,e);
 			throw new IllegalStateException(e);
 		}
 	}
 
-	public void setDiskAddr(int addr) {
+	public void setDiskAddr(final int addr) {
 		m_diskAddr = addr;
 	}
 
-	private ArrayList m_freeList;
-	private long m_startAddr;
-
-	public void setFreeList(ArrayList list) {
+	public void setFreeList(final ArrayList list) {
 		m_freeList = list;
 
 		if (hasFree()) {
@@ -230,28 +232,29 @@ public class BlobAllocator implements Allocator {
 	 * can safely be used to sort a BlobAllocator against the previous (and subsequent) allocators we
 	 * access the previous allocators address.
 	 */
-	public void setIndex(int index) {
+	public void setIndex(final int index) {
 		m_index = index;
 	}
 
-	public boolean verify(int addr) {
+	// @todo why is this a NOP?  Javadoc.
+	public boolean verify(final int addr) {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
 	public byte[] write() {
 		try {
-			byte[] buf = new byte[1024];
-			DataOutputStream str = new DataOutputStream(new FixedOutputStream(buf));
+			final byte[] buf = new byte[1024]; // @todo why this const?
+			final DataOutputStream str = new DataOutputStream(new FixedOutputStream(buf));
 	
 			str.writeInt(m_sortAddr);
 
-			for (int i = 0; i < 254; i++) {
+			for (int i = 0; i < 254; i++) { // @todo why this const?
 				str.writeInt(m_hdrs[i]);
 			}
 	
 			// add checksum
-			int chk = ChecksumUtility.getCHK().checksum(buf, str.size());
+			final int chk = ChecksumUtility.getCHK().checksum(buf, str.size());
 			str.writeInt(chk);
 	
 			return buf;
@@ -260,15 +263,15 @@ public class BlobAllocator implements Allocator {
 		}
 	}
 
-	public int compareTo(Object o) {
-		Allocator alloc = (Allocator) o;
+	public int compareTo(final Object o) {
+		final Allocator alloc = (Allocator) o;
 		
 		assert getStartAddr() != alloc.getStartAddr();
 		
 		return (getStartAddr() < alloc.getStartAddr()) ? -1 : 1;
 	}
 
-	public int register(int addr) {
+	public int register(final int addr) {
 		assert m_freeSpots > 0;
 		
 		m_store.addToCommit(this);
@@ -281,7 +284,7 @@ public class BlobAllocator implements Allocator {
 					m_freeList.remove(this);
 				}
 				
-				int ret = -((m_index << RWStore.OFFSET_BITS) + i);
+				final int ret = -((m_index << RWStore.OFFSET_BITS) + i);
 				if (((-ret) & RWStore.OFFSET_BITS_MASK) > m_hdrs.length)
 					throw new IllegalStateException("Invalid blob offset: " + ((-ret) & RWStore.OFFSET_BITS_MASK));
 				
@@ -300,15 +303,15 @@ public class BlobAllocator implements Allocator {
 		return m_index;
 	}
 
-	public int getBlobHdrAddress(int hdrIndex) {
+	public int getBlobHdrAddress(final int hdrIndex) {
 		return m_hdrs[hdrIndex];
 	}
 
-	public void appendShortStats(StringBuilder str, AllocationStats[] stats) {
+	public void appendShortStats(final StringBuilder str, final AllocationStats[] stats) {
 		str.append("Index: " + m_index + ", address: " + getStartAddr() + ", BLOB\n");
 	}
 
-	public boolean isAllocated(int offset) {
+	public boolean isAllocated(final int offset) {
 		return m_hdrs[offset] != 0;
 	}
 
@@ -316,7 +319,7 @@ public class BlobAllocator implements Allocator {
 	 * This is okay as a NOP. The true allocation is managed by the 
 	 * FixedAllocators.
 	 */
-	public void detachContext(IAllocationContext context) {
+	public void detachContext(final IAllocationContext context) {
 		// NOP
 	}
 
@@ -324,8 +327,8 @@ public class BlobAllocator implements Allocator {
 	 * Since the real allocation is in the FixedAllocators, this should delegate
 	 * to the first address, in which case 
 	 */
-	public boolean canImmediatelyFree(int addr, int size, IAllocationContext context) {
-		int faddr = this.getFirstFixedForBlob(addr, size);
+	public boolean canImmediatelyFree(final int addr, final int size, final IAllocationContext context) {
+		final int faddr = this.getFirstFixedForBlob(addr, size);
 		
 		return m_store.getBlockByAddress(faddr).canImmediatelyFree(faddr, 0, context);
 	}
