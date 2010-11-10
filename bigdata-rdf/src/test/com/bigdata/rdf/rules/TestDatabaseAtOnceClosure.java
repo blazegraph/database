@@ -411,7 +411,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         // And add in the ontology.
         final List<String> tmp = new LinkedList<String>();
-//      tmp.add("bigdata-rdf/src/resources/data/lehigh/univ-bench.owl"); FIXME Ontology not loaded?!?
+        tmp.add("bigdata-rdf/src/resources/data/lehigh/univ-bench-modified-no-bnodes.owl");
         tmp.addAll(Arrays.asList(dataFiles));
         final String[] resources = tmp.toArray(new String[tmp.size()]);
 
@@ -467,7 +467,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         // And add in the ontology.
         final List<String> tmp = new LinkedList<String>();
-//        tmp.add("bigdata-rdf/src/resources/data/lehigh/univ-bench.owl"); FIXME Ontology not loaded?!?
+        tmp.add("bigdata-rdf/src/resources/data/lehigh/univ-bench-modified-no-bnodes.owl");
         tmp.addAll(Arrays.asList(dataFiles));
         final String[] resources = tmp.toArray(new String[tmp.size()]);
         
