@@ -10,6 +10,9 @@ import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.InputStream;
 import java.net.URLEncoder;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 
 import org.openrdf.model.Statement;
@@ -24,6 +27,7 @@ import org.openrdf.sail.memory.MemoryStore;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.RdfsAxioms;
+import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -397,13 +401,19 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
     public void test_fixedPoint_LUBM_U1_As_Full_PipelineJoins()
             throws Exception {
 
-        final String[] resources = readFiles(new File(
-                "bigdata-rdf/src/resources/data/lehigh/U1"),
-                new FilenameFilter() {
-                    public boolean accept(File dir, String name) {
-                        return name.endsWith(".owl");
-                    }
-                });
+        final String[] dataFiles = readFiles(new File(
+        "bigdata-rdf/src/resources/data/lehigh/U1"),
+        new FilenameFilter() {
+            public boolean accept(File dir, String name) {
+                return name.endsWith(".owl");
+            }
+        });
+
+        // And add in the ontology.
+        final List<String> tmp = new LinkedList<String>();
+//      tmp.add("bigdata-rdf/src/resources/data/lehigh/univ-bench.owl"); FIXME Ontology not loaded?!?
+        tmp.addAll(Arrays.asList(dataFiles));
+        final String[] resources = tmp.toArray(new String[tmp.size()]);
 
         final Properties properties = getProperties(FullClosure.class, false/* nestedSubquery */);
 
@@ -448,13 +458,19 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
     public void test_fixedPoint_LUBM_U1_As_Fast_PipelineJoins() throws Exception {
 
-        final String[] resources = readFiles(new File("bigdata-rdf/src/resources/data/lehigh/U1"),
+        final String[] dataFiles = readFiles(new File("bigdata-rdf/src/resources/data/lehigh/U1"),
                 new FilenameFilter() {
                     public boolean accept(File dir, String name) {
                         return name.endsWith(".owl");
                     }
                 });
 
+        // And add in the ontology.
+        final List<String> tmp = new LinkedList<String>();
+//        tmp.add("bigdata-rdf/src/resources/data/lehigh/univ-bench.owl"); FIXME Ontology not loaded?!?
+        tmp.addAll(Arrays.asList(dataFiles));
+        final String[] resources = tmp.toArray(new String[tmp.size()]);
+        
         final Properties properties = getProperties(FastClosure.class, false/* nestedSubquery */);
 
         final AbstractTripleStore store = getStore(properties);
@@ -770,8 +786,12 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                  * by the proxy test case otherwise which does not give you much
                  * control).
                  */
-                closureStore.getInferenceEngine()
+                final ClosureStats closureStats = closureStore.getInferenceEngine()
                         .computeClosure(null/* focusStore */);
+                
+                if(log.isInfoEnabled())
+                	log.info(closureStats.toString());
+//                System.err.println("*** "+closureStats.toString());
                 
                 if (log.isDebugEnabled()) {
 
