@@ -36,10 +36,8 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -300,24 +298,20 @@ public class RWStore implements IStore {
 //	protected int m_transactionCount;
 //	private boolean m_committing;
 
-    /**
-     * When <code>true</code> the allocations will not actually be recycled
-     * until after a store restart. When <code>false</code>, the allocations are
-     * recycled once they satisfy the history retention requirement.
-     * 
-     * FIXME Should this go away or be raised as an option for unlimited
-     * retention until restart?
-     */
-	private boolean m_preserveSession = false;
+//    /**
+//     * When <code>true</code> the allocations will not actually be recycled
+//     * until after a store restart. When <code>false</code>, the allocations are
+//     * recycled once they satisfy the history retention requirement.
+//     */
+//	private boolean m_preserveSession = false;
 //	private boolean m_readOnly;
 
-    /**
-     * lists of total alloc blocks.
-     * 
-     * @todo examine concurrency and lock usage for {@link #m_alloc}, which is
-     *       used by {@link #getStats(boolean)}, and the rest of these lists as
-     *       well.
-     */
+	/**
+	 * lists of total alloc blocks.
+	 * 
+	 * @todo examine concurrency and lock usage for {@link #m_alloc} and the
+	 *       rest of these lists.
+	 */
 	private final ArrayList<Allocator> m_allocs;
 
 	/** lists of free alloc blocks. */
@@ -1295,46 +1289,46 @@ public class RWStore implements IStore {
 		return out.toString();
 	}
 
-	/**
-	 * FIXME: This method is not currently used with BigData, if needed then
-	 * the address mangling needs re-working
-	 */
-	public int getDataSize(long addr, byte buf[]) {
-		throw new UnsupportedOperationException();
-		
-//		synchronized (this) {
-//			m_writes.flush();
-//
-//			if (addr == 0) {
-//				return 0;
-//			}
-//
-//			try {
-//				int size = addr2Size((int) addr);
-//				synchronized (m_raf) {
-////					m_raf.seek(physicalAddress((int) addr));
-////					m_raf.readFully(buf, 0, size);
-//					m_raf.getChannel().read(ByteBuffer.wrap(buf, 0, size), physicalAddress((int) addr));
-//					}
-//
-//				return size;
-//			} catch (IOException e) {
-//				throw new StorageTerminalError("Unable to read data", e);
-//			}
-//		}
-	}
+//	/**
+//	 * FIXME: This method is not currently used with BigData, if needed then
+//	 * the address mangling needs re-working
+//	 */
+//	public int getDataSize(long addr, byte buf[]) {
+//		throw new UnsupportedOperationException();
+//		
+////		synchronized (this) {
+////			m_writes.flush();
+////
+////			if (addr == 0) {
+////				return 0;
+////			}
+////
+////			try {
+////				int size = addr2Size((int) addr);
+////				synchronized (m_raf) {
+//////					m_raf.seek(physicalAddress((int) addr));
+//////					m_raf.readFully(buf, 0, size);
+////					m_raf.getChannel().read(ByteBuffer.wrap(buf, 0, size), physicalAddress((int) addr));
+////					}
+////
+////				return size;
+////			} catch (IOException e) {
+////				throw new StorageTerminalError("Unable to read data", e);
+////			}
+////		}
+//	}
 
-    /**
-     * Always returns ZERO (0L).
-     * <p>
-     * This is intended to support the core functionality of a WormStore, other
-     * stores should return zero, indicating no previous versions available
-     */
-	public long getPreviousAddress(final long laddr) {
-		
-	    return 0;
-	    
-	}
+//    /**
+//     * Always returns ZERO (0L).
+//     * <p>
+//     * This is intended to support the core functionality of a WormStore, other
+//     * stores should return zero, indicating no previous versions available
+//     */
+//	public long getPreviousAddress(final long laddr) {
+//		
+//	    return 0;
+//	    
+//	}
 
 	public void free(final long laddr, final int sze) {
         
@@ -1795,11 +1789,11 @@ public class RWStore implements IStore {
 		}
 	}
 
-	static final float s_version = 3.0f;
-
-	public String getVersionString() {
-		return "RWStore " + s_version;
-	}
+//	static final float s_version = 3.0f;
+//
+//	public String getVersionString() {
+//		return "RWStore " + s_version;
+//	}
 
 	public void commitChanges(final Journal journal) {
 	    assertOpen();
@@ -2361,35 +2355,35 @@ public class RWStore implements IStore {
 		return -1;
 	}
 
-	// --------------------------------------------------------------------------------------
-    private String allocListStats(final List<Allocator> list, final AtomicLong counter) {
-		final StringBuffer stats = new StringBuffer();
-		final Iterator<Allocator> iter = list.iterator();
-		while (iter.hasNext()) {
-            stats.append(iter.next().getStats(counter));
-		}
-
-		return stats.toString();
-	}
-
-	public String getStats(final boolean full) {
-		
-        final AtomicLong counter = new AtomicLong();
-
-        final StringBuilder sb = new StringBuilder("FileSize : " + m_fileSize
-                + " allocated : " + m_nextAllocation + "\r\n");
-
-		if (full) {
-
-            sb.append(allocListStats(m_allocs, counter));
-
-            sb.append("Allocated : " + counter);
-
-		}
-
-		return sb.toString();
-
-	}
+//	// --------------------------------------------------------------------------------------
+//    private String allocListStats(final List<Allocator> list, final AtomicLong counter) {
+//		final StringBuffer stats = new StringBuffer();
+//		final Iterator<Allocator> iter = list.iterator();
+//		while (iter.hasNext()) {
+//            stats.append(iter.next().getStats(counter));
+//		}
+//
+//		return stats.toString();
+//	}
+//
+//	public String getStats(final boolean full) {
+//		
+//        final AtomicLong counter = new AtomicLong();
+//
+//        final StringBuilder sb = new StringBuilder("FileSize : " + m_fileSize
+//                + " allocated : " + m_nextAllocation + "\r\n");
+//
+//		if (full) {
+//
+//            sb.append(allocListStats(m_allocs, counter));
+//
+//            sb.append("Allocated : " + counter);
+//
+//		}
+//
+//		return sb.toString();
+//
+//	}
 	
 	public static class AllocationStats {
 		public AllocationStats(final int i) {
@@ -2510,6 +2504,13 @@ public class RWStore implements IStore {
 
 	// --------------------------------------------------------------------------------------
 
+	/**
+	 * Given a physical address (byte offset on the store), return true if that
+	 * address could be managed by an allocated block.
+	 * 
+	 * @param a
+	 *            the storage address to be tested.
+	 */
 	public boolean verify(final long laddr) {
 		
 	    final int addr = (int) laddr;
@@ -2594,27 +2595,32 @@ public class RWStore implements IStore {
 //		}
 //	}
 
+	/**
+	 * The {@link RWStore} always generates negative address values.
+	 * 
+	 * @return whether the address given is a native IStore address
+	 */
 	public boolean isNativeAddress(final long addr) {
 		return addr <= 0;
 	}
 
-	/*******************************************************************************
-	 * called when used as a server, returns whether facility is enabled, this
-	 * is the whole point of the wormStore - so the answer is true
-	 **/
-	public boolean preserveSessionData() {
-		m_preserveSession = true;
-
-		return true;
-	}
-
-	/*******************************************************************************
-	 * called by allocation blocks to determine whether they can re-allocate
-	 * data within this session.
-	 **/
-	protected boolean isSessionPreserved() {
-		return m_preserveSession || m_contexts.size() > 0;
-	}
+//	/*******************************************************************************
+//	 * called when used as a server, returns whether facility is enabled, this
+//	 * is the whole point of the wormStore - so the answer is true
+//	 **/
+//	public boolean preserveSessionData() {
+//		m_preserveSession = true;
+//
+//		return true;
+//	}
+//
+//	/*******************************************************************************
+//	 * called by allocation blocks to determine whether they can re-allocate
+//	 * data within this session.
+//	 **/
+//	protected boolean isSessionPreserved() {
+//		return m_preserveSession || m_contexts.size() > 0;
+//	}
 
 //	/*********************************************************************
 //	 * create backup file, copy data to it, and close it.
@@ -2702,21 +2708,21 @@ public class RWStore implements IStore {
 //		}
 //	}
 
-	/***************************************************************************************
-	 * Needed by PSOutputStream for BLOB buffer chaining.
-	 **/
-	public int bufferChainOffset() {
-		return m_maxFixedAlloc - 4;
-	}
+//	/***************************************************************************************
+//	 * Needed by PSOutputStream for BLOB buffer chaining.
+//	 **/
+//	public int bufferChainOffset() {
+//		return m_maxFixedAlloc - 4;
+//	}
 
 	public File getStoreFile() {
 		return m_fd;
 	}
 
-	public boolean isLongAddress() {
-		// always ints
-		return false;
-	}
+//	public boolean isLongAddress() {
+//		// always ints
+//		return false;
+//	}
 
 //	public int absoluteReadLong(long addr, int offset) {
 //		throw new UnsupportedOperationException();
@@ -2730,9 +2736,9 @@ public class RWStore implements IStore {
 //		absoluteWriteInt((int) addr, threshold, (int) addr2);
 //	}
 
-	public int getAddressSize() {
-		return 4;
-	}
+//	public int getAddressSize() {
+//		return 4;
+//	}
 
 //	public RandomAccessFile getRandomAccessFile() {
 //		return m_raf;
@@ -2838,7 +2844,7 @@ public class RWStore implements IStore {
 
     /**
      * A Blob Allocator maintains a list of Blob headers. The allocator stores
-     * upto 255 blob headers plus a checksum. When a request is made to read the
+     * up to 255 blob headers plus a checksum. When a request is made to read the
      * blob data, the blob allocator retrieves the blob header and reads the
      * data from that into the passed byte array.
      */
@@ -2851,8 +2857,8 @@ public class RWStore implements IStore {
 			}
 			if (ba == null) {
 				final Allocator lalloc = (Allocator) m_allocs.get(m_allocs.size() - 1);
-				final int psa = lalloc.getRawStartAddr(); // previous block
-															// start address
+				// previous block start address
+				final int psa = lalloc.getRawStartAddr();
 				assert (psa - 1) > m_nextAllocation;
 				ba = new BlobAllocator(this, psa - 1);
 				ba.setFreeList(m_freeBlobs); // will add itself to the free list

@@ -175,9 +175,9 @@ public class FixedAllocator implements Allocator {
                         str.writeInt(block.m_bits[i]);
                     }
 
-                    if (!m_store.isSessionPreserved()) {
+//                    if (!m_store.isSessionPreserved()) {
                         block.m_transients = block.m_bits.clone();
-                    }
+//                    }
 
                     /**
                      * If this allocator is shadowed then copy the new committed
@@ -187,8 +187,8 @@ public class FixedAllocator implements Allocator {
                         assert block.m_saveCommit != null;
 
                         block.m_saveCommit = block.m_bits.clone();
-                    } else if (m_store.isSessionPreserved()) {
-                        block.m_commit = block.m_transients.clone();
+//                    } else if (m_store.isSessionPreserved()) {
+//                        block.m_commit = block.m_transients.clone();
                     } else {
                         block.m_commit = block.m_bits.clone();
                     }
@@ -201,18 +201,18 @@ public class FixedAllocator implements Allocator {
 			    str.close();
 			}
 
-			if (!m_store.isSessionPreserved()) {
-				m_freeBits += m_freeTransients;
+//			if (!m_store.isSessionPreserved()) {
+			m_freeBits += m_freeTransients;
 
-				// Handle re-addition to free list once transient frees are
-				// added back
-				if ((m_freeTransients == m_freeBits) && (m_freeTransients != 0)) {
-					m_freeList.add(this);
-					m_freeWaiting = false;
-				}
-
-				m_freeTransients = 0;
+			// Handle re-addition to free list once transient frees are
+			// added back
+			if ((m_freeTransients == m_freeBits) && (m_freeTransients != 0)) {
+				m_freeList.add(this);
+				m_freeWaiting = false;
 			}
+
+			m_freeTransients = 0;
+//			}
 
 			return buf;
 		} catch (IOException e) {
