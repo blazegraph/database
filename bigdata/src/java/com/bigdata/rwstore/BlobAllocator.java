@@ -40,7 +40,10 @@ public class BlobAllocator implements Allocator {
 	private int m_sortAddr;
 	private ArrayList m_freeList;
 	private long m_startAddr;
-	// @todo javadoc. why 254?
+	/**
+	 * There are 256 ints in a BlobAllocator, the first is used to provide the
+	 * sortAddr, and the last for the checksum, leaving 254 BlobHdr addresses
+	 */
 	private int m_freeSpots = 254;
 	
 	public BlobAllocator(final RWStore store, final int sortAddr) {
@@ -60,14 +63,14 @@ public class BlobAllocator implements Allocator {
 		return false;
 	}
 
-	// @todo javadoc.  Why is this method a NOP (other than the assert).
+	/**
+	 * Should not be called directly since the PSOutputStream
+	 * manages the blob allocations.
+	 */
 	public int alloc(final RWStore store, final int size, final IAllocationContext context) {
-		assert size > (m_store.m_maxFixedAlloc-4);
-		
-		return 0;
+		throw new UnsupportedOperationException("Blob allocators do not allocate addresses directly");
 	}
 
-	// @todo why does this return false on all code paths?
 	public boolean free(final int addr, final int sze) {
 		if (sze < (m_store.m_maxFixedAlloc-4))
 			throw new IllegalArgumentException("Unexpected address size");
@@ -102,11 +105,10 @@ public class BlobAllocator implements Allocator {
 				m_freeList.add(this);
 			}
 			
+			return true;
 		} catch (IOException ioe) {
 			throw new RuntimeException(ioe);
 		}
-		
-		return false;
 	}
 	
 	public int getFirstFixedForBlob(final int addr, final int sze) {
@@ -292,7 +294,7 @@ public class BlobAllocator implements Allocator {
 			}
 		}
 
-		return 0;
+		throw new IllegalStateException("BlobAllocator unable to find free slot");
 	}
 
 	public int getRawStartAddr() {
@@ -308,7 +310,12 @@ public class BlobAllocator implements Allocator {
 	}
 
 	public void appendShortStats(final StringBuilder str, final AllocationStats[] stats) {
-		str.append("Index: " + m_index + ", address: " + getStartAddr() + ", BLOB\n");
+		if (stats == null) {
+			str.append("Index: " + m_index + ", address: " + getStartAddr() + ", BLOB\n");
+		} else {
+			stats[stats.length-1].m_filledSlots += 254 - m_freeSpots;
+			stats[stats.length-1].m_reservedSlots += 254;
+		}
 	}
 
 	public boolean isAllocated(final int offset) {
