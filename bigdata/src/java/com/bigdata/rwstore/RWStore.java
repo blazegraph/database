@@ -762,6 +762,12 @@ public class RWStore implements IStore {
 				cDefaultMetaBitsSize = strBuf.readInt();
 				
 				final int allocBlocks = strBuf.readInt();
+				strBuf.readInt(); // reserved5
+				strBuf.readInt(); // reserved6
+				strBuf.readInt(); // reserved7
+				strBuf.readInt(); // reserved8
+				strBuf.readInt(); // reserved9
+
 				m_allocSizes = new int[allocBlocks];
 				for (int i = 0; i < allocBlocks; i++) {
 					m_allocSizes[i] = strBuf.readInt();
@@ -1763,9 +1769,15 @@ public class RWStore implements IStore {
         try {
             str.writeInt(cVersion);
             str.writeLong(m_lastDeferredReleaseTime);
-            str.writeInt(cDefaultMetaBitsSize);
-            
+            str.writeInt(cDefaultMetaBitsSize);            
             str.writeInt(m_allocSizes.length);
+            
+            str.writeInt(0); // reserved5
+            str.writeInt(0); // reserved6
+            str.writeInt(0); // reserved7
+            str.writeInt(0); // reserved8
+            str.writeInt(0); // reserved9
+            
             for (int i = 0; i < m_allocSizes.length; i++) {
                 str.writeInt(m_allocSizes[i]);
             }
@@ -1973,16 +1985,21 @@ public class RWStore implements IStore {
 	 * 0x0200 == 2.00
 	 * 0x0320 == 3.20
 	 */
-	final private int cVersion = 0x0200;
+	final private int cVersion = 0x0300;
 	
     /**
      * MetaBits Header
-     * int version
-     * long deferredFree
-     * int defaultMetaBitsSize
-     * int length of allocation sizes
+     * 0 int version
+     * 1-2 int[2] long deferredFree
+     * 3 int defaultMetaBitsSize
+     * 4 int length of allocation sizes
+     * 5 int reserved
+     * 6 int reserved
+     * 7 int reserved
+     * 8 int reserved
+     * 9 int reserved
      */
-	final private int cMetaHdrFields = 5;  
+	final private int cMetaHdrFields = 10;  
 	/**
 	 * @see Options#META_BITS_SIZE
 	 */
@@ -2965,10 +2982,12 @@ public class RWStore implements IStore {
 
 	    final long currentExtent = convertAddr(m_fileSize);
 		
-		if (extent != currentExtent) {
+		if (extent > currentExtent) {
 
 		    extendFile(convertFromAddr(extent - currentExtent));
 		    
+		} else if (extent < currentExtent) {
+			throw new IllegalArgumentException("Cannot shrink RWStore extent");
 		}
 		
 	}
