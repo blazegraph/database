@@ -32,7 +32,6 @@ import java.nio.channels.FileChannel;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.IReopenChannel;
-import com.bigdata.io.writecache.BufferedWrite;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.io.writecache.WriteCache.FileChannelScatteredWriteCache;
@@ -40,8 +39,8 @@ import com.bigdata.quorum.Quorum;
 
 /**
  * Defines the WriteCacheService to be used by the RWStore.
+ * 
  * @author mgc
- *
  */
 public class RWWriteCacheService extends WriteCacheService {
 
