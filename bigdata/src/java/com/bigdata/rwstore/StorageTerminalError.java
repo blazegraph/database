@@ -24,16 +24,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore;
 
+import org.apache.log4j.Logger;
+
 public class StorageTerminalError extends Error {
-	protected Throwable m_cause;
-	protected static java.util.logging.Logger cat = java.util.logging.Logger.getLogger(StorageTerminalError.class.getName());
 	
-	public StorageTerminalError(String message, Throwable cause) {
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
+	
+	private final Throwable m_cause;
+
+	private static final transient Logger cat = Logger.getLogger(StorageTerminalError.class);
+	
+	public StorageTerminalError(final String message, final Throwable cause) {
 		super(message);
 		
 		m_cause = cause;
 		
-		cat.severe(message);
+		cat.fatal(message);
 	}
 
 	public String getMessage() {
