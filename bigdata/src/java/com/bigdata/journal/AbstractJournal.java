@@ -59,7 +59,6 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
@@ -1390,6 +1389,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * Note: The caller MUST have exclusive write access to the journal. When
 	 * the {@link ConcurrencyManager} is used, that means that the caller MUST
 	 * have an exclusive lock on the {@link WriteExecutorService}.
+	 * <p>
+	 * Note: The {@link BufferMode#DiskRW} does NOT support this operation. This
+	 * is because it stores meta-allocation information at the end of the file,
+	 * which makes it impossible to shrink the file. Therefore this method will
+	 * return without causing the file on disk to be shrunk for the RWStore.
 	 */
 	public void truncate() {
 
@@ -1400,6 +1404,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		final IBufferStrategy backingBuffer = getBufferStrategy();
 
+		switch (backingBuffer.getBufferMode()) {
+		case DiskRW:
+			/*
+			 * Operation is not supported for the RWStore.
+			 */
+			return;
+		default:
+			break;
+		}
+		
 		final long oldExtent = backingBuffer.getExtent();
 
 		final long newExtent = backingBuffer.getHeaderSize() + backingBuffer.getNextOffset();
