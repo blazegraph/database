@@ -27,34 +27,34 @@ package com.bigdata.rwstore;
 import java.io.*;
 
 public class FixedOutputStream extends OutputStream {
-	byte m_buf[];
-	int m_count = 0;
+	private final byte m_buf[];
+	private int m_count = 0;
 	
-	public FixedOutputStream(byte buf[]) {
+	public FixedOutputStream(final byte buf[]) {
 		m_buf = buf;
 	}
 
 	/****************************************************************
 	 * write a single 4 byte integer
 	 **/
-  public void writeInt(int b) {
+  public void writeInt(final int b) {
   	m_buf[m_count++] = (byte) ((b >>> 24) & 0xFF);
   	m_buf[m_count++] = (byte) ((b >>> 16) & 0xFF);
   	m_buf[m_count++] = (byte) ((b >>> 8) & 0xFF);
   	m_buf[m_count++] = (byte) ((b >>> 0) & 0xFF);
   }
 
-  public void write(int b) throws IOException {
+  public void write(final int b) throws IOException {
   	m_buf[m_count++] = (byte) b;
   }
   
-  public void write(byte b[], int off, int len) throws IOException {
+  public void write(final byte b[], final int off, final int len) throws IOException {
 		System.arraycopy(b, off, m_buf, m_count, len);
 		
 		m_count += len;
   }
 
-	public void writeLong(long txReleaseTime) {
+	public void writeLong(final long txReleaseTime) {
 		writeInt((int) (txReleaseTime >> 32));
 		writeInt((int) txReleaseTime & 0xFFFFFFFF);
 	}
