@@ -1945,16 +1945,14 @@ public class RWStore implements IStore {
      *         number of metabits.
      */
 	private int getRequiredMetaBitsStorage() {
-		int ints = 1 + m_allocSizes.length; // length prefixed alloc sizes
-		ints += m_metaBits.length;
+		int ints = cMetaHdrFields;
+		ints += m_allocSizes.length + m_metaBits.length;
 		
-		// need to handle number of modified blocks
+		// add the maximum number of new metaBits storage that may be
+		//	needed to save the current committed objects
 		final int commitInts = ((32 + m_commitList.size()) / 32);
-		final int allocBlocks = (8 + commitInts)/8;
-		ints += 9 * allocBlocks;
-		
-		ints += 2; // for deferredFreeListAddr and size
-		ints += 1; // for version
+		final int allocBlocks = (cDefaultMetaBitsSize - 1 + commitInts)/(cDefaultMetaBitsSize-1);
+		ints += cDefaultMetaBitsSize * allocBlocks;
 		
 		return ints*4; // return as bytes
 	}
@@ -1983,7 +1981,14 @@ public class RWStore implements IStore {
 	 */
 	final private int cVersion = 0x0200;
 	
-	final private int cMetaHdrFields = 5; // version, deferredFree(long),
+    /**
+     * MetaBits Header
+     * int version
+     * long deferredFree
+     * int defaultMetaBitsSize
+     * int length of allocation sizes
+     */
+	final private int cMetaHdrFields = 5;  
 	/**
 	 * @see Options#META_BITS_SIZE
 	 */
@@ -2403,10 +2408,13 @@ public class RWStore implements IStore {
 	 * number of filled slots | store used
 	 */
 	public void showAllocators(final StringBuilder str) {
-		final AllocationStats[] stats = new AllocationStats[m_allocSizes.length];
-		for (int i = 0; i < stats.length; i++) {
+		final AllocationStats[] stats = new AllocationStats[m_allocSizes.length+1];
+		for (int i = 0; i < stats.length-1; i++) {
 			stats[i] = new AllocationStats(m_allocSizes[i]*64);
 		}
+		// for BLOBs
+		stats[stats.length-1] = new AllocationStats(0);
+		
 		final Iterator<Allocator> allocs = m_allocs.iterator();
 		while (allocs.hasNext()) {
 			Allocator alloc = (Allocator) allocs.next();
@@ -2437,10 +2445,9 @@ public class RWStore implements IStore {
 			tfilled += filled;
 			tfilledSlots += stats[i].m_filledSlots;
 		}
-		for (int i = 0; i < stats.length; i++) {
+		for (int i = 0; i < stats.length-1; i++) {
 		    final long reserved = stats[i].m_reservedSlots * stats[i].m_blockSize;
 			final long filled = stats[i].m_filledSlots * stats[i].m_blockSize;
-			
 			str.append(padRight("" + stats[i].m_blockSize, 10));
 			str.append(padLeft("" + stats[i].m_filledSlots, 12) + padLeft("" + stats[i].m_reservedSlots, 12));
 			str.append(padLeft("" + filled, 14) + padLeft("" + reserved, 14));
@@ -2448,7 +2455,12 @@ public class RWStore implements IStore {
 			str.append(padLeft("" + (treserved==0?0:(reserved * 100 / treserved)) + "%", 8));
 			str.append("\n");
 		}
-        str.append(padRight("Totals", 10));
+		// lastly some BLOB stats - only interested in used/reserved slots
+		str.append(padRight("BLOB", 10));
+		str.append(padLeft("" + stats[stats.length-1].m_filledSlots, 12) + padLeft("" + stats[stats.length-1].m_reservedSlots, 12));
+		str.append("\n");
+
+		str.append(padRight("Totals", 10));
         str.append(padLeft("" + tfilledSlots, 12));
         str.append(padLeft("" + treservedSlots, 12));
         str.append(padLeft("" + tfilled, 14));
@@ -2831,25 +2843,31 @@ public class RWStore implements IStore {
      * data from that into the passed byte array.
      */
     public int registerBlob(final int addr) {
-		BlobAllocator ba = null;
-		if (m_freeBlobs.size() > 0) {
-			ba = (BlobAllocator) m_freeBlobs.get(0);
+		m_allocationLock.lock();
+		try {
+			BlobAllocator ba = null;
+			if (m_freeBlobs.size() > 0) {
+				ba = (BlobAllocator) m_freeBlobs.get(0);
+			}
+			if (ba == null) {
+				final Allocator lalloc = (Allocator) m_allocs.get(m_allocs.size() - 1);
+				final int psa = lalloc.getRawStartAddr(); // previous block
+															// start address
+				assert (psa - 1) > m_nextAllocation;
+				ba = new BlobAllocator(this, psa - 1);
+				ba.setFreeList(m_freeBlobs); // will add itself to the free list
+				ba.setIndex(m_allocs.size());
+				m_allocs.add(ba);
+			}
+
+			if (!m_commitList.contains(ba)) {
+				m_commitList.add(ba);
+			}
+
+			return ba.register(addr);
+		} finally {
+			m_allocationLock.unlock();
 		}
-		if (ba == null) {
-		    final Allocator lalloc = (Allocator) m_allocs.get(m_allocs.size()-1);
-			final int psa = lalloc.getRawStartAddr(); // previous block start address
-			assert (psa-1) > m_nextAllocation;
-			ba = new BlobAllocator(this, psa-1);
-			ba.setFreeList(m_freeBlobs); // will add itself to the free list
-			ba.setIndex(m_allocs.size());
-			m_allocs.add(ba);
-		}
-		
-		if (!m_commitList.contains(ba)) {
-			m_commitList.add(ba);
-		}
-		
-		return ba.register(addr);
 	}
 
 	public void addToCommit(final Allocator allocator) {
