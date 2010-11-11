@@ -915,7 +915,7 @@ public class RWStore implements IStore {
 						while (fixedSize < allocSize)
 							fixedSize = 64 * m_allocSizes[++index];
 
-						allocator = new FixedAllocator(this, allocSize, m_writeCache);
+						allocator = new FixedAllocator(this, allocSize);//, m_writeCache);
 
 						freeList = m_freeFixed[index];
 					} else {
@@ -969,7 +969,7 @@ public class RWStore implements IStore {
 		    final int allocSize = 64 * m_allocSizes[block];
 	
             final FixedAllocator allocator = new FixedAllocator(this,
-                    allocSize, m_writeCache);
+                    allocSize);//, m_writeCache);
 
 			allocator.setIndex(m_allocs.size());
 			
@@ -1480,7 +1480,7 @@ public class RWStore implements IStore {
 					final ArrayList<FixedAllocator> list = m_freeFixed[i];
 					if (list.size() == 0) {
 
-						allocator = new FixedAllocator(this, block, m_writeCache);
+						allocator = new FixedAllocator(this, block);//, m_writeCache);
 						allocator.setFreeList(list);
 						allocator.setIndex(m_allocs.size());
 

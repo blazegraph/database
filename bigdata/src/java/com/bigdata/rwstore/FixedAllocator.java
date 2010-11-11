@@ -42,7 +42,7 @@ public class FixedAllocator implements Allocator {
     
     private static final Logger log = Logger.getLogger(FixedAllocator.class);
 
-	final private RWWriteCacheService m_writeCache;
+//	final private RWWriteCacheService m_writeCache;
 	volatile private int m_freeBits;
 	volatile private int m_freeTransients;
 
@@ -298,7 +298,7 @@ public class FixedAllocator implements Allocator {
 	 * @param preserveSessionData
 	 * @param cache
 	 */
-	FixedAllocator(final RWStore store, final int size, final RWWriteCacheService cache) {
+	FixedAllocator(final RWStore store, final int size) {//, final RWWriteCacheService cache) {
 		m_diskAddr = 0;
 		m_store = store;
 
@@ -323,7 +323,7 @@ public class FixedAllocator implements Allocator {
 			m_bitSize = 32;
 		}
 
-		m_writeCache = cache;
+//		m_writeCache = cache;
 
 		// number of blocks in this allocator, bitSize plus 1 for start address
 		final int numBlocks = 255 / (m_bitSize + 1);
@@ -335,7 +335,7 @@ public class FixedAllocator implements Allocator {
 		 */
 		m_allocBlocks = new ArrayList<AllocBlock>(numBlocks);
 		for (int i = 0; i < numBlocks; i++) {
-			m_allocBlocks.add(new AllocBlock(0, m_bitSize, m_writeCache));
+			m_allocBlocks.add(new AllocBlock(0, m_bitSize));//, cache));
 		}
 
 		m_freeTransients = 0;

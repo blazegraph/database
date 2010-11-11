@@ -26,7 +26,6 @@ package com.bigdata.rwstore;
 
 import java.util.ArrayList;
 
-import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.rwstore.RWStore.AllocationStats;
 
 /**
@@ -36,6 +35,10 @@ import com.bigdata.rwstore.RWStore.AllocationStats;
  *       {@link #m_commit} final fields and then modify {@link FixedAllocator}
  *       to use {@link System#arraycopy(Object, int, Object, int, int)} to copy
  *       the data rather than cloning it.
+ * 
+ * @todo Review the locks held during reads against {@link AllocBlock}. Is it
+ *       possible that we could have updates which are not being made visible to
+ *       readers?
  * 
  * @todo change to use long[]s.
  */
@@ -67,20 +70,20 @@ public class AllocBlock {
 	 * Just the newly allocated bits. This will be copied onto {@link #m_commit}
 	 * when the current native transaction commits.
 	 */
-	int m_bits[];
+	final int m_bits[];
 	/**
 	 * All of the bits from the commit point on entry to the current native
 	 * transaction plus any newly allocated bits.
 	 */
 	int m_transients[];
-	/**
-	 * Used to clear an address on the {@link WriteCacheService} if it has been
-	 * freed.
-	 */
-	private final RWWriteCacheService m_writeCache;
+//	/**
+//	 * Used to clear an address on the {@link WriteCacheService} if it has been
+//	 * freed.
+//	 */
+//	private final RWWriteCacheService m_writeCache;
 
-	AllocBlock(final int addrIsUnused, final int bitSize, final RWWriteCacheService cache) {
-		m_writeCache = cache;
+	AllocBlock(final int addrIsUnused, final int bitSize) {//, final RWWriteCacheService cache) {
+//		m_writeCache = cache;
 		m_ints = bitSize;
 		m_commit = new int[bitSize];
 		m_bits = new int[bitSize];
@@ -116,16 +119,16 @@ public class AllocBlock {
 		if (!RWStore.tstBit(m_bits, bit)) {
 			throw new IllegalArgumentException("Freeing bit not set");
 		}
-		
-		// Allocation optimization - if bit NOT set in committed memory then
-		// clear
-		// the transient bit to permit reallocation within this transaction.
-		//
-		// Note that with buffered IO there is also an opportunity to avoid
-		// output to
-		// the file by removing any pending write to the now freed address. On
-		// large
-		// transaction scopes this may be significant.
+
+		/*
+		 * Allocation optimization - if bit NOT set in committed memory then
+		 * clear the transient bit to permit reallocation within this
+		 * transaction.
+		 * 
+		 * Note that with buffered IO there is also an opportunity to avoid
+		 * output to the file by removing any pending write to the now freed
+		 * address. On large transaction scopes this may be significant.
+		 */
 		RWStore.clrBit(m_bits, bit);
 
 		if (!RWStore.tstBit(m_commit, bit)) {
@@ -190,7 +193,7 @@ public class AllocBlock {
 		return allocBits;
 	}
 
-	public String getStats(AllocationStats stats) {
+	public String getStats(final AllocationStats stats) {
 		final int total = m_ints * 32;
 		final int allocBits = getAllocBits();
 
