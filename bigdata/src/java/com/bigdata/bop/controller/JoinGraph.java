@@ -880,6 +880,11 @@ public class JoinGraph extends PipelineOp {
 			 * will be falsely high by whatever ratio the chosen vertex
 			 * cardinality exceeds the one having the minimum cardinality which
 			 * is connected via an edge to the target vertex).
+			 * 
+			 * FIXME I am not convinced that this approach is quite right. I am
+			 * also not convinced that this approach will correctly carry the
+			 * additional metadata on the EdgeSample (exact, estimate overflow
+			 * and underflow, etc).
 			 */
 			final VertexSample moreSelectiveVertexSample = vSource.sample.rangeCount < vTarget.sample.rangeCount ? vSource.sample
 					: vTarget.sample;
