@@ -627,7 +627,8 @@ public class TestJoinGraphOnLubm extends TestCase2 {
 			 */
 			final Path p0 = new Path(g.getEdge(v2, v3));
 			final Path p1 = new Path(g.getEdge(v2, v4));
-			final Path[] paths_t0 = new Path[] { p0, p1 };
+			final Path p2 = new Path(g.getEdge(v4, v1));
+			final Path[] paths_t0 = new Path[] { p0, p1, p2 };
 			System.err.println("\n*** Paths @ t0\n"
 					+ JoinGraph.showTable(paths_t0));
 
@@ -638,7 +639,7 @@ public class TestJoinGraphOnLubm extends TestCase2 {
 //				System.err.println("Selected path: " + selected_t0);
 //
 //			}
-			
+
 			/*
 			 * The set of one step extensions of those paths.
 			 * 
@@ -648,27 +649,46 @@ public class TestJoinGraphOnLubm extends TestCase2 {
 			 * distinct from all other paths already generated in this breadth
 			 * first expansion of the search space. (ROX further constrains the
 			 * new paths to extend the stop vertex of the path from which they
-			 * are derived.) 
+			 * are derived.)
+			 * 
+			 * @todo always label edges by either minimum bopId or minimum
+			 * estimated cardinality (with tie broken by bopId)? When extending
+			 * a path in which more than one edge can reach the target vertex,
+			 * always chose the edge having the source vertex with the minimum
+			 * cardinality?
 			 */
 			final Path[] paths_t1 = new Path[] {//
+				// t0
+			    p0, // (2,3)
+			    p1, // (2,4)
+			    p2, // (4,1)
+			    // t1
 				p0.addEdge(queryEngine, limit, g.getEdge(v2, v4)), // aka (v3,v4)
 				p0.addEdge(queryEngine, limit, g.getEdge(v3, v0)), //
 				p0.addEdge(queryEngine, limit, g.getEdge(v3, v5)), //
+				//
 				p1.addEdge(queryEngine, limit, g.getEdge(v4, v1)), //
 				p1.addEdge(queryEngine, limit, g.getEdge(v4, v3)), //
 				p1.addEdge(queryEngine, limit, g.getEdge(v4, v5)), //
+				//
+				p2.addEdge(queryEngine, limit, g.getEdge(v1, v5)), // aka (4,5)
+				p2.addEdge(queryEngine, limit, g.getEdge(v4, v3)), //
+				p2.addEdge(queryEngine, limit, g.getEdge(v4, v2)), //
+
 			};
 
 			System.err.println("\n*** Paths @ t1\n"
 					+ JoinGraph.showTable(paths_t1));
 
-			final Path selected_t1 = g.getSelectedJoinPath(paths_t1);
-		
-			if (selected_t1 != null) {
-
-				System.err.println("Selected path: " + selected_t1);
-
-			}
+			g.pruneJoinPaths(paths_t1);
+			
+//			final Path selected_t1 = g.getSelectedJoinPath(paths_t1);
+//		
+//			if (selected_t1 != null) {
+//
+//				System.err.println("Selected path: " + selected_t1);
+//
+//			}
 
 		}
 
