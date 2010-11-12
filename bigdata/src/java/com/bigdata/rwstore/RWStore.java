@@ -281,6 +281,8 @@ public class RWStore implements IStore {
 	static final int ALLOCATION_SCALEUP = 16; // multiplier to convert allocations based on minimum allocation of 32k
 	static private final int META_ALLOCATION = 8; // 8 * 32K is size of meta Allocation
 
+	// Maximum fixed allocs in a BLOB, but do restrict to size that will fit within a single fixed allocation
+	// Ignored
 	static final int BLOB_FIXED_ALLOCS = 2048;
 //	private ICommitCallback m_commitCallback;
 //
@@ -578,10 +580,13 @@ public class RWStore implements IStore {
 			}
 			
             final int maxBlockLessChk = m_maxFixedAlloc-4;
-            // set this at blob header references max 4096 fixed allocs
-            // meaning that header may itself be a blob if max fixed is
-            // less than 16K
-            m_maxBlobAllocSize = (BLOB_FIXED_ALLOCS * maxBlockLessChk);
+            // ensure that BLOB header cannot itself be a BLOB
+//            int blobFixedAlocs = maxBlockLessChk/4;
+//            if (blobFixedAlocs > RWStore.BLOB_FIXED_ALLOCS)
+//            	blobFixedAlocs = RWStore.BLOB_FIXED_ALLOCS;
+//            m_maxBlobAllocSize = ((maxBlockLessChk/4) * maxBlockLessChk);
+            
+            m_maxBlobAllocSize = Integer.MAX_VALUE;
             
 			assert m_maxFixedAlloc > 0;
 			
@@ -754,8 +759,9 @@ public class RWStore implements IStore {
 		
 				final DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
 				
+				// Can handle minor store version incompatibility
 				final int storeVersion = strBuf.readInt();
-				if (storeVersion != cVersion) {
+				if ((storeVersion & 0xFF00) != (cVersion & 0xFF00)) {
 					throw new IllegalStateException("Incompatible RWStore header version");
 				}
 				m_lastDeferredReleaseTime = strBuf.readLong();
@@ -1105,13 +1111,14 @@ public class RWStore implements IStore {
                     	}
                     }
                     
-					final Allocator na = getBlock((int) addr);
-					if (! (na instanceof BlobAllocator)) {
-						throw new IllegalStateException("Invalid Allocator index");
-					}
-					final BlobAllocator ba = (BlobAllocator) na;
-					final int hdraddr = ba.getBlobHdrAddress(getOffset((int) addr));
-					getData(hdraddr, hdrbuf); // read in header - could itself be a blob!
+//					final Allocator na = getBlock((int) addr);
+//					if (! (na instanceof BlobAllocator)) {
+//						throw new IllegalStateException("Invalid Allocator index");
+//					}
+//					final BlobAllocator ba = (BlobAllocator) na;
+//					final int hdraddr = ba.getBlobHdrAddress(getOffset((int) addr));
+//					getData(hdraddr, hdrbuf); // read in header - could itself be a blob!
+                    getData(addr, hdrbuf); // fine but MUST NOT allow header to be a BLOB!
 					final DataInputStream hdrstr = new DataInputStream(new ByteArrayInputStream(hdrbuf));
 					final int rhdrs = hdrstr.readInt();
                     if (rhdrs != nblocks) {
@@ -1369,23 +1376,27 @@ public class RWStore implements IStore {
 		}
 		m_allocationLock.lock();
 		try {
-			final Allocator alloc = getBlockByAddress(addr);
-			/*
-			 * There are a few conditions here.  If the context owns the
-			 * allocator and the allocation was made by this context then
-			 * it can be freed immediately.
-			 * The problem comes when the context is null and the allocator
-			 * is NOT owned, BUT there are active AllocationContexts, in this
-			 * situation, the free must ALWAYS be deferred.
-			 */
-			final boolean alwaysDefer = context == null && m_contexts.size() > 0;
-			if (alwaysDefer)
-				if (log.isDebugEnabled())
-					log.debug("Should defer " + physicalAddress(addr));
-			if (/*alwaysDefer ||*/ !alloc.canImmediatelyFree(addr, sze, context)) {
-				deferFree(addr, sze);
+			if (sze > m_maxFixedAlloc) {
+				freeBlob(addr, sze, context);
 			} else {
-				immediateFree(addr, sze);
+				final Allocator alloc = getBlockByAddress(addr);
+				/*
+				 * There are a few conditions here.  If the context owns the
+				 * allocator and the allocation was made by this context then
+				 * it can be freed immediately.
+				 * The problem comes when the context is null and the allocator
+				 * is NOT owned, BUT there are active AllocationContexts, in this
+				 * situation, the free must ALWAYS be deferred.
+				 */
+				final boolean alwaysDefer = context == null && m_contexts.size() > 0;
+				if (alwaysDefer)
+					if (log.isDebugEnabled())
+						log.debug("Should defer " + physicalAddress(addr));
+				if (/*alwaysDefer ||*/ !alloc.canImmediatelyFree(addr, sze, context)) {
+					deferFree(addr, sze);
+				} else {
+					immediateFree(addr, sze);
+				}
 			}
 		} finally {
 			m_allocationLock.unlock();
@@ -1393,7 +1404,34 @@ public class RWStore implements IStore {
 		
 	}
 
-//	private long immediateFreeCount = 0;
+	private boolean freeBlob(final int hdr_addr, final int sze, final IAllocationContext context) {
+		if (sze < (m_maxFixedAlloc-4))
+			throw new IllegalArgumentException("Unexpected address size");
+		
+		final int alloc = m_maxFixedAlloc-4;
+		final int blcks = (alloc - 1 + sze)/alloc;		
+		
+		// read in header block, then free each reference
+		final byte[] hdr = new byte[(blcks+1) * 4 + 4]; // add space for checksum
+		getData(hdr_addr, hdr);
+		
+		final DataInputStream instr = new DataInputStream(
+				new ByteArrayInputStream(hdr, 0, hdr.length-4) );
+		try {
+			final int allocs = instr.readInt();
+			for (int i = 0; i < allocs; i++) {
+				final int nxt = instr.readInt();
+				free(nxt, m_maxFixedAlloc);
+			}
+			free(hdr_addr, hdr.length);
+			
+			return true;
+		} catch (IOException ioe) {
+			throw new RuntimeException(ioe);
+		}
+	}
+
+	//	private long immediateFreeCount = 0;
 	private void immediateFree(final int addr, final int sze) {
 		
 		switch (addr) {
@@ -1573,9 +1611,9 @@ public class RWStore implements IStore {
         
         if (size > (m_maxFixedAlloc - 4)) {
         
-            if (size > (BLOB_FIXED_ALLOCS * (m_maxFixedAlloc - 4)))
+            if (size > getMaxBlobSize())
                 throw new IllegalArgumentException(
-                        "Allocation request beyond maximum BLOB");
+                        "Allocation request beyond maximum BLOB of " + getMaxBlobSize());
 
             if (log.isTraceEnabled())
                 log.trace("BLOB ALLOC: " + size);
@@ -1585,8 +1623,8 @@ public class RWStore implements IStore {
             try {
                 
                 int i = 0;
-                final int lsize = size - 512;
-                while (i < lsize) {
+                final int blocks = size/512;
+                for (int b = 0; b < blocks; b++) {
                     psout.write(buf, i, 512); // add 512 bytes at a time
                     i += 512;
                 }
@@ -1984,8 +2022,14 @@ public class RWStore implements IStore {
 	 * Use BCD-style numbering so
 	 * 0x0200 == 2.00
 	 * 0x0320 == 3.20
+	 * 
+	 * The minor byte values should maintain binary compatibility, with
+	 * major bytes
+	 * Versions
+	 * 0x0300 - extended header to include reserved ints
+	 * 0x0400 - removed explicit BlobAllocators
 	 */
-	final private int cVersion = 0x0300;
+	final private int cVersion = 0x0400;
 	
     /**
      * MetaBits Header
@@ -2419,12 +2463,10 @@ public class RWStore implements IStore {
 	 * number of filled slots | store used
 	 */
 	public void showAllocators(final StringBuilder str) {
-		final AllocationStats[] stats = new AllocationStats[m_allocSizes.length+1];
-		for (int i = 0; i < stats.length-1; i++) {
+		final AllocationStats[] stats = new AllocationStats[m_allocSizes.length];
+		for (int i = 0; i < stats.length; i++) {
 			stats[i] = new AllocationStats(m_allocSizes[i]*64);
 		}
-		// for BLOBs
-		stats[stats.length-1] = new AllocationStats(0);
 		
 		final Iterator<Allocator> allocs = m_allocs.iterator();
 		while (allocs.hasNext()) {
@@ -2456,7 +2498,7 @@ public class RWStore implements IStore {
 			tfilled += filled;
 			tfilledSlots += stats[i].m_filledSlots;
 		}
-		for (int i = 0; i < stats.length-1; i++) {
+		for (int i = 0; i < stats.length; i++) {
 		    final long reserved = stats[i].m_reservedSlots * stats[i].m_blockSize;
 			final long filled = stats[i].m_filledSlots * stats[i].m_blockSize;
 			str.append(padRight("" + stats[i].m_blockSize, 10));
@@ -2466,9 +2508,6 @@ public class RWStore implements IStore {
 			str.append(padLeft("" + (treserved==0?0:(reserved * 100 / treserved)) + "%", 8));
 			str.append("\n");
 		}
-		// lastly some BLOB stats - only interested in used/reserved slots
-		str.append(padRight("BLOB", 10));
-		str.append(padLeft("" + stats[stats.length-1].m_filledSlots, 12) + padLeft("" + stats[stats.length-1].m_reservedSlots, 12));
 		str.append("\n");
 
 		str.append(padRight("Totals", 10));
@@ -3405,6 +3444,11 @@ public class RWStore implements IStore {
 		int ret = m_minFixedAlloc;
 		while (data_len > ret) {
 			i++;
+			// If we write directly to the writeCache then the data_len
+			//	may be larger than largest slot
+			if (i == m_allocSizes.length)
+				return data_len;
+			
 			ret = 64 * m_allocSizes[i];
 		}
 		
@@ -4059,7 +4103,7 @@ public class RWStore implements IStore {
     }
 
 	public int getMaxBlobSize() {
-		return this.m_maxBlobAllocSize-4;
+		return m_maxBlobAllocSize-4; // allow for checksum
 	}
 
 }

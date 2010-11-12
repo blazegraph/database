@@ -126,6 +126,15 @@ public class TestRWJournal extends AbstractJournalTestCase {
         properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
                 + writeCacheEnabled);
 
+        // number of bits in FixedAllocators
+        properties.setProperty(com.bigdata.rwstore.RWStore.Options.DEFAULT_FREE_BITS_THRESHOLD, "1000");
+        
+        // Size of META_BITS_BLOCKS
+        properties.setProperty(com.bigdata.rwstore.RWStore.Options.DEFAULT_META_BITS_SIZE, "9");
+
+        // properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,5,8,12,16,32"); // 2K max
+        properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,5,8,12,16"); // 1K
+
         return properties;
 
     }
@@ -238,6 +247,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
         }
 
         public Properties getProperties() {
+        	
+        	System.out.println("TestRWJournal:getProperties");
 
             final Properties properties = super.getProperties();
 
@@ -254,8 +265,24 @@ public class TestRWJournal extends AbstractJournalTestCase {
             properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
                     + writeCacheEnabled);
 
+            // number of bits in FixedAllocators
+            properties.setProperty(RWStore.Options.FREE_BITS_THRESHOLD, "50");
+            
+            // Size of META_BITS_BLOCKS
+            properties.setProperty(RWStore.Options.META_BITS_SIZE, "9");
+
+            // properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,5,8,12,16,32,48,64,128"); // 8K - max blob = 2K * 8K = 16M
+            // properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,5,8,12,16,32,48,64,128"); // 2K max
+            properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,5,8,12,16"); // 2K max
+
             return properties;
 
+        }
+        
+        protected IRawStore getStore() {
+            
+            return new Journal(getProperties());
+            
         }
         
 //        /**
@@ -758,10 +785,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 int endBlob = 1024 * 1256;
                 int[] faddrs = allocBatchBuffer(rw, 100, startBlob, endBlob);
                 
-                System.out.println("Final allocation: " + rw.physicalAddress(faddrs[99])
-                		+ ", allocations: " + (rw.getTotalAllocations() - numAllocs)
-                		+ ", allocated bytes: " + (rw.getTotalAllocationsSize() - startAllocations));
-            } finally {
+				final StringBuilder str = new StringBuilder();
+				rw.showAllocators(str);
+                System.out.println(str);
+                } finally {
 
                 store.destroy();
             
@@ -776,17 +803,17 @@ public class TestRWJournal extends AbstractJournalTestCase {
             final Journal store = (Journal) getStore();
 
             try {
+                final RWStrategy bs = (RWStrategy) store
+                .getBufferStrategy();
 
-                byte[] buf = new byte[1024 * 2048]; // 2Mb buffer of random data
+                final RWStore rw = bs.getRWStore();
+        
+
+                byte[] buf = new byte[2 * 1024 * 1024]; // 5Mb buffer of random data
                 r.nextBytes(buf);
                 
                 ByteBuffer bb = ByteBuffer.wrap(buf);
 
-                RWStrategy bs = (RWStrategy) store
-                        .getBufferStrategy();
-
-                RWStore rw = bs.getRWStore();
-                
                 long faddr = bs.write(bb); // rw.alloc(buf, buf.length);
                 
                 log.info("Blob Allocation at " + rw.convertFromAddr(faddr));
@@ -842,6 +869,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 
                 assertEquals(bb, rdBuf);
                 
+                // now delete the memory
+                bs.delete(faddr); // immediateFree!
+
+                faddr = bs.write(bb); // rw.alloc(buf, buf.length);
+                bb.position(0);
+                
                 System.out.println("Now commit to disk");
                 
                 store.commit();
@@ -862,12 +895,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 rw.checkDeferredFrees(true, store);
                 
                 try {
-                	rdBuf = bs.read(faddr); // should fail with illegal state
+                	rdBuf = bs.read(faddr); // should fail with illegal argument
                 	throw new RuntimeException("Fail");
                 } catch (Exception ise) {
-                	assertTrue("Expected IllegalStateException reading from " + (faddr >> 32) + " instead got: " + ise, ise instanceof IllegalStateException);
+                	assertTrue("Expected IllegalArgumentException reading from " + (faddr >> 32) + " instead got: " + ise, ise instanceof IllegalArgumentException);
                 }
-
+                
             } finally {
 
                 store.destroy();
@@ -1038,9 +1071,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
             	// allocBatch(store, 1, 32, 650, 100000000);
             	allocBatch(store, 1, 32, 650, 50000);
             	store.commit();
-				System.out.println("Final allocations: " + rw.getTotalAllocations()
-						+ ", allocated bytes: " + rw.getTotalAllocationsSize() + ", file length: "
-						+ rw.getStoreFile().length());
+				final StringBuilder str = new StringBuilder();
+				rw.showAllocators(str);
+                System.out.println(str);
 				store.close();
 				System.out.println("Re-open Journal");
 				store = (Journal) getStore();
@@ -1065,7 +1098,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
            long realAddr = 0;
            try {
            	// allocBatch(store, 1, 32, 650, 100000000);
-           	pureAllocBatch(store, 1, 32, 3075, 300000); // cover wider range of blocks
+           	pureAllocBatch(store, 1, 32, rw.m_maxFixedAlloc-4, 300000); // cover wider range of blocks
            	store.commit();
 				System.out.println("Final allocations: " + rw.getTotalAllocations()
 						+ ", allocated bytes: " + rw.getTotalAllocationsSize() + ", file length: "
@@ -1106,7 +1139,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
            .getBufferStrategy();
            
            RWStore rw = bs.getRWStore();
-           int freeAddr[] = new int[2048];
+           int freeAddr[] = new int[512];
            int freeCurs = 0;
 	       	for (int i = 0; i < grp; i++) {
 	       		int alloc = min + r.nextInt(sze-min);
