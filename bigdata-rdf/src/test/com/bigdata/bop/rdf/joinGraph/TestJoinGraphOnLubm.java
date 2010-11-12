@@ -16,17 +16,14 @@ import junit.framework.TestCase2;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.controller.JoinGraph;
-import com.bigdata.bop.controller.JoinGraph.Edge;
 import com.bigdata.bop.controller.JoinGraph.JGraph;
 import com.bigdata.bop.controller.JoinGraph.Path;
-import com.bigdata.bop.controller.JoinGraph.Vertex;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.ITx;
@@ -289,11 +286,29 @@ public class TestJoinGraphOnLubm extends TestCase2 {
 
 //        if(log.isInfoEnabled())
 //        	log.info
-        	System.out.println(closureStats.toString());
-        	
+		System.out.println(closureStats.toString());
+		
 	}
 
-	public void test_queryOptimizer() throws Exception {
+	/**
+	 * LUBM Query 2.
+	 * <pre>
+	 * PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+	 * PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+	 * SELECT ?x ?y ?z
+	 * WHERE{
+	 * 	?x a ub:GraduateStudent .
+	 * 	?y a ub:University .
+	 * 	?z a ub:Department .
+	 * 	?x ub:memberOf ?z .
+	 * 	?z ub:subOrganizationOf ?y .
+	 * 	?x ub:undergraduateDegreeFrom ?y
+	 * }
+	 * </pre>
+	 * 
+	 * @throws Exception
+	 */
+	public void test_query2() throws Exception {
 
 		final AbstractTripleStore database = (AbstractTripleStore) jnl
 				.getResourceLocator()
@@ -418,229 +433,187 @@ public class TestJoinGraphOnLubm extends TestCase2 {
 		// new NV(JoinGraph.Annotations.SAMPLE_SIZE, 100) //
 		// );
 
-		final JGraph g = new JGraph(preds);
-
-		final int limit = 100;
-
-		final QueryEngine queryEngine = QueryEngineFactory
-				.getQueryController(jnl/* indexManager */);
-
-		final BOpContextBase context = new BOpContextBase(queryEngine);
-
-		System.err.println("joinGraph=" + g.toString());
-
-		/*
-		 * Sample the vertices.
-		 * 
-		 * @todo Sampling for scale-out not yet finished.
-		 * 
-		 * @todo Re-sampling might always produce the same sample depending
-		 * on the sample operator impl (it should be random, but it is not).
-		 */
-		g.sampleVertices(context, limit);
-
-		System.err.println("joinGraph=" + g.toString());
-
-		/*
-		 * Estimate the cardinality and weights for each edge, obtaining the
-		 * Edge with the minimum estimated cardinality. This will be the
-		 * starting point for the join graph evaluation.
-		 * 
-		 * @todo It would be very interesting to see the variety and/or
-		 * distribution of the values bound when the edge is sampled. This
-		 * can be easily done using a hash map with a counter. That could
-		 * tell us a lot about the cardinality of the next join path
-		 * (sampling the join path also tells us a lot, but it does not
-		 * explain it as much as seeing the histogram of the bound values).
-		 * I believe that there are some interesting online algorithms for
-		 * computing the N most frequent observations and the like which
-		 * could be used here.
-		 * 
-		 * @todo We should be saving the materialized intermediate results,
-		 * if not for the initialization, then for the chain sampling.
-		 * 
-		 * FIXME ROX is choosing the starting edge based on the minimum
-		 * estimated cardinality. However, it is possible for there to be
-		 * more than one edge with an estimated cardinality which is
-		 * substantially to the minimum estimated cardinality. It would be
-		 * best to start from multiple vertices so we can explore join paths
-		 * which begin with those alternative starting vertices as well.
-		 * (LUBM Q2 is an example of such a query).
-		 */
-		g.estimateEdgeWeights(queryEngine, limit);
-
-		System.err.println("joinGraph=" + g.toString());
-
-		/*
-		 * The starting vertex for chain sampling is the vertex in the edge
-		 * with the minimum estimated cardinality whose range count is
-		 * smallest. Beginning with that vertex, create a set of paths for
-		 * each edge branching from that vertex. Since those edges were
-		 * already sampled, we can immediately form a set of join paths with
-		 * their estimated cardinality and hit ratios (aka scale factors).
-		 * 
-		 * The initial set of paths consists of a single path whose sole
-		 * edge is the edge with the minimum estimated cardinality.
-		 */
-		final Edge startEdge = g
-				.getMinimumCardinalityEdge(null/* visited */);
-		
-		if (startEdge == null)
-			throw new RuntimeException("No weighted edges.");
-
-		/*
-		 * Generate a set of paths by extending that starting vertex in one step
-		 * in each possible direction. For the initial one-step extension of the
-		 * starting vertex we can reuse the estimated cardinality of each edge
-		 * in the join graph, which was already computed above.
-		 * 
-		 * @todo This starts out with the minimum cardinality vertex of the
-		 * minimum cardinality edge. This means that it will not explore plans
-		 * which start from the next best cardinality vertex or edge. It seems
-		 * to me that such plans could in some cases dominate the plans
-		 * considered by ROX for the same reason that ROX does a bit of hill
-		 * climbing to see if it is in a local minimum. I can see two reasons
-		 * why ROX might not consider such plans. One is to prune the search
-		 * space. Another has to do with the termination criteria, which might
-		 * not be able to compare plans which start from (or branch from)
-		 * different vertices.
-		 */
-//		final Path[] paths;
-//		{
-//
-//			System.err.println("startEdge="+startEdge);
-//
-//			// The starting vertex is the one with the minimum est.
-//			// cardinality.
-//			final Vertex startVertex = startEdge
-//					.getMinimumCardinalityVertex();
-//
-//			System.err.println("startVertex=" + startVertex);
-//
-//			// Find the set of edges branching from the starting vertex.
-//			final List<Edge> branches = g
-//					.getEdges(startVertex, null/* visited */);
-//
-//			if (branches.isEmpty()) {
-//
-//				// No vertices remain to be explored so we should just execute something.
-//				throw new RuntimeException("Paths can not be extended");
-//				
-//			} else if (branches.size() == 1) {
-//
-//				final Edge e = branches.get(0);
-//
-//				final Path path = new Path(new Edge[] { e });
-//
-//				// The initial sample is just the sample for that edge.
-//				path.sample = e.sample;
-//
-//				System.err.println("path=" + path);
-//
-//				paths = new Path[] { path };
-//
-//			} else {
-//
-//				final List<Path> list = new LinkedList<Path>();
-//
-//				// Create one path for each of those branches.
-//				for (Edge e : branches) {
-//
-//					if (e.v1 != startVertex && e.v2 != startVertex)
-//						continue;
-//
-//					// Create a one step path.
-//					final Path path = new Path(new Edge[] { e });
-//
-//					// The initial sample is just the sample for that edge.
-//					path.sample = e.sample;
-//
-//					System.err
-//							.println("path[" + list.size() + "]: " + path);
-//
-//					list.add(path);
-//
-//				}
-//
-//				paths = list.toArray(new Path[list.size()]);
-//
-//			}
-//
-//			System.err.println("selectedJoinPath: "
-//					+ g.getSelectedJoinPath(paths));
-//			
-//		}
-
-		/**
-		 * Initial one-step paths starting from V2. The estimated cardinality of
-		 * these paths is just the estimated cardinality of the corresponding
-		 * edge, which is something that we have already computed.
-		 * 
-		 * (V2,V3)
-		 * 
-		 * (V2,V4)
-		 * 
-		 * Paths which are one step extensions of those initial edges:
-		 * 
-		 * (V2,V3),(V{2.3},V4)
-		 * 
-		 * (V2,V3),(V3,V0)
-		 * 
-		 * (V2,V3),(V3,V5)
-		 * 
-		 * (V2,V4),(V4,V1)
-		 * 
-		 * (V2,V4),(V4,V3)
-		 * 
-		 * (v2,V4),(V4,V5)
-		 * 
-		 * @todo Next compute the estimated cardinality of these 2-step paths.
-		 * 
-		 * @todo If we are able to compare paths which branch from different
-		 *       vertices then we can also compare paths which start from
-		 *       different vertices.
-		 * 
-		 * @todo ROX probably chooses a single starting vertex in order to
-		 *       reduce the size of the search space. Allowing the path to
-		 *       branch in other ways might make the search space much bigger
-		 *       and may also require a different rule for comparing plans.
-		 */
 		{
+			final int limit = 100;
 
-			final Vertex v0 = g.getVertex(0);
-			final Vertex v1 = g.getVertex(1);
-			final Vertex v2 = g.getVertex(2);
-			final Vertex v3 = g.getVertex(3);
-			final Vertex v4 = g.getVertex(4);
-			final Vertex v5 = g.getVertex(5);
+			final QueryEngine queryEngine = QueryEngineFactory
+					.getQueryController(jnl/* indexManager */);
 
-			/*
-			 * The initial set of paths starting from the minimum estimated
-			 * cardinality vertex of the minimum estimated cardinality edge.
-			 * 
-			 * @todo build this programmtically by finding the minimum
-			 * cardinality edge and the minimum cardinality vertex and then
-			 * creating one path for each edge joining the starting vertex to
-			 * another vertex. [ROX has the constraint that there is a single
-			 * starting vertex. We might relax that constraint to allow paths to
-			 * start at more than one low cardinality vertex.]
-			 */
-			final Path p0 = new Path(g.getEdge(v2, v3));
-			final Path p1 = new Path(g.getEdge(v2, v4));
-			final Path p2 = new Path(g.getEdge(v4, v1));
-			final Path[] paths_t0 = new Path[] { p0, p1, p2 };
-			System.err.println("\n*** Paths @ t0\n"
-					+ JoinGraph.showTable(paths_t0));
+			final JGraph g = new JGraph(preds);
 
-			int round = 1;
-			final Path[] paths_t1 = g.expand(queryEngine, limit, round++, paths_t0);
-			final Path[] paths_t2 = g.expand(queryEngine, limit, round++, paths_t1);
-			final Path[] paths_t3 = g.expand(queryEngine, limit, round++, paths_t2);
-			final Path[] paths_t4 = g.expand(queryEngine, limit, round++, paths_t3);
+			g.runtimeOptimizer(queryEngine, limit);
+			
+//			final Path[] paths_t0 = g.round0(queryEngine, limit, 2/* nedges */);
+//		
+//			int round = 1;
+//			final Path[] paths_t1 = g.expand(queryEngine, limit, round++, paths_t0);
+//			final Path[] paths_t2 = g.expand(queryEngine, limit, round++, paths_t1);
+//			final Path[] paths_t3 = g.expand(queryEngine, limit, round++, paths_t2);
+//			final Path[] paths_t4 = g.expand(queryEngine, limit, round++, paths_t3);
+//			final Path[] paths_t5 = g.expand(queryEngine, limit, round++, paths_t4);
 
 		}
 
+	} // test_query2
 
-	} // test
+	/**
+	 * LUBM Query 9
+	 * <pre>
+	 * PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+	 * PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+	 * SELECT ?x ?y ?z
+	 * WHERE{
+	 * 	?x a ub:Student .
+	 * 	?y a ub:Faculty .
+	 * 	?z a ub:Course .
+	 * 	?x ub:advisor ?y .
+	 * 	?y ub:teacherOf ?z .
+	 * 	?x ub:takesCourse ?z .
+	 * }
+	 * </pre>
+	 * 
+	 * @throws Exception
+	 */
+	public void test_query9() throws Exception {
+
+		final AbstractTripleStore database = (AbstractTripleStore) jnl
+				.getResourceLocator()
+				.locate(namespace, jnl.getLastCommitTime());
+
+		if (database == null)
+			throw new RuntimeException("Not found: " + namespace);
+
+		/*
+		 * Resolve terms against the lexicon.
+		 */
+		final BigdataValueFactory f = database.getLexiconRelation()
+				.getValueFactory();
+
+		final BigdataURI rdfType = f
+				.createURI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
+
+		final BigdataURI student = f
+				.createURI("http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#Student");
+
+		final BigdataURI faculty = f
+				.createURI("http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#Faculty");
+
+		final BigdataURI course = f
+				.createURI("http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#Course");
+
+		final BigdataURI advisor = f
+				.createURI("http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#advisor");
+
+		final BigdataURI teacherOf = f
+				.createURI("http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#teacherOf");
+
+		final BigdataURI takesCourse = f
+				.createURI("http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#takesCourse");
+
+		final BigdataValue[] terms = new BigdataValue[] { rdfType, student,
+				faculty, course, advisor, teacherOf, takesCourse };
+
+		// resolve terms.
+		database.getLexiconRelation()
+				.addTerms(terms, terms.length, true/* readOnly */);
+
+		{
+			for (BigdataValue tmp : terms) {
+				System.out.println(tmp + " : " + tmp.getIV());
+				if (tmp.getIV() == null)
+					throw new RuntimeException("Not defined: " + tmp);
+			}
+		}
+
+		final IPredicate[] preds;
+		{
+			final IVariable<?> x = Var.var("x");
+			final IVariable<?> y = Var.var("y");
+			final IVariable<?> z = Var.var("z");
+
+			// The name space for the SPO relation.
+			final String[] relation = new String[] { namespace + ".spo" };
+
+			final long timestamp = jnl.getLastCommitTime();
+
+			int nextId = 0;
+
+			// ?x a ub:Student .
+			final IPredicate p0 = new SPOPredicate(new BOp[] { x,
+					new Constant(rdfType.getIV()),
+					new Constant(student.getIV()) },//
+					new NV(BOp.Annotations.BOP_ID, nextId++),//
+					new NV(IPredicate.Annotations.TIMESTAMP, timestamp),//
+					new NV(IPredicate.Annotations.RELATION_NAME, relation)//
+			);
+
+			// ?y a ub:Faculty .
+			final IPredicate p1 = new SPOPredicate(new BOp[] { y,
+					new Constant(rdfType.getIV()),
+					new Constant(faculty.getIV()) },//
+					new NV(BOp.Annotations.BOP_ID, nextId++),//
+					new NV(IPredicate.Annotations.TIMESTAMP, timestamp),//
+					new NV(IPredicate.Annotations.RELATION_NAME, relation)//
+			);
+
+			// ?z a ub:Course .
+			final IPredicate p2 = new SPOPredicate(new BOp[] { z,
+					new Constant(rdfType.getIV()),
+					new Constant(course.getIV()) },//
+					new NV(BOp.Annotations.BOP_ID, nextId++),//
+					new NV(IPredicate.Annotations.TIMESTAMP, timestamp),//
+					new NV(IPredicate.Annotations.RELATION_NAME, relation)//
+			);
+
+			// ?x ub:advisor ?y .
+			final IPredicate p3 = new SPOPredicate(new BOp[] { x,
+					new Constant(advisor.getIV()), y },//
+					new NV(BOp.Annotations.BOP_ID, nextId++),//
+					new NV(IPredicate.Annotations.TIMESTAMP, timestamp),//
+					new NV(IPredicate.Annotations.RELATION_NAME, relation)//
+			);
+
+			// ?y ub:teacherOf ?z .
+			final IPredicate p4 = new SPOPredicate(new BOp[] { y,
+					new Constant(teacherOf.getIV()), z },//
+					new NV(BOp.Annotations.BOP_ID, nextId++),//
+					new NV(IPredicate.Annotations.TIMESTAMP, timestamp),//
+					new NV(IPredicate.Annotations.RELATION_NAME, relation)//
+			);
+
+			// ?x ub:takesCourse ?z .
+			final IPredicate p5 = new SPOPredicate(new BOp[] { x,
+					new Constant(takesCourse.getIV()), z },//
+					new NV(BOp.Annotations.BOP_ID, nextId++),//
+					new NV(IPredicate.Annotations.TIMESTAMP, timestamp),//
+					new NV(IPredicate.Annotations.RELATION_NAME, relation)//
+			);
+
+			// the vertices of the join graph (the predicates).
+			preds = new IPredicate[] { p0, p1, p2, p3, p4, p5 };
+		}
+
+		{
+			final int limit = 100;
+
+			final QueryEngine queryEngine = QueryEngineFactory
+					.getQueryController(jnl/* indexManager */);
+
+			final JGraph g = new JGraph(preds);
+
+			g.runtimeOptimizer(queryEngine, limit);
+			
+//			final Path[] paths_t0 = g.round0(queryEngine, limit, 2/* nedges */);
+//		
+//			int round = 1;
+//			final Path[] paths_t1 = g.expand(queryEngine, limit, round++, paths_t0);
+//			final Path[] paths_t2 = g.expand(queryEngine, limit, round++, paths_t1);
+//			final Path[] paths_t3 = g.expand(queryEngine, limit, round++, paths_t2);
+//			final Path[] paths_t4 = g.expand(queryEngine, limit, round++, paths_t3);
+//			final Path[] paths_t5 = g.expand(queryEngine, limit, round++, paths_t4);
+
+		}
+
+	} // test_Q9
 
 }
