@@ -912,4 +912,39 @@ public class BOpUtility {
 
     }
 
+	/**
+	 * Inject (or replace) an {@link Integer} "rowId" column. This does not have
+	 * a side-effect on the source {@link IBindingSet}s.
+	 * 
+	 * @param var
+	 *            The name of the column.
+	 * @param start
+	 *            The starting value for the identifier.
+	 * @param in
+	 *            The source {@link IBindingSet}s.
+	 * 
+	 * @return The modified {@link IBindingSet}s.
+	 */
+	public static IBindingSet[] injectRowIdColumn(final IVariable var,
+			final int start, final IBindingSet[] in) {
+
+		if (in == null)
+			throw new IllegalArgumentException();
+		
+		final IBindingSet[] out = new IBindingSet[in.length];
+		
+		for (int i = 0; i < out.length; i++) {
+		
+			final IBindingSet bset = in[i].clone();
+
+			bset.set(var, new Constant<Integer>(Integer.valueOf(start + i)));
+
+			out[i] = bset;
+			
+		}
+		
+		return out;
+
+	}
+
 }
