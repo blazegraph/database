@@ -320,7 +320,7 @@ public class RWStore implements IStore {
 	private ArrayList<FixedAllocator> m_freeFixed[];
 	
 	/** lists of free blob allocators. */
-	private final ArrayList<BlobAllocator> m_freeBlobs;
+	// private final ArrayList<BlobAllocator> m_freeBlobs;
 
 	/** lists of blocks requiring commitment. */
 	private final ArrayList<Allocator> m_commitList;
@@ -520,7 +520,7 @@ public class RWStore implements IStore {
 
 		m_allocs = new ArrayList<Allocator>();
 		
-		m_freeBlobs = new ArrayList<BlobAllocator>();
+		// m_freeBlobs = new ArrayList<BlobAllocator>();
 
 		try {
 	        final RandomAccessFile m_raf = fileMetadata.getRandomAccessFile();
@@ -915,19 +915,16 @@ public class RWStore implements IStore {
 					final int allocSize = strBuf.readInt(); // if Blob < 0
 					final Allocator allocator;
 					final ArrayList<? extends Allocator> freeList;
-					if (allocSize > 0) {
-						int index = 0;
-						int fixedSize = m_minFixedAlloc;
-						while (fixedSize < allocSize)
-							fixedSize = 64 * m_allocSizes[++index];
+					assert allocSize > 0;
 
-						allocator = new FixedAllocator(this, allocSize);//, m_writeCache);
+					int index = 0;
+					int fixedSize = m_minFixedAlloc;
+					while (fixedSize < allocSize)
+						fixedSize = 64 * m_allocSizes[++index];
 
-						freeList = m_freeFixed[index];
-					} else {
-						allocator = new BlobAllocator(this, allocSize);
-						freeList = m_freeBlobs;
-					}
+					allocator = new FixedAllocator(this, allocSize);//, m_writeCache);
+
+					freeList = m_freeFixed[index];
 
 					allocator.read(strBuf);
 					allocator.setDiskAddr(i); // store bit, not physical
@@ -1757,7 +1754,7 @@ public class RWStore implements IStore {
 
 	        m_commitList.clear();
 			m_allocs.clear();
-			m_freeBlobs.clear();
+			// m_freeBlobs.clear();
 			
 			final int numFixed = m_allocSizes.length;
 			for (int i = 0; i < numFixed; i++) {
@@ -2904,33 +2901,33 @@ public class RWStore implements IStore {
      * blob data, the blob allocator retrieves the blob header and reads the
      * data from that into the passed byte array.
      */
-    public int registerBlob(final int addr) {
-		m_allocationLock.lock();
-		try {
-			BlobAllocator ba = null;
-			if (m_freeBlobs.size() > 0) {
-				ba = (BlobAllocator) m_freeBlobs.get(0);
-			}
-			if (ba == null) {
-				final Allocator lalloc = (Allocator) m_allocs.get(m_allocs.size() - 1);
-				// previous block start address
-				final int psa = lalloc.getRawStartAddr();
-				assert (psa - 1) > m_nextAllocation;
-				ba = new BlobAllocator(this, psa - 1);
-				ba.setFreeList(m_freeBlobs); // will add itself to the free list
-				ba.setIndex(m_allocs.size());
-				m_allocs.add(ba);
-			}
-
-			if (!m_commitList.contains(ba)) {
-				m_commitList.add(ba);
-			}
-
-			return ba.register(addr);
-		} finally {
-			m_allocationLock.unlock();
-		}
-	}
+//    public int registerBlob(final int addr) {
+//		m_allocationLock.lock();
+//		try {
+//			BlobAllocator ba = null;
+//			if (m_freeBlobs.size() > 0) {
+//				ba = (BlobAllocator) m_freeBlobs.get(0);
+//			}
+//			if (ba == null) {
+//				final Allocator lalloc = (Allocator) m_allocs.get(m_allocs.size() - 1);
+//				// previous block start address
+//				final int psa = lalloc.getRawStartAddr();
+//				assert (psa - 1) > m_nextAllocation;
+//				ba = new BlobAllocator(this, psa - 1);
+//				ba.setFreeList(m_freeBlobs); // will add itself to the free list
+//				ba.setIndex(m_allocs.size());
+//				m_allocs.add(ba);
+//			}
+//
+//			if (!m_commitList.contains(ba)) {
+//				m_commitList.add(ba);
+//			}
+//
+//			return ba.register(addr);
+//		} finally {
+//			m_allocationLock.unlock();
+//		}
+//	}
 
 	public void addToCommit(final Allocator allocator) {
 		if (!m_commitList.contains(allocator)) {
@@ -3108,11 +3105,11 @@ public class RWStore implements IStore {
 	public void deferFree(final int rwaddr, final int sze) {
 	    m_allocationLock.lock();
 		try {
-			m_deferredFreeOut.writeInt(rwaddr);
-
-			final Allocator alloc = getBlockByAddress(rwaddr);
-			if (alloc instanceof BlobAllocator) {
+			if (sze > this.m_maxFixedAlloc) {
+				m_deferredFreeOut.writeInt(-rwaddr);
 				m_deferredFreeOut.writeInt(sze);
+			} else {
+				m_deferredFreeOut.writeInt(rwaddr);				
 			}
 		} catch (IOException e) {
             throw new RuntimeException("Could not free: rwaddr=" + rwaddr
@@ -3207,12 +3204,11 @@ public class RWStore implements IStore {
 			
 			while (nxtAddr != 0) { // while (false && addrs-- > 0) {
 				
-				final Allocator alloc = getBlock(nxtAddr);
-				if (alloc instanceof BlobAllocator) {
+				if (nxtAddr > 0) { // Blob
 					final int bloblen = strBuf.readInt();
 					assert bloblen > 0; // a Blob address MUST have a size
 
-					immediateFree(nxtAddr, bloblen);
+					immediateFree(-nxtAddr, bloblen);
 				} else {
 					immediateFree(nxtAddr, 0); // size ignored for FreeAllocators
 				}
