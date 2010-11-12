@@ -213,6 +213,18 @@ public class TestJoinGraphOnLubm extends TestCase2 {
 
 	}
 
+	protected void tearDown() throws Exception {
+		
+		if(jnl != null) {
+			jnl.close();
+			jnl = null;
+		}
+		
+		super.tearDown();
+		
+	}
+	
+	
 	/**
 	 * Loads the data into the closureStore and computes the closure.
 	 */
