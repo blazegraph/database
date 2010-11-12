@@ -24,10 +24,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 
 import org.apache.log4j.Logger;
 
@@ -140,7 +143,7 @@ public class PSOutputStream extends OutputStream {
 	 * PSOutputStream impl.
 	 */
 	
-	private int[] m_blobHeader = null;
+	private ArrayList<Integer> m_blobHeader = null;
 	private byte[] m_buf = null;
 	private boolean m_isSaved = false;
 //	private long m_headAddr = 0;
@@ -176,11 +179,8 @@ public class PSOutputStream extends OutputStream {
 
 		m_blobThreshold = maxAlloc-4; // allow for checksum
 		
-		final int maxHdrSize = RWStore.BLOB_FIXED_ALLOCS * 4;
-		final int bufSize = m_blobThreshold > maxHdrSize ? m_blobThreshold : maxHdrSize;
-		
-		if (m_buf == null || m_buf.length != bufSize)
-			m_buf = new byte[bufSize];
+		if (m_buf == null || m_buf.length != m_blobThreshold)
+			m_buf = new byte[m_blobThreshold];
 
 		reset();
 	}
@@ -218,12 +218,16 @@ public class PSOutputStream extends OutputStream {
   	
   	if (m_count == m_blobThreshold && !m_writingHdr) {
   		if (m_blobHeader == null) {
-  			m_blobHeader = new int[RWStore.BLOB_FIXED_ALLOCS]; // max 16K
-  			m_blobHdrIdx = 0;
+  			int hdrSize = m_blobThreshold/4;
+  			if (hdrSize > RWStore.BLOB_FIXED_ALLOCS)
+  				hdrSize = RWStore.BLOB_FIXED_ALLOCS;
+  			m_blobHeader = new ArrayList<Integer>(); // only support header
+  			// m_blobHdrIdx = 0;
   		}
   		
   		final int curAddr = (int) m_store.alloc(m_buf, m_count, m_context);
-  		m_blobHeader[m_blobHdrIdx++] = curAddr;
+  		// m_blobHeader[m_blobHdrIdx++] = curAddr;
+  		m_blobHeader.add(curAddr);
   		
   		m_count = 0;
   	}
@@ -324,28 +328,40 @@ public class PSOutputStream extends OutputStream {
   	if (m_blobHeader != null) {
   		try {
   			m_writingHdr  = true; // ensure that header CAN be a BLOB
-	  		m_blobHeader[m_blobHdrIdx++] = addr;
+	  		// m_blobHeader[m_blobHdrIdx++] = addr;
+  			m_blobHeader.add(addr);
 	  		final int precount = m_count;
 	  		m_count = 0;
 			try {
-		  		writeInt(m_blobHdrIdx);
-		  		for (int i = 0; i < m_blobHdrIdx; i++) {
-		  			writeInt(m_blobHeader[i]);
+//		  		writeInt(m_blobHdrIdx);
+//		  		for (int i = 0; i < m_blobHdrIdx; i++) {
+//		  			writeInt(m_blobHeader[i]);
+//		 		}
+				int hdrBufSize = 4*(m_blobHeader.size() + 1);
+				ByteArrayOutputStream hdrbuf = new ByteArrayOutputStream(hdrBufSize);
+				DataOutputStream hdrout = new DataOutputStream(hdrbuf);
+	  			hdrout.writeInt(m_blobHeader.size());
+		  		for (int i = 0; i < m_blobHeader.size(); i++) {
+		  			hdrout.writeInt(m_blobHeader.get(i));
 		 		}
-		  		addr = (int) m_store.alloc(m_buf, m_count, m_context);
+				hdrout.flush();
+				
+				byte[] outbuf = hdrbuf.toByteArray();
+		  		addr = (int) m_store.alloc(outbuf, hdrBufSize, m_context);
 		  		
-					if (m_blobHdrIdx != ((m_blobThreshold - 1 + m_bytesWritten - m_count) / m_blobThreshold)) {
-						throw new IllegalStateException(
-								"PSOutputStream.save at : " + addr
-										+ ", bytes: " + m_bytesWritten
-										+ ", blocks: " + m_blobHdrIdx
-										+ ", last alloc: " + precount);
-					}
+//				if (m_blobHdrIdx != ((m_blobThreshold - 1 + m_bytesWritten - m_count) / m_blobThreshold)) {
+//					throw new IllegalStateException(
+//							"PSOutputStream.save at : " + addr
+//									+ ", bytes: " + m_bytesWritten
+//									+ ", blocks: " + m_blobHdrIdx
+//									+ ", last alloc: " + precount);
+//				}
 		  		
 		  		if (log.isDebugEnabled())
 		  			log.debug("Writing BlobHdrIdx with " + m_blobHdrIdx + " allocations");
 		  		
-		  		addr = m_store.registerBlob(addr); // returns handle
+		  		// DO NOT USE BLOB ALLOCATOR
+		  		// addr = m_store.registerBlob(addr); // returns handle
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
