@@ -68,7 +68,8 @@ import cutthecrap.utils.striterators.IFilter;
  *       sampling, including: uniform distribution, randomly distribution, tuple
  *       at a time versus clustered (sampling with leaves), adaptive sampling
  *       until the sample reflects some statistical property of the underlying
- *       population, etc.
+ *       population, etc. Support for different kinds of sampling could be added
+ *       using appropriate annotations.
  */
 public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 
@@ -308,6 +309,10 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 		 *       Taking a clustered sample really requires knowing where the
 		 *       leaf boundaries are in the index, e.g., using
 		 *       {@link ILeafCursor}.
+		 *       <p>
+		 *       Taking all tuples from a few leaves in each sample might
+		 *       produce a faster estimation of the correlation when sampling
+		 *       join paths.
 		 * 
 		 * @todo Rather than evenly spaced samples, we should be taking a random
 		 *       sample. This could be achieved using a random initial offset

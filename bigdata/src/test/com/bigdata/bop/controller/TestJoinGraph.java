@@ -50,6 +50,47 @@ public class TestJoinGraph extends TestCase2 {
         super(name);
     }
 
+	/*
+	 * Among other things, there are some operations which depend on equality or
+	 * hash code behavior for vertices and perhaps edges so those things should
+	 * also be tested.
+	 */
+    
+    public void test_getMinimumCardinalityEdge() {
+    	fail("write test");
+    }
+
+    public void test_moreEdgesToExecute() {
+    	fail("write test");
+    }
+
+    // @todo also getEdgeCount()
+    public void test_getEdges() {
+    	fail("write test");
+    }
+    
+    public void test_getSelectedJoinPath() {
+    	fail("write test");
+    }
+
+    public void test_getBestAlternativeJoinPath() {
+    	fail("write test");
+    }
+
+    public void test_getVertex() {
+    	fail("write test");
+    }
+    
+    // getEdge(v1,v2)
+    public void test_getEdge() {
+    	fail("write test");
+    }
+    
+    // test ability to obtain a Path which extends another path.
+    public void test_Path_addEdge() {
+    	fail("write test");
+    }
+    
 //    @Override
 //    public Properties getProperties() {
 //
