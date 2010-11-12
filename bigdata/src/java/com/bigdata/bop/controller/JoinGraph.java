@@ -1554,9 +1554,9 @@ public class JoinGraph extends PipelineOp {
 					continue;
 
 				}
-
+				// The set of vertices used to expand this path in this round.
 				final Set<Vertex> used = new LinkedHashSet<Vertex>();
-				
+				// Check all edges in the graph.
 				for (Edge edgeInGraph : E) {
 
 					// Figure out which vertices are already part of this path.
@@ -1589,12 +1589,23 @@ public class JoinGraph extends PipelineOp {
 
 					// Add to the set of paths for this round.
 					tmp.add(p);
-					
+
 				}
 
 			}
 
-			return tmp.toArray(new Path[tmp.size()]);
+			final Path[] paths_tp1 = tmp.toArray(new Path[tmp.size()]);
+
+			System.err.println("\n*** Paths @ round=" + round + "\n"
+					+ JoinGraph.showTable(paths_tp1));
+
+			final Path[] paths_tp1_pruned = pruneJoinPaths(paths_tp1);
+
+			System.err.println("\n*** Paths @ round=" + round
+					+ " (after pruning)\n"
+					+ JoinGraph.showTable(paths_tp1_pruned));
+
+			return paths_tp1_pruned;
 			
 		}
 		
