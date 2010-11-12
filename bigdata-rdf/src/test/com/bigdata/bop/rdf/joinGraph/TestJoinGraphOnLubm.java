@@ -641,46 +641,115 @@ public class TestJoinGraphOnLubm extends TestCase2 {
 //			}
 
 			/*
-			 * The set of one step extensions of those paths.
-			 * 
-			 * @todo build this programmatically by finding the set of edges
-			 * branching from the existing paths to a vertex not already part of
-			 * the existing paths and having a total set of vertices which is
-			 * distinct from all other paths already generated in this breadth
-			 * first expansion of the search space. (ROX further constrains the
-			 * new paths to extend the stop vertex of the path from which they
-			 * are derived.)
-			 * 
-			 * @todo always label edges by either minimum bopId or minimum
-			 * estimated cardinality (with tie broken by bopId)? When extending
-			 * a path in which more than one edge can reach the target vertex,
-			 * always chose the edge having the source vertex with the minimum
-			 * cardinality?
+			 * t1
 			 */
-			final Path[] paths_t1 = new Path[] {//
-				// t0
-			    p0, // (2,3)
-			    p1, // (2,4)
-			    p2, // (4,1)
-			    // t1
-				p0.addEdge(queryEngine, limit, g.getEdge(v2, v4)), // aka (v3,v4)
-				p0.addEdge(queryEngine, limit, g.getEdge(v3, v0)), //
-				p0.addEdge(queryEngine, limit, g.getEdge(v3, v5)), //
-				//
-				p1.addEdge(queryEngine, limit, g.getEdge(v4, v1)), //
-				p1.addEdge(queryEngine, limit, g.getEdge(v4, v3)), //
-				p1.addEdge(queryEngine, limit, g.getEdge(v4, v5)), //
-				//
-				p2.addEdge(queryEngine, limit, g.getEdge(v1, v5)), // aka (4,5)
-				p2.addEdge(queryEngine, limit, g.getEdge(v4, v3)), //
-				p2.addEdge(queryEngine, limit, g.getEdge(v4, v2)), //
+			
+//			/*
+//			 * The set of one step extensions of those paths.
+//			 * 
+//			 * @todo build this programmatically by finding the set of edges
+//			 * branching from the existing paths to a vertex not already part of
+//			 * the existing paths and having a total set of vertices which is
+//			 * distinct from all other paths already generated in this breadth
+//			 * first expansion of the search space. (ROX further constrains the
+//			 * new paths to extend the stop vertex of the path from which they
+//			 * are derived.)
+//			 * 
+//			 * @todo always label edges by either minimum bopId or minimum
+//			 * estimated cardinality (with tie broken by bopId)? When extending
+//			 * a path in which more than one edge can reach the target vertex,
+//			 * always chose the edge having the source vertex with the minimum
+//			 * cardinality?
+//			 */
+//			final Path[] paths_t1 = new Path[] {//
+//				// t0
+//			    p0, // (2,3)
+//			    p1, // (2,4)
+//			    p2, // (4,1)
+//			    // t1
+//				p0.addEdge(queryEngine, limit*2, g.getEdge(v2, v4)), // aka (v3,v4)
+//				p0.addEdge(queryEngine, limit*2, g.getEdge(v3, v0)), //
+//				p0.addEdge(queryEngine, limit*2, g.getEdge(v3, v5)), //
+//				//
+//				p1.addEdge(queryEngine, limit*2, g.getEdge(v4, v1)), //
+//				p1.addEdge(queryEngine, limit*2, g.getEdge(v4, v3)), //
+//				p1.addEdge(queryEngine, limit*2, g.getEdge(v4, v5)), //
+//				//
+//				p2.addEdge(queryEngine, limit*2, g.getEdge(v1, v5)), // aka (4,5)
+//				p2.addEdge(queryEngine, limit*2, g.getEdge(v4, v3)), //
+//				p2.addEdge(queryEngine, limit*2, g.getEdge(v4, v2)), //
+//
+			/*
+			 * *** Paths @ t1
 
-			};
+p[ 1]    0.69,      68931     168831, [ 2  3  0 ]
+p[ 2]    1.00,      99900     199800, [ 2  3  4 ]
+p[ 3]    1.00,      99900     199800, [ 2  3  5 ]
+p[ 5]    1.00,        999       1998, [ 2  4  1 ]
+p[ 6]  100.00,      99900     100899, [ 2  4  3 ]
+p[ 7]   20.00,      19980      20979, [ 2  4  5 ]
+p[ 9]   16.67,      40650      43089, [ 1  4  5 ]
+p[10]    1.00,       2439       4878, [ 1  4  2 ]
+p[11]    5.00,      12195      14634, [ 1  4  3 ]
+
+			 */
+//			};
+			int round = 1;
+
+			final Path[] paths_t1 = g.expand(queryEngine, limit, round, paths_t0);
 
 			System.err.println("\n*** Paths @ t1\n"
 					+ JoinGraph.showTable(paths_t1));
 
-			g.pruneJoinPaths(paths_t1);
+			final Path[] paths_t1_pruned = g.pruneJoinPaths(paths_t1);
+
+			System.err.println("\n*** Paths @ t1 (after pruning)\n"
+					+ JoinGraph.showTable(paths_t1_pruned));
+
+			/*
+			 * t2
+			 */
+			
+			final Path[] paths_t2 = g.expand(queryEngine, limit, round++, paths_t1_pruned);
+
+			System.err.println("\n*** Paths @ t2\n"
+					+ JoinGraph.showTable(paths_t2));
+
+			final Path[] paths_t2_pruned = g.pruneJoinPaths(paths_t2);
+
+			System.err.println("\n*** Paths @ t2 (after pruning)\n"
+					+ JoinGraph.showTable(paths_t2_pruned));
+
+
+/*
+p[ 4]    0.69,      68931     168831, (2 3) (0 3) (0 5)
+p[ 4]    0.69,      68931     168831, (2 3) (0 3) (2 4)
+p[ 4]    0.69,      68931     168831, (2 3) (0 3) (3 4)
+p[ 4]    0.69,      68931     168831, (2 3) (0 3) (3 5)
+
+p[ 5]    1.00,      99900     199800, (2 3) (3 5) (0 3)
+p[ 5]    1.00,      99900     199800, (2 3) (3 5) (0 5)
+p[ 5]    1.00,      99900     199800, (2 3) (3 5) (1 5)
+p[ 5]    1.00,      99900     199800, (2 3) (3 5) (2 4)
+p[ 5]    1.00,      99900     199800, (2 3) (3 5) (3 4)
+p[ 5]    1.00,      99900     199800, (2 3) (3 5) (4 5)
+
+p[ 6]    1.00,        999       1998, (2 4) (1 4) (1 5)
+p[ 6]    1.00,        999       1998, (2 4) (1 4) (2 3)
+p[ 6]    1.00,        999       1998, (2 4) (1 4) (3 4)
+p[ 6]    1.00,        999       1998, (2 4) (1 4) (4 5)
+
+p[ 7]  100.00,      99900     100899, (2 4) (3 4) (0 3)
+p[ 7]  100.00,      99900     100899, (2 4) (3 4) (1 4)
+p[ 7]  100.00,      99900     100899, (2 4) (3 4) (3 5)
+p[ 7]  100.00,      99900     100899, (2 4) (3 4) (4 5)
+
+p[ 8]   20.00,      19980      20979, (2 4) (4 5) (0 5)
+p[ 8]   20.00,      19980      20979, (2 4) (4 5) (1 4)
+p[ 8]   20.00,      19980      20979, (2 4) (4 5) (1 5)
+p[ 8]   20.00,      19980      20979, (2 4) (4 5) (2 3)
+p[ 8]   20.00,      19980      20979, (2 4) (4 5) (3 4)
+p[ 8]   20.00,      19980      20979, (2 4) (4 5) (3 5)			 */
 			
 //			final Path selected_t1 = g.getSelectedJoinPath(paths_t1);
 //		

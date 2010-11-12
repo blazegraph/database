@@ -1184,6 +1184,35 @@ public class JoinGraph extends PipelineOp {
 			final Vertex[] a = tmp.toArray(new Vertex[tmp.size()]);
 			return a;
 		}
+
+		/**
+		 * Return <code>true</code> if this path begins with the given path.
+		 * 
+		 * @param p
+		 *            The given path.
+		 *            
+		 * @return <code>true</code> if this path begins with the given path.
+		 */
+		public boolean beginsWith(final Path p) {
+
+			if (p == null)
+				throw new IllegalArgumentException();
+
+			if (p.edges.size() > edges.size()) {
+				// Proven false since the caller's path is longer.
+				return false;
+			}
+
+			for (int i = 0; i < p.edges.size(); i++) {
+				final Edge eSelf = edges.get(i);
+				final Edge eOther = p.edges.get(i);
+				if (eSelf != eOther) {
+					return false;
+				}
+			}
+			
+			return true;
+		}
 		
 		/**
 		 * Add an edge to a path, computing the estimated cardinality of the new
@@ -1497,6 +1526,78 @@ public class JoinGraph extends PipelineOp {
 
 		}
 
+		/**
+		 * Do one breadth first expansion.
+		 * 
+		 * @param queryEngine
+		 * @param limit
+		 * @param round
+		 * @param a
+		 * @return
+		 * @throws Exception
+		 */
+		final public Path[] expand(final QueryEngine queryEngine, final int limit,
+				final int round, final Path[] a) throws Exception {
+
+			final List<Path> tmp = new LinkedList<Path>();
+
+			// First, copy all existing paths.
+			for (Path x : a) {
+				tmp.add(x);
+			}
+
+			// Then expand each path.
+			for (Path x : a) {
+
+				if (x.edges.size() < round) {
+
+					continue;
+
+				}
+
+				final Set<Vertex> used = new LinkedHashSet<Vertex>();
+				
+				for (Edge edgeInGraph : E) {
+
+					// Figure out which vertices are already part of this path.
+					final boolean v1Found = x.contains(edgeInGraph.v1);
+					final boolean v2Found = x.contains(edgeInGraph.v2);
+
+					if (!v1Found && !v2Found) {
+						// Edge is not connected to this path.
+						continue;
+					}
+
+					if (v1Found && v2Found) {
+						// Edge is already present in this path.
+						continue;
+					}
+
+					final Vertex newVertex = v1Found ? edgeInGraph.v2 : edgeInGraph.v1;
+					
+					if(used.contains(newVertex)) {
+						// Vertex already used to extend this path.
+						continue;
+					}
+					
+					// add the new vertex to the set of used vertices.
+					used.add(newVertex);
+					
+					// Extend the path to the new vertex.
+					final Path p = x.addEdge(queryEngine, limit * round,
+							edgeInGraph);
+
+					// Add to the set of paths for this round.
+					tmp.add(p);
+					
+				}
+
+			}
+
+			return tmp.toArray(new Path[tmp.size()]);
+			
+		}
+		
 		/**
 		 * Return the {@link Vertex} whose {@link IPredicate} is associated with
 		 * the given {@link BOp.Annotations#BOP_ID}.
@@ -2209,12 +2310,16 @@ public class JoinGraph extends PipelineOp {
 				final Path Pi = a[i];
 				if (Pi.sample == null)
 					throw new RuntimeException("Not sampled: " + Pi);
+				if (pruned.contains(Pi))
+					continue;
 				for (int j = 0; j < a.length; j++) {
 					if (i == j)
 						continue;
 					final Path Pj = a[j];
 					if (Pj.sample == null)
 						throw new RuntimeException("Not sampled: " + Pj);
+					if (pruned.contains(Pj))
+						continue;
 					final boolean isPiSuperSet = Pi.isUnorderedSuperSet(Pj);
 					if(!isPiSuperSet) {
 						// Can not directly compare these join paths.
@@ -2223,23 +2328,35 @@ public class JoinGraph extends PipelineOp {
 					final long costPi = Pi.cumulativeEstimatedCardinality;
 					final long costPj = Pj.cumulativeEstimatedCardinality;
 					final boolean lte = costPi <= costPj;
+					List<Integer> prunedByThisPath = null;
+					if (lte) {
+						prunedByThisPath = new LinkedList<Integer>();
+						if (pruned.add(Pj))
+							prunedByThisPath.add(j);
+						for (int k = 0; k < a.length; k++) {
+							final Path x = a[k];
+							if (x.beginsWith(Pj)) {
+								if (pruned.add(x))
+									prunedByThisPath.add(k);
+							}
+						}
+					}
 					{
 						f
 								.format(
 										"Comparing: P[%2d] with P[%2d] : %10d %2s %10d %s",
 										i, j, costPi, (lte ? "<=" : ">"),
-										costPj, lte ? " **prune P["+j+"]**" : "");
+										costPj, lte ? " *** pruned "
+												+ prunedByThisPath : "");
 						System.err.println(sb);
 						sb.setLength(0);
 					}
-					if (lte) {
-						pruned.add(Pj);
-					}
 				} // Pj
 			} // Pi
-			System.err.println("Pruned "+pruned.size()+" of out "+a.length+" paths");
+			System.err.println("Pruned " + pruned.size() + " of out "
+					+ a.length + " paths");
 			final Set<Path> keep = new LinkedHashSet<Path>();
-			for(Path p : a) {
+			for (Path p : a) {
 				if(pruned.contains(p))
 					continue;
 				keep.add(p);
