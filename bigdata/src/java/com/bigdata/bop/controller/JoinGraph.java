@@ -1440,9 +1440,6 @@ public class JoinGraph extends PipelineOp {
 		public void runtimeOptimizer(final QueryEngine queryEngine,
 				final int limit) throws Exception {
 
-			// // The set of vertices which have been consumed by the query.
-			// final Set<Vertex> executedVertices = new LinkedHashSet<Vertex>();
-
 			// Setup the join graph.
 			Path[] paths = round0(queryEngine, limit, 2/* nedges */);
 
