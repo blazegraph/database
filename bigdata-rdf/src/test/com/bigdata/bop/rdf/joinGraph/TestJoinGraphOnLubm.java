@@ -616,4 +616,144 @@ public class TestJoinGraphOnLubm extends TestCase2 {
 
 	} // test_Q9
 
+	/**
+	 * LUBM Query 8
+	 * 
+	 * <pre>
+	 * PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+	 * PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+	 * SELECT ?x ?y ?z
+	 * WHERE{
+	 * 	?y a ub:Department .
+	 * 	?x a ub:Student;
+	 * 		ub:memberOf ?y .
+	 * 	?y ub:subOrganizationOf <http://www.University0.edu> .
+	 * 	?x ub:emailAddress ?z .
+	 * }
+	 * </pre>
+	 * @throws Exception 
+	 */
+	public void test_query8() throws Exception {
+		final AbstractTripleStore database = (AbstractTripleStore) jnl
+				.getResourceLocator()
+				.locate(namespace, jnl.getLastCommitTime());
+
+		if (database == null)
+			throw new RuntimeException("Not found: " + namespace);
+
+		/*
+		 * Resolve terms against the lexicon.
+		 */
+		final BigdataValueFactory f = database.getLexiconRelation()
+				.getValueFactory();
+
+		final BigdataURI rdfType = f
+				.createURI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
+
+		final BigdataURI department = f
+				.createURI("http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#Department");
+
+		final BigdataURI student = f
+				.createURI("http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#Student");
+
+		final BigdataURI memberOf = f
+				.createURI("http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#memberOf");
+
+		final BigdataURI subOrganizationOf = f
+				.createURI("http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#subOrganizationOf");
+
+		final BigdataURI emailAddress = f
+				.createURI("http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#emailAddress");
+
+		final BigdataURI university0 = f
+				.createURI("http://www.University0.edu");
+
+		final BigdataValue[] terms = new BigdataValue[] { rdfType, department,
+				student, memberOf, subOrganizationOf, emailAddress, university0 };
+
+		// resolve terms.
+		database.getLexiconRelation()
+				.addTerms(terms, terms.length, true/* readOnly */);
+
+		{
+			for (BigdataValue tmp : terms) {
+				System.out.println(tmp + " : " + tmp.getIV());
+				if (tmp.getIV() == null)
+					throw new RuntimeException("Not defined: " + tmp);
+			}
+		}
+
+		final IPredicate[] preds;
+		{
+			final IVariable<?> x = Var.var("x");
+			final IVariable<?> y = Var.var("y");
+			final IVariable<?> z = Var.var("z");
+
+			// The name space for the SPO relation.
+			final String[] relation = new String[] { namespace + ".spo" };
+
+			final long timestamp = jnl.getLastCommitTime();
+
+			int nextId = 0;
+
+			// ?y a ub:Department .
+			final IPredicate p0 = new SPOPredicate(new BOp[] { y,
+					new Constant(rdfType.getIV()),
+					new Constant(department.getIV()) },//
+					new NV(BOp.Annotations.BOP_ID, nextId++),//
+					new NV(IPredicate.Annotations.TIMESTAMP, timestamp),//
+					new NV(IPredicate.Annotations.RELATION_NAME, relation)//
+			);
+
+			// ?x a ub:Student;
+			final IPredicate p1 = new SPOPredicate(new BOp[] { x,
+					new Constant(rdfType.getIV()),
+					new Constant(student.getIV()) },//
+					new NV(BOp.Annotations.BOP_ID, nextId++),//
+					new NV(IPredicate.Annotations.TIMESTAMP, timestamp),//
+					new NV(IPredicate.Annotations.RELATION_NAME, relation)//
+			);
+
+			// (?x) ub:memberOf ?y .
+			final IPredicate p2 = new SPOPredicate(new BOp[] { x,
+					new Constant(memberOf.getIV()), y },//
+					new NV(BOp.Annotations.BOP_ID, nextId++),//
+					new NV(IPredicate.Annotations.TIMESTAMP, timestamp),//
+					new NV(IPredicate.Annotations.RELATION_NAME, relation)//
+			);
+
+			// ?y ub:subOrganizationOf <http://www.University0.edu> .
+			final IPredicate p3 = new SPOPredicate(new BOp[] { y,
+					new Constant(subOrganizationOf.getIV()),
+					new Constant(university0.getIV()) },//
+					new NV(BOp.Annotations.BOP_ID, nextId++),//
+					new NV(IPredicate.Annotations.TIMESTAMP, timestamp),//
+					new NV(IPredicate.Annotations.RELATION_NAME, relation)//
+			);
+
+			// ?x ub:emailAddress ?z .
+			final IPredicate p4 = new SPOPredicate(new BOp[] { x,
+					new Constant(emailAddress.getIV()), z },//
+					new NV(BOp.Annotations.BOP_ID, nextId++),//
+					new NV(IPredicate.Annotations.TIMESTAMP, timestamp),//
+					new NV(IPredicate.Annotations.RELATION_NAME, relation)//
+			);
+
+			// the vertices of the join graph (the predicates).
+			preds = new IPredicate[] { p0, p1, p2, p3, p4 };
+		}
+
+		{
+			final int limit = 100;
+
+			final QueryEngine queryEngine = QueryEngineFactory
+					.getQueryController(jnl/* indexManager */);
+
+			final JGraph g = new JGraph(preds);
+
+			g.runtimeOptimizer(queryEngine, limit);
+
+		}
+	}
+
 }
