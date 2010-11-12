@@ -117,18 +117,18 @@ public interface IStore {
 	 */
 	public File getStoreFile();
 
-	/**
-	 * Called by the PSOutputStream to register the header block of a blob. The
-	 * store must return a new address that is used to retrieve the blob header.
-	 * This double indirection is required to be able to manage the blobs, since
-	 * the blob header itself is of variable size and is handled by the standard
-	 * FixedAllocators in the RWStore.
-	 * 
-	 * @param addr
-	 *            The address of the header block of the blob.
-	 * 
-	 * @return The 
-	 */
-	public int registerBlob(int addr);
+//	/**
+//	 * Called by the PSOutputStream to register the header block of a blob. The
+//	 * store must return a new address that is used to retrieve the blob header.
+//	 * This double indirection is required to be able to manage the blobs, since
+//	 * the blob header itself is of variable size and is handled by the standard
+//	 * FixedAllocators in the RWStore.
+//	 * 
+//	 * @param addr
+//	 *            The address of the header block of the blob.
+//	 * 
+//	 * @return The 
+//	 */
+//	public int registerBlob(int addr);
 
 }
