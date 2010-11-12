@@ -31,6 +31,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Formatter;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -525,14 +526,18 @@ public class JoinGraph extends PipelineOp {
 		 * @param outputCount
 		 *            The #of binding sets generated before the join was cutoff.
 		 */
-		EdgeSample(final VertexSample sourceVertexSample, final int limit,
+		EdgeSample(//final VertexSample sourceVertexSample,
+				final long sourceSampleRangeCount,
+				final boolean sourceSampleExact,
+				final int limit,
 				final int inputCount, final int outputCount,
 				final IBindingSet[] sample) {
 
 			if(sample == null)
 				throw new IllegalArgumentException();
 			
-			this.rangeCount = sourceVertexSample.rangeCount;
+//			this.rangeCount = sourceVertexSample.rangeCount;
+			this.rangeCount = sourceSampleRangeCount;
 			
 			this.limit = limit;
 			
@@ -546,10 +551,11 @@ public class JoinGraph extends PipelineOp {
 			
 			estimateIsLowerBound = inputCount == 1 && outputCount == limit;
 			
-			estimateIsUpperBound = !sourceVertexSample.exact
+//			final boolean sourceSampleExact = sourceVertexSample.exact;
+			estimateIsUpperBound = !sourceSampleExact
 					&& outputCount < limit;
 			
-			this.exact = sourceVertexSample.exact && outputCount < limit;
+			this.exact = sourceSampleExact && outputCount < limit;
 			
 			this.sample = sample;
 		}
@@ -777,8 +783,9 @@ public class JoinGraph extends PipelineOp {
 			}
 
 			// Sample the edge and save the sample on the edge as a side-effect.
-			this.sample = estimateCardinality(queryEngine, limit, v, vp, sourceSample);
-			
+			this.sample = estimateCardinality(queryEngine, limit, v, vp,
+					v.sample.rangeCount, v.sample.exact, sourceSample);
+
 			return sample.estimatedCardinality;
 
 		}
@@ -806,7 +813,9 @@ public class JoinGraph extends PipelineOp {
 		 */
 		public EdgeSample estimateCardinality(final QueryEngine queryEngine,
 				final int limit, final Vertex vSource, final Vertex vTarget,
-				IBindingSet[] sourceSample) throws Exception {
+				final long sourceSampleRangeCount,
+				final boolean sourceSampleExact, IBindingSet[] sourceSample)
+				throws Exception {
 
 			if (limit <= 0)
 				throw new IllegalArgumentException();
@@ -884,13 +893,15 @@ public class JoinGraph extends PipelineOp {
 			 * FIXME I am not convinced that this approach is quite right. I am
 			 * also not convinced that this approach will correctly carry the
 			 * additional metadata on the EdgeSample (exact, estimate overflow
-			 * and underflow, etc).
+			 * and underflow, etc). [This needs to be the estimated cardinality
+			 * of the path which is being extended by an edge to the target
+			 * vertex.]
 			 */
-			final VertexSample moreSelectiveVertexSample = vSource.sample.rangeCount < vTarget.sample.rangeCount ? vSource.sample
-					: vTarget.sample;
+//			final VertexSample moreSelectiveVertexSample = vSource.sample.rangeCount < vTarget.sample.rangeCount ? vSource.sample
+//					: vTarget.sample;
 			
 			final EdgeSample edgeSample = new EdgeSample(
-					moreSelectiveVertexSample/* vSource.sample */, limit,
+					sourceSampleRangeCount, sourceSampleExact, limit,
 					inputCount, outputCount, result
 							.toArray(new IBindingSet[result.size()]));
 
@@ -958,25 +969,42 @@ public class JoinGraph extends PipelineOp {
 	 */
 	public static class Path {
 		
+		/**
+		 * An immutable ordered list of the edges in the (aka the sequence of
+		 * joins represented by this path).
+		 */
 		public final List<Edge> edges;
 
-		/*
-		 * These fields carry state used by chainSample. It would be better to
-		 * have that state on a data structure which is purely local to
-		 * chainSample, but perhaps Path is that data structure.
+		/**
+		 * The sample obtained by the step-wise cutoff evaluation of the ordered
+		 * edges of the path. This sample is generated one edge at a time rather
+		 * than by attempting the cutoff evaluation of the entire join path (the
+		 * latter approach does allow us to limit the amount of work to be done
+		 * to satisfy the cutoff).
 		 */
-		
-		public EdgeSample sample = null;
+		final public EdgeSample sample;
 
-//		/**
-//		 * Input to the next round of sampling.
-//		 */
-//		private VertexSample inputSample;
+		/**
+		 * The cumulative estimated cardinality of the path. This is zero for an
+		 * empty path. For a path consisting of a single edge, this is the
+		 * estimated cardinality of that edge. When creating a new path adding
+		 * an edge to an existing path, the cumulative cardinality of the new
+		 * path is the cumulative cardinality of the existing path plus the
+		 * estimated cardinality of the cutoff join of the new edge given the
+		 * input sample of the existing path.
+		 */
+		final public long cumulativeEstimatedCardinality;
 
 		/**
 		 * The vertex at which the path from which this path was derived
 		 * stopped. This is initialized to the source vertex when entering the
 		 * chainSample() method.
+		 * 
+		 * @todo This is used by ROX to only grow the path from its end. We
+		 *       could of course just look at the last edge in the path.
+		 *       However, I think that I prefer to grow a path from any
+		 *       branching vertex as long as the path does not duplicate any
+		 *       path already generated (including those which were pruned).
 		 */
 		private Vertex stopVertex;
 		
@@ -990,7 +1018,8 @@ public class JoinGraph extends PipelineOp {
 				sb.append("(" + e.v1.pred.getId() + "," + e.v2.pred.getId() + ")");
 				first = false;
 			}
-			sb.append(",sample=" + sample + "}");
+			sb.append(",cumEstCard=" + cumulativeEstimatedCardinality
+					+ ",sample=" + sample + "}");
 			return sb.toString();
 		}
 
@@ -998,7 +1027,9 @@ public class JoinGraph extends PipelineOp {
 		 * Create an empty path.
 		 */
 		public Path() {
-			this.edges = new LinkedList<Edge>();
+			this.edges = Collections.emptyList();
+			this.cumulativeEstimatedCardinality = 0;
+			this.sample = null;
 		}
 
 		/**
@@ -1008,11 +1039,46 @@ public class JoinGraph extends PipelineOp {
 		 *            The edge.
 		 */
 		public Path(final Edge e) {
+
 			if (e == null)
 				throw new IllegalArgumentException();
-			this.edges = new LinkedList<Edge>();
-			this.edges.add(e);
+			
+			if (e.sample == null)
+				throw new IllegalArgumentException("Not sampled: "+e);
+			
+			this.edges = Collections.singletonList(e);
+			
 			this.sample = e.sample;
+			
+			this.cumulativeEstimatedCardinality = e.sample.estimatedCardinality;
+			
+		}
+
+		/**
+		 * Constructor used by {@link #addEdge(QueryEngine, int, Edge)}
+		 * @param edges The edges in the new path.
+		 * @param cumulativeEstimatedCardinality The cumulative estimated cardinality of the new path.
+		 * @param sample The sample from the last 
+		 */
+		private Path(final List<Edge> edges,
+				final long cumulativeEstimatedCardinality,
+				final EdgeSample sample) {
+
+			if (edges == null)
+				throw new IllegalArgumentException();
+			
+			if (cumulativeEstimatedCardinality < 0)
+				throw new IllegalArgumentException();
+			
+			if (sample == null)
+				throw new IllegalArgumentException();
+
+			this.edges = Collections.unmodifiableList(edges);
+			
+			this.cumulativeEstimatedCardinality = cumulativeEstimatedCardinality;
+			
+			this.sample = sample;
+			
 		}
 
 		/**
@@ -1037,6 +1103,86 @@ public class JoinGraph extends PipelineOp {
 			}
 
 			return false;
+		}
+
+		/**
+		 * Return <code>true</code> if this path is an unordered super set of
+		 * the given path. In the case where both paths have the same vertices
+		 * this will also return <code>true</code>.
+		 * 
+		 * @param p
+		 *            Another path.
+		 * 
+		 * @return <code>true</code> if this path is an unordered super set of
+		 *         the given path.
+		 */
+		public boolean isUnorderedSuperSet(final Path p) {
+
+			if (p == null)
+				throw new IllegalArgumentException();
+
+			if (edges.size() < p.edges.size()) {
+				/*
+				 * Fast rejection. This assumes that each edge after the first
+				 * adds one distinct vertex to the path. That assumption is
+				 * enforced by #addEdge().
+				 */
+				return false;
+			}
+
+			final Vertex[] v1 = getVertices();
+			final Vertex[] v2 = p.getVertices();
+			
+			if (v1.length < v2.length) {
+				// Proven false since the other set is larger.
+				return false;
+			}
+
+			/*
+			 * Scan the vertices of the caller's path. If any of those vertices
+			 * are NOT found in this path then the caller's path can not be a
+			 * subset of this path.
+			 */
+			for (int i = 0; i < v2.length; i++) {
+
+				final Vertex tmp = v2[i];
+
+				boolean found = false;
+				for (int j = 0; j < v1.length; j++) {
+
+					if (v1[j] == tmp) {
+						found = true;
+						break;
+					}
+
+				}
+
+				if (!found) {
+					return false;
+				}
+
+			}
+
+			return true;
+			
+		}
+
+		/**
+		 * Return the vertices in this path (in path order).
+		 * 
+		 * @return The vertices (in path order).
+		 * 
+		 * @todo this could be rewritten without the toArray() using a method
+		 *       which visits the vertices of a path in any order.
+		 */
+		public Vertex[] getVertices() {
+			final Set<Vertex> tmp = new LinkedHashSet<Vertex>();
+			for (Edge e : edges) {
+				tmp.add(e.v1);
+				tmp.add(e.v2);
+			}
+			final Vertex[] a = tmp.toArray(new Vertex[tmp.size()]);
+			return a;
 		}
 		
 		/**
@@ -1078,13 +1224,6 @@ public class JoinGraph extends PipelineOp {
 			// The new vertex, which is not part of this path.
 			final Vertex targetVertex = v1Found ? e.v2 : e.v1;
 
-			// Extend the path.
-			final Path tmp = new Path();
-
-			tmp.edges.addAll(edges);
-
-			tmp.edges.add(e);
-
 			/*
 			 * Chain sample the edge.
 			 * 
@@ -1110,13 +1249,31 @@ public class JoinGraph extends PipelineOp {
 //					0/* start */, this.sample.sample);
 			
 			final EdgeSample edgeSample = e.estimateCardinality(queryEngine,
-					limit, sourceVertex, targetVertex, this.sample.sample);
+					limit, sourceVertex, targetVertex,
+					this.sample.estimatedCardinality, this.sample.exact,
+					this.sample.sample);
 
-			tmp.sample = edgeSample;
-			
-//			tmp.stopVertex = e.getMaximumCardinalityVertex();
-			
-			return tmp;
+			{
+
+				final List<Edge> edges = new ArrayList<Edge>(
+						this.edges.size() + 1);
+				
+				edges.addAll(this.edges);
+				
+				edges.add(e);
+
+				final long cumulativeEstimatedCardinality = this.cumulativeEstimatedCardinality
+						+ edgeSample.estimatedCardinality;
+
+				// Extend the path.
+				final Path tmp = new Path(edges,
+						cumulativeEstimatedCardinality, edgeSample);
+
+				// tmp.stopVertex = e.getMaximumCardinalityVertex();
+
+				return tmp;
+
+			}
 			
 		}
 		
@@ -1184,17 +1341,24 @@ public class JoinGraph extends PipelineOp {
 	static public String showTable(final Path[] a) {
 		final StringBuilder sb = new StringBuilder();
 		final Formatter f = new Formatter(sb);
-		for (Path x : a) {
+		for(int i=0; i<a.length; i++) {
+			final Path x = a[i];
 			if (x.sample == null) {
-				f.format("%7s, %10s", "N/A", "N/A");
+				f.format("p[%2d] %7s, %10s %10s", "N/A", "N/A", "N/A", i);
 			} else {
-				f.format("% 7.2f, % 10d", x.sample.f,
-						x.sample.estimatedCardinality);
+				f.format("p[%2d] % 7.2f, % 10d % 10d", i, x.sample.f,
+						x.sample.estimatedCardinality,
+						x.cumulativeEstimatedCardinality);
 			}
-			sb.append(",");
-			for (Edge e : x.edges)
-				sb.append(" (" + e.v1.pred.getId() + " " + e.v2.pred.getId()
-						+ ")");
+			sb.append(", [");
+			final Vertex[] vertices = x.getVertices();
+			for(Vertex v : vertices) {
+				f.format("%2d ", v.pred.getId());
+			}
+			sb.append("]");
+//			for (Edge e : x.edges)
+//				sb.append(" (" + e.v1.pred.getId() + " " + e.v2.pred.getId()
+//						+ ")");
 			sb.append("\n");
 		}
 		return sb.toString();
@@ -1903,12 +2067,40 @@ public class JoinGraph extends PipelineOp {
 		 *       <p>
 		 *       It is not clear that this code is comparing all paths which
 		 *       need to be compared.
+		 * 
+		 * @todo I have restated the termination rule as follows.
+		 *       <p>
+		 *       If there is a path [p] whose total cost is LTE the cost of
+		 *       executing just its last edge [e], then the path [p] dominates
+		 *       all paths beginning with edge [e]. The dominated paths should
+		 *       be pruned.
+		 *       <p>
+		 *       If there is a path, [p], which is an unordered extension of
+		 *       another path, [p1] (the vertices of p are a superset of the
+		 *       vertices of p1), and the cost of [p] is LTE the cost of [p1],
+		 *       then [p] dominates [p1]. The dominated paths should be pruned.
+		 *       <p>
+		 *       If there is a path, [p], which has the same vertices as a path
+		 *       [p1] and the cost of [p] is LTE the cost of [p1], then [p]
+		 *       dominates (or is equivalent to) [p1]. The path [p1] should be
+		 *       pruned.
+		 * 
+		 *       For a given path length [l], if no paths of length [l] remain
+		 *       then the minimum cost path of length GT [l] may be executed.
+		 * 
+		 * @todo Due to sampling error and the desire to be robust to small
+		 *       differences in the expected cost of an operation, we should
+		 *       only consider two significant digits when comparing estimates
+		 *       of cost. E.g., 990 and 1000 should not be differentiated as
+		 *       they are the same within the sampling error. This should be
+		 *       used to chose all starting vertices which have the same minimum
+		 *       cardinality.
 		 */
 		public Path getSelectedJoinPath(final Path[] a) {
 			final StringBuilder sb = new StringBuilder();
 			final Formatter f = new Formatter(sb);
+			Path p = null;
 			for (int i = 0; i < a.length; i++) {
-				Path p = null;
 				final Path Pi = a[i];
 				if (Pi.sample == null)
 					throw new RuntimeException("Not sampled: " + Pi);
@@ -1918,31 +2110,45 @@ public class JoinGraph extends PipelineOp {
 					final Path Pj = a[j];
 					if (Pj.sample == null)
 						throw new RuntimeException("Not sampled: " + Pj);
+					/*
+					 * FIXME This needs to compare the cost of Pj given path Pi
+					 * against the cost of Pj when executed as a single edge (or
+					 * by any other alternative join path sequence). The choice
+					 * of Pi and Pj is not coherent and the same value of costPj
+					 * is being used for both sides of the equation. 
+					 */
 					final long costPi = Pi.sample.estimatedCardinality;
 					final double sfPi = Pi.sample.f;
 					final long costPj = Pj.sample.estimatedCardinality;
 					final long expectedCombinedCost = costPi
 							+ (long) (sfPi * costPj);
-					final boolean lt = expectedCombinedCost < costPj;
+					/*
+					 * @todo I think that LTE makes more sense here since having
+					 * the same net cardinality for a given edge after
+					 * performing more steps would appear to be worth while.
+					 */
+					final boolean lte = expectedCombinedCost <= costPj;
 					{
 						f
 								.format(
-										"Comparing: P[% 2d] with P[% 2d] : % 10d + (% 7.2f * % 10d) %2s %10d",
-										i, j, costPi, sfPi, costPj, (lt ? "<"
-												: ">="), costPj);
+										"Comparing: P[%2d] with P[%2d] : (% 10d + (% 7.2f * % 10d) = %10d) %2s %10d",
+										i, j, costPi, sfPi, costPj, expectedCombinedCost, (lte ? "<="
+												: ">"), costPj);
 						System.err.println(sb);
 						sb.setLength(0);
 					}
-					if (lt) {
+					if (lte) {
 						p = Pi;
-					} else {
-						p = null;
+//					} else {
+//						p = null;
 						break;
 					}
 				} // Pj
-				if (p != null)
-					return p;
+//				if (p != null)
+//					return p;
 			} // Pi
+			if (p != null)
+				return p;
 			/*
 			 * None of the paths is a winner according to the selection
 			 * criteria.
@@ -1950,6 +2156,98 @@ public class JoinGraph extends PipelineOp {
 			return null;
 		}
 
+		/**
+		 * Prune paths which are dominated by other paths. Start the algorithm
+		 * by passing in all edges which have the minimum cardinality (when
+		 * comparing their expected cardinality after rounding to 2 significant
+		 * digits).
+		 * <p>
+		 * If there is a path [p] whose total cost is LTE the cost of executing
+		 * just its last edge [e], then the path [p] dominates all paths
+		 * beginning with edge [e]. The dominated paths should be pruned. [This
+		 * is a degenerate case of the next rule.]
+		 * <p>
+		 * If there is a path, [p] != [p1], where [p] is an unordered superset
+		 * of [p1] (that is the vertices of p are a superset of the vertices of
+		 * p1, but allowing the special case where the set of vertices are the
+		 * same), and the cumulative cost of [p] is LTE the cumulative cost of
+		 * [p1], then [p] dominates (or is equivalent to) [p1] and p1 should be
+		 * pruned.
+		 * <p>
+		 * If there is a path, [p], which has the same vertices as a path [p1]
+		 * and the cumulative cost of [p] is LTE the cumulative cost of [p1],
+		 * then [p] dominates (or is equivalent to) [p1]. The path [p1] should
+		 * be pruned. [This is a degenerate case of the prior rule.]
+		 * 
+		 * @param a
+		 *            A set of paths.
+		 * 
+		 * @return The set of paths with all dominated paths removed.
+		 * 
+		 * @todo This does not give us a stopping condition unless the set of
+		 *       paths becomes empty. I think it will tend to search too far for
+		 *       a best path, running the risk of increasing inaccuracy
+		 *       introduced by propagation of samples. Resampling the vertices
+		 *       and increasing the vertex and edge cutoff at each iteration of
+		 *       the search could compensate for that.
+		 * 
+		 * @todo Cumulative estimated cardinality is an estimate of the work to
+		 *       be done. However, the actual cost of a join depends on whether
+		 *       we will use nested index subquery or a hash join and the cost
+		 *       of that operation on the database. There could be counter
+		 *       examples where the cost of the hash join with a range scan
+		 *       using the unbound variable is LT the nested index subquery. For
+		 *       those cases, we will do the same amount of IO on the hash join
+		 *       but there will still be a lower cardinality to the join path
+		 *       since we are feeding in fewer solutions to be joined.
+		 */
+		public Path[] pruneJoinPaths(final Path[] a) {
+			final StringBuilder sb = new StringBuilder();
+			final Formatter f = new Formatter(sb);
+			final Set<Path> pruned = new LinkedHashSet<Path>();
+			for (int i = 0; i < a.length; i++) {
+				final Path Pi = a[i];
+				if (Pi.sample == null)
+					throw new RuntimeException("Not sampled: " + Pi);
+				for (int j = 0; j < a.length; j++) {
+					if (i == j)
+						continue;
+					final Path Pj = a[j];
+					if (Pj.sample == null)
+						throw new RuntimeException("Not sampled: " + Pj);
+					final boolean isPiSuperSet = Pi.isUnorderedSuperSet(Pj);
+					if(!isPiSuperSet) {
+						// Can not directly compare these join paths.
+						continue;
+					}
+					final long costPi = Pi.cumulativeEstimatedCardinality;
+					final long costPj = Pj.cumulativeEstimatedCardinality;
+					final boolean lte = costPi <= costPj;
+					{
+						f
+								.format(
+										"Comparing: P[%2d] with P[%2d] : %10d %2s %10d %s",
+										i, j, costPi, (lte ? "<=" : ">"),
+										costPj, lte ? " **prune P["+j+"]**" : "");
+						System.err.println(sb);
+						sb.setLength(0);
+					}
+					if (lte) {
+						pruned.add(Pj);
+					}
+				} // Pj
+			} // Pi
+			System.err.println("Pruned "+pruned.size()+" of out "+a.length+" paths");
+			final Set<Path> keep = new LinkedHashSet<Path>();
+			for(Path p : a) {
+				if(pruned.contains(p))
+					continue;
+				keep.add(p);
+			}
+			final Path[] b = keep.toArray(new Path[keep.size()]);
+			return b;
+		}
+		
 		/**
 		 * Termination condition if no more edges to sample. This
 		 * breaks the deadlock by preferring the path whose .... 
@@ -2044,4 +2342,39 @@ public class JoinGraph extends PipelineOp {
 
     }
 
+	private static double roundToSignificantFigures(final double num,
+			final int n) {
+		if (num == 0) {
+			return 0;
+		}
+
+		final double d = Math.ceil(Math.log10(num < 0 ? -num : num));
+		final int power = n - (int) d;
+
+		final double magnitude = Math.pow(10, power);
+		final long shifted = Math.round(num * magnitude);
+		return shifted / magnitude;
+	}
+
+	/**
+	 * Places vertices into order by the {@link BOp#getId()} associated
+	 * with their {@link IPredicate}.
+	 */
+	private static class BOpIdComparator implements Comparator<Vertex> {
+
+		private static final transient Comparator<Vertex> INSTANCE = new BOpIdComparator();
+		
+		@Override
+		public int compare(Vertex o1, Vertex o2) {
+			final int id1 = o1.pred.getId();
+			final int id2 = o2.pred.getId();
+			if (id1 < id2)
+				return 1;
+			if (id2 > id1)
+				return -1;
+			return 0;
+		}
+		
+	}
+	
 }

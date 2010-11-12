@@ -286,78 +286,78 @@ public class AdaptiveQueryOptimization {
 			if (startEdge == null)
 				throw new RuntimeException("No weighted edges.");
 
-			/*
-			 * Generate a set of paths by extending that starting vertex in one
-			 * step in each possible direction. For the initial one-step
-			 * extension of the starting vertex we can reuse the estimated
-			 * cardinality of each edge in the join graph, which was already
-			 * computed above.
-			 */
-			final Path[] paths;
-			{
-
-				System.err.println("startEdge="+startEdge);
-
-				// The starting vertex is the one with the minimum est.
-				// cardinality.
-				final Vertex startVertex = startEdge
-						.getMinimumCardinalityVertex();
-
-				System.err.println("startVertex=" + startVertex);
-
-				// Find the set of edges branching from the starting vertex.
-				final List<Edge> branches = g
-						.getEdges(startVertex, null/* visited */);
-
-				if (branches.isEmpty()) {
-
-					// No vertices remain to be explored so we should just execute something.
-					throw new RuntimeException("Paths can not be extended");
-					
-				} else if (branches.size() == 1) {
-
-					final Edge e = branches.get(0);
-
-					final Path path = new Path(e);
-
-					// The initial sample is just the sample for that edge.
-					path.sample = e.sample;
-
-					System.err.println("path=" + path);
-
-					paths = new Path[] { path };
-
-				} else {
-
-					final List<Path> list = new LinkedList<Path>();
-
-					// Create one path for each of those branches.
-					for (Edge e : branches) {
-
-						if (e.v1 != startVertex && e.v2 != startVertex)
-							continue;
-
-						// Create a one step path.
-						final Path path = new Path(e);
-
-						// The initial sample is just the sample for that edge.
-						path.sample = e.sample;
-
-						System.err
-								.println("path[" + list.size() + "]: " + path);
-
-						list.add(path);
-
-					}
-
-					paths = list.toArray(new Path[list.size()]);
-
-				}
-
-				System.err.println("selectedJoinPath: "
-						+ g.getSelectedJoinPath(paths));
-				
-			}
+//			/*
+//			 * Generate a set of paths by extending that starting vertex in one
+//			 * step in each possible direction. For the initial one-step
+//			 * extension of the starting vertex we can reuse the estimated
+//			 * cardinality of each edge in the join graph, which was already
+//			 * computed above.
+//			 */
+//			final Path[] paths;
+//			{
+//
+//				System.err.println("startEdge="+startEdge);
+//
+//				// The starting vertex is the one with the minimum est.
+//				// cardinality.
+//				final Vertex startVertex = startEdge
+//						.getMinimumCardinalityVertex();
+//
+//				System.err.println("startVertex=" + startVertex);
+//
+//				// Find the set of edges branching from the starting vertex.
+//				final List<Edge> branches = g
+//						.getEdges(startVertex, null/* visited */);
+//
+//				if (branches.isEmpty()) {
+//
+//					// No vertices remain to be explored so we should just execute something.
+//					throw new RuntimeException("Paths can not be extended");
+//					
+//				} else if (branches.size() == 1) {
+//
+//					final Edge e = branches.get(0);
+//
+//					final Path path = new Path(e);
+//
+//					// The initial sample is just the sample for that edge.
+//					path.sample = e.sample;
+//
+//					System.err.println("path=" + path);
+//
+//					paths = new Path[] { path };
+//
+//				} else {
+//
+//					final List<Path> list = new LinkedList<Path>();
+//
+//					// Create one path for each of those branches.
+//					for (Edge e : branches) {
+//
+//						if (e.v1 != startVertex && e.v2 != startVertex)
+//							continue;
+//
+//						// Create a one step path.
+//						final Path path = new Path(e);
+//
+//						// The initial sample is just the sample for that edge.
+//						path.sample = e.sample;
+//
+//						System.err
+//								.println("path[" + list.size() + "]: " + path);
+//
+//						list.add(path);
+//
+//					}
+//
+//					paths = list.toArray(new Path[list.size()]);
+//
+//				}
+//
+//				System.err.println("selectedJoinPath: "
+//						+ g.getSelectedJoinPath(paths));
+//				
+//			}
 
 			/*
 			 * FIXME Now extend the initial paths some more and explore the
