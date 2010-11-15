@@ -192,13 +192,16 @@ public class BOpContext<E> extends BOpContextBase {
         
         super(runningQuery.getFederation(), runningQuery.getIndexManager());
         
-        this.runningQuery = runningQuery;
         if (stats == null)
             throw new IllegalArgumentException();
+        
         if (source == null)
             throw new IllegalArgumentException();
+        
         if (sink == null)
             throw new IllegalArgumentException();
+
+        this.runningQuery = runningQuery;
         this.partitionId = partitionId;
         this.stats = stats;
         this.source = source;

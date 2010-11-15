@@ -409,8 +409,6 @@ public class FederatedQueryEngine extends QueryEngine {
          * nodes, the node has to resolve the query from the query controller.
          * 
          * @throws RemoteException
-         * 
-         * @todo Track recently terminated queries and do not recreate them.
          */
         private FederatedRunningQuery getDeclaredQuery(final UUID queryId)
                 throws RemoteException {
@@ -421,20 +419,11 @@ public class FederatedQueryEngine extends QueryEngine {
             final PipelineOp query = msg.getQueryController().getQuery(
                     msg.getQueryId());
 
-            FederatedRunningQuery q = newRunningQuery(
+            final FederatedRunningQuery q = newRunningQuery(
                     FederatedQueryEngine.this, queryId, false/* controller */,
                     msg.getQueryController(), query);
 
-            final RunningQuery tmp = runningQueries.putIfAbsent(queryId, q);
-
-            if (tmp != null) {
-
-                // another thread won this race.
-                q = (FederatedRunningQuery) tmp;
-
-            }
-
-            return q;
+            return (FederatedRunningQuery) putIfAbsent(queryId, q);
 
         }
         
@@ -444,9 +433,11 @@ public class FederatedQueryEngine extends QueryEngine {
 
         final UUID queryId = queryDecl.getQueryId();
         
-        putRunningQuery(queryId, newRunningQuery(this, queryId,
+        final FederatedRunningQuery q = newRunningQuery(this, queryId,
                 false/* controller */, queryDecl.getQueryController(),
-                queryDecl.getQuery()));
+                queryDecl.getQuery());
+        
+        putIfAbsent(queryId, q);
 
     }
     

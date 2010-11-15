@@ -216,7 +216,7 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 
 			final long rangeCount = accessPath.rangeCount(false/* exact */);
 
-			if (limit > rangeCount) {
+			if (limit >= rangeCount) {
 
 				/*
 				 * The sample will contain everything in the access path.

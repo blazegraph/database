@@ -75,8 +75,8 @@ public class TestAll extends TestCase {
         // stress test for SliceOp.
         suite.addTestSuite(TestQueryEngine_Slice.class);
 
-        // test suite for query evaluation (DISTINCT, ORDER BY, GROUP BY).
-        suite.addTestSuite(TestQueryEngine2.class);
+        // @todo test suite for query evaluation (DISTINCT, ORDER BY, GROUP BY).
+//        suite.addTestSuite(TestQueryEngine2.class);
 
         return suite;
         
