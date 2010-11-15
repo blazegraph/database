@@ -50,21 +50,20 @@ import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.SampleIndex;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.join.PipelineJoin;
-import com.bigdata.bop.solutions.SliceOp;
+import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
+import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
@@ -91,6 +90,41 @@ import com.bigdata.striterator.IChunkedIterator;
  *       its costs. For example, by pruning the search, by recognizing when the
  *       query is simple enough to execute directly, by recognizing when we have
  *       already materialized the answer to the query, etc.
+ * 
+ * @todo Cumulative estimated cardinality is an estimate of the work to be done.
+ *       However, the actual cost of a join depends on whether we will use
+ *       nested index subquery or a hash join and the cost of that operation on
+ *       the database. There could be counter examples where the cost of the
+ *       hash join with a range scan using the unbound variable is LT the nested
+ *       index subquery. For those cases, we will do the same amount of IO on
+ *       the hash join but there will still be a lower cardinality to the join
+ *       path since we are feeding in fewer solutions to be joined.
+ * 
+ * @todo Look at the integration with the SAIL. We decorate the joins with some
+ *       annotations. Those will have to be correctly propagated to the "edges"
+ *       in order for edge sampling and incremental evaluation (or final
+ *       evaluation) to work. The {@link DataSetJoin} essentially inlines one of
+ *       its access paths. That should really be changed into an inline access
+ *       path and a normal join operator so we can defer some of the details
+ *       concerning the join operator annotations until we decide on the join
+ *       path to be executed. An inline AP really implies an inline relation,
+ *       which in turn implies that the query is a searchable context for
+ *       query-local resources.
+ *       <p>
+ *       For s/o, when the AP is remote, the join evaluation context must be ANY
+ *       and otherwise (for s/o) it must be SHARDED.
+ *       <p>
+ *       Since the join graph is fed the vertices (APs), it does not have access
+ *       to the annotated joins so we need to generated appropriately annotated
+ *       joins when sampling an edge and when evaluation a subquery.
+ * 
+ * @todo Examine behavior when we do not have perfect covering indices. This
+ *       will mean that some vertices can not be sampled using an index and that
+ *       estimation of their cardinality will have to await the estimation of
+ *       the cardinality of the edge(s) leading to that vertex. Still, the
+ *       approach should be able to handle queries without perfect / covering
+ *       automatically. Then experiment with carrying fewer statement indices
+ *       for quads.
  */
 public class JoinGraph extends PipelineOp {
 
@@ -170,10 +204,10 @@ public class JoinGraph extends PipelineOp {
 
 	}
 
-	/**
-	 * Used to assign row identifiers.
-	 */
-	static private final IVariable<Integer> ROWID = Var.var("__rowid");
+//	/**
+//	 * Used to assign row identifiers.
+//	 */
+//	static private final IVariable<Integer> ROWID = Var.var("__rowid");
 
 	/**
 	 * A sample of a {@link Vertex} (an access path).
@@ -301,7 +335,8 @@ public class JoinGraph extends PipelineOp {
 
 		/**
 		 * Take a sample of the vertex. If the sample is already exact, then
-		 * this is a NOP.
+		 * this is a NOP. If the vertex was already sampled to that limit, then
+		 * this is a NOP (you have to raise the limit to re-sample the vertex).
 		 * 
 		 * @param limit
 		 *            The sample cutoff.
@@ -327,6 +362,16 @@ public class JoinGraph extends PipelineOp {
 
 			}
 
+			if (oldSample != null && oldSample.limit >= limit) {
+
+				/*
+				 * The vertex was already sampled to this limit. 
+				 */
+				
+				return;
+				
+			}
+			
 			final BOpContextBase context = new BOpContextBase(queryEngine);
 			
 			final IRelation r = context.getRelation(pred);
@@ -384,8 +429,8 @@ public class JoinGraph extends PipelineOp {
 
 			}
 
-			if (log.isInfoEnabled())
-				log.info("Sampled: " + sample);
+			if (log.isTraceEnabled())
+				log.trace("Sampled: " + sample);
 
 			return;
 			
@@ -393,6 +438,46 @@ public class JoinGraph extends PipelineOp {
 
 	}
 
+	/**
+	 * Type safe enumeration describes the edge condition (if any) for a
+	 * cardinality estimate.
+	 */
+	public static enum EstimateEnum {
+		/**
+		 * An estimate, but not any of the edge conditions.
+		 */
+		Normal(" "),
+		/**
+		 * The cardinality estimate is exact.
+		 */
+		Exact("E"),
+		/**
+		 * The cardinality estimation is a lower bound (the actual cardinality
+		 * may be higher than the estimated value).
+		 */
+		LowerBound("L"),
+		/**
+		 * Flag is set when the cardinality estimate underflowed (false zero
+		 * (0)).
+		 */
+		Underflow("U");
+		
+		private EstimateEnum(final String code) {
+			
+			this.code = code;
+			
+		}
+
+		private final String code;
+
+		public String getCode() {
+
+			return code;
+			
+		}
+		
+	} // EstimateEnum
+	
 	/**
 	 * A sample of an {@link Edge} (a join).
 	 */
@@ -404,6 +489,13 @@ public class JoinGraph extends PipelineOp {
 		 */
 		public final long rangeCount;
 
+		/**
+		 * <code>true</code> iff the source sample is exact (because the source
+		 * is either a fully materialized vertex or an edge whose solutions have
+		 * been fully materialized).
+		 */
+		public final boolean sourceSampleExact;
+		
 		/**
 		 * The limit used to sample the edge (this is the limit on the #of
 		 * solutions generated by the cutoff join used when this sample was
@@ -438,49 +530,14 @@ public class JoinGraph extends PipelineOp {
 		public final long estimatedCardinality;
 
 		/**
-		 * Flag is set when the estimate is likely to be a lower bound for the
-		 * cardinality of the edge.
-		 * <p>
-		 * If the {@link #inputCount} is ONE (1) and the {@link #outputCount} is
-		 * the {@link #limit} then the {@link #estimatedCardinality} is a lower
-		 * bound as more than {@link #outputCount} solutions could have been
-		 * produced by the join against a single input solution.
-		 */
-		public final boolean estimateIsLowerBound;
-
-		/**
-		 * Flag indicates that the {@link #estimatedCardinality} underflowed.
-		 * <p>
-		 * Note: When the source vertex sample was not exact, then it is
-		 * possible for the cardinality estimate to underflow. When, in
-		 * addition, {@link #outputCount} is LT {@link #limit}, then feeding the
-		 * sample of source tuples in is not sufficient to generated the desired
-		 * #of output tuples. In this case, {@link #f join hit ratio} will be
-		 * low. It may even be that zero output tuples were generated, in which
-		 * case the join hit ratio will appear to be zero. However, the join hit
-		 * ratio actually underflowed and an apparent join hit ratio of zero
-		 * does not imply that the join will be empty unless the source vertex
-		 * sample is actually the fully materialized access path - see
-		 * {@link VertexSample#exact} and {@link #exact}.
-		 */
-		public final boolean estimateIsUpperBound;
-
-		/**
-		 * <code>true</code> if the sample is the exact solution for the join
-		 * path.
-		 * <p>
-		 * Note: If the entire source vertex is being feed into the sample,
-		 * {@link VertexSample#exact} flags this condition, and outputCount is
-		 * also LT the limit, then the edge sample is the actual result of the
-		 * join. That is, feeding all source tuples into the join gives fewer
-		 * than the desired number of output tuples.
+		 * Indicates whether the estimate is exact, an upper bound, or a lower
+		 * bound.
 		 * 
-		 * TODO This field marks this condition and should be used to avoid
-		 * needless re-computation of a join whose exact solution is already
-		 * known.
+		 * TODO This field should be used to avoid needless re-computation of a
+		 * join whose exact solution is already known.
 		 */
-		public final boolean exact;
-
+		public final EstimateEnum estimateEnum;
+		
 		/**
 		 * The sample of the solutions for the join path.
 		 */
@@ -504,9 +561,12 @@ public class JoinGraph extends PipelineOp {
 		 */
 		EdgeSample(
 				// final VertexSample sourceVertexSample,
-				final long sourceSampleRangeCount,
-				final boolean sourceSampleExact, final int limit,
-				final int inputCount, final int outputCount,
+				final long sourceSampleRangeCount,//
+				final boolean sourceSampleExact, //
+				final int sourceSampleLimit,//
+				final int limit,//
+				final int inputCount, //
+				final int outputCount,//
 				final IBindingSet[] sample) {
 
 			if (sample == null)
@@ -514,6 +574,8 @@ public class JoinGraph extends PipelineOp {
 
 			// this.rangeCount = sourceVertexSample.rangeCount;
 			this.rangeCount = sourceSampleRangeCount;
+			
+			this.sourceSampleExact = sourceSampleExact;
 
 			this.limit = limit;
 
@@ -525,24 +587,64 @@ public class JoinGraph extends PipelineOp {
 
 			estimatedCardinality = (long) (rangeCount * f);
 
-			estimateIsLowerBound = inputCount == 1 && outputCount == limit;
-
-			// final boolean sourceSampleExact = sourceVertexSample.exact;
-			estimateIsUpperBound = !sourceSampleExact && outputCount < limit;
-
-			this.exact = sourceSampleExact && outputCount < limit;
+			if (sourceSampleExact && outputCount < limit) {
+				/*
+				 * Note: If the entire source vertex is being fed into the
+				 * cutoff join and the cutoff join outputCount is LT the limit,
+				 * then the sample is the actual result of the join. That is,
+				 * feeding all source solutions into the join gives fewer than
+				 * the desired number of output solutions.
+				 */
+				estimateEnum = EstimateEnum.Exact;
+			} else if (inputCount == 1 && outputCount == limit) {
+				/*
+				 * If the inputCount is ONE (1) and the outputCount is the
+				 * limit, then the estimated cardinality is a lower bound as
+				 * more than outputCount solutions might be produced by the join
+				 * when presented with a single input solution.
+				 */
+				estimateEnum = EstimateEnum.LowerBound;
+			} else if (!sourceSampleExact
+					&& inputCount == Math.min(sourceSampleLimit, rangeCount)
+					&& outputCount == 0) {
+				/*
+				 * When the source sample was not exact, the inputCount is EQ to
+				 * the lesser of the source range count and the source sample
+				 * limit, and the outputCount is ZERO (0), then feeding in all
+				 * source solutions in is not sufficient to generate any output
+				 * solutions. In this case, the estimated join hit ratio appears
+				 * to be zero. However, the estimation of the join hit ratio
+				 * actually underflowed and the real join hit ratio might be a
+				 * small non-negative value. A real zero can only be identified
+				 * by executing the full join.
+				 * 
+				 * Note: An apparent join hit ratio of zero does NOT imply that
+				 * the join will be empty (unless the source vertex sample is
+				 * actually the fully materialized access path - this case is
+				 * covered above).
+				 */
+				estimateEnum = EstimateEnum.Underflow;
+			} else {
+				estimateEnum = EstimateEnum.Normal;
+			}
 
 			this.sample = sample;
 		}
 
 		public String toString() {
-			return getClass().getName() + "{inputRangeCount=" + rangeCount
-					+ ", limit=" + limit + ", inputCount=" + inputCount
-					+ ", outputCount=" + outputCount + ", f=" + f
-					+ ", estimatedCardinality=" + estimatedCardinality
-					+ ", estimateIsLowerBound=" + estimateIsLowerBound
-					+ ", estimateIsUpperBound=" + estimateIsUpperBound
-					+ ", sampleIsExactSolution=" + exact + "}";
+			return getClass().getName() //
+					+ "{ rangeCount=" + rangeCount//
+					+ ", sourceSampleExact=" + sourceSampleExact//
+					+ ", limit=" + limit //
+					+ ", inputCount=" + inputCount//
+					+ ", outputCount=" + outputCount //
+					+ ", f=" + f//
+					+ ", estimatedCardinality=" + estimatedCardinality//
+					+ ", estimateEnum=" + estimateEnum//
+//					+ ", estimateIsLowerBound=" + estimateIsLowerBound//
+//					+ ", estimateIsUpperBound=" + estimateIsUpperBound//
+//					+ ", sampleIsExactSolution=" + estimateIsExact //
+					+ "}";
 		}
 
 	};
@@ -703,6 +805,14 @@ public class JoinGraph extends PipelineOp {
 				throw new IllegalArgumentException();
 
 			/*
+			 * Note: There is never a need to "re-sample" the edge. Unlike ROX,
+			 * we always can sample a vertex. This means that we can sample the
+			 * edges exactly once, during the initialization of the join graph.
+			 */
+			if (sample != null)
+				throw new RuntimeException();
+			
+			/*
 			 * Figure out which vertex has the smaller cardinality. The sample
 			 * of that vertex is used since it is more representative than the
 			 * sample of the other vertex.
@@ -722,7 +832,7 @@ public class JoinGraph extends PipelineOp {
 			}
 
 			/*
-			 * TODO This is difficult to setup because we do not have a concept
+			 * TODO This is awkward to setup because we do not have a concept
 			 * (or class) corresponding to a fly weight relation and we do not
 			 * have a general purpose relation, just arrays or sequences of
 			 * IBindingSets. Also, all relations are persistent. Temporary
@@ -740,10 +850,6 @@ public class JoinGraph extends PipelineOp {
 			 * Together, this means that we are dealing with IBindingSet[]s for
 			 * both the input and the output of the cutoff evaluation of the
 			 * edge rather than rows of the materialized relation.
-			 * 
-			 * TODO On subsequent iterations we would probably re-sample [v] and
-			 * we would run against the materialized intermediate result for
-			 * [v'].
 			 */
 
 			/*
@@ -763,7 +869,8 @@ public class JoinGraph extends PipelineOp {
 
 			// Sample the edge and save the sample on the edge as a side-effect.
 			this.sample = estimateCardinality(queryEngine, limit, v, vp,
-					v.sample.rangeCount, v.sample.exact, sourceSample);
+					v.sample.rangeCount, v.sample.exact, v.sample.limit,
+					sourceSample);
 
 			return sample.estimatedCardinality;
 
@@ -793,17 +900,28 @@ public class JoinGraph extends PipelineOp {
 		public EdgeSample estimateCardinality(final QueryEngine queryEngine,
 				final int limit, final Vertex vSource, final Vertex vTarget,
 				final long sourceSampleRangeCount,
-				final boolean sourceSampleExact, IBindingSet[] sourceSample)
+				final boolean sourceSampleExact,
+				final int sourceSampleLimit,
+				final IBindingSet[] sourceSample)
 				throws Exception {
 
 			if (limit <= 0)
 				throw new IllegalArgumentException();
 
-			// Inject a rowId column.
-			sourceSample = BOpUtility.injectRowIdColumn(ROWID, 1/* start */,
-					sourceSample);
+//			// Inject a rowId column.
+//			sourceSample = BOpUtility.injectRowIdColumn(ROWID, 1/* start */,
+//					sourceSample);
 
 			/*
+			 * Note: This sets up a cutoff pipeline join operator which makes an
+			 * accurate estimate of the #of input solutions consumed and the #of
+			 * output solutions generated. From that, we can directly compute
+			 * the join hit ratio. This approach is preferred to injecting a
+			 * "RowId" column as the estimates are taken based on internal
+			 * counters in the join operator and the join operator knows how to
+			 * cutoff evaluation as soon as the limit is satisfied, thus
+			 * avoiding unnecessary effort.
+			 * 
 			 * TODO Any constraints on the edge (other than those implied by
 			 * shared variables) need to be annotated on the join. Constraints
 			 * (other than range constraints which are directly coded by the
@@ -811,31 +929,61 @@ public class JoinGraph extends PipelineOp {
 			 * they can reduce the cardinality of the join and that is what we
 			 * are trying to estimate here.
 			 */
+			final int joinId = 1;
 			final PipelineJoin joinOp = new PipelineJoin(new BOp[] {}, //
-					new NV(BOp.Annotations.BOP_ID, 1),//
-					new NV(PipelineJoin.Annotations.PREDICATE, vTarget.pred
-							.setBOpId(3)));
+				new NV(BOp.Annotations.BOP_ID, joinId),//
+				new NV(PipelineJoin.Annotations.PREDICATE, vTarget.pred
+						.setBOpId(3)),
+				// disallow parallel evaluation.
+				new NV(PipelineJoin.Annotations.MAX_PARALLEL,0),
+				// disable access path coalescing 
+				new NV(PipelineJoin.Annotations.COALESCE_DUPLICATE_ACCESS_PATHS,false),
+				// cutoff join.
+				new NV(PipelineJoin.Annotations.LIMIT,(long)limit),
+				/*
+				 * Note: In order to have an accurate estimate of the join
+				 * hit ratio we need to make sure that the join operator
+				 * runs using a single PipelineJoinStats instance which will
+				 * be visible to us when the query is cutoff. In turn, this
+				 * implies that the join must be evaluated on the query
+				 * controller.
+				 * 
+				 * @todo This implies that sampling of scale-out joins must
+				 * be done using remote access paths.
+				 */
+				new NV(PipelineJoin.Annotations.SHARED_STATE,true),
+				new NV(PipelineJoin.Annotations.EVALUATION_CONTEXT,BOpEvaluationContext.CONTROLLER)
+//				// make sure the chunks are large enough to hold the result.
+//				new NV(PipelineJoin.Annotations.CHUNK_CAPACITY,limit),
+//				// no chunk timeout
+//				new NV(PipelineJoin.Annotations.CHUNK_TIMEOUT,Long.MAX_VALUE)
+			);
 
-			final SliceOp sliceOp = new SliceOp(new BOp[] { joinOp },//
-					NV.asMap(//
-							new NV(BOp.Annotations.BOP_ID, 2), //
-							new NV(SliceOp.Annotations.LIMIT, (long) limit), //
-							new NV(BOp.Annotations.EVALUATION_CONTEXT,
-									BOpEvaluationContext.CONTROLLER)));
+//			BOpContext context = new BOpContext(runningQuery, partitionId, stats, source, sink, sink2);
+//			joinOp.eval(context);
+			
+//			final SliceOp sliceOp = new SliceOp(new BOp[] { joinOp },//
+//					NV.asMap(//
+//							new NV(BOp.Annotations.BOP_ID, 2), //
+//							new NV(SliceOp.Annotations.LIMIT, (long) limit), //
+//							new NV(BOp.Annotations.EVALUATION_CONTEXT,
+//									BOpEvaluationContext.CONTROLLER)));
 
+			final PipelineOp queryOp = joinOp;
+			
 			// run the cutoff sampling of the edge.
 			final UUID queryId = UUID.randomUUID();
 			final RunningQuery runningQuery = queryEngine.eval(queryId,
-					sliceOp, new LocalChunkMessage<IBindingSet>(queryEngine,
+					queryOp, new LocalChunkMessage<IBindingSet>(queryEngine,
 							queryId, joinOp.getId()/* startId */,
 							-1 /* partitionId */,
 							new ThickAsynchronousIterator<IBindingSet[]>(
 									new IBindingSet[][] { sourceSample })));
 
-			// #of source samples consumed.
-			int inputCount = 0;
-			// #of output samples generated.
-			int outputCount = 0;
+//			// #of source samples consumed.
+//			int inputCount;
+//			// #of output samples generated.
+//			int outputCount = 0;
 			final List<IBindingSet> result = new LinkedList<IBindingSet>();
 			try {
 				try {
@@ -845,20 +993,30 @@ public class JoinGraph extends PipelineOp {
 							runningQuery.iterator());
 					while (itr.hasNext()) {
 						bset = itr.next();
+//						final int rowid = (Integer) bset.get(ROWID).get();
+//						if (rowid > inputCount)
+//							inputCount = rowid;
 						result.add(bset);
-						outputCount++;
+//						outputCount++;
 					}
-					// #of input rows consumed.
-					inputCount = bset == null ? 0 : ((Integer) bset.get(ROWID)
-							.get());
+//					// #of input rows consumed.
+//					inputCount = bset == null ? 0 : ((Integer) bset.get(ROWID)
+//							.get());
 				} finally {
-					// verify no problems. FIXME Restore test of the query.
-					// runningQuery.get();
+					// verify no problems.
+					runningQuery.get();
 				}
 			} finally {
 				runningQuery.cancel(true/* mayInterruptIfRunning */);
 			}
 
+			// The join hit ratio can be computed directly from these stats.
+			final PipelineJoinStats joinStats = (PipelineJoinStats) runningQuery
+					.getStats().get(joinId);
+
+			if (log.isDebugEnabled())
+				log.debug(joinStats.toString());
+			
 			/*
 			 * TODO Improve comments here. See if it is possible to isolate a
 			 * common base class which would simplify the setup of the cutoff
@@ -866,12 +1024,16 @@ public class JoinGraph extends PipelineOp {
 			 */
 
 			final EdgeSample edgeSample = new EdgeSample(
-					sourceSampleRangeCount, sourceSampleExact, limit,
-					inputCount, outputCount, result
-							.toArray(new IBindingSet[result.size()]));
+					sourceSampleRangeCount, //
+					sourceSampleExact, // @todo redundant with sourceSampleLimit
+					sourceSampleLimit, //
+					limit, //
+					(int) joinStats.inputSolutions.get(),//
+					(int) joinStats.outputSolutions.get(), //
+					result.toArray(new IBindingSet[result.size()]));
 
-			if (log.isInfoEnabled())
-				log.info("edge=" + this + ", sample=" + edgeSample);
+			if (log.isTraceEnabled())
+				log.trace("edge=" + this + ", sample=" + edgeSample);
 
 			return edgeSample;
 
@@ -892,12 +1054,14 @@ public class JoinGraph extends PipelineOp {
 
 		/**
 		 * The sample obtained by the step-wise cutoff evaluation of the ordered
-		 * edges of the path. This sample is generated one edge at a time rather
-		 * than by attempting the cutoff evaluation of the entire join path (the
-		 * latter approach does allow us to limit the amount of work to be done
-		 * to satisfy the cutoff).
+		 * edges of the path.
+		 * <p>
+		 * Note: This sample is generated one edge at a time rather than by
+		 * attempting the cutoff evaluation of the entire join path (the latter
+		 * approach does allow us to limit the amount of work to be done to
+		 * satisfy the cutoff).
 		 */
-		final public EdgeSample sample;
+		public EdgeSample sample;
 
 		/**
 		 * The cumulative estimated cardinality of the path. This is zero for an
@@ -1012,23 +1176,84 @@ public class JoinGraph extends PipelineOp {
 			return false;
 		}
 
+//		/**
+//		 * Return <code>true</code> if this path is an unordered super set of
+//		 * the given path. In the case where both paths have the same vertices
+//		 * this will also return <code>true</code>.
+//		 * 
+//		 * @param p
+//		 *            Another path.
+//		 * 
+//		 * @return <code>true</code> if this path is an unordered super set of
+//		 *         the given path.
+//		 */
+//		public boolean isUnorderedSuperSet(final Path p) {
+//
+//			if (p == null)
+//				throw new IllegalArgumentException();
+//
+//			if (edges.size() < p.edges.size()) {
+//				/*
+//				 * Fast rejection. This assumes that each edge after the first
+//				 * adds one distinct vertex to the path. That assumption is
+//				 * enforced by #addEdge().
+//				 */
+//				return false;
+//			}
+//
+//			final Vertex[] v1 = getVertices();
+//			final Vertex[] v2 = p.getVertices();
+//
+//			if (v1.length < v2.length) {
+//				// Proven false since the other set is larger.
+//				return false;
+//			}
+//
+//			/*
+//			 * Scan the vertices of the caller's path. If any of those vertices
+//			 * are NOT found in this path then the caller's path can not be a
+//			 * subset of this path.
+//			 */
+//			for (int i = 0; i < v2.length; i++) {
+//
+//				final Vertex tmp = v2[i];
+//
+//				boolean found = false;
+//				for (int j = 0; j < v1.length; j++) {
+//
+//					if (v1[j] == tmp) {
+//						found = true;
+//						break;
+//					}
+//
+//				}
+//
+//				if (!found) {
+//					return false;
+//				}
+//
+//			}
+//
+//			return true;
+//
+//		}
+
 		/**
-		 * Return <code>true</code> if this path is an unordered super set of
-		 * the given path. In the case where both paths have the same vertices
-		 * this will also return <code>true</code>.
+		 * Return <code>true</code> if this path is an unordered variant of the
+		 * given path (same vertices in any order).
 		 * 
 		 * @param p
 		 *            Another path.
 		 * 
-		 * @return <code>true</code> if this path is an unordered super set of
-		 *         the given path.
+		 * @return <code>true</code> if this path is an unordered variant of the
+		 *         given path.
 		 */
-		public boolean isUnorderedSuperSet(final Path p) {
+		public boolean isUnorderedVariant(final Path p) {
 
 			if (p == null)
 				throw new IllegalArgumentException();
 
-			if (edges.size() < p.edges.size()) {
+			if (edges.size() != p.edges.size()) {
 				/*
 				 * Fast rejection. This assumes that each edge after the first
 				 * adds one distinct vertex to the path. That assumption is
@@ -1040,15 +1265,17 @@ public class JoinGraph extends PipelineOp {
 			final Vertex[] v1 = getVertices();
 			final Vertex[] v2 = p.getVertices();
 
-			if (v1.length < v2.length) {
-				// Proven false since the other set is larger.
+			if (v1.length != v2.length) {
+
+				// Reject (this case is also covered by the test above).
 				return false;
+				
 			}
 
 			/*
 			 * Scan the vertices of the caller's path. If any of those vertices
-			 * are NOT found in this path then the caller's path can not be a
-			 * subset of this path.
+			 * are NOT found in this path the paths are not unordered variations
+			 * of one aother.
 			 */
 			for (int i = 0; i < v2.length; i++) {
 
@@ -1170,24 +1397,24 @@ public class JoinGraph extends PipelineOp {
 			 * the new join path we have to do a one step cutoff evaluation of
 			 * the new Edge, given the sample available on the current Path.
 			 * 
-			 * TODO It is possible for the path sample to be empty. Unless the
+			 * FIXME It is possible for the path sample to be empty. Unless the
 			 * sample also happens to be exact, this is an indication that the
-			 * estimated cardinality has underflowed. How are we going to deal
-			 * with this situation?!? What would appear to matter is the amount
-			 * of work being performed by the join in achieving that low
-			 * cardinality. If we have to do a lot of work to get a small
-			 * cardinality then we should prefer join paths which achieve the
-			 * same reduction in cardinality with less 'intermediate
-			 * cardinality' - that is, by examining fewer possible solutions.
-			 * [In fact, the estimated (cumulative) cardinality might not be a
-			 * good reflection of the IOs to be done -- this needs more
-			 * thought.]
+			 * estimated cardinality has underflowed. We track the estimated
+			 * cumulative cardinality, so this does not make the join path an
+			 * immediate winner, but it does mean that we can not probe further
+			 * on that join path as we lack any intermediate solutions to feed
+			 * into the downstream joins. [If we re-sampled the edges in the
+			 * join path in each round then this would help to establish a
+			 * better estimate in successive rounds.]
 			 */
 
 			final EdgeSample edgeSample = e.estimateCardinality(queryEngine,
 					limit, sourceVertex, targetVertex,
-					this.sample.estimatedCardinality, this.sample.exact,
-					this.sample.sample);
+					this.sample.estimatedCardinality,
+					this.sample.estimateEnum == EstimateEnum.Exact,
+					this.sample.limit,//
+					this.sample.sample//
+					);
 
 			{
 
@@ -1275,23 +1502,77 @@ public class JoinGraph extends PipelineOp {
 	 * @return A table with that data.
 	 */
 	static public String showTable(final Path[] a) {
+
+		return showTable(a, null/* pruned */);
+		
+	}
+
+	/**
+	 * Comma delimited table showing the estimated join hit ratio, the estimated
+	 * cardinality, and the set of vertices for each of the specified join
+	 * paths.
+	 * 
+	 * @param a
+	 *            A set of paths (typically those before pruning).
+	 * @param pruned
+	 *            The set of paths after pruning (those which were retained)
+	 *            (optional). When given, the paths which were pruned are marked
+	 *            in the table.
+	 * 
+	 * @return A table with that data.
+	 */
+	static public String showTable(final Path[] a,final Path[] pruned) {
 		final StringBuilder sb = new StringBuilder();
 		final Formatter f = new Formatter(sb);
+		f.format("%5s %10s%1s * %7s (%3s/%3s) = %10s%1s : %10s %10s",
+				"path",//
+				"rangeCount",//
+				"",// sourceSampleExact
+				"f",//
+				"out",//
+				"in",//
+				"estCard",//
+				"",// estimateIs(Exact|LowerBound|UpperBound)
+				"sumEstCard",//
+				"joinPath\n"
+				);
 		for (int i = 0; i < a.length; i++) {
 			final Path x = a[i];
-			if (x.sample == null) {
-				f.format("p[%2d] %7s, %10s %10s", "N/A", "N/A", "N/A", i);
-			} else {
-				f.format("p[%2d] % 7.2f, % 10d % 10d", i, x.sample.f,
-						x.sample.estimatedCardinality,
-						x.cumulativeEstimatedCardinality);
+			// true iff the path survived pruning.
+			Boolean prune = null;
+			if (pruned != null) {
+				prune = Boolean.TRUE;
+				for (Path y : pruned) {
+					if (y == x) {
+						prune = Boolean.FALSE;
+						break;
+					}
+				}
 			}
-			sb.append(", [");
+			if (x.sample == null) {
+				f.format("p[%2d] %10d%1s * %7s (%3s/%3s) = %10s%1s : %10s", i, "N/A", "", "N/A", "N/A", "N/A", "N/A", "", "N/A");
+			} else {
+				f.format("p[%2d] %10d%1s * % 7.2f (%3d/%3d) = % 10d%1s : % 10d", i,
+						x.sample.rangeCount,//
+						x.sample.sourceSampleExact?"E":"",//
+						x.sample.f,//
+						x.sample.outputCount,//
+						x.sample.inputCount,//
+						x.sample.estimatedCardinality,//
+						x.sample.estimateEnum.getCode(),//
+						x.cumulativeEstimatedCardinality//
+						);
+			}
+			sb.append("  [");
 			final Vertex[] vertices = x.getVertices();
 			for (Vertex v : vertices) {
 				f.format("%2d ", v.pred.getId());
 			}
 			sb.append("]");
+			if (pruned != null) {
+				if (prune)
+					sb.append(" pruned");
+			}
 			// for (Edge e : x.edges)
 			// sb.append(" (" + e.v1.pred.getId() + " " + e.v2.pred.getId()
 			// + ")");
@@ -1326,16 +1607,6 @@ public class JoinGraph extends PipelineOp {
 	 * the timeout should be used to protect against join paths which take a
 	 * long time to materialize <i>cutoff</i> solutions rather than to fine tune
 	 * the running time of the query optimizer.
-	 * 
-	 * TODO Runtime query optimization is probably useless (or else should rely
-	 * on materialization of intermediate results) when the cardinality of the
-	 * vertices and edges for the query is small. This would let us balance the
-	 * design characteristics of MonetDB and bigdata. For this purpose, we need
-	 * to flag when a {@link VertexSample} is complete (e.g., the cutoff is GTE
-	 * the actual range count). This also needs to be done for each join path so
-	 * we can decide when the sample for the path is in fact the exact solution
-	 * rather than an estimate of the cardinality of the solution together with
-	 * a sample of the solution.
 	 */
 	public static class JGraph {
 
@@ -1432,8 +1703,7 @@ public class JoinGraph extends PipelineOp {
 		 * @param queryEngine
 		 * @param limit
 		 *            The limit for sampling a vertex and the initial limit for
-		 *            cutoff join evaluation. A reasonable value is
-		 *            <code>100</code>.
+		 *            cutoff join evaluation.
 		 * 
 		 * @throws Exception
 		 */
@@ -1474,7 +1744,7 @@ public class JoinGraph extends PipelineOp {
 			 * @todo When executing the query, it is actually being executed as
 			 * a subquery. Therefore we have to take appropriate care to ensure
 			 * that the results are copied out of the subquery and into the
-			 * parent query.
+			 * parent query.  See SubqueryTask for how this is done.
 			 * 
 			 * @todo When we execute the query, we should clear the references
 			 * to the sample (unless they are exact, in which case they can be
@@ -1588,7 +1858,7 @@ public class JoinGraph extends PipelineOp {
 		 * 
 		 * @param queryEngine
 		 *            The query engine.
-		 * @param limit
+		 * @param limitIn
 		 *            The limit (this is automatically multiplied by the round
 		 *            to increase the sample size in each round).
 		 * @param round
@@ -1602,12 +1872,12 @@ public class JoinGraph extends PipelineOp {
 		 * 
 		 * @throws Exception
 		 */
-		public Path[] expand(final QueryEngine queryEngine, int limit,
+		public Path[] expand(final QueryEngine queryEngine, int limitIn,
 				final int round, final Path[] a) throws Exception {
 
 			if (queryEngine == null)
 				throw new IllegalArgumentException();
-			if (limit <= 0)
+			if (limitIn <= 0)
 				throw new IllegalArgumentException();
 			if (round <= 0)
 				throw new IllegalArgumentException();
@@ -1617,7 +1887,7 @@ public class JoinGraph extends PipelineOp {
 				throw new IllegalArgumentException();
 			
 			// increment the limit by itself in each round.
-			limit *= round;
+			final int limit = round * limitIn;
 			
 			final List<Path> tmp = new LinkedList<Path>();
 
@@ -1628,15 +1898,41 @@ public class JoinGraph extends PipelineOp {
 
 			// Vertices are inserted into this collection when they are resampled.
 			final Set<Vertex> resampled = new LinkedHashSet<Vertex>();
-			
+
 			// Then expand each path.
 			for (Path x : a) {
 
-				if (x.edges.size() < round) {
+				final int nedges = x.edges.size();
+
+				if (nedges < round) {
+
 					// Path is from a previous round.
 					continue;
+					
 				}
 
+				/*
+				 * The only way to increase the accuracy of our estimates for
+				 * edges as we extend the join paths is to re-sample each edge
+				 * in the join path in path order.
+				 * 
+				 * Note: An edge must be sampled for each distinct join path
+				 * prefix in which it appears within each round. However, it is
+				 * common for surviving paths to share a join path prefix, so do
+				 * not re-sample a given path prefix more than once per round.
+				 * Also, do not re-sample paths which are from rounds before the
+				 * immediately previous round as those paths will not be
+				 * extended in this round.
+				 * 
+				 * FIXME Find all vertices in use by all paths which survived
+				 * into this round. Re-sample those vertices to the new limit
+				 * (resampling a vertex is a NOP if it has been resampled to the
+				 * desired limit so we can do this incrementally rather than up
+				 * front). For each edge of each path in path order, re-sample
+				 * the edge. Shared prefix samples should be reused, but samples
+				 * of the same edge with a different prefix must not be shared.
+				 */
+				
 				// The set of vertices used to expand this path in this round.
 				final Set<Vertex> used = new LinkedHashSet<Vertex>();
 
@@ -1657,28 +1953,32 @@ public class JoinGraph extends PipelineOp {
 						continue;
 					}
 
-					final Vertex newVertex = v1Found ? edgeInGraph.v2
+					// the target vertex for the new edge.
+					final Vertex tVertex = v1Found ? edgeInGraph.v2
 							: edgeInGraph.v1;
 
-					if (used.contains(newVertex)) {
+//					// the source vertex for the new edge.
+//					final Vertex sVertex = v1Found ? edgeInGraph.v1
+//							: edgeInGraph.v2;
+
+					if (used.contains(tVertex)) {
 						// Vertex already used to extend this path.
 						continue;
 					}
 
 					// add the new vertex to the set of used vertices.
-					used.add(newVertex);
+					used.add(tVertex);
 
-					if (!resampled.add(newVertex)&&round>1) {
+					if (resampled.add(tVertex)) {
 						/*
-						 * Resample this vertex before we sample a new edge
+						 * (Re-)sample this vertex before we sample a new edge
 						 * which targets this vertex.
 						 */
-						newVertex.sample(queryEngine, limit);
+						tVertex.sample(queryEngine, limit);
 					}
 					
 					// Extend the path to the new vertex.
-					final Path p = x.addEdge(queryEngine, limit,
-							edgeInGraph);
+					final Path p = x.addEdge(queryEngine, limit, edgeInGraph);
 
 					// Add to the set of paths for this round.
 					tmp.add(p);
@@ -1689,17 +1989,18 @@ public class JoinGraph extends PipelineOp {
 
 			final Path[] paths_tp1 = tmp.toArray(new Path[tmp.size()]);
 
-			if (log.isDebugEnabled())
-				log.debug("\n*** round=" + round + " : generated paths\n"
-						+ JoinGraph.showTable(paths_tp1));
-
 			final Path[] paths_tp1_pruned = pruneJoinPaths(paths_tp1);
 
+			if (log.isDebugEnabled())
+				log.debug("\n*** round=" + round + ", limit=" + limit
+						+ " : generated paths\n"
+						+ JoinGraph.showTable(paths_tp1, paths_tp1_pruned));
+
 			if (log.isInfoEnabled())
-				log.info("\n*** round=" + round + ": paths{in=" + a.length
-						+ ",considered=" + paths_tp1.length + ",out="
-						+ paths_tp1_pruned.length + "}\n"
-						+ JoinGraph.showTable(paths_tp1_pruned));
+				log.info("\n*** round=" + round + ", limit=" + limit
+						+ ": paths{in=" + a.length + ",considered="
+						+ paths_tp1.length + ",out=" + paths_tp1_pruned.length
+						+ "}\n" + JoinGraph.showTable(paths_tp1_pruned));
 
 			return paths_tp1_pruned;
 
@@ -1919,52 +2220,34 @@ public class JoinGraph extends PipelineOp {
 		}
 
 		/**
-		 * Prune paths which are dominated by other paths. Start the algorithm
-		 * by passing in all edges which have the minimum cardinality (when
-		 * comparing their expected cardinality after rounding to 2 significant
-		 * digits).
+		 * Prune paths which are dominated by other paths. Paths are extended in
+		 * each round. Paths from previous rounds are always pruned. Of the new
+		 * paths in each round, the following rule is applied to prune the
+		 * search to just those paths which are known to dominate the other
+		 * paths covering the same set of vertices:
 		 * <p>
-		 * If there is a path [p] whose total cost is LTE the cost of executing
-		 * just its last edge [e], then the path [p] dominates all paths
-		 * beginning with edge [e]. The dominated paths should be pruned. [This
-		 * is a degenerate case of the next rule.]
-		 * <p>
-		 * If there is a path, [p] != [p1], where [p] is an unordered superset
-		 * of [p1] (that is the vertices of p are a superset of the vertices of
-		 * p1, but allowing the special case where the set of vertices are the
-		 * same), and the cumulative cost of [p] is LTE the cumulative cost of
-		 * [p1], then [p] dominates (or is equivalent to) [p1] and p1 should be
-		 * pruned.
-		 * <p>
-		 * If there is a path, [p], which has the same vertices as a path [p1]
+		 * If there is a path, [p] != [p1], where [p] is an unordered variant of
+		 * [p1] (that is the vertices of p are the same as the vertices of p1),
 		 * and the cumulative cost of [p] is LTE the cumulative cost of [p1],
-		 * then [p] dominates (or is equivalent to) [p1]. The path [p1] should
-		 * be pruned. [This is a degenerate case of the prior rule.]
+		 * then [p] dominates (or is equivalent to) [p1] and p1 should be
+		 * pruned.
 		 * 
 		 * @param a
 		 *            A set of paths.
 		 * 
 		 * @return The set of paths with all dominated paths removed.
-		 * 
-		 *         FIXME This does not give us a stopping condition unless the
-		 *         set of paths becomes empty. I think it will tend to search
-		 *         too far for a best path, running the risk of increasing
-		 *         inaccuracy introduced by propagation of samples. Resampling
-		 *         the vertices and increasing the vertex and edge cutoff at
-		 *         each iteration of the search could compensate for that.
-		 * 
-		 *         TODO Cumulative estimated cardinality is an estimate of the
-		 *         work to be done. However, the actual cost of a join depends
-		 *         on whether we will use nested index subquery or a hash join
-		 *         and the cost of that operation on the database. There could
-		 *         be counter examples where the cost of the hash join with a
-		 *         range scan using the unbound variable is LT the nested index
-		 *         subquery. For those cases, we will do the same amount of IO
-		 *         on the hash join but there will still be a lower cardinality
-		 *         to the join path since we are feeding in fewer solutions to
-		 *         be joined.
 		 */
 		public Path[] pruneJoinPaths(final Path[] a) {
+			/*
+			 * Find the length of the longest path(s). All shorter paths are
+			 * dropped in each round.
+			 */
+			int maxPathLen = 0;
+			for(Path p : a) {
+				if(p.edges.size()>maxPathLen) {
+					maxPathLen = p.edges.size();
+				}
+			}
 			final StringBuilder sb = new StringBuilder();
 			final Formatter f = new Formatter(sb);
 			final Set<Path> pruned = new LinkedHashSet<Path>();
@@ -1972,6 +2255,14 @@ public class JoinGraph extends PipelineOp {
 				final Path Pi = a[i];
 				if (Pi.sample == null)
 					throw new RuntimeException("Not sampled: " + Pi);
+				if (Pi.edges.size() < maxPathLen) {
+					/*
+					 * Only the most recently generated set of paths survive to
+					 * the next round.
+					 */
+					pruned.add(Pi);
+					continue;
+				}
 				if (pruned.contains(Pi))
 					continue;
 				for (int j = 0; j < a.length; j++) {
@@ -1982,7 +2273,7 @@ public class JoinGraph extends PipelineOp {
 						throw new RuntimeException("Not sampled: " + Pj);
 					if (pruned.contains(Pj))
 						continue;
-					final boolean isPiSuperSet = Pi.isUnorderedSuperSet(Pj);
+					final boolean isPiSuperSet = Pi.isUnorderedVariant(Pj);
 					if (!isPiSuperSet) {
 						// Can not directly compare these join paths.
 						continue;
@@ -2071,62 +2362,22 @@ public class JoinGraph extends PipelineOp {
 
 		}
 
-		// /**
-		// * Return <code>true</code> iff there exists at least one {@link Edge}
-		// * branching from a vertex NOT found in the set of vertices which have
-		// * visited.
-		// *
-		// * @param visited
-		// * A set of vertices.
-		// *
-		// * @return <code>true</code> if there are more edges to explore.
-		// */
-		// private boolean moreEdgesToVisit(final Set<Vertex> visited) {
-		//			
-		// // Consider all edges.
-		// for(Edge e : E) {
-		//				
-		// if (visited.contains(e.v1) && visited.contains(e.v2)) {
-		// /*
-		// * Since both vertices for this edge have been executed the
-		// * edge is now redundant. Either it was explicitly executed
-		// * or another join path was used which implies the edge by
-		// * transitivity in the join graph.
-		// */
-		// continue;
-		// }
-		//
-		// /*
-		// * We found a counter example (an edge which has not been
-		// * explored).
-		// */
-		// if (log.isTraceEnabled())
-		// log.trace("Edge has not been explored: " + e);
-		//
-		// return true;
-		//
-		// }
-		//
-		// // No more edges to explore.
-		// return false;
-		//			
-		// }
-
 	}
 
-	private static double roundToSignificantFigures(final double num,
-			final int n) {
-		if (num == 0) {
-			return 0;
-		}
-
-		final double d = Math.ceil(Math.log10(num < 0 ? -num : num));
-		final int power = n - (int) d;
-
-		final double magnitude = Math.pow(10, power);
-		final long shifted = Math.round(num * magnitude);
-		return shifted / magnitude;
-	}
+//	@todo Could be used to appropriately ignore false precision in cardinality estimates.
+//	private static double roundToSignificantFigures(final double num,
+//			final int n) {
+//		if (num == 0) {
+//			return 0;
+//		}
+//
+//		final double d = Math.ceil(Math.log10(num < 0 ? -num : num));
+//		final int power = n - (int) d;
+//
+//		final double magnitude = Math.pow(10, power);
+//		final long shifted = Math.round(num * magnitude);
+//		return shifted / magnitude;
+//	}
 
 	/**
 	 * Places vertices into order by the {@link BOp#getId()} associated with

@@ -149,23 +149,23 @@ class RunState {
      */
     private final AtomicLong totalRunningCount = new AtomicLong();
 
-    /**
-     * The #of {@link IChunkMessage} for the query which a running task has made
-     * available but which have not yet been accepted for processing by another
-     * task.
-     * <p>
-     * Note: {@link RunningQuery#handleOutputChunk(BOp, int, IBlockingBuffer)}
-     * drops {@link IChunkMessage}s onto {@link RunningQuery#chunksIn} and drops
-     * the {@link RunningQuery} on {@link QueryEngine#runningQueries} as soon as
-     * output {@link IChunkMessage}s are generated. A {@link IChunkMessage} MAY
-     * be taken for evaluation as soon as it is published. This means that the
-     * operator which will consume that {@link IChunkMessage} can begin to
-     * execute <em>before</em> {@link RunningQuery#haltOp(HaltOpMessage)} is
-     * invoked to indicate the end of the operator which produced that
-     * {@link IChunkMessage}. Due to the potential overlap in these schedules
-     * {@link RunState#totalAvailableCount} may be <em>transiently negative</em>
-     * . This is the expected behavior.
-     */
+	/**
+	 * The #of {@link IChunkMessage} for the query which a running task has made
+	 * available but which have not yet been accepted for processing by another
+	 * task.
+	 * <p>
+	 * Note: {@link RunningQuery#handleOutputChunk(BOp, int, IBlockingBuffer)}
+	 * drops {@link IChunkMessage}s onto {@link RunningQuery#chunksIn} and drops
+	 * the {@link RunningQuery} on the {@link QueryEngine} as soon as output
+	 * {@link IChunkMessage}s are generated. A {@link IChunkMessage} MAY be
+	 * taken for evaluation as soon as it is published. This means that the
+	 * operator which will consume that {@link IChunkMessage} can begin to
+	 * execute <em>before</em> {@link RunningQuery#haltOp(HaltOpMessage)} is
+	 * invoked to indicate the end of the operator which produced that
+	 * {@link IChunkMessage}. Due to the potential overlap in these schedules
+	 * {@link RunState#totalAvailableCount} may be <em>transiently negative</em>
+	 * . This is the expected behavior.
+	 */
     private final AtomicLong totalAvailableCount = new AtomicLong();
 
     /**

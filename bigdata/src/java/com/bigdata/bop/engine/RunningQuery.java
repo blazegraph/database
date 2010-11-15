@@ -161,6 +161,16 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
     final private Haltable<Void> future = new Haltable<Void>();
 
 	/**
+	 * The {@link Future} of this query.
+	 * <p>
+	 * Note: This is exposed to the {@link QueryEngine} to let it cache the
+	 * {@link Future} for recently finished queries.
+	 */
+    final Future<Void> getFuture() {
+    	return future;
+    }
+
+	/**
 	 * The maximum number of operator tasks which may be concurrently executor
 	 * for a given (bopId,shardId).
 	 */
@@ -1138,8 +1148,12 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
     protected void consumeChunk() {
         lock.lock();
         try {
-            for(BSBundle bundle : operatorQueues.keySet()) {
-                scheduleNext(bundle);
+			for (BSBundle bundle : operatorQueues.keySet()) {
+				try {
+					scheduleNext(bundle);
+				} catch (RuntimeException ex) {
+					halt(ex);
+				}
             }
         } finally {
             lock.unlock();
@@ -1381,13 +1395,14 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                             new SendHaltMessageTask(clientProxy, msg,
                                     RunningQuery.this));
                 } catch (RejectedExecutionException ex) {
-                    // e.g., service is shutting down.
-                    log.warn("Could not send message: " + msg, ex);
-                } catch (Throwable ex) {
-                    log
-                            .error("Could not send message: " + msg + " : "
-                                    + ex, ex);
-                }
+					// e.g., service is shutting down.
+					if (log.isInfoEnabled())
+						log.info("Could not send message: " + msg, ex);
+				} catch (Throwable ex) {
+					log
+							.error("Could not send message: " + msg + " : "
+									+ ex, ex);
+				}
 
             }
         
@@ -2042,9 +2057,11 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
             try {
                 clientProxy.haltOp(msg);
             } catch (Throwable e) {
-                log.error("Could not notify query controller: " + e, e);
-                q.cancel(true/* mayInterruptIfRunning */);
-            }
+				if (!InnerCause.isInnerCause(e, InterruptedException.class)) {
+					log.error("Could not notify query controller: " + e, e);
+				}
+				q.cancel(true/* mayInterruptIfRunning */);
+			}
         }
 
     }

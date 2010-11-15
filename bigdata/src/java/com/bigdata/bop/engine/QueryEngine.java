@@ -29,9 +29,12 @@ package com.bigdata.bop.engine;
 
 import java.rmi.RemoteException;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -39,6 +42,8 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
@@ -298,22 +303,68 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     }
 
     /**
+     * Lock used to guard register / halt of a query.
+     */
+    private final ReentrantLock lock = new ReentrantLock();
+    
+    /**
+     * Signaled when no queries are running.
+     */
+    private final Condition nothingRunning = lock.newCondition();
+    
+    /**
      * The currently executing queries.
      */
-    final protected ConcurrentHashMap<UUID/* queryId */, RunningQuery> runningQueries = new ConcurrentHashMap<UUID, RunningQuery>();
+    final private ConcurrentHashMap<UUID/* queryId */, RunningQuery> runningQueries = new ConcurrentHashMap<UUID, RunningQuery>();
 
-    /**
-     * A queue of {@link RunningQuery}s having binding set chunks available for
-     * consumption.
-     * 
-     * @todo Be careful when testing out a {@link PriorityBlockingQueue} here.
-     *       First, that collection is intrinsically bounded (it is backed by an
-     *       array) so it will BLOCK under heavy load and could be expected to
-     *       have some resize costs if the queue size becomes too large. Second,
-     *       either {@link RunningQuery} needs to implement an appropriate
-     *       {@link Comparator} or we need to pass one into the constructor for
-     *       the queue.
-     */
+	/**
+	 * LRU cache used to handle problems with asynchronous termination of
+	 * running queries.
+	 * <p>
+	 * Note: Holding onto the query references here might pin memory retained by
+	 * those queries. However, all we really need is the Haltable (Future) of
+	 * that query in this map.
+	 * 
+	 * @todo This should not be much of a hot spot even though it is not thread
+	 *       safe but the synchronized() call could force cache stalls anyway. A
+	 *       concurrent hash map with an approximate LRU access policy might be
+	 *       a better choice.
+	 * 
+	 * @todo The maximum cache capacity here is a SWAG. It should be large
+	 *       enough that we can not have a false cache miss on a system which is
+	 *       heavily loaded by a bunch of light queries.
+	 */
+	private LinkedHashMap<UUID, Future<Void>> doneQueries = new LinkedHashMap<UUID,Future<Void>>(
+			16/* initialCapacity */, .75f/* loadFactor */, true/* accessOrder */) {
+
+		private static final long serialVersionUID = 1L;
+
+		@Override
+		protected boolean removeEldestEntry(Map.Entry<UUID, Future<Void>> eldest) {
+
+			return size() > 100/* maximumCacheCapacity */;
+
+		}
+	};
+
+	/**
+	 * A queue of {@link RunningQuery}s having binding set chunks available for
+	 * consumption.
+	 * 
+	 * @todo Handle priority for selective queries based on the time remaining
+	 *       until the timeout.
+	 *       <p>
+	 *       Handle priority for unselective queries based on the order in which
+	 *       they are submitted?
+	 *       <p>
+	 *       Be careful when testing out a {@link PriorityBlockingQueue} here.
+	 *       First, that collection is intrinsically bounded (it is backed by an
+	 *       array) so it will BLOCK under heavy load and could be expected to
+	 *       have some resize costs if the queue size becomes too large. Second,
+	 *       either {@link RunningQuery} needs to implement an appropriate
+	 *       {@link Comparator} or we need to pass one into the constructor for
+	 *       the queue.
+	 */
     final private BlockingQueue<RunningQuery> priorityQueue = new LinkedBlockingQueue<RunningQuery>();
 //    final private BlockingQueue<RunningQuery> priorityQueue = new PriorityBlockingQueue<RunningQuery>(
 //            );
@@ -432,27 +483,6 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * for the JVM to finalize the {@link QueryEngine} if the application no
      * longer holds a hard reference to it.  The {@link QueryEngine} is then
      * automatically closed from within its finalizer method.
-     * 
-     * @todo Handle priority for selective queries based on the time remaining
-     *       until the timeout.
-     *       <p>
-     *       Handle priority for unselective queries based on the order in which
-     *       they are submitted?
-     * 
-     * @todo The approach taken by the {@link QueryEngine} executes one task per
-     *       pipeline bop per chunk. Outside of how the tasks are scheduled,
-     *       this corresponds closely to the historical pipeline query
-     *       evaluation.
-     *       <p>
-     *       Chunk concatenation could be performed here if we (a) mark the
-     *       {@link LocalChunkMessage} with a flag to indicate when it has been
-     *       accepted; and (b) rip through the incoming chunks for the query for
-     *       the target bop and combine them to feed the task. Chunks which have
-     *       already been assigned would be dropped when take() discovers them.
-     *       [The chunk combination could also be done when we output the chunk
-     *       if the sink has not been taken, e.g., by combining the chunk into
-     *       the same target ByteBuffer, or when we add the chunk to the
-     *       RunningQuery.]
      */
     static private class QueryEngineTask implements Runnable {
         
@@ -523,18 +553,12 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         if (!msg.isMaterialized())
             throw new IllegalStateException();
 
-        final RunningQuery q = runningQueries.get(msg.getQueryId());
+        final RunningQuery q = getRunningQuery(msg.getQueryId());
         
         if(q == null) {
 			/*
 			 * The query is not registered on this node.
-			 * 
-			 * FIXME We should recognize the difference between a query which
-			 * was never registered (and throw an error here) and a query which
-			 * is done and has been removed from runningQueries.  One way to do
-			 * this is with an LRU of recently completed queries.
 			 */
-//            return false;
             throw new IllegalStateException();
         }
         
@@ -561,27 +585,24 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     /**
      * Shutdown the {@link QueryEngine} (blocking). The {@link QueryEngine} will
      * not accept new queries, but existing queries will run to completion.
-     * 
-     * @todo This sleeps until {@link #runningQueries} is empty. It could be
-     *       signaled when that collection becomes empty if we protected the
-     *       collection with a lock for mutation (or if we just notice each time
-     *       a query terminates). However, that would restrict the concurrency
-     *       for query start/stop.
      */
     public void shutdown() {
 
         // normal termination.
         shutdown = true;
 
-        while(!runningQueries.isEmpty()) {
-            
-            try {
-                Thread.sleep(100/*ms*/);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-            
-        }
+		lock.lock();
+		try {
+			while (!runningQueries.isEmpty()) {
+				try {
+					nothingRunning.await();
+				} catch (InterruptedException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		} finally {
+			lock.unlock();
+		}
         
         // hook for subclasses.
         didShutdown();
@@ -643,37 +664,6 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     }
 
-    /**
-     * The query is no longer running. Resources associated with the query
-     * should be released.
-     * 
-     * @todo A race is possible where a query is cancelled on a node where the
-     *       node receives notice to start the query after the cancelled message
-     *       has arrived. To avoid having such queries linger, we should have a
-     *       a concurrent hash set with an approximate LRU policy containing the
-     *       identifiers for queries which have been cancelled, possibly paired
-     *       with the cause (null if normal execution). That will let us handle
-     *       any reasonable concurrent indeterminism between cancel and start
-     *       notices for a query.
-     *       <p>
-     *       Another way in which this might be addressed is by involving the
-     *       client each time a query start is propagated to a node. If we
-     *       notify the client that the query will start on the node first, then
-     *       the client can always issue the cancel notices [unless the client
-     *       dies, in which case we still want to kill the query which could be
-     *       done based on a service disappearing from a jini registry or
-     *       zookeeper.]
-     */
-    protected void halt(final RunningQuery q) {
-
-        // remove from the set of running queries.
-        runningQueries.remove(q.getQueryId(), q);
-        
-        if (log.isInfoEnabled())
-            log.info("Removed entry for query: " + q.getQueryId());
-
-    }
-    
     /*
      * IQueryPeer
      */
@@ -690,13 +680,33 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     }
     
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The default implementation is a NOP.
+     */
+    public void cancelQuery(UUID queryId, Throwable cause) {
+        // NOP
+    }
+
     /*
      * IQueryClient
      */
 
+    public PipelineOp getQuery(final UUID queryId) {
+        
+        final RunningQuery q = getRunningQuery(queryId);
+        
+        if (q == null)
+            throw new IllegalArgumentException();
+        
+        return q.getQuery();
+        
+    }
+
     public void startOp(final StartOpMessage msg) throws RemoteException {
         
-        final RunningQuery q = runningQueries.get(msg.queryId);
+        final RunningQuery q = getRunningQuery(msg.queryId);
         
         if (q != null) {
         
@@ -708,7 +718,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     public void haltOp(final HaltOpMessage msg) throws RemoteException {
         
-        final RunningQuery q = runningQueries.get(msg.queryId);
+        final RunningQuery q = getRunningQuery(msg.queryId);
         
         if (q != null) {
             
@@ -829,7 +839,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         
         assertRunning();
 
-        putRunningQuery(queryId, runningQuery);
+        putIfAbsent(queryId, runningQuery);
 
         runningQuery.startQuery(msg);
         
@@ -839,55 +849,223 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     }
 
-    /**
-     * Return the {@link RunningQuery} associated with that query identifier.
-     * 
-     * @param queryId
-     *            The query identifier.
-     *            
-     * @return The {@link RunningQuery} -or- <code>null</code> if there is no
-     *         query associated with that query identifier.
+    /*
+     * Management of running queries.
      */
-    protected RunningQuery getRunningQuery(final UUID queryId) {
 
-        if(queryId == null)
-            throw new IllegalArgumentException();
-        
-        return runningQueries.get(queryId);
-
-    }
-
-    public PipelineOp getQuery(final UUID queryId) {
-     
-        final RunningQuery q = getRunningQuery(queryId);
-        
-        if (q == null)
-            throw new IllegalArgumentException();
-        
-        return q.getQuery();
-        
-    }
-    
-    /**
-     * Places the {@link RunningQuery} object into the internal map.
-     * 
-     * @param queryId
-     *            The query identifier.
-     * @param runningQuery
-     *            The {@link RunningQuery}.
-     */
-    protected void putRunningQuery(final UUID queryId,
+	/**
+	 * Places the {@link RunningQuery} object into the internal map.
+	 * 
+	 * @param queryId
+	 *            The query identifier.
+	 * @param runningQuery
+	 *            The {@link RunningQuery}.
+	 * 
+	 * @return The {@link RunningQuery} -or- another {@link RunningQuery} iff
+	 *         one exists with the same {@link UUID}.
+	 */
+    protected RunningQuery putIfAbsent(final UUID queryId,
             final RunningQuery runningQuery) {
 
         if (queryId == null)
             throw new IllegalArgumentException();
-        
-        if (runningQuery == null)
-            throw new IllegalArgumentException();
-        
-        runningQueries.put(queryId, runningQuery);
+
+		if (runningQuery == null)
+			throw new IllegalArgumentException();
+
+		// First, check [runningQueries] w/o acquiring a lock.
+		{
+			final RunningQuery tmp = runningQueries.get(queryId);
+
+			if (tmp != null) {
+		
+				// Found existing query.
+				return tmp;
+				
+			}
+			
+		}
+
+		/*
+		 * A lock is used to address a race condition here with the concurrent
+		 * registration and halt of a query.
+		 */
+
+		lock.lock();
+		
+		try {
+			
+			// Test for a recently terminated query.
+			final Future<Void> doneQueryFuture = doneQueries.get(queryId);
+
+			if (doneQueryFuture != null) {
+
+				// Throw out an appropriate exception for a halted query.
+				handleDoneQuery(queryId, doneQueryFuture);
+
+				// Should never get here.
+        		throw new AssertionError();
+        		
+			}
+
+			// Test again for an active query while holding the lock.
+			final RunningQuery tmp = runningQueries.putIfAbsent(queryId,
+					runningQuery);
+			
+			if (tmp != null) {
+				
+				// Another thread won the race.
+				return tmp;
+				
+			}
+
+			// Query was newly registered.
+			return runningQuery;
+			
+		} finally {
+
+			lock.unlock();
+			
+		}
 
     }
+    
+	/**
+	 * Return the {@link RunningQuery} associated with that query identifier.
+	 * 
+	 * @param queryId
+	 *            The query identifier.
+	 * 
+	 * @return The {@link RunningQuery} -or- <code>null</code> if there is no
+	 *         query associated with that query identifier.
+	 */
+    protected RunningQuery getRunningQuery(final UUID queryId) {
+
+        if(queryId == null)
+            throw new IllegalArgumentException();
+
+        RunningQuery q;
+
+        /*
+		 * First, test the concurrent map w/o obtaining a lock. This handles
+		 * queries which are actively running.
+		 */
+		if ((q = runningQueries.get(queryId)) != null) {
+
+			// Found running query.
+        	return q;
+        	
+        }
+
+		/*
+		 * Since the query was not found in the set of actively running queries,
+		 * we now get the lock, re-verify that it is not an active query, and
+		 * verify that it is not a halted query.
+		 */
+        
+		lock.lock();
+        
+		try {
+
+        	if ((q = runningQueries.get(queryId)) != null) {
+			
+        		// Unlikely concurrent register of the query.
+            	return q;
+            
+        	}
+
+        	// Test to see if the query is halted.
+			final Future<Void> doneQueryFuture = doneQueries.get(queryId);
+
+			if (doneQueryFuture != null) {
+				
+				// Throw out an appropriate exception for a halted query.
+				handleDoneQuery(queryId, doneQueryFuture);
+
+				// Should never get here.
+        		throw new AssertionError();
+        		
+        	}
+			
+            // Not found in done queries either.
+            return null;
+            
+        } finally {
+        	
+        	lock.unlock();
+        	
+        }
+        
+    }
+
+    /**
+     * The query is no longer running. Resources associated with the query
+     * should be released.
+     */
+    protected void halt(final RunningQuery q) {
+
+    	lock.lock();
+
+    	try {
+
+    		// insert/touch the LRU of recently finished queries.
+			doneQueries.put(q.getQueryId(), q.getFuture());
+
+			// remove from the set of running queries.
+			runningQueries.remove(q.getQueryId(), q);
+
+			if(runningQueries.isEmpty()) {
+
+				// Signal that no queries are running.
+				nothingRunning.signalAll();
+				
+			}
+			
+		} finally {
+
+			lock.unlock();
+			
+    	}
+
+    }
+    
+	/**
+	 * Handle a recently halted query by throwing an appropriate exception.
+	 * 
+	 * @param queryId
+	 *            The query identifier.
+	 * @param doneQueryFuture
+	 *            The {@link Future} for that query from {@link #doneQueries}.
+	 * @throws InterruptedException
+	 *             if the query halted normally.
+	 * @throws RuntimeException
+	 *             if the query halted with an error.
+	 */
+    private void handleDoneQuery(final UUID queryId,final Future<Void> doneQueryFuture) {
+        try {
+        	// Check the Future.
+			doneQueryFuture.get();
+			// The query is done, so the caller can not access it any more.
+			throw new InterruptedException();
+		} catch (InterruptedException e) {
+			/*
+			 * Interrupted awaiting the future (note that the Future should be
+			 * available immediately).
+			 */
+			throw new RuntimeException(e);
+		} catch (ExecutionException e) {
+			/*
+			 * Some kind of an error when running the query (might have just
+			 * been interrupted, in which case the InterruptedException will be
+			 * wrapped here).
+			 */
+			throw new RuntimeException(e);
+		}
+    }
+
+    /*
+     * RunningQuery factory.
+     */
     
     /**
      * Factory for {@link RunningQuery}s.
@@ -899,15 +1077,6 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         return new RunningQuery(this, queryId, true/* controller */,
                 this/* clientProxy */, query);
 
-    }
-
-    /**
-     * {@inheritDoc}
-     * <p>
-     * The default implementation is a NOP.
-     */
-    public void cancelQuery(UUID queryId, Throwable cause) {
-        // NOP
     }
 
 }
