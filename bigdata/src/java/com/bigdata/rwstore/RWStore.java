@@ -105,25 +105,24 @@ import com.bigdata.util.ChecksumUtility;
  * <p>
  * The method of storing the allocation headers has been changed from always
  * allocating at the end of the file (and moving them on file extend) to
- * allocation of fixed areas.  The meta-allocation data, containing the bitmap
+ * allocation of fixed areas. The meta-allocation data, containing the bitmap
  * that controls these allocations, is itself stored in the heap, and is now
  * structured to include both the bit data and the list of meta-storage
  * addresses.
  * <p>
- * Sizing:
- * 256 allocators would reference approximately 2M objects/allocations.  At 1K
- * per allocator this would require 250K of store.  The meta-allocation data
- * would therefore need a start address plus 32 bytes (or 8 ints) to represent
- * the meta-allocation bits.  An array of such data referencing sequentially
- * allocated storage areas completes the meta-allocation requirements.
+ * Sizing: 256 allocators would reference approximately 2M objects/allocations.
+ * At 1K per allocator this would require 250K of store. The meta-allocation
+ * data would therefore need a start address plus 32 bytes (or 8 ints) to
+ * represent the meta-allocation bits. An array of such data referencing
+ * sequentially allocated storage areas completes the meta-allocation
+ * requirements.
  * <p>
  * A meta-allocation address can therefore be represented as a single bit offset
- * from which the block, providing start address, and bit offset can be
- * directly determined.
+ * from which the block, providing start address, and bit offset can be directly
+ * determined.
  * <p>
- * The m_metaBits int array used to be fully used as allocation bits, but
- * now stores both the start address plus the 8 ints used to manage that data
- * block.
+ * The m_metaBits int array used to be fully used as allocation bits, but now
+ * stores both the start address plus the 8 ints used to manage that data block.
  * <p>
  * Allocation is reduced to sets of allocator objects which have a start address
  * and a bitmap of allocated storage maps.
@@ -136,9 +135,9 @@ import com.bigdata.util.ChecksumUtility;
  * the BitSet class.
  * <p>
  * Using the meta-allocation bits, it is straightforward to load ALL the
- * allocation headers. A total of (say) 100 allocation headers might provide
- * up to 4000 allocations each -> 400 000 objects, while 1000 headers -> 4m
- * objects and 2000 -> 8m objects.
+ * allocation headers. A total of (say) 100 allocation headers might provide up
+ * to 4000 allocations each -> 400 000 objects, while 1000 headers -> 4m objects
+ * and 2000 -> 8m objects.
  * <p>
  * The allocators are split into a set of FixedAllocators and then
  * BlobAllocation. The FixedAllocators will allocate from 128 to 32K objects,
@@ -167,28 +166,44 @@ import com.bigdata.util.ChecksumUtility;
  * All data is checksummed, both allocated/saved data and the allocation blocks.
  * <p>
  * BLOB allocation is not handled using chained data buffers but with a blob
- * header record.  This is indicated with a BlobAllocator that provides indexed
+ * header record. This is indicated with a BlobAllocator that provides indexed
  * offsets to the header record (the address encodes the BlobAllocator and the
  * offset to the address). The header record stores the number of component
  * allocations and the address of each.
  * <p>
  * This approach makes for much more efficient freeing/re-allocation of Blob
- * storage, in particular avoiding the need to read in the component blocks
- * to determine chained blocks for freeing.  This is particularly important
- * for larger stores where a disk cache could be flushed through simply freeing
- * BLOB allocations.
+ * storage, in particular avoiding the need to read in the component blocks to
+ * determine chained blocks for freeing. This is particularly important for
+ * larger stores where a disk cache could be flushed through simply freeing BLOB
+ * allocations.
  * <h2>
- * Deferred Free List
- * </h2>
+ * Deferred Free List</h2>
  * <p>
  * The previous implementation has been amended to associate a single set of
- * deferredFree blocks with each CommitRecord.  The CommitRecordIndex will
- * then provide access to the CommitRecords to support the deferred freeing
- * of allocations based on age/earliestTxReleaseTime.
+ * deferredFree blocks with each CommitRecord. The CommitRecordIndex will then
+ * provide access to the CommitRecords to support the deferred freeing of
+ * allocations based on age/earliestTxReleaseTime.
  * <p>
  * The last release time processed is held with the MetaAllocation data
  * 
  * @author Martyn Cutcher
+ * 
+ *         FIXME Release checklist:
+ *         <p>
+ *         Checksum metabits header record?
+ *         <p>
+ *         Checksum fixed allocators?
+ *         <p>
+ *         Checksum delete blocks / blob records?
+ *         <p>
+ *         PSOutputStream - remove caching logic. It is unused and makes this
+ *         class much more complex. A separate per-RWStore caching class for
+ *         recycling PSOutputStreams can be added later.
+ *         <p>
+ *         Modify FixedAllocator to use arrayCopy() rather than clone and
+ *         declare more fields to be final. See notes on {@link AllocBlock}.
+ *         <p>
+ *         Implement logic to "abort" a shadow allocation context.
  */
 
 public class RWStore implements IStore {
@@ -281,8 +296,13 @@ public class RWStore implements IStore {
 	static final int ALLOCATION_SCALEUP = 16; // multiplier to convert allocations based on minimum allocation of 32k
 	static private final int META_ALLOCATION = 8; // 8 * 32K is size of meta Allocation
 
-	// Maximum fixed allocs in a BLOB, but do restrict to size that will fit within a single fixed allocation
-	// Ignored
+	/**
+	 * Maximum fixed allocs in a BLOB, but do restrict to size that will fit
+	 * within a single fixed allocation Ignored.
+	 * 
+	 * FIXME Javadoc. Is this ignored or not? (what is the Ignored doing at the
+	 * end of the comment above?) Is this in units of int32 values or bytes?
+	 */
 	static final int BLOB_FIXED_ALLOCS = 2048;
 //	private ICommitCallback m_commitCallback;
 //
@@ -751,7 +771,7 @@ public class RWStore implements IStore {
 			
 			if (metaBitsStore > 0) {
 				rawmbaddr >>= 16;
-		
+				
 				// RWStore now restore metabits
 				final byte[] buf = new byte[metaBitsStore * 4];
 	
@@ -1063,8 +1083,8 @@ public class RWStore implements IStore {
      * direct read will be the blob header record. In this case we should hand
      * over the streaming to a PSInputStream.
      * 
-     * FIXME: For now we do not use the PSInputStream but instead process
-     * directly
+     * FIXME: Javadoc update (was: For now we do not use the PSInputStream but instead process
+     * directly...)
      * 
      * If it is a BlobAllocation, then the BlobAllocation address points to the
      * address of the BlobHeader record.
@@ -1298,47 +1318,6 @@ public class RWStore implements IStore {
 		}
 		return out.toString();
 	}
-
-//	/**
-//	 * FIXME: This method is not currently used with BigData, if needed then
-//	 * the address mangling needs re-working
-//	 */
-//	public int getDataSize(long addr, byte buf[]) {
-//		throw new UnsupportedOperationException();
-//		
-////		synchronized (this) {
-////			m_writes.flush();
-////
-////			if (addr == 0) {
-////				return 0;
-////			}
-////
-////			try {
-////				int size = addr2Size((int) addr);
-////				synchronized (m_raf) {
-//////					m_raf.seek(physicalAddress((int) addr));
-//////					m_raf.readFully(buf, 0, size);
-////					m_raf.getChannel().read(ByteBuffer.wrap(buf, 0, size), physicalAddress((int) addr));
-////					}
-////
-////				return size;
-////			} catch (IOException e) {
-////				throw new StorageTerminalError("Unable to read data", e);
-////			}
-////		}
-//	}
-
-//    /**
-//     * Always returns ZERO (0L).
-//     * <p>
-//     * This is intended to support the core functionality of a WormStore, other
-//     * stores should return zero, indicating no previous versions available
-//     */
-//	public long getPreviousAddress(final long laddr) {
-//		
-//	    return 0;
-//	    
-//	}
 
 	public void free(final long laddr, final int sze) {
         

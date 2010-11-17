@@ -330,23 +330,23 @@ public class PSOutputStream extends OutputStream {
   			m_writingHdr  = true; // ensure that header CAN be a BLOB
 	  		// m_blobHeader[m_blobHdrIdx++] = addr;
   			m_blobHeader.add(addr);
-	  		final int precount = m_count;
+//	  		final int precount = m_count;
 	  		m_count = 0;
 			try {
 //		  		writeInt(m_blobHdrIdx);
 //		  		for (int i = 0; i < m_blobHdrIdx; i++) {
 //		  			writeInt(m_blobHeader[i]);
 //		 		}
-				int hdrBufSize = 4*(m_blobHeader.size() + 1);
-				ByteArrayOutputStream hdrbuf = new ByteArrayOutputStream(hdrBufSize);
-				DataOutputStream hdrout = new DataOutputStream(hdrbuf);
+				final int hdrBufSize = 4*(m_blobHeader.size() + 1);
+				final ByteArrayOutputStream hdrbuf = new ByteArrayOutputStream(hdrBufSize);
+				final DataOutputStream hdrout = new DataOutputStream(hdrbuf);
 	  			hdrout.writeInt(m_blobHeader.size());
 		  		for (int i = 0; i < m_blobHeader.size(); i++) {
 		  			hdrout.writeInt(m_blobHeader.get(i));
 		 		}
 				hdrout.flush();
 				
-				byte[] outbuf = hdrbuf.toByteArray();
+				final byte[] outbuf = hdrbuf.toByteArray();
 		  		addr = (int) m_store.alloc(outbuf, hdrBufSize, m_context);
 		  		
 //				if (m_blobHdrIdx != ((m_blobThreshold - 1 + m_bytesWritten - m_count) / m_blobThreshold)) {
@@ -363,7 +363,8 @@ public class PSOutputStream extends OutputStream {
 		  		// DO NOT USE BLOB ALLOCATOR
 		  		// addr = m_store.registerBlob(addr); // returns handle
 			} catch (IOException e) {
-				e.printStackTrace();
+//				e.printStackTrace();
+				throw new RuntimeException(e);
 			}
   		} finally {
   			m_writingHdr = false;
