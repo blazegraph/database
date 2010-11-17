@@ -123,6 +123,37 @@ import com.bigdata.striterator.IChunkedIterator;
  *       Since the join graph is fed the vertices (APs), it does not have access
  *       to the annotated joins so we need to generated appropriately annotated
  *       joins when sampling an edge and when evaluation a subquery.
+ *       <p>
+ *       One solution would be to always use the unpartitioned views of the
+ *       indices for the runtime query optimizer, which is how we are estimating
+ *       the range counts of the access paths right now. [Note that the static
+ *       query optimizer ignores named and default graphs, while the runtime
+ *       query optimizer SHOULD pay attention to these things and exploit their
+ *       conditional selectivity for the query plan.]
+ * 
+ * @todo When there are optional join graphs, are we going to handle that by
+ *       materializing a sample (or all) of the joins feeding that join graph
+ *       and then apply the runtime optimizer to the optional join graph,
+ *       getting out a sample to feed onto any downstream join graph?
+ * 
+ * @todo When we run into a cardinality estimation underflow (the expected
+ *       cardinality goes to zero) we could double the sample size for just
+ *       those join paths which hit a zero estimated cardinality and re-run them
+ *       within the round. This would imply that we keep per join path limits.
+ *       The vertex and edge samples are already aware of the limit at which
+ *       they were last sampled so this should not cause any problems there.
+ * 
+ * @todo When comparing choices among join paths having fully bound tails where
+ *       the estimated cardinality has also gone to zero, we should prefer to
+ *       evaluate vertices in the tail with better index locality first. For
+ *       example, if one vertex had one variable in the original plan while
+ *       another had two variables, then solutions which reach the 2-var vertex
+ *       could be spread out over a much wider range of the selected index than
+ *       those which reach the 1-var vertex. [In order to support this, we would
+ *       need a means to indicate that a fully bound access path should use an
+ *       index specified by the query optimizer rather than the primary index
+ *       for the relation.  In addition, this suggests that we should keep bloom
+ *       filters for more than just the SPO(C) index in scale-out.]
  * 
  * @todo Examine behavior when we do not have perfect covering indices. This
  *       will mean that some vertices can not be sampled using an index and that

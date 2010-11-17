@@ -56,6 +56,10 @@ public class QueryLog {
             .getLogger(QueryLog.class);
 
     static {
+		logTableHeader();
+    }
+    
+    static public void logTableHeader() {
     	if(log.isInfoEnabled())
     		log.info(QueryLog.getTableHeader());
     }
@@ -74,27 +78,10 @@ public class QueryLog {
 
 			try {
 
-//				if (log.isDebugEnabled()) {
+				logDetailRows(q);
 
-				/*
-				 * Detail row for each operator in the query.
-				 */
-				final Integer[] order = BOpUtility.getEvaluationOrder(q
-						.getQuery());
-
-				int orderIndex = 0;
-				for (Integer bopId : order) {
-					log
-							.info(getTableRow(q, orderIndex, bopId, false/* summary */));
-					orderIndex++;
-				}
-
-//				}
-
-				// summary row.
-				log.info(getTableRow(q, -1/* orderIndex */, q.getQuery().getId(),
-						true/* summary */));
-
+				logSummaryRow(q);
+				
 			} catch (RuntimeException t) {
 
 				log.error(t,t);
@@ -105,6 +92,34 @@ public class QueryLog {
 
     }
 
+	/**
+	 * Log a detail row for each operator in the query.
+	 */
+    static private void logDetailRows(final IRunningQuery q) {
+
+		final Integer[] order = BOpUtility.getEvaluationOrder(q.getQuery());
+
+		int orderIndex = 0;
+		
+		for (Integer bopId : order) {
+
+			log.info(getTableRow(q, orderIndex, bopId, false/* summary */));
+			
+			orderIndex++;
+			
+		}
+
+	}
+
+    /**
+     * Log a summary row for the query.
+     */
+    static private void logSummaryRow(final IRunningQuery q) {
+
+		log.info(getTableRow(q, -1/* orderIndex */, q.getQuery().getId(), true/* summary */));
+
+    }
+    
     static private String getTableHeader() {
 
         final StringBuilder sb = new StringBuilder();
@@ -135,6 +150,7 @@ public class QueryLog {
         // dynamics (aggregated for totals as well).
         sb.append("\tfanIO");
         sb.append("\tsumMillis"); // cumulative milliseconds for eval of this operator.
+        sb.append("\topCount"); // cumulative #of invocations of tasks for this operator.
         sb.append("\tchunksIn");
         sb.append("\tunitsIn");
         sb.append("\tchunksOut");
@@ -304,6 +320,8 @@ public class QueryLog {
 		sb.append(Integer.toString(fanIO));
 		sb.append('\t');
 		sb.append(stats.elapsed.get());
+		sb.append('\t');
+		sb.append(stats.opCount.get());
 		sb.append('\t');
 		sb.append(stats.chunksIn.get());
 		sb.append('\t');

@@ -54,6 +54,13 @@ public class BOpStats implements Serializable {
 	 */
     final public CAT elapsed = new CAT();
 
+	/**
+	 * The #of instances of a given operator which have been created for a given
+	 * query. This provides interesting information about the #of task instances
+	 * for each operator which were required to execute a query.
+	 */
+    final public CAT opCount = new CAT();
+    
     /**
      * #of chunks in.
      */
@@ -83,7 +90,9 @@ public class BOpStats implements Serializable {
      * Constructor.
      */
     public BOpStats() {
-        
+
+    	opCount.increment();
+    	
     }
 
     /**
@@ -98,21 +107,18 @@ public class BOpStats implements Serializable {
             return;
         }
         elapsed.add(o.elapsed.get());
+        opCount.add(o.opCount.get());
         chunksIn.add(o.chunksIn.get());
         unitsIn.add(o.unitsIn.get());
         unitsOut.add(o.unitsOut.get());
         chunksOut.add(o.chunksOut.get());
-//        chunksIn.addAndGet(o.chunksIn.get());
-//        unitsIn.addAndGet(o.unitsIn.get());
-//        unitsOut.addAndGet(o.unitsOut.get());
-//        chunksOut.addAndGet(o.chunksOut.get());
     }
-    
     
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append(super.toString());
         sb.append("{elapsed=" + elapsed.get());
+        sb.append(",opCount=" + opCount.get());
         sb.append(",chunksIn=" + chunksIn.get());
         sb.append(",unitsIn=" + unitsIn.get());
         sb.append(",chunksOut=" + chunksOut.get());
