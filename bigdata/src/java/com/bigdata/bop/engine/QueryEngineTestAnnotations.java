@@ -69,9 +69,20 @@ public interface QueryEngineTestAnnotations {
 
     boolean DEFAULT_ONE_MESSAGE_PER_CHUNK = false;
 
+	/**
+	 * This option may be used to place an optional limit on the #of concurrent
+	 * tasks which may run for the same (bopId,shardId) for a given query. The
+	 * query is guaranteed to make progress as long as this is some positive
+	 * integer. Limiting this value can limit the concurrency with which certain
+	 * operators are evaluated and that can have a negative effect on the
+	 * throughput for a given query.
+	 */
     String MAX_CONCURRENT_TASKS_PER_OPERATOR_AND_SHARD = QueryEngineTestAnnotations.class.getName()
             + ".maxConcurrentTasksPerOperatorAndShard";
 
+    /**
+     * The default is essentially unlimited.
+     */
     int DEFAULT_MAX_CONCURRENT_TASKS_PER_OPERATOR_AND_SHARD = Integer.MAX_VALUE; 
     
 }
