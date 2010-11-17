@@ -54,6 +54,7 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
@@ -324,7 +325,7 @@ public class TestQueryEngine extends TestCase2 {
 						new NV(Predicate.Annotations.RELATION_NAME,
 								new String[] { namespace }),//
 						new NV(Predicate.Annotations.BOP_ID, predId),//
-						new NV(Predicate.Annotations.TIMESTAMP,
+						new NV(Annotations.TIMESTAMP,
 								ITx.READ_COMMITTED),//
 				}));
 
@@ -429,7 +430,7 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId),//
-                        new NV(Predicate.Annotations.TIMESTAMP,
+                        new NV(Annotations.TIMESTAMP,
                                 ITx.READ_COMMITTED),//
                 }));
         
@@ -858,7 +859,7 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId),//
-                        new NV(Predicate.Annotations.TIMESTAMP,
+                        new NV(Annotations.TIMESTAMP,
                                 ITx.READ_COMMITTED),//
                 }));
 
@@ -1003,7 +1004,7 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId),//
-                        new NV(Predicate.Annotations.TIMESTAMP,
+                        new NV(Annotations.TIMESTAMP,
                                 ITx.READ_COMMITTED),//
 //                        new NV(Predicate.Annotations.KEY_ORDER,
 //                                R.primaryKeyOrder),//
@@ -1163,7 +1164,7 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId1),//
-                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
         
         final Predicate<?> pred2Op = new Predicate<E>(new IVariableOrConstant[] {
@@ -1172,7 +1173,7 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId2),//
-                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
         
 		final PipelineOp join1Op = new PipelineJoin<E>(//
@@ -1462,7 +1463,7 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId1),//
-                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
         
         final Predicate<?> pred2Op = new Predicate<E>(
@@ -1471,7 +1472,7 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId2),//
-                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
         
         final PipelineOp join1Op = new PipelineJoin<E>(//
@@ -1823,7 +1824,7 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId1),//
-                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
         
         final Predicate<?> pred2Op = new Predicate<E>(new IVariableOrConstant[] {
@@ -1832,7 +1833,7 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId2),//
-                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
         
         final ConditionalRoutingOp cond = new ConditionalRoutingOp(new BOp[]{startOp},

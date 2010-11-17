@@ -43,6 +43,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.config.IValidator;
@@ -122,7 +123,7 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
                 Var.var("y"), rdfType, Department },//
                 new NV(Predicate.Annotations.RELATION_NAME,
                         new String[] { relation }),//
-                new NV(Predicate.Annotations.TIMESTAMP,timestamp)//
+                new NV(Annotations.TIMESTAMP,timestamp)//
                 );
 
         final IPredicate<?> pred1 = new Predicate(//
@@ -130,7 +131,7 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
                 Var.var("x"), rdfType, Student },//
                 new NV(Predicate.Annotations.RELATION_NAME,
                         new String[] { relation }),//
-                new NV(Predicate.Annotations.TIMESTAMP,timestamp)//
+                new NV(Annotations.TIMESTAMP,timestamp)//
                 );
         
         final IPredicate<?> pred2 = new Predicate( //
@@ -138,7 +139,7 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
                 Var.var("x"), memberOf, Var.var("y") },//
                 new NV(Predicate.Annotations.RELATION_NAME,
                         new String[] { relation }),//
-                new NV(Predicate.Annotations.TIMESTAMP,timestamp)//
+                new NV(Annotations.TIMESTAMP,timestamp)//
                 );
         
         final IPredicate<?> pred3 = new Predicate(//
@@ -146,7 +147,7 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
                 Var.var("y"), subOrganizationOf, University0 },//
                 new NV(Predicate.Annotations.RELATION_NAME,
                         new String[] { relation }),//
-                new NV(Predicate.Annotations.TIMESTAMP,timestamp)//
+                new NV(Annotations.TIMESTAMP,timestamp)//
                 );
         
         final IPredicate<?> pred4 = new Predicate(//
@@ -154,7 +155,7 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
                 Var.var("x"), emailAddress, Var.var("z") },
                 new NV(Predicate.Annotations.RELATION_NAME,
                         new String[] { relation }),//
-                new NV(Predicate.Annotations.TIMESTAMP,timestamp)//
+                new NV(Annotations.TIMESTAMP,timestamp)//
                 );
         
         final IRule rule = new Rule(getName(), null/* head */,

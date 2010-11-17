@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -699,7 +698,7 @@ public class BOpUtility {
         
         for (BOp arg : bop.args()) {
 
-            if (arg.arity() > 0) {
+            if (!(arg instanceof IVariableOrConstant<?>)) {
              
                 toString(arg, sb, indent+1);
                 
@@ -798,29 +797,33 @@ public class BOpUtility {
         return true;
 
     }
-    
-    /**
-     * Copy binding sets from the source to the sink(s).
-     * 
-     * @param source
-     *            The source.
-     * @param sink
-     *            The sink (required).
-     * @param sink2
-     *            Another sink (optional).
-     * @param constraints
-     *            Binding sets which fail these constraints will NOT be copied
-     *            (optional).
-     * @param stats
-     *            The {@link BOpStats#chunksIn} and {@link BOpStats#unitsIn}
-     *            will be updated during the copy (optional).
-     */
-    static public void copy(
+
+	/**
+	 * Copy binding sets from the source to the sink(s).
+	 * 
+	 * @param source
+	 *            The source.
+	 * @param sink
+	 *            The sink (required).
+	 * @param sink2
+	 *            Another sink (optional).
+	 * @param constraints
+	 *            Binding sets which fail these constraints will NOT be copied
+	 *            (optional).
+	 * @param stats
+	 *            The {@link BOpStats#chunksIn} and {@link BOpStats#unitsIn}
+	 *            will be updated during the copy (optional).
+	 * 
+	 * @return The #of binding sets copied.
+	 */
+    static public long copy(
             final IAsynchronousIterator<IBindingSet[]> source,
             final IBlockingBuffer<IBindingSet[]> sink,
             final IBlockingBuffer<IBindingSet[]> sink2,
             final IConstraint[] constraints, final BOpStats stats) {
 
+    	long nout = 0;
+    	
         while (source.hasNext()) {
 
             final IBindingSet[] chunk = source.next();
@@ -841,12 +844,18 @@ public class BOpUtility {
             // copy accepted binding sets to the default sink.
             sink.add(tmp);
             
+            nout += chunk.length;
+            
             if (sink2 != null) {
-                // copy accepted binding sets to the alt sink.
+
+            	// copy accepted binding sets to the alt sink.
                 sink2.add(tmp);
+                
             }
             
         }
+        
+        return nout;
         
     }
 
@@ -946,5 +955,5 @@ public class BOpUtility {
 		return out;
 
 	}
-
+	
 }

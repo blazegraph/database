@@ -265,7 +265,7 @@ public class TestPredicateAccessPath extends TestCase2 {
                 new Constant<String>("Mary"), Var.var("value") }, 
                 NV.asMap(new NV[] {//
                         new NV(Annotations.RELATION_NAME,new String[]{namespace}),//
-                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                        new NV(com.bigdata.bop.IPredicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                         new NV(Annotations.REMOTE_ACCESS_PATH, false),//
                 }));
 
@@ -341,7 +341,7 @@ public class TestPredicateAccessPath extends TestCase2 {
         final Predicate<E> pred = new Predicate<E>(new IVariableOrConstant[] {
                 x, y }, NV.asMap(new NV[] {//
                 new NV(Annotations.RELATION_NAME, new String[] { namespace }),//
-                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                        new NV(com.bigdata.bop.IPredicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                         new NV(Annotations.INDEX_LOCAL_FILTER, filter),//
                 }));
 
@@ -439,7 +439,7 @@ public class TestPredicateAccessPath extends TestCase2 {
         final Predicate<E> pred = new Predicate<E>(new IVariableOrConstant[] {
                 x, y }, NV.asMap(new NV[] {//
                 new NV(Annotations.RELATION_NAME, new String[] { namespace }),//
-                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                        new NV(com.bigdata.bop.IPredicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                         new NV(Annotations.ACCESS_PATH_FILTER, distinctFilter),//
                 }));
 

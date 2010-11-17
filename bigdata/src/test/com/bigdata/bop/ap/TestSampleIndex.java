@@ -40,6 +40,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -190,7 +191,7 @@ public class TestSampleIndex extends TestCase2 {
 		final IPredicate<E> predicate = new Predicate<E>(new BOp[] { x, y },
 				new NV(IPredicate.Annotations.RELATION_NAME,
 						new String[] { namespace }),//
-				new NV(IPredicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED)//
+				new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED)//
 		);
 
 		final BOpContextBase context = new BOpContextBase(null/* fed */, jnl/* indexManager */);

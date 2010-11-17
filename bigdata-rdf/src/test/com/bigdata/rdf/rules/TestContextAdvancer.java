@@ -36,6 +36,7 @@ import org.openrdf.model.vocabulary.RDF;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.rdf.filter.StripContextFilter;
 import com.bigdata.btree.IRangeQuery;
@@ -151,7 +152,7 @@ public class TestContextAdvancer extends TestCase2 {
                     .asMap(new NV[] {//
 //                            new NV(Predicate.Annotations.KEY_ORDER,
 //                                    SPOKeyOrder.SPOC), //
-                            new NV(Predicate.Annotations.TIMESTAMP,
+                            new NV(Annotations.TIMESTAMP,
                                     ITx.UNISOLATED),//
                     }));
 

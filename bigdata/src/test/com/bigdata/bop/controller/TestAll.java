@@ -80,7 +80,8 @@ public class TestAll extends TestCase {
         // @todo test STAR (transitive closure).
 //        suite.addTestSuite(TestStar.class);
 
-        suite.addTestSuite(TestJoinGraph.class);
+        // @todo join graph test suite.
+//        suite.addTestSuite(TestJoinGraph.class);
 
         return suite;
         

@@ -72,15 +72,33 @@ public class QueryLog {
 
 		if (log.isInfoEnabled()) {
 
-			final Integer[] order = BOpUtility.getEvaluationOrder(q.getQuery());
+			try {
 
-			log.info(getTableRow(q, -1/* orderIndex */, q.getQuery().getId(),
-					true/* summary */));
+//				if (log.isDebugEnabled()) {
 
-			int orderIndex = 0;
-			for (Integer bopId : order) {
-				log.info(getTableRow(q, orderIndex, bopId, false/* summary */));
-				orderIndex++;
+				/*
+				 * Detail row for each operator in the query.
+				 */
+				final Integer[] order = BOpUtility.getEvaluationOrder(q
+						.getQuery());
+
+				int orderIndex = 0;
+				for (Integer bopId : order) {
+					log
+							.info(getTableRow(q, orderIndex, bopId, false/* summary */));
+					orderIndex++;
+				}
+
+//				}
+
+				// summary row.
+				log.info(getTableRow(q, -1/* orderIndex */, q.getQuery().getId(),
+						true/* summary */));
+
+			} catch (RuntimeException t) {
+
+				log.error(t,t);
+				
 			}
 
 		}
@@ -107,6 +125,7 @@ public class QueryLog {
          */
         sb.append("\tevalOrder"); // [0..n-1]
         sb.append("\tbopId");
+        sb.append("\tpredId");
         sb.append("\tevalContext");
         sb.append("\tcontroller");
         // metadata considered by the static optimizer.
@@ -120,7 +139,7 @@ public class QueryLog {
         sb.append("\tunitsIn");
         sb.append("\tchunksOut");
         sb.append("\tunitsOut");
-        sb.append("\tmultipler"); // expansion rate multipler in the solution count.
+        sb.append("\tjoinRatio"); // expansion rate multipler in the solution count.
         sb.append("\taccessPathDups");
         sb.append("\taccessPathCount");
         sb.append("\taccessPathChunksIn");
@@ -146,7 +165,8 @@ public class QueryLog {
      * @param summary <code>true</code> iff the summary for the query should be written.
      * @return The row of the table.
      */
-    static private String getTableRow(final IRunningQuery q, final int evalOrder, final Integer bopId, final boolean summary) {
+	static private String getTableRow(final IRunningQuery q,
+			final int evalOrder, final Integer bopId, final boolean summary) {
 
         final StringBuilder sb = new StringBuilder();
 
@@ -190,15 +210,31 @@ public class QueryLog {
 			 * keep this from breaking the table format.
 			 */
 			sb.append(BOpUtility.toString(q.getQuery()).replace('\n', ' '));
+            sb.append('\t');
+            sb.append("total"); // summary line.
         } else {
-        	// Otherwise how just this bop.
+        	// Otherwise show just this bop.
         	sb.append(bopIndex.get(bopId).toString());
+	        sb.append('\t');
+	        sb.append(evalOrder); // eval order for this bop.
         }
         
         sb.append('\t');
-        sb.append(evalOrder);
-        sb.append('\t');
         sb.append(Integer.toString(bopId));
+		sb.append('\t');
+		{
+			/*
+			 * Show the predicate identifier if this is a Join operator.
+			 * 
+			 * @todo handle other kinds of join operators when added using a
+			 * shared interface.
+			 */
+			final IPredicate<?> pred = (IPredicate<?>) bop
+					.getProperty(PipelineJoin.Annotations.PREDICATE);
+			if (pred != null) {
+				sb.append(Integer.toString(pred.getId()));
+			}
+		}
 		sb.append('\t');
 		sb.append(bop.getEvaluationContext());
 		sb.append('\t');
