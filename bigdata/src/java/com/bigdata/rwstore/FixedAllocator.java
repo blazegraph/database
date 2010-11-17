@@ -123,6 +123,13 @@ public class FixedAllocator implements Allocator {
 		return m_size;
 	}
 
+	/**
+	 * The free list for the allocation slot size serviced by this allocator.
+	 * This is a reference back into the corresponding free list as managed by
+	 * the RWStore.
+	 * 
+	 * @see #setFreeList(ArrayList)
+	 */
 	private ArrayList m_freeList;
 
 	public void setFreeList(ArrayList list) {
@@ -243,7 +250,7 @@ public class FixedAllocator implements Allocator {
 					if (block.m_bits[i] == 0) { // empty
 						m_freeBits += 32;
 					} else if (block.m_bits[i] != 0xFFFFFFFF) { // not full
-						int anInt = block.m_bits[i];
+						final int anInt = block.m_bits[i];
 						for (int bit = 0; bit < 32; bit++) {
 							if ((anInt & (1 << bit)) == 0) {
 								m_freeBits++;
@@ -425,9 +432,9 @@ public class FixedAllocator implements Allocator {
 			return true;
 		} else if (addr >= m_startAddr && addr < m_endAddr) {
 
-			final Iterator iter = m_allocBlocks.iterator();
+			final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
 			while (iter.hasNext()) {
-				final AllocBlock block = (AllocBlock) iter.next();
+				final AllocBlock block = iter.next();
 				if (block.free(addr, m_size)) {
 					m_freeTransients++;
 
@@ -506,7 +513,8 @@ public class FixedAllocator implements Allocator {
 	}
 
 	public void addAddresses(ArrayList addrs) {
-		Iterator blocks = m_allocBlocks.iterator();
+		
+		final Iterator blocks = m_allocBlocks.iterator();
 
 		// FIXME int baseAddr = -((m_index << 16) + 4); // bit adjust
 		int baseAddr = -(m_index << 16); // bit adjust??
