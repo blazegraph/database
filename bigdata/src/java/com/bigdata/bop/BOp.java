@@ -31,6 +31,8 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
+import com.bigdata.bop.IPredicate.Annotations;
+
 import cutthecrap.utils.striterators.IPropertySet;
 
 /**
@@ -180,24 +182,28 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
      */
     BOpEvaluationContext getEvaluationContext();
     
-    /**
-     * Return <code>true</code> iff this operator is an access path which writes
-     * on the database.
-     * 
-     * @see Annotations#MUTATION
-     */
-    boolean isMutation();
-
-    /**
-     * The timestamp or transaction identifier on which the operator will read
-     * or write.
-     * 
-     * @see Annotations#TIMESTAMP
-     * 
-     * @throws IllegalStateException
-     *             if {@link Annotations#TIMESTAMP} was not specified.
-     */
-    long getTimestamp();
+//    /**
+//     * Return <code>true</code> iff this operator is an access path which writes
+//     * on the database.
+//     * 
+//     * @see com.bigdata.bop.IPredicate.Annotations#MUTATION
+//     * 
+//     * @todo Move to {@link IPredicate}?
+//     */
+//    boolean isMutation();
+//
+//	/**
+//	 * The timestamp or transaction identifier on which the operator will read
+//	 * or write.
+//	 * 
+//	 * @see Annotations#TIMESTAMP
+//	 * 
+//	 * @throws IllegalStateException
+//	 *             if {@link Annotations#TIMESTAMP} was not specified.
+//	 * 
+//	 * @todo move to {@link IPredicate}?
+//	 */
+//    long getTimestamp();
 
 //    /**
 //     * Compare this {@link BOp} with another {@link BOp}.
@@ -238,37 +244,6 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
          * The default timeout for operator evaluation.
          */
         long DEFAULT_TIMEOUT = Long.MAX_VALUE;
-
-        /**
-         * Boolean property whose value is <code>true</code> iff this operator
-         * writes on a database.
-         * <p>
-         * Most operators operate solely on streams of elements or binding sets.
-         * Some operators read or write on the database using an access path,
-         * which is typically described by an {@link IPredicate}. This property
-         * MUST be <code>true</code> when access path is used to write on the
-         * database.
-         * <p>
-         * Operators which read or write on the database must declare the
-         * {@link Annotations#TIMESTAMP} associated with that operation.
-         * 
-         * @see #TIMESTAMP
-         * 
-         * @todo Move to {@link IPredicate}?
-         */
-        String MUTATION = BOp.class.getName() + ".mutation";
-
-        boolean DEFAULT_MUTATION = false;
-
-        /**
-         * The timestamp (or transaction identifier) used by this operator if it
-         * reads or writes on the database (no default).
-         * 
-         * @see #MUTATION
-         * 
-         * @todo Move to {@link IPredicate}?
-         */
-        String TIMESTAMP = BOp.class.getName() + ".timestamp";
 
         /**
          * This annotation determines where an operator will be evaluated

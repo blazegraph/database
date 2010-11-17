@@ -29,6 +29,7 @@ package com.bigdata.bop.join;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -173,6 +174,8 @@ public class PipelineJoin<E> extends PipelineOp implements
 		 * estimated from a cutoff join. 
 		 * 
 		 * @see PipelineJoinStats#getJoinHitRatio()
+		 * 
+		 * @todo unit tests when (en|dis)abled.
 		 */
 		String COALESCE_DUPLICATE_ACCESS_PATHS = PipelineJoin.class.getName()
 				+ ".coalesceDuplicateAccessPaths";
@@ -353,12 +356,12 @@ public class PipelineJoin<E> extends PipelineOp implements
         
         @Override
         protected void toString(final StringBuilder sb) {
-            sb.append(",accessPathDups=" + accessPathDups.estimate_get());
-            sb.append(",accessPathCount=" + accessPathCount.estimate_get());
-            sb.append(",accessPathChunksIn=" + accessPathChunksIn.estimate_get());
-            sb.append(",accessPathUnitsIn=" + accessPathUnitsIn.estimate_get());
-            sb.append(",inputSolutions=" + inputSolutions.estimate_get());
-            sb.append(",outputSolutions=" + outputSolutions.estimate_get());
+            sb.append(",accessPathDups=" + accessPathDups.get());
+            sb.append(",accessPathCount=" + accessPathCount.get());
+            sb.append(",accessPathChunksIn=" + accessPathChunksIn.get());
+            sb.append(",accessPathUnitsIn=" + accessPathUnitsIn.get());
+            sb.append(",inputSolutions=" + inputSolutions.get());
+            sb.append(",outputSolutions=" + outputSolutions.get());
             sb.append(",joinHitRatio=" + getJoinHitRatio());
         }
         
@@ -540,6 +543,14 @@ public class PipelineJoin<E> extends PipelineOp implements
         final private long limit;
         
         /**
+         * When <code>true</code> an attempt will be made to coalesce as-bound
+         * predicates which result in the same access path.
+         * 
+         * @see Annotations#COALESCE_DUPLICATE_ACCESS_PATHS
+         */
+        final boolean coalesceAccessPaths;
+        
+        /**
          * Used to enforce the {@link Annotations#LIMIT} iff one is specified.
          */
         final private AtomicLong exactOutputCount = new AtomicLong();
@@ -634,7 +645,10 @@ public class PipelineJoin<E> extends PipelineOp implements
             this.partitionId = context.getPartitionId();
             this.stats = (PipelineJoinStats) context.getStats();
             this.limit = joinOp.getProperty(Annotations.LIMIT,Annotations.DEFAULT_LIMIT);
-
+			this.coalesceAccessPaths = joinOp.getProperty(
+					Annotations.COALESCE_DUPLICATE_ACCESS_PATHS,
+					Annotations.DEFAULT_COALESCE_DUPLICATE_ACCESS_PATHS);
+        	
             this.threadLocalBufferFactory = new TLBFactory(sink);
             
             this.threadLocalBufferFactory2 = sink2 == null ? null
@@ -974,7 +988,7 @@ public class PipelineJoin<E> extends PipelineOp implements
              *             true for query on the lastJoin) and that
              *             {@link IBlockingBuffer} has been closed.
              */
-            public Void call() throws Exception {
+			public Void call() throws Exception {
 
                 try {
 
@@ -986,24 +1000,15 @@ public class PipelineJoin<E> extends PipelineOp implements
                         return null;
                         
                     }
-                    
-                    /*
-                     * Aggregate the source bindingSets that license the same
-                     * asBound predicate.
-                     */
-                    final Map<HashedPredicate<E>, Collection<IBindingSet>> map = combineBindingSets(chunk);
 
-                    /*
-                     * Generate an AccessPathTask from each distinct asBound
-                     * predicate that will consume all of the source bindingSets
-                     * in the chunk which resulted in the same asBound
-                     * predicate.
-                     */
-                    final AccessPathTask[] tasks = getAccessPathTasks(map);
+					/*
+					 * Generate (and optionally coalesce) the access path tasks.
+					 */
+					final AccessPathTask[] tasks = generateAccessPaths(chunk);
 
-                    /*
-                     * Reorder those tasks for better index read performance.
-                     */
+					/*
+					 * Reorder those tasks for better index read performance.
+					 */
                     reorderTasks(tasks);
 
                     /*
@@ -1032,34 +1037,105 @@ public class PipelineJoin<E> extends PipelineOp implements
              */
             private void runOneTask() throws Exception {
 
-                if (chunk.length != 1)
-                    throw new AssertionError();
-                
-                final IBindingSet bindingSet = chunk[0];
+				if (chunk.length != 1)
+					throw new AssertionError();
 
-                // constrain the predicate to the given bindings.
-                IPredicate<E> asBound = predicate.asBound(bindingSet);
+				final IBindingSet bindingSet = chunk[0];
 
-                if (partitionId != -1) {
+				// constrain the predicate to the given bindings.
+				IPredicate<E> asBound = predicate.asBound(bindingSet);
 
-                    /*
-                     * Constrain the predicate to the desired index
-                     * partition.
-                     * 
-                     * Note: we do this for scale-out joins since the access
-                     * path will be evaluated by a JoinTask dedicated to
-                     * this index partition, which is part of how we give
-                     * the JoinTask to gain access to the local index object
-                     * for an index partition.
-                     */
+				if (partitionId != -1) {
 
-                    asBound = asBound.setPartitionId(partitionId);
+					/*
+					 * Constrain the predicate to the desired index partition.
+					 * 
+					 * Note: we do this for scale-out joins since the access
+					 * path will be evaluated by a JoinTask dedicated to this
+					 * index partition, which is part of how we give the
+					 * JoinTask to gain access to the local index object for an
+					 * index partition.
+					 */
 
-                }
+					asBound = asBound.setPartitionId(partitionId);
 
-                new JoinTask.AccessPathTask(asBound, Arrays.asList(chunk))
-                        .call();
+				}
 
+				new JoinTask.AccessPathTask(asBound, Arrays.asList(chunk))
+						.call();
+
+			}
+
+			/**
+			 * Generate (and optionally coalesce) the {@link AccessPathTask}s
+			 * for the chunk.
+			 * 
+			 * @param chunk
+			 *            The chunk.
+			 *            
+			 * @return The tasks to process that chunk.
+			 */
+			protected AccessPathTask[] generateAccessPaths(final IBindingSet[] chunk) {
+
+				final AccessPathTask[] tasks;
+
+				if (coalesceAccessPaths) {
+
+					/*
+					 * Aggregate the source bindingSets that license the same
+					 * asBound predicate.
+					 */
+					final Map<HashedPredicate<E>, Collection<IBindingSet>> map = combineBindingSets(chunk);
+
+					/*
+					 * Generate an AccessPathTask from each distinct asBound
+					 * predicate that will consume all of the source bindingSets
+					 * in the chunk which resulted in the same asBound
+					 * predicate.
+					 */
+					tasks = getAccessPathTasks(map);
+
+				} else {
+
+					/*
+					 * Do not coalesce access paths.
+					 */
+					
+					tasks = new JoinTask.AccessPathTask[chunk.length];
+
+					for (int i = 0; i < chunk.length; i++) {
+
+						final IBindingSet bindingSet = chunk[i];
+
+						// constrain the predicate to the given bindings.
+						IPredicate<E> asBound = predicate.asBound(bindingSet);
+
+						if (partitionId != -1) {
+
+							/*
+							 * Constrain the predicate to the desired index
+							 * partition.
+							 * 
+							 * Note: we do this for scale-out joins since the
+							 * access path will be evaluated by a JoinTask
+							 * dedicated to this index partition, which is part
+							 * of how we give the JoinTask to gain access to the
+							 * local index object for an index partition.
+							 */
+
+							asBound = asBound.setPartitionId(partitionId);
+
+						}
+
+						tasks[i] = new AccessPathTask(asBound, Collections
+								.singletonList(bindingSet));
+
+					}
+
+				}
+
+				return tasks;
+            	
             }
             
             /**

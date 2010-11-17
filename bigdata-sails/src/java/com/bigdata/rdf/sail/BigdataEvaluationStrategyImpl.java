@@ -61,6 +61,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
@@ -1495,7 +1496,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             anns.add(new NV(IPredicate.Annotations.ACCESS_PATH_EXPANDER, expander));
 
         // timestamp
-        anns.add(new NV(IPredicate.Annotations.TIMESTAMP, database
+        anns.add(new NV(Annotations.TIMESTAMP, database
                 .getSPORelation().getTimestamp()));
 
         /*

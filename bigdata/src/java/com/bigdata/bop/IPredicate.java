@@ -42,13 +42,12 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.filter.Advancer;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IAccessPathExpander;
+import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
 import com.bigdata.service.ndx.IClientIndex;
@@ -69,9 +68,12 @@ import cutthecrap.utils.striterators.IFilter;
  */
 public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 
-    /**
-     * Interface declaring well known annotations.
-     */
+	/**
+	 * Interface declaring well known annotations.
+	 * 
+	 * FIXME All of these annotations should be in the {@link IPredicate}
+	 * namespace.
+	 */
     public interface Annotations extends BOp.Annotations, BufferAnnotations {
 
         /**
@@ -288,6 +290,35 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
         final int DEFAULT_FLAGS = IRangeQuery.KEYS | IRangeQuery.VALS
 //                | IRangeQuery.PARALLEL
                 ;
+
+		/**
+		 * Boolean property whose value is <code>true</code> iff this operator
+		 * writes on a database.
+		 * <p>
+		 * Most operators operate solely on streams of elements or binding sets.
+		 * Some operators read or write on the database using an access path,
+		 * which is typically described by an {@link IPredicate}. This property
+		 * MUST be <code>true</code> when access path is used to write on the
+		 * database.
+		 * <p>
+		 * Operators which read or write on the database must declare the
+		 * {@link Annotations#TIMESTAMP} associated with that operation.
+		 * 
+		 * @see Annotations#TIMESTAMP
+		 */
+		String MUTATION = BOp.class.getName() + ".mutation";
+
+        boolean DEFAULT_MUTATION = false;
+
+		/**
+		 * The timestamp (or transaction identifier) used by this operator if it
+		 * reads or writes on the database (no default).
+		 * 
+		 * @see com.bigdata.bop.IPredicate.Annotations#MUTATION
+		 * 
+		 * @todo Move to {@link IPredicate}?
+		 */
+		String TIMESTAMP = BOp.class.getName() + ".timestamp";
 
     }
     
@@ -636,5 +667,24 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * @return The newly annotated {@link IPredicate}.
      */
     public IPredicate<E> setBOpId(int bopId);
+
+	/**
+	 * Return <code>true</code> iff this operator is an access path which writes
+	 * on the database.
+	 * 
+	 * @see Annotations#MUTATION
+	 */
+	boolean isMutation();
+
+	/**
+	 * The timestamp or transaction identifier on which the operator will read
+	 * or write.
+	 * 
+	 * @see Annotations#TIMESTAMP
+	 * 
+	 * @throws IllegalStateException
+	 *             if {@link Annotations#TIMESTAMP} was not specified.
+	 */
+	long getTimestamp();
 
 }

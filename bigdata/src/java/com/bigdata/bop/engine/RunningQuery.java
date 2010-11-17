@@ -491,8 +491,16 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
             populateStatsMap(query);
 
-            if (!query.isMutation()) {
+			/*
+			 * FIXME Review the concept of mutation queries. It used to be that
+			 * queries could only either read or write. Now we have access paths
+			 * which either read or write and each query could use zero or more
+			 * such access paths.
+			 */
+            if (true/*!query.isMutation()*/) {
 
+            	// read-only query.
+            	
                 final BOpStats queryStats = statsMap.get(query.getId());
 
                 queryBuffer = new BlockingBufferWithStats<IBindingSet[]>(query,
@@ -501,11 +509,11 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                 queryIterator = new QueryResultIterator<IBindingSet[]>(this,
                         queryBuffer.iterator());
 
-            } else {
-
-                // Note: Not used for mutation queries.
-                queryBuffer = null;
-                queryIterator = null;
+//            } else {
+//
+//                // Note: Not used for mutation queries.
+//                queryBuffer = null;
+//                queryIterator = null;
 
             }
 
@@ -1361,13 +1369,15 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                 
             } catch (Throwable ex1) {
 
-                /*
-                 * Note: SliceOp will cause other operators to be interrupted
-                 * during normal evaluation so it is not useful to log an
-                 * InterruptedException @ ERROR.
-                 */
-                if (!InnerCause.isInnerCause(ex1, InterruptedException.class)) {
-                    // Log an error.
+				/*
+				 * Note: SliceOp will cause other operators to be interrupted
+				 * during normal evaluation so it is not useful to log an
+				 * InterruptedException @ ERROR.
+				 */
+				if (!InnerCause.isInnerCause(ex1, InterruptedException.class)
+		 		 && !InnerCause.isInnerCause(ex1, BufferClosedException.class)
+		 		 ) {
+					// Log an error.
                     log.error("queryId=" + queryId + ", bopId=" + t.bopId
                             + ", bop=" + t.bop, ex1);
                 }

@@ -582,18 +582,6 @@ public class BOpBase implements BOp {
 
     }
 
-    public final boolean isMutation() {
-
-        return getProperty(Annotations.MUTATION, Annotations.DEFAULT_MUTATION);
-
-    }
-
-    public final long getTimestamp() {
-
-		return (Long) getRequiredProperty(Annotations.TIMESTAMP);
-
-    }
-
     /*
      * Note: I've played around with a few hash functions and senses of
      * equality. Predicate (before the bops were introduced) used to have a

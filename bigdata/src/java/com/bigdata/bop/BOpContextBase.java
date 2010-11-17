@@ -165,8 +165,7 @@ public class BOpContextBase {
         final IIndexManager tmp = getFederation() == null ? getIndexManager()
                 : getFederation();
         
-        final long timestamp = (Long) pred
-                .getRequiredProperty(BOp.Annotations.TIMESTAMP);
+        final long timestamp = pred.getTimestamp();
 
         return (IRelation<E>) tmp.getResourceLocator().locate(
                 pred.getOnlyRelationName(), timestamp);

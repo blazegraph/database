@@ -1196,7 +1196,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      */
     public LatchedExecutor getReadExecutor() {
         
-        assertOpen();
+//        assertOpen();
         
         return readService;
         
