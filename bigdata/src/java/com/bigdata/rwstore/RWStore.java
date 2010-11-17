@@ -190,11 +190,13 @@ import com.bigdata.util.ChecksumUtility;
  * 
  *         FIXME Release checklist:
  *         <p>
- *         Checksum metabits header record?
+ *         Add metabits header record checksum field and verify on read back.
  *         <p>
- *         Checksum fixed allocators?
+ *         Checksum fixed allocators (needs to be tested on read back).
  *         <p>
- *         Checksum delete blocks / blob records?
+ *         Add version field to the fixed allocator.
+ *         <p>
+ *         Done. Checksum delete blocks / blob records.
  *         <p>
  *         PSOutputStream - remove caching logic. It is unused and makes this
  *         class much more complex. A separate per-RWStore caching class for
@@ -204,6 +206,14 @@ import com.bigdata.util.ChecksumUtility;
  *         declare more fields to be final. See notes on {@link AllocBlock}.
  *         <p>
  *         Implement logic to "abort" a shadow allocation context.
+ *         <p>
+ *         Unit test to verify that we do not recycle allocations from the last
+ *         commit point even when the retention time is zero such that it is
+ *         always possible to re-open the store from the alternative root block
+ *         even after you have allocated things against the current root block
+ *         (but not yet committed).
+ *         <p>
+ *         Read-only mode.
  */
 
 public class RWStore implements IStore {
@@ -336,10 +346,18 @@ public class RWStore implements IStore {
 	 */
 	private final ArrayList<Allocator> m_allocs;
 
-	/** lists of free alloc blocks. */
+	/**
+	 * A fixed length array of lists of free {@link FixedAllocator}s with one
+	 * entry in the array for each configured allocator size. An allocator is
+	 * put onto this free list when it is initially created. When the store is
+	 * opened, it will be added to this list if {@link Allocator#hasFree()}
+	 * returns true. It will be removed when it has no free space remaining. It
+	 * will be added back to the free list when its free slots exceeds a
+	 * configured threshold.
+	 */
 	private ArrayList<FixedAllocator> m_freeFixed[];
 	
-	/** lists of free blob allocators. */
+//	/** lists of free blob allocators. */
 	// private final ArrayList<BlobAllocator> m_freeBlobs;
 
 	/** lists of blocks requiring commitment. */
@@ -2039,7 +2057,7 @@ public class RWStore implements IStore {
 	private int m_metaTransientBits[];
 	// volatile private int m_metaStartAddr;
     private volatile int m_metaBitsAddr;
-
+    // @todo javadoc please.
 	volatile private boolean m_recentAlloc = false;
 
 	/**
@@ -2437,6 +2455,20 @@ public class RWStore implements IStore {
 	 * Collected statistics are against each Allocation Block size:
 	 * total number of slots | store size
 	 * number of filled slots | store used
+	 * <dl>
+	 * <dt>AllocatorSize</dt><dd>The #of bytes in the allocated slots issued by this allocator.</dd>
+	 * <dt>AllocatorCount</dt><dd>The #of fixed allocators for that slot size.</dd>
+	 * <dt>SlotsAllocated</dt><dd>Cumulative allocation of slots to date in this slot size (regardless of the transaction outcome).</dd>
+	 * <dt>SlotsRecycled</dt><dd>Cumulative recycled slots to date in this slot size (regardless of the transaction outcome).</dd>
+	 * <dt>SlotsInUse</dt><dd>The difference between the two previous columns (net slots in use for this slot size).</dd>
+	 * <dt>SlotsReserved</dt><dd>The #of slots in this slot size which have had storage reserved for them.</dd>
+	 * <dt>BytesReserved</dt><dd>The space reserved on the backing file for those allocation slots</dd>
+	 * <dt>BytesAppData</dt><dd>The #of bytes in the allocated slots which are used by application data (including the record checksum).</dd>
+	 * <dt>%SlotWaste</dt><dd>BytesAppData/(SlotsInUse*AllocatorSize) : How well the application data fits in the slots.</dd>
+	 * <dt>%StoreWaste</dt><dd>BytesAppData/BytesReserved : How much of the reserved space is in use by application data.</dd>
+	 * <dt>%AppData</dt><dd>BytesAppData/Sum(BytesAppData).  This is how much of your data is stored by each allocator.</dd>
+	 * <dt>%BackingFile</dt><dd>BytesReserved/Sum(BytesReserved).  This is how much of the backing file is reserved for each allocator.</dd>
+	 * </dl>
 	 */
 	public void showAllocators(final StringBuilder str) {
 		final AllocationStats[] stats = new AllocationStats[m_allocSizes.length];
