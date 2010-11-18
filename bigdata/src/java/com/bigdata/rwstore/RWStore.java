@@ -2521,16 +2521,18 @@ public class RWStore implements IStore {
 	 * <dl>
 	 * <dt>AllocatorSize</dt><dd>The #of bytes in the allocated slots issued by this allocator.</dd>
 	 * <dt>AllocatorCount</dt><dd>The #of fixed allocators for that slot size.</dd>
-	 * <dt>SlotsAllocated</dt><dd>Cumulative allocation of slots to date in this slot size (regardless of the transaction outcome).</dd>
-	 * <dt>SlotsRecycled</dt><dd>Cumulative recycled slots to date in this slot size (regardless of the transaction outcome).</dd>
 	 * <dt>SlotsInUse</dt><dd>The difference between the two previous columns (net slots in use for this slot size).</dd>
 	 * <dt>SlotsReserved</dt><dd>The #of slots in this slot size which have had storage reserved for them.</dd>
+	 * <dt>SlotsAllocated</dt><dd>Cumulative allocation of slots to date in this slot size (regardless of the transaction outcome).</dd>
+	 * <dt>SlotsRecycled</dt><dd>Cumulative recycled slots to date in this slot size (regardless of the transaction outcome).</dd>
+	 * <dt>SlotsChurn</dt><dd>How frequently slots of this size are re-allocated (SlotsInUse/SlotsAllocated).</dd>
+	 * <dt>%SlotsUnused</dt><dd>The percentage of slots of this size which are not in use (1-(SlotsInUse/SlotsReserved)).</dd>
 	 * <dt>BytesReserved</dt><dd>The space reserved on the backing file for those allocation slots</dd>
 	 * <dt>BytesAppData</dt><dd>The #of bytes in the allocated slots which are used by application data (including the record checksum).</dd>
-	 * <dt>%SlotWaste</dt><dd>BytesAppData/(SlotsInUse*AllocatorSize) : How well the application data fits in the slots.</dd>
-	 * <dt>%StoreWaste</dt><dd>BytesAppData/BytesReserved : How much of the reserved space is in use by application data.</dd>
-	 * <dt>%AppData</dt><dd>BytesAppData/Sum(BytesAppData).  This is how much of your data is stored by each allocator.</dd>
-	 * <dt>%BackingFile</dt><dd>BytesReserved/Sum(BytesReserved).  This is how much of the backing file is reserved for each allocator.</dd>
+	 * <dt>%SlotWaste</dt><dd>How well the application data fits in the slots (BytesAppData/(SlotsInUse*AllocatorSize)).</dd>
+	 * <dt>%AppData</dt><dd>How much of your data is stored by each allocator (BytesAppData/Sum(BytesAppData)).</dd>
+	 * <dt>%StoreFile</dt><dd>How much of the backing file is reserved for each allocator (BytesReserved/Sum(BytesReserved)).</dd>
+	 * <dt>%StoreWaste</dt><dd>How much of the total waste on the store is waste for this allocator size ((BytesReserved-BytesAppData)/(Sum(BytesReserved)-Sum(BytesAppData))).</dd>
 	 * </dl>
 	 */
 	public void showAllocators(final StringBuilder str) {
