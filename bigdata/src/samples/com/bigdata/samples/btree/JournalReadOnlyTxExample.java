@@ -183,10 +183,12 @@ public class JournalReadOnlyTxExample {
                 // First, remove the existing tuples.
                 removeWriteSet(unisolatedBTree);
 
+                store.commit();
+                
 				/*
 				 * Verify that the read-only view has not seen those changes.
 				 */
-				{
+				if(false) {
 					final BTree readOnlyBTree = (BTree) store.getIndex(name, tx2);
 
 					verifyWriteSet1(readOnlyBTree);
@@ -198,6 +200,8 @@ public class JournalReadOnlyTxExample {
 				 */
 				writeSet2(unisolatedBTree);
 
+				store.commit();
+				
 				/*
 				 * Verify that the read-only view has not seen those changes.
 				 * 

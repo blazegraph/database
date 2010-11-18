@@ -237,7 +237,25 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     protected AbstractLocalTransactionManager newLocalTransactionManager() {
 
         final JournalTransactionService abstractTransactionService = new JournalTransactionService(
-                properties, this).start();
+                properties, this) {
+            
+            protected void activateTx(final TxState state) {
+                final IBufferStrategy bufferStrategy = Journal.this.getBufferStrategy();
+                if(bufferStrategy instanceof RWStrategy) {
+                    ((RWStrategy)bufferStrategy).getRWStore().activateTx();
+                }
+                super.activateTx(state);
+            }
+
+            protected void deactivateTx(final TxState state) {
+                super.deactivateTx(state);
+                final IBufferStrategy bufferStrategy = Journal.this.getBufferStrategy();
+                if(bufferStrategy instanceof RWStrategy) {
+                    ((RWStrategy)bufferStrategy).getRWStore().deactivateTx();
+                }
+            }
+            
+        }.start();
 
         return new AbstractLocalTransactionManager() {
 
