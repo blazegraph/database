@@ -1258,12 +1258,7 @@ public class RWStore implements IStore {
                 
 	                assertAllocators();
 
-                    final String msg = "Address did not resolve to physical address: "
-                            + addr;
-
-                    log.warn(msg);
-
-                    throw new IllegalArgumentException(msg);
+                    throw new PhysicalAddressResolutionException(addr);
                     
 				}
 

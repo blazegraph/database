@@ -171,10 +171,20 @@ public class JournalReadOnlyTxExample {
 
 			}
 
-			/*
-			 * Open a read-only transaction on the last commit time.
-			 */
-            final long tx2 = store.newTx(ITx.READ_COMMITTED);
+            /*
+             * Open a read-only transaction on the last commit time.
+             * 
+             * Note: If you use store.getLastCommitTime() here instead you will
+             * have a read-historical view of the same data, but that view is
+             * NOT protected by a read lock. Running the example with this
+             * change will cause the RWStore to throw out an exception since the
+             * writes will have overwritten the historical data by the time you
+             * try to read it.
+             */
+			// Obtaining a tx here protects against recycling.
+//            final long tx2 = store.newTx(ITx.READ_COMMITTED);
+            // Using a historical read w/o a tx does NOT protect against recycling.
+            final long tx2 = store.getLastCommitTime();
             try {
 
                 // lookup the UNISOLATED B+Tree.
@@ -186,30 +196,20 @@ public class JournalReadOnlyTxExample {
                 store.commit();
                 
 				/*
-				 * Verify that the read-only view has not seen those changes.
-				 */
-				if(false) {
-					final BTree readOnlyBTree = (BTree) store.getIndex(name, tx2);
-
-					verifyWriteSet1(readOnlyBTree);
-					
-				}
-                
-				/*
 				 * Write some new records on the unisolated index.
 				 */
 				writeSet2(unisolatedBTree);
 
 				store.commit();
-				
-				/*
-				 * Verify that the read-only view has not seen those changes.
-				 * 
-				 * Note: This probably hits the index cache and everything in
-				 * the read-only B+Tree was already materialized when we
-				 * verified it just before writing writeSet2 onto the unisolated
-				 * index, so this is not really testing anything.
-				 */
+
+                /*
+                 * Verify that the read-only view has not seen those changes.
+                 * 
+                 * Note: If you used a historical read rather than a read-only
+                 * tx then this is where the RWStore will throw out an exception
+                 * because the recycled has reused some of the records
+                 * associated with the historical revision of the BTree.
+                 */
 				{
 					final BTree readOnlyBTree = (BTree) store.getIndex(name, tx2);
 
