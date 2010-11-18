@@ -31,6 +31,7 @@ import java.io.*;
 import org.apache.log4j.Logger;
 
 import com.bigdata.rwstore.RWStore.AllocationStats;
+import com.bigdata.rwstore.StorageStats.Bucket;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -52,6 +53,8 @@ public class FixedAllocator implements Allocator {
      */
 	volatile private int m_diskAddr;
 	volatile private int m_index;
+	
+	Bucket m_statsBucket = null;
 
 	public void setIndex(final int index) {
 		final AllocBlock fb = (AllocBlock) m_allocBlocks.get(0);
@@ -109,7 +112,7 @@ public class FixedAllocator implements Allocator {
 		final int bit = offset % allocBlockRange;
 		
 		if (RWStore.tstBit(block.m_bits, bit)) {		
-			return RWStore.convertAddr(block.m_addr) + ((long)m_size * bit);
+			return RWStore.convertAddr(block.m_addr) + ((long) m_size * bit);
 		} else {
 			return 0L;
 		}
@@ -428,6 +431,10 @@ public class FixedAllocator implements Allocator {
 			} else {
 				m_freeTransients++;
 			}
+			
+			if (m_statsBucket != null) {
+				m_statsBucket.delete(size);
+			}
 
 			return true;
 		} else if (addr >= m_startAddr && addr < m_endAddr) {
@@ -463,7 +470,11 @@ public class FixedAllocator implements Allocator {
 
 			final AllocBlock block = iter.next();
 			if (block.m_addr == 0) {
-				int blockSize = 32 * m_bitSize * m_size;
+				int blockSize = 32 * m_bitSize;
+				if (m_statsBucket != null) {
+					m_statsBucket.addSlots(blockSize);
+				}
+				blockSize *= m_size;
 				blockSize >>= RWStore.ALLOCATION_SCALEUP;
 
 				block.m_addr = store.allocBlock(blockSize);
@@ -498,6 +509,10 @@ public class FixedAllocator implements Allocator {
 			addr += (count * 32 * m_bitSize);
 
 			final int value = -((m_index << RWStore.OFFSET_BITS) + addr);
+			
+			if (m_statsBucket != null) {
+				m_statsBucket.allocate(size);
+			}
 
 			return value;
 		} else {
@@ -650,5 +665,9 @@ public class FixedAllocator implements Allocator {
 		} else {
 			return false;
 		}
+	}
+
+	public void setBucketStats(Bucket b) {
+		m_statsBucket = b;
 	}
 }
