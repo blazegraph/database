@@ -444,6 +444,14 @@ public class RWStore implements IStore {
 //    * the same txReleaseTime.
 //	private static final int MAX_DEFERRED_FREE = 4094; // fits in 16k block
     private final long m_minReleaseAge;
+
+    /**
+     * The #of open transactions (read-only or read-write).
+     * 
+     * This is guarded by the {@link #m_allocationLock}.
+     */
+    private int m_activeTxCount = 0;
+    
 	private volatile long m_lastDeferredReleaseTime = 0L;
 //	private final ArrayList<Integer> m_currentTxnFreeList = new ArrayList<Integer>();
 	private final PSOutputStream m_deferredFreeOut;
@@ -1428,7 +1436,8 @@ public class RWStore implements IStore {
                  * FIXME We need unit test when MIN_RELEASE_AGE is ZERO AND
                  * there are open read-only transactions.
                  */
-                boolean alwaysDefer = m_minReleaseAge > 0L;
+                boolean alwaysDefer = m_minReleaseAge > 0L
+                        || m_activeTxCount > 0;
                 if (!alwaysDefer)
                     alwaysDefer = context == null && !m_contexts.isEmpty();
                 if (alwaysDefer)
@@ -4206,4 +4215,22 @@ public class RWStore implements IStore {
 		return m_storageStats;
 	}
 
+    public void activateTx() {
+        m_allocationLock.lock();
+        try {
+            m_activeTxCount++;
+        } finally {
+            m_allocationLock.unlock();
+        }
+    }
+    
+    public void deactivateTx() {
+        m_allocationLock.lock();
+        try {
+            m_activeTxCount++;
+        } finally {
+            m_allocationLock.unlock();
+        }
+    }
+    
 }
