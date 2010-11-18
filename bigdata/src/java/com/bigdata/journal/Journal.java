@@ -715,8 +715,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
         try {
 
-            return localTransactionManager.getTransactionService().newTx(
-                    timestamp);
+			return getTransactionService().newTx(timestamp);
 
         } catch (IOException e) {
 
@@ -963,6 +962,12 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         return concurrencyManager.getTransactionManager();
         
+    }
+    
+    public ITransactionService getTransactionService() {
+    	
+    	return getTransactionManager().getTransactionService();
+
     }
 
     public WriteExecutorService getWriteService() {
