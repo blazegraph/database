@@ -61,7 +61,7 @@ public class FixedAllocator implements Allocator {
 		
         if (log.isDebugEnabled())
             log.debug("Restored index " + index + " with " + getStartAddr()
-                    + "[" + fb.m_bits[0] + "] from " + m_diskAddr);
+                    + "[" + fb.m_live[0] + "] from " + m_diskAddr);
 
 		m_index = index;
 	}
@@ -111,7 +111,7 @@ public class FixedAllocator implements Allocator {
 		
 		final int bit = offset % allocBlockRange;
 		
-		if (RWStore.tstBit(block.m_bits, bit)) {		
+		if (RWStore.tstBit(block.m_live, bit)) {		
 			return RWStore.convertAddr(block.m_addr) + ((long) m_size * bit);
 		} else {
 			return 0L;
@@ -170,7 +170,7 @@ public class FixedAllocator implements Allocator {
 		try {
 			final AllocBlock fb = m_allocBlocks.get(0);
 			if (log.isDebugEnabled())
-				log.debug("writing allocator " + m_index + " for " + getStartAddr() + " with " + fb.m_bits[0]);
+				log.debug("writing allocator " + m_index + " for " + getStartAddr() + " with " + fb.m_live[0]);
 			final byte[] buf = new byte[1024];
 			final DataOutputStream str = new DataOutputStream(new FixedOutputStream(buf));
 			try {
@@ -182,11 +182,11 @@ public class FixedAllocator implements Allocator {
 
                     str.writeInt(block.m_addr);
                     for (int i = 0; i < m_bitSize; i++) {
-                        str.writeInt(block.m_bits[i]);
+                        str.writeInt(block.m_live[i]);
                     }
 
 //                    if (!m_store.isSessionPreserved()) {
-                        block.m_transients = block.m_bits.clone();
+                        block.m_transients = block.m_live.clone();
 //                    }
 
                     /**
@@ -196,11 +196,11 @@ public class FixedAllocator implements Allocator {
                     if (m_context != null) {
                         assert block.m_saveCommit != null;
 
-                        block.m_saveCommit = block.m_bits.clone();
+                        block.m_saveCommit = block.m_live.clone();
 //                    } else if (m_store.isSessionPreserved()) {
 //                        block.m_commit = block.m_transients.clone();
                     } else {
-                        block.m_commit = block.m_bits.clone();
+                        block.m_commit = block.m_live.clone();
                     }
                 }
                 // add checksum
@@ -243,17 +243,17 @@ public class FixedAllocator implements Allocator {
 
 				block.m_addr = str.readInt();
 				for (int i = 0; i < m_bitSize; i++) {
-					block.m_bits[i] = str.readInt();
+					block.m_live[i] = str.readInt();
 
 					/**
 					 * Need to calc how many free blocks are available, minor
 					 * optimization by checking against either empty or full to
 					 * avoid scanning every bit unnecessarily
 					 **/
-					if (block.m_bits[i] == 0) { // empty
+					if (block.m_live[i] == 0) { // empty
 						m_freeBits += 32;
-					} else if (block.m_bits[i] != 0xFFFFFFFF) { // not full
-						final int anInt = block.m_bits[i];
+					} else if (block.m_live[i] != 0xFFFFFFFF) { // not full
+						final int anInt = block.m_live[i];
 						for (int bit = 0; bit < 32; bit++) {
 							if ((anInt & (1 << bit)) == 0) {
 								m_freeBits++;
@@ -262,8 +262,8 @@ public class FixedAllocator implements Allocator {
 					}
 				}
 
-				block.m_transients = (int[]) block.m_bits.clone();
-				block.m_commit = (int[]) block.m_bits.clone();
+				block.m_transients = (int[]) block.m_live.clone();
+				block.m_commit = (int[]) block.m_live.clone();
 
 				if (m_startAddr == 0) {
 					m_startAddr = block.m_addr;
@@ -642,7 +642,7 @@ public class FixedAllocator implements Allocator {
 		
 		final int bit = offset % allocBlockRange;
 		
-		return RWStore.tstBit(block.m_bits, bit);
+		return RWStore.tstBit(block.m_live, bit);
 	}
 
 	public boolean isCommitted(int offset) {

@@ -31,7 +31,7 @@ import com.bigdata.rwstore.RWStore.AllocationStats;
 /**
  * Bit maps for an allocator. The allocator is a bit map managed as int[]s.
  * 
- * @todo change to make {@link #m_transients}, {@link #m_bits}, and
+ * @todo change to make {@link #m_transients}, {@link #m_live}, and
  *       {@link #m_commit} final fields and then modify {@link FixedAllocator}
  *       to use {@link System#arraycopy(Object, int, Object, int, int)} to copy
  *       the data rather than cloning it.
@@ -70,7 +70,7 @@ public class AllocBlock {
 	 * Just the newly allocated bits. This will be copied onto {@link #m_commit}
 	 * when the current native transaction commits.
 	 */
-	final int m_bits[];
+	final int m_live[];
 	/**
 	 * All of the bits from the commit point on entry to the current native
 	 * transaction plus any newly allocated bits.
@@ -86,7 +86,7 @@ public class AllocBlock {
 //		m_writeCache = cache;
 		m_ints = bitSize;
 		m_commit = new int[bitSize];
-		m_bits = new int[bitSize];
+		m_live = new int[bitSize];
 		m_transients = new int[bitSize];
 	}
 
@@ -98,7 +98,7 @@ public class AllocBlock {
 		// Now check to see if it allocated
 		final int bit = (addr - m_addr) / size;
 
-		return RWStore.tstBit(m_bits, bit);
+		return RWStore.tstBit(m_live, bit);
 	}
 
 	public boolean addressInRange(final int addr, final int size) {
@@ -116,7 +116,7 @@ public class AllocBlock {
 	}
 
 	public boolean freeBit(final int bit) {
-		if (!RWStore.tstBit(m_bits, bit)) {
+		if (!RWStore.tstBit(m_live, bit)) {
 			throw new IllegalArgumentException("Freeing bit not set");
 		}
 
@@ -129,7 +129,7 @@ public class AllocBlock {
 		 * output to the file by removing any pending write to the now freed
 		 * address. On large transaction scopes this may be significant.
 		 */
-		RWStore.clrBit(m_bits, bit);
+		RWStore.clrBit(m_live, bit);
 
 		if (!RWStore.tstBit(m_commit, bit)) {
 			RWStore.clrBit(m_transients, bit);
@@ -162,7 +162,7 @@ public class AllocBlock {
 		final int bit = RWStore.fndBit(m_transients, m_ints);
 
 		if (bit != -1) {
-			RWStore.setBit(m_bits, bit);
+			RWStore.setBit(m_live, bit);
 			RWStore.setBit(m_transients, bit);
 
 			return bit;
@@ -173,7 +173,7 @@ public class AllocBlock {
 
 	public boolean hasFree() {
 		for (int i = 0; i < m_ints; i++) {
-			if (m_bits[i] != 0xFFFFFFFF) {
+			if (m_live[i] != 0xFFFFFFFF) {
 				return true;
 			}
 		}
@@ -185,7 +185,7 @@ public class AllocBlock {
 		int total = m_ints * 32;
 		int allocBits = 0;
 		for (int i = 0; i < total; i++) {
-			if (RWStore.tstBit(m_bits, i)) {
+			if (RWStore.tstBit(m_live, i)) {
 				allocBits++;
 			}
 		}
@@ -211,7 +211,7 @@ public class AllocBlock {
 		final int total = m_ints * 32;
 
 		for (int i = 0; i < total; i++) {
-			if (RWStore.tstBit(m_bits, i)) {
+			if (RWStore.tstBit(m_live, i)) {
 				addrs.add(new Integer(rootAddr - i));
 			}
 		}
