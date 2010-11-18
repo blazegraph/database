@@ -415,7 +415,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 ArrayList<Integer> sizes = new ArrayList<Integer>();
                 TreeMap<Long, Integer> paddrs = new TreeMap<Long, Integer>();
                 for (int i = 0; i < 100000; i++) {
-                	int s = r.nextInt(250);
+                	int s = r.nextInt(250)+1;
                 	sizes.add(s);
                 	int a = rw.alloc(s, null);
                 	long pa = rw.physicalAddress(a);
@@ -424,7 +424,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 }
                 
                 for (int i = 0; i < 50; i++) {
-                	int s = r.nextInt(500);
+                	int s = r.nextInt(500)+1;
                 	sizes.add(s);
                 	int a = rw.alloc(s, null);
                 	long pa = rw.physicalAddress(a);
