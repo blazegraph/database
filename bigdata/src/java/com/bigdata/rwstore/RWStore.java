@@ -216,6 +216,9 @@ import com.bigdata.util.ChecksumUtility;
  *         (but not yet committed).
  *         <p>
  *         Read-only mode.
+ *         <p>
+ *         Unit tests looking for persistent memory leaks (e.g., all allocated
+ *         space can be reclaimed).
  */
 
 public class RWStore implements IStore {
@@ -2051,7 +2054,17 @@ public class RWStore implements IStore {
             // the effective release time.
             long latestReleasableTime = transactionService.getReleaseTime();
 
-            // add one to give this inclusive upper bound semantics.
+            /*
+             * add one because we want to read the delete blocks for all commit
+             * points up to and including the first commit point that we may not
+             * release.
+             */
+            latestReleasableTime++;
+
+            /*
+             * add one to give this inclusive upper bound semantics to the range
+             * scan.
+             */
             latestReleasableTime++;
 
             /*

@@ -31,9 +31,7 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.AbstractTransactionService;
@@ -444,15 +442,18 @@ public class JournalTransactionService extends AbstractTransactionService {
         
     }
 
-    /**
-     * Ignored since the {@link Journal} records the last commit time
-     * in its root blocks.
+    /* @todo This is only true for the WORM.  For the RWStore, the release time
+     * will advance normally and things can get aged out of the store.
      */
-    public void notifyCommit(long commitTime) {
-    
-        // NOP
-        
-    }
+//    /**
+//     * Ignored since the {@link Journal} records the last commit time
+//     * in its root blocks.
+//     */
+//    public void notifyCommit(long commitTime) {
+//    
+//        // NOP
+//        
+//    }
 
     /* @todo This is only true for the WORM.  For the RWStore, the release time
      * will advance normally and things can get aged out of the store.
@@ -501,42 +502,42 @@ public class JournalTransactionService extends AbstractTransactionService {
         
     }
 
-	/**
-	 * Invoke a method with the {@link AbstractTransactionService}'s lock held.
-	 * 
-	 * @param <T>
-	 * @param callable
-	 * @return
-	 * @throws Exception
-	 */
-	public <T> T callWithLock(final Callable<T> callable) throws Exception {
-		lock.lock();
-		try {
-			return callable.call();
-		} finally {
-			lock.unlock();
-		}
-	}
-    
-	/**
-	 * Invoke a method with the {@link AbstractTransactionService}'s lock held.
-	 * 
-	 * But throw immediate exception if try fails.
-	 * 
-	 * @param <T>
-	 * @param callable
-	 * @return
-	 * @throws Exception
-	 */
-	public <T> T tryCallWithLock(final Callable<T> callable, long waitFor, TimeUnit unit) throws Exception {
-		if (!lock.tryLock(waitFor,unit)) {
-			throw new RuntimeException("Lock not available");
-		}
-		try {
-			return callable.call();
-		} finally {
-			lock.unlock();
-		}
-	}
+//	/**
+//	 * Invoke a method with the {@link AbstractTransactionService}'s lock held.
+//	 * 
+//	 * @param <T>
+//	 * @param callable
+//	 * @return
+//	 * @throws Exception
+//	 */
+//	public <T> T callWithLock(final Callable<T> callable) throws Exception {
+//		lock.lock();
+//		try {
+//			return callable.call();
+//		} finally {
+//			lock.unlock();
+//		}
+//	}
+//    
+//	/**
+//	 * Invoke a method with the {@link AbstractTransactionService}'s lock held.
+//	 * 
+//	 * But throw immediate exception if try fails.
+//	 * 
+//	 * @param <T>
+//	 * @param callable
+//	 * @return
+//	 * @throws Exception
+//	 */
+//	public <T> T tryCallWithLock(final Callable<T> callable, long waitFor, TimeUnit unit) throws Exception {
+//		if (!lock.tryLock(waitFor,unit)) {
+//			throw new RuntimeException("Lock not available");
+//		}
+//		try {
+//			return callable.call();
+//		} finally {
+//			lock.unlock();
+//		}
+//	}
     
 }
