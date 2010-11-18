@@ -461,7 +461,12 @@ public class FixedAllocator implements Allocator {
 	 * must therefore handle the 
 	 */
 	public int alloc(final RWStore store, final int size, final IAllocationContext context) {
-		int addr = -1;
+
+        if (size <= 0)
+            throw new IllegalArgumentException(
+                    "Allocate requires positive size, got: " + size);
+
+	    int addr = -1;
 
 		final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
 		int count = -1;
