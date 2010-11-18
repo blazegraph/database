@@ -238,6 +238,23 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         final JournalTransactionService abstractTransactionService = new JournalTransactionService(
                 properties, this) {
+
+            {
+                
+                final long lastCommitTime = Journal.this.getLastCommitTime();
+                
+                if (lastCommitTime != 0L) {
+
+                    /*
+                     * Notify the transaction service on startup so it can set
+                     * the effective release time based on the last commit time
+                     * for the store.
+                     */
+                    updateReleaseTimeForBareCommit(lastCommitTime);
+                    
+                }
+                
+            }
             
             protected void activateTx(final TxState state) {
                 final IBufferStrategy bufferStrategy = Journal.this.getBufferStrategy();

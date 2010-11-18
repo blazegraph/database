@@ -1442,8 +1442,8 @@ public class RWStore implements IStore {
                     alwaysDefer = context == null && !m_contexts.isEmpty();
                 if (alwaysDefer)
 					if (log.isDebugEnabled())
-						log.debug("Should defer " + physicalAddress(addr));
-				if (alwaysDefer || !alloc.canImmediatelyFree(addr, sze, context)) {
+					    log.debug("Should defer " + addr + " real: " + physicalAddress(addr));
+                if (alwaysDefer || !alloc.canImmediatelyFree(addr, sze, context)) {
 					deferFree(addr, sze);
 				} else {
 					immediateFree(addr, sze);
@@ -1505,8 +1505,10 @@ public class RWStore implements IStore {
 			if (alloc == null) {
 				throw new IllegalArgumentException("Invalid address provided to immediateFree: " + addr + ", size: " + sze);
 			}
-			final long pa = alloc.getPhysicalAddress(addrOffset);
-			alloc.free(addr, sze);
+            final long pa = alloc.getPhysicalAddress(addrOffset);
+            if (log.isTraceEnabled())
+                log.trace("Freeing allocation at " + addr + ", physical address: " + pa);
+            alloc.free(addr, sze);
 			// must clear after free in case is a blobHdr that requires reading!
 			// the allocation lock protects against a concurrent re-allocation
 			// of the address before the cache has been cleared
@@ -2038,16 +2040,16 @@ public class RWStore implements IStore {
             final JournalTransactionService transactionService = (JournalTransactionService) journal
                     .getLocalTransactionManager().getTransactionService();
 
-            // the previous commit point.
-            long latestReleasableTime = journal.getLastCommitTime(); 
-
-            if (latestReleasableTime == 0L) {
-                // Nothing committed.
-                return;
-            }
+//            // the previous commit point.
+//            long lastCommitTime = journal.getLastCommitTime(); 
+//
+//            if (lastCommitTime == 0L) {
+//                // Nothing committed.
+//                return;
+//            }
             
-            // subtract out the retention period.
-            latestReleasableTime -= transactionService.getMinReleaseAge();
+            // the effective release time.
+            long latestReleasableTime = transactionService.getReleaseTime();
 
             // add one to give this inclusive upper bound semantics.
             latestReleasableTime++;
@@ -4219,6 +4221,8 @@ public class RWStore implements IStore {
         m_allocationLock.lock();
         try {
             m_activeTxCount++;
+            if(log.isInfoEnabled())
+                log.info("#activeTx="+m_activeTxCount);
         } finally {
             m_allocationLock.unlock();
         }
@@ -4228,6 +4232,8 @@ public class RWStore implements IStore {
         m_allocationLock.lock();
         try {
             m_activeTxCount--;
+            if(log.isInfoEnabled())
+                log.info("#activeTx="+m_activeTxCount);
         } finally {
             m_allocationLock.unlock();
         }
