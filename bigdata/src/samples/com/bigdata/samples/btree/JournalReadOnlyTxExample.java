@@ -182,9 +182,9 @@ public class JournalReadOnlyTxExample {
              * try to read it.
              */
 			// Obtaining a tx here protects against recycling.
-//            final long tx2 = store.newTx(ITx.READ_COMMITTED);
+            final long tx2 = store.newTx(ITx.READ_COMMITTED);
             // Using a historical read w/o a tx does NOT protect against recycling.
-            final long tx2 = store.getLastCommitTime();
+//            final long tx2 = store.getLastCommitTime();
             try {
 
                 // lookup the UNISOLATED B+Tree.
