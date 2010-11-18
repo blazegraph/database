@@ -4227,7 +4227,7 @@ public class RWStore implements IStore {
     public void deactivateTx() {
         m_allocationLock.lock();
         try {
-            m_activeTxCount++;
+            m_activeTxCount--;
         } finally {
             m_allocationLock.unlock();
         }
