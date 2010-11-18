@@ -1120,7 +1120,7 @@ abstract public class AbstractTransactionService extends AbstractService
 	 * (commitTime-1) then compute and set the new releaseTime.
 	 * <p>
 	 * Note: This method was historically part of {@link #notifyCommit(long)}.
-	 * It was moved into its own method so it can be overriden for some unit
+	 * It was moved into its own method so it can be overridden for some unit
 	 * tests.
 	 * 
 	 * @throws IllegalMonitorStateException

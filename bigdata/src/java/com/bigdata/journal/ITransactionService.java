@@ -247,8 +247,9 @@ public interface ITransactionService extends ITimestampService {
      * derived from the timestamp of the earliest running transaction MINUS the
      * minimum release age and is updated whenever the earliest running
      * transaction terminates. This value is monotonically increasing. It will
-     * never be GT the last commit time. It will never be negative. It MAY be
-     * ZERO (0L) and will be ZERO (0L) on startup.
+     * always be LT the last non-zero last commit time. It will never be
+     * negative. It MAY be ZERO (0L) and will be ZERO (0L) on startup (unless
+     * explicitly set by the database to the last known commit time).
      */
     public long getReleaseTime() throws IOException;
     
