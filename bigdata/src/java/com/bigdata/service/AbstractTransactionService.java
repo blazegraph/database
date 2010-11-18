@@ -1128,9 +1128,11 @@ abstract public class AbstractTransactionService extends AbstractService
 	 */
 	protected void updateReleaseTimeForBareCommit(final long commitTime) {
 
-		if(!lock.isHeldByCurrentThread())
-			throw new IllegalMonitorStateException();
-		
+//		if(!lock.isHeldByCurrentThread())
+//			throw new IllegalMonitorStateException();
+
+	    lock.lock();
+	    try {
 		synchronized (startTimeIndex) {
 
 			if (this.releaseTime < (commitTime - 1)
@@ -1159,6 +1161,9 @@ abstract public class AbstractTransactionService extends AbstractService
 			}
 
 		}
+	    } finally {
+	        lock.unlock();
+	    }
 
     }
     
