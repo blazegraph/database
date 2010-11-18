@@ -50,6 +50,7 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.BTree.Counter;
+import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
@@ -73,6 +74,7 @@ import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -441,6 +443,7 @@ public class RWStore implements IStore {
 //    * serves as a BLOB header when there is more than a single entry with
 //    * the same txReleaseTime.
 //	private static final int MAX_DEFERRED_FREE = 4094; // fits in 16k block
+    private final long m_minReleaseAge;
 	private volatile long m_lastDeferredReleaseTime = 0L;
 //	private final ArrayList<Integer> m_currentTxnFreeList = new ArrayList<Integer>();
 	private final PSOutputStream m_deferredFreeOut;
@@ -524,6 +527,14 @@ public class RWStore implements IStore {
 
         if (fileMetadata == null)
             throw new IllegalArgumentException();
+
+        this.m_minReleaseAge = LongValidator.GTE_ZERO.parse(
+                AbstractTransactionService.Options.MIN_RELEASE_AGE,
+                AbstractTransactionService.Options.DEFAULT_MIN_RELEASE_AGE);
+
+        if (log.isInfoEnabled())
+            log.info(AbstractTransactionService.Options.MIN_RELEASE_AGE + "="
+                    + m_minReleaseAge);
 
         cDefaultMetaBitsSize = Integer.valueOf(fileMetadata.getProperty(
                 Options.META_BITS_SIZE,
@@ -1404,19 +1415,26 @@ public class RWStore implements IStore {
 				freeBlob(addr, sze, context);
 			} else {
 				final Allocator alloc = getBlockByAddress(addr);
-				/*
-				 * There are a few conditions here.  If the context owns the
-				 * allocator and the allocation was made by this context then
-				 * it can be freed immediately.
-				 * The problem comes when the context is null and the allocator
-				 * is NOT owned, BUT there are active AllocationContexts, in this
-				 * situation, the free must ALWAYS be deferred.
-				 */
-				final boolean alwaysDefer = context == null && m_contexts.size() > 0;
-				if (alwaysDefer)
+                /*
+                 * There are a few conditions here. If the context owns the
+                 * allocator and the allocation was made by this context then it
+                 * can be freed immediately. The problem comes when the context
+                 * is null and the allocator is NOT owned, BUT there are active
+                 * AllocationContexts, in this situation, the free must ALWAYS
+                 * be deferred.
+                 * 
+                 * FIXME We need unit tests when MIN_RELEASE_AGE is GT ZERO.
+                 * 
+                 * FIXME We need unit test when MIN_RELEASE_AGE is ZERO AND
+                 * there are open read-only transactions.
+                 */
+                boolean alwaysDefer = m_minReleaseAge > 0L;
+                if (!alwaysDefer)
+                    alwaysDefer = context == null && !m_contexts.isEmpty();
+                if (alwaysDefer)
 					if (log.isDebugEnabled())
 						log.debug("Should defer " + physicalAddress(addr));
-				if (/*alwaysDefer ||*/ !alloc.canImmediatelyFree(addr, sze, context)) {
+				if (alwaysDefer || !alloc.canImmediatelyFree(addr, sze, context)) {
 					deferFree(addr, sze);
 				} else {
 					immediateFree(addr, sze);
@@ -3487,6 +3505,12 @@ public class RWStore implements IStore {
 	
     private ContextAllocation establishContextAllocation(
             final IAllocationContext context) {
+
+        /*
+         * The allocation lock MUST be held to make changes in the membership of
+         * m_contexts atomic with respect to free().
+         */
+        assert m_allocationLock.isHeldByCurrentThread();
         
         ContextAllocation ret = m_contexts.get(context);
         
@@ -3500,8 +3524,9 @@ public class RWStore implements IStore {
                 
             }
         
-            log.warn("Context: ncontexts=" + m_contexts.size() + ", context="
-                    + context);
+            if (log.isInfoEnabled())
+                log.info("Context: ncontexts=" + m_contexts.size()
+                        + ", context=" + context);
             
         }
 
