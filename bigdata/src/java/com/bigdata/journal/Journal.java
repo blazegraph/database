@@ -285,6 +285,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             /**
              * Extended to shutdown the embedded transaction service.
              */
+            @Override
             public void shutdown() {
 
                 ((JournalTransactionService) getTransactionService())
@@ -297,6 +298,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             /**
              * Extended to shutdown the embedded transaction service.
              */
+            @Override
             public void shutdownNow() {
 
                 ((JournalTransactionService) getTransactionService())

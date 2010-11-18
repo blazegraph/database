@@ -851,15 +851,15 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
             try {
 
-                byte[] buf = new byte[1024 * 2048]; // 2Mb buffer of random data
+                final byte[] buf = new byte[1024 * 2048]; // 2Mb buffer of random data
                 r.nextBytes(buf);
                 
-                ByteBuffer bb = ByteBuffer.wrap(buf);
+                final ByteBuffer bb = ByteBuffer.wrap(buf);
 
-                RWStrategy bs = (RWStrategy) store
+                final RWStrategy bs = (RWStrategy) store
                         .getBufferStrategy();
 
-                RWStore rw = bs.getRWStore();
+                final RWStore rw = bs.getRWStore();
                 
                 long faddr = bs.write(bb); // rw.alloc(buf, buf.length);
                 
@@ -870,12 +870,16 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 assertEquals(bb, rdBuf);
                 
                 // now delete the memory
-                bs.delete(faddr); // immediateFree!
-
+                bs.delete(faddr); 
+                
+                // verify immediateFree!
+                assertEquals(0L,bs.getPhysicalAddress(faddr));
+                
+                // allocate another address, might (or might not) be the same.
                 faddr = bs.write(bb); // rw.alloc(buf, buf.length);
                 bb.position(0);
                 
-                System.out.println("Now commit to disk");
+                System.out.println("Now commit to disk (1)");
                 
                 store.commit();
                               
@@ -887,13 +891,26 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
                 // now delete the memory
                 bs.delete(faddr);
+
+                // Must not have been immediately freed.
+                assertNotSame(0L, bs.getPhysicalAddress(faddr));
+
+                /*
+                 * Commit before testing for deferred frees. Since there is a
+                 * prior commit point, we are not allowed to immediately free
+                 * any record from that commit point in order to preserve the
+                 * consistency of the last commit point, so we have to commit
+                 * first then test for deferred frees.
+                 */
+                System.out.println("Now commit to disk (2)");
                 
-                // since deferred frees, we must commit in order to ensure the
-                //	address in invalid, indicating it is available for
                 store.commit();
                 
-                rw.checkDeferredFrees(true, store);
-                
+                // Request release of deferred frees.
+                rw.checkDeferredFrees(true/* freeNow */, store);
+
+                assertEquals(0L, bs.getPhysicalAddress(faddr));
+
                 try {
                 	rdBuf = bs.read(faddr); // should fail with illegal argument
                 	throw new RuntimeException("Fail");
