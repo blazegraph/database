@@ -142,6 +142,15 @@ import com.bigdata.striterator.IChunkedIterator;
  *       within the round. This would imply that we keep per join path limits.
  *       The vertex and edge samples are already aware of the limit at which
  *       they were last sampled so this should not cause any problems there.
+ *       <p>
+ *       A related option would be to deepen the samples only when we are in
+ *       danger of cardinality estimation underflow. E.g., a per-path limit.
+ *       Resampling vertices may only make sense when we increase the limit
+ *       since otherwise we may find a different correlation with the new sample
+ *       but the comparison of paths using one sample base with paths using a
+ *       different sample base in a different round does not carry forward the
+ *       cardinality estimates from the prior round (unless we do something like
+ *       a weighted moving average).
  * 
  * @todo When comparing choices among join paths having fully bound tails where
  *       the estimated cardinality has also gone to zero, we should prefer to
@@ -152,7 +161,7 @@ import com.bigdata.striterator.IChunkedIterator;
  *       those which reach the 1-var vertex. [In order to support this, we would
  *       need a means to indicate that a fully bound access path should use an
  *       index specified by the query optimizer rather than the primary index
- *       for the relation.  In addition, this suggests that we should keep bloom
+ *       for the relation. In addition, this suggests that we should keep bloom
  *       filters for more than just the SPO(C) index in scale-out.]
  * 
  * @todo Examine behavior when we do not have perfect covering indices. This
@@ -187,6 +196,15 @@ public class JoinGraph extends PipelineOp {
 		String LIMIT = JoinGraph.class.getName() + ".limit";
 
 		int DEFAULT_LIMIT = 100;
+
+		/**
+		 * The <i>nedges</i> edges of the join graph having the lowest
+		 * cardinality will be used to generate the initial join paths (default
+		 * {@value #DEFAULT_NEDGES}). This must be a positive integer.
+		 */
+		String NEDGES = JoinGraph.class.getName() + ".nedges";
+
+		int DEFAULT_NEDGES = 2;
 	}
 
 	/**
@@ -204,6 +222,15 @@ public class JoinGraph extends PipelineOp {
 	public int getLimit() {
 
 		return getProperty(Annotations.LIMIT, Annotations.DEFAULT_LIMIT);
+
+	}
+
+	/**
+	 * @see Annotations#NEDGES
+	 */
+	public int getNEdges() {
+
+		return getProperty(Annotations.NEDGES, Annotations.DEFAULT_NEDGES);
 
 	}
 
@@ -542,7 +569,7 @@ public class JoinGraph extends PipelineOp {
 		 * there is an error in the query such that the join will not select
 		 * anything. This is not 100%, merely indicative.
 		 */
-		public final int outputCount;
+		public final long outputCount;
 
 		/**
 		 * The ratio of the #of input samples consumed to the #of output samples
@@ -592,7 +619,9 @@ public class JoinGraph extends PipelineOp {
 				final int sourceSampleLimit,//
 				final int limit,//
 				final int inputCount, //
-				final int outputCount,//
+				final long outputCount,//
+				final double f,
+				final long estimatedCardinality,
 				final IBindingSet[] sample) {
 
 			if (sample == null)
@@ -609,10 +638,10 @@ public class JoinGraph extends PipelineOp {
 
 			this.outputCount = outputCount;
 
-			f = outputCount == 0 ? 0 : (outputCount / (double) inputCount);
-
-			estimatedCardinality = (long) (rangeCount * f);
-
+			this.f = f;
+			
+			this.estimatedCardinality = estimatedCardinality;
+			
 			if (sourceSampleExact && outputCount < limit) {
 				/*
 				 * Note: If the entire source vertex is being fed into the
@@ -1037,20 +1066,55 @@ public class JoinGraph extends PipelineOp {
 
 			if (log.isTraceEnabled())
 				log.trace(joinStats.toString());
-			
+
 			/*
 			 * TODO Improve comments here. See if it is possible to isolate a
 			 * common base class which would simplify the setup of the cutoff
 			 * join and the computation of the sample stats.
 			 */
 
+			// #of solutions in.
+			final int nin = (int) joinStats.inputSolutions.get();
+
+			// #of solutions out.
+			long nout = joinStats.outputSolutions.get();
+
+			// cumulative range count of the sampled access paths.
+			final long sumRangeCount = joinStats.accessPathRangeCount.get();
+
+			if (nin == 1 && nout == limit) {
+				/*
+				 * We are getting [limit] solutions out for one solution in. In
+				 * this case, (nout/nin) is a lower bound for the estimated
+				 * cardinality of the edge. In fact, this condition suggests
+				 * that the upper bound is a must better estimate of the
+				 * cardinality of this join. Therefore, we replace [nout] with
+				 * the sum of the range counts for the as-bound predicates
+				 * considered by the cutoff join.
+				 * 
+				 * For example, consider a join feeding a rangeCount of 16 into
+				 * a rangeCount of 175000. With a limit of 100, we estimated the
+				 * cardinality at 1600L (lower bound). In fact, the cardinality
+				 * is 16*175000. This falsely low estimate can cause solutions
+				 * which are really better to be dropped.
+				 */
+				nout = sumRangeCount;
+
+			}
+
+			final double f = nout == 0 ? 0 : (nout / (double) nin);
+
+			final long estimatedCardinality = (long) (sourceSampleRangeCount * f);
+			
 			final EdgeSample edgeSample = new EdgeSample(
 					sourceSampleRangeCount, //
 					sourceSampleExact, // @todo redundant with sourceSampleLimit
 					sourceSampleLimit, //
 					limit, //
-					(int) joinStats.inputSolutions.get(),//
-					(int) joinStats.outputSolutions.get(), //
+					nin,//
+					nout, //
+					f, //
+					estimatedCardinality, //
 					result.toArray(new IBindingSet[result.size()]));
 
 			if (log.isDebugEnabled())
@@ -1719,19 +1783,25 @@ public class JoinGraph extends PipelineOp {
 		 * @param limit
 		 *            The limit for sampling a vertex and the initial limit for
 		 *            cutoff join evaluation.
+		 * @param nedges
+		 *            The edges in the join graph are sorted in order of
+		 *            increasing cardinality and up to <i>nedges</i> of the
+		 *            edges having the lowest cardinality are used to form the
+		 *            initial set of join paths. For each edge selected to form
+		 *            a join path, the starting vertex will be the vertex of
+		 *            that edge having the lower cardinality.
 		 * 
 		 * @throws Exception
 		 */
 		public Path runtimeOptimizer(final QueryEngine queryEngine,
-				final int limit) throws Exception {
+				final int limit, final int nedges) throws Exception {
 
 			// Setup the join graph.
-			Path[] paths = round0(queryEngine, limit, 2/* nedges */);
+			Path[] paths = round0(queryEngine, limit, nedges);
 
 			/*
-			 * The input paths for the first round have two vertices (one edge
-			 * is two vertices). Each round adds one more vertex, so we have
-			 * three vertices by the end of round 1. We are done once we have
+			 * The initial paths all have one edge, and hence two vertices. Each
+			 * round adds one more vertex to each path. We are done once we have
 			 * generated paths which include all vertices.
 			 * 
 			 * This occurs at round := nvertices - 1
@@ -1795,6 +1865,11 @@ public class JoinGraph extends PipelineOp {
 		 * @param nedges
 		 *            The maximum #of edges to choose. Those having the smallest
 		 *            expected cardinality will be chosen.
+		 * 
+		 * @return An initial set of paths starting from any most <i>nedges</i>.
+		 *         For each of the <i>nedges</i> lowest cardinality edges, the
+		 *         starting vertex will be the vertex with the lowest
+		 *         cardinality for that edge.
 		 * 
 		 * @throws Exception
 		 */
@@ -2489,6 +2564,8 @@ public class JoinGraph extends PipelineOp {
 		private final JGraph g;
 
 		private int limit;
+		
+		private int nedges;
 
 		JoinGraphTask(final BOpContext<IBindingSet> context) {
 
@@ -2499,7 +2576,12 @@ public class JoinGraph extends PipelineOp {
 
 			limit = getLimit();
 
+			nedges = getNEdges();
+
 			if (limit <= 0)
+				throw new IllegalArgumentException();
+
+			if (nedges <= 0)
 				throw new IllegalArgumentException();
 
 			final IPredicate[] v = getVertices();
@@ -2515,7 +2597,7 @@ public class JoinGraph extends PipelineOp {
 
 			// Find the best join path.
 			final Path p = g.runtimeOptimizer(context.getRunningQuery()
-					.getQueryEngine(), limit);
+					.getQueryEngine(), limit, nedges);
 
 			// Factory avoids reuse of bopIds assigned to the predicates.
 			final BOpIdFactory idFactory = new BOpIdFactory();

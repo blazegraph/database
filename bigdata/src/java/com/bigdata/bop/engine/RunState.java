@@ -778,6 +778,7 @@ class RunState {
         sb.append("\tunitsOut");
         sb.append("\taccessPathDups");
         sb.append("\taccessPathCount");
+        sb.append("\taccessPathRangeCount");
         sb.append("\taccessPathChunksIn");
         sb.append("\taccessPathUnitsIn");
         //{chunksIn=1,unitsIn=100,chunksOut=4,unitsOut=313,accessPathDups=0,accessPathCount=100,chunkCount=100,elementCount=313}
@@ -928,6 +929,8 @@ class RunState {
 				sb.append(t.accessPathDups.get());
 				sb.append('\t');
 				sb.append(t.accessPathCount.get());
+				sb.append('\t');
+				sb.append(t.accessPathRangeCount.get());
 				sb.append('\t');
 				sb.append(t.accessPathChunksIn.get());
 				sb.append('\t');

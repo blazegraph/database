@@ -41,6 +41,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -114,7 +115,7 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
     final private AtomicLong deadline = new AtomicLong(Long.MAX_VALUE);
 
 	/**
-	 * The timestamp(ms) when the query begins to execute.
+	 * The timestamp (ms) when the query begins to execute.
 	 */
 	final private AtomicLong startTime = new AtomicLong(System
 			.currentTimeMillis());
@@ -171,10 +172,91 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
     }
 
 	/**
-	 * The maximum number of operator tasks which may be concurrently executor
+	 * The maximum number of operator tasks which may be concurrently executed
 	 * for a given (bopId,shardId).
+	 * 
+	 * @see QueryEngineTestAnnotations#MAX_CONCURRENT_TASKS_PER_OPERATOR_AND_SHARD
 	 */
     final private int maxConcurrentTasksPerOperatorAndShard;
+
+//	/**
+//	 * The maximum #of concurrent tasks for this query across all operators and
+//	 * shards.
+//	 * 
+//	 * Note: This is not a safe option and MUST be removed. It is possible for
+//	 * N-1 tasks to backup with the Nth task not running due to concurrent
+//	 * execution of some of the N-t tasks.
+//	 */
+//	final private int maxConcurrentTasks = 10;
+
+	/*
+	 * FIXME Explore the use of this semaphore to limit the maximum #of messages
+	 * further. (Note that placing a limit on messages would allow us to buffer
+	 * potentially many chunks. That could be solved by making LocalChunkMessage
+	 * transparent in terms of the #of chunks or _binding_sets_ which it is
+	 * carrying, but let's take this one step at a time).
+	 * 
+	 * The first issue is ensuring that the query continue to make progress when
+	 * a semaphore with a limited #of permits is introduced. This is because the
+	 * ChunkFutureTask only attempts to schedule the next task for a given
+	 * (bopId,shardId) but we could have failed to accept outstanding work for
+	 * any of a number of operator/shard combinations. Likewise, the QueryEngine
+	 * tells the RunningQuery to schedule work each time a message is dropped
+	 * onto the QueryEngine, but the signal to execute more work is lost if the
+	 * permits were not available immediately.
+	 * 
+	 * One possibility would be to have a delayed retry. Another would be to
+	 * have ChunkTaskFuture try to run *any* messages, not just messages for the
+	 * same (bopId,shardId).
+	 * 
+	 * Also, when scheduling work, there needs to be some bias towards the
+	 * downstream operators in the query plan in order to ensure that they get a
+	 * chance to clear work from upstream operators. This suggests that we might
+	 * carry an order[] and use it to scan the work queue -- or make the work
+	 * queue a priority heap using the order[] to place a primary sort over the
+	 * bopIds in terms of the evaluation order and letting the shardIds fall in
+	 * increasing shard order so we have a total order for the priority heap (a
+	 * total order may also require a tie breaker, but I think that the priority
+	 * heap allows ties).
+	 * 
+	 * This concept of memory overhead and permits would be associated with the
+	 * workload waiting on a given node for processing. (In scale-out, we do not
+	 * care how much data is moving in the cluster, only how much data is
+	 * challenging an individual machine).
+	 * 
+	 * This emphasize again why we need to get the data off of the Java heap.
+	 * 
+	 * The same concept should apply for chained buffers.  Maybe one way to do
+	 * this is to allocate a fixed budget to each query for the Java heap and
+	 * the C heap and then the query blocks or goes to disk.
+	 */
+//	/**
+//	 * The maximum number of binding sets which may be outstanding before a task
+//	 * which is producing binding sets will block. This value may be used to
+//	 * limit the memory demand of a query in which some operators produce
+//	 * binding sets faster than other operators can consume them.
+//	 * 
+//	 * @todo This could be generalized to consider the Java heap separately from
+//	 *       the native heap as we get into the use of native ByteBuffers to
+//	 *       buffer intermediate results.
+//	 * 
+//	 * @todo This is expressed in terms of messages and not {@link IBindingSet}s
+//	 *       because the {@link LocalChunkMessage} does not self-report the #of
+//	 *       {@link IBindingSet}s (or chunks).
+//	 */
+//	final private int maxOutstandingMessageCount = 100;
+//
+//	/**
+//	 * A counting semaphore used to limit the #of outstanding binding set chunks
+//	 * which may be buffered before a producer will block when trying to emit
+//	 * another chunk.
+//	 * 
+//	 * @see HandleChunkBuffer#outputChunk(IBindingSet[])
+//	 * @see #scheduleNext(BSBundle)
+//	 * 
+//	 * @see #maxOutstandingMessageCount
+//	 */
+//	final private Semaphore outstandingMessageSemaphore = new Semaphore(maxOutstandingMessageCount);
     
     /**
      * A collection of (bopId,partitionId) keys mapped onto a collection of
@@ -471,6 +553,8 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
         this.bopIndex = BOpUtility.getIndex(query);
 
+
+//		this.maxConcurrentTasksPerOperatorAndShard = 300;
 		this.maxConcurrentTasksPerOperatorAndShard = query
 				.getProperty(
 						QueryEngineTestAnnotations.MAX_CONCURRENT_TASKS_PER_OPERATOR_AND_SHARD,
@@ -1203,6 +1287,33 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 					return false;
 				}
 			}
+//			if (runState.getTotalRunningCount() > maxConcurrentTasks) {
+//				// Too many already running.
+//				return false;
+//			}
+//			{
+//				/*
+//				 * Verify that we can acquire sufficient permits to do some
+//				 * work.
+//				 */
+//				final BlockingQueue<IChunkMessage<IBindingSet>> queue = operatorQueues
+//						.get(bundle);
+//				if (queue == null || queue.isEmpty()) {
+//					// No work.
+//					return false;
+//				}
+//				// The queue could be increased, but this will be its minimum size.
+//				final int minQueueSize = queue.size();
+//				if(!outstandingMessageSemaphore.tryAcquire(minQueueSize)) {
+//					// Not enough permits.
+//					System.err.println("Permits: required=" + minQueueSize
+//							+ ", available="
+//							+ outstandingMessageSemaphore.availablePermits()
+//							+ ", bundle=" + bundle);
+//					return false;
+//				}
+//			
+//			}
 			// Remove the work queue for that (bopId,partitionId).
             final BlockingQueue<IChunkMessage<IBindingSet>> queue = operatorQueues
                     .remove(bundle);
@@ -1210,7 +1321,7 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                 // no work
                 return false;
             }
-            // Drain the work queue.
+            // Drain the work queue for that (bopId,partitionId).
             final List<IChunkMessage<IBindingSet>> messages = new LinkedList<IChunkMessage<IBindingSet>>();
             queue.drainTo(messages);
             final int nmessages = messages.size();
@@ -1218,9 +1329,11 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
              * Combine the messages into a single source to be consumed by a
              * task.
              */
+            int nchunks = 1;
             final IMultiSourceAsynchronousIterator<IBindingSet[]> source = new MultiSourceSequentialAsynchronousIterator<IBindingSet[]>(messages.remove(0).getChunkAccessor().iterator());
             for (IChunkMessage<IBindingSet> msg : messages) {
                 source.add(msg.getChunkAccessor().iterator());
+                nchunks++;
             }
 			/*
 			 * Create task to consume that source.
@@ -1852,13 +1965,23 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
          */
         private void outputChunk(final IBindingSet[] e) {
 
-            stats.unitsOut.add(((Object[]) e).length);
+        	final int chunkSize = e.length;
+        	
+            stats.unitsOut.add(chunkSize);
             
             stats.chunksOut.increment();
             
-            sinkMessagesOut.addAndGet(q.getChunkHandler().handleChunk(q, bopId,
-                    sinkId, e));
+            final int messagesOut = q.getChunkHandler().handleChunk(q, bopId,
+                    sinkId, e);
             
+            sinkMessagesOut.addAndGet(messagesOut);
+            
+//        	try {
+//				q.outstandingMessageSemaphore.acquire();
+//			} catch (InterruptedException e1) {
+//				throw new RuntimeException(e1);
+//			}
+        	
         }
         
         /**
