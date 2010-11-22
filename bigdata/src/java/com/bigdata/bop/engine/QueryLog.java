@@ -158,6 +158,7 @@ public class QueryLog {
         sb.append("\tjoinRatio"); // expansion rate multipler in the solution count.
         sb.append("\taccessPathDups");
         sb.append("\taccessPathCount");
+        sb.append("\taccessPathRangeCount");
         sb.append("\taccessPathChunksIn");
         sb.append("\taccessPathUnitsIn");
         // dynamics based on elapsed wall clock time.
@@ -336,6 +337,8 @@ public class QueryLog {
 		sb.append(stats.accessPathDups.get());
 		sb.append('\t');
 		sb.append(stats.accessPathCount.get());
+		sb.append('\t');
+		sb.append(stats.accessPathRangeCount.get());
 		sb.append('\t');
 		sb.append(stats.accessPathChunksIn.get());
 		sb.append('\t');

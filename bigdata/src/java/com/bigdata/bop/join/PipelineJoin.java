@@ -218,6 +218,12 @@ public class PipelineJoin<E> extends PipelineOp implements
 		public final CAT accessPathCount = new CAT();
 
 		/**
+		 * The running sum of the range counts of the accepted as-bound access
+		 * paths.
+		 */
+		public final CAT accessPathRangeCount = new CAT();
+
+		/**
 		 * The #of input solutions consumed (not just accepted).
 		 * <p>
 		 * This counter is highly correlated with {@link BOpStats#unitsIn} but
@@ -333,6 +339,8 @@ public class PipelineJoin<E> extends PipelineOp implements
 
                 accessPathCount.add(t.accessPathCount.get());
 
+                accessPathRangeCount.add(t.accessPathRangeCount.get());
+
                 accessPathChunksIn.add(t.accessPathChunksIn.get());
 
                 accessPathUnitsIn.add(t.accessPathUnitsIn.get());
@@ -358,6 +366,7 @@ public class PipelineJoin<E> extends PipelineOp implements
         protected void toString(final StringBuilder sb) {
             sb.append(",accessPathDups=" + accessPathDups.get());
             sb.append(",accessPathCount=" + accessPathCount.get());
+            sb.append(",accessPathRangeCount=" + accessPathRangeCount.get());
             sb.append(",accessPathChunksIn=" + accessPathChunksIn.get());
             sb.append(",accessPathUnitsIn=" + accessPathUnitsIn.get());
             sb.append(",inputSolutions=" + inputSolutions.get());
@@ -1562,6 +1571,10 @@ public class PipelineJoin<E> extends PipelineOp implements
 				
                 stats.accessPathCount.increment();
 
+                // the range count of the as-bound access path (should be cached).
+				stats.accessPathRangeCount.add(accessPath
+						.rangeCount(false/* exact */));
+                
                 if (accessPath.getPredicate() instanceof IStarJoin<?>) {
 
                     handleStarJoin();
