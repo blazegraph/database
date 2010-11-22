@@ -95,18 +95,18 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         super(name);
     }
 
-    /**
-     * Verify that {@link AbstractTripleStore#isLiteral(long)} and friends all
-     * reported <code>false</code> for {@link IRawTripleStore#NULL}.
-     */
-    public void test_bitFlagsReportFalseForNULL() {
-
-//        assertFalse(VTE.isStatement(TermId.NULL));
-//        assertFalse(VTE.isLiteral(TermId.NULL));
-//        assertFalse(VTE.isURI(TermId.NULL));
-//        assertFalse(VTE.isBNode(TermId.NULL));
-
-    }
+//    /**
+//     * Verify that {@link AbstractTripleStore#isLiteral(long)} and friends all
+//     * reported <code>false</code> for {@link IRawTripleStore#NULL}.
+//     */
+//    public void test_bitFlagsReportFalseForNULL() {
+//
+////        assertFalse(VTE.isStatement(TermId.NULL));
+////        assertFalse(VTE.isLiteral(TermId.NULL));
+////        assertFalse(VTE.isURI(TermId.NULL));
+////        assertFalse(VTE.isBNode(TermId.NULL));
+//
+//    }
     
     /**
      * Test helper verifies that the term is not in the lexicon, adds the term
