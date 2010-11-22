@@ -383,10 +383,10 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             final int minimumChunkSize, final long chunkTimeout,
             final TimeUnit chunkTimeoutUnit, final boolean ordered) {
     
-		if (minimumChunkSize >= 1000 || queue.remainingCapacity() >= 1000)
-			log.fatal(new RuntimeException("queueCapacity="
-					+ queue.remainingCapacity() + ", minimumChunkSize="
-					+ minimumChunkSize));
+//		if (minimumChunkSize >= 1000 || queue.remainingCapacity() >= 1000)
+//			log.fatal(new RuntimeException("queueCapacity="
+//					+ queue.remainingCapacity() + ", minimumChunkSize="
+//					+ minimumChunkSize));
     	
 		if (queue == null)
             throw new IllegalArgumentException();
