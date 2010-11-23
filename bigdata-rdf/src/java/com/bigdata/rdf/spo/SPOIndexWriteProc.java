@@ -29,6 +29,7 @@ package com.bigdata.rdf.spo;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.Arrays;
 import org.apache.log4j.Logger;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
@@ -43,6 +44,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.ISPO.ModifiedEnum;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
@@ -190,7 +192,12 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 //                .endsWith(SPOKeyOrder.SPO.getIndexName()) : false;
 
         // Array used to report by which statements were modified by this operation.
-        final boolean[] modified = reportMutation ? new boolean[n] : null;
+        final ModifiedEnum[] modified = reportMutation ? new ModifiedEnum[n] : null;
+        if (reportMutation) {
+            for (int i = 0; i < n; i++) {
+                modified[i] = ModifiedEnum.NONE;
+            }
+        }
                 
         for (int i = 0; i < n; i++) {
 
@@ -255,7 +262,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                 writeCount++;
 
                 if (reportMutation)
-                    modified[i] = true;
+                    modified[i] = ModifiedEnum.INSERTED;
 
             } else {
 
@@ -291,7 +298,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                         writeCount++;
 
                         if (reportMutation)
-                            modified[i] = true;
+                            modified[i] = ModifiedEnum.UPDATED;
 
                     }
 
@@ -337,7 +344,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                         writeCount++;
 
                         if (reportMutation)
-                            modified[i] = true;
+                            modified[i] = ModifiedEnum.UPDATED;
 
                     }
 
@@ -351,9 +358,26 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
             log.info("Wrote " + writeCount + " SPOs on ndx="
                     + ndx.getIndexMetadata().getName());
 
-        return reportMutation ? new ResultBitBuffer(n, modified, writeCount)
-                : Long.valueOf(writeCount);
-
+        if (reportMutation) {
+            
+            final boolean[] b = ModifiedEnum.toBooleans(modified, n);
+            
+            int onCount = 0;
+            for (int i = 0; i < b.length; i++) {
+                if (b[i])
+                    onCount++;
+            }
+            
+            ResultBitBuffer rbb = new ResultBitBuffer(b.length, b, onCount);
+            
+            return rbb;
+            
+        } else {
+            
+            return Long.valueOf(writeCount);
+            
+        }
+        
     }
 
     /**

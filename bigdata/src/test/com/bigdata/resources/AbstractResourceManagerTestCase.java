@@ -144,21 +144,21 @@ public class AbstractResourceManagerTestCase extends
 
             final private UUID dataServiceUUID = UUID.randomUUID();
             
-            @Override
+//            @Override
             public IBigdataFederation getFederation() {
                 
                 return fed;
                 
             }
             
-            @Override
+//            @Override
             public DataService getDataService() {
                 
                 throw new UnsupportedOperationException();
                 
             }
             
-            @Override
+//            @Override
             public UUID getDataServiceUUID() {
                 
                 return dataServiceUUID;

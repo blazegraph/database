@@ -27,6 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.inf;
 
+import java.util.Map;
+import com.bigdata.rdf.changesets.IChangeLog;
+import com.bigdata.rdf.changesets.StatementWriter;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -49,6 +54,11 @@ public class SPORetractionBuffer extends AbstractSPOBuffer {
 
     private final AbstractTripleStore store;
     private final boolean computeClosureForStatementIdentifiers;
+
+    /**
+     * Optional change log for change notification.
+     */
+    protected final IChangeLog changeLog;
     
     /**
      * @param store
@@ -63,6 +73,27 @@ public class SPORetractionBuffer extends AbstractSPOBuffer {
     public SPORetractionBuffer(AbstractTripleStore store, int capacity,
             boolean computeClosureForStatementIdentifiers) {
         
+        this(store, capacity, computeClosureForStatementIdentifiers,
+                null/* changeLog */);
+        
+    }
+        
+    /**
+     * @param store
+     *            The database from which the statement will be removed when the
+     *            buffer is {@link #flush()}ed.
+     * @param capacity
+     *            The capacity of the retraction buffer.
+     * @param computeClosureForStatementIdentifiers
+     *            See
+     *            {@link AbstractTripleStore#removeStatements(com.bigdata.rdf.spo.ISPOIterator, boolean)}
+     * @param changeLog
+     *            optional change log for change notification
+     */
+    public SPORetractionBuffer(AbstractTripleStore store, int capacity,
+            boolean computeClosureForStatementIdentifiers,
+            final IChangeLog changeLog) {
+        
         super(store, null/*filter*/, capacity);
         
         if (store == null)
@@ -72,14 +103,31 @@ public class SPORetractionBuffer extends AbstractSPOBuffer {
         
         this.computeClosureForStatementIdentifiers = computeClosureForStatementIdentifiers;
         
+        this.changeLog = changeLog;
+        
     }
 
     public int flush() {
 
         if (isEmpty()) return 0;
         
-        long n = store.removeStatements(new ChunkedArrayIterator<ISPO>(numStmts,stmts,
+        final long n;
+        
+        if (changeLog == null) {
+
+            n = store.removeStatements(new ChunkedArrayIterator<ISPO>(numStmts,stmts,
                 null/*keyOrder*/), computeClosureForStatementIdentifiers);
+            
+        } else {
+            
+            n = StatementWriter.removeStatements(
+                    store, 
+                    new ChunkedArrayIterator<ISPO>(
+                            numStmts,stmts,null/*keyOrder*/),
+                    computeClosureForStatementIdentifiers,
+                    changeLog);
+            
+        }
 
         // reset the counter.
         numStmts = 0;
