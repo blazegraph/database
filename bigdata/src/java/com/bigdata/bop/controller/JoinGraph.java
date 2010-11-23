@@ -131,10 +131,37 @@ import com.bigdata.striterator.IChunkedIterator;
  *       query optimizer SHOULD pay attention to these things and exploit their
  *       conditional selectivity for the query plan.]
  * 
- * @todo When there are optional join graphs, are we going to handle that by
- *       materializing a sample (or all) of the joins feeding that join graph
- *       and then apply the runtime optimizer to the optional join graph,
- *       getting out a sample to feed onto any downstream join graph?
+ * @todo Handle optional join graphs by first applying the runtime optimizer to
+ *       the main join graph and obtaining a sample for the selected join path.
+ *       That sample will then be feed into the the optional join graph in order
+ *       to optimize the join order within the optional join graph (a join order
+ *       which is selective in the optional join graph is better since it will
+ *       result in faster rejections of intermediate results and hence do less
+ *       work).
+ *       <p>
+ *       This is very much related to accepting a collection of non-empty
+ *       binding sets when running the join graph. However, optional join graph
+ *       should be presented in combination with the original join graph and the
+ *       starting paths must be constrained to have the selected join path for
+ *       the original join graph as a prefix. With this setup, the original join
+ *       graph has been locked in to a specific join path and the sampling of
+ *       edges and vertices for the optional join graph can proceed normally.
+ *       <p>
+ *       True optionals will always be appended as part of the "tail plan" for
+ *       any join graph and can not be optimized as each optional join must run
+ *       regardless (as long as the intermediate solution survives the
+ *       non-optional joins).
+ * 
+ * @todo There are two cases where a join graph must be optimized against a
+ *       specific set of inputs. In one case, it is a sample (this is how
+ *       optimization of an optional join group proceeds per above). In the
+ *       other case, the set of inputs is fixed and is provided instead of a
+ *       single empty binding set as the starting condition. This second case is
+ *       actually a bit more complicated since we can not use a random sample of
+ *       vertices unless the do not share any variables with the initial binding
+ *       sets. When there is a shared variable, we need to do a cutoff join of
+ *       the edge with the initial binding sets. When there is not a shared
+ *       variable, we can sample the vertex and then do a cutoff join.
  * 
  * @todo When we run into a cardinality estimation underflow (the expected
  *       cardinality goes to zero) we could double the sample size for just
