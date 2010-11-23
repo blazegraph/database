@@ -57,6 +57,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.bigdata.rdf.sail;
 
+import info.aduna.collections.iterators.EmptyIterator;
 import info.aduna.iteration.CloseableIteration;
 
 import java.io.IOException;
@@ -118,6 +119,11 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.changesets.ChangeRecord;
+import com.bigdata.rdf.changesets.IChangeLog;
+import com.bigdata.rdf.changesets.IChangeRecord;
+import com.bigdata.rdf.changesets.StatementWriter;
+import com.bigdata.rdf.changesets.IChangeRecord.ChangeAction;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -1066,6 +1072,7 @@ public class BigdataSail extends SailBase implements Sail {
      * @todo many of the stores can support concurrent writers, but there is a
      *       requirement to serialize writers when truth maintenance is enabled.
      */
+    @Override
     protected NotifyingSailConnection getConnectionInternal() 
         throws SailException {
 
@@ -1439,11 +1446,13 @@ public class BigdataSail extends SailBase implements Sail {
                     assertBuffer = new StatementBuffer<Statement>(database,
                             bufferCapacity);
 
+                    assertBuffer.setChangeLog(changeLog);
+
                 }
 
                 // FIXME bnodes : must also track the reverse mapping [bnodes2].
                 assertBuffer.setBNodeMap(bnodes);
-
+                
             }
 
             return assertBuffer;
@@ -2274,7 +2283,7 @@ public class BigdataSail extends SailBase implements Sail {
             }
 
             // #of explicit statements removed.
-            final long n;
+            long n = 0;
 
             if (getTruthMaintenance()) {
 
@@ -2315,7 +2324,51 @@ public class BigdataSail extends SailBase implements Sail {
                  * buffered).
                  */
                 
-                n = database.removeStatements(s, p, o, c);
+                if (changeLog == null) {
+                    
+                    n = database.removeStatements(s, p, o, c);
+                    
+                } else {
+                
+                    final IChunkedOrderedIterator<ISPO> itr = 
+                        database.computeClosureForStatementIdentifiers(
+                                database.getAccessPath(s, p, o, c).iterator());
+                    
+                    // no need to compute closure for sids since we just did it
+                    n = StatementWriter.removeStatements(database, itr, 
+                            false/* computeClosureForStatementIdentifiers */,
+                            changeLog);
+                    
+//                    final IAccessPath<ISPO> ap = 
+//                        database.getAccessPath(s, p, o, c);
+//    
+//                    final IChunkedOrderedIterator<ISPO> itr = ap.iterator();
+//                    
+//                    if (itr.hasNext()) {
+//                        
+//                        final BigdataStatementIteratorImpl itr2 = 
+//                            new BigdataStatementIteratorImpl(database, bnodes2, itr)
+//                                .start(database.getExecutorService()); 
+//                        
+//                        final BigdataStatement[] stmts = 
+//                            new BigdataStatement[database.getChunkCapacity()];
+//                        
+//                        int i = 0;
+//                        while (i < stmts.length && itr2.hasNext()) {
+//                            stmts[i++] = itr2.next();
+//                            if (i == stmts.length) {
+//                                // process stmts[]
+//                                n += removeAndNotify(stmts, i);
+//                                i = 0;
+//                            }
+//                        }
+//                        if (i > 0) {
+//                            n += removeAndNotify(stmts, i);
+//                        }
+//                        
+//                    }
+                    
+                }
 
             }
 
@@ -2323,6 +2376,69 @@ public class BigdataSail extends SailBase implements Sail {
             return (int) Math.min(Integer.MAX_VALUE, n);
             
         }
+        
+//        private long removeAndNotify(final BigdataStatement[] stmts, final int numStmts) {
+//            
+//            final SPO[] tmp = new SPO[numStmts];
+//
+//            for (int i = 0; i < tmp.length; i++) {
+//
+//                final BigdataStatement stmt = stmts[i];
+//                
+//                /*
+//                 * Note: context position is not passed when statement identifiers
+//                 * are in use since the statement identifier is assigned based on
+//                 * the {s,p,o} triple.
+//                 */
+//
+//                final SPO spo = new SPO(stmt);
+//
+//                if (log.isDebugEnabled())
+//                    log.debug("adding: " + stmt.toString() + " (" + spo + ")");
+//                
+//                if(!spo.isFullyBound()) {
+//                    
+//                    throw new AssertionError("Not fully bound? : " + spo);
+//                    
+//                }
+//                
+//                tmp[i] = spo;
+//
+//            }
+//            
+//            /*
+//             * Note: When handling statement identifiers, we clone tmp[] to avoid a
+//             * side-effect on its order so that we can unify the assigned statement
+//             * identifiers below.
+//             * 
+//             * Note: In order to report back the [ISPO#isModified()] flag, we also
+//             * need to clone tmp[] to avoid a side effect on its order. Therefore we
+//             * now always clone tmp[].
+//             */
+////            final long nwritten = writeSPOs(sids ? tmp.clone() : tmp, numStmts);
+//            final long nwritten = database.removeStatements(tmp.clone(), numStmts);
+//
+//            // Copy the state of the isModified() flag
+//            {
+//
+//                for (int i = 0; i < numStmts; i++) {
+//
+//                    if (tmp[i].isModified()) {
+//
+//                        stmts[i].setModified(true);
+//                        
+//                        changeLog.changeEvent(
+//                                new ChangeRecord(stmts[i], ChangeAction.REMOVED));
+//
+//                    }
+//                    
+//                }
+//                
+//            }
+//            
+//            return nwritten;
+//            
+//        }
 
         public synchronized CloseableIteration<? extends Resource, SailException> getContextIDs()
                 throws SailException {
@@ -2416,6 +2532,12 @@ public class BigdataSail extends SailBase implements Sail {
             // discard the write set.
             database.abort();
             
+            if (changeLog != null) {
+                
+                changeLog.transactionAborted();
+                
+            }
+            
         }
         
         /**
@@ -2440,7 +2562,28 @@ public class BigdataSail extends SailBase implements Sail {
             
             database.commit();
             
+            if (changeLog != null) {
+                
+                changeLog.transactionCommited();
+                
+            }
+            
         }
+        
+//        /**
+//         * Commit the write set, providing detailed feedback on the change set 
+//         * that occurred as a result of this commit.
+//         * 
+//         * @return
+//         *          an iterator over a set of {@link IChangeRecord}s.
+//         */
+//        public synchronized Iterator<IChangeRecord> commit2() throws SailException {
+//
+//            commit();
+//            
+//            return new EmptyIterator<IChangeRecord>();
+//            
+//        }
 
         final public boolean isOpen() throws SailException {
 
@@ -2562,7 +2705,9 @@ public class BigdataSail extends SailBase implements Sail {
                 if(getTruthMaintenance()) {
 
                     // do TM, writing on the database.
-                    tm.assertAll((TempTripleStore)assertBuffer.getStatementStore());
+                    tm.assertAll(
+                            (TempTripleStore)assertBuffer.getStatementStore(), 
+                            changeLog);
 
                     // must be reallocated on demand.
                     assertBuffer = null;
@@ -2579,7 +2724,8 @@ public class BigdataSail extends SailBase implements Sail {
                 if(getTruthMaintenance()) {
                 
                     // do TM, writing on the database.
-                    tm.retractAll((TempTripleStore)retractBuffer.getStatementStore());
+                    tm.retractAll((TempTripleStore)retractBuffer.getStatementStore(),
+                            changeLog);
 
                     // must be re-allocated on demand.
                     retractBuffer = null;
@@ -3300,6 +3446,26 @@ public class BigdataSail extends SailBase implements Sail {
             return new Object[] { dataset, bindings };
 
         }
+        
+        /**
+         * Set the change log on the SAIL connection.  See {@link IChangeLog} 
+         * and {@link IChangeRecord}.
+         * 
+         * @param log
+         *          the change log
+         */
+        public void setChangeLog(final IChangeLog changeLog) {
+            
+            this.changeLog = changeLog;
+            
+            if (assertBuffer != null  && !getTruthMaintenance()) {
+                
+                assertBuffer.setChangeLog(changeLog);
+                
+            }
+        }
+        
+        private IChangeLog changeLog;
 
     }
    

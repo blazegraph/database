@@ -240,7 +240,7 @@ public interface ISPO {
      * Modification can indicate that the statement was inserted, retracted, or
      * had its associated {@link StatementEnum} in the database updated.
      */
-    public void setModified(boolean modified);
+    public void setModified(ModifiedEnum modified);
 
     /**
      * Return the state of the transient <i>modified</i> flag. This flag
@@ -265,6 +265,8 @@ public interface ISPO {
      *       Because this information is set at a low-level it can not currently
      *       be used in combination with truth maintenance mechanisms.
      */
+    public ModifiedEnum getModified();
+    
     public boolean isModified();
 
     /**
@@ -294,5 +296,60 @@ public interface ISPO {
      *            The database whose lexicon will be used.
      */
     public String toString(IRawTripleStore db);
+    
+    public enum ModifiedEnum {
+        
+        INSERTED, REMOVED, UPDATED, NONE;
+        
+        public static boolean[] toBooleans(final ModifiedEnum[] modified, final int n) {
+            
+            final boolean[] b = new boolean[n*2];
+            for (int i = 0; i < n; i++) {
+                switch(modified[i]) {
+                case INSERTED:
+                    b[i*2] = true;
+                    b[i*2+1] = false;
+                    break;
+                case REMOVED:
+                    b[i*2] = false;
+                    b[i*2+1] = true;
+                    break;
+                case UPDATED:
+                    b[i*2] = true;
+                    b[i*2+1] = true;
+                    break;
+                case NONE:
+                default:
+                    b[i*2] = false;
+                    b[i*2+1] = false;
+                    break;
+                }
+            }
+            
+            return b;
+            
+        }
+        
+        public static ModifiedEnum[] fromBooleans(final boolean[] b, final int n) {
+            
+            assert n < b.length && n % 2 == 0;
+            
+            final ModifiedEnum[] m = new ModifiedEnum[n/2];
+            for (int i = 0; i < n; i+=2) {
+                if (b[i] && !b[i+1])
+                    m[i/2] = INSERTED;
+                else if (!b[i] && b[i+1])
+                    m[i/2] = REMOVED;
+                else if (b[i] && b[i+1])
+                    m[i/2] = UPDATED;
+                else
+                    m[i/2] = NONE;
+            }
+            
+            return m;
+            
+        }
+        
+    }
 
 }

@@ -697,7 +697,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 				 * Comparator puts the entries into descending order by the query
 				 * execution time (longest running queries are first).
 				 */
-				@Override
+//				@Override
 				public int compare(Long o1, Long o2) {
 					if(o1.longValue()<o2.longValue()) return 1;
 					if(o1.longValue()>o2.longValue()) return -1;

@@ -12,6 +12,7 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBufferHandler;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.rdf.inf.Justification;
+import com.bigdata.rdf.spo.ISPO.ModifiedEnum;
 
 /**
  * Class writes on a statement index, removing the specified statements (batch
@@ -183,7 +184,7 @@ public class SPOIndexRemover implements Callable<Long> {
             final boolean[] bits = modified.getResult();
             
             writeCount = modified.getOnCount();
-
+            
             for (int i = 0; i < numStmts; i++) {
 
                 if (bits[i]) {
@@ -198,8 +199,8 @@ public class SPOIndexRemover implements Callable<Long> {
                      * explicitly cleared it in between those writes).
                      */
                     
-                    a[i].setModified(bits[i]);
-
+                    a[i].setModified(ModifiedEnum.REMOVED);
+                    
                 }
 
             }

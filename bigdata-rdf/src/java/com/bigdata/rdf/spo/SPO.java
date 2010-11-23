@@ -88,7 +88,8 @@ public class SPO implements ISPO {
      */
     private transient boolean override = false;
     
-    private transient boolean modified = false;
+//    private transient boolean modified = false;
+    private transient ModifiedEnum modified = ModifiedEnum.NONE;
 
     final public IV get(final int index) {
         switch(index) {
@@ -621,7 +622,7 @@ public class SPO implements ISPO {
                 + (c == null ? "" : ", " + toString(c))
                 + (type == null ? "" : " : " + type
                         + (override ? ", override" : ""))
-                + (modified ? ", modified" : "") + " >";
+                + (isModified() ? ", modified ("+modified+")" : "") + " >";
 
     }
 
@@ -670,7 +671,7 @@ public class SPO implements ISPO {
                 t = "Unknown     ";
             }
 
-            return t + (modified ? "(*)" : "") + " : "
+            return t + (isModified() ? "(*)" : "") + " : "
                     + store.toString(s, p, o, c);
 
         } else {
@@ -713,14 +714,20 @@ public class SPO implements ISPO {
 
     public boolean isModified() {
         
-        return modified;
+        return modified != ModifiedEnum.NONE;
         
     }
 
-    public void setModified(final boolean modified) {
+    public void setModified(final ModifiedEnum modified) {
 
         this.modified = modified;
 
+    }
+    
+    public ModifiedEnum getModified() {
+        
+        return modified;
+        
     }
 
 }

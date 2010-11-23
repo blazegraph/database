@@ -274,8 +274,8 @@ public abstract class ProxyBigdataSailTestCase
         return bindingSet;
     }
     
-    protected void compare(final TupleQueryResult result,
-            final Collection<BindingSet> answer)
+    protected void compare(final TupleQueryResult actual,
+            final Collection<BindingSet> expected)
             throws QueryEvaluationException {
 
         try {
@@ -285,13 +285,13 @@ public abstract class ProxyBigdataSailTestCase
     
             int resultCount = 0;
             int nmatched = 0;
-            while (result.hasNext()) {
-                BindingSet bindingSet = result.next();
+            while (actual.hasNext()) {
+                BindingSet bindingSet = actual.next();
                 resultCount++;
                 boolean match = false;
                 if(log.isInfoEnabled())
                     log.info(bindingSet);
-                Iterator<BindingSet> it = answer.iterator();
+                Iterator<BindingSet> it = expected.iterator();
                 while (it.hasNext()) {
                     if (it.next().equals(bindingSet)) {
                         it.remove();
@@ -304,7 +304,7 @@ public abstract class ProxyBigdataSailTestCase
                     extraResults.add(bindingSet);
                 }
             }
-            missingResults = answer;
+            missingResults = expected;
     
             for (BindingSet bs : extraResults) {
                 if (log.isInfoEnabled()) {
@@ -326,7 +326,7 @@ public abstract class ProxyBigdataSailTestCase
 
         } finally {
             
-            result.close();
+            actual.close();
             
         }
         
