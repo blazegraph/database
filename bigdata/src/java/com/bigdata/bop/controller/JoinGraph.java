@@ -2650,7 +2650,7 @@ public class JoinGraph extends PipelineOp {
 
 		private static final transient Comparator<Vertex> INSTANCE = new BOpIdComparator();
 
-		@Override
+//		@Override
 		public int compare(final Vertex o1, final Vertex o2) {
 			final int id1 = o1.pred.getId();
 			final int id2 = o2.pred.getId();
@@ -2674,7 +2674,7 @@ public class JoinGraph extends PipelineOp {
 
 		public static final transient Comparator<Edge> INSTANCE = new EstimatedEdgeCardinalityComparator();
 
-		@Override
+//		@Override
 		public int compare(final Edge o1, final Edge o2) {
 			if (o1.sample == null && o2.sample == null) {
 				// Neither edge is weighted.
