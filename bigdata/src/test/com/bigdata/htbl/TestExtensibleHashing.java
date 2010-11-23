@@ -34,14 +34,12 @@ import junit.framework.TestCase2;
 /**
  * Test suite for extensible hashing.
  * 
- * <br>
- * 
  * @todo Persistence capable hash table for high volume hash joins. The data
  *       will be "rows" in a "relation" modeled using binding sets. We can use
  *       dense encoding of these rows since they have a fixed schema (some
  *       columns may allow nulls). There should also be a relationship to how we
  *       encode these data for network IO.
- *       <p>
+ * 
  * @todo Extensible hashing:
  *       <p>
  *       - hash(byte[] key) -> IRaba page. Use IRaba for keys/values and key
@@ -308,6 +306,9 @@ public class TestExtensibleHashing extends TestCase2 {
 	 */
 	private static class SimpleExtensibleHashMap {
 
+	    // @todo static logger.
+//	    final transient Logger log = SimpleExtensibleHashMap.class
+	    
 		/**
 		 * The #of int32 positions which are available in a {@link SimpleBucket}
 		 * .
@@ -323,11 +324,11 @@ public class TestExtensibleHashing extends TestCase2 {
 		 */
 		private int globalHashBits;
 
-		/**
-		 * The size of the address space (#of buckets addressable given the #of
-		 * {@link #globalHashBits} in use).
-		 */
-		private int addressSpaceSize;
+//		/**
+//		 * The size of the address space (#of buckets addressable given the #of
+//		 * {@link #globalHashBits} in use).
+//		 */
+//		private int addressSpaceSize;
 		
 		/**
 		 * The address map. You index into this map using
@@ -353,10 +354,10 @@ public class TestExtensibleHashing extends TestCase2 {
 		 */
 		private final int[] masks;
 		
-		/**
-		 * The current mask for the current {@link #globalHashBits}.
-		 */
-		private int globalMask;
+//		/**
+//		 * The current mask for the current {@link #globalHashBits}.
+//		 */
+//		private int globalMask;
 		
 		/**
 		 * 
@@ -405,14 +406,14 @@ public class TestExtensibleHashing extends TestCase2 {
 				
 			}
 
-			// save the current masking value for the current #of global bits.
-			globalMask = masks[globalHashBits];
+//			// save the current masking value for the current #of global bits.
+//			globalMask = masks[globalHashBits];
 
 			/*
 			 * Now work backwards to determine the size of the address space (in
 			 * buckets).
 			 */
-			addressSpaceSize = 1 << globalHashBits;
+			final int addressSpaceSize = 1 << globalHashBits;
 
 			/*
 			 * Allocate and initialize the address space. All indices are
@@ -422,7 +423,8 @@ public class TestExtensibleHashing extends TestCase2 {
 
 			buckets = new ArrayList<SimpleBucket>(addressSpaceSize/* initialCapacity */);
 			
-			buckets.add(new SimpleBucket(1/* localHashBits */, bucketSize));
+			// Note: the local bits of the first bucket is set to ZERO (0).
+			buckets.add(new SimpleBucket(0/* localHashBits */, bucketSize));
 
 		}
 
@@ -432,15 +434,47 @@ public class TestExtensibleHashing extends TestCase2 {
 		
 		/** The hash of an int key is that int. */
 		private int hash(final int key) {
-			return key;
-		}
 		
+		    return key;
+		    
+		}
+
+        /**
+         * The index into the address table given that we use
+         * {@link #globalHashBits} of the given hash value.
+         * <p>
+         * Note: This is identical to maskOff(h,{@link #globalHashBits}).
+         */
+        private int getIndexOf(final int h) {
+
+            return maskOff(h, globalHashBits);
+
+        }
+
+        /**
+         * Mask off all but the lower <i>nbits</i> of the hash value.
+         * 
+         * @param h
+         *            The hash value.
+         * @param nbits
+         *            The #of bits to consider.
+         * @return The hash value considering only the lower <i>nbits</i>.
+         */
+        private int maskOff(final int h, final int nbits) {
+
+            if (nbits < 0 || nbits > 32)
+                throw new IllegalArgumentException();
+            
+            return h & masks[nbits];
+            
+        }
+        
 		/** The bucket address given the hash code of a key. */
 		private int addrOf(final int h) {
 
-			final int maskedOffIndex = h & globalMask;
+			final int index = getIndexOf(h);
 
-			return addressMap[maskedOffIndex];
+			return addressMap[index];
 			
 		}
 
@@ -474,7 +508,7 @@ public class TestExtensibleHashing extends TestCase2 {
 		 */
 		public int getAddressSpaceSize() {
 
-			return addressSpaceSize;
+			return addressMap.length;
 			
 		}
 		
@@ -511,10 +545,15 @@ public class TestExtensibleHashing extends TestCase2 {
 		 * @return <code>true</code> iff the key was found.
 		 */
 		public boolean contains(final int key) {
-			final int h = hash(key);
-			final int addr = addrOf(h);
-			final SimpleBucket b = getBucket(addr);
-			return b.contains(h,key);
+			
+		    final int h = hash(key);
+			
+		    final int addr = addrOf(h);
+			
+		    final SimpleBucket b = getBucket(addr);
+            
+		    return b.contains(h, key);
+		    
 		}
 
 		/**
@@ -591,8 +630,11 @@ public class TestExtensibleHashing extends TestCase2 {
 		 *       logic since detecting some of these cases requires transparency
 		 *       into the bucket.
 		 */
-		private void split(final int key, final SimpleBucket b) {
-			if (globalHashBits < b.localHashBits) {
+        private void split(final int key, final SimpleBucket b) {
+            if (log.isDebugEnabled())
+                log.debug("globalBits=" + globalHashBits + ",localHashBits="
+                        + b.localHashBits + ",key=" + key);
+            if (globalHashBits < b.localHashBits) {
 				// This condition should never arise.
 				throw new AssertionError();
 			}
@@ -616,19 +658,108 @@ public class TestExtensibleHashing extends TestCase2 {
 				 * allowed to be larger than the target size and gets treated as
 				 * a blob).
 				 */
-//				doubleAddressSpace();
-				/*
-				 * Create a new bucket and wire it into the 2nd entry for the
-				 * hash code for that key.
-				 */
-//				final int h = hash(key);
-//				final int addr1 = addrOf(h);
-//				final int addr2 = addr + 1;
-//				final SimpleBucket b1 = getBucket(addr);
-//				if (b1.insert(h, key)) {
-//					return;
-//				}
-				throw new UnsupportedOperationException();
+			    // the size of the address space before we double it.
+			    final int oldAddrSize = getAddressSpaceSize();
+                // the hash value of the key.
+                final int h = hash(key);
+                /*
+                 * The index into the address space for the hash key given the
+                 * #of bits considered before we double the address space.
+                 */
+                final int oldIndex = getIndexOf(h);
+                // the address of the bucket to be split.
+                final int addrOld = addressMap[oldIndex];
+                /*
+                 * The address into the new address map of the new bucket (once
+                 * it gets created).
+                 * 
+                 * Note: We find that entry by adding the size of the old
+                 * address table to the index within the table of the bucket to
+                 * be split.
+                 */
+                final int newIndex = oldIndex + oldAddrSize;
+                final int addrNew = addressMap[newIndex];
+                // double the address space.
+                doubleAddressSpace();
+                /*
+                 * Create a new bucket and wire it into the 2nd entry for the
+                 * hash code for that key.
+                 */
+                // the original bucket.
+                final SimpleBucket bold = getBucket(addrOld);
+                bold.localHashBits++;
+                // the new bucket.
+                final SimpleBucket bnew = new SimpleBucket(bold.localHashBits,
+                        bucketSize);
+                // The address for the new bucket.
+                final int addrBNew = buckets.size();
+                // Add to the chain of buckets.
+                buckets.add(bnew);
+                // Update the address table to point to the new bucket.
+                addressMap[addrNew] = addrBNew;
+                /*
+                 * FIXME Redistribute the keys in the old bucket between the old
+                 * and new bucket by considering one more bit in their hash
+                 * values.
+                 * 
+                 * Note: The move has to be handled in a manner which does not
+                 * have side-effects which put the visitation of the keys in the
+                 * original bucket out of whack. The code below figures out
+                 * which keys move and which stay and copies the ones that move
+                 * in one step. It then goes back through and deletes all keys
+                 * which are found in the new bucket from the original bucket.
+                 * 
+                 * @todo As a pre-condition to splitting the bucket, we need to
+                 * verify that at least one key is not the same as the others in
+                 * the bucket. If all keys are the same, then we should have
+                 * followed an overflow path instead of a split path.
+                 */
+                {
+                    // // flag for each key says whether it moves or stays.
+                    // final boolean[] move = new boolean[bold.size];
+                    for (int i = 0; i < bold.size; i++) {
+                        // a key from the original bucket.
+                        final int k = bold.data[i];
+                        // the hash of the key with the #of of local bits.
+                        final int h1 = maskOff(k, bold.localHashBits);
+                        if (h1 == oldIndex) {
+                            // The key does not move.
+                            continue;
+                            // move[i] = false;
+                        } else if (h1 == newIndex) {
+                            // The key will move.
+                            // move[i] = true;
+                            bnew.insert(h/* hash(key) */, key);
+                        } else {
+                            // Must be hashed to one of these two buckets!!!
+                            throw new AssertionError();
+                        }
+                    }
+                    for (int i = 0; i < bnew.size; i++) {
+                        // a key from the new bucket.
+                        final int k = bnew.data[i];
+                        // delete the key from the old bucket.
+                        bold.delete(h/* hash(key) */, key);
+                    }
+                }
+                /*
+                 * Insert the key into the expanded hash table.
+                 */
+                {
+                    // the address of the bucket for that hash code.
+                    final int addr = addrOf(h);
+                    // the bucket for that address.
+                    final SimpleBucket btmp = getBucket(addr);
+                    if (btmp.insert(h, key)) {
+                        // insert was successful.
+                        return;
+                    }
+                    /*
+                     * FIXME This could be a variety of special conditions which
+                     * need to be handled.
+                     */
+                    throw new UnsupportedOperationException();
+                }
 			}
 			if (globalHashBits > b.localHashBits) {
 				/*
@@ -654,19 +785,56 @@ public class TestExtensibleHashing extends TestCase2 {
 			}
 		}
 
-		/**
-		 * Doubles the address space.
-		 * 
-		 * FIXME Review the exact rule for doubling the address space.
-		 */
-		private void doubleAddressSpace() {
-			globalHashBits += 1;
-			final int[] tmp = addressMap;
-			addressMap = new int[tmp.length << 1];
-			for (int i = 0, j = 0; i < tmp.length; i++) {
-				addressMap[j++] = tmp[i];
-				addressMap[j++] = tmp[i];
-			}
+        /**
+         * Doubles the address space.
+         * <p>
+         * This allocates a new address table and initializes it with TWO (2)
+         * identical copies of the current address table, one right after the
+         * other and increases {@link #globalHashBits} by ONE (1).
+         * <p>
+         * This operation preserves the current mapping of hash values into an
+         * address table when we consider one more bit in those hash values. For
+         * example, if we used to consider <code>3</code> bits of the hash value
+         * then we will now consider <code>4</code> bits. If the fourth bit of
+         * the hash value is ZERO (0) then it addresses into the first copy of
+         * the address table. If the fourth bit of the hash value is ONE (1)
+         * then it addresses into the second copy of the address table. Since
+         * the entries point to the same buckets as they did when we only
+         * considered <code>3</code> bits of the hash value the mapping of the
+         * keys onto the buckets is not changed by this operation.
+         */
+        private void doubleAddressSpace() {
+
+            if (log.isInfoEnabled())
+                log.info("Doubleing the address space: globalBits="
+                        + globalHashBits + ", addressSpaceSize="
+                        + getAddressSpaceSize());
+
+            final int oldLength = addressMap.length;
+
+            // allocate a new address table which is twice a large.
+            final int[] tmp = new int[oldLength << 1];
+
+            /*
+             * Copy the current address table into the lower half of the new
+             * table.
+             */
+            System.arraycopy(addressMap/* src */, 0/* srcPos */, tmp/* dest */,
+                    0/* destPos */, oldLength);
+
+            /*
+             * Copy the current address table into the upper half of the new
+             * table.
+             */
+            System.arraycopy(addressMap/* src */, 0/* srcPos */, tmp/* dest */,
+                    oldLength/* destPos */, oldLength);
+
+            // Replace the address table.
+            addressMap = tmp;
+            
+            // Consider one more bit in the hash value of the keys.
+            globalHashBits += 1;
+            
 		}
 		
 		private void merge(final int h, final SimpleBucket b) {
@@ -710,9 +878,52 @@ public class TestExtensibleHashing extends TestCase2 {
 		 * Note: This is NOT thread-safe!
 		 */
 		public Iterator<SimpleBucket> buckets() {
-			return buckets.iterator();
+
+		    return buckets.iterator();
+		    
 		}
-		
+
+        /**
+         * Return the #of entries in the hash table having the given key.
+         * 
+         * @param key
+         *            The key.
+         *            
+         * @return The #of entries having that key.
+         */
+        public int[] getEntryCount(final int key) {
+            throw new UnsupportedOperationException();
+        }
+
+        /**
+         * Return all entries in the hash table having the given key.
+         * 
+         * @param key
+         *            The key.
+         * 
+         * @return The entries in the hash table having that key.
+         * 
+         * @todo this should return an iterator over the tuples for the real
+         *       implementation.
+         */
+        public int[] getEntries(final int key) {
+            throw new UnsupportedOperationException();
+        }
+
+        /**
+         * Return an entry in the hash table having the given key. If there is
+         * more than one entry for that key, then any entry having that key may
+         * be returned.
+         * 
+         * @param key
+         *            The key.
+         * 
+         * @return An entry having that key.
+         */
+        public int getEntry(final int key) {
+            throw new UnsupportedOperationException();
+        }
+        
 	}
 	
 	/**
@@ -720,24 +931,32 @@ public class TestExtensibleHashing extends TestCase2 {
 	 */
 	private static class SimpleBucket {
 
-		/** The #of hash code bits which are in use by this {@link SimpleBucket}. */
-		int localHashBits;
+        /**
+         * The #of hash code bits which are in use by this {@link SimpleBucket}.
+         * 
+         * @todo If we need to examine this when we change the size of the
+         *       address space then it makes more sense to have this as local
+         *       metadata in the address table than as local data in the bucket
+         *       (the latter would require us to visit each bucket when
+         *       expanding the address space).
+         */
+		private int localHashBits;
 
 		/**
 		 * The #of keys stored in the bucket. The keys are stored in a dense
 		 * array. For a given {@link #size}, the only indices of the array which
 		 * have any data are [0:{@link #size}-1].
 		 */
-		int size;
+		private int size;
 		
 		/**
 		 * The user data for the bucket.
 		 */
-		final int[] data;
+		private final int[] data;
 		
-		public SimpleBucket(final int localHashBits,final int bucketSize) {
+        public SimpleBucket(final int localHashBits, final int bucketSize) {
 
-			if (localHashBits <= 0 || localHashBits > 32)
+			if (localHashBits < 0 || localHashBits > 32)
 				throw new IllegalArgumentException();
 
 			this.localHashBits = localHashBits;
@@ -849,7 +1068,29 @@ public class TestExtensibleHashing extends TestCase2 {
 			return false;
 
 		}
+		
+		/**
+		 * The #of entries in the bucket.
+		 */
+		public int getEntryCount() {
 
+		    return size;
+		    
+		}
+
+        /**
+         * A copy of the entries.
+         * <p>
+         * Note: This method returns as an array in order to avoid autobox
+         * issues which arise with int32 keys and Integers. Visitation of tuples
+         * in the bucket will be handled differently in a full implementation.
+         */
+		public int[] getEntries() {
+
+		    return data.clone();
+		    
+		}
+		
 	}
 
 	/**
@@ -962,26 +1203,167 @@ public class TestExtensibleHashing extends TestCase2 {
 		// still not split.
 		assertEquals("bucketCount", 1, map.getBucketCount());
 
-		// force a split.
+		// force a split (83 == 0b10000011)
 		map.insert(83);
 
 		assertEquals("bucketCount", 2, map.getBucketCount());
 
 	}
-	
-	/**
-	 * Unit test with the following configuration and insert / event sequence:
-	 * <ul>
-	 * <li>bucket size := 4k</li>
-	 * <li></li>
-	 * <li></li>
-	 * <li></li>
-	 * </ul> 
-	 * <pre>
-	 * </pre>
-	 */
+
+    /**
+     * Unit test based on example in
+     * "External Memory Algorithms and Data Structures" by Vitter, page 239.
+     * <p>
+     * The assignment of keys to buckets in this example is based on the low
+     * bits of the key. Initially, the global depth is <code>3</code> so only
+     * the lower three bits are considered.
+     * 
+     * <pre>
+     * 0   0
+     * 1   1
+     * 2   10
+     * 3   11
+     * 4   100
+     * 5   101
+     * 6   110
+     * 7   111
+     * </pre>
+     * 
+     * To setup the example, we insert the sequence {4, 23, 18, 10, 44, 32, 9}
+     * into an extensible hashing algorithm using buckets with a capacity of
+     * <code>3</code>. The keys and the values stored in the buckets are int32
+     * values. Inserting this sequence of keys should yield a hash table with a
+     * global depth <em>d</em> of <code>8</code> having 8 addresses and four
+     * buckets arranged as follows.
+     * 
+     * <pre>
+     * [000] -> (A) [k=2] {4, 44, 32}
+     * [001] -> (C) [k=1] {23, 9}
+     * [010] -> (B) [k=3] {18}
+     * [011] -> (C)
+     * [100] -> (A)
+     * [101] -> (C)
+     * [110] -> (D) [k=3] {10}
+     * [111] -> (C)
+     * </pre>
+     * 
+     * Where <em>k</em> is the local depth of a given bucket and the buckets are
+     * labeled A, B, C, ... based on the order in which they are written on the
+     * page in the example (which presumably is the order in which those buckets
+     * were created, but I have not yet verified this).
+     * <p>
+     * Next, key <code>76</code> is inserted. Considering only the d=3 bits of
+     * its hash code, this key would be inserted the address having bits
+     * <code>100</code>, which is mapped onto bucket (A). This will cause bucket
+     * (A) to be split into (A) and (D). The local depth of (A) is increased by
+     * one to <code>k=3</code>. The local depth of (D) is the same as (A). The
+     * hash table looks as follows after this split.
+     * 
+     * <pre>
+     * [000] -> (A) [k=3] {32}
+     * [001] -> (C) [k=1] {23, 9}
+     * [010] -> (B) [k=3] {18}
+     * [011] -> (C)
+     * [100] -> (E) [k=4] {4, 44, 76}
+     * [101] -> (C)
+     * [110] -> (D) [k=3] {10}
+     * [111] -> (C)
+     * </pre>
+     * 
+     * Finally, key <code>20</code> is inserted, again into the block addressed
+     * by address table entry <code>100</code>. This causes block (E) to be
+     * split into two blocks (E) and (F) having local bits <code>k=4</code>. The
+     * address table is doubled and the #of global bits is increased to
+     * <code>d=4</code>. The hash table after this expansion looks as follows:
+     * 
+     * <pre>
+     * [0000] -> (A) [k=3] {32}
+     * [0001] -> (C) [k=1] {23, 9}
+     * [0010] -> (B) [k=3] {18}
+     * [0011] -> (C)
+     * [0100] -> (E) [k=4] {4, 20}
+     * [0101] -> (C)
+     * [0110] -> (D) [k=3] {10}
+     * [0111] -> (C)
+     *  ---- extension ----
+     * [1000] -> (A)
+     * [1001] -> (C)
+     * [1010] -> (B)
+     * [1011] -> (C)
+     * [1100] -> (F) [k=4] {44, 76}
+     * [1101] -> (C)
+     * [1110] -> (D)
+     * [1111] -> (C)
+     * </pre>
+     * 
+     * When the address space is extended, the original address table entries
+     * remain at their given offsets into the new table. The new address table
+     * entries are initialized from the same entry which would have been
+     * addressed if we considered one less bit. For example, any hash code
+     * ending in <code>000</code> used to index into the first entry in the
+     * address table. After the address table is split, one more bit will be
+     * considered in the hash code of the key. Therefore, the same key will
+     * either be in the address table entry <code>0000</code> or the entry
+     * <code>1000</code>. To keep everything consistent, the address table entry
+     * for <code>1000</code> is therefore initialized from the address table
+     * entry for <code>0000</code>. In practice, all you are doing is writing a
+     * second copy of the original address table entries starting immediately
+     * after the original address table entries.
+     * <p>
+     * Personally, I find this representation much easier to interpret. You can
+     * see that the address table was simply duplicated and (E) was split into
+     * two buckets. One remains (E) and continues to be addressed from the 1st
+     * half of the address table. The other is (F) and is the only change in the
+     * 2nd half of the address table.
+     */
 	public void test_simple() {
-		
-	}
-	
+        final int bucketSize = 3;
+        
+        final SimpleExtensibleHashMap map = new SimpleExtensibleHashMap(
+                1/* initialCapacity */, bucketSize);
+
+        /*
+         * Insert the initial key sequence.
+         * 
+         * FIXME Verify post-condition in detail for each bucket since the next
+         * steps require the problem to be setup correctly.
+         */
+        final int[] keys0 = new int[]{4, 23, 18, 10, 44, 32, 9};
+        for(int key : keys0) {
+            assertFalse(map.contains(key));
+            map.insert(key);
+            assertTrue(map.contains(key));
+        }
+
+        assertEquals("globalHashBits", 3, map.getGlobalHashBits());
+        assertEquals("addressSpace", 8, map.getAddressSpaceSize());
+        assertEquals("bucketCount", 3, map.getBucketCount());
+
+        /*
+         * Insert key 76. This splits (A), which is the bucket addressed by
+         * [000]. This does not cause the address space to double since [100]
+         * was also a reference to (A). This increments the local depth of (A)
+         * to [3] and also creates a new bucket (E), having the same local depth
+         * as (A) [3], and then sets a reference to that bucket at index [100]
+         * of the address table. The keys in (A) are redistributed between (A)
+         * and (E) by considering the [k=3] bit hash, where [k] is the new local
+         * depth of (A) and (E). This gets the hash table into a consistent
+         * state. The new key (76) is then inserted into the hash table and
+         * winds up in (E).
+         * 
+         * @todo verify the contents of each bucket in detail.
+         */
+        map.insert(76);
+
+        // unchanged.
+        assertEquals("globalHashBits", 3, map.getGlobalHashBits());
+        assertEquals("addressSpace", 8, map.getAddressSpaceSize());
+
+        // one more bucket.
+        assertEquals("bucketCount", 4, map.getBucketCount());
+
+        fail("write test");
+
+    }
+
 }
