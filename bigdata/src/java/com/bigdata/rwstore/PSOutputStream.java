@@ -357,11 +357,6 @@ public class PSOutputStream extends OutputStream {
 //									+ ", last alloc: " + precount);
 //				}
 		  		
-		  		if (log.isDebugEnabled())
-		  			log.debug("Writing BlobHdrIdx with " + m_blobHdrIdx + " allocations");
-		  		
-		  		// DO NOT USE BLOB ALLOCATOR
-		  		// addr = m_store.registerBlob(addr); // returns handle
 			} catch (IOException e) {
 //				e.printStackTrace();
 				throw new RuntimeException(e);
