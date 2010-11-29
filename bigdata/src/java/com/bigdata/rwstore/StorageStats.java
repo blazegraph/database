@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Formatter;
 
 /**
  * Maintains stats on the RWStore allocations, useful for tuning Allocator
@@ -64,35 +65,63 @@ import java.util.ArrayList;
  *
  */
 public class StorageStats {
+	final int cVersion = 0x0100;
+	
 	final int m_maxFixed;
 	
 	public class BlobBucket {
 		final int m_size;
+		long m_allocationSize;
 		long m_allocations;
 		long m_deletes;
+		long m_deleteSize;
 		
 		public BlobBucket(final int size) {
 			m_size = size;
 		}
 		public BlobBucket(DataInputStream instr) throws IOException {
 			m_size = instr.readInt();
+			m_allocationSize = instr.readLong();
 			m_allocations = instr.readLong();
+			m_deleteSize = instr.readLong();
 			m_deletes = instr.readLong();
 		}
 		public void write(DataOutputStream outstr) throws IOException {
 			outstr.writeInt(m_size);
+			outstr.writeLong(m_allocationSize);
 			outstr.writeLong(m_allocations);
+			outstr.writeLong(m_deleteSize);
 			outstr.writeLong(m_deletes);
 		}
-		public void delete() {
+		public void delete(int sze) {
+			m_deleteSize += sze;
 			m_deletes++;
 		}
-		public void allocate() {
+		public void allocate(int sze) {
+			m_allocationSize += sze;
 			m_allocations++;
+		}
+		public long active() {
+			return m_allocations - m_deletes;
+		}
+		public int meanAllocation() {
+			if (m_allocations == 0)
+				return 0;
+			return (int) (m_allocationSize / m_allocations);
+		}
+		public float churn() {
+			if (active() == 0)
+				return m_allocations;
+			
+			BigDecimal allocs = new BigDecimal(m_allocations);
+			BigDecimal used = new BigDecimal(active());			
+			
+			return allocs.divide(used, 2, RoundingMode.HALF_UP).floatValue();
 		}
 	}
 	
 	public class Bucket {
+		final int m_start;
 		final int m_size;
 		int m_allocators;
 		long m_totalSlots;
@@ -101,11 +130,13 @@ public class StorageStats {
 		long m_sizeAllocations;
 		long m_sizeDeletes;
 		
-		public Bucket(final int size) {
+		public Bucket(final int size, final int startRange) {
 			m_size = size;
+			m_start = startRange;
 		}
 		public Bucket(DataInputStream instr) throws IOException {
 			m_size = instr.readInt();
+			m_start = instr.readInt();
 			m_allocators = instr.readInt();
 			m_slotAllocations = instr.readLong();
 			m_slotDeletes = instr.readLong();
@@ -115,6 +146,7 @@ public class StorageStats {
 		}
 		public void write(DataOutputStream outstr) throws IOException {
 			outstr.writeInt(m_size);
+			outstr.writeInt(m_start);
 			outstr.writeInt(m_allocators);
 			outstr.writeLong(m_slotAllocations);
 			outstr.writeLong(m_slotDeletes);
@@ -125,6 +157,12 @@ public class StorageStats {
 		public void delete(int sze) {
 			if (sze < 0)
 				throw new IllegalArgumentException("delete requires positive size, got: " + sze);
+			
+			if (m_size > 64 && sze < 64) {
+				// if called from deferFree then may not include size.  If so then use
+				//	average size of slots to date as best running estimate.
+				sze = meanAllocation();
+			}
 			
 			if (sze > m_size) {
 				// sze = ((sze - 1 + m_maxFixed)/ m_maxFixed) * 4; // Blob header
@@ -151,6 +189,10 @@ public class StorageStats {
 			return m_slotAllocations - m_slotDeletes;
 		}
 		
+		public long emptySlots() {
+			return m_totalSlots - usedSlots();
+		}
+		
 		public long usedStore() {
 			return m_sizeAllocations - m_sizeDeletes;
 		}
@@ -160,29 +202,61 @@ public class StorageStats {
 			if (usedStore() == 0)
 				return 0.0f;
 			
-			BigDecimal size = new BigDecimal(m_size * usedSlots());
-			BigDecimal store = new BigDecimal(100 * usedStore());
-			store = store.divide(size, 2, RoundingMode.HALF_UP);
-			BigDecimal total = new BigDecimal(100);
+			BigDecimal size = new BigDecimal(reservedStore());
+			BigDecimal store = new BigDecimal(100 * (reservedStore() - usedStore()));
 			
-			return total.subtract(store).floatValue();
+			return store.divide(size, 2, RoundingMode.HALF_UP).floatValue();
 		}
-		public float totalWaste() {	
+		public float totalWaste(long total) {	
 			if (usedStore() == 0)
 				return 0.0f;
 			
-			BigDecimal size = new BigDecimal(m_size * m_totalSlots);
-			BigDecimal store = new BigDecimal(100 * usedStore());			
-			store = store.divide(size, 2, RoundingMode.HALF_UP);			
-			BigDecimal total = new BigDecimal(100);
+			long slotWaste = reservedStore() - usedStore();
 			
-			return total.subtract(store).floatValue();
+			BigDecimal localWaste = new BigDecimal(100 * slotWaste);
+			BigDecimal totalWaste = new BigDecimal(total);			
+			
+			return localWaste.divide(totalWaste, 2, RoundingMode.HALF_UP).floatValue();
 		}
 		public long reservedStore() {
 			return m_size * m_totalSlots;
 		}
 		public void addAlocator() {
 			m_allocators++;
+		}
+		public float slotChurn() {
+			// Handle case where we may have deleted all allocations
+			if (usedSlots() == 0)
+				return m_slotAllocations;
+			
+			BigDecimal allocs = new BigDecimal(m_slotAllocations);
+			BigDecimal used = new BigDecimal(usedSlots());			
+			
+			return allocs.divide(used, 2, RoundingMode.HALF_UP).floatValue();
+		}
+		public float slotsUnused() {
+			BigDecimal used = new BigDecimal(100 * (m_totalSlots-usedSlots()));			
+			BigDecimal total = new BigDecimal(m_totalSlots);
+			
+			return used.divide(total, 2, RoundingMode.HALF_UP).floatValue();
+		}
+		public float percentAllocations(long totalAllocations) {
+			BigDecimal used = new BigDecimal(100 * m_slotAllocations);			
+			BigDecimal total = new BigDecimal(totalAllocations);
+			
+			return used.divide(total, 2, RoundingMode.HALF_UP).floatValue();
+		}
+		public float percentSlotsInuse(long totalInuse) {
+			BigDecimal used = new BigDecimal(100 * usedSlots());			
+			BigDecimal total = new BigDecimal(totalInuse);
+			
+			return used.divide(total, 2, RoundingMode.HALF_UP).floatValue();
+		}
+		public int meanAllocation() {
+			if (m_slotAllocations == 0)
+				return 0;
+			
+			return (int) (m_sizeAllocations / m_slotAllocations);
 		}
 	}
 	
@@ -199,8 +273,10 @@ public class StorageStats {
 	 */
 	public StorageStats(final int[] buckets) {
 		m_buckets = new ArrayList<Bucket>();
+		int prevLimit = 0;
 		for (int i = 0; i < buckets.length; i++) {
-			m_buckets.add(new Bucket(buckets[i]*64)); // slot sizes are 64 multiples
+			m_buckets.add(new Bucket(buckets[i]*64, prevLimit)); // slot sizes are 64 multiples
+			prevLimit = buckets[i]*64;
 		}
 		// last fixed allocator needed to compute BlobBuckets
 		m_maxFixed = m_buckets.get(buckets.length-1).m_size;
@@ -223,6 +299,10 @@ public class StorageStats {
 	 * @throws IOException
 	 */
 	public StorageStats(final DataInputStream instr) throws IOException {
+		int version = instr.readInt();
+		if (cVersion != version) {
+			throw new IllegalStateException("StorageStats object is wrong version");
+		}
 		m_buckets = new ArrayList<Bucket>();
 		int nbuckets = instr.readInt();
 		for (int i = 0; i < nbuckets; i++) {
@@ -241,6 +321,8 @@ public class StorageStats {
 	public byte[] getData() throws IOException {
 		ByteArrayOutputStream outb = new ByteArrayOutputStream();
 		DataOutputStream outd = new DataOutputStream(outb);
+		
+		outd.writeInt(cVersion);
 		
 		outd.writeInt(m_buckets.size());
 		
@@ -266,14 +348,14 @@ public class StorageStats {
 		m_blobAllocation += sze;
 		
 		// increment blob bucket
-		findBlobBucket(sze).allocate();
+		findBlobBucket(sze).allocate(sze);
 	}
 	
 	public void deleteBlob(int sze) {
 		m_blobDeletion -= sze;
 		
 		// decrement blob bucket
-		findBlobBucket(sze).delete();
+		findBlobBucket(sze).delete(sze);
 	}
 	
 	private BlobBucket findBlobBucket(final int sze) {
@@ -307,57 +389,88 @@ public class StorageStats {
 		str.append("\n-------------------------\n");
 		str.append("RWStore Allocator Summary\n");
 		str.append("-------------------------\n");
-		str.append(padRight("AllocatorSize", 16));
-		str.append(padLeft("AllocatorCount", 16));
-		str.append(padLeft("SlotsAllocated", 16));
-		str.append(padLeft("SlotsRecycled", 16));
-		str.append(padLeft("SlotsInUse", 16));
-		str.append(padLeft("SlotsReserved", 16));
-		str.append(padLeft("BytesReserved", 16));
-		str.append(padLeft("BytesAppData", 16));
-		str.append(padLeft("%SlotWaste", 16));
-		str.append(padLeft("%StoreWaste", 16));
-		str.append(padLeft("%AppData", 16));
-		str.append(padLeft("%StoreFile", 16));
-		str.append("\n");
+		str.append(String.format("%-16s %16s %16s %16s %16s %16s %16s %16s %16s %16s %16s %16s %16s %16s %16s %16s %16s %16s \n", 
+				"AllocatorSize",
+				"AllocatorCount",
+				"SlotsAllocated",
+				"%SlotsAllocated",
+				"SlotsRecycled",
+				"SlotChurn",
+				"SlotsInUse",
+				"%SlotsInUse",
+				"MeanAllocation",
+				"SlotsReserved",
+				"%SlotsUnused",
+				"BytesReserved",
+				"BytesAppData",
+				"%SlotWaste",
+				"%AppData",
+				"%StoreFile",
+				"%TotalWaste",
+				"%FileWaste"
+				));
 		
 		long totalAppData = 0;
 		long totalFileStore = 0;
+		long totalAllocations = 0;
+		long totalInuse = 0;
 		for (Bucket b: m_buckets) {
 			totalAppData += b.usedStore();
 			totalFileStore += b.reservedStore();
+			totalAllocations += b.m_slotAllocations;
+			totalInuse += b.usedSlots();
 		}
+		long totalWaste = totalFileStore - totalAppData;
+		
 		for (Bucket b: m_buckets) {
-			str.append(padRight("" + b.m_size, 16));
-			str.append(padLeft("" + b.m_allocators, 16));
-			str.append(padLeft("" + b.m_slotAllocations, 16));
-			str.append(padLeft("" + b.m_slotDeletes, 16));
-			str.append(padLeft("" + b.usedSlots(), 16));
-			str.append(padLeft("" + b.m_totalSlots, 16));
-			str.append(padLeft("" + b.reservedStore(), 16));
-			str.append(padLeft("" + b.usedStore(), 16));
-			str.append(padLeft("" + b.slotWaste() + "%", 16));
-			str.append(padLeft("" + b.totalWaste() + "%", 16));
-			str.append(padLeft("" + dataPercent(b.usedStore(), totalAppData) + "%", 16));
-			str.append(padLeft("" + dataPercent(b.reservedStore(), totalFileStore) + "%", 16));
-			str.append("\n");
+			str.append(String.format("%-16d %16d %16d %16.2f %16d %16.2f %16d %16.2f %16d %16d %16.2f %16d %16d %16.2f %16.2f %16.2f %16.2f  %16.2f \n",
+				b.m_size,
+				b.m_allocators,
+				b.m_slotAllocations,
+				b.percentAllocations(totalAllocations),
+				b.m_slotDeletes,
+				b.slotChurn(),
+				b.usedSlots(),
+				b.percentSlotsInuse(totalInuse),
+				b.meanAllocation(),
+				b.m_totalSlots,
+				b.slotsUnused(),
+				b.reservedStore(),
+				b.usedStore(),
+				b.slotWaste(),
+				dataPercent(b.usedStore(), totalAppData),
+				dataPercent(b.reservedStore(), totalFileStore),
+				b.totalWaste(totalWaste),
+				b.totalWaste(totalFileStore)
+			));
 		}
 		
 		str.append("\n-------------------------\n");
 		str.append("BLOBS\n");
 		str.append("-------------------------\n");
-		str.append(padRight("Bucket", 10));
-		str.append(padLeft("Allocations", 12));
-		str.append(padLeft("Deletes", 12));
-		str.append(padLeft("Current", 12));
-		str.append("\n");
+		str.append(String.format("%-10s %12s %12s %12s %12s %12s %12s %12s %12s\n", 
+			"Bucket(K)",
+			"Allocations",
+			"Allocated",
+			"Deletes",
+			"Deleted",
+			"Current",
+			"Data",
+			"Mean",
+			"Churn"));
 
 		for (BlobBucket b: m_blobBuckets) {
-			str.append(padRight("" + (b.m_size/1024) + "K", 10));
-			str.append(padLeft("" + b.m_allocations, 12));
-			str.append(padLeft("" + b.m_deletes, 12));
-			str.append(padLeft("" + (b.m_allocations - b.m_deletes), 12));
-			str.append("\n");
+			str.append(String.format("%-10d %12d %12d %12d %12d %12d %12d %12d %12.2f\n", 
+				b.m_size/1024,
+				b.m_allocations,
+				b.m_allocationSize,
+				b.m_deletes,
+				b.m_deleteSize,
+				(b.m_allocations - b.m_deletes),
+				(b.m_allocationSize - b.m_deleteSize),
+				b.meanAllocation(),
+				b.churn()
+			));
 		}
 		
 	}
@@ -367,33 +480,5 @@ public class StorageStats {
 		BigDecimal total = new BigDecimal(totalData);
 		
 		return used.divide(total, 2, RoundingMode.HALF_UP).floatValue();
-	}
-
-	public static String padLeft(String str, int minlen) {
-		if (str.length() >= minlen)
-			return str;
-		
-		StringBuffer out = new StringBuffer();
-		int pad = minlen - str.length();
-		while (pad-- > 0) {
-			out.append(' ');
-		}
-		out.append(str);
-		
-		return out.toString();
-	}
-	
-	public static String padRight(String str, int minlen) {
-		if (str.length() >= minlen)
-			return str;
-		
-		StringBuffer out = new StringBuffer();
-		out.append(str);
-		int pad = minlen - str.length();
-		while (pad-- > 0) {
-			out.append(' ');
-		}
-		
-		return out.toString();
 	}
 }

@@ -42,8 +42,10 @@ import com.bigdata.util.ChecksumUtility;
 public class FixedAllocator implements Allocator {
     
     private static final Logger log = Logger.getLogger(FixedAllocator.class);
+    
+    private final int cModAllocation = 1 << RWStore.ALLOCATION_SCALEUP;
+    private final int cMinAllocation = cModAllocation * 1; // must be multiple of cModAllocation
 
-//	final private RWWriteCacheService m_writeCache;
 	volatile private int m_freeBits;
 	volatile private int m_freeTransients;
 
@@ -111,7 +113,9 @@ public class FixedAllocator implements Allocator {
 		
 		final int bit = offset % allocBlockRange;
 		
-		if (RWStore.tstBit(block.m_live, bit)) {		
+		if (RWStore.tstBit(block.m_live, bit) 
+				|| (this.m_sessionActive && RWStore.tstBit(block.m_transients, bit))) 
+		{		
 			return RWStore.convertAddr(block.m_addr) + ((long) m_size * bit);
 		} else {
 			return 0L;
@@ -145,6 +149,14 @@ public class FixedAllocator implements Allocator {
 	}
 
 	volatile private IAllocationContext m_context;
+
+	/**
+	 * Indicates whether session protection has been used to protect
+	 * store from re-allocating allocations reachable from read-only
+	 * requests and concurrent transactions.
+	 */
+	private boolean m_sessionActive;
+	
 	public void setAllocationContext(final IAllocationContext context) {
 		if (context == null && m_context != null) {
 			// restore commit bits in AllocBlocks
@@ -161,6 +173,21 @@ public class FixedAllocator implements Allocator {
 	}
 
 	/**
+	 * Unwinds the allocations made within the context and clears
+	 */
+	public void abortAllocationContext(final IAllocationContext context) {
+		if (context != null && m_context == context) {
+			// restore commit bits in AllocBlocks
+			for (AllocBlock allocBlock : m_allocBlocks) {
+				allocBlock.abortshadow();
+			}
+			m_context = null;
+		} else {
+			throw new IllegalArgumentException();
+		}
+	}
+
+	/**
 	 * write called on commit, so this is the point when "transient frees" - the
 	 * freeing of previously committed memory can be made available since we
 	 * are creating a new commit point - the condition being that m_freeBits
@@ -174,6 +201,8 @@ public class FixedAllocator implements Allocator {
 			final byte[] buf = new byte[1024];
 			final DataOutputStream str = new DataOutputStream(new FixedOutputStream(buf));
 			try {
+				m_sessionActive = m_store.isSessionProtected();
+				
                 str.writeInt(m_size);
 
                 final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
@@ -185,9 +214,9 @@ public class FixedAllocator implements Allocator {
                         str.writeInt(block.m_live[i]);
                     }
 
-//                    if (!m_store.isSessionPreserved()) {
+                    if (!m_sessionActive) {
                         block.m_transients = block.m_live.clone();
-//                    }
+                    }
 
                     /**
                      * If this allocator is shadowed then copy the new committed
@@ -314,29 +343,12 @@ public class FixedAllocator implements Allocator {
 
 		m_size = size;
 
-		/*
-		 * For smaller allocations we'll allocate a larger span, this is needed
-		 * to ensure the minimum allocation is large enough to guarantee 
-		 * a unique address for a BlobAllocator.
-		 */
-		if (m_size < 256) {
-			/*
-			 * Note: 64 ints is 256 bytes is 2048 bits, so 2048 allocation
-			 * slots.
-			 */ 
-			m_bitSize = 64;
-		} else {
-			/*
-			 * Note: 32 ints is 128 bytes is 1024 bits, so 1024 allocation
-			 * slots.
-			 */ 
-			m_bitSize = 32;
-		}
+		m_bitSize = calcBitSize(true, size, cMinAllocation, cModAllocation);
 
 //		m_writeCache = cache;
 
 		// number of blocks in this allocator, bitSize plus 1 for start address
-		final int numBlocks = 255 / (m_bitSize + 1);
+		final int numBlocks = 254 / (m_bitSize + 1);
 
 		/*
 		 * Create AllocBlocks for this FixedAllocator, but do not allocate
@@ -350,6 +362,82 @@ public class FixedAllocator implements Allocator {
 
 		m_freeTransients = 0;
 		m_freeBits = 32 * m_bitSize * numBlocks;
+	}
+	
+	/**
+	 * This determines the size of the reservation required in terms of
+	 * the number of ints each holding bits for 32 slots.
+	 * 
+	 * The minimum return value will be 1, for a single int holiding 32 bits.
+	 * 
+	 * The maximum value will be the number of ints required to fill the minimum
+	 * reservation.
+	 * 
+	 * The minimum reservation will be some multiple of the
+	 * address multiplier that allows alloction blocks to address large addresses
+	 * with an INT32.  For example, by setting a minimum reservation at 128K, the
+	 * allocation blocks INT32 start address may be multiplied by 128K to provide
+	 * a physical address.
+	 * 
+	 * The minReserve must be a power of 2, eg 1K, 2k or 4K.. etc
+	 * 
+	 * A standard minReserve of 16K is plenty big enough, enabling 32TB of
+	 * addressable store.  The logical maximum used store is calculated as the
+	 * maximum fixed allocation size * MAX_INT.  So a store with a maximum
+	 * fixed slot size of 4K could only allocated 8TB.
+	 * 
+	 * Since the allocation size must be MOD 0 the minReserve, the lower the 
+	 * minReserve the smaller the allocation may be required for larger
+	 * slot sizes.
+	 * 
+	 * Another consideration is file locality.  In this case the emphasis is
+	 * on larger contiguous areas to improve the likely locality of allocations
+	 * made by a FixedAllocator.  Here the addressability implied by the reserve
+	 * is not an issue, and larger reserves are chosen to improve locality.  The
+	 * downside is a potential for more wasted space, but this
+	 * reduces as the store size grows and in large stores (> 10GB) becomes
+	 * insignificant.
+	 * 
+	 * Therefore, if a FixedAllocator is to be used in a large store and
+	 * locality needs to be optimised for SATA disk access then the minReserve
+	 * should be high = say 128K, while if the allocator is tuned to ByteBuffer
+	 * allocation, a minallocation of 8 to 16K is more suitable.
+	 * 
+	 * A final consideration is allocator reference efficiency in the sense
+	 * to maximise the amount of allocations that can be made.  By this I mean
+	 * just how close we can get to MAX_INT allocations.  For example, if we
+	 * allow for upto 8192 allocations from a single allocator, but in
+	 * practice average closer to 4096 then the maximum number of allocations
+	 * comes down from MAX_INT to MAX_INT/2.  This is also a consideration when
+	 * considering max fixed allocator size, since if we require a large number
+	 * of Blobs this reduces the amount of "virtual" allocations by at least
+	 * a factro of three for each blob (at least 2 fixed allocations for
+	 * content and 1 more for the header).  A variation on the current Blob
+	 * implementation could include the header in the first allocation, thus
+	 * reducing the minimum Blob allocations from 3 to 2, but the point still
+	 * holds that too small a max fixed allocation could rmatically reduce the
+	 * number of allocations that could be made.
+	 * 
+	 * @param alloc the slot size to be managed
+	 * @param minReserve the minimum reservation in bytes
+	 * @return the size of the int array
+	 */
+	public static int calcBitSize(final boolean optDensity, final int alloc, final int minReserve, final int modAllocation) {
+		final int intAllocation = 32 * alloc; // min 32 bits
+		
+		// we need to find smallest number of ints * the intAllocation
+		//	such that totalAllocation % minReserve is 0
+		// example 6K intAllocation would need 8 ints for 48K for 16K min
+		// likewise a 24K intAllocation would require 2 ints
+		 // if optimising for density set min ints to 8
+		int nints = optDensity ? 8 : 1;
+		while ((nints * intAllocation) < minReserve) nints++;
+		
+		while ((nints * intAllocation) % modAllocation != 0) nints++;
+		
+		System.out.println("calcBitSize for " + alloc + " returns " + nints);
+		
+		return nints;
 	}
 
 	public String getStats(final AtomicLong counter) {
@@ -674,5 +762,15 @@ public class FixedAllocator implements Allocator {
 
 	public void setBucketStats(Bucket b) {
 		m_statsBucket = b;
+	}
+
+	public void releaseSession() {
+		if (this.m_sessionActive) {
+			if (log.isTraceEnabled())
+				log.trace("Allocator: #" + m_index + " releasing session protection");
+			for (AllocBlock ab : m_allocBlocks) {
+				ab.releaseSession();
+			}
+		}
 	}
 }

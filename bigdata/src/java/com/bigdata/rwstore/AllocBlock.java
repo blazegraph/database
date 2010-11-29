@@ -237,4 +237,43 @@ public class AllocBlock {
 		m_commit = m_saveCommit;
 		m_saveCommit = null;
 	}
+
+	/**
+	 * Must release allocations made by this allocator.
+	 * 
+	 * The commit bits are the old transient bits, so any allocated bits
+	 * set in live, but not in commit, were set within this context.
+	 * 
+	 * The m_commit is the m_transients bits at the point of the
+	 * link of the allocationContext with this allocator, bits set in m_live
+	 * that are not set in m_commit, were made by this allocator for the
+	 * aborted context.
+	 * 
+	 * L 1100	0110	AC	0111	AB	0110
+	 * T 1100	1110		1111		1110	
+	 * C 1100	1100		1110		1100
+	 */
+	public void abortshadow() {
+		for (int i = 0; i < m_live.length; i++) {
+			m_live[i] &= m_commit[i];
+			m_transients[i] = m_live[i] | m_saveCommit[i];
+		}
+		m_commit = m_saveCommit;
+	}
+
+	/**
+	 * When a session is active, the transient bits do not equate to an ORing
+	 * of the committed bits and the live bits, but rather an ORing of the live
+	 * with all the committed bits since the start of the session.
+	 * When the session is released, the state is restored to an ORing of the
+	 * live and the committed, thus releasing slots for re-allocation. 
+	 */
+	public void releaseSession() {
+		if (m_addr != 0) { // check active!
+			for (int i = 0; i < m_live.length; i++) {
+				m_transients[i] = m_live[i] | m_commit[i];
+			}
+		}
+	}
+
 }
