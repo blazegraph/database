@@ -698,9 +698,8 @@ public class TestExtensibleHashing extends TestCase2 {
                 // Update the address table to point to the new bucket.
                 addressMap[addrNew] = addrBNew;
                 /*
-                 * FIXME Redistribute the keys in the old bucket between the old
-                 * and new bucket by considering one more bit in their hash
-                 * values.
+                 * Redistribute the keys in the old bucket between the old and
+                 * new bucket by considering one more bit in their hash values.
                  * 
                  * Note: The move has to be handled in a manner which does not
                  * have side-effects which put the visitation of the keys in the
@@ -715,31 +714,29 @@ public class TestExtensibleHashing extends TestCase2 {
                  * followed an overflow path instead of a split path.
                  */
                 {
-                    // // flag for each key says whether it moves or stays.
-                    // final boolean[] move = new boolean[bold.size];
+                    // consider the keys in the old bucket.
                     for (int i = 0; i < bold.size; i++) {
                         // a key from the original bucket.
-                        final int k = bold.data[i];
-                        // the hash of the key with the #of of local bits.
-                        final int h1 = maskOff(k, bold.localHashBits);
+                        final int k1 = bold.data[i];
+                        // hash of the key with only the local bits visible
+                        final int h1 = maskOff(k1, bold.localHashBits);
                         if (h1 == oldIndex) {
                             // The key does not move.
                             continue;
-                            // move[i] = false;
                         } else if (h1 == newIndex) {
-                            // The key will move.
-                            // move[i] = true;
+                            // Move the key to the new bucket.
                             bnew.insert(h/* hash(key) */, key);
                         } else {
                             // Must be hashed to one of these two buckets!!!
                             throw new AssertionError();
                         }
                     }
+                    // Now delete any keys which were moved to the new bucket.
                     for (int i = 0; i < bnew.size; i++) {
                         // a key from the new bucket.
-                        final int k = bnew.data[i];
+                        final int k1 = bnew.data[i];
                         // delete the key from the old bucket.
-                        bold.delete(h/* hash(key) */, key);
+                        bold.delete(hash(k1), k1);
                     }
                 }
                 /*
@@ -762,25 +759,30 @@ public class TestExtensibleHashing extends TestCase2 {
                 }
 			}
 			if (globalHashBits > b.localHashBits) {
-				/*
-				 * There will be at least two entries in the address table which
-				 * point to this bucket. One of those entries is relabeled. Both
-				 * the original bucket and the new bucket have their {@link
-				 * SimpleBucket#localHashBits} incremented by one, but the
-				 * {@link #globalHashBits}. Of the entries in the bucket address
-				 * table which used to point to the original bucket, the 1st
-				 * half are left alone and the 2nd half are updated to point to
-				 * the new bucket. (Note that the #of entries depends on the
-				 * global #of hash bits in use and the bucket local #of hash
-				 * bits in use and will be 2 if there is a difference of one
-				 * between those values but can be more than 2 and will always
-				 * be an even number). The entries in the original bucket are
-				 * rehashed and assigned based on the new #of hash bits to be
-				 * considered to either the original bucket or the new bucket.
-				 * The record is then inserted based on the new #of hash bits to
-				 * be considered. If it still does not fit, then either handle
-				 * by case (1) or case (2) as appropriate.
-				 */
+                /*
+                 * FIXME Implement this next. It handles the simpler split case
+                 * when we only need to redistribute the keys but do not need to
+                 * double the address space. The logic above can just be
+                 * refactored for this purpose.
+                 * 
+                 * There will be at least two entries in the address table which
+                 * point to this bucket. One of those entries is relabeled. Both
+                 * the original bucket and the new bucket have their {@link
+                 * SimpleBucket#localHashBits} incremented by one, but the
+                 * {@link #globalHashBits}. Of the entries in the bucket address
+                 * table which used to point to the original bucket, the 1st
+                 * half are left alone and the 2nd half are updated to point to
+                 * the new bucket. (Note that the #of entries depends on the
+                 * global #of hash bits in use and the bucket local #of hash
+                 * bits in use and will be 2 if there is a difference of one
+                 * between those values but can be more than 2 and will always
+                 * be an even number). The entries in the original bucket are
+                 * rehashed and assigned based on the new #of hash bits to be
+                 * considered to either the original bucket or the new bucket.
+                 * The record is then inserted based on the new #of hash bits to
+                 * be considered. If it still does not fit, then either handle
+                 * by case (1) or case (2) as appropriate.
+                 */
 				throw new UnsupportedOperationException();
 			}
 		}
@@ -993,17 +995,22 @@ public class TestExtensibleHashing extends TestCase2 {
 			
 		}
 
-		/**
-		 * Insert the key into the bucket (duplicates are allowed). It is an
-		 * error if the bucket is full.
-		 * 
-		 * @param h
-		 *            The hash code of the key.
-		 * @param key
-		 *            The key.
-		 * 
-		 * @return <code>false</code> iff the bucket must be split.
-		 */
+        /**
+         * Insert the key into the bucket (duplicates are allowed). It is an
+         * error if the bucket is full.
+         * 
+         * @param h
+         *            The hash code of the key.
+         * @param key
+         *            The key.
+         * 
+         * @return <code>false</code> iff the bucket must be split.
+         * 
+         * @todo The caller needs to be careful that [h] is the full hash code
+         *       for the key. Normally this is not a problem, but we sometimes
+         *       wind up with masked off hash codes, especially during splits
+         *       and merges, and those must not be passed in here.
+         */
 		public boolean insert(final int h, final int key) {
 
 			if (size == data.length) {
