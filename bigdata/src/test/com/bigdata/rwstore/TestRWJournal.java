@@ -481,6 +481,33 @@ public class TestRWJournal extends AbstractJournalTestCase {
         	
         }
         
+        public void testAllocationReserves() {
+        	final int cReserve16K = 16 * 1024;
+        	final int cReserve128K = 32 * 1024;
+        	
+        	showAllocReserve(false, 64, cReserve16K, cReserve16K);
+        	showAllocReserve(false, 128, cReserve16K, cReserve16K);
+        	showAllocReserve(false, 1024, cReserve16K, cReserve16K);
+        	showAllocReserve(false, 2048, cReserve16K, cReserve16K);
+        	showAllocReserve(false, 3072, cReserve16K, cReserve16K);
+        	showAllocReserve(false, 4096, cReserve16K, cReserve16K);
+        	showAllocReserve(false, 8192, cReserve16K, cReserve16K);
+        	
+        	showAllocReserve(true, 64, cReserve128K, cReserve16K);
+        	showAllocReserve(true, 128, cReserve128K, cReserve16K);
+        	showAllocReserve(true, 1024, cReserve128K, cReserve16K);
+        	showAllocReserve(true, 2048, cReserve128K, cReserve16K);
+        	showAllocReserve(true, 3072, cReserve128K, cReserve16K);
+        	showAllocReserve(true, 4096, cReserve16K, cReserve16K);
+        	showAllocReserve(true, 8192, cReserve128K, cReserve16K);
+        }
+        private void showAllocReserve(final boolean optDensity, final int slotSize, final int reserve, final int mod) {
+        	final int ints = FixedAllocator.calcBitSize(optDensity, slotSize, reserve, mod);
+        	// there are max 126 ints available to a FixedAllocator
+        	final int maxuse = (126/(ints+1)) * ints;
+        	System.out.println("Allocate " + ints + ":" + (32 * ints * slotSize) + " for " + slotSize + " in " + reserve + " using " + maxuse + " of 126 possible");
+        }
+        
         long allocBatch(RWStore rw, int bsize, int asze, int ainc) {
 	        long curAddress = rw.physicalAddress(rw.alloc(asze, null));
 	        for (int i = 1; i < bsize; i++) {
@@ -786,7 +813,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 int[] faddrs = allocBatchBuffer(rw, 100, startBlob, endBlob);
                 
 				final StringBuilder str = new StringBuilder();
-				rw.showAllocators(str);
+				rw.getStorageStats().showStats(str);
                 System.out.println(str);
                 } finally {
 
@@ -844,8 +871,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
         
         /**
          * Test of blob allocation and read-back, firstly from cache and then from disk.
+         * @throws InterruptedException 
          */
-        public void test_blob_realloc() {
+        public void test_blob_realloc() throws InterruptedException {
             
             final Journal store = (Journal) getStore();
 
@@ -877,6 +905,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 
                 // allocate another address, might (or might not) be the same.
                 faddr = bs.write(bb); // rw.alloc(buf, buf.length);
+                final long pa = bs.getPhysicalAddress(faddr);
                 bb.position(0);
                 
                 System.out.println("Now commit to disk (1)");
@@ -892,8 +921,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 // now delete the memory
                 bs.delete(faddr);
 
-                // Must not have been immediately freed.
-                assertNotSame(0L, bs.getPhysicalAddress(faddr));
+                // Must not have been immediately freed if history is retained.
+                if (rw.getHistoryRetention() != 0)
+                	assertEquals(pa, bs.getPhysicalAddress(faddr));
+                else
+                	assertEquals(0L, bs.getPhysicalAddress(faddr));
+                	
 
                 /*
                  * Commit before testing for deferred frees. Since there is a
@@ -905,6 +938,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 System.out.println("Now commit to disk (2)");
                 
                 store.commit();
+                
+                Thread.currentThread().sleep(10);
                 
                 // Request release of deferred frees.
                 rw.checkDeferredFrees(true/* freeNow */, store);
