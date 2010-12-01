@@ -73,7 +73,7 @@ class ChildIterator implements INodeIterator {
      * @exception IllegalArgumentException
      *                if fromKey is given and is greater than toKey.
      */
-    public ChildIterator(Node node, byte[] fromKey, byte[] toKey) {
+    public ChildIterator(final Node node, final byte[] fromKey, final byte[] toKey) {
 
         assert node != null;
 
