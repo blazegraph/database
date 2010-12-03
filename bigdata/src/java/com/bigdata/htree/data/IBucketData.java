@@ -26,40 +26,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.htree.data;
 
-import com.bigdata.btree.IOverflowHandler;
-import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.data.IAbstractNodeDataCoder;
+import java.util.Iterator;
+
 import com.bigdata.btree.data.ILeafData;
-import com.bigdata.btree.raba.IRaba;
-import com.bigdata.rawstore.IRawStore;
 
 /**
- * Interface for the data record of a hash bucket.
- * <p>
- * The hash bucket extends the B+Tree leaf node page. However, hash buckets must
- * have the HASH_KEYS flag enabled and SHOULD NOT use prefix compression unless
- * (a) an order preserving hash function is used; and (b) the tuples are in key
- * order within the page.
- * <p>
- * The hash values of the keys in the bucket will have a shared prefix (when
- * using an MSB hash prefix) which corresponds to the globalDepth of the path
- * through the hash tree leading to this bucket less the localDepth of this
- * bucket. It is therefore possible (in principle) to store only the LSB bits of
- * the hash values in the page and reconstruct the hash values using the MSB
- * bits from the path through the hash tree. In order to be able to reconstruct
- * the full hash code key based solely on local information, the MSB bits can be
- * written out once and the LSB bits can be written out once per tuple. Testing
- * the hash value of a key may then be done considering only the LSB bits of the
- * hash value. This storage scheme also has the advantage that the hash value is
- * not restricted to an int32 and is therefore compatible with the use of
- * cryptographic hash functions. (If hash values are stored in a B+Tree leaf
- * they will not shared this prefix property and can not be compressed in this
- * manner).
+ * Interface for the data record of a hash bucket. The hash bucket extends the
+ * B+Tree leaf data record interface. A hash bucket page may be shared by
+ * multiple directory entries (this is one of the principle tenants of
+ * extendible hashing). However, the bucket is just a bucket to each such
+ * directory entry. There is no sense of offset addressing into the shared
+ * bucket.
  * <p>
  * The {@link ILeafData#getPriorAddr()} and {@link ILeafData#getNextAddr()}
  * fields of the {@link ILeafData} record are reserved by the hash tree to
  * encode the search order for range queries when used in combination with an
  * order preserving hash function.
+ * <p>
  * 
  * @author thompsonbry@users.sourceforge.net
  */
@@ -72,10 +55,11 @@ public interface IBucketData extends ILeafData {
 //	 */
 //	int getLocalDepth();
 
-//	/**
-//	 * The total bit length of the hash values of the keys.
-//	 */
-//	int getHashBitLength();
+	/**
+	 * Return the #of entries in the hash bucket (all keys, not just the
+	 * distinct keys).
+	 */
+	int getKeyCount();
 	
 	/**
 	 * The length (in bits) of the MSB prefix shared by the hash values of the
@@ -91,6 +75,29 @@ public interface IBucketData extends ILeafData {
 	 * @return The hash value of that key.
 	 */
 	int getHash(int index);
+
+	/**
+	 * Return an {@link Iterator} which visits the index of each entry in the
+	 * hash bucket having the given hash code.
+	 * 
+	 * @param h
+	 *            The hash code.
+	 * 
+	 * @todo Note: There is a design tradeoff between autoboxing of the
+	 *       <code>int</code> index and allowing the {@link IBucketData} class
+	 *       to encapsulate the iterator pattern together with any setup which
+	 *       can be done once per scan for a given hash code. For example, using
+	 *       a BitInputStream. The iterator allows us to amortize the cost of
+	 *       that setup, but we pay for the autoboxing of the index values.
+	 *       However, autobox primitives tend to be quite cheap as they are
+	 *       rapidly reclaimed by GC.
+	 *       <p>
+	 *       It is possible to implement an extension interface which returns
+	 *       the [int] index without autoboxing. If this method signature is
+	 *       modified to return that interface then the implementation can avoid
+	 *       autoboxing.
+	 */
+	Iterator<Integer> hashIterator(int h);
 	
 //	/**
 //	 * The storage address of the last overflow page in the overflow chain.

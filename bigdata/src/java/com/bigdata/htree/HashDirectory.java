@@ -775,7 +775,7 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 			// Adjust the #of local bits to be considered.
 			bold.setLocalHashBits(bold.getLocalHashBits() + 1);
 			// The new bucket.
-			bnew = new HashBucket(htbl, bold.getLocalHashBits(), bold.data.length/* bucketSize */);
+			bnew = new HashBucket(htbl, bold.getLocalHashBits(), bold.entries.length/* bucketSize */);
 //			// The address for the new bucket.
 //			final int addrBNew = htbl.buckets.size();
 			// Add to the chain of buckets.
@@ -862,7 +862,7 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 		{
 			// the new bucket.
 			bnew = new HashBucket(htbl, bold.getLocalHashBits() + 1,
-					bold.data.length/* bucketSize */);
+					bold.entries.length/* bucketSize */);
 //			// Add to the chain of buckets.
 //			htbl.buckets.add(bnew);
 		}

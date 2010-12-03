@@ -1,5 +1,10 @@
 package com.bigdata.htree.data;
 
+import it.unimi.dsi.fastutil.Hash;
+
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+
 import com.bigdata.btree.data.MockLeafData;
 import com.bigdata.btree.raba.IRaba;
 
@@ -69,6 +74,59 @@ public class MockBucketData extends MockLeafData implements IBucketData {
 	public int getHash(final int index) {
 
 		return hashCodes[index];
+
+	}
+
+	public Iterator<Integer> hashIterator(final int h) {
+		
+		return new HashMatchIterator(h);
+		
+	}
+
+	/**
+	 * Visits the index of each bucket entry having a matching hash code.
+	 */
+	private class HashMatchIterator implements Iterator<Integer> {
+		
+		private final int h;
+		private int currentIndex = 0;
+		private Integer nextResult = null;
+
+		private HashMatchIterator(final int h) {
+			this.h = h;
+		}
+
+		public boolean hasNext() {
+			final int n = getKeyCount();
+			while (nextResult == null && currentIndex < n) {
+				final int index = currentIndex++;
+				final int h1 = getHash(index);
+				if (h1 == h) {
+					nextResult = Integer.valueOf(index);
+					break;
+				}
+			}
+			return nextResult != null;
+		}
+
+		public Integer next() {
+			
+			if (!hasNext())
+				throw new NoSuchElementException();
+			
+			final Integer tmp = nextResult;
+			
+			nextResult = null;
+			
+			return tmp;
+			
+		}
+
+		public void remove() {
+			
+			throw new UnsupportedOperationException();
+			
+		}
 
 	}
 

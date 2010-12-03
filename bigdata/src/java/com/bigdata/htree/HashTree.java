@@ -528,8 +528,7 @@ implements ISimpleBTree // @todo rename ISimpleBTree interface
 	 *       have access to the store or ITuple will have to have indirection
 	 *       support.
 	 */
-	public HashTree(final int initialCapacity,
-			final int bucketSize) {
+	public HashTree(final int initialCapacity, final int bucketSize) {
 
 		// @todo pass in the store reference per AbstractBTree.
 		this.store = new SimpleMemoryRawStore();
