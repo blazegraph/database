@@ -32,6 +32,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IOverflowHandler;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.data.DefaultLeafCoder;
 import com.bigdata.btree.data.IAbstractNodeDataCoder;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.raba.IRaba;
@@ -45,6 +46,11 @@ import com.bigdata.rawstore.IRawStore;
  * 
  * @todo The hash of the key should be part of the ITuple interface so it can be
  *       passed along based on the application level encoding of the key.
+ * 
+ * @todo Consider organizing the hash values of the keys in the page using a
+ *       trie for faster lookup. This could be done when they are serialized (in
+ *       which case this decision disappears into the {@link DefaultLeafCoder})
+ *       or dynamically.
  * 
  * @todo Support out-of-line representations of the key and/or value for a tuple
  *       when they are large. The definition of "large" can be a configuration
@@ -124,7 +130,18 @@ public class HashBucket extends AbstractHashPage<HashBucket>//
 	 * 
 	 * @todo IRaba keys plus IRaba vals.
 	 */
-	final int[] data;
+	final int[] entries;
+
+	/**
+	 * The data record. A mutable is used for all mutation operations. The data
+	 * record is replaced by a read-only record used when the hash bucket is
+	 * made persistent. A read-only data record is automatically converted into
+	 * a mutable record when a mutation operation is requested.
+	 * <p>
+	 * Note: This is package private in order to expose it to
+	 * {@link HashDirectory}.
+	 */
+	private IBucketData data;
 
 	protected void setLocalHashBits(final int localHashBits) {
 		
@@ -133,7 +150,9 @@ public class HashBucket extends AbstractHashPage<HashBucket>//
 	}
 
 	public int getLocalHashBits() {
+
 		return localHashBits;
+		
 	}
 
 	/**
@@ -148,7 +167,7 @@ public class HashBucket extends AbstractHashPage<HashBucket>//
 		for (int i = 0; i < size; i++) {
 			if (i > 0)
 				sb.append(',');
-			sb.append(Integer.toString(data[i]));
+			sb.append(Integer.toString(entries[i]));
 		}
 		sb.append("}}");
 		return sb.toString();
@@ -174,7 +193,7 @@ public class HashBucket extends AbstractHashPage<HashBucket>//
 
 		this.localHashBits = localHashBits;
 
-		this.data = new int[bucketSize];
+		this.entries = new int[bucketSize];
 
 		// one more bucket.
 		htbl.nbuckets++;
@@ -200,7 +219,7 @@ public class HashBucket extends AbstractHashPage<HashBucket>//
 
 		for (int i = 0; i < size; i++) {
 
-			if (data[i] == key)
+			if (entries[i] == key)
 				return true;
 
 		}
@@ -287,7 +306,7 @@ public class HashBucket extends AbstractHashPage<HashBucket>//
 	 */
 	public void insert(final int h, final int key) {
 
-		if (size == data.length) {
+		if (size == entries.length) {
 
 			/*
 			 * The bucket must be split, potentially recursively.
@@ -375,7 +394,7 @@ public class HashBucket extends AbstractHashPage<HashBucket>//
 			
 		}
 
-		data[size++] = key;
+		entries[size++] = key;
 
         // one more entry in the index.
         htbl.nentries++;
@@ -397,7 +416,7 @@ public class HashBucket extends AbstractHashPage<HashBucket>//
 
 		for (int i = 0; i < size; i++) {
 
-			if (data[i] == key) {
+			if (entries[i] == key) {
 
 				// #of tuples remaining beyond this point.
 				final int length = size - i - 1;
@@ -405,7 +424,7 @@ public class HashBucket extends AbstractHashPage<HashBucket>//
 				if (length > 0) {
 
 					// Keep the array dense by copying down by one.
-					System.arraycopy(data, i + 1/* srcPos */, data/* dest */,
+					System.arraycopy(entries, i + 1/* srcPos */, entries/* dest */,
 							i/* destPos */, length);
 
 				}
@@ -461,7 +480,7 @@ public class HashBucket extends AbstractHashPage<HashBucket>//
 
 		@Override
 		public Integer next() {
-			return data[current++];
+			return entries[current++];
 		}
 
 		@Override
@@ -568,14 +587,12 @@ public class HashBucket extends AbstractHashPage<HashBucket>//
 	 * IBucketData
 	 */
 	
-	public int getHash(int index) {
-		// TODO Auto-generated method stub
-		return 0;
+	public int getHash(final int index) {
+		return data.getHash(index);
 	}
 
 	public int getLengthMSB() {
-		// TODO Auto-generated method stub
-		return 0;
+		return data.getLengthMSB();
 	}
 	
 	/*
@@ -583,49 +600,39 @@ public class HashBucket extends AbstractHashPage<HashBucket>//
 	 */
 	
 	public boolean hasVersionTimestamps() {
-		// TODO Auto-generated method stub
-		return false;
+		return data.hasVersionTimestamps();
 	}
 
 	public AbstractFixedByteArrayBuffer data() {
-		// TODO Auto-generated method stub
-		return null;
+		return data.data();
 	}
 
 	public int getKeyCount() {
-		// TODO Auto-generated method stub
-		return 0;
+		return data.getKeyCount();
 	}
 
 	public IRaba getKeys() {
-		// TODO Auto-generated method stub
-		return null;
+		return data.getKeys();
 	}
 
 	public long getMaximumVersionTimestamp() {
-		// TODO Auto-generated method stub
-		return 0;
+		return data.getMaximumVersionTimestamp();
 	}
 
 	public long getMinimumVersionTimestamp() {
-		// TODO Auto-generated method stub
-		return 0;
+		return data.getMinimumVersionTimestamp();
 	}
 
 	public int getSpannedTupleCount() {
-		// TODO Auto-generated method stub
-		return 0;
+		return data.getKeyCount();
 	}
 
 	public boolean isCoded() {
-		// TODO Auto-generated method stub
-		return false;
+		return data.isCoded();
 	}
 
 	final public boolean isLeaf() {
-		
 		return true;
-		
 	}
 
 	/**
@@ -635,55 +642,43 @@ public class HashBucket extends AbstractHashPage<HashBucket>//
 	 * {@link IBucketData} is automatically converted into a mutable instance.
 	 */
     final public boolean isReadOnly() {
-        
-//        return data.isReadOnly();
-		// TODO Auto-generated method stub
-		return false;
-        
+        return data.isReadOnly();
     }
 
     /*
 	 * ILeafData
 	 */
 	
-	public boolean getDeleteMarker(int index) {
-		// TODO Auto-generated method stub
-		return false;
+	public boolean getDeleteMarker(final int index) {
+		return data.getDeleteMarker(index);
 	}
 
 	public long getNextAddr() {
-		// TODO Auto-generated method stub
-		return 0;
+		return data.getNextAddr();
 	}
 
 	public long getPriorAddr() {
-		// TODO Auto-generated method stub
-		return 0;
+		return data.getPriorAddr();
 	}
 
 	public int getValueCount() {
-		// TODO Auto-generated method stub
-		return 0;
+		return data.getValueCount();
 	}
 
 	public IRaba getValues() {
-		// TODO Auto-generated method stub
-		return null;
+		return data.getValues();
 	}
 
-	public long getVersionTimestamp(int index) {
-		// TODO Auto-generated method stub
-		return 0;
+	public long getVersionTimestamp(final int index) {
+		return data.getVersionTimestamp(index);
 	}
 
 	public boolean hasDeleteMarkers() {
-		// TODO Auto-generated method stub
-		return false;
+		return data.hasDeleteMarkers();
 	}
 
 	public boolean isDoubleLinked() {
-		// TODO Auto-generated method stub
-		return false;
+		return data.isDoubleLinked();
 	}
 
 }

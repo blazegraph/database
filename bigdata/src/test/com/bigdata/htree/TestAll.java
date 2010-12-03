@@ -1,6 +1,6 @@
-/*
+/**
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -21,46 +21,48 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-/*
- * Created on Aug 5, 2009
- */
+package com.bigdata.htree;
 
-package com.bigdata.htree.data;
-
-import com.bigdata.btree.data.AbstractLeafDataRecordTestCase;
-import com.bigdata.btree.data.DefaultLeafCoder;
-import com.bigdata.btree.raba.codec.SimpleRabaCoder;
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /**
- * Test with simple coding for keys and values (no compression).
- * 
+ * Aggregates test suites into increasing dependency order.
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestBucketDataRecord_Simple_Simple extends AbstractLeafDataRecordTestCase {
+public class TestAll extends TestCase {
 
     /**
      * 
      */
-    public TestBucketDataRecord_Simple_Simple() {
+    public TestAll() {
     }
 
     /**
-     * @param name
+     * @param arg0
      */
-    public TestBucketDataRecord_Simple_Simple(String name) {
-        super(name);
+    public TestAll(String arg0) {
+        super(arg0);
     }
-    
-    protected void setUp() throws Exception {
-        
-        super.setUp();
 
-        coder = new DefaultLeafCoder(//
-                SimpleRabaCoder.INSTANCE,// keys
-                SimpleRabaCoder.INSTANCE // vals
-        );
-        
-    }
+    /**
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
+     */
+    public static Test suite()
+    {
+
+        final TestSuite suite = new TestSuite("HTree");
+
+		suite.addTest(com.bigdata.htree.data.TestAll.suite());
+
+		suite.addTestSuite(TestExtensibleHashing.class);
+
+		return suite;
+
+	}
 
 }

@@ -27,40 +27,42 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.htree.data;
 
-import com.bigdata.btree.data.AbstractLeafDataRecordTestCase;
 import com.bigdata.btree.data.DefaultLeafCoder;
-import com.bigdata.btree.raba.codec.SimpleRabaCoder;
+import com.bigdata.btree.data.ILeafData;
+import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
 
 /**
- * Test with simple coding for keys and values (no compression).
+ * Test suite for the HTree {@link ILeafData} records (accessing coded data in
+ * place).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestBucketDataRecord_Simple_Simple extends AbstractLeafDataRecordTestCase {
+public class TestBucketDataRecord_CanonicalHuffman_CanonicalHuffman extends
+		AbstractHashBucketDataRecordTestCase {
 
-    /**
+	/**
      * 
      */
-    public TestBucketDataRecord_Simple_Simple() {
-    }
+	public TestBucketDataRecord_CanonicalHuffman_CanonicalHuffman() {
+	}
 
-    /**
-     * @param name
-     */
-    public TestBucketDataRecord_Simple_Simple(String name) {
-        super(name);
-    }
-    
-    protected void setUp() throws Exception {
-        
-        super.setUp();
+	/**
+	 * @param name
+	 */
+	public TestBucketDataRecord_CanonicalHuffman_CanonicalHuffman(String name) {
+		super(name);
+	}
 
-        coder = new DefaultLeafCoder(//
-                SimpleRabaCoder.INSTANCE,// keys
-                SimpleRabaCoder.INSTANCE // vals
-        );
-        
-    }
+	protected void setUp() throws Exception {
+
+		super.setUp();
+
+		coder = new DefaultLeafCoder(//
+				CanonicalHuffmanRabaCoder.INSTANCE,// keys
+				CanonicalHuffmanRabaCoder.INSTANCE // vals
+		);
+
+	}
 
 }

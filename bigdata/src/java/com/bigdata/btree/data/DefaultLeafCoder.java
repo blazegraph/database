@@ -35,6 +35,8 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
 
@@ -368,7 +370,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 			if (nkeys > 0) {
 
 				final int byteLength = BytesUtil
-						.bitFlagByteLength((lengthMSB + (nkeys * lengthLSB)) * 8/* nbits */);
+						.bitFlagByteLength((lengthMSB + (nkeys * lengthLSB))/* nbits */);
 
 				final byte[] a = new byte[byteLength];
 
@@ -443,22 +445,45 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
         return encodeLive(leaf, buf).data();
 
     }
-    
-    /**
-     * A read-only view of the data for a B+Tree leaf based on a compact record
-     * format. While some fields are cached, for the most part the various data
-     * fields, including the keys and values, are accessed in place in the data
-     * record in order to minimize the memory footprint of the leaf. The keys and
-     * values are coded using a caller specified {@link IRabaCoder}. The specific
-     * coding scheme is specified by the {@link IndexMetadata} for the B+Tree
-     * instance and is not stored within the leaf data record.
-     * <p>
-     * Note: The leading byte of the record format codes for a leaf, a double-linked
-     * leaf or a node in a manner which is compatible with {@link ReadOnlyNodeData}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
+
+	/**
+	 * A read-only view of the data for a B+Tree leaf based on a compact record
+	 * format. While some fields are cached, for the most part the various data
+	 * fields, including the keys and values, are accessed in place in the data
+	 * record in order to minimize the memory footprint of the leaf. The keys
+	 * and values are coded using a caller specified {@link IRabaCoder}. The
+	 * specific coding scheme is specified by the {@link IndexMetadata} for the
+	 * B+Tree instance and is not stored within the leaf data record. The use of
+	 * prefix coding for keys is a good general choices, but should not be used
+	 * in combination with a hash tree unless an order preserving hashing
+	 * function is being used.
+	 * <p>
+	 * Note: The leading byte of the record format codes for a leaf, a
+	 * double-linked leaf or a node in a manner which is compatible with
+	 * {@link ReadOnlyNodeData}.
+	 * <p>
+	 * The {@link DefaultLeafCoder} automatically maintains hash values for keys
+	 * for an {@link IBucketData} record. The hash values of the keys in the
+	 * bucket will have a shared prefix (the MSB hash prefix) which corresponds
+	 * to the globalDepth of the path through the hash tree leading to this
+	 * bucket less the localDepth of this bucket. It is therefore possible to
+	 * store only the LSB bits of the hash values in the page and reconstruct
+	 * the hash values using the MSB bits from the path through the hash tree.
+	 * In order to be able to reconstruct the full hash code key based solely on
+	 * local information, the MSB bits can be written out once and the LSB bits
+	 * can be written out once per tuple. Testing the hash value of a key may
+	 * then be done considering only the LSB bits of the hash value. This
+	 * storage scheme also has the advantage that the hash value is not
+	 * restricted to an int32 and is therefore compatible with the use of
+	 * cryptographic hash functions. (If hash values are stored in a B+Tree leaf
+	 * they will not shared this prefix property and can not be compressed in
+	 * this manner).
+	 * 
+	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+	 *         Thompson</a>
+	 * @version $Id: DefaultLeafCoder.java 3991 2010-12-03 18:48:02Z thompsonbry
+	 *          $
+	 */
     static private class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
             implements ILeafData, IBucketData {
 
@@ -645,7 +670,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 				O_hashKeys = pos;
 
 				final int byteLength = BytesUtil
-						.bitFlagByteLength((lengthMSB + (nkeys * lengthLSB)) * 8/* nbits */);
+						.bitFlagByteLength((lengthMSB + (nkeys * lengthLSB))/* nbits */);
 
 				if (nkeys > 0) {
 					
@@ -804,7 +829,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 				O_hashKeys = pos;
 
 				final int byteLength = BytesUtil
-						.bitFlagByteLength((lengthMSB + (nkeys * lengthLSB)) * 8/* nbits */);
+						.bitFlagByteLength((lengthMSB + (nkeys * lengthLSB))/* nbits */);
 
 				if (nkeys > 0) {
 					
@@ -994,7 +1019,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 			final int lengthMSB = 32/* hashBitLength */- lengthLSB;
 
 			final int byteLength = BytesUtil.bitFlagByteLength(lengthMSB
-					+ nkeys * lengthMSB/* nbits */);
+					+ (nkeys * lengthLSB)/* nbits */);
 
 			final InputBitStream ibs = b.slice(O_hashKeys, byteLength)
 					.getInputBitStream();
@@ -1018,8 +1043,102 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
         	}
         	
         }
-        
-        final public IRaba getKeys() {
+
+		public Iterator<Integer> hashIterator(final int h) {
+			
+			return new HashMatchIterator(h);
+			
+		}
+
+		/**
+		 * Visits the index of each bucket entry having a matching hash code.
+		 * 
+		 * @todo a trie over the hash entries would provide much faster search.
+		 */
+		private class HashMatchIterator implements Iterator<Integer> {
+			
+			private final int h;
+			private final int lengthMSB;
+			private final InputBitStream ibs;
+			private int currentIndex = 0;
+			private Integer nextResult = null;
+
+			private HashMatchIterator(final int h) {
+
+				this.h = h;
+				
+				lengthMSB = 32/* hashBitLength */- lengthLSB;
+
+				final int byteLength = BytesUtil.bitFlagByteLength(lengthMSB
+						+ (nkeys * lengthLSB)/* nbits */);
+
+				ibs = b.slice(O_hashKeys, byteLength)
+						.getInputBitStream();
+
+			}
+
+			public boolean hasNext() {
+
+				final int n = getKeyCount();
+
+				while (nextResult == null && currentIndex < n) {
+
+					final int index = currentIndex++;
+					
+					int h1;
+					try {
+
+						// We do not need to re-position the ibs.
+//						final long position = lengthMSB + currentIndex
+//								* lengthLSB;
+//						ibs.position(position);
+
+						h1 = ibs.readInt(lengthLSB);
+
+						h1 |= hashMSB;
+
+					} catch (IOException ex) {
+
+						throw new RuntimeException(ex);
+
+					}
+
+					if (h1 == h) {
+
+						nextResult = Integer.valueOf(index);
+
+						break;
+
+					}
+					
+				}
+
+				return nextResult != null;
+				
+			}
+
+			public Integer next() {
+				
+				if (!hasNext())
+					throw new NoSuchElementException();
+				
+				final Integer tmp = nextResult;
+				
+				nextResult = null;
+				
+				return tmp;
+				
+			}
+
+			public void remove() {
+				
+				throw new UnsupportedOperationException();
+				
+			}
+
+		}
+
+		final public IRaba getKeys() {
             
             return keys;
             

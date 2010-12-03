@@ -32,6 +32,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
@@ -53,6 +55,7 @@ import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.RandomKeysGenerator;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.htree.data.IBucketData;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -479,6 +482,12 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
         }
 
+        if(n1 instanceof IBucketData) {
+
+			assertSameHashCodes((IBucketData) n1, (IBucketData) n2);
+	
+        }
+        
         assertSameRaba(n1.getValues(), n2.getValues());
         
     }
@@ -668,6 +677,68 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
     }
 
+	/**
+	 * Verifies details for the {@link IBucketData} interface.
+	 * 
+	 * @param b1
+	 *            A hash bucket.
+	 * @param b2
+	 *            Another hash bucket.
+	 */
+    static public void assertSameHashCodes(final IBucketData b1, final IBucketData b2) {
+
+    	// The key and value counts must be the same.
+    	final int n = b1.getKeyCount();
+    	assertEquals("keyCount", n, b2.getKeyCount());
+    	assertEquals("valueCount", n, b1.getValueCount());
+    	assertEquals("valueCount", n, b2.getValueCount());
+
+		assertEquals("lengthMSB", b1.getLengthMSB(), b2.getLengthMSB());
+    	
+    	/*
+    	 * Verify that the same hash codes are reported at each index position.
+    	 */
+		for (int i = 0; i < n; i++) {
+
+			final int h1 = b1.getHash(i);
+
+			final int h2 = b2.getHash(i);
+			
+			if (h1 != h2) {
+			
+				assertEquals("getHash(" + i + ")", h1, h2);
+				
+			}
+
+		}
+		
+		/*
+		 * Now verify that the same hash matches are reported for each
+		 * visited hash code.
+		 */
+		for (int i = 0; i < n; i++) {
+
+			final int h1 = b1.getHash(i);
+
+			final List<Integer> indices = new LinkedList<Integer>();
+
+			final Iterator<Integer> eitr = b1.hashIterator(h1);
+
+			while (eitr.hasNext()) {
+
+				indices.add(eitr.next());
+
+			}
+
+			final Integer[] hashCodes = indices.toArray(new Integer[indices
+					.size()]);
+
+			assertSameIterator("hashCodes", hashCodes, b2.hashIterator(h1));
+
+    	}
+
+    }
+    
     /**
      * Special purpose helper used to vet {@link Node#childAddr}.
      * 
@@ -677,7 +748,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param node
      *            The node.
      */
-    public void assertChildKeys(final long[] childAddr, final Node node) {
+    static public void assertChildKeys(final long[] childAddr, final Node node) {
 
         final int nChildAddr = childAddr.length;
         
@@ -720,7 +791,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param node
      *            The node.
      */
-    public void assertKeys(final byte[][] keys, final AbstractNode<?> node) {
+    static public void assertKeys(final byte[][] keys, final AbstractNode<?> node) {
 
 //        // verify the capacity of the keys[] on the node.
 //        assertEquals("keys[] capacity", (node.maxKeys + 1) * stride,
@@ -763,7 +834,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param node
      *            The node.
      */
-    public void assertEntryCounts(final int[] expected, final INodeData node) {
+    static public void assertEntryCounts(final int[] expected, final INodeData node) {
 
         final int len = expected.length;
         
