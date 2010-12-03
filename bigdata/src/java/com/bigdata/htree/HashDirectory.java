@@ -24,13 +24,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Dec 1, 2010
  */
-package com.bigdata.htbl;
+package com.bigdata.htree;
 
 import java.lang.ref.Reference;
 import java.util.Formatter;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
@@ -118,6 +120,117 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 	 */
     private transient/* volatile */Reference<AbstractHashPage<?>>[] childRefs;
 
+	public String toString() {
+
+		return super.toString();
+		
+	}
+
+	/**
+	 * Dumps the buckets in the directory along with metadata about the
+	 * directory.
+	 * 
+	 * @param sb
+	 *            Where to write the dump.
+	 */
+	protected void dump(final StringBuilder sb) {
+
+		// used to remember the visited pages by their addresses (when non-NULL)
+		final Set<Long/* addrs */> visitedAddrs = new LinkedHashSet<Long>();
+
+		// used to remember the visited pages when they are transient.
+		final Map<AbstractHashPage/* children */, Integer/* label */> visitedChildren = new LinkedHashMap<AbstractHashPage, Integer>();
+
+		// used to format the address table.
+		final Formatter f = new Formatter(sb);
+
+		// scan through the address table.
+		for (int index = 0; index < addressMap.length; index++) {
+
+			boolean visited = false;
+
+			long addr = addressMap[index];
+
+			if (addr != NULL && !visitedAddrs.add(addr)) {
+
+				visited = true;
+
+			}
+
+			HashBucket b = (HashBucket) (childRefs[index]).get();
+
+			if (b != null && visitedChildren.containsKey(b)) {
+
+				visited = true;
+
+			} else {
+				
+				visitedChildren.put(b, index);
+				
+			}
+
+			if(b == null) {
+				
+				// materialize the bucket.
+				b = getBucketFromEntryIndex(index);
+				
+				addr = b.getIdentity();
+				
+			}
+			
+			/*
+			 * The label will be either the storage address followed by "P" (for
+			 * Persistent) or the index of the directory entry followed by "T"
+			 * (for Transient).
+			 */
+			final String label = addr == 0L ? (visitedChildren.get(b) + "T")
+					: (addr + "P");
+			
+			f.format("\n%2d [%" + globalHashBits + "s] => (%8s)", index,
+					Integer.toBinaryString(HashTree.maskOff(index,
+							globalHashBits)), label);
+
+			if (!visited) {
+			
+				/*
+				 * Show the bucket details the first time we visit it.
+				 */
+				
+				// The #of local hash bits for the target page.
+				final int localHashBits = b.getLocalHashBits();
+				
+				// The #of entries in this directory for that target page.
+				final int nrefs = HashTree.pow2(globalHashBits
+						- localHashBits);
+				
+				sb.append(" [k=" + b.getLocalHashBits() + ", n=" + nrefs
+						+ "] {");
+
+				final Iterator<Integer> eitr = b.getEntries();
+
+				boolean first = true;
+				
+				while(eitr.hasNext()) {
+
+					if (!first)
+						sb.append(", ");
+					
+					sb.append(eitr.next()/*.getObject()*/);
+				
+					first = false;
+					
+				}
+				
+				sb.append("}");
+				
+			}
+			
+		}
+
+		sb.append('\n');
+
+	}
+	
 	/**
 	 * Create a new mutable directory page.
 	 * 
@@ -138,7 +251,7 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 	 *       function for splitting, overflowing, or growing the bucket page.
 	 */
 	@SuppressWarnings("unchecked")
-	protected HashDirectory(final ExtensibleHashMap htbl,
+	protected HashDirectory(final HashTree htbl,
 			final int initialCapacity, final int maximumCapacity,
 			final int bucketSize) {
 
@@ -156,7 +269,7 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 		 * Setup the hash table given the initialCapacity (in buckets). We need
 		 * to find the first power of two which is GTE the initialCapacity.
 		 */
-		globalHashBits = ExtensibleHashMap.getMapSize(initialCapacity);
+		globalHashBits = HashTree.getMapSize(initialCapacity);
 
 		if (globalHashBits > 32) {
 			
@@ -211,7 +324,7 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 	 */
 	public int getAddressSpaceSize() {
 
-		return ExtensibleHashMap.pow2(globalHashBits);
+		return HashTree.pow2(globalHashBits);
 
 	}
 
@@ -223,7 +336,7 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 	 */
 	private int getIndexOf(final int h) {
 
-		return ExtensibleHashMap.maskOff(h, globalHashBits);
+		return HashTree.maskOff(h, globalHashBits);
 
 	}
 
@@ -392,7 +505,7 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 			final HashBucket b = htbl.getBucketAtStoreAddr(addr);
 
 			// Invariant.
-			assert b.localHashBits <= globalHashBits;
+			assert b.getLocalHashBits() <= globalHashBits;
 			
 			return b;
 
@@ -406,127 +519,6 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 		throw new UnsupportedOperationException();
 	}
 
-	public String toString() {
-		return super.toString();
-	}
-
-	/**
-	 * Dumps the buckets in the directory along with metadata about the
-	 * directory.
-	 * 
-	 * @param sb
-	 *            Where to write the dump.
-	 */
-	protected void dump(final StringBuilder sb) {
-
-		// used to remember the visited pages by their addresses (when non-NULL)
-		final Set<Long/* addrs */> visitedAddrs = new LinkedHashSet<Long>();
-
-		final Set<AbstractHashPage/* children */> visitedChildren = new LinkedHashSet<AbstractHashPage>();
-
-		// used to format the address table.
-		final Formatter f = new Formatter(sb);
-		
-		// the decimal index into the address table.
-		int i = 0;
-
-		for (int index = 0; index < addressMap.length; index++) {
-
-			boolean visited = false;
-
-			long addr = addressMap[index];
-
-			if (addr != NULL && !visitedAddrs.add(addr)) {
-
-				visited = true;
-
-			}
-
-			HashBucket b = (HashBucket) (childRefs[index]).get();
-
-			if (b != null && !visitedChildren.add(b)) {
-
-				visited = true;
-
-			}
-
-			if(b == null) {
-				
-				// materialize the bucket.
-				b = getBucketFromEntryIndex(index);
-				
-				addr = b.getIdentity();
-				
-			}
-			
-			f.format("\n%2d [%" + globalHashBits + "s] => (% 8d)", index, Integer
-					.toBinaryString(ExtensibleHashMap.maskOff(index,
-							globalHashBits)), addr);
-
-			if (!visited) {
-			
-				/*
-				 * Show the bucket details the first time we visit it.
-				 */
-				sb.append(" [k=" + b.localHashBits + "] {");
-				
-				for (int j = 0; j < b.size; j++) {
-
-					if (j > 0)
-						sb.append(", ");
-					
-					sb.append(Integer.toString(b.data[j]));
-				
-				}
-				
-				sb.append("}");
-				
-			}
-
-			index++;
-			
-		}
-
-		sb.append('\n');
-
-	}
-	
-//	/**
-//	 * Visits the storage addresses of the directory entries in directory index
-//	 * order. Note that storage addresses for dirty buckets will be
-//	 * {@link #NULL}.
-//	 * <p>
-//	 * Note: This is NOT thread-safe!
-//	 */
-//	Iterator<Long/*addr*/> addresses() {
-//
-//		return new AddressIterator();
-//		
-//	}
-//
-//	/**
-//	 * Visits the storage addresses of the directory entries in directory index
-//	 * order. Note that storage addresses for dirty buckets will be
-//	 * {@link #NULL}.
-//	 */
-//	private class AddressIterator implements Iterator<Long> {
-//
-//		private int current;
-//
-//		public boolean hasNext() {
-//			return current<addressMap.length;
-//		}
-//
-//		public Long next() {
-//			return addressMap[current++];
-//		}
-//
-//		public void remove() {
-//			throw new UnsupportedOperationException();
-//		}
-//
-//	}
-	
 	/**
 	 * Visit the distinct buckets.
 	 * <p>
@@ -535,20 +527,6 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 	public Iterator<HashBucket> buckets() {
 		
 		return new DistinctChildIterator();
-//		return new Striterator(new ChildIterator()).addFilter(
-//				new UniquenessFilter()).addFilter(new Resolver() {
-//
-//			private static final long serialVersionUID = 1L;
-//
-//			@Override
-//			protected Object resolve(Object obj) {
-//				
-//				final Integer addr = (Integer) obj;
-//				
-//				return htbl.getBucketAtStoreAddr(addr);
-//				
-//			}
-//		});
 
 	}
 
@@ -791,13 +769,13 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 		 * page.
 		 */
 		// The #of local hash bits _before_ the page is split.
-		final int localHashBitsBefore = bold.localHashBits;
+		final int localHashBitsBefore = bold.getLocalHashBits();
 		final HashBucket bnew;
 		{
 			// Adjust the #of local bits to be considered.
-			bold.localHashBits++;
+			bold.setLocalHashBits(bold.getLocalHashBits() + 1);
 			// The new bucket.
-			bnew = new HashBucket(htbl, bold.localHashBits, bold.data.length/* bucketSize */);
+			bnew = new HashBucket(htbl, bold.getLocalHashBits(), bold.data.length/* bucketSize */);
 //			// The address for the new bucket.
 //			final int addrBNew = htbl.buckets.size();
 			// Add to the chain of buckets.
@@ -849,8 +827,8 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 	protected void splitBucket(final int key, final HashBucket bold) {
 		if (log.isDebugEnabled())
 			log.debug("key=" + key + ", globalHashBits=" + globalHashBits
-					+ ", localHashBits=" + bold.localHashBits);
-		assert globalHashBits - bold.localHashBits > 0;
+					+ ", localHashBits=" + bold.getLocalHashBits());
+		assert globalHashBits - bold.getLocalHashBits() > 0;
 		// The hash value of the key.
 		final int h = htbl.hash(key);
 		/*
@@ -880,29 +858,29 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 //		final long addrBNew = htbl.buckets.size();
 		// The new bucket.
 		final HashBucket bnew;
-		final int localHashBitsBefore = bold.localHashBits;
+		final int localHashBitsBefore = bold.getLocalHashBits();
 		{
 			// the new bucket.
-			bnew = new HashBucket(htbl, bold.localHashBits + 1,
+			bnew = new HashBucket(htbl, bold.getLocalHashBits() + 1,
 					bold.data.length/* bucketSize */);
 //			// Add to the chain of buckets.
 //			htbl.buckets.add(bnew);
 		}
 		// Hash code with only the local bits showing.
-		final int localBitsHash = ExtensibleHashMap.maskOff(h, bold.localHashBits);
+		final int localBitsHash = HashTree.maskOff(h, bold.getLocalHashBits());
 		// The #of address map entries for this page.
-		final int numSlotsForPage = ExtensibleHashMap.pow2(globalHashBits - bold.localHashBits);
+		final int numSlotsForPage = HashTree.pow2(globalHashBits - bold.getLocalHashBits());
 		// Loop over the upper 1/2 of those slots.
 		for (int i = (numSlotsForPage / 2); i < numSlotsForPage; i++) {
 			// Index into address table of an entry pointing to this page.
-			final int entryIndex = (i << bold.localHashBits) + localBitsHash;
+			final int entryIndex = (i << bold.getLocalHashBits()) + localBitsHash;
 			// This entry is updated to point to the new page.
 //			addressMap[entryIndex] = addrBNew;
 			childRefs[entryIndex] = ((AbstractHashPage)bnew).self;
 			addressMap[entryIndex] = 0L;
 		}
 		// adjust the #of local bits to be considered on the old bucket.
-		bold.localHashBits++;
+		bold.setLocalHashBits(bold.getLocalHashBits() + 1);
 		// redistribute the tuples between the old and new buckets.
 		redistributeTuples(bold, bnew, /*globalHashBits,*/ localHashBitsBefore);
 		/*
@@ -979,7 +957,7 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 				// The full hash code for that key.
 				final int h = htbl.hash(key);
 				// Mask off all but the global bits.
-				final int h1 = ExtensibleHashMap.maskOff(h, globalHashBits);
+				final int h1 = HashTree.maskOff(h, globalHashBits);
 //				// Drop off the lower bits (w/o sign extension).
 //				final int h2 = h1 >>> localHashBitsBefore;
 				if (h1 >= newPageThreshold) {

@@ -34,17 +34,59 @@ public class Checkpoint implements Externalizable {
 
     // persistent and immutable.
     private long addrMetadata;
-    private long addrRoot;
-    private int height;
-    private int nnodes;
-    private int nleaves;
-    private int nentries;
+    private long addrRoot; // of root node/leaf for BTree; rootDir for HTree.
+    private int height; // height for BTree; globalDepth for HTree.
+    private int nnodes; // #of directories for HTree
+    private int nleaves; // #of buckets for HTree.
+    private int nentries; // #of tuples in the index.
     private long counter;
 
-    /** Note: added in {@link #VERSION1} and presumed 0L in earlier versions. */
     private long addrBloomFilter;
 
-    /**
+	/**
+	 * Added in {@link #VERSION1}. This is a short field allowing for 65536
+	 * different possible index types.
+	 */
+    private IndexTypeEnum indexType;
+
+	/**
+	 * Type safe enumeration of index types.
+	 */
+	public static enum IndexTypeEnum {
+
+		/** BTree. */
+		BTree((short)0),
+		
+		/** Extendable hash tree. */
+		HTree((short)1);
+		
+		private IndexTypeEnum(final short code) {
+		
+			this.code = code;
+			
+		}
+
+		private final short code;
+
+		public short getCode() {
+			
+			return code;
+			
+		}
+		
+		static public IndexTypeEnum valueOf(final short code) {
+			switch (code) {
+			case 0:
+				return BTree;
+			case 1:
+				return HTree;
+			default:
+				throw new IllegalArgumentException("code=" + code);
+			}
+		}
+	}
+
+	/**
      * The address used to read this {@link Checkpoint} record from the
      * store.
      * <p>
@@ -99,20 +141,45 @@ public class Checkpoint implements Externalizable {
         return addrBloomFilter;
         
     }
-    
-    /**
-     * The height of the tree - ZERO(0) means just a root leaf. Values
-     * greater than zero give the #of levels of abstract nodes. There is
-     * always one layer of leaves which is not included in this value.
-     */
+
+	/**
+	 * The height of a B+Tree. ZERO(0) means just a root leaf. Values greater
+	 * than zero give the #of levels of abstract nodes. There is always one
+	 * layer of leaves which is not included in this value.
+	 * 
+	 * @return The global depth and ZERO (0) unless the checkpoint record is for
+	 *         an {@link IndexTypeEnum#BTree}
+	 */
     public final int getHeight() {
 
-        return height;
+		switch (indexType) {
+		case BTree:
+			return height;
+		default:
+			throw new UnsupportedOperationException();
+		}
         
     }
 
+	/**
+	 * The global depth of the root directory (HTree only).
+	 * 
+	 * @return The global depth and ZERO (0) unless the checkpoint record is for
+	 *         an {@link IndexTypeEnum#HTree}
+	 */
+    public final int getGlobalDepth() {
+    	
+		switch (indexType) {
+		case HTree:
+			return height;
+		default:
+			throw new UnsupportedOperationException();
+		}
+
+    }
+
     /**
-     * The #of non-leaf nodes.
+     * The #of non-leaf nodes (B+Tree) or directories (HTree).
      */
     public final int getNodeCount() {
         
@@ -121,7 +188,7 @@ public class Checkpoint implements Externalizable {
     }
 
     /**
-     * The #of leaves.
+     * The #of leaves (B+Tree) or hash buckets (HTree).
      */
     public final int getLeafCount() {
         
@@ -130,7 +197,7 @@ public class Checkpoint implements Externalizable {
     }
 
     /**
-     * The #of index entries.
+     * The #of index entries (aka tuple count).
      */
     public final int getEntryCount() {
         
@@ -155,7 +222,10 @@ public class Checkpoint implements Externalizable {
     public final String toString() {
 
         return "Checkpoint" + //
-                "{height=" + height + //
+        		"{indexType=" + indexType + //
+				(indexType == IndexTypeEnum.BTree ? ",height=" + height
+						: (indexType == IndexTypeEnum.HTree ? ",globalDepth="
+								+ height : "")) +
                 ",nnodes=" + nnodes + //
                 ",nleaves=" + nleaves + //
                 ",nentries=" + nentries + //
@@ -195,7 +265,9 @@ public class Checkpoint implements Externalizable {
                 0, // nnodes
                 0, // nleaves
                 0, // nentries
-                0L // counter
+                0L, // counter
+                IndexTypeEnum.BTree // indexType
+                
         );
         
     }
@@ -223,7 +295,8 @@ public class Checkpoint implements Externalizable {
                 0, // nnodes
                 0, // nleaves
                 0, // nentries
-                oldCheckpoint.counter
+                oldCheckpoint.counter,//
+                IndexTypeEnum.BTree//
         );
         
     }
@@ -276,15 +349,19 @@ public class Checkpoint implements Externalizable {
                 btree.nnodes,//
                 btree.nleaves,//
                 btree.nentries,//
-                btree.counter.get()//
+                btree.counter.get(),//
+                IndexTypeEnum.BTree//
                 );
            
     }
 
-    private Checkpoint(final long addrMetadata, final long addrRoot,
-            final long addrBloomFilter, final int height, final int nnodes,
-            final int nleaves, final int nentries, final long counter) {
+	private Checkpoint(final long addrMetadata, final long addrRoot,
+			final long addrBloomFilter, final int height, final int nnodes,
+			final int nleaves, final int nentries, final long counter,
+			final IndexTypeEnum indexType) {
 
+		assert indexType != null;
+		
         /*
          * Note: The constraint on [addrMetadata] is relaxed in order to permit
          * a transient BTree (no backing store).
@@ -313,6 +390,8 @@ public class Checkpoint implements Externalizable {
 
         this.counter = counter;
         
+        this.indexType = indexType;
+        
     }
 
     /**
@@ -327,11 +406,17 @@ public class Checkpoint implements Externalizable {
      * {@link Checkpoint} record.
      */
     private static transient final int VERSION0 = 0x0;
+
+	/**
+	 * Adds the {@link #indexType} field and the {@link #globalDepth} field,
+	 * which is present only for {@link IndexTypeEnum#HTree}.
+	 */
+    private static transient final int VERSION1 = 0x1;
     
     /**
      * The current version.
      */
-    private static transient final int VERSION = VERSION0;
+    private static transient final int VERSION = VERSION1;
 
     /**
      * Write the {@link Checkpoint} record on the store, setting
@@ -386,8 +471,13 @@ public class Checkpoint implements Externalizable {
         
         final int version = in.readInt();
 
-        if (version != VERSION0)
-            throw new IOException("Unknown version: " + version);
+		switch (version) {
+		case VERSION0:
+		case VERSION1:
+			break;
+		default:
+			throw new IOException("Unknown version: " + version);
+		}
 
         this.addrMetadata = in.readLong();
 
@@ -405,7 +495,19 @@ public class Checkpoint implements Externalizable {
 
         this.counter = in.readLong();
 
-        in.readLong(); // unused.
+		switch (version) {
+		case VERSION0:
+			in.readLong(); // unused
+			indexType = IndexTypeEnum.BTree;
+			break;
+		case VERSION1:
+			this.indexType = IndexTypeEnum.valueOf(in.readShort());
+			in.readShort();// ignored.
+			in.readInt();// ignored.
+			break;
+		default:
+			throw new AssertionError();
+        }
         
         in.readLong(); // unused.
         
@@ -431,10 +533,20 @@ public class Checkpoint implements Externalizable {
 
         out.writeLong(counter);
 
-        out.writeLong(0L/*unused*/);
+        /*
+         * 8 bytes follow. 
+         */
         
-        out.writeLong(0L/*unused*/);
-        
-    }
+        out.writeShort(indexType.getCode());
+		out.writeShort(0/* unused */);
+		out.writeInt(0/* unused */);
+
+        /*
+         * 8 bytes follow. 
+         */
+
+		out.writeLong(0L/* unused */);
+
+	}
 
 }

@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Nov 29, 2010
  */
-package com.bigdata.htbl;
+package com.bigdata.htree;
 
 import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
@@ -112,7 +112,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @todo Integrate a ring buffer for retention of frequently accessed pages per
  *       the weak reference policy observed by the BTree with touch()
  */
-public class ExtensibleHashMap 
+public class HashTree 
 implements ISimpleBTree // @todo rename ISimpleBTree interface
 // @todo implement IAutoBoxBTree and rename IAutoBoxBTree interface.
 // @todo implements IRangeQuery (iff using order preserving hashing)
@@ -120,18 +120,7 @@ implements ISimpleBTree // @todo rename ISimpleBTree interface
 {
 
 	private final transient static Logger log = Logger
-			.getLogger(ExtensibleHashMap.class);
-
-//	/**
-//	 * The buckets. The first bucket is pre-allocated when the address table is
-//	 * setup and all addresses in the table are initialized to point to that
-//	 * bucket. Thereafter, buckets are allocated when a bucket is split.
-//	 * 
-//	 * @todo This needs to become an {@link IRawStore} reference, but first we
-//	 *       need to provide {@link Reference}s from the directory to the
-//	 *       buckets and then we can allow for persistence of dirty pages.
-//	 */
-//	protected final ArrayList<SimpleBucket> buckets;
+			.getLogger(HashTree.class);
 
 	/**
 	 * The backing store.
@@ -532,9 +521,14 @@ implements ISimpleBTree // @todo rename ISimpleBTree interface
 	 *       IRaba implementations for the keys and values (including an option
 	 *       for a pure append binary representation with compaction of deleted
 	 *       tuples). [Some hash table schemes depend on page transparency for
-	 *       the dictionary.] 
+	 *       the dictionary.] The encoded representation must support out of
+	 *       line keys/values for large tuples if we are to keep to a given page
+	 *       size (but we could always expand the page size to fit at least one
+	 *       tuple). Raw record indirection means that the IRaba will have to
+	 *       have access to the store or ITuple will have to have indirection
+	 *       support.
 	 */
-	public ExtensibleHashMap(final int initialCapacity,
+	public HashTree(final int initialCapacity,
 			final int bucketSize) {
 
 		// @todo pass in the store reference per AbstractBTree.
@@ -542,18 +536,6 @@ implements ISimpleBTree // @todo rename ISimpleBTree interface
 
 		root = new HashDirectory(this, initialCapacity,
 				Bytes.kilobyte32 * 4/* maximumCapacity */, bucketSize);
-
-//		/*
-//		 * Now work backwards to determine the size of the address space (in
-//		 * buckets).
-//		 */
-//		final int addressSpaceSize = SimpleExtensibleHashMap.pow2(root
-//				.getGlobalHashBits());
-//
-//		buckets = new ArrayList<SimpleBucket>(addressSpaceSize/* initialCapacity */);
-//
-//		// Note: the local bits of the first bucket is set to ZERO (0).
-//		buckets.add(new SimpleBucket(this, 0/* localHashBits */, bucketSize));
 
 	}
 

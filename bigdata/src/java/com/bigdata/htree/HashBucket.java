@@ -24,22 +24,64 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Nov 29, 2010
  */
-package com.bigdata.htbl;
+package com.bigdata.htree;
 
 import java.util.Iterator;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.IOverflowHandler;
+import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.data.IAbstractNodeDataCoder;
 import com.bigdata.btree.data.ILeafData;
+import com.bigdata.btree.raba.IRaba;
+import com.bigdata.htree.data.IBucketData;
+import com.bigdata.htree.data.IDirectoryData;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * A (very) simple hash bucket. The bucket holds N int32 keys.
  * 
- * @todo Share the {@link ILeafData} interface? Or define a common base
- *       interface for hash buckets and b+tree leaves and then specialize it for
- *       the different kinds of indices?
+ * @todo The hash of the key should be part of the ITuple interface so it can be
+ *       passed along based on the application level encoding of the key.
+ * 
+ * @todo Support out-of-line representations of the key and/or value for a tuple
+ *       when they are large. The definition of "large" can be a configuration
+ *       value for the index metadata. For example, 1/4 of the target page size
+ *       or (1k assuming a target page size of 4k). It should also be possible
+ *       to specify that the value is always out of line (this corresponds to
+ *       the common practice in a relational database of indexing into a
+ *       persistent heap rather than the perfect indices with their inline data
+ *       which we use for RDF statements).
+ *       <p>
+ *       The easiest way to do this is to treat the key and value separately and
+ *       write them as raw records onto the backing store if they exceed the
+ *       configured threshold. For the B+Tree, we can not readily move the key
+ *       out of line since we need it for search, but it is easy to do this for
+ *       the HTree. (For now, I suggest that we live with the constraint that
+ *       the key can not be moved out of line for the B+Tree.) For both index
+ *       structures, it is easy to move the value out of line. The tuple
+ *       metadata will stay inline regardless.
+ *       <p>
+ *       In order to resolve out of line keys and/or values the
+ *       {@link ILeafData} will need access to the {@link IRawStore} reference.
+ *       This may require an API change to {@link IRaba} and/or
+ *       {@link IAbstractNodeDataCoder} (the latter also needs to be modified to
+ *       work with {@link IDirectoryData} records) in order to made the
+ *       {@link IRawStore} reference available when the record is serialized
+ *       and/or deserialized.
+ *       <p>
+ *       When the tuple is deleted, the raw record reference for its key and/or
+ *       value must also be deleted.
+ *       <p>
+ *       During a bulk index build, the raw record must be copied to the target
+ *       index store, e.g., an {@link IndexSegment} using an
+ *       {@link IOverflowHandler}.
  */
-public class HashBucket extends AbstractHashPage<HashBucket> {
+public class HashBucket extends AbstractHashPage<HashBucket>//
+//		implements IBucketData// 
+{
 
 	private final transient static Logger log = Logger
 			.getLogger(HashBucket.class);
@@ -68,7 +110,7 @@ public class HashBucket extends AbstractHashPage<HashBucket> {
 	 *       stored in the address table entry, but that increases the in-memory
 	 *       burden of the address table).
 	 */
-	int localHashBits;
+	private int localHashBits;
 
 	/**
 	 * The #of keys stored in the bucket. The keys are stored in a dense array.
@@ -80,12 +122,19 @@ public class HashBucket extends AbstractHashPage<HashBucket> {
 	/**
 	 * The user data for the bucket.
 	 * 
-	 * @todo IRaba keys plus IRaba vals, but the encoded representation must
-	 *       support out of line keys/values. That means that the IRaba will
-	 *       have to have access to the store or ITuple will have to have
-	 *       indirection support.
+	 * @todo IRaba keys plus IRaba vals.
 	 */
 	final int[] data;
+
+	protected void setLocalHashBits(final int localHashBits) {
+		
+		this.localHashBits = localHashBits;
+		
+	}
+
+	public int getLocalHashBits() {
+		return localHashBits;
+	}
 
 	/**
 	 * Human friendly representation.
@@ -93,7 +142,7 @@ public class HashBucket extends AbstractHashPage<HashBucket> {
 	public String toString() {
 		final StringBuilder sb = new StringBuilder();
 		sb.append(super.toString());
-		sb.append("{localHashBits=" + localHashBits);
+		sb.append("{localHashBits=" + getLocalHashBits());
 		sb.append(",size=" + size);
 		sb.append(",values={");
 		for (int i = 0; i < size; i++) {
@@ -112,7 +161,7 @@ public class HashBucket extends AbstractHashPage<HashBucket> {
 	 * @param localHashBits
 	 * @param bucketSize
 	 */
-	public HashBucket(final ExtensibleHashMap htbl,
+	public HashBucket(final HashTree htbl,
 			final int localHashBits, final int bucketSize) {
 
 		super(htbl, true/* dirty */);
@@ -490,14 +539,14 @@ public class HashBucket extends AbstractHashPage<HashBucket> {
 		
 		if (log.isDebugEnabled())
 			log.debug("globalBits=" + globalHashBits + ",localHashBits="
-					+ bold.localHashBits + ",key=" + key);
+					+ bold.getLocalHashBits() + ",key=" + key);
 
-		if (globalHashBits < bold.localHashBits) {
+		if (globalHashBits < bold.getLocalHashBits()) {
 			// This condition should never arise.
 			throw new AssertionError();
 		}
 
-		if (globalHashBits == bold.localHashBits) {
+		if (globalHashBits == bold.getLocalHashBits()) {
 			/*
 			 * The address table is out of space and needs to be resized.
 			 */
@@ -505,7 +554,7 @@ public class HashBucket extends AbstractHashPage<HashBucket> {
 			// fall through
 		}
 
-		if (globalHashBits > bold.localHashBits) {
+		if (globalHashBits > bold.getLocalHashBits()) {
 			/*
 			 * Split the bucket.
 			 */
@@ -513,6 +562,128 @@ public class HashBucket extends AbstractHashPage<HashBucket> {
 			// fall through.
 		}
 
+	}
+
+	/*
+	 * IBucketData
+	 */
+	
+	public int getHash(int index) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public int getLengthMSB() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+	
+	/*
+	 * IAbstractNodeData
+	 */
+	
+	public boolean hasVersionTimestamps() {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	public AbstractFixedByteArrayBuffer data() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public int getKeyCount() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public IRaba getKeys() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public long getMaximumVersionTimestamp() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public long getMinimumVersionTimestamp() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public int getSpannedTupleCount() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public boolean isCoded() {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	final public boolean isLeaf() {
+		
+		return true;
+		
+	}
+
+	/**
+	 * The result depends on the implementation. The {@link HashBucket} will be
+	 * mutable when it is first created and is made immutable when it is
+	 * persisted. If there is a mutation operation, the backing
+	 * {@link IBucketData} is automatically converted into a mutable instance.
+	 */
+    final public boolean isReadOnly() {
+        
+//        return data.isReadOnly();
+		// TODO Auto-generated method stub
+		return false;
+        
+    }
+
+    /*
+	 * ILeafData
+	 */
+	
+	public boolean getDeleteMarker(int index) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	public long getNextAddr() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public long getPriorAddr() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public int getValueCount() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public IRaba getValues() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public long getVersionTimestamp(int index) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public boolean hasDeleteMarkers() {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	public boolean isDoubleLinked() {
+		// TODO Auto-generated method stub
+		return false;
 	}
 
 }
