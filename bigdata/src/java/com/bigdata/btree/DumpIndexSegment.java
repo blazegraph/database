@@ -284,7 +284,7 @@ public class DumpIndexSegment {
      *            The owning B+Tree.
      * @param addr
      *            The address of the data record in the backing store.
-     * @param data
+     * @param buf
      *            The data record.
      * 
      * @return The node or leaf.
