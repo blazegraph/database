@@ -129,6 +129,14 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData> {
      */
     protected static final short DELTA_VERSION_TIMESTAMPS = 1 << 2;
 
+	/**
+	 * Bit flag indicating that the int32 hash of the key should be stored in
+	 * the leaf data record. The function used to compute hash code will be
+	 * known to the owning data structure. This is primarily intended for use
+	 * with hash trees.
+	 */
+    protected static final short FLAG_HASH_KEYS = 1 << 3;
+
     /**
      * The size of the field in the data record which encodes whether the data
      * record represents a B+Tree {@link #NODE}, a {@link #LEAF}, or a

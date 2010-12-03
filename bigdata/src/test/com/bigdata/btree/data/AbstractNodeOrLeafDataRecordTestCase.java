@@ -29,6 +29,7 @@ package com.bigdata.btree.data;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
@@ -58,6 +59,45 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
 //    protected IRabaCoder keysCoder = null;
 //    protected IRabaCoder valuesCoder = null;
 
+	/**
+	 * Factory for the mock {@link ILeafData} object used to provide ground
+	 * truth for the fixture under test.
+	 * 
+	 * @param keys
+	 *            The keys.
+	 * @param vals
+	 *            The values.
+	 * 
+	 * @return The mock {@link ILeafData} object.
+	 */
+	final protected ILeafData mockLeafFactory(final IRaba keys, final IRaba vals) {
+
+		return mockLeafFactory(keys, vals, null/* deleteMarkers */, null/* versionTimestamps */);
+
+	}
+
+	/**
+	 * Factory for the mock {@link ILeafData} object used to provide ground
+	 * truth for the fixture under test.
+	 * 
+	 * @param keys
+	 *            The keys.
+	 * @param vals
+	 *            The values.
+	 * @param deleteMarkers
+	 *            The delete markers (optional).
+	 * @param versionTimestamps
+	 *            The version timestamps (optional).
+	 * 
+	 * @return The mock {@link ILeafData} object.
+	 */
+	protected ILeafData mockLeafFactory(final IRaba keys, final IRaba vals,
+			final boolean[] deleteMarkers, final long[] versionTimestamps) {
+
+		return new MockLeafData(keys, vals, deleteMarkers, versionTimestamps);
+
+    }
+    
     /**
      * Set by concrete test suite classes to the coder under test.
      */
@@ -339,7 +379,7 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
     /**
      * Generates a non-leaf node with random data.
      */
-    public MockNodeData getRandomNode(final int m) {
+    public INodeData getRandomNode(final int m) {
 
         // #of keys per node.
         final int branchingFactor = m;
@@ -397,7 +437,7 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
     /**
      * Generates a leaf node with random data.
      */
-    public MockLeafData getRandomLeaf(final int m,
+    public ILeafData getRandomLeaf(final int m,
             final boolean isDeleteMarkers, final boolean isVersionTimestamps) {
 
         // #of keys per node.
@@ -441,7 +481,7 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
 
         }
 
-        return new MockLeafData(//
+        return mockLeafFactory(//
                 new ReadOnlyKeysRaba(nkeys, keys),//
                 new ReadOnlyValuesRaba(nkeys, values),//
                 deleteMarkers,//

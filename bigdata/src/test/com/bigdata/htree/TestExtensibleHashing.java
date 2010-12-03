@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Nov 22, 2010
  */
-package com.bigdata.htbl;
+package com.bigdata.htree;
 
 import java.util.Arrays;
 import java.util.Formatter;
@@ -166,60 +166,60 @@ public class TestExtensibleHashing extends TestCase2 {
 	}
 
 	/**
-	 * Unit test for {@link ExtensibleHashMap#getMapSize(int)}.
+	 * Unit test for {@link HashTree#getMapSize(int)}.
 	 */
 	public void test_getMapSize() {
 		
-		assertEquals(1/* addressSpaceSize */, ExtensibleHashMap.getMapSize(1)/* initialCapacity */);
-		assertEquals(1/* addressSpaceSize */, ExtensibleHashMap.getMapSize(2)/* initialCapacity */);
-		assertEquals(2/* addressSpaceSize */, ExtensibleHashMap.getMapSize(3)/* initialCapacity */);
-		assertEquals(2/* addressSpaceSize */, ExtensibleHashMap.getMapSize(4)/* initialCapacity */);
-		assertEquals(3/* addressSpaceSize */, ExtensibleHashMap.getMapSize(5)/* initialCapacity */);
-		assertEquals(3/* addressSpaceSize */, ExtensibleHashMap.getMapSize(6)/* initialCapacity */);
-		assertEquals(3/* addressSpaceSize */, ExtensibleHashMap.getMapSize(7)/* initialCapacity */);
-		assertEquals(3/* addressSpaceSize */, ExtensibleHashMap.getMapSize(8)/* initialCapacity */);
-		assertEquals(4/* addressSpaceSize */, ExtensibleHashMap.getMapSize(9)/* initialCapacity */);
+		assertEquals(1/* addressSpaceSize */, HashTree.getMapSize(1)/* initialCapacity */);
+		assertEquals(1/* addressSpaceSize */, HashTree.getMapSize(2)/* initialCapacity */);
+		assertEquals(2/* addressSpaceSize */, HashTree.getMapSize(3)/* initialCapacity */);
+		assertEquals(2/* addressSpaceSize */, HashTree.getMapSize(4)/* initialCapacity */);
+		assertEquals(3/* addressSpaceSize */, HashTree.getMapSize(5)/* initialCapacity */);
+		assertEquals(3/* addressSpaceSize */, HashTree.getMapSize(6)/* initialCapacity */);
+		assertEquals(3/* addressSpaceSize */, HashTree.getMapSize(7)/* initialCapacity */);
+		assertEquals(3/* addressSpaceSize */, HashTree.getMapSize(8)/* initialCapacity */);
+		assertEquals(4/* addressSpaceSize */, HashTree.getMapSize(9)/* initialCapacity */);
 
-		assertEquals(5/* addressSpaceSize */, ExtensibleHashMap.getMapSize(32)/* initialCapacity */);
+		assertEquals(5/* addressSpaceSize */, HashTree.getMapSize(32)/* initialCapacity */);
 
-		assertEquals(10/* addressSpaceSize */, ExtensibleHashMap.getMapSize(1024)/* initialCapacity */);
+		assertEquals(10/* addressSpaceSize */, HashTree.getMapSize(1024)/* initialCapacity */);
 
 	}
 
 	/**
-	 * Unit test for {@link ExtensibleHashMap#getMaskBits(int)}
+	 * Unit test for {@link HashTree#getMaskBits(int)}
 	 */
 	public void test_getMaskBits() {
 
-		assertEquals(0x00000001, ExtensibleHashMap.getMaskBits(1));
-		assertEquals(0x00000003, ExtensibleHashMap.getMaskBits(2));
-		assertEquals(0x00000007, ExtensibleHashMap.getMaskBits(3));
-		assertEquals(0x0000000f, ExtensibleHashMap.getMaskBits(4));
-		assertEquals(0x0000001f, ExtensibleHashMap.getMaskBits(5));
-		assertEquals(0x0000003f, ExtensibleHashMap.getMaskBits(6));
-		assertEquals(0x0000007f, ExtensibleHashMap.getMaskBits(7));
-		assertEquals(0x000000ff, ExtensibleHashMap.getMaskBits(8));
+		assertEquals(0x00000001, HashTree.getMaskBits(1));
+		assertEquals(0x00000003, HashTree.getMaskBits(2));
+		assertEquals(0x00000007, HashTree.getMaskBits(3));
+		assertEquals(0x0000000f, HashTree.getMaskBits(4));
+		assertEquals(0x0000001f, HashTree.getMaskBits(5));
+		assertEquals(0x0000003f, HashTree.getMaskBits(6));
+		assertEquals(0x0000007f, HashTree.getMaskBits(7));
+		assertEquals(0x000000ff, HashTree.getMaskBits(8));
 
-		assertEquals(0x0000ffff, ExtensibleHashMap.getMaskBits(16));
+		assertEquals(0x0000ffff, HashTree.getMaskBits(16));
 
-		assertEquals(0xffffffff, ExtensibleHashMap.getMaskBits(32));
+		assertEquals(0xffffffff, HashTree.getMaskBits(32));
 		
 	}
 
 	/**
-	 * Unit test for {@link ExtensibleHashMap#maskOff(int, int)}
+	 * Unit test for {@link HashTree#maskOff(int, int)}
 	 */
 	public void test_maskOff() {
 
 //		SimpleExtensibleHashMap.class;
 		
-		assertEquals(0x00000000, ExtensibleHashMap
+		assertEquals(0x00000000, HashTree
 				.maskOff(0/* hash */, 1/* nbits */));
 
-		assertEquals(0x00000000, ExtensibleHashMap
+		assertEquals(0x00000000, HashTree
 				.maskOff(8/* hash */, 2/* nbits */));
 
-		assertEquals(0x00000002, ExtensibleHashMap
+		assertEquals(0x00000002, HashTree
 				.maskOff(18/* hash */, 2/* nbits */));
 
 	}
@@ -257,7 +257,7 @@ public class TestExtensibleHashing extends TestCase2 {
 	 */
 	public void test_ctor() {
 
-		final ExtensibleHashMap map = new ExtensibleHashMap(
+		final HashTree map = new HashTree(
 				1/* initialCapacity */, 3/* bucketSize */);
 	
 		assertEquals("globalHashBits", 1, map.getGlobalHashBits());
@@ -276,7 +276,7 @@ public class TestExtensibleHashing extends TestCase2 {
 	 */
 	public void test_crud1() {
 	
-		final ExtensibleHashMap map = new ExtensibleHashMap(
+		final HashTree map = new HashTree(
 				1/* initialCapacity */, 3/* bucketSize */);
 
 		// a bunch of things which are not in the map.
@@ -317,7 +317,7 @@ public class TestExtensibleHashing extends TestCase2 {
 	 */
 	public void test_crud2() {
 	
-		final ExtensibleHashMap map = new ExtensibleHashMap(
+		final HashTree map = new HashTree(
 				1/* initialCapacity */, 3/* bucketSize */);
 
 		assertEquals("bucketCount", 1, map.getBucketCount());
@@ -566,7 +566,7 @@ public class TestExtensibleHashing extends TestCase2 {
         
 		final int bucketSize = 3;
         
-        final ExtensibleHashMap map = new ExtensibleHashMap(
+        final HashTree map = new HashTree(
                 1/* initialCapacity */, bucketSize);
 
 		/*
@@ -580,7 +580,7 @@ public class TestExtensibleHashing extends TestCase2 {
 			assertSameIteratorAnyOrder(new Integer[] { }, map
 					.getEntries());
 			final HashBucket b = map.getRoot().getBucketFromEntryIndex(0);
-			assertEquals("localHashBits", 0, b.localHashBits);
+			assertEquals("localHashBits", 0, b.getLocalHashBits());
 			assertSameIteratorAnyOrder(new Integer[] { }, b.getEntries());
 		}
 
@@ -600,7 +600,7 @@ public class TestExtensibleHashing extends TestCase2 {
 				assertSameIteratorAnyOrder(new Integer[] { 4 }, map
 						.getEntries());
 				final HashBucket b = map.getRoot().getBucketFromEntryIndex(0);
-				assertEquals("localHashBits", 0, b.localHashBits);
+				assertEquals("localHashBits", 0, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 4 }, b.getEntries());
 			}
 			{
@@ -614,7 +614,7 @@ public class TestExtensibleHashing extends TestCase2 {
 				assertSameIteratorAnyOrder(new Integer[] { 4, 23 }, map
 						.getEntries());
 				final HashBucket b = map.getRoot().getBucketFromEntryIndex(0);
-				assertEquals("localHashBits", 0, b.localHashBits);
+				assertEquals("localHashBits", 0, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 4, 23 }, b
 						.getEntries());
 			}
@@ -630,7 +630,7 @@ public class TestExtensibleHashing extends TestCase2 {
 						.getEntries());
 				// addressMap[0] => bucket 0
 				final HashBucket b = map.getRoot().getBucketFromEntryIndex(0);
-				assertEquals("localHashBits", 0, b.localHashBits);
+				assertEquals("localHashBits", 0, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 4, 23, 18 }, b
 						.getEntries());
 			}
@@ -655,12 +655,12 @@ public class TestExtensibleHashing extends TestCase2 {
 						.getEntries());
 				// addressMap[0] => bucket 0
 				HashBucket b = map.getRoot().getBucketFromEntryIndex(0);
-				assertEquals("localHashBits", 1, b.localHashBits);
+				assertEquals("localHashBits", 1, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 4, 10, 18 }, b
 						.getEntries());
 				// addressMap[0] => bucket 1
 				b = map.getRoot().getBucketFromEntryIndex(1);
-				assertEquals("localHashBits", 1, b.localHashBits);
+				assertEquals("localHashBits", 1, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 23 }, b.getEntries());
 			}
 		}
@@ -683,18 +683,18 @@ public class TestExtensibleHashing extends TestCase2 {
 						map.getEntries());
 				// addressMap[0] => bucket 0.
 				HashBucket b = map.getRoot().getBucketFromEntryIndex(0);
-				assertEquals("localHashBits", 2, b.localHashBits);
+				assertEquals("localHashBits", 2, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 4, 44 }, b
 						.getEntries());
 				// addressMap[1,3] => bucket 1
 				assertEquals("addr", map.getRoot().getAddressFromEntryIndex(1), map
 						.getRoot().getAddressFromEntryIndex(3));
 				b = map.getRoot().getBucketFromEntryIndex(1);
-				assertEquals("localHashBits", 1, b.localHashBits);
+				assertEquals("localHashBits", 1, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 23 }, b.getEntries());
 				// addressMap[2] => bucket 2
 				b = map.getRoot().getBucketFromEntryIndex(2);
-				assertEquals("localHashBits", 2, b.localHashBits);
+				assertEquals("localHashBits", 2, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 10, 18 }, b.getEntries());
 			}
 		}
@@ -716,18 +716,18 @@ public class TestExtensibleHashing extends TestCase2 {
 						32 }, map.getEntries());
 				// addressMap[0] => bucket 0.
 				HashBucket b = map.getRoot().getBucketFromEntryIndex(0);
-				assertEquals("localHashBits", 2, b.localHashBits);
+				assertEquals("localHashBits", 2, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 4, 44, 32 }, b
 						.getEntries());
 				// addressMap[1,3] => bucket 1
 				assertEquals("addr", map.getRoot().getAddressFromEntryIndex(1), map
 						.getRoot().getAddressFromEntryIndex(3));
 				b = map.getRoot().getBucketFromEntryIndex(1);
-				assertEquals("localHashBits", 1, b.localHashBits);
+				assertEquals("localHashBits", 1, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 23 }, b.getEntries());
 				// addressMap[2] => bucket 2
 				b = map.getRoot().getBucketFromEntryIndex(2);
-				assertEquals("localHashBits", 2, b.localHashBits);
+				assertEquals("localHashBits", 2, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 10, 18 }, b.getEntries());
 			}
 		}
@@ -749,18 +749,18 @@ public class TestExtensibleHashing extends TestCase2 {
 						32, 9 }, map.getEntries());
 				// addressMap[0] => bucket 0.
 				HashBucket b = map.getRoot().getBucketFromEntryIndex(0);
-				assertEquals("localHashBits", 2, b.localHashBits);
+				assertEquals("localHashBits", 2, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 4, 44, 32 }, b
 						.getEntries());
 				// addressMap[1,3] => bucket 1
 				assertEquals("addr", map.getRoot().getAddressFromEntryIndex(1), map
 						.getRoot().getAddressFromEntryIndex(3));
 				b = map.getRoot().getBucketFromEntryIndex(1);
-				assertEquals("localHashBits", 1, b.localHashBits);
+				assertEquals("localHashBits", 1, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 23, 9 }, b.getEntries());
 				// addressMap[2] => bucket 2
 				b = map.getRoot().getBucketFromEntryIndex(2);
-				assertEquals("localHashBits", 2, b.localHashBits);
+				assertEquals("localHashBits", 2, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 10, 18 }, b.getEntries());
 			}
 		}
@@ -857,7 +857,7 @@ public class TestExtensibleHashing extends TestCase2 {
 						32, 9, 76 }, map.getEntries());
 				// addressMap[0] => bucket 0.
 				HashBucket b = map.getRoot().getBucketFromEntryIndex(0);
-				assertEquals("localHashBits", 3, b.localHashBits);
+				assertEquals("localHashBits", 3, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 32 }, b
 						.getEntries());
 				// addressMap[1,3,5,7] => bucket 1
@@ -868,17 +868,17 @@ public class TestExtensibleHashing extends TestCase2 {
 				assertEquals("addr", map.getRoot().getAddressFromEntryIndex(1), map
 						.getRoot().getAddressFromEntryIndex(7));
 				b = map.getRoot().getBucketFromEntryIndex(1);
-				assertEquals("localHashBits", 1, b.localHashBits);
+				assertEquals("localHashBits", 1, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 23, 9 }, b.getEntries());
 				// addressMap[2,6] => bucket 2
 				b = map.getRoot().getBucketFromEntryIndex(2);
 				assertEquals("addr", map.getRoot().getAddressFromEntryIndex(2), map
 						.getRoot().getAddressFromEntryIndex(6));
-				assertEquals("localHashBits", 2, b.localHashBits);
+				assertEquals("localHashBits", 2, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 10, 18 }, b.getEntries());
 				// addressMap[4] => bucket 3
 				b = map.getRoot().getBucketFromEntryIndex(4);
-				assertEquals("localHashBits", 3, b.localHashBits);
+				assertEquals("localHashBits", 3, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 4, 44, 76 }, b.getEntries());
 			}
         }
@@ -929,7 +929,7 @@ public class TestExtensibleHashing extends TestCase2 {
 				HashBucket b = map.getRoot().getBucketFromEntryIndex(0);
 				assertEquals("addr", map.getRoot().getAddressFromEntryIndex(0), map
 						.getRoot().getAddressFromEntryIndex(8));
-				assertEquals("localHashBits", 3, b.localHashBits);
+				assertEquals("localHashBits", 3, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 32 }, b
 						.getEntries());
 				// addressMap[1,3,5,7,9,11,13,15] => bucket 1
@@ -948,7 +948,7 @@ public class TestExtensibleHashing extends TestCase2 {
 				assertEquals("addr", map.getRoot().getAddressFromEntryIndex(1), map
 						.getRoot().getAddressFromEntryIndex(15));
 				b = map.getRoot().getBucketFromEntryIndex(1);
-				assertEquals("localHashBits", 1, b.localHashBits);
+				assertEquals("localHashBits", 1, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 23, 9 }, b.getEntries());
 				// addressMap[2,6,10,14] => bucket 2
 				b = map.getRoot().getBucketFromEntryIndex(2);
@@ -958,15 +958,15 @@ public class TestExtensibleHashing extends TestCase2 {
 						.getRoot().getAddressFromEntryIndex(10));
 				assertEquals("addr", map.getRoot().getAddressFromEntryIndex(2), map
 						.getRoot().getAddressFromEntryIndex(14));
-				assertEquals("localHashBits", 2, b.localHashBits);
+				assertEquals("localHashBits", 2, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 10, 18 }, b.getEntries());
 				// addressMap[4] => bucket 3
 				b = map.getRoot().getBucketFromEntryIndex(4);
-				assertEquals("localHashBits", 4, b.localHashBits);
+				assertEquals("localHashBits", 4, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 4, 20 }, b.getEntries());
 				// addressMap[12] => bucket 5
 				b = map.getRoot().getBucketFromEntryIndex(12);
-				assertEquals("localHashBits", 4, b.localHashBits);
+				assertEquals("localHashBits", 4, b.getLocalHashBits());
 				assertSameIteratorAnyOrder(new Integer[] { 44, 76 }, b.getEntries());
 			}
         }
@@ -1017,7 +1017,7 @@ public class TestExtensibleHashing extends TestCase2 {
 
 		final int bucketSize = 3;
 		
-		final ExtensibleHashMap map = new ExtensibleHashMap(
+		final HashTree map = new HashTree(
 				1/* initialCapacity */, bucketSize);
 
 		/*
@@ -1030,7 +1030,7 @@ public class TestExtensibleHashing extends TestCase2 {
 			assertSameIteratorAnyOrder(new Integer[] { }, map
 					.getEntries());
 			final HashBucket b = map.getRoot().getBucketFromEntryIndex(0);
-			assertEquals("localHashBits", 0, b.localHashBits);
+			assertEquals("localHashBits", 0, b.getLocalHashBits());
 			assertSameIteratorAnyOrder(new Integer[] { }, b.getEntries());
 		}
 
@@ -1051,7 +1051,7 @@ public class TestExtensibleHashing extends TestCase2 {
 			assertSameIteratorAnyOrder(new Integer[] { 4, 20, 44 }, map
 					.getEntries());
 			final HashBucket b = map.getRoot().getBucketFromEntryIndex(0);
-			assertEquals("localHashBits", 0, b.localHashBits);
+			assertEquals("localHashBits", 0, b.getLocalHashBits());
 			assertSameIteratorAnyOrder(new Integer[] { 4, 20, 44 }, b
 					.getEntries());
 		}
@@ -1087,12 +1087,12 @@ public class TestExtensibleHashing extends TestCase2 {
 					.getEntries());
 			// addressMap[0...7] => bucket 0.
 			HashBucket b = map.getRoot().getBucketFromEntryIndex(0);
-			assertEquals("localHashBits", 1, b.localHashBits);
+			assertEquals("localHashBits", 1, b.getLocalHashBits());
 			assertSameIteratorAnyOrder(new Integer[] { 4, 20 }, b
 					.getEntries());
 			// addressMap[8...15] => bucket 1.
 			b = map.getRoot().getBucketFromEntryIndex(8);
-			assertEquals("localHashBits", 1, b.localHashBits);
+			assertEquals("localHashBits", 1, b.getLocalHashBits());
 			assertSameIteratorAnyOrder(new Integer[] { 44, 76 }, b
 					.getEntries());
 		}
@@ -1107,7 +1107,7 @@ public class TestExtensibleHashing extends TestCase2 {
 
 		final int bucketSize = 3;
 		
-		final ExtensibleHashMap map = new ExtensibleHashMap(
+		final HashTree map = new HashTree(
 				1/* initialCapacity */, bucketSize);
 
 		assertEquals("bucketCount", 1, map.getBucketCount());
@@ -1128,7 +1128,7 @@ public class TestExtensibleHashing extends TestCase2 {
 
 	/**
 	 * Stress test using distinct integer keys verifies that the
-	 * {@link ExtensibleHashMap} correctly tracks the {@link HashMap} for
+	 * {@link HashTree} correctly tracks the {@link HashMap} for
 	 * inserts.
 	 * 
 	 * @todo Do another test with deletes (or mixed inserts and deletes).
@@ -1153,7 +1153,7 @@ public class TestExtensibleHashing extends TestCase2 {
 		final Set<Integer> groundTruth = new LinkedHashSet<Integer>(limit);
 
 		// The fixture under test.
-        final ExtensibleHashMap map = new ExtensibleHashMap(
+        final HashTree map = new HashTree(
                 1/* initialCapacity */, bucketSize);
 
 		for (int i = 0; i < limit; i++) {

@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Dec 1, 2010
  */
-package com.bigdata.htbl;
+package com.bigdata.htree;
 
 import java.io.Externalizable;
 import java.io.IOException;
@@ -49,6 +49,10 @@ public class HTableMetadata implements Externalizable {
 	 */
 	private HashFunction hashFunction;
 
+	private Object directoryCoder;
+	
+	private Object bucketCoder;
+	
 	/**
 	 * Function decides whether to split a page, link an overflow page, or
 	 * expand the size of a page.

@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Dec 1, 2010
  */
-package com.bigdata.htbl;
+package com.bigdata.htree;
 
 import java.lang.ref.Reference;
 
@@ -49,7 +49,7 @@ abstract public class AbstractHashPage <T extends AbstractHashPage
 	/**
 	 * Transient back reference to the index to which this directory belongs.
 	 */
-	protected transient ExtensibleHashMap htbl;
+	protected transient HashTree htbl;
 
 	/**
 	 * <p>
@@ -71,7 +71,7 @@ abstract public class AbstractHashPage <T extends AbstractHashPage
         
     }
 
-	protected AbstractHashPage(final ExtensibleHashMap htbl, final boolean dirty) {
+	protected AbstractHashPage(final HashTree htbl, final boolean dirty) {
 
 		if(htbl == null)
 			throw new IllegalArgumentException();

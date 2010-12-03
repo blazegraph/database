@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.data;
 
 
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.io.DataOutputBuffer;
@@ -75,7 +76,7 @@ public class AbstractLeafDataRecordTestCase extends
         final byte[][] keys = new byte[m + 1][];
         final byte[][] vals = new byte[m + 1][];
 
-        final ILeafData expected = new MockLeafData(new ReadOnlyKeysRaba(
+        final ILeafData expected = mockLeafFactory(new ReadOnlyKeysRaba(
                 nkeys, keys), new ReadOnlyValuesRaba(nkeys, vals));
 
         doRoundTripTest(expected, coder, new DataOutputBuffer());
@@ -99,7 +100,7 @@ public class AbstractLeafDataRecordTestCase extends
 
         keys[0] = new byte[0];
         
-        final ILeafData expected = new MockLeafData(new ReadOnlyKeysRaba(
+        final ILeafData expected = mockLeafFactory(new ReadOnlyKeysRaba(
                 nkeys, keys), new ReadOnlyValuesRaba(nkeys, vals));
 
         doRoundTripTest(expected, coder, new DataOutputBuffer());
@@ -135,7 +136,7 @@ public class AbstractLeafDataRecordTestCase extends
         deleteMarkers[0] = true;
         versionTimestamps[0] = System.currentTimeMillis();
 
-        final ILeafData expected = new MockLeafData(//
+        final ILeafData expected = mockLeafFactory(//
                 new ReadOnlyKeysRaba(nkeys, keys),//
                 new ReadOnlyValuesRaba(nkeys, vals),//
                 deleteMarkers,//
@@ -184,7 +185,7 @@ public class AbstractLeafDataRecordTestCase extends
         versionTimestamps[0] = System.currentTimeMillis();
         versionTimestamps[1] = System.currentTimeMillis()+20;
 
-        final ILeafData expected = new MockLeafData(//
+        final ILeafData expected = mockLeafFactory(//
                 new ReadOnlyKeysRaba(nkeys, keys),//
                 new ReadOnlyValuesRaba(nkeys, vals),//
                 deleteMarkers,//
