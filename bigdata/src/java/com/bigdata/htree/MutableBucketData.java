@@ -100,7 +100,37 @@ public class MutableBucketData implements IBucketData {
 	 * @param data
 	 */
 	public MutableBucketData(final IBucketData data) {
-		
+
+		/*
+		 * @todo this is the initial capacity. the buffer can grow as necessary
+		 * until we have reached the maximum number of entries permitted by the
+		 * branching factor (and for HTree we should let the branching factor
+		 * grow as well if we are under the target page size!).
+		 * 
+		 * The caller should be passing in the estimated bufferSize to achieve a
+		 * target page size.
+		 */
+		buf = new ByteArrayBuffer(Bytes.kilobyte32*4);
+
+		/*
+		 * @todo this is an exact fit. The caller should be passing in the
+		 * configured branchingFactor.
+		 * 
+		 * Actually, an ArrayList or simply an extendable or pre-extended array
+		 * would do fine here. All we need to do is translate the index of the
+		 * entry into the offset into the buffer. There are very specialized
+		 * data structures which can do better for this than an array by leaving
+		 * "holes" to minimize the amount of copying when inserting, but that
+		 * should not be a problem with a compacting pass over the buffer. We
+		 * can either compact over each hole, copy down things into "good" fits
+		 * in the holes, or copy things into a new array. This would be a pretty
+		 * natural fit with a single free buffer which is available on the
+		 * HTree/BTree and swapped with the buffer in a leaf/bucket each time it
+		 * is compacted.  Any of these schemes will do less copying that the
+		 * current B+Tree scheme, which copies up/down all the time.
+		 */
+		index = new OpenIntIntHashMap(data.getKeyCount());
+
 	}
 
 	/**
@@ -122,13 +152,24 @@ public class MutableBucketData implements IBucketData {
 	 *       fit a model which estimates the size of the resulting page based on
 	 *       the size of the buffer and then grow the buffer until we can
 	 *       satisfy the target page size.
+	 * 
+	 *       FIXME The buffer should be LARGER than the target value required to
+	 *       model a full page in order to have some efficiency with update
+	 *       operations when the page is nearly full.  Probably we should use
+	 *       1.5x to 2x the target page size for the bufferSize. 
 	 */
 	public MutableBucketData(final int bufferSize, final int branchingFactor) {
 
-		final int initialBufferSize = Math
-				.min(Bytes.kilobyte32 * 4, bufferSize);
-
-		buf = new ByteArrayBuffer(initialBufferSize);
+		/*
+		 * Initialize the buffer and the index using the given values.
+		 * 
+		 * The bufferSize should be adaptive.
+		 * 
+		 * The branchingFactor could be adaptive as well (but the B+Tree logic
+		 * would have to be updated to handle leaves which are over or under the
+		 * nominal branching factor).
+		 */
+		buf = new ByteArrayBuffer(bufferSize);
 
 		index = new OpenIntIntHashMap(branchingFactor/* initialCapacity */);
 
