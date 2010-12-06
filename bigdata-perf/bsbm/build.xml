@@ -1,3 +1,4 @@
+
 <!-- $Id: build.xml 2266 2009-10-26 18:21:50Z mrpersonick $ -->
 <!--                                                        -->
 <!-- do "ant bundle-jar" in the parent directory first.     -->
@@ -246,6 +247,45 @@
 			</classpath>
 		</java>
 	</target>
+	
+    <target name="run-print-queries" depends="compile" description="Prints some sample benchmark queries to be run against the loaded data.">
+        <java classname="benchmark.bigdata.TestDriver" fork="true" failonerror="true" dir="${build.dir}/bin">
+            <!-- -runs # is the #of query mix runs (default is 500). -->
+            <arg value="-runs" />
+            <arg value="${bsbm.runs}" />
+
+            <!-- -w # is the #of warmup query mixes (default is 50). -->
+            <arg value="-w" />
+            <arg value="${bsbm.w}" />
+
+            <!-- -mt # is the #of concurrent clients. -->
+            <arg value="-mt" />
+            <arg value="${bsbm.mt}" />
+
+            <!-- -qdir dir is the query directory (default is queries). -->
+            <!--<arg value="-qdir"/><arg value="src/resources/bsbm_data"/>-->
+
+            <!-- -idir dir is the test data directory (default td_data). -->
+            <arg value="-idir" />
+            <arg value="${bsbm.dataDir}" />
+
+            <!-- The randomizer seed. -->
+            <arg value="-seed" />
+            <arg value="${bsbm.seed}" />
+
+            <!-- -o file is the name of the xml output file. -->
+            <arg value="-o" />
+            <arg value="${bsbm.resultsDir}/benchmark_result_pc${bsbm.pc}_runs${bsbm.runs}_mt${bsbm.mt}.xml" />
+
+            <!-- The SPARQL endpoint. -->
+            <arg value="http://localhost:${bsbm.nanoServerPort}" />
+
+            <classpath>
+                <path refid="runtime.classpath" />
+            </classpath>
+        </java>
+    </target>
+	
 
 	<target name="set-properties" depends="compile" description="Set or change properties for a kb instance. The new values are read from stdin.">
 		<java classname="com.bigdata.rdf.sail.BigdataSailHelper" fork="true" failonerror="true">
