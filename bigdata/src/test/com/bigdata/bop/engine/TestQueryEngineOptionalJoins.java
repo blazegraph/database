@@ -706,11 +706,12 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
         final int startId = 1;
         final int joinId1 = 2;
         final int predId1 = 3;
-        final int joinId2 = 4;
-        final int predId2 = 5;
-        final int joinId3 = 6;
-        final int predId3 = 7;
-        final int sliceId = 8;
+        final int condId = 4;
+        final int joinId2 = 5;
+        final int predId2 = 6;
+        final int joinId3 = 7;
+        final int predId3 = 8;
+        final int sliceId = 9;
         
         final IVariable<?> a = Var.var("a");
         final IVariable<?> b = Var.var("b");
@@ -736,8 +737,68 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
                                 BOpEvaluationContext.CONTROLLER),//
                         }));
         
+        final Predicate<?> pred1Op = new Predicate<E>(
+                new IVariableOrConstant[] { a, b }, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId1),//
+                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                }));
+        
+        final Predicate<?> pred2Op = new Predicate<E>(
+                new IVariableOrConstant[] { b, c }, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId2),//
+                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                }));
+        
+        final Predicate<?> pred3Op = new Predicate<E>(
+                new IVariableOrConstant[] { c, d }, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId3),//
+                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                }));
+        
+        final PipelineOp join1Op = new PipelineJoin<E>(//
+                new BOp[]{startOp},// 
+                        new NV(Predicate.Annotations.BOP_ID, joinId1),//
+                        new NV(PipelineJoin.Annotations.PREDICATE,pred1Op));
+
+        final IConstraint condition = new EQConstant(a, new Constant<String>("Paul"));
+        
+        final ConditionalRoutingOp condOp = new ConditionalRoutingOp(new BOp[]{join1Op},
+                NV.asMap(new NV[]{//
+                    new NV(BOp.Annotations.BOP_ID,condId),
+                    new NV(PipelineOp.Annotations.SINK_REF, joinId2),
+                    new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId),
+                    new NV(ConditionalRoutingOp.Annotations.CONDITION, condition),
+                }));
+
+		final PipelineOp join2Op = new PipelineJoin<E>(//
+				new BOp[] { condOp },//
+				new NV(Predicate.Annotations.BOP_ID, joinId2),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op),//
+				// join is optional.
+				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
+				// optional target is the same as the default target.
+				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
+
+		final PipelineOp join3Op = new PipelineJoin<E>(//
+				new BOp[] { join2Op },//
+				new NV(Predicate.Annotations.BOP_ID, joinId3),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred3Op),//
+				// join is optional.
+				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
+				// optional target is the same as the default target.
+				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
+
         final PipelineOp sliceOp = new SliceOp(//
-                new BOp[]{startOp},
+                new BOp[]{join3Op},
                 NV.asMap(new NV[] {//
                         new NV(BOp.Annotations.BOP_ID, sliceId),//
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
