@@ -435,7 +435,7 @@ public class FixedAllocator implements Allocator {
 		
 		while ((nints * intAllocation) % modAllocation != 0) nints++;
 		
-		System.out.println("calcBitSize for " + alloc + " returns " + nints);
+//		System.out.println("calcBitSize for " + alloc + " returns " + nints);
 		
 		return nints;
 	}
