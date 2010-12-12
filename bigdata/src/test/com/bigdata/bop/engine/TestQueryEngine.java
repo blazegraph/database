@@ -458,20 +458,31 @@ public class TestQueryEngine extends TestCase2 {
          * 
          * Note: We can't bind y in advance for the primary index!
          */
-        final IBindingSet[] source = new IBindingSet[] {//
-                new HashBindingSet(new ArrayBindingSet(//
-                        new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Paul") }//
-                )),//
-                new HashBindingSet(new ArrayBindingSet(//
-                        new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Leon") }//
-                )),
-                new HashBindingSet(new ArrayBindingSet(//
-                        new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Mary") }//
-                )),
+        final IBindingSet[] source;
+		{
+			final IBindingSet bset1 = new HashBindingSet();
+			bset1.set(x, new Constant<String>("Paul"));
+			final IBindingSet bset2 = new HashBindingSet();
+			bset2.set(x, new Constant<String>("Leon"));
+			final IBindingSet bset3 = new HashBindingSet();
+			bset3.set(x, new Constant<String>("Mary"));
+
+			source = new IBindingSet[] {//
+        		bset1,bset2,bset3
+//                new HashBindingSet(new ArrayBindingSet(//
+//                        new IVariable[] { x },//
+//                        new IConstant[] { new Constant<String>("Paul") }//
+//                )),//
+//                new HashBindingSet(new ArrayBindingSet(//
+//                        new IVariable[] { x },//
+//                        new IConstant[] { new Constant<String>("Leon") }//
+//                )),
+//                new HashBindingSet(new ArrayBindingSet(//
+//                        new IVariable[] { x },//
+//                        new IConstant[] { new Constant<String>("Mary") }//
+//                )),
         };
+        }
         // Put each source binding set into a chunk by itself.
         final IBindingSet[][] sources = new IBindingSet[source.length][];
         for (int i = 0; i < sources.length; i++) {
