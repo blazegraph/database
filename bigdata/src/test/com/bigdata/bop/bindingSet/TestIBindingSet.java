@@ -31,23 +31,29 @@ package com.bigdata.bop.bindingSet;
 import java.util.Iterator;
 import java.util.Map;
 
+import junit.framework.TestCase2;
+
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
-
-import junit.framework.TestCase2;
+import com.bigdata.io.SerializerUtil;
 
 /**
  * Unit tests for {@link IBindingSet}.
- * 
+ * <p>
  * Note:
- * a) these tests assume that the values held for a given key are not cloned,
- *    i.e. comparison is done by '==' and not '.equals'
- * b) keys with the same 'name' are a unique object.
+ * <ul>
+ * <li>a) these tests assume that the values held for a given key are not
+ * cloned, i.e. comparison is done by '==' and not '.equals' (this is true
+ * except for the Serializatoin tests, where the {@link Var} references will be
+ * preserved but the {@link IConstant}s will be distinct).</li>
+ * <li>b) keys with the same 'name' are a unique object.</li>
+ * </ul>
  * 
  * @author <a href="mailto:dmacgbr@users.sourceforge.net">David MacMillan</a>
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public abstract class TestIBindingSet extends TestCase2 {
@@ -259,7 +265,13 @@ public abstract class TestIBindingSet extends TestCase2 {
         IBindingSet bs = newBindingSet ( new IVariable [] { var1, var2, var3, var4, var5 }
                                        , new IConstant [] { val1, val2, val3, val4, val5 }
                                        ) ;
-                
+        
+		assertEqual(
+				bs.copy(null/* variablesToKeep */), //
+				new IVariable[] { var1, var2, var3, var4, var5 },
+				new IConstant[] { val1, val2, val3, val4, val5 }//
+		);
+
         IBindingSet bs2 = bs.copy ( new IVariable [] { var1, var3, var5 } ) ;
 
         assertTrue ( 3 == bs2.size () ) ;
@@ -321,13 +333,141 @@ public abstract class TestIBindingSet extends TestCase2 {
         assertTrue ( "expected equal: same bindings after mutation", bs1.hashCode () == bs4.hashCode () ) ;
     }
 
+	/*
+	 * push()/pop() tests.
+	 * 
+	 * Note: In addition to testing push() and pop(save:boolean), we have to
+	 * test that copy() and clone() operate correctly in the presence of nested
+	 * symbol tables, and that the visitation patterns for the bindings operate
+	 * correctly when there are nested symbol tables. For example, if there "y"
+	 * is bound at level zero, a push() is executed, and then "x" is bound at
+	 * level one. The visitation pattern must visit both "x" and "y".
+	 */
+    
+    public void test_nestedSymbolTables() {
+
+        final Var<?> var1 = Var.var ( "a" ) ;
+        final Var<?> var2 = Var.var ( "b" ) ;
+        final Constant<Integer> val1 = new Constant<Integer> ( 1 ) ;
+        final Constant<Integer> val2 = new Constant<Integer> ( 2 ) ;
+
+		final IBindingSet bs1 = newBindingSet(2/* size */);
+		
+		bs1.set(var1,val1);
+
+		/*
+		 * push a symbol table onto the stack
+		 */
+		bs1.push();
+
+		bs1.set(var2, val2);
+
+		bs1.pop(false/* save */);
+
+		// verify the modified bindings were discarded.
+		assertEqual(bs1, new IVariable[] { var1 }, new IConstant[] { val1 });
+
+		/*
+		 * push a symbol table onto the stack
+		 */
+		bs1.push();
+
+		bs1.set(var2, val2);
+
+		bs1.pop(true/* save */);
+
+		// verify the modified bindings were saved.
+		assertEqual(bs1, new IVariable[] { var1, var2 }, new IConstant[] {
+				val1, val2 });
+	}
+
+    public void test_serialization() {
+    	
+        final Var<?> var1 = Var.var ( "a" ) ;
+        final Var<?> var2 = Var.var ( "b" ) ;
+        final Constant<Integer> val1 = new Constant<Integer> ( 1 ) ;
+        final Constant<Integer> val2 = new Constant<Integer> ( 2 ) ;
+
+		final IBindingSet bs1 = newBindingSet(2/* size */);
+
+		bs1.set(var1, val1);
+
+		bs1.set(var2, val2);
+
+		assertEqual(bs1, new IVariable[] { var1, var2 }, new IConstant[] {
+				val1, val2 });
+
+		final IBindingSet bs2 = (IBindingSet) SerializerUtil
+				.deserialize(SerializerUtil.serialize(bs1));
+
+		assertEquals(bs1, bs1);
+
+    }
+    
+    /*
+     * Hooks for testing specific implementations.
+     */
+
     protected abstract IBindingSet newBindingSet ( IVariable<?> vars [], IConstant<?> vals [] ) ;
     protected abstract IBindingSet newBindingSet ( int size ) ;
 
+	/**
+	 * Compare actual and expected, where the latter is expressed using
+	 * (vars,vals).
+	 * <p>
+	 * Note: This does not follow the junit pattern for asserts, which puts the
+	 * expected data first.
+	 * 
+	 * @param actual
+	 * @param vars
+	 * @param vals
+	 */
     protected void assertEqual ( IBindingSet actual, IVariable<?> vars [], IConstant<?> vals [] )
     {
         assertTrue ( "wrong size", actual.size () == vars.length ) ;
         for ( int i = 0; i < vars.length; i++ )
             assertTrue ( "wrong value", vals [ i ] == actual.get ( vars [ i ] ) ) ;
     }
+
+	protected void assertEquals(IBindingSet expected, IBindingSet actual) {
+
+		// expected variables in some order.
+		final Iterator<IVariable> evars = expected.vars();
+		
+		// actual variables in some order (the order MAY be different).
+		final Iterator<IVariable> avars = actual.vars();
+		
+		while(evars.hasNext()) {
+
+			// Some variable for which we expect a binding.
+			final IVariable evar = evars.next();
+			
+			if(!avars.hasNext()) {
+			
+				fail("actual does not bind enough variables.");
+				
+			}
+
+			// consume and ignore actual variable since the order may differ 
+			avars.next();
+
+			// The expected binding for some variable.
+			final IConstant eval = expected.get(evar);
+
+			// The actual binding for the same variable.
+			final IConstant aval = actual.get(evar);
+
+			// Verify that the bound values compare as equals.
+			assertEquals(evar.getName(), eval, aval);
+			
+		}
+		
+		if(avars.hasNext()) {
+			
+			fail("actual binds more variables than expected.");
+			
+		}
+		
+	}
+
 }

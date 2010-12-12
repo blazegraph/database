@@ -59,23 +59,23 @@ public class TestArrayBindingSet extends TestIBindingSet
      */
     public TestArrayBindingSet ( String name ) { super ( name ) ; }
 
-    /**
-     * Unit test for {@link ArrayBindingSet#ArrayBindingSet(ArrayBindingSet)}
-     */
-    public void testConstructorArrayBindingSet ()
-    {
-        try { assertTrue ( null != new ArrayBindingSet ( null ) ) ; fail ( "IllegalArgumentException expected, copy from was null" ) ; }
-        catch ( IllegalArgumentException e ) {}
-
-        Var<?> var1 = Var.var ( "a" ) ;
-        Var<?> var2 = Var.var ( "b" ) ;
-        Constant<Integer> val1 = new Constant<Integer> ( 1 ) ;
-        Constant<Integer> val2 = new Constant<Integer> ( 2 ) ;
-        IVariable<?> vars [] = new IVariable [] { var1, var2 } ;
-        IConstant<?> vals [] = new IConstant [] { val1, val2 } ;
-
-        assertEqual ( new ArrayBindingSet ( new ArrayBindingSet ( vars, vals ) ), vars, vals ) ;
-    }
+//    /**
+//     * Unit test for {@link ArrayBindingSet#ArrayBindingSet(ArrayBindingSet)}
+//     */
+//    public void testConstructorArrayBindingSet ()
+//    {
+//        try { assertTrue ( null != new ArrayBindingSet ( null ) ) ; fail ( "IllegalArgumentException expected, copy from was null" ) ; }
+//        catch ( IllegalArgumentException e ) {}
+//
+//        Var<?> var1 = Var.var ( "a" ) ;
+//        Var<?> var2 = Var.var ( "b" ) ;
+//        Constant<Integer> val1 = new Constant<Integer> ( 1 ) ;
+//        Constant<Integer> val2 = new Constant<Integer> ( 2 ) ;
+//        IVariable<?> vars [] = new IVariable [] { var1, var2 } ;
+//        IConstant<?> vals [] = new IConstant [] { val1, val2 } ;
+//
+//        assertEqual ( new ArrayBindingSet ( new ArrayBindingSet ( vars, vals ) ), vars, vals ) ;
+//    }
 
     /**
      * Unit test for {@link ArrayBindingSet#ArrayBindingSet(IVariable[],IConstant[])}

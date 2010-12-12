@@ -103,14 +103,22 @@ public interface IBindingSet extends Cloneable, Serializable {
      * The #of bound variables.
      */
     public int size();
-    
-    /**
-     * Visits the bindings.
-     */
+
+	/**
+	 * Visits the bindings.
+	 * 
+	 * @todo The unit tests verify that the implementations do not permit
+	 *       mutation using the iterator, but that is not actually specified by
+	 *       the API as forbidden.
+	 */
     public Iterator<Map.Entry<IVariable,IConstant>> iterator();
 
     /**
      * Visits the bound variables.
+     * 
+	 * @todo The unit tests verify that the implementations do not permit
+	 *       mutation using the iterator, but that is not actually specified by
+	 *       the API as forbidden.
      */
     public Iterator<IVariable> vars();
     
@@ -118,13 +126,17 @@ public interface IBindingSet extends Cloneable, Serializable {
      * Return a shallow copy of the binding set.
      */
     public IBindingSet clone();
-    
-    /**
-     * Return a shallow copy of the binding set, eliminating unnecessary 
-     * variables.
-     */
+
+	/**
+	 * Return a shallow copy of the binding set, eliminating unnecessary
+	 * variables.
+	 * 
+	 * @param variablesToKeep
+	 *            When non-<code>null</code>, only the listed variables are
+	 *            retained.
+	 */
     public IBindingSet copy(IVariable[] variablesToKeep);
-    
+
     /**
      * True iff the variables and their bound values are the same
      * for the two binding sets.
@@ -134,15 +146,49 @@ public interface IBindingSet extends Cloneable, Serializable {
      */
     public boolean equals(Object o);
 
-    /**
-     * The hash code of a binding is defined as the bit-wise XOR of the hash
-     * codes of the {@link IConstant}s for its bound variables. Unbound
-     * variables are ignored when computing the hash code. Binding sets are
-     * unordered collections, therefore the calculated hash code intentionally
-     * does not dependent on the order in which the bindings are iterated over.
-     * The hash code reflects the current state of the bindings and must be
-     * recomputed if the bindings are changed.
-     */
+	/**
+	 * The hash code of a binding is defined as the bit-wise XOR of the hash
+	 * codes of the {@link IConstant}s for its bound variables. Unbound
+	 * variables are ignored when computing the hash code. Binding sets are
+	 * unordered collections, therefore the calculated hash code intentionally
+	 * does not depend on the order in which the bindings are visited. The hash
+	 * code reflects the current state of the bindings and must be recomputed if
+	 * the bindings are changed.
+	 */
     public int hashCode();
-    
+
+	/**
+	 * Make a copy of the current symbol table (aka current variable bindings)
+	 * and push it onto onto the stack. Variable bindings will be made against
+	 * the current symbol table. The symbol table stack is propagated by
+	 * {@link #clone()} and {@link #copy(IVariable[])}. Symbols tables may be
+	 * used to propagate conditional bindings through a data flow until a
+	 * decision point is reached, at which point they may be either discarded or
+	 * committed. This mechanism may be used to support SPARQL style optional
+	 * join groups.
+	 * 
+	 * @throws UnsupportedOperationException
+	 *             if the {@link IBindingSet} is not mutable.
+	 * 
+	 * @see #pop(boolean)
+	 */
+	public void push();
+
+	/**
+	 * Pop the current symbol table off of the stack.
+	 * 
+	 * @param save
+	 *            When <code>true</code>, the bindings on the current symbol
+	 *            table are copied to the parent symbol table before the current
+	 *            symbol table is popped off of the stack. If <code>false</code>
+	 *            , any bindings associated with that symbol table are
+	 *            discarded.
+	 * 
+	 * @throws IllegalStateException
+	 *             if there is no nested symbol table.
+	 * 
+	 * @see #push()
+	 */
+	public void pop(boolean save);
+
 }

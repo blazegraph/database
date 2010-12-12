@@ -250,7 +250,15 @@ public class DistinctBindingSetOp extends PipelineOp {
 //                            System.err.println("accepted: "
 //                                    + Arrays.toString(vals));
 
-                            accepted.add(new HashBindingSet(vars, vals));
+							final HashBindingSet tmp = new HashBindingSet();
+                        	
+							for (int i = 0; i < vars.length; i++) {
+
+								tmp.set(vars[i], vals[i]);
+
+							}
+							
+                            accepted.add(tmp);
 
                             naccepted++;
 
