@@ -29,82 +29,242 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.bindingSet;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.Map;
+import java.util.Stack;
 import java.util.Map.Entry;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.Var;
 
 /**
- * {@link IBindingSet} backed by a {@link HashMap}.
+ * {@link IBindingSet} backed by a {@link LinkedHashMap}.
+ * <p>
+ * Note: A {@link LinkedHashMap} provides a fast iterator, which we use a bunch.
+ * However, {@link IBindingSet}s are inherently unordered collections of
+ * bindings so the order preservation aspect of the {@link LinkedHashMap} is not
+ * relied upon.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Since {@link Var}s allow reference testing, a faster implementation
- *       could be written based on a {@link LinkedList}. Just scan the list
- *       until the entry is found with the desired {@link Var} reference and
- *       then return it.
  */
 public class HashBindingSet implements IBindingSet {
 
     private static final long serialVersionUID = -2989802566387532422L;
     
-    /**
-     * Note: A {@link LinkedHashMap} provides a fast iterator, which we use a
-     * bunch.
-     */
-    private LinkedHashMap<IVariable, IConstant> map;
+//	/**
+//  * Note: A {@link LinkedHashMap} provides a fast iterator, which we use a
+//  * bunch.
+//  */
+// private final LinkedHashMap<IVariable, IConstant> map;
+
+	/**
+	 * The stack of symbol tables. Each symbol table is a mapping from an
+	 * {@link IVariable} onto its non-<code>null</code> bound {@link IConstant}.
+	 * The stack is initialized with an empty symbol table. Symbol tables may be
+	 * pushed onto the stack or popped off of the stack, but the stack MAY NOT
+	 * become empty.
+	 */
+	private final Stack<LinkedHashMap<IVariable, IConstant>> stack;
+
+	/**
+	 * Return the symbol table on the top of the stack.
+	 */
+	private LinkedHashMap<IVariable, IConstant> current() {
+
+		return stack.peek();
+		
+	}
+	
+	public void push() {
+
+		// The current symbol table.
+		final LinkedHashMap<IVariable, IConstant> cur = current();
+
+		// Create a new symbol table.
+		final LinkedHashMap<IVariable, IConstant> tmp = new LinkedHashMap<IVariable, IConstant>(
+				cur.size());
+
+		// Push the new symbol table onto the stack.
+		stack.push(tmp);
+
+		/*
+		 * Make a copy of each entry in the symbol table which was on the top of
+		 * the stack when we entered this method, inserting the entries into the
+		 * new symbol table as we go. This avoids side effects of mutation on
+		 * the nested symbol tables and also ensures that we do not need to read
+		 * through to the nested symbol tables when answering a query about the
+		 * current symbol table. The only down side of this is that naive
+		 * serialization is that much less compact.
+		 */
+		for (Map.Entry<IVariable, IConstant> e : cur.entrySet()) {
+
+			tmp.put(e.getKey(), e.getValue());
+
+		}
+		
+	}
+
+	public void pop(final boolean save) {
+
+		if (stack.size() < 2) {
+			/*
+			 * The stack may never become empty. Therefore there must be at
+			 * least two symbol tables on the stack for a pop() request.
+			 */
+			throw new IllegalArgumentException();
+		}
+		
+		// Pop the symbol table off of the top of the stack.
+		final LinkedHashMap<IVariable,IConstant> old = stack.pop();
+
+		if (save) {
+
+			// discard the current symbol table.
+			stack.pop();
+			
+			// replacing it with the symbol table which we popped off the stack.
+			stack.push(old);
+
+		} else {
+			
+	        // clear the hash code.
+	        hash = 0;
+
+		}
+		
+	}
 
     /**
      * New empty binding set.
      */
     public HashBindingSet() {
-        
-        map = new LinkedHashMap<IVariable, IConstant>();
-        
-    }
 
-    /**
-     * Copy constructor.
-     * 
-     * @param src
-     */
-    protected HashBindingSet(final HashBindingSet src) {
-        
-        map = new LinkedHashMap<IVariable, IConstant>(src.map);
+		stack = new Stack<LinkedHashMap<IVariable, IConstant>>();
+
+		stack.push(new LinkedHashMap<IVariable, IConstant>());
         
     }
 
     /**
-     * Copy constructor.
+     * Copy constructor (used by clone, copy).
      * 
      * @param src
      */
-    public HashBindingSet(final IBindingSet src) {
+    protected HashBindingSet(final HashBindingSet src, final IVariable[] variablesToKeep) {
+        
+		stack = new Stack<LinkedHashMap<IVariable,IConstant>>();
 
-        map = new LinkedHashMap<IVariable, IConstant>(src.size());
+		final int stackSize = src.stack.size();
 
+		int depth = 1;
+		
+		for (LinkedHashMap<IVariable, IConstant> srcLst : src.stack) {
+
+			/*
+			 * Copy the source bindings.
+			 * 
+			 * Note: If a restriction exists on the variables to be copied, then
+			 * it is applied onto the the top level of the stack. If the symbol
+			 * table is saved when it is pop()'d, then the modified bindings
+			 * will replace the parent symbol table on the stack.
+			 */
+			final LinkedHashMap<IVariable,IConstant> tmp = copy(srcLst,
+					depth == stackSize ? variablesToKeep : null);
+
+			// Push onto the stack.
+			stack.push(tmp);
+
+		}
+
+	}
+
+	/**
+	 * Return a copy of the source list.
+	 * 
+	 * @param src
+	 *            The source list.
+	 * @param variablesToKeep
+	 *            When non-<code>null</code>, only the bindings for the
+	 *            variables listed in this array will copied.
+	 * 
+	 * @return The copy.
+	 */
+	private LinkedHashMap<IVariable, IConstant> copy(
+			final LinkedHashMap<IVariable, IConstant> src,
+			final IVariable[] variablesToKeep) {
+
+		final LinkedHashMap<IVariable, IConstant> dst = new LinkedHashMap<IVariable, IConstant>(
+				variablesToKeep != null ? variablesToKeep.length : src.size());
+
+		final Iterator<Map.Entry<IVariable, IConstant>> itr = src.entrySet()
+				.iterator();
+
+		while (itr.hasNext()) {
+
+			final Map.Entry<IVariable, IConstant> e = itr.next();
+
+			boolean keep = true;
+
+			if (variablesToKeep != null) {
+			
+				keep = false;
+				
+				for (IVariable<?> x : variablesToKeep) {
+				
+					if (x == e.getKey()) {
+					
+						keep = true;
+						
+						break;
+						
+					}
+					
+				}
+				
+			}
+
+			if (keep)
+				dst.put(e.getKey(), e.getValue());
+
+        }
+
+		return dst;
+		
+	}
+
+    /**
+     * Package private constructor used by the unit tests.
+     * 
+     * @param src
+     */
+    HashBindingSet(final IBindingSet src) {
+
+    	this();
+    	
         final Iterator<Map.Entry<IVariable, IConstant>> itr = src.iterator();
 
         while (itr.hasNext()) {
 
             final Map.Entry<IVariable, IConstant> e = itr.next();
 
-            map.put(e.getKey(), e.getValue());
+            set(e.getKey(), e.getValue());
 
         }
 
     }
     
-    public HashBindingSet(final IVariable[] vars, final IConstant[] vals) {
+    /**
+     * Package private constructor used by the unit tests.
+     * @param vars
+     * @param vals
+     */
+    HashBindingSet(final IVariable[] vars, final IConstant[] vals) {
 
+    	this();
+    	
         if (vars == null)
             throw new IllegalArgumentException();
 
@@ -114,14 +274,24 @@ public class HashBindingSet implements IBindingSet {
         if (vars.length != vals.length)
             throw new IllegalArgumentException();
 
-        map = new LinkedHashMap<IVariable, IConstant>(vars.length);
-
         for (int i = 0; i < vars.length; i++) {
 
-            map.put(vars[i], vals[i]);
+            set(vars[i], vals[i]);
 
         }
         
+    }
+    
+    public HashBindingSet clone() {
+        
+		return new HashBindingSet(this, null /* variablesToKeep */);
+        
+    }
+
+	public HashBindingSet copy(final IVariable[] variablesToKeep) {
+
+		return new HashBindingSet(this/* src */, variablesToKeep);
+
     }
     
     public boolean isBound(final IVariable var) {
@@ -129,7 +299,7 @@ public class HashBindingSet implements IBindingSet {
         if (var == null)
             throw new IllegalArgumentException();
         
-        return map.containsKey(var);
+        return current().containsKey(var);
         
     }
     
@@ -138,7 +308,7 @@ public class HashBindingSet implements IBindingSet {
         if (var == null)
             throw new IllegalArgumentException();
         
-        return map.get(var);
+        return current().get(var);
         
     }
 
@@ -150,7 +320,7 @@ public class HashBindingSet implements IBindingSet {
         if (val == null)
             throw new IllegalArgumentException();
         
-        map.put(var,val);
+        current().put(var,val);
 
         // clear the hash code.
         hash = 0;
@@ -162,7 +332,7 @@ public class HashBindingSet implements IBindingSet {
         if (var == null)
             throw new IllegalArgumentException();
         
-        map.remove(var);
+        current().remove(var);
         
         // clear the hash code.
         hash = 0;
@@ -171,7 +341,7 @@ public class HashBindingSet implements IBindingSet {
     
     public void clearAll() {
         
-        map.clear();
+        current().clear();
     
         // clear the hash code.
         hash = 0;
@@ -186,7 +356,7 @@ public class HashBindingSet implements IBindingSet {
 
         int i = 0;
         
-        final Iterator<Map.Entry<IVariable, IConstant>> itr = map.entrySet()
+        final Iterator<Map.Entry<IVariable, IConstant>> itr = current().entrySet()
                 .iterator();
 
         while (itr.hasNext()) {
@@ -217,52 +387,22 @@ public class HashBindingSet implements IBindingSet {
      */
     public Iterator<Entry<IVariable, IConstant>> iterator() {
 
-        return Collections.unmodifiableMap(map).entrySet().iterator();
+        return Collections.unmodifiableMap(current()).entrySet().iterator();
         
     }
 
     public Iterator<IVariable> vars() {
 
-        return Collections.unmodifiableSet(map.keySet()).iterator();
+        return Collections.unmodifiableSet(current().keySet()).iterator();
         
     }
     
     public int size() {
 
-        return map.size();
+        return current().size();
         
     }
 
-    public HashBindingSet clone() {
-        
-        return new HashBindingSet( this );
-        
-    }
-    
-    /**
-     * Return a shallow copy of the binding set, eliminating unecessary 
-     * variables.
-     */
-    public HashBindingSet copy(final IVariable[] variablesToKeep) {
-        
-        final HashBindingSet bs = new HashBindingSet();
-        
-        for (IVariable<?> var : variablesToKeep) {
-            
-            final IConstant<?> val = map.get(var);
-            
-            if (val != null) {
-                
-                bs.map.put(var, val);
-                
-            }
-            
-        }
-        
-        return bs;
-        
-    }
-    
     public boolean equals(final Object t) {
         
         if (this == t)
@@ -276,7 +416,7 @@ public class HashBindingSet implements IBindingSet {
         if (size() != o.size())
             return false;
         
-        final Iterator<Map.Entry<IVariable,IConstant>> itr = map.entrySet().iterator();
+        final Iterator<Map.Entry<IVariable,IConstant>> itr = current().entrySet().iterator();
         
         while(itr.hasNext()) {
 
@@ -288,7 +428,7 @@ public class HashBindingSet implements IBindingSet {
             
 //            if (!o.isBound(vars[i]))
 //                return false;
-            IConstant<?> o_val = o.get ( var ) ;
+            final IConstant<?> o_val = o.get ( var ) ;
             if (null == o_val || !val.equals(o_val))
                 return false;
             
@@ -304,7 +444,7 @@ public class HashBindingSet implements IBindingSet {
 
             int result = 0;
 
-            for(IConstant<?> c : map.values()) {
+            for(IConstant<?> c : current().values()) {
 
                 if (c == null)
                     continue;
