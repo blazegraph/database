@@ -1641,8 +1641,14 @@ abstract public class WriteCache implements IWriteCache {
 
 			/*
 			 * Retrieve the sorted write iterator and write each block to the
-			 * file
+			 * file.
+			 * 
+			 * If there is a BufferedWrite then ensure it is reset.
 			 */
+			if (m_bufferedWrite == null) {
+				m_bufferedWrite.reset();
+			}
+			
 			int nwrites = 0;
 			final Iterator<Entry<Long, RecordMetadata>> entries = recordMap.entrySet().iterator();
 			while (entries.hasNext()) {

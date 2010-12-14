@@ -93,11 +93,7 @@ public class BufferedWrite {
 		final int nwrites = FileChannelUtility.writeAll(opener, m_data, m_startAddr);
 		m_fileWrites++;
 		
-		m_data.position(0);
-		m_data.limit(m_data.capacity());
-		
-		m_startAddr = -1;
-		m_endAddr = 0;
+		reset();
 		
 		return nwrites;
 	}
@@ -114,5 +110,16 @@ public class BufferedWrite {
 		}
 		
 		return ret;
+	}
+
+	/**
+	 * Caled by flush and also prior to use by the WriteCache.
+	 */
+	public void reset() {
+		m_data.position(0);
+		m_data.limit(m_data.capacity());
+		
+		m_startAddr = -1;
+		m_endAddr = 0;
 	}
 }
