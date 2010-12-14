@@ -1645,7 +1645,7 @@ abstract public class WriteCache implements IWriteCache {
 			 * 
 			 * If there is a BufferedWrite then ensure it is reset.
 			 */
-			if (m_bufferedWrite == null) {
+			if (m_bufferedWrite != null) {
 				m_bufferedWrite.reset();
 			}
 			
