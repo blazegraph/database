@@ -285,6 +285,16 @@ public class RWStore implements IStore {
 
         String DEFAULT_FREE_BITS_THRESHOLD = "300";
 
+		/**
+		 * When <code>true</code>, scattered writes which are strictly ascending
+		 * will be coalesced within a buffer and written out as a single IO
+		 * (default {@value #DEFAULT_DOUBLE_BUFFER_WRITES}). This improves write
+		 * performance for SATA, SAS, and even SSD.
+		 */
+        String DOUBLE_BUFFER_WRITES = RWStore.class.getName() + ".doubleBuffer";
+        
+        String DEFAULT_DOUBLE_BUFFER_WRITES = "true";
+        
     }
 
     /*
@@ -594,10 +604,16 @@ public class RWStore implements IStore {
 		} catch (IOException e1) {
 			throw new RuntimeException(e1);
 		}
-		
-		try {
-			m_bufferedWrite = new BufferedWrite(this);
-		} catch (InterruptedException e1) {
+
+		if (Boolean.valueOf(fileMetadata.getProperty(
+				Options.DOUBLE_BUFFER_WRITES,
+				Options.DEFAULT_DOUBLE_BUFFER_WRITES))) {
+			try {
+				m_bufferedWrite = new BufferedWrite(this);
+			} catch (InterruptedException e1) {
+				m_bufferedWrite = null;
+			}
+		} else {
 			m_bufferedWrite = null;
 		}
 
