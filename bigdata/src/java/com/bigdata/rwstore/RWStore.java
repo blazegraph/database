@@ -1448,21 +1448,35 @@ public class RWStore implements IStore {
                  * FIXME We need unit test when MIN_RELEASE_AGE is ZERO AND
                  * there are open read-only transactions.
                  */
-				if (m_minReleaseAge == 0) {
-					immediateFree(addr, sze);
+				boolean alwaysDefer = m_minReleaseAge > 0L
+						|| m_activeTxCount > 0;
+				if (!alwaysDefer)
+					alwaysDefer = context == null && !m_contexts.isEmpty();
+				if (alwaysDefer)
+					if (log.isDebugEnabled())
+						log.debug("Should defer " + addr + " real: "
+								+ physicalAddress(addr));
+				if (alwaysDefer
+						|| !alloc.canImmediatelyFree(addr, sze, context)) {
+					deferFree(addr, sze);
 				} else {
-	                boolean alwaysDefer = m_activeTxCount > 0;
-	                if (!alwaysDefer)
-	                    alwaysDefer = context == null && !m_contexts.isEmpty();
-	                if (alwaysDefer)
-						if (log.isDebugEnabled())
-						    log.debug("Should defer " + addr + " real: " + physicalAddress(addr));
-	                if (alwaysDefer || !alloc.canImmediatelyFree(addr, sze, context)) {
-						deferFree(addr, sze);
-					} else {
-						immediateFree(addr, sze);
-					}
+					immediateFree(addr, sze);
 				}
+//				if (m_minReleaseAge == 0) {
+//					immediateFree(addr, sze);
+//				} else {
+//	                boolean alwaysDefer = m_activeTxCount > 0;
+//	                if (!alwaysDefer)
+//	                    alwaysDefer = context == null && !m_contexts.isEmpty();
+//	                if (alwaysDefer)
+//						if (log.isDebugEnabled())
+//						    log.debug("Should defer " + addr + " real: " + physicalAddress(addr));
+//	                if (alwaysDefer || !alloc.canImmediatelyFree(addr, sze, context)) {
+//						deferFree(addr, sze);
+//					} else {
+//						immediateFree(addr, sze);
+//					}
+//				}
 			}
 		} finally {
 			m_allocationLock.unlock();
@@ -2596,85 +2610,68 @@ public class RWStore implements IStore {
 		long m_reservedSlots;
 		long m_filledSlots;
 	}
+
 	/**
-	 * Utility debug outputing the allocator array, showing index, start
-	 * address and alloc type/size
-	 * 
-	 * Collected statistics are against each Allocation Block size:
-	 * total number of slots | store size
-	 * number of filled slots | store used
-	 * <dl>
-	 * <dt>AllocatorSize</dt><dd>The #of bytes in the allocated slots issued by this allocator.</dd>
-	 * <dt>AllocatorCount</dt><dd>The #of fixed allocators for that slot size.</dd>
-	 * <dt>SlotsInUse</dt><dd>The difference between the two previous columns (net slots in use for this slot size).</dd>
-	 * <dt>SlotsReserved</dt><dd>The #of slots in this slot size which have had storage reserved for them.</dd>
-	 * <dt>SlotsAllocated</dt><dd>Cumulative allocation of slots to date in this slot size (regardless of the transaction outcome).</dd>
-	 * <dt>SlotsRecycled</dt><dd>Cumulative recycled slots to date in this slot size (regardless of the transaction outcome).</dd>
-	 * <dt>SlotsChurn</dt><dd>How frequently slots of this size are re-allocated (SlotsInUse/SlotsAllocated).</dd>
-	 * <dt>%SlotsUnused</dt><dd>The percentage of slots of this size which are not in use (1-(SlotsInUse/SlotsReserved)).</dd>
-	 * <dt>BytesReserved</dt><dd>The space reserved on the backing file for those allocation slots</dd>
-	 * <dt>BytesAppData</dt><dd>The #of bytes in the allocated slots which are used by application data (including the record checksum).</dd>
-	 * <dt>%SlotWaste</dt><dd>How well the application data fits in the slots (BytesAppData/(SlotsInUse*AllocatorSize)).</dd>
-	 * <dt>%AppData</dt><dd>How much of your data is stored by each allocator (BytesAppData/Sum(BytesAppData)).</dd>
-	 * <dt>%StoreFile</dt><dd>How much of the backing file is reserved for each allocator (BytesReserved/Sum(BytesReserved)).</dd>
-	 * <dt>%StoreWaste</dt><dd>How much of the total waste on the store is waste for this allocator size ((BytesReserved-BytesAppData)/(Sum(BytesReserved)-Sum(BytesAppData))).</dd>
-	 * </dl>
+	 * Collected statistics are against each Allocation Block size. See
+	 * {@link StorageStats#showStats(StringBuilder)} for details on the
+	 * generated report.
 	 */
 	public void showAllocators(final StringBuilder str) {
-		final AllocationStats[] stats = new AllocationStats[m_allocSizes.length];
-		for (int i = 0; i < stats.length; i++) {
-			stats[i] = new AllocationStats(m_allocSizes[i]*64);
-		}
-		
-		final Iterator<FixedAllocator> allocs = m_allocs.iterator();
-		while (allocs.hasNext()) {
-			Allocator alloc = (Allocator) allocs.next();
-			alloc.appendShortStats(str, stats);
-		}
-		
-		// Append Summary
-		str.append("\n-------------------------\n");
-		str.append("RWStore Allocation Summary\n");
-		str.append("-------------------------\n");
-		str.append(padRight("Allocator", 10));
-		str.append(padLeft("SlotsUsed", 12));
-		str.append(padLeft("reserved", 12));
-		str.append(padLeft("StoreUsed", 14));
-		str.append(padLeft("reserved", 14));
-		str.append(padLeft("Usage", 8));
-		str.append(padLeft("Store", 8));
-		str.append("\n");
-		long treserved = 0;
-		long treservedSlots = 0;
-		long tfilled = 0;
-		long tfilledSlots = 0;
-		for (int i = 0; i < stats.length; i++) {
-		    final long reserved = stats[i].m_reservedSlots * stats[i].m_blockSize;
-			treserved += reserved;
-			treservedSlots += stats[i].m_reservedSlots;
-			final long filled = stats[i].m_filledSlots * stats[i].m_blockSize;
-			tfilled += filled;
-			tfilledSlots += stats[i].m_filledSlots;
-		}
-		for (int i = 0; i < stats.length; i++) {
-		    final long reserved = stats[i].m_reservedSlots * stats[i].m_blockSize;
-			final long filled = stats[i].m_filledSlots * stats[i].m_blockSize;
-			str.append(padRight("" + stats[i].m_blockSize, 10));
-			str.append(padLeft("" + stats[i].m_filledSlots, 12) + padLeft("" + stats[i].m_reservedSlots, 12));
-			str.append(padLeft("" + filled, 14) + padLeft("" + reserved, 14));
-			str.append(padLeft("" + (reserved==0?0:(filled * 100 / reserved)) + "%", 8));
-			str.append(padLeft("" + (treserved==0?0:(reserved * 100 / treserved)) + "%", 8));
-			str.append("\n");
-		}
-		str.append("\n");
-
-		str.append(padRight("Totals", 10));
-        str.append(padLeft("" + tfilledSlots, 12));
-        str.append(padLeft("" + treservedSlots, 12));
-        str.append(padLeft("" + tfilled, 14));
-        str.append(padLeft("" + treserved, 14));
-        str.append(padLeft("" + (treserved==0?0:(tfilled * 100 / treserved)) + "%", 8));
-        str.append("\nFile size: " + convertAddr(m_fileSize) + "bytes\n");
+		m_storageStats.showStats(str);
+//		final AllocationStats[] stats = new AllocationStats[m_allocSizes.length];
+//		for (int i = 0; i < stats.length; i++) {
+//			stats[i] = new AllocationStats(m_allocSizes[i]*64);
+//		}
+//		
+//		final Iterator<FixedAllocator> allocs = m_allocs.iterator();
+//		while (allocs.hasNext()) {
+//			Allocator alloc = (Allocator) allocs.next();
+//			alloc.appendShortStats(str, stats);
+//		}
+//		
+//		// Append Summary
+//		str.append("\n-------------------------\n");
+//		str.append("RWStore Allocation Summary\n");
+//		str.append("-------------------------\n");
+//		str.append(padRight("Allocator", 10));
+//		str.append(padLeft("SlotsUsed", 12));
+//		str.append(padLeft("reserved", 12));
+//		str.append(padLeft("StoreUsed", 14));
+//		str.append(padLeft("reserved", 14));
+//		str.append(padLeft("Usage", 8));
+//		str.append(padLeft("Store", 8));
+//		str.append("\n");
+//		long treserved = 0;
+//		long treservedSlots = 0;
+//		long tfilled = 0;
+//		long tfilledSlots = 0;
+//		for (int i = 0; i < stats.length; i++) {
+//		    final long reserved = stats[i].m_reservedSlots * stats[i].m_blockSize;
+//			treserved += reserved;
+//			treservedSlots += stats[i].m_reservedSlots;
+//			final long filled = stats[i].m_filledSlots * stats[i].m_blockSize;
+//			tfilled += filled;
+//			tfilledSlots += stats[i].m_filledSlots;
+//		}
+//		for (int i = 0; i < stats.length; i++) {
+//		    final long reserved = stats[i].m_reservedSlots * stats[i].m_blockSize;
+//			final long filled = stats[i].m_filledSlots * stats[i].m_blockSize;
+//			str.append(padRight("" + stats[i].m_blockSize, 10));
+//			str.append(padLeft("" + stats[i].m_filledSlots, 12) + padLeft("" + stats[i].m_reservedSlots, 12));
+//			str.append(padLeft("" + filled, 14) + padLeft("" + reserved, 14));
+//			str.append(padLeft("" + (reserved==0?0:(filled * 100 / reserved)) + "%", 8));
+//			str.append(padLeft("" + (treserved==0?0:(reserved * 100 / treserved)) + "%", 8));
+//			str.append("\n");
+//		}
+//		str.append("\n");
+//
+//		str.append(padRight("Totals", 10));
+//        str.append(padLeft("" + tfilledSlots, 12));
+//        str.append(padLeft("" + treservedSlots, 12));
+//        str.append(padLeft("" + tfilled, 14));
+//        str.append(padLeft("" + treserved, 14));
+//        str.append(padLeft("" + (treserved==0?0:(tfilled * 100 / treserved)) + "%", 8));
+//        str.append("\nFile size: " + convertAddr(m_fileSize) + "bytes\n");
     }
 	
 	private String padLeft(String str, int minlen) {
