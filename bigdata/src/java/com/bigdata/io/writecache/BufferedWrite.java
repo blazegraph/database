@@ -213,7 +213,7 @@ public class BufferedWrite {
 
 		final ByteBuffer m_data = this.m_data.get();
 
-		if (m_data.remaining() == 0) {
+		if (m_data.position() == 0) {
 			// NOP.
 			return 0;
 		}
