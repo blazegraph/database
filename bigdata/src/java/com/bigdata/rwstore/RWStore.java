@@ -37,6 +37,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -54,6 +56,7 @@ import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.BufferedWrite;
@@ -61,6 +64,7 @@ import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.CommitRecordSerializer;
 import com.bigdata.journal.FileMetadata;
@@ -194,9 +198,9 @@ import com.bigdata.util.ChecksumUtility;
  *         <p>
  *         Add metabits header record checksum field and verify on read back.
  *         <p>
- *         Checksum fixed allocators (needs to be tested on read back).
+ *         Done. Checksum fixed allocators (needs to be tested on read back).
  *         <p>
- *         Add version field to the fixed allocator.
+ *         Done. Add version field to the fixed allocator.
  *         <p>
  *         Done. Checksum delete blocks / blob records.
  *         <p>
@@ -207,7 +211,7 @@ import com.bigdata.util.ChecksumUtility;
  *         Modify FixedAllocator to use arrayCopy() rather than clone and
  *         declare more fields to be final. See notes on {@link AllocBlock}.
  *         <p>
- *         Implement logic to "abort" a shadow allocation context.
+ *         Done. Implement logic to "abort" a shadow allocation context.
  *         <p>
  *         Unit test to verify that we do not recycle allocations from the last
  *         commit point even when the retention time is zero such that it is
@@ -334,6 +338,12 @@ public class RWStore implements IStore {
 //	public void setCommitCallback(final ICommitCallback callback) {
 //		m_commitCallback = callback;
 //	}
+
+	// If required, then allocate 1M direct buffers
+	private static final int cDirectBufferCapacity = 1024 * 1024;
+
+	private int cMaxDirectBuffers = 20; // 20M of direct buffers
+	static final int cDirectAllocationOffset = 64 * 1024;
 
 	// ///////////////////////////////////////////////////////////////////////////////////////
 	// RWStore Data
@@ -483,11 +493,26 @@ public class RWStore implements IStore {
 	private StorageStats m_storageStats;
 	private long m_storageStatsAddr = 0;
 	
+	/**
+	 * Direct ByteBuffer allocations.
+	 * 
+	 * TODO: Support different scaleups for disk and direct allocation to
+	 * allow for finer granularity of allocation.  For example, a 1K
+	 * scaleup would allow 32bit slot allocations for all slot sizes.
+	 */
+	private int m_directSpaceAvailable = 0;
+	private int m_nextDirectAllocation = cDirectAllocationOffset;
+	private ArrayList<ByteBuffer> m_directBuffers = null;
+	
+	private final boolean m_enableDirectBuffer;
+    
     /**
      * <code>true</code> iff the backing store is open.
      */
     private volatile boolean m_open = true;
     
+    private TreeMap<Integer, Integer> m_lockAddresses = null;
+
 	class WriteCacheImpl extends WriteCache.FileChannelScatteredWriteCache {
         public WriteCacheImpl(final ByteBuffer buf,
                 final boolean useChecksum,
@@ -549,13 +574,23 @@ public class RWStore implements IStore {
         if (fileMetadata == null)
             throw new IllegalArgumentException();
 
-        this.m_minReleaseAge = LongValidator.GTE_ZERO.parse(
+        this.m_minReleaseAge = Long.valueOf(fileMetadata.getProperty(
                 AbstractTransactionService.Options.MIN_RELEASE_AGE,
-                AbstractTransactionService.Options.DEFAULT_MIN_RELEASE_AGE);
+                AbstractTransactionService.Options.DEFAULT_MIN_RELEASE_AGE));
 
         if (log.isInfoEnabled())
             log.info(AbstractTransactionService.Options.MIN_RELEASE_AGE + "="
                     + m_minReleaseAge);
+        /*
+         * Disable TemporaryRW option for now
+         */
+        // m_enableDirectBuffer = fileMetadata.getBufferMode() == BufferMode.TemporaryRW;
+        m_enableDirectBuffer = false;
+        
+        if (m_enableDirectBuffer) {
+			m_directBuffers = new ArrayList<ByteBuffer>();
+			addDirectBuffer();
+        }
 
         cDefaultMetaBitsSize = Integer.valueOf(fileMetadata.getProperty(
                 Options.META_BITS_SIZE,
@@ -673,6 +708,8 @@ public class RWStore implements IStore {
 					for (FixedAllocator fa: m_allocs) {
 						m_storageStats.register(fa);
 					}
+				} else {
+	        		m_storageStats = new StorageStats(m_allocSizes);
 				}
 				
 			}
@@ -694,7 +731,15 @@ public class RWStore implements IStore {
 		}
 	}
     
-    private void setAllocations(final FileMetadata fileMetadata)
+    private void addDirectBuffer() {
+    	if (cMaxDirectBuffers > m_directBuffers.size()) {
+			ByteBuffer bbuf = ByteBuffer.allocateDirect(cDirectBufferCapacity);
+			m_directBuffers.add(bbuf);
+			m_directSpaceAvailable += cDirectBufferCapacity;
+    	}
+	}
+
+	private void setAllocations(final FileMetadata fileMetadata)
             throws IOException {
         
         final String buckets = fileMetadata.getProperty(
@@ -1017,11 +1062,20 @@ public class RWStore implements IStore {
 					final ArrayList<? extends Allocator> freeList;
 					assert allocSize > 0;
 
+					// m_minFixedAlloc and m_maxFixedAlloc may not be set since
+					// as finals they must be set in the constructor.  Therefore
+					// recalculate for local load
+					final int minFixedAlloc = 64 * m_allocSizes[0];
+					final int maxFixedAlloc = 64 * m_allocSizes[m_allocSizes.length-1];
 					int index = 0;
-					int fixedSize = m_minFixedAlloc;
-					while (fixedSize < allocSize)
+					int fixedSize = minFixedAlloc;
+					while (fixedSize < allocSize && fixedSize < maxFixedAlloc)
 						fixedSize = 64 * m_allocSizes[++index];
 
+					if (allocSize != fixedSize) {
+						throw new IllegalStateException("Unexpected allocator size: " 
+								+ allocSize + " != " + fixedSize);
+					}
 					allocator = new FixedAllocator(this, allocSize);//, m_writeCache);
 
 					freeList = m_freeFixed[index];
@@ -1055,13 +1109,6 @@ public class RWStore implements IStore {
 		Collections.sort(m_allocs);
 		for (int index = 0; index < m_allocs.size(); index++) {
 			((Allocator) m_allocs.get(index)).setIndex(index);
-		}
-
-		if (false) {
-			StringBuilder tmp = new StringBuilder();
-			showAllocators(tmp);
-			
-			System.out.println("Allocators: " + tmp.toString());
 		}
 	}
 	
@@ -1206,6 +1253,8 @@ public class RWStore implements IStore {
 
         readLock.lock();
         
+        assertOpen(); // check again after taking lock
+
 		try {
 			// length includes space for the checksum
 			if (length > m_maxFixedAlloc) {
@@ -1277,6 +1326,10 @@ public class RWStore implements IStore {
 	        }
 
 	        try {
+	        	
+	        	if (getBlock((int) addr).getBlockSize() < length) {
+	        		throw new IllegalStateException("Bad Address: length requested greater than allocated slot");
+	        	}
 
 	            final long paddr = physicalAddress((int) addr);
                 
@@ -1286,6 +1339,12 @@ public class RWStore implements IStore {
 
                     throw new PhysicalAddressResolutionException(addr);
                     
+				}
+	            
+				if (paddr < 0) { // read from Direct ByteBuffer
+					directRead(paddr, buf, offset, length);
+					
+					return;
 				}
 
                 /**
@@ -1382,6 +1441,69 @@ public class RWStore implements IStore {
 		}
 	}
 
+    /**
+     * Retrieves data from the direct byte buffers, must handle transfers across
+     * multiple buffers
+     */
+	private void directRead(final long paddr, final byte[] buf, final int offset, final int length) {
+		assert paddr < 0;
+		assert m_directBuffers != null;
+		
+		final int baddr = (int) (-paddr) - cDirectAllocationOffset; // buffer address
+		int bufIndex = baddr / cDirectBufferCapacity;
+		int bufOffset = baddr % cDirectBufferCapacity;
+		
+		int transfer = 0;
+		int curOut = offset;
+		
+		while (transfer < length) {
+			ByteBuffer direct = m_directBuffers.get(bufIndex);
+			direct.position(bufOffset);
+			int avail = cDirectBufferCapacity - bufOffset;
+			int req = length - transfer;
+			int tlen = avail < req ? avail : req;
+			
+			direct.get(buf, curOut, tlen);
+			
+			transfer += tlen;
+			curOut += tlen;
+			
+			bufIndex++;
+			bufOffset = 0;
+		}
+	}
+
+	/**
+	 * Writes to direct buffers, transferring across boundaries as required
+	 */
+    private void directWrite(final long pa, final byte[] buf, final int offset, final int length, final int chk) {
+		assert pa < 0;
+		assert m_directBuffers != null;
+		
+		final int baddr = (int) (-pa) - cDirectAllocationOffset; // buffer address
+		int bufIndex = baddr / cDirectBufferCapacity;
+		int bufOffset = baddr % cDirectBufferCapacity;
+		
+		int transfer = 0;
+		int curIn = offset;
+		
+		while (transfer < length) {
+			ByteBuffer direct = m_directBuffers.get(bufIndex);
+			direct.position(bufOffset);
+			int avail = cDirectBufferCapacity - bufOffset;
+			int req = length - transfer;
+			int tlen = avail < req ? avail : req;
+			
+			direct.put(buf, curIn, tlen);
+			
+			transfer += tlen;
+			curIn += tlen;
+			
+			bufIndex++;
+			bufOffset = 0;
+		}
+	}
+
 	private void assertAllocators() {
 		for (int i = 0; i < m_allocs.size(); i++) {
 			if (m_allocs.get(i).getIndex() != i) {
@@ -1434,7 +1556,7 @@ public class RWStore implements IStore {
 	public void free(final long laddr, final int sze, final IAllocationContext context) {
 	    assertOpen();
 		final int addr = (int) laddr;
-
+		
 		switch (addr) {
 		case 0:
 		case -1:
@@ -1443,6 +1565,9 @@ public class RWStore implements IStore {
 		}
 		m_allocationLock.lock();
 		try {
+			if (m_lockAddresses != null && m_lockAddresses.containsKey((int)laddr))
+				throw new IllegalStateException("address locked: " + laddr);
+			
 			if (sze > m_maxFixedAlloc-4) {
 				freeBlob(addr, sze, context);
 			} else {
@@ -1464,35 +1589,32 @@ public class RWStore implements IStore {
                  * FIXME We need unit test when MIN_RELEASE_AGE is ZERO AND
                  * there are open read-only transactions.
                  */
-				boolean alwaysDefer = m_minReleaseAge > 0L
-						|| m_activeTxCount > 0;
-				if (!alwaysDefer)
-					alwaysDefer = context == null && !m_contexts.isEmpty();
-				if (alwaysDefer)
-					if (log.isDebugEnabled())
-						log.debug("Should defer " + addr + " real: "
-								+ physicalAddress(addr));
-				if (alwaysDefer
-						|| !alloc.canImmediatelyFree(addr, sze, context)) {
-					deferFree(addr, sze);
+				if (m_minReleaseAge == 0) {
+					/*
+					 * The session protection is complicated by the mix of
+					 * transaction protection and isolated AllocationContexts.
+					 */
+					if (this.isSessionProtected()) {
+						
+						immediateFree(addr, sze, context != null && alloc.canImmediatelyFree(addr, sze, context));
+					} else {
+						immediateFree(addr, sze);
+					}
 				} else {
-					immediateFree(addr, sze);
+	                boolean alwaysDefer = m_activeTxCount > 0;
+
+					if (!alwaysDefer)
+	                    alwaysDefer = context == null && !m_contexts.isEmpty();
+					
+	                if (alwaysDefer)
+						if (log.isDebugEnabled())
+						    log.debug("Should defer " + addr + " real: " + physicalAddress(addr));
+	                if (alwaysDefer || !alloc.canImmediatelyFree(addr, sze, context)) {
+						deferFree(addr, sze);
+					} else {
+						immediateFree(addr, sze);
+					}
 				}
-//				if (m_minReleaseAge == 0) {
-//					immediateFree(addr, sze);
-//				} else {
-//	                boolean alwaysDefer = m_activeTxCount > 0;
-//	                if (!alwaysDefer)
-//	                    alwaysDefer = context == null && !m_contexts.isEmpty();
-//	                if (alwaysDefer)
-//						if (log.isDebugEnabled())
-//						    log.debug("Should defer " + addr + " real: " + physicalAddress(addr));
-//	                if (alwaysDefer || !alloc.canImmediatelyFree(addr, sze, context)) {
-//						deferFree(addr, sze);
-//					} else {
-//						immediateFree(addr, sze);
-//					}
-//				}
 			}
 		} finally {
 			m_allocationLock.unlock();
@@ -1504,6 +1626,19 @@ public class RWStore implements IStore {
 		return m_minReleaseAge;
 	}
 
+	/**
+	 * Session protection can only be used in preference to deferred frees when 
+	 * the minReleaseAge is zero.  If so then two protection states are checked:
+	 * either a positive activeTxCount incremented by the TransactionManager
+	 * or if there are active AllocationContexts.
+	 * 
+	 * The activeTxCount esentially protects read-only transactions while the
+	 * AllocationContexts enable concurrent store allocations, whilst also
+	 * supporting immediate re-cycling of localized allocations (those made
+	 * and released within the same AllocationContext).
+	 * 
+	 * @return whether there is a logical active session
+	 */
 	boolean isSessionProtected() {
 		return m_minReleaseAge == 0 && (m_activeTxCount > 0 || !m_contexts.isEmpty());
 	}
@@ -1515,11 +1650,16 @@ public class RWStore implements IStore {
 	 * 
 	 * When called, will call through to the Allocators to re-sync the
 	 * transient bits with the committed and live.
+	 * 
+	 * The writeCache is passed into the allocator to enable any "now free"
+	 * allocations to be cleared from the cache.  Until the session is released
+	 * the writeCache must be maintained to support readers of uncommitted and
+	 * unwritten allocations.
 	 */
 	void releaseSessions() {
 		if (m_minReleaseAge == 0) {
 			for (FixedAllocator fa : m_allocs) {
-				fa.releaseSession();
+				fa.releaseSession(m_writeCache);
 			}
 		}
 	}
@@ -1559,6 +1699,10 @@ public class RWStore implements IStore {
 
 	//	private long immediateFreeCount = 0;
 	private void immediateFree(final int addr, final int sze) {
+		immediateFree(addr, sze, false);
+	}
+	
+	private void immediateFree(final int addr, final int sze, final boolean overrideSession) {
 		
 		switch (addr) {
 		case 0:
@@ -1575,14 +1719,18 @@ public class RWStore implements IStore {
 				throw new IllegalArgumentException("Invalid address provided to immediateFree: " + addr + ", size: " + sze);
 			}
             final long pa = alloc.getPhysicalAddress(addrOffset);
+            
             if (log.isTraceEnabled())
                 log.trace("Freeing allocation at " + addr + ", physical address: " + pa);
-            alloc.free(addr, sze);
+            alloc.free(addr, sze, overrideSession);
 			// must clear after free in case is a blobHdr that requires reading!
 			// the allocation lock protects against a concurrent re-allocation
 			// of the address before the cache has been cleared
 			assert pa != 0;
-			m_writeCache.clearWrite(pa);
+			// only clear any existing write to cache if no active session
+			if (overrideSession || !this.isSessionProtected()) {
+				m_writeCache.clearWrite(pa);
+			}
 			m_frees++;
 			if (alloc.isAllocated(addrOffset))
 				throw new IllegalStateException("Reallocation problem with WriteCache");
@@ -1649,7 +1797,12 @@ public class RWStore implements IStore {
 					final ArrayList<FixedAllocator> list = m_freeFixed[i];
 					if (list.size() == 0) {
 
-						allocator = new FixedAllocator(this, block);//, m_writeCache);
+						if (canAllocateDirect()) {
+							allocator = new DirectFixedAllocator(this, block);
+						} else {
+							allocator = new FixedAllocator(this, block);
+						}
+						
 						allocator.setFreeList(list);
 						allocator.setIndex(m_allocs.size());
 
@@ -1707,6 +1860,13 @@ public class RWStore implements IStore {
 		}
 	}
 	
+	/**
+	 * @return true if we have spare directBuffers.
+	 */
+	private boolean canAllocateDirect() {
+		return m_directBuffers != null && m_directBuffers.size() < cMaxDirectBuffers;
+	}
+
 	private int fixedAllocatorIndex(final int size) {
 		int i = 0;
 
@@ -1788,13 +1948,23 @@ public class RWStore implements IStore {
         }
 
 		final int newAddr = alloc(size + 4, context); // allow size for checksum
+		
+		if (newAddr == 0)
+			throw new IllegalStateException("NULL address allocated");
 
 		final int chk = ChecksumUtility.getCHK().checksum(buf, size);
+		
+		final long pa = physicalAddress(newAddr);
 
-		try {
-			m_writeCache.write(physicalAddress(newAddr), ByteBuffer.wrap(buf,  0, size), chk);
-		} catch (InterruptedException e) {
-            throw new RuntimeException("Closed Store?", e);
+		// if from DirectFixedAllocator then physical address will be negative
+		if (pa < 0) {
+			directWrite(pa, buf, 0, size, chk);
+		} else {
+			try {
+				m_writeCache.write(pa, ByteBuffer.wrap(buf,  0, size), chk);
+			} catch (InterruptedException e) {
+	            throw new RuntimeException("Closed Store?", e);
+			}
 		}
 
         // Update counters.
@@ -1875,12 +2045,19 @@ public class RWStore implements IStore {
 //		}
 //	}
 
-    /**
+	/**
      * Toss away all buffered writes and then reload from the current root
      * block.
+     * 
+     * If the store is using DirectFixedAllocators then an IllegalStateException
+     * is thrown
      */
 	public void reset() {
 	    assertOpen();
+	    
+	    if (m_directBuffers != null)
+	    	throw new IllegalStateException("Reset is not supported with direct buffers");
+	    
 		if (log.isInfoEnabled()) {
 			log.info("RWStore Reset");
 		}
@@ -1915,7 +2092,7 @@ public class RWStore implements IStore {
 			// notify of current file length.
 			m_writeCache.setExtent(convertAddr(m_fileSize));
 		} catch (Exception e) {
-			throw new IllegalStateException("Unable reset the store", e);
+			throw new IllegalStateException("Unable to reset the store", e);
 		} finally {
 		    m_allocationLock.unlock();
 		}
@@ -1971,10 +2148,14 @@ public class RWStore implements IStore {
 		if (addr == 0) {
 			throw new IllegalStateException("Invalid metabits address: " + m_metaBitsAddr);
 		}
-		try {
-			m_writeCache.write(addr, ByteBuffer.wrap(buf), 0, false);
-		} catch (InterruptedException e) {
-			throw new RuntimeException(e);
+		if (addr < 0) {
+			directWrite(addr, buf, 0, buf.length, 0);
+		} else {
+			try {
+				m_writeCache.write(addr, ByteBuffer.wrap(buf), 0, false);
+			} catch (InterruptedException e) {
+				throw new RuntimeException(e);
+			}
 		}
 	}
 
@@ -1993,8 +2174,11 @@ public class RWStore implements IStore {
 		
 		try {
 		
-			checkDeferredFrees(true, journal); // free now if possible
+			final int totalFreed = checkDeferredFrees(true, journal); // free now if possible
 			
+			if (totalFreed > 0 && log.isInfoEnabled()) {
+				log.info("Freed " + totalFreed + " deferralls on commit");
+			}
 			// free old storageStatsAddr
 			if (m_storageStatsAddr != 0) {
 				int len = (int) (m_storageStatsAddr & 0xFFFF);				
@@ -2017,13 +2201,13 @@ public class RWStore implements IStore {
 				throw new IllegalStateException("Returned MetaBits Address not valid!");
 			}
 			
-			// TODO: assert that m_deferredFreeOut is empty!
-			assert m_deferredFreeOut.getBytesWritten() == 0;
-
 			// Call immediateFree - no need to defer freeof metaBits, this
 			//	has to stop somewhere!
 			// No more allocations must be made
 			immediateFree((int) oldMetaBits, oldMetaBitsSize);
+
+			// There must be no buffered deferred frees
+			assert m_deferredFreeOut.getBytesWritten() == 0;
 
 			// save allocation headers
 			final Iterator<Allocator> iter = m_commitList.iterator();
@@ -2097,8 +2281,10 @@ public class RWStore implements IStore {
      * <p>
      * Note: This method is package private in order to expose it to the unit
      * tests.
+     * 
+     * returns number of addresses freed
      */
-    /* public */void checkDeferredFrees(final boolean freeNow,
+    /* public */int checkDeferredFrees(final boolean freeNow,
             final Journal journal) {
 
         // Note: Invoked from unit test w/o the lock...
@@ -2140,9 +2326,11 @@ public class RWStore implements IStore {
              * Note: This adds one to the lastDeferredReleaseTime to give
              * exclusive lower bound semantics.
              */
-            freeDeferrals(journal, m_lastDeferredReleaseTime + 1,
+            return freeDeferrals(journal, m_lastDeferredReleaseTime + 1,
                     latestReleasableTime);
             
+        } else {
+        	return 0;
         }
         
     }
@@ -2397,31 +2585,6 @@ public class RWStore implements IStore {
 		return ret;
 	}
 
-//	/*
-//	 * clear
-//	 * 
-//	 * reset the file size commit the root blocks
-//	 */
-//	public void clear() {
-//		try {
-//			baseInit();
-//
-//			m_fileSize = -4;
-//			m_metaStartAddr = m_fileSize;
-//			m_nextAllocation = -1; // keep on a 8K boundary (8K minimum
-//			// allocation)
-//			m_raf.setLength(convertAddr(m_fileSize));
-//
-//			m_curHdrAddr = 0;
-//			m_rootAddr = 0;
-//
-//			startTransaction();
-//			commitTransaction();
-//		} catch (Exception e) {
-//			throw new StorageTerminalError("Unable to clear store", e);
-//		}
-//	}
-
 	public static long convertAddr(final int addr) {
 	    final long laddr = addr;
 		if (laddr < 0) {
@@ -2587,36 +2750,6 @@ public class RWStore implements IStore {
 
 		return -1;
 	}
-
-//	// --------------------------------------------------------------------------------------
-//    private String allocListStats(final List<Allocator> list, final AtomicLong counter) {
-//		final StringBuffer stats = new StringBuffer();
-//		final Iterator<Allocator> iter = list.iterator();
-//		while (iter.hasNext()) {
-//            stats.append(iter.next().getStats(counter));
-//		}
-//
-//		return stats.toString();
-//	}
-//
-//	public String getStats(final boolean full) {
-//		
-//        final AtomicLong counter = new AtomicLong();
-//
-//        final StringBuilder sb = new StringBuilder("FileSize : " + m_fileSize
-//                + " allocated : " + m_nextAllocation + "\r\n");
-//
-//		if (full) {
-//
-//            sb.append(allocListStats(m_allocs, counter));
-//
-//            sb.append("Allocated : " + counter);
-//
-//		}
-//
-//		return sb.toString();
-//
-//	}
 	
 	public static class AllocationStats {
 		public AllocationStats(final int i) {
@@ -2626,11 +2759,29 @@ public class RWStore implements IStore {
 		long m_reservedSlots;
 		long m_filledSlots;
 	}
-
 	/**
-	 * Collected statistics are against each Allocation Block size. See
-	 * {@link StorageStats#showStats(StringBuilder)} for details on the
-	 * generated report.
+	 * Utility debug outputing the allocator array, showing index, start
+	 * address and alloc type/size
+	 * 
+	 * Collected statistics are against each Allocation Block size:
+	 * total number of slots | store size
+	 * number of filled slots | store used
+	 * <dl>
+	 * <dt>AllocatorSize</dt><dd>The #of bytes in the allocated slots issued by this allocator.</dd>
+	 * <dt>AllocatorCount</dt><dd>The #of fixed allocators for that slot size.</dd>
+	 * <dt>SlotsInUse</dt><dd>The difference between the two previous columns (net slots in use for this slot size).</dd>
+	 * <dt>SlotsReserved</dt><dd>The #of slots in this slot size which have had storage reserved for them.</dd>
+	 * <dt>SlotsAllocated</dt><dd>Cumulative allocation of slots to date in this slot size (regardless of the transaction outcome).</dd>
+	 * <dt>SlotsRecycled</dt><dd>Cumulative recycled slots to date in this slot size (regardless of the transaction outcome).</dd>
+	 * <dt>SlotsChurn</dt><dd>How frequently slots of this size are re-allocated (SlotsInUse/SlotsAllocated).</dd>
+	 * <dt>%SlotsUnused</dt><dd>The percentage of slots of this size which are not in use (1-(SlotsInUse/SlotsReserved)).</dd>
+	 * <dt>BytesReserved</dt><dd>The space reserved on the backing file for those allocation slots</dd>
+	 * <dt>BytesAppData</dt><dd>The #of bytes in the allocated slots which are used by application data (including the record checksum).</dd>
+	 * <dt>%SlotWaste</dt><dd>How well the application data fits in the slots (BytesAppData/(SlotsInUse*AllocatorSize)).</dd>
+	 * <dt>%AppData</dt><dd>How much of your data is stored by each allocator (BytesAppData/Sum(BytesAppData)).</dd>
+	 * <dt>%StoreFile</dt><dd>How much of the backing file is reserved for each allocator (BytesReserved/Sum(BytesReserved)).</dd>
+	 * <dt>%StoreWaste</dt><dd>How much of the total waste on the store is waste for this allocator size ((BytesReserved-BytesAppData)/(Sum(BytesReserved)-Sum(BytesAppData))).</dd>
+	 * </dl>
 	 */
 	public void showAllocators(final StringBuilder str) {
 		m_storageStats.showStats(str);
@@ -2761,8 +2912,8 @@ public class RWStore implements IStore {
 			final FixedAllocator allocator = getBlock(addr);
 			final int offset = getOffset(addr);
 			final long laddr = allocator.getPhysicalAddress(offset);
-
-			return laddr;
+			
+			return allocator instanceof DirectFixedAllocator ? -laddr : laddr;
 		}
 	}
 
@@ -2790,10 +2941,6 @@ public class RWStore implements IStore {
 		return alloc;
 	}
 
-//	private int blockIndex(int addr) {
-//		return (-addr) >>> OFFSET_BITS;
-//	}
-
 	private FixedAllocator getBlock(final int addr) {
 		final int index = (-addr) >>> OFFSET_BITS;
 
@@ -2804,24 +2951,6 @@ public class RWStore implements IStore {
 		return (-addr) & OFFSET_BITS_MASK; // OFFSET_BITS
 	}
 
-//	public int addr2Size(final int addr) {
-//		if (addr > 0) {
-//			int size = 0;
-//
-//			final int index = ((int) addr) % 16;
-//
-//			if (index == 15) { // blob
-//				throw new Error("FIX ME : legacy BLOB code being accessed somehow");
-//			} else {
-//				size = m_minFixedAlloc * m_allocSizes[index];
-//			}
-//
-//			return size;
-//		} else {
-//			return getBlock(addr).getPhysicalSize(getOffset(addr));
-//		}
-//	}
-
 	/**
 	 * The {@link RWStore} always generates negative address values.
 	 * 
@@ -2831,149 +2960,9 @@ public class RWStore implements IStore {
 		return addr <= 0;
 	}
 
-//	/*******************************************************************************
-//	 * called when used as a server, returns whether facility is enabled, this
-//	 * is the whole point of the wormStore - so the answer is true
-//	 **/
-//	public boolean preserveSessionData() {
-//		m_preserveSession = true;
-//
-//		return true;
-//	}
-//
-//	/*******************************************************************************
-//	 * called by allocation blocks to determine whether they can re-allocate
-//	 * data within this session.
-//	 **/
-//	protected boolean isSessionPreserved() {
-//		return m_preserveSession || m_contexts.size() > 0;
-//	}
-
-//	/*********************************************************************
-//	 * create backup file, copy data to it, and close it.
-//	 **/
-//	synchronized public void backup(String filename) throws FileNotFoundException, IOException {
-//		File destFile = new File(filename);
-//		destFile.createNewFile();
-//
-//		RandomAccessFile dest = new RandomAccessFile(destFile, "rw");
-//
-//		int bufSize = 64 * 1024;
-//		byte[] buf = new byte[bufSize];
-//
-//		m_raf.seek(0);
-//
-//		int rdSize = bufSize;
-//		while (rdSize == bufSize) {
-//			rdSize = m_raf.read(buf);
-//			if (rdSize > 0) {
-//				dest.write(buf, 0, rdSize);
-//			}
-//		}
-//
-//		dest.close();
-//	}
-//
-//	/*********************************************************************
-//	 * copy storefile to output stream.
-//	 **/
-//	synchronized public void backup(OutputStream outstr) throws IOException {
-//		int bufSize = 64 * 1024;
-//		byte[] buf = new byte[bufSize];
-//
-//		m_raf.seek(0);
-//
-//		int rdSize = bufSize;
-//		while (rdSize == bufSize) {
-//			rdSize = m_raf.read(buf);
-//			if (rdSize > 0) {
-//				outstr.write(buf, 0, rdSize);
-//			}
-//		}
-//	}
-//
-//	synchronized public void restore(InputStream instr) throws IOException {
-//		int bufSize = 64 * 1024;
-//		byte[] buf = new byte[bufSize];
-//
-//		m_raf.seek(0);
-//
-//		int rdSize = bufSize;
-//		while (rdSize == bufSize) {
-//			rdSize = instr.read(buf);
-//			if (rdSize > 0) {
-//				m_raf.write(buf, 0, rdSize);
-//			}
-//		}
-//	}
-
-//	/***************************************************************************************
-//	 * Needed by PSOutputStream for BLOB buffer chaining.
-//	 **/
-//	public void absoluteWriteInt(final int addr, final int offset, final int value) {
-//		try {
-//			// must check write cache!!, or the write may be overwritten - just
-//			// flush for now
-//			m_writes.flush();
-//
-//			m_raf.seek(physicalAddress(addr) + offset);
-//			m_raf.writeInt(value);
-//		} catch (IOException e) {
-//			throw new StorageTerminalError("Unable to write integer", e);
-//		}
-//	}
-
-//	/***************************************************************************************
-//	 * Needed to free Blob chains.
-//	 **/
-//	public int absoluteReadInt(final int addr, final int offset) {
-//		try {
-//			m_raf.seek(physicalAddress(addr) + offset);
-//			return m_raf.readInt();
-//		} catch (IOException e) {
-//			throw new StorageTerminalError("Unable to write integer", e);
-//		}
-//	}
-
-//	/***************************************************************************************
-//	 * Needed by PSOutputStream for BLOB buffer chaining.
-//	 **/
-//	public int bufferChainOffset() {
-//		return m_maxFixedAlloc - 4;
-//	}
-
 	public File getStoreFile() {
 		return m_fd;
 	}
-
-//	public boolean isLongAddress() {
-//		// always ints
-//		return false;
-//	}
-
-//	public int absoluteReadLong(long addr, int offset) {
-//		throw new UnsupportedOperationException();
-//	}
-//
-//	public void absoluteWriteLong(long addr, int threshold, long value) {
-//		throw new UnsupportedOperationException();
-//	}
-
-//	public void absoluteWriteAddress(long addr, int threshold, long addr2) {
-//		absoluteWriteInt((int) addr, threshold, (int) addr2);
-//	}
-
-//	public int getAddressSize() {
-//		return 4;
-//	}
-
-//	public RandomAccessFile getRandomAccessFile() {
-//		return m_raf;
-//	}
-
-//	public FileChannel getChannel() {
-//		return m_raf.getChannel();
-//	}
 
 	public boolean requiresCommit() {
 		return m_recentAlloc;
@@ -3359,8 +3348,9 @@ public class RWStore implements IStore {
 	/**
 	 * Provided with the address of a block of addresses to be freed
 	 * @param blockAddr
+	 * @return the total number of addresses freed
 	 */
-	private void freeDeferrals(final long blockAddr, final long lastReleaseTime) {
+	private int freeDeferrals(final long blockAddr, final long lastReleaseTime) {
 		final int addr = (int) (blockAddr >> 32);
 		final int sze = (int) blockAddr & 0xFFFFFF;
 		
@@ -3371,8 +3361,11 @@ public class RWStore implements IStore {
 		getData(addr, buf);
 		final DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
 		m_allocationLock.lock();
+		int totalFreed = 0;
 		try {
 			int nxtAddr = strBuf.readInt();
+			
+			int cnt = 0;
 			
 			while (nxtAddr != 0) { // while (false && addrs-- > 0) {
 				
@@ -3386,6 +3379,8 @@ public class RWStore implements IStore {
 					immediateFree(nxtAddr, 1); // size ignored for FixedAllocators
 				}
 				
+				totalFreed++;
+				
 				nxtAddr = strBuf.readInt();
 			}
             m_lastDeferredReleaseTime = lastReleaseTime;
@@ -3397,6 +3392,8 @@ public class RWStore implements IStore {
 		} finally {
 			m_allocationLock.unlock();
 		}
+		
+		return totalFreed;
 	}
 
     /**
@@ -3409,7 +3406,7 @@ public class RWStore implements IStore {
      * @param toTime
      *            The exclusive upper bound.
      */
-    private void freeDeferrals(final AbstractJournal journal,
+    private int freeDeferrals(final AbstractJournal journal,
             final long fromTime,
             final long toTime) {
 
@@ -3438,6 +3435,8 @@ public class RWStore implements IStore {
         if(log.isTraceEnabled())
             log.trace("fromTime=" + fromTime + ", toTime=" + toTime);
 
+        int totalFreed = 0;
+        
         while (commitRecords.hasNext()) {
             
             final ITuple<CommitRecordIndex.Entry> tuple = commitRecords.next();
@@ -3452,12 +3451,13 @@ public class RWStore implements IStore {
 			
             if (blockAddr != 0) {
 			
-                freeDeferrals(blockAddr, record.getTimestamp());
+                totalFreed += freeDeferrals(blockAddr, record.getTimestamp());
                 
 			}
 
         }
         
+        return totalFreed;
 	}
 
     /**
@@ -3465,6 +3465,7 @@ public class RWStore implements IStore {
      * and an overall list of allocators. When the context is detached, all
      * allocators must be released and any that has available capacity will be
      * assigned to the global free lists.
+	 * 	See {@link AllocBlock #releaseSession}
      * 
      * @param context
      *            The context to be released from all FixedAllocators.
@@ -3485,9 +3486,9 @@ public class RWStore implements IStore {
 	
     /**
      * The ContextAllocation object manages a freeList of associated allocators
-     * and an overall list of allocators. When the context is detached, all
-     * allocators must be released and any that has available capacity will be
-     * assigned to the global free lists.
+     * and an overall list of allocators.  When the context is aborted then
+     * allocations made by that context should be released.
+	 * 	See {@link AllocBlock #abortShadow}
      * 
      * @param context
      *            The context to be released from all FixedAllocators.
@@ -3499,7 +3500,7 @@ public class RWStore implements IStore {
 			final ContextAllocation alloc = m_contexts.remove(context);
 			
 			if (alloc != null) {
-				alloc.release();			
+				alloc.abort();			
 			}
 		} finally {
 			m_allocationLock.unlock();
@@ -4352,5 +4353,59 @@ public class RWStore implements IStore {
             m_allocationLock.unlock();
         }
     }
+
+    /**
+     * A request for a direct allocation from a Direct ByteBuffer
+     * 
+     * @param blockSize the size requested
+     * @return the address of the direct allocation
+     */
+	public int allocateDirect(final int blockSize) {
+		final int allocBytes = blockSize << this.ALLOCATION_SCALEUP;
+		if (m_directSpaceAvailable < allocBytes) {
+			// try and allocate a further buffer
+			addDirectBuffer();			
+		}
+		
+		if (m_directSpaceAvailable < allocBytes) {
+			return -1;
+		} else {
+			final int ret = m_nextDirectAllocation;
+			m_nextDirectAllocation += allocBytes;
+			m_directSpaceAvailable -= allocBytes;
+			
+			return ret;
+		}
+	}
+
+	/**
+	 * Returns the slot size associated with this address
+	 */
+	public int getAssociatedSlotSize(int addr) {
+		return getBlock(addr).getBlockSize();
+	}
+
+	/**
+	 * lockAddress adds the address passed to a lock list.  This is for
+	 * debug only and is not intended to be used generally for the live system.
+	 * 
+	 * @param addr - address to be locked
+	 */
+	public void lockAddress(int addr) {
+		m_allocationLock.lock();
+		try {
+			if (m_lockAddresses == null) {
+				m_lockAddresses = new TreeMap<Integer, Integer>();
+			}
+			
+			if (m_lockAddresses.containsKey(addr)) {
+				throw new IllegalStateException("address already locked " + addr);
+			}
+			
+			m_lockAddresses.put(addr, addr);
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
     
 }

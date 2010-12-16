@@ -26,6 +26,8 @@ package com.bigdata.rwstore;
 
 import java.util.ArrayList;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.rwstore.RWStore.AllocationStats;
 
 /**
@@ -43,6 +45,15 @@ import com.bigdata.rwstore.RWStore.AllocationStats;
  * @todo change to use long[]s.
  */
 public class AllocBlock {
+
+    private static final Logger log = Logger.getLogger(AllocBlock.class);
+    
+    /**
+	 * The FixedAllocator owning this block.  The callback reference is needed
+	 * to allow the AllocBlock to determine the session state and whether to
+	 * clear the transient bits.
+	 */
+	final FixedAllocator m_allocator;
 	/**
 	 * The address of the {@link AllocBlock} -or- ZERO (0) if {@link AllocBlock}
 	 * has not yet been allocated on the persistent heap. Note that the space
@@ -82,8 +93,9 @@ public class AllocBlock {
 //	 */
 //	private final RWWriteCacheService m_writeCache;
 
-	AllocBlock(final int addrIsUnused, final int bitSize) {//, final RWWriteCacheService cache) {
+	AllocBlock(final int addrIsUnused, final int bitSize, final FixedAllocator allocator) {//, final RWWriteCacheService cache) {
 //		m_writeCache = cache;
+		m_allocator = allocator;
 		m_ints = bitSize;
 		m_commit = new int[bitSize];
 		m_live = new int[bitSize];
@@ -116,6 +128,16 @@ public class AllocBlock {
 	}
 
 	public boolean freeBit(final int bit) {
+		// by default do NOT session protect, the 2 argument call is made
+		// directly from the RWStore that has access to sessio and transaction
+		// state
+		return freeBit(bit, false);
+	}
+	
+	/*
+	 * 
+	 */
+	public boolean freeBit(final int bit, final boolean sessionProtect) {
 		if (!RWStore.tstBit(m_live, bit)) {
 			throw new IllegalArgumentException("Freeing bit not set");
 		}
@@ -128,16 +150,34 @@ public class AllocBlock {
 		 * Note that with buffered IO there is also an opportunity to avoid
 		 * output to the file by removing any pending write to the now freed
 		 * address. On large transaction scopes this may be significant.
+		 * 
+		 * The sessionProtect parameter indicates whether we really should
+		 * continue to protect this alloction by leaving the transient bit
+		 * set.  For general session protection we should, BUT it allocation
+		 * contexts have been used we can allow immediate recycling and this
+		 * is setup by the caller
 		 */
 		RWStore.clrBit(m_live, bit);
+		
+		if (log.isTraceEnabled()) {
+			log.trace("Freeing " + bitPhysicalAddress(bit) + " sessionProtect: " + sessionProtect);
+		}
 
-		if (!RWStore.tstBit(m_commit, bit)) {
-			RWStore.clrBit(m_transients, bit);
-
-			return true;
+		if (!sessionProtect) {
+			if (!RWStore.tstBit(m_commit, bit)) {
+				RWStore.clrBit(m_transients, bit);
+	
+				return true;
+			} else {
+				return false;
+			}
 		} else {
 			return false;
 		}
+	}
+	
+	private long bitPhysicalAddress(int bit) {
+		return RWStore.convertAddr(m_addr) + ((long) m_allocator.m_size * bit);
 	}
 
 	/**
@@ -266,14 +306,45 @@ public class AllocBlock {
 	 * of the committed bits and the live bits, but rather an ORing of the live
 	 * with all the committed bits since the start of the session.
 	 * When the session is released, the state is restored to an ORing of the
-	 * live and the committed, thus releasing slots for re-allocation. 
+	 * live and the committed, thus releasing slots for re-allocation.
+	 * 
+	 * For each transient bit, check if cleared and ensure any write is removed
+	 * from the write cache. Where the bit is set in the session protected
+	 * but not in the recalculated transient.  Tested with new &= ~old;
+	 * 
+	 * @param cache 
 	 */
-	public void releaseSession() {
+	public void releaseSession(RWWriteCacheService cache) {
 		if (m_addr != 0) { // check active!
 			for (int i = 0; i < m_live.length; i++) {
+				int chkbits = m_transients[i];
 				m_transients[i] = m_live[i] | m_commit[i];
+				chkbits &= ~m_transients[i];
+				
+				if (chkbits != 0) {
+					// there are writes to clear
+					for (int b = 0; b < 32; b++) {
+						if ((chkbits & (1 << b)) != 0) {
+							long clr = RWStore.convertAddr(m_addr) + ((long) m_allocator.m_size * b);
+							
+							if (log.isTraceEnabled())
+								log.trace("releasing address: " + clr);
+							
+							cache.clearWrite(clr);
+						}
+					}
+				}
 			}
 		}
+	}
+
+	public String show() {
+		StringBuilder sb = new StringBuilder();
+		sb.append("AllocBlock, baseAddress: " + RWStore.convertAddr(m_addr) + " bits: ");
+		for (int b: m_transients)
+			sb.append(b + " ");
+		
+		return sb.toString();
 	}
 
 }

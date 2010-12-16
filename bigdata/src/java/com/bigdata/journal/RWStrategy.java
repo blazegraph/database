@@ -633,4 +633,14 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
     }
 
+    /**
+     * An assert oriented method that allows a finite number of addresses
+     * to be monitored to ensure it is not freed.
+     * 
+     * @param addr - address to be locked
+     */
+	public void lockAddress(final long addr) {
+		m_store.lockAddress(decodeAddr(addr));
+	}
+
 }

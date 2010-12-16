@@ -37,6 +37,7 @@ import java.util.TreeMap;
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
+import com.bigdata.config.LongValidator;
 import com.bigdata.journal.AbstractInterruptsTestCase;
 import com.bigdata.journal.AbstractJournalTestCase;
 import com.bigdata.journal.AbstractMRMWTestCase;
@@ -50,6 +51,7 @@ import com.bigdata.journal.TestJournalBasics;
 import com.bigdata.journal.Journal.Options;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.service.AbstractTransactionService;
 
 /**
  * Test suite for {@link BufferMode#DiskRW} journals.
@@ -116,8 +118,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
         final Properties properties = super.getProperties();
 
         properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
+        // properties.setProperty(Options.BUFFER_MODE, BufferMode.TemporaryRW.toString());
 
-        properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+        // properties.setProperty(Options.CREATE_TEMP_FILE, "true");
         
         // properties.setProperty(Options.FILE, "/Volumes/SSDData/TestRW/tmp.rw");
 
@@ -134,6 +137,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
         // properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,5,8,12,16,32"); // 2K max
         properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,5,8,12,16"); // 1K
+
+        // ensure history retention to force deferredFrees
+        // properties.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "1"); // Non-zero
 
         return properties;
 
@@ -243,6 +249,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
         protected BufferMode getBufferMode() {
             
             return BufferMode.DiskRW;
+            // return BufferMode.TemporaryRW;
             
         }
 
@@ -253,6 +260,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
             final Properties properties = super.getProperties();
 
             properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
+            // properties.setProperty(Options.BUFFER_MODE, BufferMode.TemporaryRW.toString());
 
             properties.setProperty(Options.CREATE_TEMP_FILE, "true");
             
@@ -274,6 +282,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
             // properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,5,8,12,16,32,48,64,128"); // 8K - max blob = 2K * 8K = 16M
             // properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,5,8,12,16,32,48,64,128"); // 2K max
             properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,5,8,12,16"); // 2K max
+
+            // ensure history retention to force deferredFrees
+            // properties.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "1"); // Non-zero
 
             return properties;
 
@@ -481,6 +492,16 @@ public class TestRWJournal extends AbstractJournalTestCase {
         	
         }
         
+        /**
+         * Not so much a test as a code coverage exercise.
+         * 
+         * The output from showAllocReserve confirms the relative merits of
+         * optimising for space vs density.  The DirectFixedAllocators will
+         * allocate from DirectBuffers, where locality of reference is less
+         * important than efficient management of the memory, which is optimised
+         * by allocations in smaller amounts that match the demands at a finer
+         * granularity.
+         */
         public void testAllocationReserves() {
         	final int cReserve16K = 16 * 1024;
         	final int cReserve128K = 32 * 1024;
@@ -498,14 +519,14 @@ public class TestRWJournal extends AbstractJournalTestCase {
         	showAllocReserve(true, 1024, cReserve128K, cReserve16K);
         	showAllocReserve(true, 2048, cReserve128K, cReserve16K);
         	showAllocReserve(true, 3072, cReserve128K, cReserve16K);
-        	showAllocReserve(true, 4096, cReserve16K, cReserve16K);
+        	showAllocReserve(true, 4096, cReserve128K, cReserve16K);
         	showAllocReserve(true, 8192, cReserve128K, cReserve16K);
         }
         private void showAllocReserve(final boolean optDensity, final int slotSize, final int reserve, final int mod) {
         	final int ints = FixedAllocator.calcBitSize(optDensity, slotSize, reserve, mod);
-        	// there are max 126 ints available to a FixedAllocator
-        	final int maxuse = (126/(ints+1)) * ints;
-        	System.out.println("Allocate " + ints + ":" + (32 * ints * slotSize) + " for " + slotSize + " in " + reserve + " using " + maxuse + " of 126 possible");
+        	// there are max 254 ints available to a FixedAllocator
+        	final int maxuse = (254/(ints+1)) * ints;
+        	System.out.println("Allocate " + ints + ":" + (32 * ints * slotSize) + " for " + slotSize + " in " + reserve + " using " + maxuse + " of 254 possible");
         }
         
         long allocBatch(RWStore rw, int bsize, int asze, int ainc) {
@@ -513,11 +534,16 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	        for (int i = 1; i < bsize; i++) {
 	        	int a = rw.alloc(asze, null);
 	        	long nxt = rw.physicalAddress(a);
-	        	assertTrue("Problem with index: " + i, (curAddress+ainc) == nxt || (nxt % 8192 == 0));
+	        	assertTrue("Problem with index: " + i, diff(curAddress, nxt) == ainc || (nxt % 8192 == 0));
 	        	curAddress = nxt;
 	        }
 	        
 	        return curAddress;
+        }
+        
+        int diff(final long cur, final long nxt) {
+        	int ret = (int) (nxt - cur);
+        	return ret < 0 ? -ret : ret;
         }
 
         int[] allocBatchBuffer(RWStore rw, int bsize, int base, int scope) {
@@ -535,11 +561,20 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
         
         /**
-         * Reallocation tests the freeing of allocated address and the re-use within a transaction.
+         * Reallocation tests the freeing of allocated address and the re-use 
+         * within a transaction.
+         * 
+         * The repeated runs with full reopening of the store check the
+         * initialization of the allocators on reload.
+         * 
+         * @throws IOException 
          */
-        public void test_reallocation() {
-            
-            final Journal store = (Journal) getStore();
+        public void test_reallocation() throws IOException {
+            final Properties properties = getProperties();
+            File tmpfile = File.createTempFile("TestRW", "rw");
+            properties.setProperty(Options.FILE, tmpfile.getAbsolutePath());
+            properties.remove(Options.CREATE_TEMP_FILE);
+            Journal store = new Journal(properties);
 
             try {
 
@@ -549,8 +584,31 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 RWStore rw = bufferStrategy.getRWStore();
                 long numAllocs = rw.getTotalAllocations();
                 long startAllocations = rw.getTotalAllocationsSize();
+                
                 reallocBatch(rw, 1000, 275, 1000);
-                reallocBatch(rw, 1000, 860, 1000);
+                
+                store.commit();
+                store.close();
+                store = new Journal(properties);
+                bufferStrategy = (RWStrategy) store.getBufferStrategy();
+                rw = bufferStrategy.getRWStore();
+                
+                reallocBatch(rw, 1000, 100, 10000);
+                
+                store.commit();
+                store.close();
+                store = new Journal(properties);
+                bufferStrategy = (RWStrategy) store.getBufferStrategy();
+                rw = bufferStrategy.getRWStore();
+
+                reallocBatch(rw, 1000, 100, 10000);
+                
+                store.commit();
+                store.close();
+                store = new Journal(properties);
+                bufferStrategy = (RWStrategy) store.getBufferStrategy();
+                rw = bufferStrategy.getRWStore();
+
                 System.out.println("Final allocations: " + (rw.getTotalAllocations() - numAllocs)
                 		+ ", allocated bytes: " + (rw.getTotalAllocationsSize() - startAllocations)
                  + ", file length: " + rw.getStoreFile().length());
@@ -566,13 +624,16 @@ public class TestRWJournal extends AbstractJournalTestCase {
         private long reallocBatch(RWStore rw, int tsts, int sze, int grp) {
         	long[] addr = new long[grp];
         	for (int i = 0; i < grp; i++) {
-        		addr[i] = rw.alloc(sze, null);
+        		addr[i] = rw.alloc(2 + r.nextInt(sze), null);
         	}
         	for (int t = 0; t < tsts; t++) {
             	for (int i = 0; i < grp; i++) {
             		long old = addr[i];
-            		addr[i] = rw.alloc(sze, null);
-            		rw.free(old, sze);
+            		int asze = 2 + r.nextInt(sze);
+            		addr[i] = rw.alloc(asze, null);
+            		
+            		if (i % 2 == 0)
+            			rw.free(old, 1); // dunno what the real size is
             	}       		
         	}
 	        
@@ -1135,6 +1196,40 @@ public class TestRWJournal extends AbstractJournalTestCase {
             	store.destroy();
             }
         }
+       
+       /**
+        * Tests whether tasks are able to access and modify
+        * data safely by emulating transactions by calling activateTx and
+        * deactivateTx directly.
+        */
+       public void test_sessionProtection() {
+    	   // Sequential logic
+    	   
+           final Journal store = (Journal) getStore();
+           final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+           final RWStore rw = bs.getRWStore();
+
+           byte[] buf = new byte[300]; // Just some data
+           r.nextBytes(buf);
+           
+           ByteBuffer bb = ByteBuffer.wrap(buf);
+
+           long faddr = bs.write(bb); // rw.alloc(buf, buf.length);
+           
+           rw.activateTx();
+                      
+           bs.delete(faddr); // delettion protected by session
+           
+           bb.position(0);
+           
+           ByteBuffer rdBuf = bs.read(faddr);
+           
+           assertEquals(bb, rdBuf);
+           
+           rw.deactivateTx();
+
+           store.commit();
+       }
 
        /**
         * The pureAlloc test is to test the allocation aspect of the memory 

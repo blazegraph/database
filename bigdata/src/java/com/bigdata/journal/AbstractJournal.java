@@ -992,6 +992,20 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 				}
 
+				case TemporaryRW: {
+
+					/*
+					 * Setup the buffer strategy.
+					 */
+
+					_bufferStrategy = new RWStrategy(fileMetadata, quorum);
+
+					this._rootBlock = fileMetadata.rootBlock;
+					
+					break;
+
+				}
+
 				case Temporary: {
 
 					/*
@@ -2354,6 +2368,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * the store.
 			 */
 			final long commitRecordIndexAddr = _commitRecordIndex.writeCheckpoint();
+			
+			/*
+			 * DEBUG: The commitRecordIndexAddr should not be deleted, the
+			 * call to lockAddress forces a runtime check protecting the address
+			 */
+			if (_bufferStrategy instanceof RWStrategy) {
+				((RWStrategy) _bufferStrategy).lockAddress(commitRecordIndexAddr);
+			}
 
             if (quorum != null) {
                 /*
