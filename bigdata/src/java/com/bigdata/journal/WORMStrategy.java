@@ -822,14 +822,14 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             final Quorum<?, ?> quorum) {
 
         super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
-                fileMetadata.nextOffset, fileMetadata.bufferMode,
+                fileMetadata.nextOffset, fileMetadata.getBufferMode(),
                 fileMetadata.readOnly);
 
         this.file = fileMetadata.file;
 
         this.fileMode = fileMetadata.fileMode;
         
-        this.temporaryStore = (fileMetadata.bufferMode==BufferMode.Temporary);
+        this.temporaryStore = (fileMetadata.getBufferMode()==BufferMode.Temporary);
         
         this.raf = fileMetadata.raf;
         

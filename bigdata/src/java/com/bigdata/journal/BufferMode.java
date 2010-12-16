@@ -139,6 +139,18 @@ public enum BufferMode {
 
     /**
      * <p>
+     * A variant on the DiskRW backed by a temporary file.  Options enable
+     * part of the store to be held with Direct ByteBuffers.  A significant
+     * use case would be an in-memory store but with disk overflow if
+     * required.
+     * </p>
+     * 
+     * @see RWStrategy
+     */
+    TemporaryRW(false/* stable */, false/* fullyBuffered */,StoreTypeEnum.RW),
+
+    /**
+     * <p>
      * A variant on the {@link #Disk} mode that is not restart-safe. This mode
      * is useful for all manners of temporary data with full concurrency control
      * and scales-up to very large temporary files. The backing file (if any) is

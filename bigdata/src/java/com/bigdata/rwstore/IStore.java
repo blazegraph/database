@@ -77,6 +77,12 @@ public interface IStore {
 	 */
 	public void getData(long l, byte buf[]);
 	
+	/**************************************************************
+	 * @param addr - the address
+	 * @return the size of the slot associated
+	 */
+	public int getAssociatedSlotSize(int addr);
+	
 //	/**************************************************************
 //	 * Given a physical address (byte offset on the store), return true
 //	 * if that address could be managed by an allocated block.

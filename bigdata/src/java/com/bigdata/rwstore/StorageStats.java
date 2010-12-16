@@ -207,7 +207,7 @@ public class StorageStats {
 			return store.divide(size, 2, RoundingMode.HALF_UP).floatValue();
 		}
 		public float totalWaste(long total) {	
-			if (usedStore() == 0)
+			if (total == 0)
 				return 0.0f;
 			
 			long slotWaste = reservedStore() - usedStore();
@@ -234,18 +234,30 @@ public class StorageStats {
 			return allocs.divide(used, 2, RoundingMode.HALF_UP).floatValue();
 		}
 		public float slotsUnused() {
+			if (m_totalSlots == 0) {
+				return 0.0f;
+			}
+			
 			BigDecimal used = new BigDecimal(100 * (m_totalSlots-usedSlots()));			
 			BigDecimal total = new BigDecimal(m_totalSlots);
 			if(total.signum()==0) return 0f;
 			return used.divide(total, 2, RoundingMode.HALF_UP).floatValue();
 		}
 		public float percentAllocations(long totalAllocations) {
+			if (totalAllocations == 0) {
+				return 0.0f;
+			}
+			
 			BigDecimal used = new BigDecimal(100 * m_slotAllocations);			
 			BigDecimal total = new BigDecimal(totalAllocations);
 			if(total.signum()==0) return 0f;
 			return used.divide(total, 2, RoundingMode.HALF_UP).floatValue();
 		}
 		public float percentSlotsInuse(long totalInuse) {
+			if (totalInuse == 0) {
+				return 0.0f;
+			}
+			
 			BigDecimal used = new BigDecimal(100 * usedSlots());			
 			BigDecimal total = new BigDecimal(totalInuse);
 			if(total.signum()==0) return 0f;
@@ -508,6 +520,9 @@ public class StorageStats {
 	}
 
 	private float dataPercent(long usedData, long totalData) {
+		if (totalData == 0)
+			return 0.0f;
+		
 		BigDecimal used = new BigDecimal(100 * usedData);
 		BigDecimal total = new BigDecimal(totalData);
 		

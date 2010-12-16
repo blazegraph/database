@@ -802,6 +802,7 @@ public class FileMetadata {
 					log.info("Mapping file=" + file);
 				buffer = opener.reopenChannel().map(FileChannel.MapMode.READ_WRITE, headerSize0, userExtent);
 				break;
+			case TemporaryRW:
 			case DiskRW:
 				buffer = null;
 				break;
@@ -1512,6 +1513,10 @@ public class FileMetadata {
 	 */
 	public String getProperty(final String name, final String defaultValue) {
 		return getProperty(properties, name, defaultValue);
+	}
+
+	public BufferMode getBufferMode() {
+		return bufferMode;
 	}
 
 }
