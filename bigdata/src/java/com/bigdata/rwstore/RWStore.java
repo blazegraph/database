@@ -1253,9 +1253,9 @@ public class RWStore implements IStore {
 
         readLock.lock();
         
-        assertOpen(); // check again after taking lock
-
 		try {
+	        assertOpen(); // check again after taking lock
+
 			// length includes space for the checksum
 			if (length > m_maxFixedAlloc) {
 				try {

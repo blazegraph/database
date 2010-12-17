@@ -113,9 +113,14 @@ public class FixedAllocator implements Allocator {
 		
 		final int bit = offset % allocBlockRange;
 		
-		if (RWStore.tstBit(block.m_live, bit) 
-				|| (m_sessionActive && RWStore.tstBit(block.m_transients, bit))) 
-		{		
+//		if (RWStore.tstBit(block.m_live, bit) 
+//				|| (m_sessionActive && RWStore.tstBit(block.m_transients, bit))) 
+		/*
+		 * Just check transients since there are case (eg CommitRecordIndex)
+		 * where committed data is accessed even if has been marked as ready to
+		 * be recycled after the next commit
+		 */
+		if (RWStore.tstBit(block.m_transients, bit)) {		
 			return RWStore.convertAddr(block.m_addr) + ((long) m_size * bit);
 		} else {
 			return 0L;
