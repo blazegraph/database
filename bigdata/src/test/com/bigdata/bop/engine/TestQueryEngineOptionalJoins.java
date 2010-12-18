@@ -28,17 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase2;
@@ -62,14 +54,10 @@ import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
-import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.constraint.NEConstant;
-import com.bigdata.bop.fed.TestFederatedQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
-import com.bigdata.bop.solutions.SliceOp.SliceStats;
-import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -78,16 +66,16 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.ICloseableIterator;
-import com.bigdata.util.InnerCause;
-import com.bigdata.util.concurrent.LatchedExecutor;
-import com.ibm.icu.impl.ByteBuffer;
 
 /**
- * Test suite for the {@link QueryEngine} against a local database instance.
- * <p>
- * Note: The {@link BOp}s are unit tested separately. This test suite is focused
- * on interactions when {@link BOp}s are chained together in a query, such as a
- * sequence of pipeline joins, a slice applied to a query, etc.
+ * Test suite for handling of optional join groups during query evaluation
+ * against a local database instance. Optional join groups are handled using
+ * {@link IBindingSet#push()} when entering the join group and
+ * {@link IBindingSet#pop(boolean)} when exiting the join group. If the join
+ * group was successful for a given binding set, then <code>save:=true</code> is
+ * specified for {@link IBindingSet#pop(boolean)} and the applied bindings will
+ * be visible to the downstream consumer. Otherwise the bindings applied during
+ * the join group are simply discarded.
  * 
  * <pre>
  * -Dlog4j.configuration=bigdata/src/resources/logging/log4j.properties
@@ -95,10 +83,6 @@ import com.ibm.icu.impl.ByteBuffer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestQueryEngine.java 3950 2010-11-17 02:14:08Z thompsonbry $
- * 
- * @see TestFederatedQueryEngine
- * 
- * @todo write a unit and stress tests for deadlines.
  */
 public class TestQueryEngineOptionalJoins extends TestCase2 {
 
@@ -270,14 +254,14 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
      */
     public void test_query_join2_optionals() throws Exception {
 
-        final int startId = 1;
-        final int joinId1 = 2;
-        final int predId1 = 3;
-        final int joinId2 = 4;
-        final int predId2 = 5;
-        final int joinId3 = 6;
-        final int predId3 = 7;
-        final int sliceId = 8;
+        final int startId = 1; // 
+        final int joinId1 = 2; //         : base join group.
+        final int predId1 = 3; // (a b)
+        final int joinId2 = 4; //         : joinGroup1
+        final int predId2 = 5; // (b c)   
+        final int joinId3 = 6; //         : joinGroup1
+        final int predId3 = 7; // (c d)
+        final int sliceId = 8; // 
         
         final IVariable<?> a = Var.var("a");
         final IVariable<?> b = Var.var("b");

@@ -30,12 +30,9 @@ package com.bigdata.bop;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
 
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
  * Abstract base class for pipeline operators where the data moving along the
@@ -84,6 +81,48 @@ abstract public class PipelineOp extends BOpBase {
 		String SHARED_STATE = PipelineOp.class.getName() + ".sharedState";
 
 		boolean DEFAULT_SHARED_STATE = false;
+
+		/**
+		 * Annotation used to mark the set of non-optional joins which may be
+		 * input to either the static or runtime query optimizer. Joins within a
+		 * join graph may be freely reordered by the query optimizer in order to
+		 * minimize the amount of work required to compute the solutions.
+		 * <p>
+		 * Note: Optional joins MAY NOT appear within the a join graph. Optional
+		 * joins SHOULD be evaluated as part of the "tail plan" following the
+		 * join graph, but before operations such as SORT, DISTINCT, etc.
+		 * 
+		 * @todo We should be able to automatically apply the static or runtime
+		 *       query optimizers to an operator tree using this annotation to
+		 *       identify the join graphs.
+		 */
+		String JOIN_GRAPH = PipelineOp.class.getName() + ".joinGraph";
+
+		/**
+		 * Annotation marks a high level join group, which may include optional
+		 * joins. Join groups are marked in order to decide the re-entry point
+		 * in the query plan when a join within an optional join group fails.
+		 * Also, the top-level join group is not marked -- only nested join
+		 * groups are marked. This is used by the decision rule to handle do 
+		 * {@link IBindingSet#push()} when entering a 
+		 * <p>
+		 * This is different from a {@link #JOIN_GRAPH} primarily in that the
+		 * latter may not include optional joins.
+		 */
+		String JOIN_GROUP = PipelineOp.class.getName() + ".joinGroup";
+
+		/**
+		 * Annotation is used to designate the target when a join within an
+		 * optional join group fails. The value of this annotation must be the
+		 * {@link #JOIN_GROUP} identifier corresponding to the next join group
+		 * in the query plan. The target join group identifier is specified
+		 * (rather than the bopId of the target join) since the joins in the
+		 * target join group may be reordered by the query optimizer. The entry
+		 * point for solutions redirected to the {@link #ALT_SINK_GROUP} is
+		 * therefore the first operator in the target {@link #JOIN_GROUP}. This
+		 * decouples the routing decisions from the join ordering decisions.
+		 */
+		String ALT_SINK_GROUP = PipelineOp.class.getName() + ".altSinkGroup";
 
     }
 
