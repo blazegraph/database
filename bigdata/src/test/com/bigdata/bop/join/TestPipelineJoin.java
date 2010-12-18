@@ -535,16 +535,16 @@ public class TestPipelineJoin extends TestCase2 {
         
     }
 
-    /**
-     * Unit tests for optional joins. For an optional join, an alternative sink
-     * may be specified in the {@link BOpContext}. When specified, it is used if
-     * the join fails (if not specified, the binding sets which do not join are
-     * forwarded to the primary sink). Binding sets which join go to the primary
-     * sink regardless.
-     * 
-     * @throws ExecutionException 
-     * @throws InterruptedException 
-     */
+	/**
+	 * Unit tests for optional joins. For an optional join, an alternative sink
+	 * may be specified for the join. When specified, it is used if the join
+	 * fails (if not specified, the binding sets which do not join are forwarded
+	 * to the primary sink). Binding sets which join go to the primary sink
+	 * regardless.
+	 * 
+	 * @throws ExecutionException
+	 * @throws InterruptedException
+	 */
     public void test_optionalJoin() throws InterruptedException, ExecutionException {
 
         final Var<?> x = Var.var("x");

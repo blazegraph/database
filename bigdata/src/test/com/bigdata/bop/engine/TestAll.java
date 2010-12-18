@@ -75,6 +75,9 @@ public class TestAll extends TestCase {
         // stress test for SliceOp.
         suite.addTestSuite(TestQueryEngine_Slice.class);
 
+        // test suite for optional join groups.
+		suite.addTestSuite(TestQueryEngineOptionalJoins.class);
+		
         // @todo test suite for query evaluation (DISTINCT, ORDER BY, GROUP BY).
 //        suite.addTestSuite(TestQueryEngine2.class);
 
