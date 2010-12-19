@@ -384,7 +384,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         }
         
         {
-            
+
             inlineLiterals = Boolean.parseBoolean(getProperty(
                     AbstractTripleStore.Options.INLINE_LITERALS,
                     AbstractTripleStore.Options.DEFAULT_INLINE_LITERALS));
@@ -392,26 +392,35 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             inlineBNodes = storeBlankNodes && Boolean.parseBoolean(getProperty(
                     AbstractTripleStore.Options.INLINE_BNODES,
                     AbstractTripleStore.Options.DEFAULT_INLINE_BNODES));
-            
+
+            inlineDateTimes = Boolean.parseBoolean(getProperty(
+                    AbstractTripleStore.Options.INLINE_DATE_TIMES,
+                    AbstractTripleStore.Options.DEFAULT_INLINE_DATE_TIMES));
+
             try {
-                
+
                 final Class<IExtensionFactory> xfc = 
                     determineExtensionFactoryClass();
+
                 final IExtensionFactory xFactory = xfc.newInstance();
-                
+
                 lexiconConfiguration = new LexiconConfiguration(
-                        inlineLiterals, inlineBNodes, xFactory);
-                
+                        inlineLiterals, inlineBNodes, inlineDateTimes, xFactory);
+
             } catch (InstantiationException e) {
+
                 throw new IllegalArgumentException(
                         AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
+
             } catch (IllegalAccessException e) {
+
                 throw new IllegalArgumentException(
                         AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
+
             }
-            
+
         }
-        
+
     }
     
     /**
@@ -580,7 +589,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      */
     final private boolean inlineBNodes;
     
-    
+	/**
+	 * Are xsd:dateTime litersls being inlined into the statement indices.
+	 * 
+	 * {@link AbstractTripleStore.Options#INLINE_DATE_TIMES}
+	 */
+	final private boolean inlineDateTimes;
+
     /**
      * Return <code>true</code> if datatype literals are being inlined into
      * the statement indices.

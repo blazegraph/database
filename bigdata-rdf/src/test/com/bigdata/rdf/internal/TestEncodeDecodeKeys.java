@@ -31,10 +31,13 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Random;
 import java.util.UUID;
-import org.openrdf.model.URI;
-import org.openrdf.model.impl.LiteralImpl;
+
+import javax.xml.datatype.DatatypeFactory;
 
 import junit.framework.TestCase2;
+
+import org.openrdf.model.URI;
+import org.openrdf.model.impl.LiteralImpl;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -335,7 +338,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      * @param e
      *            The array of the expected values.
      */
-    protected void doEncodeDecodeTest(final IV<?, ?>[] e) {
+    protected IV<?, ?>[] doEncodeDecodeTest(final IV<?, ?>[] e) {
 
         /*
          * Encode.
@@ -370,6 +373,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
             }
 
+            return a;
+            
         }
 
     }
@@ -762,4 +767,61 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
     }
 
+    public void test_SPO_encodeDecodeDateTime() throws Exception {
+        
+        final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
+        
+        final DatatypeFactory df = DatatypeFactory.newInstance();
+
+        final DateTimeExtension<BigdataValue> ext = 
+            new DateTimeExtension<BigdataValue>(new IDatatypeURIResolver() {
+            public BigdataURI resolve(URI uri) {
+                BigdataURI buri = vf.createURI(uri.stringValue());
+                buri.setIV(new TermId(VTE.URI, 1024));
+                return buri;
+            }
+        });
+        
+        final BigdataLiteral[] dt = {
+    		vf.createLiteral(
+        		df.newXMLGregorianCalendar("2001-10-26T21:32:52")),
+    		vf.createLiteral(
+        		df.newXMLGregorianCalendar("2001-10-26T21:32:52+02:00")),
+    		vf.createLiteral(
+        		df.newXMLGregorianCalendar("2001-10-26T19:32:52Z")),
+    		vf.createLiteral(
+        		df.newXMLGregorianCalendar("2001-10-26T19:32:52+00:00")),
+    		vf.createLiteral(
+        		df.newXMLGregorianCalendar("-2001-10-26T21:32:52")),
+    		vf.createLiteral(
+        		df.newXMLGregorianCalendar("2001-10-26T21:32:52.12679")),
+    		vf.createLiteral(
+        		df.newXMLGregorianCalendar("1901-10-26T21:32:52")),
+        };
+        
+        final IV<?, ?>[] e = {//
+                ext.createIV(dt[0]),
+                ext.createIV(dt[1]),
+                ext.createIV(dt[2]),
+                ext.createIV(dt[3]),
+                ext.createIV(dt[4]),
+                ext.createIV(dt[5]),
+                ext.createIV(dt[6]),
+//                ext.createIV(dt[7]),
+        };
+        
+        final IV<?, ?>[] a = doEncodeDecodeTest(e);
+
+        if (log.isInfoEnabled()) {
+        	for (int i = 0; i < e.length; i++) {
+	        	log.info(dt[i]);
+	        	log.info(ext.asValue((ExtensionIV) e[i], vf));
+	        	log.info(ext.asValue((ExtensionIV) a[i], vf));
+	        	log.info("");
+	        }
+        }
+        
+
+    }
+    
 }
