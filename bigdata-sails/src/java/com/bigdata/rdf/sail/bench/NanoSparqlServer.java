@@ -64,6 +64,7 @@ import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
+import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.query.parser.QueryParser;
 import org.openrdf.query.parser.sparql.SPARQLParserFactory;
 import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
@@ -83,17 +84,18 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.bench.NanoSparqlClient.QueryType;
+import com.bigdata.rdf.store.AbstractLocalTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractDistributedFederation;
-import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.sparse.ITPS;
@@ -126,7 +128,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 	 * The logger for the concrete {@link NanoSparqlServer} class.  The {@link NanoHTTPD}
 	 * class has its own logger.
 	 */
-	static protected final Logger log = Logger.getLogger(NanoSparqlServer.class); 
+	static private final Logger log = Logger.getLogger(NanoSparqlServer.class); 
 	
 	/**
 	 * A SPARQL results set in XML.
@@ -366,16 +368,21 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			}
 
 			// sb.append(tripleStore.predicateUsage());
-			
+
 			if (tripleStore.getIndexManager() instanceof Journal) {
-				Journal journal = (Journal) tripleStore.getIndexManager();
-				IBufferStrategy strategy = journal.getBufferStrategy();
+
+				final Journal journal = (Journal) tripleStore.getIndexManager();
+				
+				final IBufferStrategy strategy = journal.getBufferStrategy();
+				
 				if (strategy instanceof RWStrategy) {
-					RWStore store = ((RWStrategy) strategy).getRWStore();
+				
+					final RWStore store = ((RWStrategy) strategy).getRWStore();
 					
 					store.showAllocators(sb);
 					
 				}
+				
 			}
 
 		} catch (Throwable t) {
@@ -800,7 +807,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		 * rather than running on in the background with a disconnected client.
 		 */
 		final PipedOutputStream os = new PipedOutputStream();
-		final InputStream is = new PipedInputStream(os);//Bytes.kilobyte32*8/*pipeSize*/);
+		final InputStream is = new PipedInputStream(os,Bytes.kilobyte32*1); // note: default is 1k.
         final FutureTask<Void> ft = new FutureTask<Void>(getQueryTask(
                 namespace, timestamp, queryStr, os));
 		try {
@@ -910,7 +917,10 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		 * position of having to parse the query here and then again when it is
 		 * executed.
 		 */
-		/*final ParsedQuery q =*/ engine.parseQuery(queryStr, null/*baseURI*/);
+		final ParsedQuery q = engine.parseQuery(queryStr, null/*baseURI*/);
+		
+		if(log.isInfoEnabled())
+			log.info(q.toString());
 
 		final NanoSparqlClient.QueryType queryType = NanoSparqlClient.QueryType
 				.fromQuery(queryStr);
