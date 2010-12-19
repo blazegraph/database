@@ -350,10 +350,21 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
             
         }
 
-        throw new UnsupportedOperationException(
-                "Not supported: timestamp="
-                + TimestampUtility.toString(timestamp));
+        /*
+         * FIXME The RWStore uses a read-only transaction to protect against
+         * recycling of the B+Tree revisions associated with the commit point
+         * on which it is reading.  The temporary store only supports unisolated
+         * reads, so this is just ignoring the tx specified by the mutation rule
+         * for reading on the temporary store and going with the unisolated index
+         * anyway.  See https://sourceforge.net/apps/trac/bigdata/ticket/215.
+         */
         
+//        throw new UnsupportedOperationException(
+//                "Not supported: timestamp="
+//                + TimestampUtility.toString(timestamp));
+
+		return getIndex(name);
+
     }
 
     public SparseRowStore getGlobalRowStore() {
