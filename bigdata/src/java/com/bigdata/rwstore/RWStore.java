@@ -1589,7 +1589,7 @@ public class RWStore implements IStore {
                  * FIXME We need unit test when MIN_RELEASE_AGE is ZERO AND
                  * there are open read-only transactions.
                  */
-				if (m_minReleaseAge == 0) {
+				if (false&&m_minReleaseAge == 0) {
 					/*
 					 * The session protection is complicated by the mix of
 					 * transaction protection and isolated AllocationContexts.
