@@ -203,7 +203,7 @@ public class StorageStats {
 			
 			BigDecimal size = new BigDecimal(reservedStore());
 			BigDecimal store = new BigDecimal(100 * (reservedStore() - usedStore()));
-			if(store.signum()==0) return 0f;
+			if(size.signum()==0) return 0f;
 			return store.divide(size, 2, RoundingMode.HALF_UP).floatValue();
 		}
 		public float totalWaste(long total) {	
