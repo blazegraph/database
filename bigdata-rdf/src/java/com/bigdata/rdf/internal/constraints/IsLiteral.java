@@ -31,7 +31,12 @@ import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IVariable;
 
 /**
- * Imposes the constraint <code>isLiteral(x)</code>.
+ * Imposes the constraint <code>x != y</code>.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id: NE.java 2889 2010-05-20 16:11:35Z mrpersonick $
+ * 
+ * FIXME Write unit tests for this.
  */
 public class IsLiteral implements IConstraint {
 
@@ -40,17 +45,24 @@ public class IsLiteral implements IConstraint {
 	 */
 	private static final long serialVersionUID = 3125106876006900339L;
 
-	private final IVariable x;
+	public final IVariable x;
 
+	private final boolean stringsOnly;
+    
 	public IsLiteral(final IVariable x) {
-		
+		this(x, false);
+	}
+	
+    public IsLiteral(final IVariable x, final boolean stringsOnly) {
+        
         if (x == null)
             throw new IllegalArgumentException();
 
         this.x = x;
-		
-	}
-	
+        this.stringsOnly = stringsOnly;
+        
+    }
+    
     public boolean accept(IBindingSet s) {
         
         // get binding for "x".
@@ -59,10 +71,12 @@ public class IsLiteral implements IConstraint {
         if (x == null)
             return true; // not yet bound.
 
-        final IV iv = (IV) x.get();
-        
-		return iv.isLiteral();
-		
+        IV iv = (IV) x.get();
+        if (stringsOnly)
+        	return iv.isLiteral() && !iv.isInline();
+        else
+        	return iv.isLiteral(); 
+
    }
 
     public IVariable[] getVariables() {
