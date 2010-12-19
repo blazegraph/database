@@ -880,15 +880,28 @@ abstract public class AbstractTripleStore extends
 
         String DEFAULT_INLINE_BNODES = "false";
 
-        /**
-         * The name of the {@link IExtensionFactory} class. The implementation 
-         * MUST declare a constructor that accepts an 
-         * {@link IDatatypeURIResolver} as its only argument.  The 
-         * {@link IExtension}s constructed by the factory need a resolver to
-         * resolve datatype URIs to term identifiers in the database.
-         * 
-         * @see #DEFAULT_EXTENSION_FACTORY_CLASS
-         */
+		/**
+		 * Set up database to inline date/times directly into the statement
+		 * indices rather than using the lexicon to map them to term identifiers
+		 * and back. Date times will be converted to UTC, then stored as
+		 * milliseconds since the epoch. Thus if you inline date/times you will
+		 * lose the canonical representation of the date/time, and you will not
+		 * be able to recover the original time zone of the date/time.
+		 */
+		String INLINE_DATE_TIMES = AbstractTripleStore.class.getName()
+				+ ".inlineDateTimes";
+
+		String DEFAULT_INLINE_DATE_TIMES = "false";
+
+		/**
+		 * The name of the {@link IExtensionFactory} class. The implementation
+		 * MUST declare a constructor that accepts an
+		 * {@link IDatatypeURIResolver} as its only argument. The
+		 * {@link IExtension}s constructed by the factory need a resolver to
+		 * resolve datatype URIs to term identifiers in the database.
+		 * 
+		 * @see #DEFAULT_EXTENSION_FACTORY_CLASS
+		 */
         String EXTENSION_FACTORY_CLASS = AbstractTripleStore.class.getName()
                 + ".extensionFactoryClass";
 

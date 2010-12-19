@@ -20,8 +20,10 @@ public class SampleExtensionFactory implements IExtensionFactory {
             
     }
     
-    public void init(final IDatatypeURIResolver resolver) {
+    public void init(final IDatatypeURIResolver resolver,boolean inlineDateTimes) {
 
+       	if (inlineDateTimes)
+    		extensions.add(new DateTimeExtension(resolver));
 		extensions.add(new EpochExtension(resolver));
 		extensions.add(new ColorsEnumExtension(resolver));
 		extensionsArray = extensions.toArray(new IExtension[2]);

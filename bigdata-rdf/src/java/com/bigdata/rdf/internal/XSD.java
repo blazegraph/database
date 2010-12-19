@@ -79,5 +79,8 @@ public interface XSD {
     URI UUID = new URIImpl(NAMESPACE
             + "uuid");
 
+    URI DATETIME = new URIImpl(NAMESPACE
+            + "dateTime");
+
     
 }
