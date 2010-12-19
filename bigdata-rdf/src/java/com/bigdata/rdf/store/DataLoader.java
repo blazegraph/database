@@ -860,7 +860,7 @@ public class DataLoader {
 //                        rdfFormat);
 
                 loadFiles(totals, depth + 1, f, baseURI, rdfFormat, defaultGraph, filter,
-                        (depth == 0 && i < files.length ? false : endOfBatch));
+                        (depth == 0 && i < (files.length-1) ? false : endOfBatch));
                 
             }
             
@@ -1128,12 +1128,6 @@ public class DataLoader {
      */
     public ClosureStats doClosure() {
         
-        if (buffer == null)
-            throw new IllegalStateException();
-        
-        // flush anything in the buffer.
-        buffer.flush();
-        
         final ClosureStats stats;
         
         switch (closureEnum) {
@@ -1144,6 +1138,12 @@ public class DataLoader {
             /*
              * Incremental truth maintenance.
              */
+            
+            if (buffer == null)
+                throw new IllegalStateException();
+            
+            // flush anything in the buffer.
+            buffer.flush();
             
             stats = new TruthMaintenance(inferenceEngine)
                     .assertAll((TempTripleStore) buffer.getStatementStore());
@@ -1252,7 +1252,7 @@ public class DataLoader {
         
         final int remaining = args.length - i;
 
-        if (remaining < 2) {
+        if (remaining < 1/*allow run w/o any named files or directories*/) {
 
             System.err.println("Not enough arguments.");
 
@@ -1360,7 +1360,8 @@ public class DataLoader {
             }
 
             final LoadStats totals = new LoadStats();
-            final DataLoader dataLoader = kb.getDataLoader();
+            final DataLoader dataLoader = //kb.getDataLoader();
+            	new DataLoader(properties,kb); // use the override properties.
             
             for (File fileOrDir : files) {
 
