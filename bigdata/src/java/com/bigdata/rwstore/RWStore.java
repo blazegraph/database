@@ -1589,7 +1589,7 @@ public class RWStore implements IStore {
                  * FIXME We need unit test when MIN_RELEASE_AGE is ZERO AND
                  * there are open read-only transactions.
                  */
-				if (false&&m_minReleaseAge == 0) {
+				if (m_minReleaseAge == 0) {
 					/*
 					 * The session protection is complicated by the mix of
 					 * transaction protection and isolated AllocationContexts.
@@ -1737,6 +1737,8 @@ public class RWStore implements IStore {
 
 			if (!m_commitList.contains(alloc)) {
 				m_commitList.add(alloc);
+				
+				m_recentAlloc = true;
 			}
 		} finally {
 			m_allocationLock.unlock();

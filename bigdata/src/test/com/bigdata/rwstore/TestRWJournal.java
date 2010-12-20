@@ -997,26 +997,35 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				bs.delete(faddr);
 
 				// Must not have been immediately freed if history is retained.
-				if (rw.getHistoryRetention() != 0)
+				if (rw.getHistoryRetention() != 0) {
 					assertEquals(pa, bs.getPhysicalAddress(faddr));
-				else
-					assertEquals(0L, bs.getPhysicalAddress(faddr));
 
-				/*
-				 * Commit before testing for deferred frees. Since there is a
-				 * prior commit point, we are not allowed to immediately free
-				 * any record from that commit point in order to preserve the
-				 * consistency of the last commit point, so we have to commit
-				 * first then test for deferred frees.
-				 */
-				System.out.println("Now commit to disk (2)");
+					/*
+					 * Commit before testing for deferred frees. Since there is a
+					 * prior commit point, we are not allowed to immediately free
+					 * any record from that commit point in order to preserve the
+					 * consistency of the last commit point, so we have to commit
+					 * first then test for deferred frees.
+					 */
+					System.out.println("Now commit to disk (2)");
 
-				store.commit();
+					store.commit();
 
-				Thread.currentThread().sleep(10);
+					Thread.currentThread().sleep(10); // to force deferredFrees
 
-				// Request release of deferred frees.
-				rw.checkDeferredFrees(true/* freeNow */, store);
+					// Request release of deferred frees.
+					rw.checkDeferredFrees(true/* freeNow */, store);
+					
+					// Now commit() to ensure the deferrals can be recycled
+					store.commit();
+				} else {
+					// The address is deleted, but will still return a valid
+					//	address since it is committed
+					assertEquals(pa, bs.getPhysicalAddress(faddr));
+					
+					// Now commit() to ensure the deferrals can be recycled
+					store.commit();
+				}
 
 				assertEquals(0L, bs.getPhysicalAddress(faddr));
 
