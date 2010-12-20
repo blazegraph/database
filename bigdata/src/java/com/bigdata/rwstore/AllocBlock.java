@@ -321,11 +321,12 @@ public class AllocBlock {
 				m_transients[i] = m_live[i] | m_commit[i];
 				chkbits &= ~m_transients[i];
 				
+				final int startBit = i * 32;
 				if (chkbits != 0) {
 					// there are writes to clear
 					for (int b = 0; b < 32; b++) {
 						if ((chkbits & (1 << b)) != 0) {
-							long clr = RWStore.convertAddr(m_addr) + ((long) m_allocator.m_size * b);
+							long clr = RWStore.convertAddr(m_addr) + ((long) m_allocator.m_size * (startBit + b));
 							
 							if (log.isTraceEnabled())
 								log.trace("releasing address: " + clr);
