@@ -212,7 +212,7 @@ public interface IKeyBuilder extends ISortKeyBuilder<Object> {
      * <p>
      * Note: While the ASCII encoding happens to use one byte for each character
      * that is NOT true of the Unicode encoding. The space requirements for the
-     * Unicode encoding depend on the text, the Local, the collator strength,
+     * Unicode encoding depend on the text, the Locale, the collator strength,
      * and the collator decomposition mode.
      * <p>
      * Note: The <i>successor</i> option is designed to encapsulate some

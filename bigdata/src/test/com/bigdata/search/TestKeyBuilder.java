@@ -33,7 +33,6 @@ import java.util.Properties;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.search.FullTextIndex.Options;
@@ -43,8 +42,6 @@ import com.bigdata.search.FullTextIndex.Options;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo write tests in which the docId is a negative long integer.
  */
 public class TestKeyBuilder extends TestCase2 {
 
@@ -94,36 +91,35 @@ public class TestKeyBuilder extends TestCase2 {
     private IKeyBuilder keyBuilder;
     
     /**
-     * @todo this test needs to populate an index with terms that would match on
-     *       a prefix match and then verify that they do match and that terms
-     *       that are not prefix matches do not match.
-     */
-    public void test_prefixMatch_unicode() {
-
-    }
-    
-    /**
      * Unit test verifies the relative sort order of a term and its successor,
      * of a prefix of that term and its successor, and that the prefix and the
      * successor of the prefix are ordered before and after the term and its
      * successor respectively.
      */
     public void test_keyOrder() {
-        
-        final IKeyBuilder keyBuilder = getKeyBuilder();
-        
-        final long docId = 0L;
-        
-        final int fieldId = 0;
 
+        doKeyOrderTest(-1L/*docId*/, 0/*fieldId*/, true/*fieldsEnabled*/);
+        doKeyOrderTest(0L/*docId*/, 0/*fieldId*/, true/*fieldsEnabled*/);
+        doKeyOrderTest(1L/*docId*/, 12/*fieldId*/, true/*fieldsEnabled*/);
+
+        doKeyOrderTest(-1L/*docId*/, 0/*fieldId*/, false/*fieldsEnabled*/);
+        doKeyOrderTest(0L/*docId*/, 0/*fieldId*/, false/*fieldsEnabled*/);
+        doKeyOrderTest(1L/*docId*/, 0/*fieldId*/, false/*fieldsEnabled*/);
+
+    }
+    
+    protected void doKeyOrderTest(final long docId, final int fieldId,
+            final boolean fieldsEnabled) {
+
+        final IKeyBuilder keyBuilder = getKeyBuilder();
         
         // the full term.
         final byte[] k0 = FullTextIndex.getTokenKey(keyBuilder, "brown",
-                false/* successor */, docId, fieldId);
+                false/* successor */, fieldsEnabled, docId, fieldId);
         
         // the successor of the full term.
         final byte[] k0s = FullTextIndex.getTokenKey(keyBuilder, "brown",
-                true/* successor */, docId, fieldId);
+                true/* successor */, fieldsEnabled, docId, fieldId);
 
         // verify sort key order for the full term and its successor.
         assertTrue(BytesUtil.compareBytes(k0, k0s) < 0);
@@ -131,11 +127,11 @@ public class TestKeyBuilder extends TestCase2 {
         
         // a prefix of that term.
         final byte[] k1 = FullTextIndex.getTokenKey(keyBuilder, "bro",
-                false/* successor */, docId, fieldId);
+                false/* successor */, fieldsEnabled, docId, fieldId);
         
         // the successor of that prefix.
         final byte[] k1s = FullTextIndex.getTokenKey(keyBuilder, "bro",
-                true/* successor */, docId, fieldId);
+                true/* successor */, fieldsEnabled, docId, fieldId);
         
         // verify sort key order for prefix and its successor.
         assertTrue(BytesUtil.compareBytes(k0, k0s) < 0);
@@ -183,77 +179,5 @@ public class TestKeyBuilder extends TestCase2 {
                 + BytesUtil.toString(b));
 
     }
-
-/*
- * @todo Finish the exact match test.
- */
-//    /**
-//     * @todo this test needs to populate an index with terms that would match if
-//     *       we were allowing a prefix match and then verify that the terms are
-//     *       NOT matched. it should also verify that terms that are exact
-//     *       matches are matched.
-//     * 
-//     * @todo also test ability to extract the docId and fieldId from the key.
-//     * 
-//     * @todo refactor into an {@link ITupleSerializer}.
-//     * 
-//     * @todo make the fieldId optional in the key. this needs to be part of the
-//     *       state of the {@link ITupleSerializer}.
-//     */
-//    public void test_exactMatch_unicode() {
-//        
-//        final IKeyBuilder keyBuilder = getKeyBuilder();
-//        
-//        final long docId = 0L;
-//        
-//        final int fieldId = 0;
-//
-//        
-//        // the full term.
-//        final byte[] termSortKey = FullTextIndex.getTokenKey(keyBuilder, "brown",
-//                false/* successor */, docId, fieldId);
-//        
-//        // the successor of the full term allowing prefix matches.
-//        final byte[] termPrefixMatchSuccessor = FullTextIndex.getTokenKey(keyBuilder, "brown",
-//                true/* successor */, docId, fieldId);
-//
-////        // the successor of the full term for an exact match.
-////        final byte[] termExactMatchSuccessor = FullTextIndex.getTokenKey(
-////                keyBuilder, "brown \0", true/* successor */, docId, fieldId);
-////
-////        /*
-////         * verify sort key order for the full term and its prefix match
-////         * successor.
-////         */
-////        LT(termSortKey, termPrefixMatchSuccessor);
-//
-////        /*
-////         * verify sort key for the full term orders before its exact match
-////         * successor.
-////         */
-////        LT(termSortKey, termExactMatchSuccessor);
-//
-//        // term that is longer than the full term.
-//        final byte[] longerTermSortKey = FullTextIndex.getTokenKey(keyBuilder,
-//                "browns", false/* successor */, docId, fieldId);
-//
-//        // verify sort order for the full term and the longer term.
-//        LT(termSortKey, longerTermSortKey);
-//
-//        /*
-//         * verify longer term is less than the prefix match successor of the
-//         * full term.
-//         */
-//        LT(longerTermSortKey, termPrefixMatchSuccessor);
-//
-////        /*
-////         * verify longer term is greater than the exact match successor of the
-////         * full term.
-////         */
-////        GT(longerTermSortKey, termExactMatchSuccessor);
-//
-//        fail("finish test");
-//
-//    }
 
 }

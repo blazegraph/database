@@ -3,10 +3,7 @@ package com.bigdata.search;
 import java.util.Arrays;
 import java.util.Iterator;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.apache.lucene.analysis.Token;
-import org.apache.lucene.analysis.TokenStream;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KV;
@@ -319,12 +316,12 @@ public class TokenBuffer {
                 final String termText = termMetadata.termText();
                 
                 final byte[] key = FullTextIndex.getTokenKey(keyBuilder, termText,
-                        false/* successor */, docId, fieldId);
+                        false/* successor */, textIndexer.isFieldsEnabled(), docId, fieldId);
                 
                 if(log.isDebugEnabled()) {
                     log.debug("{" + termText + "," + docId + "," + fieldId
                             + "}: #occurences="
-                            + termMetadata.occurrences.size());
+                            + termMetadata.termFreq());
                 }
                 
                 final byte[] val = textIndexer.getTokenValue(buf, termMetadata);
