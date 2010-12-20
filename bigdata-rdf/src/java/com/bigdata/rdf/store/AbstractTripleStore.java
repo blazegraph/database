@@ -880,7 +880,7 @@ abstract public class AbstractTripleStore extends
 
         String DEFAULT_INLINE_BNODES = "false";
 
-		/**
+        /**
 		 * Set up database to inline date/times directly into the statement
 		 * indices rather than using the lexicon to map them to term identifiers
 		 * and back. Date times will be converted to UTC, then stored as
@@ -894,14 +894,14 @@ abstract public class AbstractTripleStore extends
 		String DEFAULT_INLINE_DATE_TIMES = "false";
 
 		/**
-		 * The name of the {@link IExtensionFactory} class. The implementation
-		 * MUST declare a constructor that accepts an
-		 * {@link IDatatypeURIResolver} as its only argument. The
-		 * {@link IExtension}s constructed by the factory need a resolver to
-		 * resolve datatype URIs to term identifiers in the database.
-		 * 
-		 * @see #DEFAULT_EXTENSION_FACTORY_CLASS
-		 */
+         * The name of the {@link IExtensionFactory} class. The implementation 
+         * MUST declare a constructor that accepts an 
+         * {@link IDatatypeURIResolver} as its only argument.  The 
+         * {@link IExtension}s constructed by the factory need a resolver to
+         * resolve datatype URIs to term identifiers in the database.
+         * 
+         * @see #DEFAULT_EXTENSION_FACTORY_CLASS
+         */
         String EXTENSION_FACTORY_CLASS = AbstractTripleStore.class.getName()
                 + ".extensionFactoryClass";
 
@@ -1255,6 +1255,20 @@ abstract public class AbstractTripleStore extends
         // set property that will let the contained relations locate their container.
         tmp.setProperty(RelationSchema.CONTAINER, getNamespace());
         
+        if (Boolean.valueOf(tmp.getProperty(Options.TEXT_INDEX,
+                Options.DEFAULT_TEXT_INDEX))) {
+
+            /*
+             * If the text index is enabled for a new kb instance, then disable
+             * the fieldId component of the full text index key since it is not
+             * used by the RDF database and will just waste space in the index.
+             * 
+             * Note: Also see below where this is set on the global row store.
+             */
+            tmp.setProperty(FullTextIndex.Options.FIELDS_ENABLED, "false");
+            
+        }
+        
         final IResourceLock resourceLock = acquireExclusiveLock();
 
         try {
@@ -1336,7 +1350,7 @@ abstract public class AbstractTripleStore extends
                     ((BaseAxioms)axioms).init();
 
                 }
-
+                
                 /*
                  * Update the global row store to set the axioms and the
                  * vocabulary objects.
@@ -1354,6 +1368,14 @@ abstract public class AbstractTripleStore extends
                     // vocabulary.
                     map.put(TripleStoreSchema.VOCABULARY, vocab);
 
+                    if (lexiconRelation.isTextIndex()) {
+                        /*
+                         * Per the logic and commentary at the top of create(),
+                         * disable this option on the global row store.
+                         */
+                        map.put(FullTextIndex.Options.FIELDS_ENABLED, "false");
+                    }
+                    
                     // Write the map on the row store.
                     getIndexManager().getGlobalRowStore().write(
                             RelationSchema.INSTANCE, map);

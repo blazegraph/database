@@ -37,7 +37,6 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.TokenBuffer;
 
@@ -94,7 +93,9 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
 
     }
 
-    public void index(int capacity, Iterator<BigdataValue> valuesIterator) {
+    public void index(final int capacity,
+            final Iterator<BigdataValue> valuesIterator) {
+
         final TokenBuffer buffer = new TokenBuffer(capacity, this);
 
         int n = 0;
@@ -141,8 +142,7 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
 
             final IV termId = val.getIV();
 
-            assert termId != null; // the termId must have been
-                                                    // assigned.
+            assert termId != null; // the termId must have been assigned.
 
             // don't bother text indexing inline values for now
             if (termId.isInline()) {

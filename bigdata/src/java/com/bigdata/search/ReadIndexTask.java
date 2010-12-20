@@ -35,7 +35,7 @@ import com.bigdata.rawstore.Bytes;
  */
 public class ReadIndexTask implements Callable<Object> {
 
-    final protected static Logger log = Logger.getLogger(ReadIndexTask.class);
+    final private static Logger log = Logger.getLogger(ReadIndexTask.class);
 
 //    /**
 //     * True iff the {@link #log} level is INFO or less.
@@ -48,8 +48,10 @@ public class ReadIndexTask implements Callable<Object> {
 //    final protected static boolean DEBUG = log.isDebugEnabled();
 
     private final String queryTerm;
-    private final boolean prefixMatch;
+//    private final boolean prefixMatch;
+//    private final int exactMatchLength;
     private final double queryTermWeight;
+    private final boolean fieldsEnabled;
 //    private final FullTextIndex searchEngine;
     private final ConcurrentHashMap<Long, Hit> hits;
     private final ITupleIterator itr;
@@ -95,36 +97,69 @@ public class ReadIndexTask implements Callable<Object> {
         
         this.queryTerm = termText;
 
-        this.prefixMatch = prefixMatch;
+//        this.prefixMatch = prefixMatch;
         
         this.queryTermWeight = queryTermWeight;
 
+        this.fieldsEnabled = searchEngine.isFieldsEnabled();
+        
 //        this.searchEngine = searchEngine;
         
         this.hits = hits;
      
         final IKeyBuilder keyBuilder = searchEngine.getKeyBuilder();
+
+//        if (!prefixMatch) {
+//            /*
+//             * Figure out how many bytes are in the Unicode sort key for the
+//             * termText. In order to be an exact match, the visited tuples may
+//             * not have more than this many bytes before the start of the docId
+//             * field. (It is not possible for them to have fewer bytes since the
+//             * Unicode sort key prefix length will be the same for both the
+//             * fromKey and the toKey. The Unicode sort key for the toKey is
+//             * formed by adding one to the LSB position).
+//             */
+//            
+//            keyBuilder
+//                    .appendText(termText, true/* unicode */, false/* successor */);
+//            
+//            exactMatchLength = keyBuilder.getLength();
+//            
+//        } else {
+//            
+//            // ignored.
+//            exactMatchLength = -1;
+//            
+//        }
         
+        /*
+         * FIXME This would appear to start in the middle of the docId and
+         * fieldId value space since I would assume that Long.MIN_VALUE is the
+         * first docId.
+         */
         final byte[] fromKey = FullTextIndex.getTokenKey(keyBuilder, termText,
-                false/* successor */, 0L/* docId */, 0/* fieldId */);
+                false/* successor */, fieldsEnabled, Long.MIN_VALUE/* docId */,
+                Integer.MIN_VALUE/* fieldId */);
 
         final byte[] toKey;
         
         // FIXME prefixMatch can not be turned off right now.
-//        if (prefixMatch) {
+        if (prefixMatch) {
             /*
              * Accepts anything starting with the search term. E.g., given
              * "bro", it will match "broom" and "brown" but not "break".
              */
+        toKey = FullTextIndex.getTokenKey(keyBuilder, termText,
+                true/* successor */, fieldsEnabled, Long.MIN_VALUE/* docId */,
+                Integer.MIN_VALUE/* fieldId */);
+        } else {
+            /*
+             * Accepts only those entries that exactly match the search term.
+             */
             toKey = FullTextIndex.getTokenKey(keyBuilder, termText,
-                    true/* successor */, Long.MIN_VALUE/* docId */, Integer.MIN_VALUE/* fieldId */);
-//        } else {
-//            /*
-//             * Accepts only those entries that exactly match the search term.
-//             */
-//            toKey = FullTextIndex.getTokenKey(keyBuilder, termText+"\0",
-//                    false/* successor */, 0L/* docId */, 0/* fieldId */);
-//        }
+                    false/* successor */, fieldsEnabled,
+                    Long.MAX_VALUE/* docId */, Integer.MAX_VALUE/* fieldId */);
+        }
 
         if (log.isDebugEnabled()) log.debug
 //            System.err.println
@@ -161,7 +196,8 @@ public class ReadIndexTask implements Callable<Object> {
         
         while (itr.hasNext()) {
 
-            if (t.isInterrupted()) {
+            // don't test for interrupted on each result -- too much work.
+            if (nhits % 100 == 0 && t.isInterrupted()) {
 
                 if (log.isInfoEnabled())
                     log.info("Interrupted: queryTerm=" + queryTerm + ", nhits="
@@ -182,10 +218,29 @@ public class ReadIndexTask implements Callable<Object> {
 //                    - Bytes.SIZEOF_LONG /*docId*/ - Bytes.SIZEOF_INT/*fieldId*/);
 
             final ByteArrayBuffer kbuf = tuple.getKeyBuffer();
+
+            /*
+             * The byte offset of the docId in the key.
+             * 
+             * Note: This is also the byte length of the match on the unicode
+             * sort key, which appears at the head of the key.
+             */
+            final int docIdOffset = kbuf.limit() - Bytes.SIZEOF_LONG /* docId */
+                    - (fieldsEnabled ? Bytes.SIZEOF_INT/* fieldId */: 0);
+
+//            if (!prefixMatch && docIdOffset != exactMatchLength) {
+//             
+//                /*
+//                 * The Unicode sort key associated with this tuple is longer
+//                 * than the given token - hence it can not be an exact match.
+//                 */
+//                
+//                continue;
+//                
+//            }
             
             // decode the document identifier.
-            final long docId = KeyBuilder.decodeLong(kbuf.array(), kbuf.limit()
-                    - Bytes.SIZEOF_LONG /*docId*/ - Bytes.SIZEOF_INT/*fieldId*/);
+            final long docId = KeyBuilder.decodeLong(kbuf.array(), docIdOffset);
 
             /*
              * Extract the term frequency and normalized term-frequency (term

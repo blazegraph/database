@@ -100,7 +100,7 @@ public class Hiterator<A extends IHit> implements Iterator<A> {
     /**
      * The #of hits (approximate).
      * 
-     * @todo differentiate between the #of hits and the #of hits that satisify
+     * @todo differentiate between the #of hits and the #of hits that satisfy
      *       the minCosine and maxRank criteria
      * 
      * @todo this and other search engine metadata (elapsed time) might go on a
@@ -144,7 +144,7 @@ public class Hiterator<A extends IHit> implements Iterator<A> {
      
         if(!hasNext()) throw new NoSuchElementException();
         
-        A tmp = nextHit;
+        final A tmp = nextHit;
         
         nextHit = null;
         
@@ -171,9 +171,6 @@ public class Hiterator<A extends IHit> implements Iterator<A> {
 
     /**
      * @throws UnsupportedOperationException
-     * 
-     * @todo should this even be supported? it makes no sense unless you can
-     * restart the iterator.
      */
     public void remove() {
         

@@ -76,7 +76,6 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -344,6 +343,17 @@ public class FullTextIndex extends AbstractRelation {
         String INDEXER_TIMEOUT = "indexer.timeout";
         
         String DEFAULT_INDEXER_TIMEOUT = "1000";
+
+        /**
+         * When <code>true</code>, the <code>fieldId</code> is stored as part of
+         * the key. When <code>false</code>, each key will be four bytes
+         * shorter. Applications which do not use <code>fieldId</code> are
+         * encouraged to disable it when creating the {@link FullTextIndex}.
+         */
+        String FIELDS_ENABLED = FullTextIndex.class.getName()
+                + ".fieldsEnabled";
+
+        String DEFAULT_FIELDS_ENABLED = "true";
         
     }
     
@@ -365,6 +375,21 @@ public class FullTextIndex extends AbstractRelation {
      * @see Options#INDEXER_TIMEOUT
      */
     private final long timeout;
+    
+    /**
+     * @see Options#FIELDS_ENABLED
+     */
+    private final boolean fieldsEnabled;
+
+    /**
+     * Return the value configured by the {@link Options#FIELDS_ENABLED}
+     * property.
+     */
+    public boolean isFieldsEnabled() {
+        
+        return fieldsEnabled;
+        
+    }
     
     /**
      * The basename of the search index.
@@ -431,6 +456,16 @@ public class FullTextIndex extends AbstractRelation {
 
             if (log.isInfoEnabled())
                 log.info(Options.INDEXER_TIMEOUT + "=" + timeout);
+
+        }
+
+        {
+
+            fieldsEnabled = Boolean.parseBoolean(properties.getProperty(
+                    Options.FIELDS_ENABLED, Options.DEFAULT_FIELDS_ENABLED));
+
+            if (log.isInfoEnabled())
+                log.info(Options.FIELDS_ENABLED + "=" + fieldsEnabled);
 
         }
 
@@ -950,7 +985,7 @@ public class FullTextIndex extends AbstractRelation {
         return tokenStream;
         
     }
-    
+
     /**
      * Create a key for a term.
      * 
@@ -959,21 +994,26 @@ public class FullTextIndex extends AbstractRelation {
      * @param token
      *            The token whose key will be formed.
      * @param successor
-     *            When <code>true</code> the successor of the token's text
-     *            will be encoded into the key. This is useful when forming the
+     *            When <code>true</code> the successor of the token's text will
+     *            be encoded into the key. This is useful when forming the
      *            <i>toKey</i> in a search.
+     * @param fieldsEnabled
+     *            When <code>true</code> the <code>fieldId</code> will be
+     *            included as a component in the generated key. When
+     *            <code>false</code> it will not be present in the generated
+     *            key.
      * @param docId
-     *            The document identifier - use {@link Long#MIN_VALUE} when forming a
-     *            search key.
+     *            The document identifier - use {@link Long#MIN_VALUE} when
+     *            forming a search key.
      * @param fieldId
-     *            The field identifier - use {@link Integer#MIN_VALUE} when forming a
-     *            search key.
+     *            The field identifier - use {@link Integer#MIN_VALUE} when
+     *            forming a search key.
      * 
      * @return The key.
      */
     static protected byte[] getTokenKey(final IKeyBuilder keyBuilder,
-            final String termText, final boolean successor, final long docId,
-            final int fieldId) {
+            final String termText, final boolean successor,
+            final boolean fieldsEnabled, final long docId, final int fieldId) {
         
         keyBuilder.reset();
 
@@ -982,14 +1022,16 @@ public class FullTextIndex extends AbstractRelation {
         
         keyBuilder.append(docId);
 
-        keyBuilder.append(fieldId);
+        if (fieldsEnabled)
+            keyBuilder.append(fieldId);
         
         final byte[] key = keyBuilder.getKey();
 
         if (log.isDebugEnabled()) {
 
-            log.debug("{" + termText + "," + docId + "," + fieldId
-                    + "}, successor=" + (successor?"true ":"false") + ", key="
+            log.debug("{" + termText + "," + docId
+                    + (fieldsEnabled ? "," + fieldId : "") + "}, successor="
+                    + (successor ? "true " : "false") + ", key="
                     + BytesUtil.toString(key));
 
         }
@@ -1146,15 +1188,15 @@ public class FullTextIndex extends AbstractRelation {
      * The collection of hits is scored and hits that fail a threshold are
      * discarded. The remaining hits are placed into a total order and the
      * caller is returned an iterator which can read from that order. If the
-     * operation is interrupted, then only those {@link IHit}s that have
-     * already been computed will be returned.
+     * operation is interrupted, then only those {@link IHit}s that have already
+     * been computed will be returned.
      * 
      * @param query
      *            The query (it will be parsed into tokens).
      * @param languageCode
      *            The language code that should be used when tokenizing the
-     *            query -or- <code>null</code> to use the default
-     *            {@link Locale}).
+     *            query -or- <code>null</code> to use the default {@link Locale}
+     *            ).
      * @param minCosine
      *            The minimum cosine that will be returned.
      * @param maxRank
@@ -1169,22 +1211,17 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @return The hit list.
      * 
-     * @todo note that we can not incrementally materialize the search results
-     *       since they are being delivered in rank order and the search
-     *       algorithm achieves rank order by a post-search sort. mg4j supports
+     * @todo Note: we can not incrementally materialize the search results since
+     *       they are being delivered in rank order and the search algorithm
+     *       achieves rank order by a post-search sort. mg4j supports
      *       incremental evaluation and would be a full-featured replacement for
      *       this package.
      * 
-     * @todo manage the life of the result sets and perhaps serialize them onto
-     *       an index backed by a {@link TemporaryStore}. The fromIndex/toIndex
-     *       might be with respect to that short-term result set. Reclaim result
-     *       sets after N seconds.
-     * 
-     * @todo consider other kinds of queries that we might write here. For
+     * @todo Consider other kinds of queries that we might write here. For
      *       example, full text search should support AND OR NOT operators for
      *       tokens.
      * 
-     * @todo allow search within field(s). This will be a filter on the range
+     * @todo Allow search within field(s). This will be a filter on the range
      *       iterator that is sent to the data service such that the search
      *       terms are visited only when they occur in the matching field(s).
      */
@@ -1331,7 +1368,7 @@ public class FullTextIndex extends AbstractRelation {
             log.info("Done: " + nhits + " hits in " + elapsed + "ms");
 
         /*
-         * Note: The caller will only see those documents which satisify both
+         * Note: The caller will only see those documents which satisfy both
          * constraints (minCosine and maxRank). Results below a threshold will
          * be pruned. Any relevant results exceeding the maxRank will be pruned.
          */
