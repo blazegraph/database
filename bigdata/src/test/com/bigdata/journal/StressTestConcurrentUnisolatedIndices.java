@@ -103,10 +103,10 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         
         final Journal journal = new Journal(properties);
 
-        final IBufferStrategy bufferStrategy = journal.getBufferStrategy();
-        if (bufferStrategy instanceof RWStrategy) {
-            ((RWStrategy)bufferStrategy).getRWStore().activateTx();
-        }
+//        final IBufferStrategy bufferStrategy = journal.getBufferStrategy();
+//        if (bufferStrategy instanceof RWStrategy) {
+//            ((RWStrategy)bufferStrategy).getRWStore().activateTx();
+//        }
 
         try {
         
@@ -134,9 +134,9 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         );
         
         } finally {
-            if (bufferStrategy instanceof RWStrategy) {
-                ((RWStrategy)bufferStrategy).getRWStore().deactivateTx();
-            }
+//            if (bufferStrategy instanceof RWStrategy) {
+//                ((RWStrategy)bufferStrategy).getRWStore().deactivateTx();
+//            }
             
             journal.destroy();
             
