@@ -1354,8 +1354,9 @@ public class SPORelation extends AbstractRelation<ISPO> {
                     
                 });
 
-        return new ChunkedWrappedIterator<IV>(itr);
-                
+        return new ChunkedWrappedIterator<IV>(itr,
+                IChunkedIterator.DEFAULT_CHUNK_SIZE, IV.class);
+
     }
 	/**
      * Efficient scan of the distinct term identifiers that appear in the first
