@@ -471,7 +471,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
 				joinNexusFactory.setReadTimestamp(TimestampUtility
 						.asHistoricalRead(lastCommitTime));
 
-			} else if (indexManager instanceof Journal
+			} else if (false && indexManager instanceof Journal
 					&& ((Journal) indexManager).getBufferStrategy()
 							.getBufferMode() == BufferMode.DiskRW) {
 
