@@ -187,12 +187,12 @@ public interface BD {
      * select ?s ?rank
      * where {
      *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:rank ?rank .
+     *   ?s bd:maxHits "5"^^xsd:int .
      * }
      * 
      * </pre>
      */
-    final URI RANK = new URIImpl(SEARCH_NAMESPACE+"rank");
+    final URI MAX_HITS = new URIImpl(SEARCH_NAMESPACE+"maxHits");
     
     /**
      * Magic predicate used to query for free text search metadata.  Use 
@@ -203,13 +203,13 @@ public interface BD {
      * select ?s ?matched
      * where {
      *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:numMatchedTokens ?matched .
+     *   ?s bd:minRelevance "0.5"^^xsd:double .
      * }
      * 
      * </pre>
      */
-    final URI NUM_MATCHED_TOKENS = new URIImpl(SEARCH_NAMESPACE+"numMatchedTokens");
-
+    final URI MIN_RELEVANCE = new URIImpl(SEARCH_NAMESPACE+"minRelevance");
+    
     /**
      * Sesame has the notion of a "null" graph. Any time you insert a statement
      * into a quad store and the context position is not specified, it is
