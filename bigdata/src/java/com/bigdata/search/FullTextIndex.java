@@ -31,13 +31,12 @@ package com.bigdata.search;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -50,19 +49,7 @@ import org.apache.log4j.Logger;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.LowerCaseFilter;
 import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.br.BrazilianAnalyzer;
-import org.apache.lucene.analysis.cjk.CJKAnalyzer;
-import org.apache.lucene.analysis.cn.ChineseAnalyzer;
-import org.apache.lucene.analysis.cz.CzechAnalyzer;
-import org.apache.lucene.analysis.de.GermanAnalyzer;
-import org.apache.lucene.analysis.el.GreekAnalyzer;
-import org.apache.lucene.analysis.fr.FrenchAnalyzer;
-import org.apache.lucene.analysis.nl.DutchAnalyzer;
-import org.apache.lucene.analysis.ru.RussianAnalyzer;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.analysis.th.ThaiAnalyzer;
 import org.apache.lucene.analysis.tokenattributes.TermAttribute;
-import org.apache.lucene.util.Version;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
@@ -309,7 +296,7 @@ public class FullTextIndex extends AbstractRelation {
          * for an RDF database since the set of terms only grows and each term
          * is immutable.
          */
-        String OVERWRITE = "indexer.overwrite";
+        String OVERWRITE = FullTextIndex.class.getName() + ".overwrite";
 
         String DEFAULT_OVERWRITE = "true";
 
@@ -328,7 +315,8 @@ public class FullTextIndex extends AbstractRelation {
          * @todo consider modifying the default system so that defaults can be
          *       made on a per-index, per-application, or per-namespace basis.
          */
-        String INDEXER_COLLATOR_STRENGTH = "indexer.collator.strength";
+        String INDEXER_COLLATOR_STRENGTH = FullTextIndex.class.getName()
+                + ".collator.strength";
 
         String DEFAULT_INDEXER_COLLATOR_STRENGTH = StrengthEnum.Primary.toString();
 
@@ -340,8 +328,8 @@ public class FullTextIndex extends AbstractRelation {
          * the timeout expires before all tasks complete then the search results
          * will only reflect partial information.
          */
-        String INDEXER_TIMEOUT = "indexer.timeout";
-        
+        String INDEXER_TIMEOUT = FullTextIndex.class.getName() + ".timeout";
+
         String DEFAULT_INDEXER_TIMEOUT = "1000";
 
         /**
@@ -354,6 +342,16 @@ public class FullTextIndex extends AbstractRelation {
                 + ".fieldsEnabled";
 
         String DEFAULT_FIELDS_ENABLED = "true";
+
+        /**
+         * The name of the {@link IAnalyzerFactory} class which will be used to
+         * obtain analyzers when tokenizing documents and queries (default
+         * {@value #DEFAULT_ANALYZER_FACTORY_CLASS}).
+         */
+        String ANALYZER_FACTORY_CLASS = FullTextIndex.class.getName()
+                + ".analyzerFactoryClass";
+
+        String DEFAULT_ANALYZER_FACTORY_CLASS = DefaultAnalyzerFactory.class.getName();
         
     }
     
@@ -390,6 +388,11 @@ public class FullTextIndex extends AbstractRelation {
         return fieldsEnabled;
         
     }
+
+    /**
+     * @see Options#ANALYZER_FACTORY_CLASS
+     */
+    private final IAnalyzerFactory analyzerFactory;
     
     /**
      * The basename of the search index.
@@ -437,7 +440,6 @@ public class FullTextIndex extends AbstractRelation {
 
         super(indexManager, namespace, timestamp, properties);
         
-        // indexer.overwrite
         {
             
             overwrite = Boolean.parseBoolean(properties.getProperty(
@@ -448,7 +450,6 @@ public class FullTextIndex extends AbstractRelation {
 
         }
 
-        // indexer.timeout
         {
 
             timeout = Long.parseLong(properties.getProperty(
@@ -469,6 +470,41 @@ public class FullTextIndex extends AbstractRelation {
 
         }
 
+        {
+
+            final String className = getProperty(
+                    Options.ANALYZER_FACTORY_CLASS,
+                    Options.DEFAULT_ANALYZER_FACTORY_CLASS);
+
+            final Class<IAnalyzerFactory> cls;
+            try {
+                cls = (Class<IAnalyzerFactory>) Class.forName(className);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException("Bad option: "
+                        + Options.ANALYZER_FACTORY_CLASS, e);
+            }
+
+            if (!IAnalyzerFactory.class.isAssignableFrom(cls)) {
+                throw new RuntimeException(Options.ANALYZER_FACTORY_CLASS
+                        + ": Must extend: " + IAnalyzerFactory.class.getName());
+            }
+
+            try {
+
+                final Constructor<? extends IAnalyzerFactory> ctor = cls
+                        .getConstructor(new Class[] { FullTextIndex.class });
+
+                // save reference.
+                analyzerFactory = ctor.newInstance(new Object[] { this });
+
+            } catch (Exception ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+        }
+        
         /*
          * Note: defer resolution of the index.
          */
@@ -565,278 +601,9 @@ public class FullTextIndex extends AbstractRelation {
      */
     protected Analyzer getAnalyzer(final String languageCode) {
 
-        final IKeyBuilder keyBuilder = getKeyBuilder();
-
-        Map<String, AnalyzerConstructor> map = getAnalyzers();
-        
-        AnalyzerConstructor ctor = null;
-        
-        if (languageCode == null) {
-        
-            if (keyBuilder.isUnicodeSupported()) {
-
-                // The configured local for the database.
-                final Locale locale = ((KeyBuilder) keyBuilder)
-                        .getSortKeyGenerator().getLocale();
-
-                // The analyzer for that locale.
-                Analyzer a = getAnalyzer(locale.getLanguage());
-
-                if (a != null)
-                    return a;
-            
-            }
-            
-            // fall through
-            
-        } else {
-            
-            /*
-             * Check the declared analyzers. We first check the three letter
-             * language code. If we do not have a match there then we check the
-             * 2 letter language code.
-             */
-            
-            String code = languageCode;
-
-            if (code.length() > 3) {
-
-                code = code.substring(0, 2);
-
-                ctor = map.get(languageCode);
-
-            }
-
-            if (ctor == null && code.length() > 2) {
-
-                code = code.substring(0, 1);
-
-                ctor = map.get(languageCode);
-                
-            }
-            
-        }
-        
-        if (ctor == null) {
-
-            // request the default analyzer.
-            
-            ctor = map.get("");
-            
-            if (ctor == null) {
-
-                throw new IllegalStateException("No entry for empty string?");
-                
-            }
-            
-        }
-
-        Analyzer a = ctor.newInstance();
-        
-        return a;
+        return analyzerFactory.getAnalyzer(languageCode);
         
     }
-    
-    abstract private static class AnalyzerConstructor {
-        
-        abstract public Analyzer newInstance();
-        
-    }
-
-    /**
-     * A map containing instances of the various kinds of analyzers that we know
-     * about.
-     * <p>
-     * Note: There MUST be an entry under the empty string (""). This entry will
-     * be requested when there is no entry for the specified language code.
-     */
-    private Map<String,AnalyzerConstructor> analyzers;
-    
-    /**
-     * Initializes the various kinds of analyzers that we know about.
-     * <p>
-     * Note: Each {@link Analyzer} is registered under both the 3 letter and the
-     * 2 letter language codes. See <a
-     * href="http://www.loc.gov/standards/iso639-2/php/code_list.php">ISO 639-2</a>.
-     * 
-     * @todo get some informed advice on which {@link Analyzer}s map onto which
-     *       language codes.
-     * 
-     * @todo thread safety? Analyzers produce token processors so maybe there is
-     *       no problem here once things are initialized. If so, maybe this
-     *       could be static.
-     * 
-     * @todo configuration. Could be configured by a file containing a class
-     *       name and a list of codes that are handled by that class.
-     * 
-     * @todo strip language code down to 2/3 characters during lookup.
-     * 
-     * @todo There are a lot of pidgins based on french, english, and other
-     *       languages that are not being assigned here.
-     */
-    synchronized private Map<String,AnalyzerConstructor> getAnalyzers() {
-        
-        if (analyzers != null) {
-
-            return analyzers;
-            
-        }
-
-        analyzers = new HashMap<String, AnalyzerConstructor>();
-
-        {
-            AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new BrazilianAnalyzer(Version.LUCENE_CURRENT);
-                }
-            };
-            analyzers.put("por", a);
-            analyzers.put("pt", a);
-        }
-
-        /*
-         * Claims to handle Chinese. Does single character extraction. Claims to
-         * produce smaller indices as a result.
-         * 
-         * Note: you can not tokenize with the Chinese analyzer and the do
-         * search using the CJK analyzer and visa versa.
-         * 
-         * Note: I have no idea whether this would work for Japanese and Korean
-         * as well. I expect so, but no real clue.
-         */
-        {
-            AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new ChineseAnalyzer();
-                }
-            };
-            analyzers.put("zho", a);
-            analyzers.put("chi", a);
-            analyzers.put("zh", a);
-        }
-        
-        /*
-         * Claims to handle Chinese, Japanese, Korean. Does double character
-         * extraction with overlap.
-         */
-        {
-            AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new CJKAnalyzer(Version.LUCENE_CURRENT);
-                }
-            };
-//            analyzers.put("zho", a);
-//            analyzers.put("chi", a);
-//            analyzers.put("zh", a);
-            analyzers.put("jpn", a);
-            analyzers.put("ja", a);
-            analyzers.put("jpn", a);
-            analyzers.put("kor",a);
-            analyzers.put("ko",a);
-        }
-
-        {
-            AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new CzechAnalyzer(Version.LUCENE_CURRENT);
-                }
-            };
-            analyzers.put("ces",a);
-            analyzers.put("cze",a);
-            analyzers.put("cs",a);
-        }
-
-        {
-            AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new DutchAnalyzer(Version.LUCENE_CURRENT);
-                }
-            };
-            analyzers.put("dut",a);
-            analyzers.put("nld",a);
-            analyzers.put("nl",a);
-        }
-        
-        {  
-            AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new FrenchAnalyzer(Version.LUCENE_CURRENT);
-                }
-            };
-            analyzers.put("fra",a); 
-            analyzers.put("fre",a); 
-            analyzers.put("fr",a);
-        }
-
-        /*
-         * Note: There are a lot of language codes for German variants that
-         * might be useful here.
-         */
-        {  
-            AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new GermanAnalyzer(Version.LUCENE_CURRENT);
-                }
-            };
-            analyzers.put("deu",a); 
-            analyzers.put("ger",a); 
-            analyzers.put("de",a);
-        }
-        
-        // Note: ancient greek has a different code (grc).
-        {  
-            AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new GreekAnalyzer(Version.LUCENE_CURRENT);
-                }
-            };
-            analyzers.put("gre",a); 
-            analyzers.put("ell",a); 
-            analyzers.put("el",a);
-        }        
-
-        // @todo what about other Cyrillic scripts?
-        {  
-            AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new RussianAnalyzer(Version.LUCENE_CURRENT);
-                }
-            };
-            analyzers.put("rus",a); 
-            analyzers.put("ru",a); 
-        }        
-        
-        {
-            AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new ThaiAnalyzer(Version.LUCENE_CURRENT);
-                }
-            };
-            analyzers.put("tha",a); 
-            analyzers.put("th",a); 
-        }
-
-        // English
-        {
-            AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new StandardAnalyzer(Version.LUCENE_CURRENT);
-                }
-            };
-            analyzers.put("eng", a);
-            analyzers.put("en", a);
-            /*
-             * Note: There MUST be an entry under the empty string (""). This
-             * entry will be requested when there is no entry for the specified
-             * language code.
-             */
-            analyzers.put("", a);
-        }
-
-        return analyzers;
-        
-    }
-    
     
     /*
      * thread-local key builder. 
@@ -1202,7 +969,13 @@ public class FullTextIndex extends AbstractRelation {
      * @param maxRank
      *            The upper bound on the #of hits in the result set.
      * @param prefixMatch
-     *            <strong>Option is not implemented yet</strong>
+     *            When <code>true</code>, the matches will be on tokens which
+     *            include the query tokens as a prefix. This includes exact
+     *            matches as a special case when the prefix is the entire token,
+     *            but it also allows longer matches. For example,
+     *            <code>free</code> will be an exact match on <code>free</code>
+     *            but a partial match on <code>freedom</code>. When
+     *            <code>false</code>, only exact matches will be made.
      * @param timeout
      *            The timeout -or- ZERO (0) for NO timeout (this is equivalent
      *            to using {@link Long#MAX_VALUE}).
