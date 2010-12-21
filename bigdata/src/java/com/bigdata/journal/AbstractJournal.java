@@ -880,7 +880,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			} else {
 
-				final FileMetadata fileMetadata = FileMetadata.createInstance(
+				/*final FileMetadata*/ fileMetadata = FileMetadata.createInstance(
 						properties, !(this instanceof Journal), quorumToken);
 
 				final BufferMode bufferMode = fileMetadata.bufferMode;
