@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -751,11 +752,50 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         // problem
         final Map<IPredicate, StatementPattern> searches = 
             new HashMap<IPredicate, StatementPattern>();
+       
+        final Set<StatementPattern> searchMetadata1 =
+        	new LinkedHashSet<StatementPattern>();
+        final Map<Var, Set<StatementPattern>> searchMetadata2 =
+        	new LinkedHashMap<Var, Set<StatementPattern>>();
+        Iterator<Map.Entry<StatementPattern, Boolean>> it = 
+        	stmtPatterns.entrySet().iterator();
+        while (it.hasNext()) {
+        	final StatementPattern sp = it.next().getKey();
+        	final Value s = sp.getSubjectVar().getValue();
+        	final Value p = sp.getPredicateVar().getValue();
+        	final Value o = sp.getObjectVar().getValue();
+        	if (s == null && p != null && o != null) {
+        		if (BD.SEARCH.equals(p)) {
+        			searchMetadata1.add(sp);
+        			searchMetadata2.put(sp.getSubjectVar(), 
+        					new LinkedHashSet<StatementPattern>());
+                	it.remove();
+        		}
+        	}
+        }
+        it = stmtPatterns.entrySet().iterator();
+        while (it.hasNext()) {
+        	final StatementPattern sp = it.next().getKey();
+        	final Value s = sp.getSubjectVar().getValue();
+        	final Value p = sp.getPredicateVar().getValue();
+        	final Value o = sp.getObjectVar().getValue();
+        	if (s == null && p != null && o == null) {
+        		if (BD.RELEVANCE.equals(p)) {
+        			final Var sVar = sp.getSubjectVar();
+        			Set<StatementPattern> metadata = searchMetadata2.get(sVar);
+        			if (metadata != null) {
+        				metadata.add(sp);
+        			}
+        			it.remove();
+        		}
+        	}
+        }
+        
         for (Map.Entry<StatementPattern, Boolean> entry : stmtPatterns
                 .entrySet()) {
-            StatementPattern sp = entry.getKey();
-            boolean optional = entry.getValue();
-            IPredicate tail = generateTail(sp, optional);
+            final StatementPattern sp = entry.getKey();
+            final boolean optional = entry.getValue();
+            final IPredicate tail = generateTail(sp, optional);
             // encountered a value not in the database lexicon
             if (tail == null) {
                 if (log.isDebugEnabled()) {
@@ -769,10 +809,15 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                     return null;
                 }
             }
-            if (tail.getSolutionExpander() instanceof FreeTextSearchExpander) {
-                searches.put(tail, sp);
-            }
             tails.add(tail);
+        }
+        
+        for (StatementPattern sp : searchMetadata1) {
+        	final Set<StatementPattern> metadata = 
+        		searchMetadata2.get(sp.getSubjectVar());
+        	final IPredicate tail = generateSearchTail(sp, metadata);
+        	searches.put(tail, sp);
+        	tails.add(tail);
         }
         
         /*
@@ -826,7 +871,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                 boolean needsFilter = true;
                 // check the other tails one by one
                 for (IPredicate<ISPO> tail : tails) {
-                    ISolutionExpander<ISPO> expander = 
+                    final ISolutionExpander<ISPO> expander = 
                         tail.getSolutionExpander();
                     // only concerned with non-optional tails that are not
                     // themselves magic searches
@@ -837,7 +882,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                     // see if the search variable appears in this tail
                     boolean appears = false;
                     for (int i = 0; i < tail.arity(); i++) {
-                        IVariableOrConstant term = tail.get(i);
+                        final IVariableOrConstant term = tail.get(i);
                         if (log.isDebugEnabled()) {
                             log.debug(term);
                         }
@@ -857,8 +902,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                     if (log.isDebugEnabled()) {
                         log.debug("needs filter: " + searchVar);
                     }
-                    FreeTextSearchExpander expander = (FreeTextSearchExpander) 
-                            search.getSolutionExpander();
+                    final FreeTextSearchExpander expander = 
+                    	(FreeTextSearchExpander) search.getSolutionExpander();
                     expander.addNamedGraphsFilter(graphs);
                 }
             }
@@ -907,9 +952,9 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                     IAccessPath<ISPO> accessPath = database.getSPORelation()
                             .getAccessPath(tail);
                     accessPath = expander.getAccessPath(accessPath);
-                    IChunkedOrderedIterator<ISPO> it = accessPath.iterator();
-                    while (it.hasNext()) {
-                        log.debug(it.next().toString(database));
+                    IChunkedOrderedIterator<ISPO> it1 = accessPath.iterator();
+                    while (it1.hasNext()) {
+                        log.debug(it1.next().toString(database));
                     }
                 }
             }
@@ -1257,23 +1302,6 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
     private IPredicate generateTail(final StatementPattern stmtPattern,
             final boolean optional) throws QueryEvaluationException {
         
-        // create a solution expander for free text search if necessary
-        ISolutionExpander<ISPO> expander = null;
-        final Value predValue = stmtPattern.getPredicateVar().getValue();
-        if (log.isDebugEnabled()) {
-            log.debug(predValue);
-        }
-        if (predValue != null && BD.SEARCH.equals(predValue)) {
-            final Value objValue = stmtPattern.getObjectVar().getValue();
-            if (log.isDebugEnabled()) {
-                log.debug(objValue);
-            }
-            if (objValue != null && objValue instanceof Literal) {
-                expander = new FreeTextSearchExpander(database,
-                        (Literal) objValue);
-            }
-        }
-        
         // @todo why is [s] handled differently?
         // because [s] is the variable in free text searches, no need to test
         // to see if the free text search expander is in place
@@ -1283,26 +1311,20 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             return null;
         }
         
-        final IVariableOrConstant<IV> p;
-        if (expander == null) {
-            p = generateVariableOrConstant(stmtPattern.getPredicateVar());
-        } else {
-            p = new Constant(DummyIV.INSTANCE);
-        }
+        final IVariableOrConstant<IV> p = generateVariableOrConstant(
+        		stmtPattern.getPredicateVar());
         if (p == null) {
             return null;
         }
         
-        final IVariableOrConstant<IV> o;
-        if (expander == null) {
-            o = generateVariableOrConstant(stmtPattern.getObjectVar());
-        } else {
-            o = new Constant(DummyIV.INSTANCE);
-        }
+        final IVariableOrConstant<IV> o = generateVariableOrConstant(
+        		stmtPattern.getObjectVar());
         if (o == null) {
             return null;
         }
-        
+
+        // for default and named graph expansion
+        ISolutionExpander<ISPO> expander = null;
         final IVariableOrConstant<IV> c;
         if (!database.isQuads()) {
             /*
@@ -1361,78 +1383,67 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                 }
                 System.err.println(stmtPattern.toString());
             }
-            if (expander != null) {
-                /*
-                 * @todo can this happen? If it does then we need to look at how
-                 * to layer the expanders.
-                 */
-                // throw new AssertionError("expander already set");
-                // we are doing a free text search, no need to do any named or
-                // default graph expansion work
-                c = null;
-            } else {
-                final Var cvar = stmtPattern.getContextVar();
-                if (dataset == null) {
-                    if (cvar == null) {
-                        /*
-                         * There is no dataset and there is no graph variable,
-                         * so the default graph will be the RDF Merge of ALL
-                         * graphs in the quad store.
-                         * 
-                         * This code path uses an "expander" which strips off
-                         * the context information and filters for the distinct
-                         * (s,p,o) triples to realize the RDF Merge of the
-                         * source graphs for the default graph.
-                         */
+            final Var cvar = stmtPattern.getContextVar();
+            if (dataset == null) {
+                if (cvar == null) {
+                    /*
+                     * There is no dataset and there is no graph variable,
+                     * so the default graph will be the RDF Merge of ALL
+                     * graphs in the quad store.
+                     * 
+                     * This code path uses an "expander" which strips off
+                     * the context information and filters for the distinct
+                     * (s,p,o) triples to realize the RDF Merge of the
+                     * source graphs for the default graph.
+                     */
+                    c = null;
+                    expander = new DefaultGraphSolutionExpander(null/* ALL */);
+                } else {
+                    /*
+                     * There is no data set and there is a graph variable,
+                     * so the query will run against all named graphs and
+                     * [cvar] will be to the context of each (s,p,o,c) in
+                     * turn. This handles constructions such as:
+                     * 
+                     * "SELECT * WHERE {graph ?g {?g :p :o } }"
+                     */
+                    expander = new NamedGraphSolutionExpander(null/* ALL */);
+                    c = generateVariableOrConstant(cvar);
+                }
+            } else { // dataset != null
+                switch (stmtPattern.getScope()) {
+                case DEFAULT_CONTEXTS: {
+                    /*
+                     * Query against the RDF merge of zero or more source
+                     * graphs.
+                     */
+                    expander = new DefaultGraphSolutionExpander(dataset
+                            .getDefaultGraphs());
+                    /*
+                     * Note: cvar can not become bound since context is
+                     * stripped for the default graph.
+                     */
+                    if (cvar == null)
                         c = null;
-                        expander = new DefaultGraphSolutionExpander(null/* ALL */);
+                    else
+                        c = generateVariableOrConstant(cvar);
+                    break;
+                }
+                case NAMED_CONTEXTS: {
+                    /*
+                     * Query against zero or more named graphs.
+                     */
+                    expander = new NamedGraphSolutionExpander(dataset
+                            .getNamedGraphs());
+                    if (cvar == null) {// || !cvar.hasValue()) {
+                        c = null;
                     } else {
-                        /*
-                         * There is no data set and there is a graph variable,
-                         * so the query will run against all named graphs and
-                         * [cvar] will be to the context of each (s,p,o,c) in
-                         * turn. This handles constructions such as:
-                         * 
-                         * "SELECT * WHERE {graph ?g {?g :p :o } }"
-                         */
-                        expander = new NamedGraphSolutionExpander(null/* ALL */);
                         c = generateVariableOrConstant(cvar);
                     }
-                } else { // dataset != null
-                    switch (stmtPattern.getScope()) {
-                    case DEFAULT_CONTEXTS: {
-                        /*
-                         * Query against the RDF merge of zero or more source
-                         * graphs.
-                         */
-                        expander = new DefaultGraphSolutionExpander(dataset
-                                .getDefaultGraphs());
-                        /*
-                         * Note: cvar can not become bound since context is
-                         * stripped for the default graph.
-                         */
-                        if (cvar == null)
-                            c = null;
-                        else
-                            c = generateVariableOrConstant(cvar);
-                        break;
-                    }
-                    case NAMED_CONTEXTS: {
-                        /*
-                         * Query against zero or more named graphs.
-                         */
-                        expander = new NamedGraphSolutionExpander(dataset
-                                .getNamedGraphs());
-                        if (cvar == null) {// || !cvar.hasValue()) {
-                            c = null;
-                        } else {
-                            c = generateVariableOrConstant(cvar);
-                        }
-                        break;
-                    }
-                    default:
-                        throw new AssertionError();
-                    }
+                    break;
+                }
+                default:
+                    throw new AssertionError();
                 }
             }
         }
@@ -1456,6 +1467,63 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                 s, p, o, c,
                 optional, // optional
                 filter, // filter on elements visited by the access path.
+                expander // named graphs expander
+                );
+        
+    }
+
+    private IPredicate generateSearchTail(final StatementPattern sp,
+            final Set<StatementPattern> metadata) 
+    		throws QueryEvaluationException {
+        
+        final Value predValue = sp.getPredicateVar().getValue();
+        if (log.isDebugEnabled()) {
+            log.debug(predValue);
+        }
+        if (predValue == null || !BD.SEARCH.equals(predValue)) {
+        	throw new IllegalArgumentException("not a valid magic search: " + sp);
+        }
+        final Value objValue = sp.getObjectVar().getValue();
+        if (log.isDebugEnabled()) {
+            log.debug(objValue);
+        }
+        if (objValue == null || !(objValue instanceof Literal)) {
+        	throw new IllegalArgumentException("not a valid magic search: " + sp);
+        }
+        
+        final ISolutionExpander expander = 
+        	new FreeTextSearchExpander(database, (Literal) objValue);
+
+        final Var subjVar = sp.getSubjectVar();
+
+        final IVariableOrConstant<IV> search = 
+        	com.bigdata.relation.rule.Var.var(subjVar.getName());
+        
+        IVariableOrConstant<IV> relevance = new Constant(DummyIV.INSTANCE);
+        
+        for (StatementPattern meta : metadata) {
+        	if (!meta.getSubjectVar().equals(subjVar)) {
+        		throw new IllegalArgumentException("illegal metadata: " + meta);
+        	}
+        	final Value pVal = meta.getPredicateVar().getValue();
+        	final Var oVar = meta.getObjectVar();
+        	if (pVal == null || oVar.hasValue()) {
+        		throw new IllegalArgumentException("illegal metadata: " + meta);
+        	}
+        	if (BD.RELEVANCE.equals(pVal)) {
+        		relevance = com.bigdata.relation.rule.Var.var(oVar.getName());
+        	}
+        }
+        
+        return new SPOPredicate(
+                new String[] { database.getSPORelation().getNamespace() },
+                -1, // partitionId
+                search, // s = searchVar
+                relevance, // p = relevanceVar
+                new Constant(DummyIV.INSTANCE), // o = reserved
+                new Constant(DummyIV.INSTANCE), // c = reserved
+                false, // optional
+                null, // filter on elements visited by the access path.
                 expander // free text search expander or named graphs expander
                 );
         
@@ -1707,6 +1775,12 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
     /**
      * Override evaluation of StatementPatterns to recognize magic search 
      * predicate.
+     * 
+     * select *
+     * where {
+     *   ?s bd:search "foo" .
+     *   ?s bd:score ?score .
+     * }
      */
     @Override
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
