@@ -748,15 +748,30 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         
         // generate tails
         Collection<IPredicate> tails = new LinkedList<IPredicate>();
+        
         // keep a list of free text searches for later to solve a named graphs
         // problem
         final Map<IPredicate, StatementPattern> searches = 
             new HashMap<IPredicate, StatementPattern>();
        
+        /*
+         * deal with free text search tails first. need to match up search
+         * metadata tails with the searches themselves. ie:
+         * 
+         * select *
+         * where {
+         *   ?s bd:search "foo" .
+         *   ?s bd:relevance ?score .
+         * }
+         */
+        // the statement patterns for the searches themselves
         final Set<StatementPattern> searchMetadata1 =
         	new LinkedHashSet<StatementPattern>();
+        // the statement patterns for metadata about the searches
         final Map<Var, Set<StatementPattern>> searchMetadata2 =
         	new LinkedHashMap<Var, Set<StatementPattern>>();
+        // do a first pass to gather up the actual searches and take them out
+        // of the master list of statement patterns
         Iterator<Map.Entry<StatementPattern, Boolean>> it = 
         	stmtPatterns.entrySet().iterator();
         while (it.hasNext()) {
@@ -773,6 +788,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         		}
         	}
         }
+        // do a second pass to get the search metadata
         it = stmtPatterns.entrySet().iterator();
         while (it.hasNext()) {
         	final StatementPattern sp = it.next().getKey();
