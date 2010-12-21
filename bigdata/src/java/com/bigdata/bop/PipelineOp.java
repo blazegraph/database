@@ -33,10 +33,18 @@ import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.solutions.SliceOp;
 
 /**
  * Abstract base class for pipeline operators where the data moving along the
  * pipeline is chunks of {@link IBindingSet}s.
+ * <p>
+ * The top-level of a query plan is composed of a required
+ * {@link Annotations#JOIN_GRAPH}s followed by a mixture of optional joins and
+ * {@link Annotations#CONDITIONAL_GROUP}s. A
+ * {@link Annotations#CONDITIONAL_GROUP} will have at least one required join
+ * (in a {@link Annotations#JOIN_GRAPH}) followed by zero or more optional
+ * joins.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -61,6 +69,8 @@ abstract public class PipelineOp extends BOpBase {
          * The value of the annotation is the {@link BOp.Annotations#BOP_ID} of
          * the ancestor in the operator tree which serves as the alternative
          * sink for binding sets (default is no alternative sink).
+         * 
+         * @see #ALT_SINK_GROUP
          */
         String ALT_SINK_REF = PipelineOp.class.getName()
                 + ".altSinkRef";
@@ -82,46 +92,73 @@ abstract public class PipelineOp extends BOpBase {
 
 		boolean DEFAULT_SHARED_STATE = false;
 
-		/**
-		 * Annotation used to mark the set of non-optional joins which may be
-		 * input to either the static or runtime query optimizer. Joins within a
-		 * join graph may be freely reordered by the query optimizer in order to
-		 * minimize the amount of work required to compute the solutions.
-		 * <p>
-		 * Note: Optional joins MAY NOT appear within the a join graph. Optional
-		 * joins SHOULD be evaluated as part of the "tail plan" following the
-		 * join graph, but before operations such as SORT, DISTINCT, etc.
-		 * 
-		 * @todo We should be able to automatically apply the static or runtime
-		 *       query optimizers to an operator tree using this annotation to
-		 *       identify the join graphs.
-		 */
+        /**
+         * Annotation used to mark a set of (non-optional) joins which may be
+         * freely reordered by the query optimizer in order to minimize the
+         * amount of work required to compute the solutions.
+         * <p>
+         * Note: Optional joins MAY NOT appear within a join graph. Optional
+         * joins SHOULD be evaluated as part of the "tail plan" following the
+         * join graph, but before operations such as SORT, DISTINCT, etc. When
+         * the query plan includes {@link #CONDITIONAL_GROUP}s, those groups
+         * include a leading {@link #JOIN_GRAPH} (required joins) followed by
+         * zero or more optional joins.
+         */
 		String JOIN_GRAPH = PipelineOp.class.getName() + ".joinGraph";
 
-		/**
-		 * Annotation marks a high level join group, which may include optional
-		 * joins. Join groups are marked in order to decide the re-entry point
-		 * in the query plan when a join within an optional join group fails.
-		 * Also, the top-level join group is not marked -- only nested join
-		 * groups are marked. This is used by the decision rule to handle do 
-		 * {@link IBindingSet#push()} when entering a 
-		 * <p>
-		 * This is different from a {@link #JOIN_GRAPH} primarily in that the
-		 * latter may not include optional joins.
-		 */
-		String JOIN_GROUP = PipelineOp.class.getName() + ".joinGroup";
+        /**
+         * Annotation used to mark a set of operators belonging to a conditional
+         * binding group. Bindings within with the group will be discarded if
+         * any required operator in the group fails. For example, if a binding
+         * set exits via the alternative sink for a required join then any
+         * conditional bindings within the group will be discarded.
+         * <p>
+         * Together with {@link #ALT_SINK_GROUP}, the {@link #CONDITIONAL_GROUP}
+         * annotation provides the information necessary in order to decide the
+         * re-entry point in the query plan when a join within an conditional
+         * binding group fails.
+         * <p>
+         * The {@link #CONDITIONAL_GROUP} annotation controls the
+         * {@link IBindingSet#push()} and {@link IBindingSet#pop(boolean)} of
+         * individual solutions as they propagate through the pipeline. When a
+         * pipeline starts, the {@link IBindingSet} stack contains only the top
+         * level symbol table (i.e., name/value bindings). When an intermediate
+         * solution enters a {@link PipelineOp} marked as belonging to a
+         * {@link #CONDITIONAL_GROUP}, a new symbol table is
+         * {@link IBindingSet#push() pushed} onto the stack for that solution.
+         * If the solution leaves the optional join group via the default sink,
+         * then the symbol table is "saved" when it is
+         * {@link IBindingSet#pop(boolean) popped} off of the stack. If the
+         * solution leaves the join group via the alternative sink, then the
+         * symbol table is discarded when it is {@link IBindingSet#pop(boolean)
+         * popped} off of the stack. This provides for conditional binding of
+         * variables within the operators of the group.
+         * <p>
+         * The value of the {@link #CONDITIONAL_GROUP} is an {@link Integer}
+         * which uniquely identifies the group within the query.
+         */
+		String CONDITIONAL_GROUP = PipelineOp.class.getName() + ".conditionalGroup";
 
-		/**
-		 * Annotation is used to designate the target when a join within an
-		 * optional join group fails. The value of this annotation must be the
-		 * {@link #JOIN_GROUP} identifier corresponding to the next join group
-		 * in the query plan. The target join group identifier is specified
-		 * (rather than the bopId of the target join) since the joins in the
-		 * target join group may be reordered by the query optimizer. The entry
-		 * point for solutions redirected to the {@link #ALT_SINK_GROUP} is
-		 * therefore the first operator in the target {@link #JOIN_GROUP}. This
-		 * decouples the routing decisions from the join ordering decisions.
-		 */
+        /**
+         * Annotation used to designate the target when a required operator
+         * within an {@link #CONDITIONAL_GROUP} fails. The value of this
+         * annotation must be the {@link #CONDITIONAL_GROUP} identifier
+         * corresponding to the next conditional binding group in the query
+         * plan. If there is no such group, then the {@link #ALT_SINK_REF}
+         * should be used instead to specify the target operator in the
+         * pipeline, e.g., a {@link SliceOp}.
+         * <p>
+         * The target {@link #CONDITIONAL_GROUP} is specified (rather than the
+         * bopId of the target join) since the non-optional joins in the target
+         * {@link #CONDITIONAL_GROUP} be reordered by the query optimizer. The
+         * entry point for solutions redirected to the {@link #ALT_SINK_GROUP}
+         * is therefore the first operator in the target
+         * {@link #CONDITIONAL_GROUP}. This decouples the routing decisions from
+         * the join ordering decisions.
+         * 
+         * @see #CONDITIONAL_GROUP
+         * @see #ALT_SINK_REF
+         */
 		String ALT_SINK_GROUP = PipelineOp.class.getName() + ".altSinkGroup";
 
     }

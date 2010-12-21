@@ -131,6 +131,7 @@ public class BOpContext<E> extends BOpContextBase {
      * join group.
      * 
      * @see PipelineOp.Annotations#ALT_SINK_REF
+     * @see PipelineOp.Annotations#ALT_SINK_GROUP
      */
     public final IBlockingBuffer<E[]> getSink2() {
         return sink2;

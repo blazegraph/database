@@ -31,6 +31,14 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.FutureTask;
 
+import com.bigdata.bop.IPredicate.Annotations;
+import com.bigdata.bop.ap.E;
+import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.solutions.SliceOp;
+import com.bigdata.journal.ITx;
+
 import junit.framework.TestCase2;
 
 /**
@@ -578,6 +586,120 @@ public class TestBOpUtility extends TestCase2 {
 
     }
 
+    /**
+     * A conditional join group:
+     * 
+     * <pre>
+     * (a b)
+     * optional { 
+     *   (b c) 
+     *   (c d) 
+     * }
+     * </pre>
+     * 
+     * where the groupId for the optional join group is ONE (1). The test should
+     * locate the first {@link PipelineJoin} in that join group, which is the
+     * one reading on the <code>(b c)</code> access path.
+     */
+    public void test_getFirstBOpIdForConditionalGroup() {
+        
+        final String namespace = "kb";
+        
+        final int startId = 1; // 
+        final int joinId1 = 2; //         : base join group.
+        final int predId1 = 3; // (a b)
+        final int joinId2 = 4; //         : joinGroup1
+        final int predId2 = 5; // (b c)   
+        final int joinId3 = 6; //         : joinGroup1
+        final int predId3 = 7; // (c d)
+        final int sliceId = 8; // 
+        
+        final IVariable<?> a = Var.var("a");
+        final IVariable<?> b = Var.var("b");
+        final IVariable<?> c = Var.var("c");
+        final IVariable<?> d = Var.var("d");
+
+        final Integer joinGroup1 = Integer.valueOf(1);
+        
+        final PipelineOp startOp = new StartOp(new BOp[] {},
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, startId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
+                        }));
+        
+        final Predicate<?> pred1Op = new Predicate<E>(
+                new IVariableOrConstant[] { a, b }, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId1),//
+                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                }));
+        
+        final Predicate<?> pred2Op = new Predicate<E>(
+                new IVariableOrConstant[] { b, c }, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId2),//
+                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                }));
+        
+        final Predicate<?> pred3Op = new Predicate<E>(
+                new IVariableOrConstant[] { c, d }, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId3),//
+                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                }));
+        
+        final PipelineOp join1Op = new PipelineJoin<E>(//
+                new BOp[]{startOp},// 
+                        new NV(Predicate.Annotations.BOP_ID, joinId1),//
+                        new NV(PipelineJoin.Annotations.PREDICATE,pred1Op));
+
+        final PipelineOp join2Op = new PipelineJoin<E>(//
+                new BOp[] { join1Op },//
+                new NV(Predicate.Annotations.BOP_ID, joinId2),//
+                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
+                new NV(PipelineJoin.Annotations.PREDICATE, pred2Op),//
+                // join is optional.
+                new NV(PipelineJoin.Annotations.OPTIONAL, true),//
+                // optional target is the same as the default target.
+                new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
+
+        final PipelineOp join3Op = new PipelineJoin<E>(//
+                new BOp[] { join2Op },//
+                new NV(Predicate.Annotations.BOP_ID, joinId3),//
+                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
+                new NV(PipelineJoin.Annotations.PREDICATE, pred3Op),//
+                // join is optional.
+                new NV(PipelineJoin.Annotations.OPTIONAL, true),//
+                // optional target is the same as the default target.
+                new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
+
+        final PipelineOp sliceOp = new SliceOp(//
+                new BOp[]{join3Op},
+                NV.asMap(new NV[] {//
+                        new NV(BOp.Annotations.BOP_ID, sliceId),//
+                        new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
+                        }));
+
+        final PipelineOp query = sliceOp;
+
+        // verify found.
+        assertEquals(Integer.valueOf(joinId2), BOpUtility
+                .getFirstBOpIdForConditionalGroup(query, joinGroup1));
+
+        // verify not-found.
+        assertEquals(null, BOpUtility.getFirstBOpIdForConditionalGroup(query,
+                Integer.valueOf(2)/* groupId */));
+        
+    }
+    
     /**
      * Unit test for {@link BOpUtility#getParent(BOp, BOp)}.
      */
