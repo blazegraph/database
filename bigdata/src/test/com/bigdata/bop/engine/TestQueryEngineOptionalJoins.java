@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -218,39 +220,46 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
 
     /**
      * Unit test for optional join group. Three joins are used and target a
-     * {@link SliceOp}. The 2nd and 3rd joins are an optional join group. 
-     * Intermediate results which do not succeed on the optional join are 
+     * {@link SliceOp}. The 2nd and 3rd joins are an optional join group.
+     * Intermediate results which do not succeed on the optional join are
      * forwarded to the {@link SliceOp} which is the target specified by the
      * {@link PipelineOp.Annotations#ALT_SINK_REF}.
      * 
      * The optional join group takes the form:
+     * 
+     * <pre>
      * (a b)
      * optional { 
      *   (b c) 
      *   (c d) 
      * }
-     *
-     * The (a b) tail will match everything in the knowledge base.  The join
-     * group takes us two hops out from ?b.  There should be four solutions
-     * that succeed the optional join group:
+     * </pre>
      * 
+     * The (a b) tail will match everything in the knowledge base. The join
+     * group takes us two hops out from ?b. There should be four solutions that
+     * succeed the optional join group:
+     * 
+     * <pre>
      * (paul mary brad fred)
      * (paul mary brad leon)
      * (john mary brad fred)
      * (john mary brad leon)
+     * </pre>
      * 
      * and five more that don't succeed the optional join group:
      * 
+     * <pre>
      * (paul brad) *
      * (john brad) *
      * (mary brad) *
      * (brad fred)
      * (brad leon)
+     * </pre>
      * 
-     * In this cases marked with a *, ?c will become temporarily bound to fred 
-     * and leon (since brad knows fred and leon), but the (c d) tail will fail 
-     * since fred and leon don't know anyone else. At this point, the ?c binding
-     * must be removed from the solution.
+     * In this cases marked with a <code>*</code>, ?c will become temporarily
+     * bound to fred and leon (since brad knows fred and leon), but the (c d)
+     * tail will fail since fred and leon don't know anyone else. At this point,
+     * the ?c binding must be removed from the solution.
      */
     public void test_query_join2_optionals() throws Exception {
 
@@ -267,6 +276,8 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
         final IVariable<?> b = Var.var("b");
         final IVariable<?> c = Var.var("c");
         final IVariable<?> d = Var.var("d");
+
+        final Object joinGroup1 = Integer.valueOf(1);
         
         final PipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
@@ -309,7 +320,8 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
 
 		final PipelineOp join2Op = new PipelineJoin<E>(//
 				new BOp[] { join1Op },//
-				new NV(Predicate.Annotations.BOP_ID, joinId2),//
+                new NV(Predicate.Annotations.BOP_ID, joinId2),//
+                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
 				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op),//
 				// join is optional.
 				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
@@ -319,6 +331,7 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
 		final PipelineOp join3Op = new PipelineJoin<E>(//
 				new BOp[] { join2Op },//
 				new NV(Predicate.Annotations.BOP_ID, joinId3),//
+                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
 				new NV(PipelineJoin.Annotations.PREDICATE, pred3Op),//
 				// join is optional.
 				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
@@ -415,6 +428,11 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
             )
             };
 
+            /*
+             * junit.framework.AssertionFailedError: Iterator will deliver too
+             * many objects: reminder(3)=[{ a=John, b=Brad }, { a=Mary, b=Brad
+             * }, { a=Paul, b=Brad }].
+             */
             assertSameSolutionsAnyOrder(expected,
                     new Dechunkerator<IBindingSet>(runningQuery.iterator()));
         
@@ -434,45 +452,54 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
     }
 
     /**
-     * Unit test for optional join group with a filter. Three joins are used 
-     * and target a {@link SliceOp}. The 2nd and 3rd joins are an optional join 
-     * group. Intermediate results which do not succeed on the optional join are 
+     * Unit test for optional join group with a filter. Three joins are used and
+     * target a {@link SliceOp}. The 2nd and 3rd joins are an optional join
+     * group. Intermediate results which do not succeed on the optional join are
      * forwarded to the {@link SliceOp} which is the target specified by the
-     * {@link PipelineOp.Annotations#ALT_SINK_REF}.  The optional join group
+     * {@link PipelineOp.Annotations#ALT_SINK_REF}. The optional join group
      * contains a filter.
-     * 
+     * <p>
      * The optional join group takes the form:
+     * 
+     * <pre>
      * (a b)
      * optional { 
      *   (b c) 
      *   (c d) 
      *   filter(d != Leon) 
      * }
-     *
-     * The (a b) tail will match everything in the knowledge base.  The join
-     * group takes us two hops out from ?b.  There should be two solutions
-     * that succeed the optional join group:
+     * </pre>
      * 
+     * The (a b) tail will match everything in the knowledge base. The join
+     * group takes us two hops out from ?b. There should be two solutions that
+     * succeed the optional join group:
+     * 
+     * <pre>
      * (paul mary brad fred)
      * (john mary brad fred)
+     * </pre>
      * 
      * and five more that don't succeed the optional join group:
      * 
+     * <pre>
      * (paul brad) *
      * (john brad) *
      * (mary brad) *
      * (brad fred)
      * (brad leon)
+     * </pre>
      * 
-     * In this cases marked with a *, ?c will become temporarily bound to fred 
-     * and leon (since brad knows fred and leon), but the (c d) tail will fail 
-     * since fred and leon don't know anyone else. At this point, the ?c binding
-     * must be removed from the solution.
-     *
+     * In this cases marked with a <code>*</code>, ?c will become temporarily
+     * bound to fred and leon (since brad knows fred and leon), but the (c d)
+     * tail will fail since fred and leon don't know anyone else. At this point,
+     * the ?c binding must be removed from the solution.
+     * <p>
      * The filter (d != Leon) will prune the two solutions:
      * 
+     * <pre>
      * (paul mary brad leon)
      * (john mary brad leon)
+     * </pre>
      * 
      * since ?d is bound to Leon in those cases.
      */
@@ -647,43 +674,50 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
     }
 
     /**
-     * Unit test for optional join group with a filter on a variable outside 
-     * the optional join group. Three joins are used and target a 
-     * {@link SliceOp}. The 2nd and 3rd joins are an optional join 
-     * group. Intermediate results which do not succeed on the optional join are 
-     * forwarded to the {@link SliceOp} which is the target specified by the
-     * {@link PipelineOp.Annotations#ALT_SINK_REF}.  The optional join group
+     * Unit test for optional join group with a filter on a variable outside the
+     * optional join group. Three joins are used and target a {@link SliceOp}.
+     * The 2nd and 3rd joins are an optional join group. Intermediate results
+     * which do not succeed on the optional join are forwarded to the
+     * {@link SliceOp} which is the target specified by the
+     * {@link PipelineOp.Annotations#ALT_SINK_REF}. The optional join group
      * contains a filter that uses a variable outside the optional join group.
-     * 
+     * <P>
      * The query takes the form:
+     * 
+     * <pre>
      * (a b)
      * optional { 
      *   (b c) 
      *   (c d) 
      *   filter(a != Paul) 
      * }
-     *
-     * The (a b) tail will match everything in the knowledge base.  The join
-     * group takes us two hops out from ?b.  There should be two solutions
-     * that succeed the optional join group:
+     * </pre>
      * 
+     * The (a b) tail will match everything in the knowledge base. The join
+     * group takes us two hops out from ?b. There should be two solutions that
+     * succeed the optional join group:
+     * 
+     * <pre>
      * (john mary brad fred)
      * (john mary brad leon)
+     * </pre>
      * 
      * and six more that don't succeed the optional join group:
-     *
+     * 
+     * <pre>
      * (paul mary) *
      * (paul brad) *
      * (john brad)
      * (mary brad)
      * (brad fred)
      * (brad leon)
+     * </pre>
      * 
-     * In this cases marked with a *, ?a is bound to Paul even though there is
-     * a filter that specifically prohibits a = Paul. This is because the filter
-     * is inside the optional join group, which means that solutions can still
-     * include a = Paul, but the optional join group should not run in that
-     * case.
+     * In this cases marked with a <code>*</code>, ?a is bound to Paul even
+     * though there is a filter that specifically prohibits a = Paul. This is
+     * because the filter is inside the optional join group, which means that
+     * solutions can still include a = Paul, but the optional join group should
+     * not run in that case.
      */
     public void test_query_optionals_filter2() throws Exception {
 
@@ -1006,7 +1040,14 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
 
             if (actual.hasNext()) {
 
-                fail("Iterator will deliver too many objects.");
+                final List<T> remainder = new LinkedList<T>(); 
+                
+                while(actual.hasNext()) {
+                    remainder.add(actual.next());
+                }
+
+                fail("Iterator will deliver too many objects: reminder("
+                        + remainder.size() + ")=" + remainder);
 
             }
 

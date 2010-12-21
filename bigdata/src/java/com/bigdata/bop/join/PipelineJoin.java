@@ -137,7 +137,8 @@ public class PipelineJoin<E> extends PipelineOp implements
         /**
          * Marks the join as "optional" in the SPARQL sense. Binding sets which
          * fail the join will be routed to the alternative sink as specified by
-         * {@link PipelineOp.Annotations#ALT_SINK_REF}.
+         * either {@link PipelineOp.Annotations#ALT_SINK_REF} or
+         * {@link PipelineOp.Annotations#ALT_SINK_GROUP}.  
          * 
          * @see #DEFAULT_OPTIONAL
          */
