@@ -340,7 +340,6 @@ public class BigdataSail extends SailBase implements Sail {
         
         public static final String DEFAULT_ALLOW_AUTO_COMMIT = "false";
 
-        
         /**
          * Options (default <code>false</code>) creates the SPO relation with
          * isolatable indices to allow read/write transactions.
@@ -360,6 +359,15 @@ public class BigdataSail extends SailBase implements Sail {
         
         public static final String DEFAULT_STAR_JOINS = "false";
         
+		/**
+		 * Option specifies the namespace of the designed KB instance (default
+		 * {@value #DEFAULT_NAMESPACE}).
+		 */
+		public static final String NAMESPACE = BigdataSail.class.getPackage()
+				.getName()+ ".namespace";
+
+		public static final String DEFAULT_NAMESPACE = "kb";
+
     }
 
     /**
@@ -621,8 +629,10 @@ public class BigdataSail extends SailBase implements Sail {
         final ITransactionService txService = 
             journal.getTransactionManager().getTransactionService();
         
-        final String namespace = "kb";
-        
+        final String namespace = properties.getProperty(
+                BigdataSail.Options.NAMESPACE,
+                BigdataSail.Options.DEFAULT_NAMESPACE);
+       
         // throws an exception if there are inconsistent properties
         checkProperties(properties);
         
