@@ -13,6 +13,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.XSDDoubleIV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
@@ -305,9 +306,12 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
             }
             ISPO[] spos = new ISPO[hits.length];
             for (int i = 0; i < hits.length; i++) {
-                IV s = new TermId(VTE.LITERAL, hits[i].getDocId());
-                if (INFO) log.info("hit: " + s);
-                spos[i] = new SPO(s, null, null);
+                final IV s = new TermId(VTE.LITERAL, hits[i].getDocId());
+                final IV p = new XSDDoubleIV(hits[i].getCosine());
+                final IV o = null; // reserved
+                final IV c = null; // reserved
+                spos[i] = new SPO(s, p, o, c);
+                if (INFO) log.info("hit: " + spos[i]);
             }
 //            Arrays.sort(spos, SPOKeyOrder.SPO.getComparator());
             return spos;
@@ -316,9 +320,12 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
         private ISPO[] convertWhenBound(IHit[] hits) {
             ISPO[] result = new ISPO[0];
             for (IHit hit : hits) {
-                IV s = new TermId(VTE.LITERAL, hit.getDocId());
+                final IV s = new TermId(VTE.LITERAL, hit.getDocId());
                 if (s == boundVal) {
-                    result = new ISPO[] { new SPO(s, null, null) };
+                    final IV p = new XSDDoubleIV(hit.getCosine());
+                    final IV o = null; // reserved
+                    final IV c = null; // reserved
+                    result = new ISPO[] { new SPO(s, p, o, c) };
                     break;
                 }
             }

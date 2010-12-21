@@ -40,10 +40,10 @@ import java.util.Set;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
-import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.BNodeImpl;
 import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.LiteralImpl;
@@ -665,4 +665,89 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
         
     }
 
+    public void testWithRelevance() throws Exception {
+        
+        final BigdataSail sail = getSail();
+        try {
+            
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        final BigdataSailRepositoryConnection cxn = 
+            (BigdataSailRepositoryConnection) repo.getConnection();
+        cxn.setAutoCommit(false);
+        
+        try {
+            
+        	final ValueFactory vf = sail.getValueFactory();
+
+        	final URI s1 = vf.createURI(BD.NAMESPACE+"s1");
+        	final URI s2 = vf.createURI(BD.NAMESPACE+"s2");
+        	final URI s3 = vf.createURI(BD.NAMESPACE+"s3");
+        	final URI s4 = vf.createURI(BD.NAMESPACE+"s4");
+        	final URI s5 = vf.createURI(BD.NAMESPACE+"s5");
+        	final URI s6 = vf.createURI(BD.NAMESPACE+"s6");
+        	final URI s7 = vf.createURI(BD.NAMESPACE+"s7");
+        	final Literal l1 = vf.createLiteral("how");
+        	final Literal l2 = vf.createLiteral("now");
+        	final Literal l3 = vf.createLiteral("brown");
+        	final Literal l4 = vf.createLiteral("cow");
+        	final Literal l5 = vf.createLiteral("how now");
+        	final Literal l6 = vf.createLiteral("brown cow");
+        	final Literal l7 = vf.createLiteral("how now brown cow");
+        	
+            cxn.add(s1, RDFS.LABEL, l1);
+            cxn.add(s2, RDFS.LABEL, l2);
+            cxn.add(s3, RDFS.LABEL, l3);
+            cxn.add(s4, RDFS.LABEL, l4);
+            cxn.add(s5, RDFS.LABEL, l5);
+            cxn.add(s6, RDFS.LABEL, l6);
+            cxn.add(s7, RDFS.LABEL, l7);
+
+            /*
+             * Note: The either flush() or commit() is required to flush the
+             * statement buffers to the database before executing any operations
+             * that go around the sail.
+             */
+            cxn.commit();
+            
+/**/            
+            if (log.isInfoEnabled()) {
+                log.info("\n" + sail.getDatabase().dumpStore());
+            }
+            
+            { // run the query with no graphs specified
+                final String query = 
+                    "select ?s ?o ?score " + 
+                    "where " +
+                    "{ " +
+                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+                    "    ?o <"+BD.SEARCH+"> \"how now brown cow\" . " +
+                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
+                    "}";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                while (result.hasNext()) {
+                	System.err.println(result.next());
+                }
+                
+                result = tupleQuery.evaluate();
+//                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+//                answer.add(createBindingSet(new BindingImpl("s", alice)));
+//                
+//                compare(result, answer);
+            }
+
+        } finally {
+            cxn.close();
+        }
+        } finally {
+            sail.__tearDownUnitTest();
+        }
+        
+    }
+    
 }

@@ -63,7 +63,9 @@ public interface BD {
     /**
      * The namespace used for bigdata specific extensions.
      */
-    String NAMESPACE = "http://www.bigdata.com/rdf#";
+    final String NAMESPACE = "http://www.bigdata.com/rdf#";
+    
+    final String SEARCH_NAMESPACE = "http://www.bigdata.com/rdf/search#";
     
     /**
      * The namespace prefix used in SPARQL queries to signify query hints.  You
@@ -150,7 +152,13 @@ public interface BD {
      * Note: The context position should be unbound when using statement
      * identifiers.
      */
-    URI SEARCH = new URIImpl(NAMESPACE+"search");
+    final URI SEARCH = new URIImpl(SEARCH_NAMESPACE+"search");
+    
+    final URI RELEVANCE = new URIImpl(SEARCH_NAMESPACE+"relevance");
+    
+    final URI RANK = new URIImpl(SEARCH_NAMESPACE+"rank");
+    
+    final URI NUM_MATCHED_TOKENS = new URIImpl(SEARCH_NAMESPACE+"numMatchedTokens");
 
     /**
      * Sesame has the notion of a "null" graph. Any time you insert a statement
