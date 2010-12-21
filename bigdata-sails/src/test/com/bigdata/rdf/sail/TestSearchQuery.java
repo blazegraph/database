@@ -32,10 +32,13 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.Graph;
@@ -70,9 +73,18 @@ import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.journal.BufferMode;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.XSDDoubleIV;
+import com.bigdata.rdf.lexicon.ITextIndexer;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.search.Hiterator;
+import com.bigdata.search.IHit;
 
 /**
  * Test suite for high-level query against a graph containing statements about
@@ -702,7 +714,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             cxn.add(s5, RDFS.LABEL, l5);
             cxn.add(s6, RDFS.LABEL, l6);
             cxn.add(s7, RDFS.LABEL, l7);
-
+            
             /*
              * Note: The either flush() or commit() is required to flush the
              * statement buffers to the database before executing any operations
@@ -710,18 +722,38 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
              */
             cxn.commit();
             
+            final Map<IV, Literal> literals = new LinkedHashMap<IV, Literal>();
+            literals.put(((BigdataValue)l1).getIV(), l1);
+            literals.put(((BigdataValue)l2).getIV(), l2);
+            literals.put(((BigdataValue)l3).getIV(), l3);
+            literals.put(((BigdataValue)l4).getIV(), l4);
+            literals.put(((BigdataValue)l5).getIV(), l5);
+            literals.put(((BigdataValue)l6).getIV(), l6);
+            literals.put(((BigdataValue)l7).getIV(), l7);
+            
+            final Map<IV, URI> uris = new LinkedHashMap<IV, URI>();
+            uris.put(((BigdataValue)l1).getIV(), s1);
+            uris.put(((BigdataValue)l2).getIV(), s2);
+            uris.put(((BigdataValue)l3).getIV(), s3);
+            uris.put(((BigdataValue)l4).getIV(), s4);
+            uris.put(((BigdataValue)l5).getIV(), s5);
+            uris.put(((BigdataValue)l6).getIV(), s6);
+            uris.put(((BigdataValue)l7).getIV(), s7);
+            
 /**/            
             if (log.isInfoEnabled()) {
                 log.info("\n" + sail.getDatabase().dumpStore());
             }
             
-            { // run the query with no graphs specified
+            { 
+            	final String searchQuery = "how now brown cow";
+            	
                 final String query = 
                     "select ?s ?o ?score " + 
                     "where " +
                     "{ " +
                     "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?o <"+BD.SEARCH+"> \"how now brown cow\" . " +
+                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
                     "    ?o <"+BD.RELEVANCE+"> ?score . " +
                     "}";
                 
@@ -735,10 +767,35 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 }
                 
                 result = tupleQuery.evaluate();
-//                Collection<BindingSet> answer = new LinkedList<BindingSet>();
-//                answer.add(createBindingSet(new BindingImpl("s", alice)));
-//                
-//                compare(result, answer);
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            false, // prefixMatch
+                            0d, // minCosine
+                            10000, // maxRank
+                            1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = new TermId(VTE.LITERAL, hit.getDocId());
+                	final Literal score = vf.createLiteral(hit.getCosine());
+                	final URI s = uris.get(id);
+                	final Literal o = literals.get(id);
+                    answer.add(createBindingSet(
+                    		new BindingImpl("s", s),
+                    		new BindingImpl("o", o),
+                    		new BindingImpl("score", score)));
+                }
+                
+                compare(result, answer);
+
             }
 
         } finally {
