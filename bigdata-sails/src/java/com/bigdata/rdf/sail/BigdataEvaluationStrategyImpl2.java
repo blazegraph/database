@@ -794,9 +794,10 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         	final StatementPattern sp = it.next().getKey();
         	final Value s = sp.getSubjectVar().getValue();
         	final Value p = sp.getPredicateVar().getValue();
-        	final Value o = sp.getObjectVar().getValue();
-        	if (s == null && p != null && o == null) {
-        		if (BD.RELEVANCE.equals(p)) {
+        	if (s == null && p != null) {
+        		if (BD.RELEVANCE.equals(p) ||
+        				BD.MAX_HITS.equals(p) ||
+        				BD.MIN_RELEVANCE.equals(p)) {
         			final Var sVar = sp.getSubjectVar();
         			Set<StatementPattern> metadata = searchMetadata2.get(sVar);
         			if (metadata != null) {
@@ -1507,15 +1508,14 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         	throw new IllegalArgumentException("not a valid magic search: " + sp);
         }
         
-        final ISolutionExpander expander = 
-        	new FreeTextSearchExpander(database, (Literal) objValue);
-
         final Var subjVar = sp.getSubjectVar();
 
         final IVariableOrConstant<IV> search = 
         	com.bigdata.relation.rule.Var.var(subjVar.getName());
         
         IVariableOrConstant<IV> relevance = new Constant(DummyIV.INSTANCE);
+        Literal maxHits = null;
+        Literal minRelevance = null;
         
         for (StatementPattern meta : metadata) {
         	if (!meta.getSubjectVar().equals(subjVar)) {
@@ -1523,14 +1523,32 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         	}
         	final Value pVal = meta.getPredicateVar().getValue();
         	final Var oVar = meta.getObjectVar();
-        	if (pVal == null || oVar.hasValue()) {
+        	final Value oVal = oVar.getValue();
+        	if (pVal == null) {
         		throw new IllegalArgumentException("illegal metadata: " + meta);
         	}
         	if (BD.RELEVANCE.equals(pVal)) {
+        		if (oVar.hasValue()) {
+            		throw new IllegalArgumentException("illegal metadata: " + meta);
+        		}
         		relevance = com.bigdata.relation.rule.Var.var(oVar.getName());
-        	}
+        	} else if (BD.MAX_HITS.equals(pVal)) {
+        		if (oVal == null || !(oVal instanceof Literal)) {
+        			throw new IllegalArgumentException("illegal metadata: " + meta);
+        		}
+        		maxHits = (Literal) oVal;
+	    	} else if (BD.MIN_RELEVANCE.equals(pVal)) {
+        		if (oVal == null || !(oVal instanceof Literal)) {
+        			throw new IllegalArgumentException("illegal metadata: " + meta);
+        		}
+        		minRelevance = (Literal) oVal;
+	    	}
         }
         
+        final ISolutionExpander expander = 
+        	new FreeTextSearchExpander(database, (Literal) objValue, 
+        			maxHits, minRelevance);
+
         return new SPOPredicate(
                 new String[] { database.getSPORelation().getNamespace() },
                 -1, // partitionId
