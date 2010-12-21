@@ -2747,7 +2747,7 @@ abstract public class AbstractTripleStore extends
         
             final StringBuilder sb = new StringBuilder();
 
-            while (itr.hasNext()) {
+            while (itr2.hasNext()) {
 
                 final BigdataValue term = itr2.next();
 
