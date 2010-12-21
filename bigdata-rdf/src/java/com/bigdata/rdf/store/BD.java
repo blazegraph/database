@@ -225,14 +225,14 @@ public interface BD {
      */
     URI NULL_GRAPH = new URIImpl(NAMESPACE + "nullGraph");
     
-    /**
-     * We need the abiltiy to do atomic add+drop in one operation via the
-     * remoting interface.  Thus we need the ability to place 
-     * statements to add and to delete in the same serialized document sent
-     * across the wire.  This separator key, when included in a comment, will
-     * mark the separation point between statements to drop (above the 
-     * separator) and statements to add (below the separator).
-     */
-    URI ATOMIC_UPDATE_SEPARATOR_KEY = new URIImpl(NAMESPACE + "atomicUpdateSeparatorKey");
+//    /**
+//     * We need the ability to do atomic add+drop in one operation via the
+//     * remoting interface.  Thus we need the ability to place 
+//     * statements to add and to delete in the same serialized document sent
+//     * across the wire.  This separator key, when included in a comment, will
+//     * mark the separation point between statements to drop (above the 
+//     * separator) and statements to add (below the separator).
+//     */
+//    URI ATOMIC_UPDATE_SEPARATOR_KEY = new URIImpl(NAMESPACE + "atomicUpdateSeparatorKey");
     
 }
