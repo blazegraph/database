@@ -56,12 +56,18 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
     
     private final AbstractTripleStore database;
     
-    private final Literal query;
+    private final Literal query, maxHits, minRelevance;
     
     private Set<URI> graphs;
     
     public FreeTextSearchExpander(final AbstractTripleStore database,
             final Literal query) {
+    	this(database, query, null, null);
+    }
+    
+    public FreeTextSearchExpander(final AbstractTripleStore database,
+            final Literal query, final Literal maxHits, 
+            final Literal minRelevance) {
 
         if (database == null)
             throw new IllegalArgumentException();
@@ -72,6 +78,10 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
         this.database = database;
         
         this.query = query;
+        
+        this.maxHits = maxHits;
+        
+        this.minRelevance = minRelevance;
         
     }
     
@@ -135,8 +145,10 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
 //                final long begin = System.nanoTime();
                 hiterator = database.getLexiconRelation()
                         .getSearchEngine().search(query.getLabel(),
-                                query.getLanguage(), false/* prefixMatch */,
-                                0d/* minCosine */, 10000/* maxRank */,
+                                query.getLanguage(), 
+                                false/* prefixMatch */,
+                                minRelevance == null ? 0d : minRelevance.doubleValue()/* minCosine */, 
+                                maxHits == null ? 10000 : maxHits.intValue()+1/* maxRank */,
                                 1000L/* timeout */, TimeUnit.MILLISECONDS);
 //                hiterator = database.getSearchEngine().search
 //                    ( query.getLabel(),
