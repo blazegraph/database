@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.search;
 
+import info.aduna.i18n.languagetag.IanaLanguageTag;
+
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
@@ -346,7 +348,12 @@ public class FullTextIndex extends AbstractRelation {
         /**
          * The name of the {@link IAnalyzerFactory} class which will be used to
          * obtain analyzers when tokenizing documents and queries (default
-         * {@value #DEFAULT_ANALYZER_FACTORY_CLASS}).
+         * {@value #DEFAULT_ANALYZER_FACTORY_CLASS}).  The specified class MUST
+         * implement {@link IAnalyzerFactory} and MUST have a constructor with
+         * the following signature:
+         * <pre>
+         * public MyAnalyzerFactory(FullTextIndexer indexer)
+         * </pre>
          */
         String ANALYZER_FACTORY_CLASS = FullTextIndex.class.getName()
                 + ".analyzerFactoryClass";
