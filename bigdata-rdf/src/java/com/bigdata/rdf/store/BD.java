@@ -65,6 +65,14 @@ public interface BD {
      */
     final String NAMESPACE = "http://www.bigdata.com/rdf#";
     
+    /**
+     * The namespace used for magic search predicates.
+     * <p>
+     * @see #SEARCH
+     * @see #RELEVANCE
+     * @see #RANK
+     * @see #NUM_MATCHED_TOKENS
+     */
     final String SEARCH_NAMESPACE = "http://www.bigdata.com/rdf/search#";
     
     /**
@@ -154,10 +162,52 @@ public interface BD {
      */
     final URI SEARCH = new URIImpl(SEARCH_NAMESPACE+"search");
     
+    /**
+     * Magic predicate used to query for free text search metadata.  Use 
+     * in conjunction with {@link #SEARCH} as follows:
+     * <p>
+     * <pre>
+     * 
+     * select ?s ?relevance
+     * where {
+     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bd:relevance ?relevance .
+     * }
+     * 
+     * </pre>
+     */
     final URI RELEVANCE = new URIImpl(SEARCH_NAMESPACE+"relevance");
     
+    /**
+     * Magic predicate used to query for free text search metadata.  Use 
+     * in conjunction with {@link #SEARCH} as follows:
+     * <p>
+     * <pre>
+     * 
+     * select ?s ?rank
+     * where {
+     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bd:rank ?rank .
+     * }
+     * 
+     * </pre>
+     */
     final URI RANK = new URIImpl(SEARCH_NAMESPACE+"rank");
     
+    /**
+     * Magic predicate used to query for free text search metadata.  Use 
+     * in conjunction with {@link #SEARCH} as follows:
+     * <p>
+     * <pre>
+     * 
+     * select ?s ?matched
+     * where {
+     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bd:numMatchedTokens ?matched .
+     * }
+     * 
+     * </pre>
+     */
     final URI NUM_MATCHED_TOKENS = new URIImpl(SEARCH_NAMESPACE+"numMatchedTokens");
 
     /**
