@@ -39,6 +39,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Name2Addr;
+import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
@@ -1173,8 +1174,21 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
 
         assertNotReadOnly();
 
-        if (getIndexMetadata().getDeleteMarkers()) {
-            
+        /*
+         * FIXME Per https://sourceforge.net/apps/trac/bigdata/ticket/221, we
+         * should special case this for the RWStore when delete markers are not
+         * enabled and just issue deletes against each node and leave in the
+         * BTree. This could be done using a post-order traversal of the nodes
+         * and leaves such that the parent is not removed from the store until
+         * its children have been removed. The deletes should be low-level
+         * IRawStore#delete(addr) invocations without maintenance to the B+Tree
+         * data structures. Afterwards replaceRootWithEmptyLeaf() should be
+         * invoked to discard the hard reference ring buffer and associate a new
+         * root leaf with the B+Tree.
+         */
+        if (getIndexMetadata().getDeleteMarkers()
+                || getStore() instanceof RWStrategy) {
+
             /*
              * Write deletion markers for each non-deleted entry. When the
              * transaction commits, those delete markers will have to validate
