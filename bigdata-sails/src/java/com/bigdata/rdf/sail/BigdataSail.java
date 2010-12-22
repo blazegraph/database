@@ -112,6 +112,7 @@ import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailConnectionListener;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
@@ -2848,10 +2849,11 @@ public class BigdataSail extends SailBase implements Sail {
             getInferenceEngine().computeClosure(null/* focusStore */);
 
         }
-        
+
         /**
-         * Removes all "inferred" statements from the database (does NOT commit
-         * the database).
+         * Removes all "inferred" statements from the database and the proof
+         * chains (if any) associated with those inferences (does NOT commit the
+         * database).
          */
         public synchronized void removeAllEntailments() throws SailException {
             
@@ -2871,6 +2873,15 @@ public class BigdataSail extends SailBase implements Sail {
             database
                     .getAccessPath(NULL, NULL, NULL, InferredSPOFilter.INSTANCE)
                     .removeAll();
+
+            if (database.isJustify()) {
+                database
+                        .getSPORelation()
+                        .getJustificationIndex()
+                        .rangeIterator(null/* fromKey */, null/* toKey */,
+                                0/* capacity */,
+                                IRangeQuery.REMOVEALL/* flags */, null/* filterCtor */);
+            }
             
         }
 
