@@ -143,13 +143,13 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
                 new E("Paul", "Mary"),// [0]
                 new E("Paul", "Brad"),// [1]
                 
-                new E("John", "Mary"),// [0]
-                new E("John", "Brad"),// [1]
+                new E("John", "Mary"),// [2]
+                new E("John", "Brad"),// [3]
                 
-                new E("Mary", "Brad"),// [1]
+                new E("Mary", "Brad"),// [4]
                 
-                new E("Brad", "Fred"),// [1]
-                new E("Brad", "Leon"),// [1]
+                new E("Brad", "Fred"),// [5]
+                new E("Brad", "Leon"),// [6]
         };
 
         // insert data (the records are not pre-sorted).
@@ -277,7 +277,7 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
         final IVariable<?> c = Var.var("c");
         final IVariable<?> d = Var.var("d");
 
-        final Object joinGroup1 = Integer.valueOf(1);
+        final Integer joinGroup1 = Integer.valueOf(1);
         
         final PipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
@@ -489,7 +489,7 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
      * (brad leon)
      * </pre>
      * 
-     * In this cases marked with a <code>*</code>, ?c will become temporarily
+     * In the cases marked with a <code>*</code>, ?c will become temporarily
      * bound to fred and leon (since brad knows fred and leon), but the (c d)
      * tail will fail since fred and leon don't know anyone else. At this point,
      * the ?c binding must be removed from the solution.
@@ -506,19 +506,21 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
     public void test_query_optionals_filter() throws Exception {
 
         final int startId = 1;
-        final int joinId1 = 2;
-        final int predId1 = 3;
-        final int joinId2 = 4;
-        final int predId2 = 5;
-        final int joinId3 = 6;
-        final int predId3 = 7;
+        final int joinId1 = 2; // 
+        final int predId1 = 3; // (a,b)
+        final int joinId2 = 4; //       : group1
+        final int predId2 = 5; // (b,c)
+        final int joinId3 = 6; //       : group1
+        final int predId3 = 7; // (c,d) 
         final int sliceId = 8;
         
         final IVariable<?> a = Var.var("a");
         final IVariable<?> b = Var.var("b");
         final IVariable<?> c = Var.var("c");
         final IVariable<?> d = Var.var("d");
-        
+
+        final Integer joinGroup1 = Integer.valueOf(1);
+
         final PipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
@@ -561,6 +563,7 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
 		final PipelineOp join2Op = new PipelineJoin<E>(//
 				new BOp[] { join1Op },//
 				new NV(Predicate.Annotations.BOP_ID, joinId2),//
+                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
 				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op),//
 				// join is optional.
 				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
@@ -570,6 +573,7 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
 		final PipelineOp join3Op = new PipelineJoin<E>(//
 				new BOp[] { join2Op },//
 				new NV(Predicate.Annotations.BOP_ID, joinId3),//
+                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
 				new NV(PipelineJoin.Annotations.PREDICATE, pred3Op),//
 				// constraint d != Leon
 				new NV(PipelineJoin.Annotations.CONSTRAINTS,
@@ -713,7 +717,7 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
      * (brad leon)
      * </pre>
      * 
-     * In this cases marked with a <code>*</code>, ?a is bound to Paul even
+     * In the cases marked with a <code>*</code>, ?a is bound to Paul even
      * though there is a filter that specifically prohibits a = Paul. This is
      * because the filter is inside the optional join group, which means that
      * solutions can still include a = Paul, but the optional join group should
@@ -723,19 +727,21 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
 
         final int startId = 1;
         final int joinId1 = 2;
-        final int predId1 = 3;
-        final int condId = 4;
-        final int joinId2 = 5;
-        final int predId2 = 6;
-        final int joinId3 = 7;
-        final int predId3 = 8;
+        final int predId1 = 3; // (a,b)
+        final int condId = 4;  // (a != Paul)
+        final int joinId2 = 5; //             : group1
+        final int predId2 = 6; // (b,c)
+        final int joinId3 = 7; //             : group1
+        final int predId3 = 8; // (c,d)
         final int sliceId = 9;
         
         final IVariable<?> a = Var.var("a");
         final IVariable<?> b = Var.var("b");
         final IVariable<?> c = Var.var("c");
         final IVariable<?> d = Var.var("d");
-        
+
+        final Integer joinGroup1 = Integer.valueOf(1);
+
         /*
          * Not quite sure how to write this one.  I think it probably goes
          * something like this:
@@ -792,14 +798,15 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
         final ConditionalRoutingOp condOp = new ConditionalRoutingOp(new BOp[]{join1Op},
                 NV.asMap(new NV[]{//
                     new NV(BOp.Annotations.BOP_ID,condId),
-                    new NV(PipelineOp.Annotations.SINK_REF, joinId2),
-                    new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId),
+                    new NV(PipelineOp.Annotations.SINK_REF, sliceId), // a == Paul
+                    new NV(PipelineOp.Annotations.ALT_SINK_REF, joinId2), // a != Paul
                     new NV(ConditionalRoutingOp.Annotations.CONDITION, condition),
                 }));
 
 		final PipelineOp join2Op = new PipelineJoin<E>(//
 				new BOp[] { condOp },//
 				new NV(Predicate.Annotations.BOP_ID, joinId2),//
+                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
 				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op),//
 				// join is optional.
 				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
@@ -809,6 +816,7 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
 		final PipelineOp join3Op = new PipelineJoin<E>(//
 				new BOp[] { join2Op },//
 				new NV(Predicate.Annotations.BOP_ID, joinId3),//
+                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
 				new NV(PipelineJoin.Annotations.PREDICATE, pred3Op),//
 				// join is optional.
 				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
@@ -853,7 +861,7 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
                     new IConstant[] { new Constant<String>("John"),
                             new Constant<String>("Mary"),
                             new Constant<String>("Brad"),
-                    		new Constant<String>("John") }//
+                    		new Constant<String>("Leon") }//
             ),
             new ArrayBindingSet(//
                     new IVariable[] { a, b, c, d },//
