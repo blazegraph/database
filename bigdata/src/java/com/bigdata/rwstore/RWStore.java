@@ -3556,6 +3556,10 @@ public class RWStore implements IStore {
 			
 		}
 		
+        /**
+         * Must return the shadowed allocators to the parent/global
+         * environment, resetting the freeList association.
+         */
         void release() {
             final ArrayList<FixedAllocator> freeFixed[] = m_parent != null ? m_parent.m_freeFixed
                     : m_store.m_freeFixed;
@@ -3565,6 +3569,7 @@ public class RWStore implements IStore {
 
 			for (FixedAllocator f : m_allFixed) {
 				f.setAllocationContext(pcontext);
+				f.setFreeList(freeFixed[m_store.fixedAllocatorIndex(f.m_size)]);
 			}
 			
 			for (int i = 0; i < m_freeFixed.length; i++) {
@@ -3597,6 +3602,7 @@ public class RWStore implements IStore {
 			if (free.size() == 0) {
 				final FixedAllocator falloc = establishFixedAllocator(i);
 				falloc.setAllocationContext(m_context);
+				falloc.setFreeList(free);
 				free.add(falloc);
 				m_allFixed.add(falloc);
 			}

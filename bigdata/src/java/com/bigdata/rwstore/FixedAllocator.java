@@ -517,21 +517,8 @@ public class FixedAllocator implements Allocator {
 			if (((AllocBlock) m_allocBlocks.get(block))
 					.freeBit(offset % nbits, m_sessionActive && !overideSession)) { // bit adjust
 				
-				// Only add back to the free list this is a DirectFixedAllocator
-				//	or the freeBits exceed the cDefaultFreeBitsThreshold
-				// If a DirectFixedAllocator then also ensure it is added to the
-				//	front of the free list
-				if (m_freeBits++ == 0 && this instanceof DirectFixedAllocator) {
-					m_freeWaiting = false;
-					m_freeList.add(0, this);
-				} else if (m_freeWaiting && m_freeBits == m_store.cDefaultFreeBitsThreshold) {
-					m_freeWaiting = false;
-					
-					if (log.isDebugEnabled())
-						log.debug("Returning Allocator to FreeList - " + m_size);
-					
-					m_freeList.add(this);
-				}
+				m_freeBits++;
+				checkFreeList();
 			} else {
 				m_freeTransients++;
 			}
@@ -555,6 +542,22 @@ public class FixedAllocator implements Allocator {
 		}
 		
 		return false;
+	}
+
+	private void checkFreeList() {
+		if (m_freeWaiting) {
+			if (m_freeBits > 0 && this instanceof DirectFixedAllocator) {
+				m_freeWaiting = false;
+				m_freeList.add(0, this);
+			} else if (m_freeBits >= m_store.cDefaultFreeBitsThreshold) {
+				m_freeWaiting = false;
+				
+				if (log.isDebugEnabled())
+					log.debug("Returning Allocator to FreeList - " + m_size);
+				
+				m_freeList.add(this);
+			}
+		}
 	}
 
 	/**
@@ -803,9 +806,17 @@ public class FixedAllocator implements Allocator {
 		if (this.m_sessionActive) {
 			if (log.isTraceEnabled())
 				log.trace("Allocator: #" + m_index + " releasing session protection");
+			
+			int releasedAllocations = 0;
 			for (AllocBlock ab : m_allocBlocks) {
-				ab.releaseSession(cache);
+				releasedAllocations += ab.releaseSession(cache);
 			}
+			
+			m_freeBits += releasedAllocations;
+			m_freeTransients -= releasedAllocations;
+			
+			checkFreeList();
+			
 		}
 	}
 }

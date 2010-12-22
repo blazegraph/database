@@ -313,8 +313,11 @@ public class AllocBlock {
 	 * but not in the recalculated transient.  Tested with new &= ~old;
 	 * 
 	 * @param cache 
+	 * @return the number of allocations released
 	 */
-	public void releaseSession(RWWriteCacheService cache) {
+	public int releaseSession(RWWriteCacheService cache) {
+		int freebits = 0;
+		
 		if (m_addr != 0) { // check active!
 			for (int i = 0; i < m_live.length; i++) {
 				int chkbits = m_transients[i];
@@ -332,11 +335,15 @@ public class AllocBlock {
 								log.trace("releasing address: " + clr);
 							
 							cache.clearWrite(clr);
+							
+							freebits++;
 						}
 					}
 				}
 			}
 		}
+		
+		return freebits;
 	}
 
 	public String show() {
