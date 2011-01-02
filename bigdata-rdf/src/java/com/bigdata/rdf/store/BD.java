@@ -52,6 +52,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
 
+
 /**
  * A vocabulary for bigdata specific extensions.
  * 
@@ -64,15 +65,6 @@ public interface BD {
      * The namespace used for bigdata specific extensions.
      */
     String NAMESPACE = "http://www.bigdata.com/rdf#";
-    
-    /**
-     * The namespace prefix used in SPARQL queries to signify query hints.  You
-     * can embed query hints into a SPARQL query as follows:
-     * <code>
-     * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.relation.rule.eval.DefaultRuleTaskFactory.nestedSubquery=true&amp;com.bigdata.fullScanTreshold=1000&gt;
-     * </code>
-     */
-    String QUERY_HINTS_NAMESPACE = "BIGDATA_QUERY_HINTS";
 
     /**
      * The name of a per-statement attribute whose value is recognized in

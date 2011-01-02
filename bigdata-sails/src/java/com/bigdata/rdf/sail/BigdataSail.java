@@ -3117,7 +3117,7 @@ public class BigdataSail extends SailBase implements Sail {
          * {@link Options#QUERY_TIME_EXPANDER}, but not on a per-query basis.
          * <p>
          * QueryHints are a set of properties that are parsed from a SPARQL 
-         * query.  See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
+         * query.  See {@link QueryHints#NAMESPACE} for more information.
          * 
          * @todo The [bindings] are supposed to be inputs to the query
          *       evaluation, but I am still not quite clear what the role of the

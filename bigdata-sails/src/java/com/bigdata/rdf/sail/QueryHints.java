@@ -1,0 +1,66 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+/*
+ * Created on Jan 2, 2011
+ */
+
+package com.bigdata.rdf.sail;
+
+import com.bigdata.bop.BOp;
+
+/**
+ * Query hint directives understood by a bigdata SPARQL end point.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
+public interface QueryHints {
+
+    /**
+     * The namespace prefix used in SPARQL queries to signify query hints. You
+     * can embed query hints into a SPARQL query as follows:
+     * 
+     * <pre>
+     * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#name1=value1&amp;name2=value2&gt;
+     * </pre>
+     * 
+     * where <i>name</i> is the name of a query hint and <i>value</i> is the
+     * value associated with that query hint. Multiple query hints can be
+     * specified (as shown in this example) using a <code>&amp;</code> character
+     * to separate each name=value pair.
+     * <p>
+     * Query hints are either directives understood by the SPARQL end point or
+     * {@link BOp.Annotations}. A list of the known directives is declared by
+     * this interface.
+     */
+    String NAMESPACE = "BIGDATA_QUERY_HINTS";
+
+    /**
+     * Specify the query optimizer.
+     * 
+     * @see QueryOptimizerEnum
+     */
+    String OPTIMIZER = QueryHints.class.getName() + ".optimizer";
+
+}

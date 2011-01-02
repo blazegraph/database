@@ -110,7 +110,7 @@ public class SliceOp extends PipelineOp {
      * Deep Copy constructor.
      * @param op
      */
-    public SliceOp(SliceOp op) {
+    public SliceOp(final SliceOp op) {
 
         super(op);
         
@@ -122,7 +122,7 @@ public class SliceOp extends PipelineOp {
      * @param args
      * @param annotations
      */
-    public SliceOp(BOp[] args, Map<String, Object> annotations) {
+    public SliceOp(final BOp[] args, final Map<String, Object> annotations) {
 
         super(args, annotations);
 

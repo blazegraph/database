@@ -28,21 +28,16 @@ package com.bigdata.rdf.sail;
 
 import java.util.Collection;
 import java.util.LinkedList;
-import org.openrdf.model.BNode;
-import org.openrdf.model.Literal;
-import org.openrdf.model.Resource;
+
 import org.openrdf.model.URI;
-import org.openrdf.model.impl.BNodeImpl;
-import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.impl.BindingImpl;
-import com.bigdata.rdf.store.BD;
+
+import com.bigdata.bop.join.PipelineJoin;
 
 /**
  * Unit tests the query hints aspect of the {@link BigdataSail} implementation.
@@ -68,7 +63,11 @@ public class TestQueryHints extends QuadsTestCase {
     /**
      * Tests adding query hints in SPARQL.
      * 
-     * @throws Exception 
+     * @throws Exception
+     * 
+     * @todo Unfortunately, this does not really _test_ anything since the query
+     *       should be answered correctly regardless of the query hint(s)
+     *       specified.
      */
     public void testQueryHints() throws Exception {
 
@@ -102,20 +101,22 @@ public class TestQueryHints extends QuadsTestCase {
 
             {
                 
-                String query = 
-                    "PREFIX "+BD.QUERY_HINTS_NAMESPACE+": " +
-                    "  <http://www.bigdata.com/queryOption#com.bigdata.relation.rule.eval.DefaultRuleTaskFactory.nestedSubquery=true&com.bigdata.fullScanTreshold=1000> " +
-                    "SELECT * " +
-                    "WHERE { " +
-                    "  <"+a+"> ?p ?o " +
-                    "}";
-                
+                final String query = "PREFIX " + QueryHints.NAMESPACE
+                        + ": " + "<http://www.bigdata.com/queryOption#" + //
+                        PipelineJoin.Annotations.MAX_PARALLEL + "=-5" //
+                        + "&" + "com.bigdata.fullScanTreshold=1000" //
+                        + ">\n"//
+                        + "SELECT * " + //
+                        "WHERE { " + //
+                        "  <" + a + "> ?p ?o " + //
+                        "}";
+
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
-                TupleQueryResult result = tupleQuery.evaluate();
+                final TupleQueryResult result = tupleQuery.evaluate();
     
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 answer.add(createBindingSet(
                         new BindingImpl("p", b),
                         new BindingImpl("o", c)

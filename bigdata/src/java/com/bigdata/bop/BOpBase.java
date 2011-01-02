@@ -360,7 +360,30 @@ public class BOpBase implements BOp {
         if (!annotations.containsKey(name))
             return defaultValue;
 
-        return (T) annotations.get(name);
+        final Object val = annotations.get(name);
+
+        if (defaultValue != null && val.getClass() != defaultValue.getClass()) {
+
+            /*
+             * Attempt to convert to the correct target type.
+             */
+            
+            if (defaultValue.getClass() == Integer.class) {
+                return (T) Integer.valueOf("" + val);
+            }
+            if (defaultValue.getClass() == Long.class) {
+                return (T) Long.valueOf("" + val);
+            }
+            if (defaultValue.getClass() == Float.class) {
+                return (T) Float.valueOf("" + val);
+            }
+            if (defaultValue.getClass() == Double.class) {
+                return (T) Double.valueOf("" + val);
+            }
+
+        }
+
+        return (T) val;
 
     }
 
