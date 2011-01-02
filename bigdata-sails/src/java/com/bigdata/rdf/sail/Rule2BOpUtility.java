@@ -66,8 +66,6 @@ import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.controller.Steps;
 import com.bigdata.bop.controller.Union;
-import com.bigdata.bop.controller.JoinGraph.JGraph;
-import com.bigdata.bop.controller.JoinGraph.Path;
 import com.bigdata.bop.cost.ScanCostReport;
 import com.bigdata.bop.cost.SubqueryCostReport;
 import com.bigdata.bop.engine.QueryEngine;
@@ -443,6 +441,16 @@ public class Rule2BOpUtility {
              * which optimizes the join graph and then evaluates it rather than
              * explicitly doing the optimization and evaluation steps here.
              * 
+             * FIXME The runtime query optimizer can not be run against an
+             * IPredicate[] extracted from the IRule, even for triples, because
+             * those IPredicates lack some critical annotations, such as the
+             * bopId, which are only added in the logic below this point. Thus,
+             * while we can run the static optimizer first, the runtime
+             * optimizer needs to be run after we convert to bops (or as a bop
+             * at runtime). [This all runs into trouble because we are creating
+             * the JOIN operators in the code below rather than inferring the
+             * correct JOIN annotations based on the IPredicates.]
+             * 
              * @todo Make sure that a summary of the information collected by
              * the runtime query optimizer is attached as an annotation to the
              * query.
@@ -450,35 +458,38 @@ public class Rule2BOpUtility {
              * @todo query hints for [limit] and [nedges].
              */
             
-            // The initial sampling limit.
-            final int limit = 100;
+//            // The initial sampling limit.
+//            final int limit = 100;
+//
+//            // The #of edges considered for the initial paths.
+//            final int nedges = 2;
+//
+//            // isolate/extract the join graph.
+//            final IPredicate[] preds = new IPredicate[rule.getTailCount()];
+//            for (int i = 0; i < preds.length; i++) {
+//                preds[i] = rule.getTail(i);
+//            }
+//            
+//            final JGraph g = new JGraph(preds);
+//            
+//            final Path p;
+//            try {
+//                p = g.runtimeOptimizer(queryEngine, limit, nedges);
+//            } catch (Exception e) {
+//                throw new RuntimeException(e);
+//            }
+//
+//            // the permutation order.
+//            order = g.getOrder(p);
+//            
+//            keyOrder = null;
+//            
+//            cardinality = null;
+//            
+//            break;
 
-            // The #of edges considered for the initial paths.
-            final int nedges = 2;
+            throw new UnsupportedOperationException("Runtime optimizer is not supported yet.");
 
-            // isolate/extract the join graph.
-            final IPredicate[] preds = new IPredicate[rule.getTailCount()];
-            for (int i = 0; i < preds.length; i++) {
-                preds[i] = rule.getTail(i);
-            }
-            
-            final JGraph g = new JGraph(preds);
-            
-            final Path p;
-            try {
-                p = g.runtimeOptimizer(queryEngine, limit, nedges);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-
-            // the permutation order.
-            order = g.getOrder(p);
-            
-            keyOrder = null;
-            
-            cardinality = null;
-
-            break;
         }
         default:
             throw new AssertionError("Unknown option: " + optimizer);
