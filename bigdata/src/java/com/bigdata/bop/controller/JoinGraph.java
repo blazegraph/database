@@ -1416,7 +1416,7 @@ public class JoinGraph extends PipelineOp {
 			return preds;
 
 		}
-		
+
 		/**
 		 * Return the {@link BOp} identifiers of the predicates associated with
 		 * each vertex in path order.
@@ -1850,6 +1850,55 @@ public class JoinGraph extends PipelineOp {
 			return paths[0];
 
 		}
+
+        /**
+         * Return a permutation vector which may be used to reorder the given
+         * {@link IPredicate}[] into the evaluation order selected by the
+         * runtime query optimizer.
+         * 
+         * @throws IllegalArgumentException
+         *             if the argument is <code>null</code>.
+         * @throws IllegalArgumentException
+         *             if the given {@link Path} does not cover all vertices in
+         *             the join graph.
+         */
+        public int[] getOrder(final Path p) {
+
+            if(p == null)
+                throw new IllegalArgumentException();
+            
+            final IPredicate[] path = p.getPredicates();
+
+            if (path.length != V.length) {
+                throw new IllegalArgumentException(
+                        "Wrong path length: #vertices=" + V.length
+                                + ", but path.length=" + path.length);
+            }
+
+            final int[] order = new int[V.length];
+
+            for (int i = 0; i < order.length; i++) {
+
+                boolean found = false;
+                for (int j = 0; j < order.length; j++) {
+
+                    if (path[i].getId() == V[j].pred.getId()) {
+                        order[i] = j;
+                        found = true;
+                        break;
+                    }
+
+                }
+
+                if (!found)
+                    throw new RuntimeException("No such vertex: id="
+                            + path[i].getId());
+
+            }
+            
+            return order;
+            
+        }
 
 		/**
 		 * Choose the starting vertices.

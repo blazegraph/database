@@ -29,7 +29,6 @@ import com.bigdata.rdf.sail.sparql.BaseDeclProcessor;
 import com.bigdata.rdf.sail.sparql.PrefixDeclProcessor;
 import com.bigdata.rdf.sail.sparql.StringEscapesProcessor;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BD;
 
 public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
    
@@ -52,7 +51,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
      * <p>
      * Overridden to capture query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
-     * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
+     * See {@link QueryHints#NAMESPACE} for more information.
      */
     @Override
     public SailGraphQuery prepareGraphQuery(final QueryLanguage ql,
@@ -72,7 +71,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
      * <p>
      * Overridden to capture query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
-     * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
+     * See {@link QueryHints#NAMESPACE} for more information.
      */
     @Override
     public SailTupleQuery prepareTupleQuery(final QueryLanguage ql,
@@ -89,7 +88,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
      * <p>
      * Overridden to capture query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces. See
-     * {@link BD#QUERY_HINTS_NAMESPACE} for more information.
+     * {@link QueryHints#NAMESPACE} for more information.
      */
     @Override
     public SailBooleanQuery prepareBooleanQuery(final QueryLanguage ql,
@@ -106,7 +105,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
      * <p>
      * Overridden to capture query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
-     * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
+     * See {@link QueryHints#NAMESPACE} for more information.
      */
     @Override
     public SailQuery prepareQuery(final QueryLanguage ql, final String qs,
@@ -251,7 +250,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     /**
      * Parse query hints from a query string.  Query hints are embedded in the 
      * query string via special namespaces.      
-     * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
+     * See {@link QueryHints#NAMESPACE} for more information.
      */
     private Properties parseQueryHints(QueryLanguage ql, String queryString, 
             String baseURI) 
@@ -270,7 +269,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
                 for (Map.Entry<String, String> prefix : prefixes.entrySet()) {
                     // if we see one that matches the magic namespace, try
                     // to parse it
-                    if (prefix.getKey().equalsIgnoreCase(BD.QUERY_HINTS_NAMESPACE)) {
+                    if (prefix.getKey().equalsIgnoreCase(QueryHints.NAMESPACE)) {
                         String hints = prefix.getValue();
                         // has to have a # and it can't be at the end
                         int i = hints.indexOf('#');

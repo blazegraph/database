@@ -30,12 +30,14 @@ package com.bigdata.rdf.sail;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -64,6 +66,8 @@ import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.controller.Steps;
 import com.bigdata.bop.controller.Union;
+import com.bigdata.bop.controller.JoinGraph.JGraph;
+import com.bigdata.bop.controller.JoinGraph.Path;
 import com.bigdata.bop.cost.ScanCostReport;
 import com.bigdata.bop.cost.SubqueryCostReport;
 import com.bigdata.bop.engine.QueryEngine;
@@ -243,13 +247,13 @@ public class Rule2BOpUtility {
      */
     public static PipelineOp convert(final IStep step,
             final AtomicInteger idFactory, final AbstractTripleStore db,
-            final QueryEngine queryEngine) {
+            final QueryEngine queryEngine, final Properties queryHints) {
 
         if (step instanceof IRule<?>) {
 
             // Convert the step to a bigdata operator tree.
             PipelineOp tmp = convert((IRule<?>) step, idFactory, db,
-                    queryEngine);
+                    queryEngine, queryHints);
 
             if (!tmp.getEvaluationContext().equals(
                     BOpEvaluationContext.CONTROLLER)) {
@@ -265,14 +269,54 @@ public class Rule2BOpUtility {
 
             }
 
-            return tmp;
+            return applyQueryHints(tmp, queryHints);
             
         }
         
-        return convert((IProgram) step, idFactory, db, queryEngine);
+        return convert((IProgram) step, idFactory, db, queryEngine, queryHints);
 
     }
 
+    /**
+     * Apply any query hints to the operator as annotations of that operator.
+     * 
+     * @param op
+     *            The operator.
+     * @param queryHints
+     *            The query hints.
+     * 
+     * @return A copy of that operator to which the query hints (if any) have
+     *         been applied. If there are no query hints then the original
+     *         operator is returned.
+     * 
+     * @todo It would be nice if this would only apply those query hints to an
+     *       operator which are known to be annotations understood by that
+     *       operator. This information is basically available from the inner
+     *       Annotation interface for a given operator class, but that is not
+     *       really all that accessible.
+     */
+    private static PipelineOp applyQueryHints(PipelineOp op,
+            Properties queryHints) {
+
+        final Enumeration<?> pnames = queryHints.propertyNames();
+
+        while (pnames.hasMoreElements()) {
+
+            final String name = (String) pnames.nextElement();
+
+            final String value = queryHints.getProperty(name);
+
+            if (log.isInfoEnabled())
+                log.info("Query hint: [" + name + "=" + value + "]");
+
+            op = (PipelineOp) op.setProperty(name, value);
+
+        }
+
+        return op;
+        
+    }
+    
     /**
      * Convert a rule into an operator tree.
      * 
@@ -282,52 +326,164 @@ public class Rule2BOpUtility {
      */
     public static PipelineOp convert(final IRule<?> rule,
             final AtomicInteger idFactory, final AbstractTripleStore db,
-            final QueryEngine queryEngine) {
+            final QueryEngine queryEngine, final Properties queryHints) {
 
 //        // true iff the database is in quads mode.
 //        final boolean isQuadsQuery = db.isQuads();
         
-        final PipelineOp startOp = new StartOp(new BOp[] {},
+        final PipelineOp startOp = applyQueryHints(new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, idFactory
                                 .incrementAndGet()),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
-                }));
-        
+                })),queryHints);
+
         /*
          * First put the tails in the correct order based on the logic in
          * DefaultEvaluationPlan2.
+         * 
+         * @todo Consider making order[] disappear such that all of the arrays
+         * (preds[], cardinality[], keyOrder[]) are indexed directly by the
+         * array index rather than by order[i]. Alternatively, make sure that
+         * the runtime query optimizer reports the permutation array (order[])
+         * so we can maintain information about the relationship between the
+         * given joins and the evaluation order.
          */
         final BOpContextBase context = new BOpContextBase(queryEngine);
-        final DefaultEvaluationPlan2 plan = new DefaultEvaluationPlan2(
-                new IRangeCountFactory() {
+        
+        final QueryOptimizerEnum optimizer = QueryOptimizerEnum
+                .valueOf(queryHints.getProperty(QueryHints.OPTIMIZER,
+                        QueryOptimizerEnum.Static.toString()));
 
-            public long rangeCount(final IPredicate pred) {
-                return context.getRelation(pred).getAccessPath(pred)
-                                .rangeCount(false);
+        // The evaluation plan order.
+        final int[] order;
+        // The estimated cardinality of each tail (if the optimizer provides it)
+        final long[] cardinality;
+        // The index assigned to each tail of the rule by static analysis. 
+        final IKeyOrder[] keyOrder;
+
+        switch(optimizer) {
+        case None: {
+            /*
+             * Do not run the join optimizer.
+             * 
+             * @todo Do we need to move any of the joins to the front, e.g.,
+             * magic search, or should everything just be left the way it is?
+             */
+            order = new int[rule.getTailCount()];
+            for (int i = 0; i < order.length; i++) {
+                order[i] = i;
+            }
+            cardinality = null;
+            keyOrder = null;
+            break;
+        }
+        case Static: {
+            /*
+             * Static query optimizer.
+             */
+            final DefaultEvaluationPlan2 plan = new DefaultEvaluationPlan2(
+                    new IRangeCountFactory() {
+
+                        public long rangeCount(final IPredicate pred) {
+                            return context.getRelation(pred)
+                                    .getAccessPath(pred).rangeCount(false);
+                        }
+
+                    }, rule);
+
+            order = plan.getOrder();
+
+            /*
+             * The index assigned to each tail of the rule by static analysis
+             * (this is often not the index which is actually used when we
+             * evaluate a given predicate since we always choose the best index
+             * and that can depend on whether or not we are binding the context
+             * position for a default or named graph query. When optional joins
+             * are involved, some variables may not become bound for some
+             * solutions. A different index will often be chosen for access
+             * paths using the unbound variable.
+             */
+                
+            // the #of variables in each tail of the rule (set by side-effect).
+            final int[] nvars = new int[rule.getTailCount()];
+
+            cardinality = new long[rule.getTailCount()];
+            for (int i = 0; i < cardinality.length; i++) {
+                cardinality[i] = plan.cardinality(i);
+            }
+
+            keyOrder = computeKeyOrderForEachTail(rule, context, order, nvars);
+
+            break;
+
+        }
+        case Runtime: {
+            /*
+             * The runtime query optimizer.
+             * 
+             * FIXME MikeP: I have modified the JoinGraph so that it can report
+             * the permutation order. However, the code here needs to isolate
+             * the join graph rather than running against all predicates in the
+             * tail. As it is, it will reorder optionals.
+             * 
+             * FIXME We can not optimize quads here using the runtime query
+             * optimizer since we have not yet generated the full query plan. In
+             * order to get the runtime query optimizer working for quads we
+             * need to replace the DataSetJoin with a PipelineJoin against an
+             * inline "relation" containing the named or default graphs IVs. The
+             * runtime query optimizer does not accept the JOIN operators so the
+             * annotations which are being applied there will be lost which is
+             * another problem, especially in scale-out. Both of these issues
+             * need to be resolved before quads can be used with the runtime
+             * query optimizer.
+             * 
+             * @todo In fact, we should be able to write in a JoinGraph operator
+             * which optimizes the join graph and then evaluates it rather than
+             * explicitly doing the optimization and evaluation steps here.
+             * 
+             * @todo Make sure that a summary of the information collected by
+             * the runtime query optimizer is attached as an annotation to the
+             * query.
+             * 
+             * @todo query hints for [limit] and [nedges].
+             */
+            
+            // The initial sampling limit.
+            final int limit = 100;
+
+            // The #of edges considered for the initial paths.
+            final int nedges = 2;
+
+            // isolate/extract the join graph.
+            final IPredicate[] preds = new IPredicate[rule.getTailCount()];
+            for (int i = 0; i < preds.length; i++) {
+                preds[i] = rule.getTail(i);
             }
             
-        }, rule);
-        
-        // evaluation plan order.
-        final int[] order = plan.getOrder();
-        
-        // the #of variables in each tail of the rule.
-        final int[] nvars = new int[rule.getTailCount()];
+            final JGraph g = new JGraph(preds);
+            
+            final Path p;
+            try {
+                p = g.runtimeOptimizer(queryEngine, limit, nedges);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
 
-		/*
-		 * The index assigned to each tail of the rule by static analysis (this
-		 * is often not the index which is actually used when we evaluate a
-		 * given predicate since we always choose the best index and that can
-		 * depend on whether or not we are binding the context position for a
-		 * default or named graph query. When optional joins are involved, some
-		 * variables may not become bound for some solutions. A different index
-		 * will often be chosen for access paths using the unbound variable.
-		 */
-        final IKeyOrder[] keyOrder = computeKeyOrderForEachTail(rule, context,
-                order, nvars);
+            // the permutation order.
+            order = g.getOrder(p);
+            
+            keyOrder = null;
+            
+            cardinality = null;
 
+            break;
+        }
+        default:
+            throw new AssertionError("Unknown option: " + optimizer);
+        }
+        
         // the variables to be retained for each join.
         final IVariable<?>[][] selectVars = RuleState
                 .computeRequiredVarsForEachTail(rule, order);
@@ -379,15 +535,22 @@ public class Rule2BOpUtility {
             Predicate<?> pred = (Predicate<?>) rule.getTail(order[i]).setBOpId(
                     idFactory.incrementAndGet());
 
-            // decorate the predicate with the assigned index.
-//            pred = pred.setKeyOrder(keyOrder[order[i]]);
-			pred = (Predicate<?>) pred.setProperty(Annotations.ORIGINAL_INDEX,
-					keyOrder[order[i]]);
+            /*
+             * Decorate the predicate with the assigned index (this is purely
+             * informative).
+             */
+            if (keyOrder != null && keyOrder[order[i]] != null) {
+                // pred = pred.setKeyOrder(keyOrder[order[i]]);
+                pred = (Predicate<?>) pred.setProperty(
+                        Annotations.ORIGINAL_INDEX, keyOrder[order[i]]);
+            }
 
 			// decorate the predicate with the cardinality estimate.
-			pred = (Predicate<?>) pred.setProperty(
-					Annotations.ESTIMATED_CARDINALITY, plan
-							.cardinality(order[i]));
+            if (cardinality != null) {
+                pred = (Predicate<?>) pred.setProperty(
+                        Annotations.ESTIMATED_CARDINALITY,
+                        cardinality[order[i]]);
+            }
             
             /*
              * Collect all the constraints for this predicate based on which
@@ -468,11 +631,11 @@ public class Rule2BOpUtility {
                     switch (scope) {
                     case NAMED_CONTEXTS:
                         left = namedGraphJoin(queryEngine, context, idFactory,
-                                left, anns, pred, dataset);
+                                left, anns, pred, dataset, queryHints);
                         break;
                     case DEFAULT_CONTEXTS:
                         left = defaultGraphJoin(queryEngine, context, idFactory,
-                                left, anns, pred, dataset);
+                                left, anns, pred, dataset, queryHints);
                         break;
                     default:
                         throw new AssertionError();
@@ -494,9 +657,9 @@ public class Rule2BOpUtility {
                             BOpEvaluationContext.ANY));
 
                     anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
-                    
-					left = new PipelineJoin(new BOp[] { left }, anns
-							.toArray(new NV[anns.size()]));
+
+                    left = applyQueryHints(new PipelineJoin(new BOp[] { left },
+                            anns.toArray(new NV[anns.size()])), queryHints);
 
                 }
 
@@ -506,7 +669,7 @@ public class Rule2BOpUtility {
                  * Triples or provenance mode.
                  */
 
-                left = triplesModeJoin(queryEngine, left, anns, pred);
+                left = triplesModeJoin(queryEngine, left, anns, pred, queryHints);
 
             }
 
@@ -533,7 +696,8 @@ public class Rule2BOpUtility {
      * @return The join operator.
      */
     private static PipelineOp triplesModeJoin(final QueryEngine queryEngine,
-            final PipelineOp left, final List<NV> anns, Predicate<?> pred) {
+            final PipelineOp left, final List<NV> anns, Predicate<?> pred,
+            final Properties queryHints) {
 
         final boolean scaleOut = queryEngine.isScaleOut();
         if (scaleOut) {
@@ -551,8 +715,8 @@ public class Rule2BOpUtility {
 
         anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-        return new PipelineJoin(new BOp[] { left }, anns
-                .toArray(new NV[anns.size()]));
+        return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+                .toArray(new NV[anns.size()])), queryHints);
 
     }
 
@@ -578,7 +742,7 @@ public class Rule2BOpUtility {
     private static PipelineOp namedGraphJoin(final QueryEngine queryEngine,
             final BOpContextBase context, final AtomicInteger idFactory,
             final PipelineOp left, final List<NV> anns, Predicate<?> pred,
-            final Dataset dataset) {
+            final Dataset dataset, final Properties queryHints) {
 
         final boolean scaleOut = queryEngine.isScaleOut();
         if (scaleOut) {
@@ -603,8 +767,8 @@ public class Rule2BOpUtility {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return new PipelineJoin(new BOp[] { left }, anns
-                    .toArray(new NV[anns.size()]));
+            return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+                    .toArray(new NV[anns.size()])), queryHints);
 
         }
 
@@ -616,8 +780,8 @@ public class Rule2BOpUtility {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-			return new PipelineJoin(new BOp[] { left }, anns
-					.toArray(new NV[anns.size()]));
+            return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+                    .toArray(new NV[anns.size()])), queryHints);
 
         }
 
@@ -646,8 +810,8 @@ public class Rule2BOpUtility {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return new PipelineJoin(new BOp[] { left }, anns
-                    .toArray(new NV[anns.size()]));
+            return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+                    .toArray(new NV[anns.size()])), queryHints);
 
         }
 
@@ -662,8 +826,8 @@ public class Rule2BOpUtility {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return new PipelineJoin(new BOp[] { left }, anns
-                    .toArray(new NV[anns.size()]));
+            return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+                    .toArray(new NV[anns.size()])), queryHints);
 
         }
 
@@ -714,8 +878,8 @@ public class Rule2BOpUtility {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return new PipelineJoin(new BOp[] { left }, anns
-                    .toArray(new NV[anns.size()]));
+            return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+                    .toArray(new NV[anns.size()])), queryHints);
 
         } else {
 
@@ -762,8 +926,8 @@ public class Rule2BOpUtility {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return new PipelineJoin(new BOp[] { dataSetJoin }, anns
-                    .toArray(new NV[anns.size()]));
+            return applyQueryHints(new PipelineJoin(new BOp[] { dataSetJoin },
+                    anns.toArray(new NV[anns.size()])), queryHints);
 
         }
 
@@ -786,7 +950,7 @@ public class Rule2BOpUtility {
     private static PipelineOp defaultGraphJoin(final QueryEngine queryEngine,
             final BOpContextBase context, final AtomicInteger idFactory,
             final PipelineOp left, final List<NV> anns, Predicate<?> pred,
-            final Dataset dataset) {
+            final Dataset dataset, final Properties queryHints) {
 
         /*
          * @todo raise this into the caller and do one per rule rather than once
@@ -813,8 +977,8 @@ public class Rule2BOpUtility {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-			return new PipelineJoin(new BOp[] { left }, anns
-					.toArray(new NV[anns.size()]));
+            return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+                    .toArray(new NV[anns.size()])), queryHints);
 
         }
         
@@ -842,8 +1006,8 @@ public class Rule2BOpUtility {
             
 			anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-			return new PipelineJoin(new BOp[] { left }, anns
-					.toArray(new NV[anns.size()]));
+            return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+                    .toArray(new NV[anns.size()])), queryHints);
 
         }
 
@@ -911,8 +1075,8 @@ public class Rule2BOpUtility {
 //
 //            }
 //
-//            return new PipelineJoin(new BOp[] { left, pred }, anns
-//                    .toArray(new NV[anns.size()]));
+//            return applyQueryHints(new PipelineJoin(new BOp[] { left, pred }, anns
+//                    .toArray(new NV[anns.size()])),queryHints);
 //
 //        }
 
@@ -987,8 +1151,8 @@ public class Rule2BOpUtility {
             
 			anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-			return new PipelineJoin(new BOp[] { left }, anns
-					.toArray(new NV[anns.size()]));
+			return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+					.toArray(new NV[anns.size()])),queryHints);
 
         } else {
 
@@ -1037,8 +1201,8 @@ public class Rule2BOpUtility {
             
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-			return new PipelineJoin(new BOp[] { left }, anns
-					.toArray(new NV[anns.size()]));
+			return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+					.toArray(new NV[anns.size()])),queryHints);
 
         }
 
@@ -1059,7 +1223,7 @@ public class Rule2BOpUtility {
      */
     public static PipelineOp convert(final IProgram program,
             final AtomicInteger idFactory, final AbstractTripleStore db,
-            final QueryEngine queryEngine) {
+            final QueryEngine queryEngine, final Properties queryHints) {
 
         // When parallel, the program is translated to a UNION. Else STEPS.
         final boolean isParallel = program.isParallel();
@@ -1076,7 +1240,8 @@ public class Rule2BOpUtility {
         for (int i = 0; i < arity; i++) {
 
             // convert the child IStep
-            BOpBase tmp = convert(steps[i], idFactory, db, queryEngine);
+            final BOpBase tmp = convert(steps[i], idFactory, db, queryEngine,
+                    queryHints);
 
             /*
              * @todo Route binding sets around the UNION/STEPS operator. We need

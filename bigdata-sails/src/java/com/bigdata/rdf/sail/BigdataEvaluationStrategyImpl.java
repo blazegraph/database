@@ -366,7 +366,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
      * This is the top-level method called by the SAIL to evaluate a query.
      * The TupleExpr parameter here is guaranteed to be the root of the operator
      * tree for the query.  Query hints are parsed by the SAIL from the
-     * namespaces in the original query.  See {@link BD#QUERY_HINTS_NAMESPACE}.
+     * namespaces in the original query.  See {@link QueryHints#NAMESPACE}.
      */
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
             TupleExpr expr, BindingSet bindings, Properties queryHints)
@@ -1673,7 +1673,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         
         final QueryEngine queryEngine = tripleSource.getSail().getQueryEngine();
 
-        final int startId = 1;
+//        final int startId = 1;
         final PipelineOp query;
         {
 
@@ -1686,7 +1686,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
             // Convert the step to a bigdata operator tree.
             query = Rule2BOpUtility.convert(step, idFactory, database,
-                    queryEngine);
+                    queryEngine, queryHints);
 
             if (log.isInfoEnabled())
                 log.info(query);

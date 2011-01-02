@@ -14,14 +14,13 @@ import org.openrdf.repository.sail.SailTupleQuery;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
-import com.bigdata.rdf.store.BD;
 
 public class BigdataSailTupleQuery extends SailTupleQuery 
         implements BigdataSailQuery {
     
     /**
      * Query hints are embedded in query strings as namespaces.  
-     * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
+     * See {@link QueryHints#NAMESPACE} for more information.
      */
     private final Properties queryHints;
     
@@ -34,7 +33,7 @@ public class BigdataSailTupleQuery extends SailTupleQuery
     /**
      * Overriden to use query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
-     * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
+     * See {@link QueryHints#NAMESPACE} for more information.
      */
     @Override
     public TupleQueryResult evaluate() throws QueryEvaluationException {

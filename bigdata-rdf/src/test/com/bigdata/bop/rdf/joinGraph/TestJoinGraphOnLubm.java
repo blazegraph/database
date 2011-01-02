@@ -230,7 +230,7 @@ public class TestJoinGraphOnLubm extends TestCase2 {
 		final Properties properties = getProperties();
 
 		final File file;
-		if (false) {
+		if (true) {
 			/*
 			 * Use a persistent file that is generated once and then reused by
 			 * each test run.
@@ -899,6 +899,8 @@ public class TestJoinGraphOnLubm extends TestCase2 {
 //			System.err.println(getName() + " : runtime optimizer join order "
 //					+ Arrays.toString(Path.getVertexIds(p.edges)));
 
+            System.err.println(getName() + " : order[]=" + Arrays.toString(g.getOrder(p)));
+			
 			return p.getPredicates();
 
 		} finally {

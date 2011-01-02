@@ -378,6 +378,15 @@ public class PipelineJoin<E> extends PipelineOp implements
     }
 
     /**
+     * Deep copy constructor.
+     * 
+     * @param op
+     */
+    public PipelineJoin(final PipelineJoin<E> op) {
+        super(op);
+    }
+    
+    /**
      * Shallow copy vararg constructor.
      * 
      * @param args
@@ -637,6 +646,9 @@ public class PipelineJoin<E> extends PipelineOp implements
             this.predicate = joinOp.getPredicate();
             this.constraints = joinOp.constraints();
             this.maxParallel = joinOp.getMaxParallel();
+            if (maxParallel < 0)
+                throw new IllegalArgumentException(Annotations.MAX_PARALLEL
+                        + "=" + maxParallel);
             if (maxParallel > 0) {
                 // shared service.
                 service = new LatchedExecutor(context.getIndexManager()

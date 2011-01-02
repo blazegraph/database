@@ -42,14 +42,13 @@ import org.openrdf.repository.sail.SailGraphQuery;
 import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.sail.SailException;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
-import com.bigdata.rdf.store.BD;
 
 public class BigdataSailGraphQuery extends SailGraphQuery 
         implements BigdataSailQuery {
     
     /**
      * Query hints are embedded in query strings as namespaces.  
-     * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
+     * See {@link QueryHints#NAMESPACE} for more information.
      */
     private final Properties queryHints;
     
@@ -222,7 +221,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery
     /**
      * Overriden to use query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
-     * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
+     * See {@link QueryHints#NAMESPACE} for more information.
      */
     @Override
     public GraphQueryResult evaluate() throws QueryEvaluationException {
