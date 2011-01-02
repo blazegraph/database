@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
+import java.lang.reflect.Constructor;
 import java.rmi.RemoteException;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -203,6 +204,37 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     protected static final transient String ERR_QUERY_NOT_RUNNING = "Query is not running:";
 
     /**
+     * Annotations understood by the {@link QueryEngine}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    public interface Annotations extends PipelineOp.Annotations {
+
+        /**
+         * The name of the {@link IRunningQuery} implementation class which will
+         * be used to evaluate a query marked by this annotation (optional). The
+         * specified class MUST implement {@link IRunningQuery} and MUST have a
+         * constructor with the following signature:
+         * 
+         * <pre>
+         * public MyRunningQuery(QueryEngine queryEngine, UUID queryId,
+         *             boolean controller, IQueryClient clientProxy,
+         *             PipelineOp query)
+         * </pre>
+         * 
+         * Note that classes derived from {@link QueryEngine} may override
+         * {@link QueryEngine#newRunningQuery(QueryEngine, UUID, boolean, IQueryClient, PipelineOp)}
+         * in which case they might not support this option.
+         */
+        String RUNNING_QUERY_CLASS = QueryEngine.class.getName()
+                + ".runningQueryClass";
+
+//        String DEFAULT_RUNNING_QUERY_CLASS = StandaloneChainedRunningQuery.class.getName();
+        String DEFAULT_RUNNING_QUERY_CLASS = ChunkedRunningQuery.class.getName();
+
+    }
+    
+    /**
      * Access to the indices.
      * <p>
      * Note: You MUST NOT use unisolated indices without obtaining the necessary
@@ -315,7 +347,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     /**
      * The currently executing queries.
      */
-    final private ConcurrentHashMap<UUID/* queryId */, RunningQuery> runningQueries = new ConcurrentHashMap<UUID, RunningQuery>();
+    final private ConcurrentHashMap<UUID/* queryId */, AbstractRunningQuery> runningQueries = new ConcurrentHashMap<UUID, AbstractRunningQuery>();
 
 	/**
 	 * LRU cache used to handle problems with asynchronous termination of
@@ -348,7 +380,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 	};
 
 	/**
-	 * A queue of {@link RunningQuery}s having binding set chunks available for
+	 * A queue of {@link ChunkedRunningQuery}s having binding set chunks available for
 	 * consumption.
 	 * 
 	 * @todo Handle priority for selective queries based on the time remaining
@@ -361,11 +393,11 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 	 *       First, that collection is intrinsically bounded (it is backed by an
 	 *       array) so it will BLOCK under heavy load and could be expected to
 	 *       have some resize costs if the queue size becomes too large. Second,
-	 *       either {@link RunningQuery} needs to implement an appropriate
+	 *       either {@link ChunkedRunningQuery} needs to implement an appropriate
 	 *       {@link Comparator} or we need to pass one into the constructor for
 	 *       the queue.
 	 */
-    final private BlockingQueue<RunningQuery> priorityQueue = new LinkedBlockingQueue<RunningQuery>();
+    final private BlockingQueue<AbstractRunningQuery> priorityQueue = new LinkedBlockingQueue<AbstractRunningQuery>();
 //    final private BlockingQueue<RunningQuery> priorityQueue = new PriorityBlockingQueue<RunningQuery>(
 //            );
 
@@ -486,9 +518,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     static private class QueryEngineTask implements Runnable {
         
-        final private BlockingQueue<RunningQuery> queue;
+        final private BlockingQueue<AbstractRunningQuery> queue;
 
-        public QueryEngineTask(final BlockingQueue<RunningQuery> queue) {
+        public QueryEngineTask(final BlockingQueue<AbstractRunningQuery> queue) {
 
             if (queue == null)
                 throw new IllegalArgumentException();
@@ -502,7 +534,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
                 log.info("Running: " + this);
             while (true) {
                 try {
-                    final RunningQuery q = queue.take();
+                    final AbstractRunningQuery q = queue.take();
                     if (!q.isDone())
                         q.consumeChunk();
                 } catch (InterruptedException e) {
@@ -553,7 +585,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         if (!msg.isMaterialized())
             throw new IllegalStateException();
 
-        final RunningQuery q = getRunningQuery(msg.getQueryId());
+        final AbstractRunningQuery q = getRunningQuery(msg.getQueryId());
         
         if(q == null) {
 			/*
@@ -652,7 +684,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         }
         
         // halt any running queries.
-        for(RunningQuery q : runningQueries.values()) {
+        for(AbstractRunningQuery q : runningQueries.values()) {
             
             q.cancel(true/*mayInterruptIfRunning*/);
             
@@ -695,7 +727,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     public PipelineOp getQuery(final UUID queryId) {
         
-        final RunningQuery q = getRunningQuery(queryId);
+        final AbstractRunningQuery q = getRunningQuery(queryId);
         
         if (q == null)
             throw new IllegalArgumentException();
@@ -706,7 +738,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     public void startOp(final StartOpMessage msg) throws RemoteException {
         
-        final RunningQuery q = getRunningQuery(msg.queryId);
+        final AbstractRunningQuery q = getRunningQuery(msg.queryId);
         
         if (q != null) {
         
@@ -718,7 +750,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     public void haltOp(final HaltOpMessage msg) throws RemoteException {
         
-        final RunningQuery q = getRunningQuery(msg.queryId);
+        final AbstractRunningQuery q = getRunningQuery(msg.queryId);
         
         if (q != null) {
             
@@ -755,7 +787,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *             if the {@link QueryEngine} has been {@link #shutdown()}.
      * @throws Exception
      */
-    public RunningQuery eval(final BOp op) throws Exception {
+    public AbstractRunningQuery eval(final BOp op) throws Exception {
         
         final BOp startOp = BOpUtility.getPipelineStart(op);
 
@@ -789,7 +821,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *             if the {@link QueryEngine} has been {@link #shutdown()}.
      * @throws Exception
      */
-    public RunningQuery eval(final UUID queryId,
+    public AbstractRunningQuery eval(final UUID queryId,
             final PipelineOp query,
             final IChunkMessage<IBindingSet> msg) throws Exception {
 
@@ -805,8 +837,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         if (!queryId.equals(msg.getQueryId()))
             throw new IllegalArgumentException();
 
-        final RunningQuery runningQuery = newRunningQuery(this, queryId,
-                true/* controller */, getProxy()/*queryController*/, query);
+        final AbstractRunningQuery runningQuery = newRunningQuery(
+                /* this, */queryId, true/* controller */,
+                getProxy()/* queryController */, query);
 
         final long timeout = query.getProperty(BOp.Annotations.TIMEOUT,
                 BOp.Annotations.DEFAULT_TIMEOUT);
@@ -836,13 +869,17 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 //         * messages to those operators.
 //         */
 //        BOpUtility.verifyPipline(msg.getBOpId(), query);
-        
+
+        // verify query engine is running.
         assertRunning();
 
+        // add to running query table.
         putIfAbsent(queryId, runningQuery);
 
+        // notify query start
         runningQuery.startQuery(msg);
         
+        // tell query to consume the initial chunk.
         acceptChunk(msg);
 
         return runningQuery;
@@ -853,19 +890,20 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * Management of running queries.
      */
 
-	/**
-	 * Places the {@link RunningQuery} object into the internal map.
-	 * 
-	 * @param queryId
-	 *            The query identifier.
-	 * @param runningQuery
-	 *            The {@link RunningQuery}.
-	 * 
-	 * @return The {@link RunningQuery} -or- another {@link RunningQuery} iff
-	 *         one exists with the same {@link UUID}.
-	 */
-    protected RunningQuery putIfAbsent(final UUID queryId,
-            final RunningQuery runningQuery) {
+    /**
+     * Places the {@link AbstractRunningQuery} object into the internal map.
+     * 
+     * @param queryId
+     *            The query identifier.
+     * @param runningQuery
+     *            The {@link AbstractRunningQuery}.
+     * 
+     * @return The {@link AbstractRunningQuery} -or- another
+     *         {@link AbstractRunningQuery} iff one exists with the same
+     *         {@link UUID}.
+     */
+    protected AbstractRunningQuery putIfAbsent(final UUID queryId,
+            final AbstractRunningQuery runningQuery) {
 
         if (queryId == null)
             throw new IllegalArgumentException();
@@ -875,7 +913,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
 		// First, check [runningQueries] w/o acquiring a lock.
 		{
-			final RunningQuery tmp = runningQueries.get(queryId);
+			final AbstractRunningQuery tmp = runningQueries.get(queryId);
 
 			if (tmp != null) {
 		
@@ -909,7 +947,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 			}
 
 			// Test again for an active query while holding the lock.
-			final RunningQuery tmp = runningQueries.putIfAbsent(queryId,
+			final AbstractRunningQuery tmp = runningQueries.putIfAbsent(queryId,
 					runningQuery);
 			
 			if (tmp != null) {
@@ -931,20 +969,20 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     }
     
 	/**
-	 * Return the {@link RunningQuery} associated with that query identifier.
+	 * Return the {@link AbstractRunningQuery} associated with that query identifier.
 	 * 
 	 * @param queryId
 	 *            The query identifier.
 	 * 
-	 * @return The {@link RunningQuery} -or- <code>null</code> if there is no
+	 * @return The {@link AbstractRunningQuery} -or- <code>null</code> if there is no
 	 *         query associated with that query identifier.
 	 */
-    protected RunningQuery getRunningQuery(final UUID queryId) {
+    protected AbstractRunningQuery getRunningQuery(final UUID queryId) {
 
         if(queryId == null)
             throw new IllegalArgumentException();
 
-        RunningQuery q;
+        AbstractRunningQuery q;
 
         /*
 		 * First, test the concurrent map w/o obtaining a lock. This handles
@@ -1002,7 +1040,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * The query is no longer running. Resources associated with the query
      * should be released.
      */
-    protected void halt(final RunningQuery q) {
+    protected void halt(final AbstractRunningQuery q) {
 
     	lock.lock();
 
@@ -1068,14 +1106,61 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     
     /**
-     * Factory for {@link RunningQuery}s.
+     * Factory for {@link IRunningQuery}s.
+     * 
+     * @see Annotations#RUNNING_QUERY_CLASS
      */
-    protected RunningQuery newRunningQuery(final QueryEngine queryEngine,
-            final UUID queryId, final boolean controller,
-            final IQueryClient clientProxy, final PipelineOp query) {
+    protected AbstractRunningQuery newRunningQuery(
+            /*final QueryEngine queryEngine,*/ final UUID queryId,
+            final boolean controller, final IQueryClient clientProxy,
+            final PipelineOp query) {
 
-        return new RunningQuery(this, queryId, true/* controller */,
-                this/* clientProxy */, query);
+        final String className = query.getProperty(
+                Annotations.RUNNING_QUERY_CLASS,
+                Annotations.DEFAULT_RUNNING_QUERY_CLASS);
+
+        final Class<IRunningQuery> cls;
+        try {
+            cls = (Class<IRunningQuery>) Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Bad option: "
+                    + Annotations.RUNNING_QUERY_CLASS, e);
+        }
+
+        if (!IRunningQuery.class.isAssignableFrom(cls)) {
+            throw new RuntimeException(Annotations.RUNNING_QUERY_CLASS
+                    + ": Must extend: " + IRunningQuery.class.getName());
+        }
+
+        final IRunningQuery runningQuery;
+        try {
+
+            final Constructor<? extends IRunningQuery> ctor = cls
+                    .getConstructor(new Class[] { QueryEngine.class,
+                            UUID.class, Boolean.TYPE, IQueryClient.class,
+                            PipelineOp.class });
+
+            // save reference.
+            runningQuery = ctor.newInstance(new Object[] { this, queryId,
+                    controller, clientProxy, query });
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+        
+        /*
+         * @todo either modify to allow IRunningQuery return or update the
+         * javadoc to specify the AbstractRunningQuery base class. 
+         * 
+         * @todo Measure the runtime cost of this dynamic decision.  We could
+         * always hardware the default.
+         */
+        return (AbstractRunningQuery) runningQuery;
+        
+//        return new ChunkedRunningQuery(this, queryId, true/* controller */,
+//                this/* clientProxy */, query);
 
     }
 

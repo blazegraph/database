@@ -256,7 +256,7 @@ public class TestQueryEngine extends TestCase2 {
                 }));
 
         final UUID queryId = UUID.randomUUID();
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId, -1/* partitionId */,
                         newBindingSetIterator(new HashBindingSet())));
@@ -299,10 +299,87 @@ public class TestQueryEngine extends TestCase2 {
     }
 
     /**
+     * Test the ability run a simple join without a {@link StartOp}. An empty
+     * binding set[] is fed into the join. The join probes the index once for
+     * "Mary" and binds "Paul" when it does so. There there is one solution,
+     * which is "value=Paul".
+     * 
+     * @throws Exception
+     */
+    public void test_query_join1_without_StartOp() throws Exception {
+
+//        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+
+//        final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
+//                        new NV(Predicate.Annotations.BOP_ID, startId),//
+//                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+//                                BOpEvaluationContext.CONTROLLER),//
+//                }));
+
+        final Predicate<E> pred = new Predicate<E>(new IVariableOrConstant[] {
+                new Constant<String>("Mary"), Var.var("value") }, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                }));
+
+        final PipelineOp query = new PipelineJoin<E>(new BOp[] { /*startOp*/ },//
+                new NV(Predicate.Annotations.BOP_ID, joinId),//
+                new NV(PipelineJoin.Annotations.PREDICATE, pred));
+
+        // the expected solution.
+        final IBindingSet[] expected = new IBindingSet[] {//
+        new ArrayBindingSet(//
+                new IVariable[] { Var.var("value") },//
+                new IConstant[] { new Constant<String>("Paul") }//
+        ) };
+
+        final UUID queryId = UUID.randomUUID();
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
+                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
+                        joinId, -1 /* partitionId */,
+                        newBindingSetIterator(new HashBindingSet())));
+
+        // verify solutions.
+        assertSameSolutions(expected, runningQuery.iterator());
+
+        // Wait until the query is done.
+        runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
+        {
+            // validate the stats map.
+            assertNotNull(statsMap);
+            assertEquals(1, statsMap.size());
+            if (log.isInfoEnabled())
+                log.info(statsMap.toString());
+        }
+
+        // validate the stats for the join operator.
+        {
+            final BOpStats stats = statsMap.get(joinId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("join : "+stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+    }
+
+    /**
      * Test the ability run a simple join. There are three operators. One feeds
      * an empty binding set[] into the join, another is the predicate for the
      * access path on which the join will read (it probes the index once for
-     * "Mary" and bindings "Paul" when it does so), and the third is the join
+     * "Mary" and binds "Paul" when it does so), and the third is the join
      * itself (there is one solution, which is "value=Paul").
      * 
      * @throws Exception
@@ -341,7 +418,7 @@ public class TestQueryEngine extends TestCase2 {
         ) };
 
         final UUID queryId = UUID.randomUUID();
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId, -1 /* partitionId */,
                         newBindingSetIterator(new HashBindingSet())));
@@ -516,7 +593,7 @@ public class TestQueryEngine extends TestCase2 {
         };
 
         final UUID queryId = UUID.randomUUID();
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId, -1 /* partitionId */,
                         newBindingSetIterator(sources)));
@@ -664,7 +741,7 @@ public class TestQueryEngine extends TestCase2 {
         
         final PipelineOp query = delayOp; 
         final UUID queryId = UUID.randomUUID();
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId, -1 /* partitionId */,
                         newBindingSetIterator(sources)));
@@ -707,6 +784,11 @@ public class TestQueryEngine extends TestCase2 {
      * Unit test runs chunks into a slice without a limit. This verifies that
      * the query terminates properly even though the slice is willing to accept
      * more data.
+     * <p>
+     * When the {@link IRunningQuery} implementation supports it, the source
+     * data are presented in multiple chunks in order to verify the behavior of
+     * the {@link SliceOp} across multiple (and potentially concurrent)
+     * invocations of that operator.
      * 
      * @throws Exception
      */
@@ -740,6 +822,9 @@ public class TestQueryEngine extends TestCase2 {
                                         new NV(SliceOp.Annotations.LIMIT, Long.MAX_VALUE),//
                                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                                 BOpEvaluationContext.CONTROLLER),//
+//                                        // Require the chunked running query impl.
+//                                        new NV(QueryEngine.Annotations.RUNNING_QUERY_CLASS,
+//                                                ChunkedRunningQuery.class.getName()),//
                                 })//
                 );
         
@@ -775,7 +860,7 @@ public class TestQueryEngine extends TestCase2 {
         
         final PipelineOp query = sliceOp; 
         final UUID queryId = UUID.randomUUID();
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId, -1 /* partitionId */,
                         newBindingSetIterator(sources)));
@@ -824,10 +909,27 @@ public class TestQueryEngine extends TestCase2 {
                 log.info("slice: " + stats.toString());
 
             // verify query solution stats details.
-            assertEquals((long)nsources, stats.chunksIn.get());
-            assertEquals((long)nsources, stats.unitsIn.get());
-            assertEquals((long)nsources, stats.unitsOut.get());
-            assertEquals((long)nsources, stats.chunksOut.get());
+            assertEquals((long) nsources, stats.unitsIn.get());
+            assertEquals((long) nsources, stats.unitsOut.get());
+            if (runningQuery instanceof ChunkedRunningQuery) {
+                /*
+                 * The unit test setup will result in four distinct chunks
+                 * being presented to the SliceOp and four distinct invocations
+                 * of the ChunkTask for that SliceOp.
+                 */
+                assertEquals((long) nsources, stats.chunksIn.get());
+                assertEquals((long) nsources, stats.chunksOut.get());
+            } else if (runningQuery instanceof StandaloneChainedRunningQuery) {
+                /*
+                 * The chunks will have been combined and the SliceOp will only
+                 * run once.
+                 */
+                assertEquals(1L, stats.chunksIn.get());
+                assertEquals(1L, stats.chunksOut.get());
+            } else {
+                fail("Unknown implementation class: "
+                        + runningQuery.getClass().getName());
+            }
         }
         
     }
@@ -904,7 +1006,7 @@ public class TestQueryEngine extends TestCase2 {
                 ) };
 
         final UUID queryId = UUID.randomUUID();
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId, -1 /* partitionId */,
                         newBindingSetIterator(new HashBindingSet())));
@@ -1073,7 +1175,7 @@ public class TestQueryEngine extends TestCase2 {
 //        new E("Mary", "Paul"),// [2]
 //        new E("Paul", "Leon"),// [3]
 
-        final RunningQuery runningQuery;
+        final IRunningQuery runningQuery;
         {
             final IBindingSet initialBindingSet = new HashBindingSet();
 
@@ -1213,7 +1315,7 @@ public class TestQueryEngine extends TestCase2 {
                     -1, // partitionId
                     newBindingSetIterator(initialBindings));
         }
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 initialChunkMessage);
 
         // verify solutions.
@@ -1527,7 +1629,7 @@ public class TestQueryEngine extends TestCase2 {
                     -1, // partitionId
                     newBindingSetIterator(initialBindings));
         }
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 initialChunkMessage);
 
         // verify solutions.
@@ -1650,7 +1752,7 @@ public class TestQueryEngine extends TestCase2 {
         int joinId2 = 3;
         
         IConstraint condition = new EQConstant(Var.var("x"), new Constant<String>("Mary"));
-        RunningQuery runningQuery = initQueryWithConditionalRoutingOp(condition, startId, joinId1, joinId2);
+        IRunningQuery runningQuery = initQueryWithConditionalRoutingOp(condition, startId, joinId1, joinId2);
 
         // verify solutions.
         {
@@ -1733,7 +1835,7 @@ public class TestQueryEngine extends TestCase2 {
         // 'x' is actually bound to "Mary" so this condition will be false.
         IConstraint condition = new EQConstant(Var.var("x"), new Constant<String>("Fred"));
         
-        RunningQuery runningQuery = initQueryWithConditionalRoutingOp(condition, startId, joinId1, joinId2);
+        IRunningQuery runningQuery = initQueryWithConditionalRoutingOp(condition, startId, joinId1, joinId2);
 
         // verify solutions.
         {
@@ -1816,7 +1918,7 @@ public class TestQueryEngine extends TestCase2 {
      * 
      * @throws Exception
      */
-    private RunningQuery initQueryWithConditionalRoutingOp(IConstraint condition, int startId, int joinId1, int joinId2) throws Exception {
+    private IRunningQuery initQueryWithConditionalRoutingOp(IConstraint condition, int startId, int joinId1, int joinId2) throws Exception {
         final int predId1 = 10;
         final int predId2 = 11;
         final int condId = 12;
@@ -1888,7 +1990,7 @@ public class TestQueryEngine extends TestCase2 {
                     newBindingSetIterator(initialBindings));
         }
         
-        RunningQuery runningQuery = queryEngine.eval(queryId, query,initialChunkMessage);
+        IRunningQuery runningQuery = queryEngine.eval(queryId, query,initialChunkMessage);
         
         return runningQuery;
     }

@@ -44,8 +44,8 @@ import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.engine.IChunkHandler;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryPeer;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
-import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.engine.StandaloneChunkHandler;
 import com.bigdata.bop.fed.shards.MapBindingSetsOverShardsBuffer;
 import com.bigdata.io.DirectBufferPool;
@@ -94,7 +94,7 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
      *       and how to best combine their data together.
      */
     @Override
-    public int handleChunk(final RunningQuery query, final int bopId,
+    public int handleChunk(final IRunningQuery query, final int bopId,
             final int sinkId, final IBindingSet[] chunk) {
 
         if (query == null)

@@ -70,7 +70,7 @@ public interface IChunkHandler {
 	 *         {@link IChunkMessage} per index partition over which the
 	 *         intermediate results were mapped.
 	 */
-    int handleChunk(RunningQuery query, int bopId, int sinkId,
+    int handleChunk(IRunningQuery query, int bopId, int sinkId,
             IBindingSet[] chunk);
 
 }

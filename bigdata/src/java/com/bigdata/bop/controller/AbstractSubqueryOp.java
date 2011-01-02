@@ -42,8 +42,8 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bset.Tee;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
@@ -167,7 +167,7 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
 
         private final AbstractSubqueryOp controllerOp;
         private final BOpContext<IBindingSet> context;
-        private final List<FutureTask<RunningQuery>> tasks = new LinkedList<FutureTask<RunningQuery>>();
+        private final List<FutureTask<IRunningQuery>> tasks = new LinkedList<FutureTask<IRunningQuery>>();
         private final CountDownLatch latch;
         private final int nparallel;
         private final Executor executor;
@@ -204,7 +204,7 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
                  * Task runs subquery and cancels all subqueries in [tasks] if
                  * it fails.
                  */
-                tasks.add(new FutureTask<RunningQuery>(new SubqueryTask(op,
+                tasks.add(new FutureTask<IRunningQuery>(new SubqueryTask(op,
                         context)) {
                     /*
                      * Hook future to count down the latch when the task is
@@ -233,7 +233,7 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
                 /*
                  * Run subqueries with limited parallelism.
                  */
-                for (FutureTask<RunningQuery> ft : tasks) {
+                for (FutureTask<IRunningQuery> ft : tasks) {
                     executor.execute(ft);
                 }
 
@@ -251,7 +251,7 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
                 /*
                  * Get the futures, throwing out any errors.
                  */
-                for (FutureTask<RunningQuery> ft : tasks)
+                for (FutureTask<IRunningQuery> ft : tasks)
                     ft.get();
 
                 // Now that we know the subqueries ran Ok, flush the sink.
@@ -263,7 +263,7 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
             } finally {
 
                 // Cancel any tasks which are still running.
-                for (FutureTask<RunningQuery> ft : tasks)
+                for (FutureTask<IRunningQuery> ft : tasks)
                     ft.cancel(true/* mayInterruptIfRunning */);
                 
                 context.getSink().close();
@@ -281,7 +281,7 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
          * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
          *         Thompson</a>
          */
-        private class SubqueryTask implements Callable<RunningQuery> {
+        private class SubqueryTask implements Callable<IRunningQuery> {
 
             /**
              * The evaluation context for the parent query.
@@ -302,7 +302,7 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
 
             }
 
-            public RunningQuery call() throws Exception {
+            public IRunningQuery call() throws Exception {
 
                 IAsynchronousIterator<IBindingSet[]> subquerySolutionItr = null;
                 try {
@@ -310,7 +310,7 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
                     final QueryEngine queryEngine = parentContext.getRunningQuery()
                             .getQueryEngine();
 
-                    final RunningQuery runningQuery = queryEngine
+                    final IRunningQuery runningQuery = queryEngine
                             .eval(subQueryOp);
 
                     // Iterator visiting the subquery solutions.

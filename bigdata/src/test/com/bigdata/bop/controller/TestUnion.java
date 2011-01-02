@@ -46,8 +46,8 @@ import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.EmptyBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.BufferMode;
@@ -192,7 +192,7 @@ public class TestUnion extends TestCase2 {
                 EmptyBindingSet.INSTANCE,
         };
 
-        final RunningQuery runningQuery = queryEngine.eval(query);
+        final IRunningQuery runningQuery = queryEngine.eval(query);
 
         // verify solutions.
         TestQueryEngine.assertSameSolutionsAnyOrder(expected,
@@ -278,7 +278,7 @@ public class TestUnion extends TestCase2 {
         ),//
         };
 
-        final RunningQuery runningQuery = queryEngine.eval(query);
+        final IRunningQuery runningQuery = queryEngine.eval(query);
 
         // verify solutions.
         TestQueryEngine.assertSameSolutionsAnyOrder(expected,
@@ -365,7 +365,7 @@ public class TestUnion extends TestCase2 {
         ),//
         };
 
-        final RunningQuery runningQuery = queryEngine.eval(query);
+        final IRunningQuery runningQuery = queryEngine.eval(query);
 
         // verify solutions.
         TestQueryEngine.assertSameSolutionsAnyOrder(expected,

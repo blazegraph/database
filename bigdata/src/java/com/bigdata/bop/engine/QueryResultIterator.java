@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 
 /**
- * Delegate pattern cancels the {@link RunningQuery} when the iterator is
+ * Delegate pattern cancels the {@link IRunningQuery} when the iterator is
  * {@link #close() closed} and signals normal completion of the query once the
  * iterator is exhausted.
  * 
@@ -15,13 +15,13 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
  */
 class QueryResultIterator<E> implements IAsynchronousIterator<E> {
 
-    private final RunningQuery runningQuery;
+    private final IRunningQuery runningQuery;
 
     private final IAsynchronousIterator<E> src;
     
     private final AtomicBoolean open = new AtomicBoolean(true);
 
-    public QueryResultIterator(final RunningQuery runningQuery,
+    public QueryResultIterator(final IRunningQuery runningQuery,
             final IAsynchronousIterator<E> src) {
 
         if (runningQuery == null)

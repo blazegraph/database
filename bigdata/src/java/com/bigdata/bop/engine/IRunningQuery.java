@@ -29,13 +29,17 @@ package com.bigdata.bop.engine;
 
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Future;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Non-Remote interface exposing a limited set of the state of an executing
@@ -44,7 +48,7 @@ import com.bigdata.service.IBigdataFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IRunningQuery {
+public interface IRunningQuery extends Future<Void>{
     
 	/**
 	 * The query.
@@ -73,10 +77,19 @@ public interface IRunningQuery {
     IIndexManager getIndexManager();
 
     /**
-     * The query engine.  This may be used to submit subqueries for evaluation.
+     * The query engine class executing the query on this node.
      */
     QueryEngine getQueryEngine();
 
+    /**
+     * The client coordinate the evaluation of this query (aka the query
+     * controller). For a standalone database, this will be the
+     * {@link QueryEngine}. For scale-out, this will be the RMI proxy for the
+     * {@link QueryEngine} instance to which the query was submitted for
+     * evaluation by the application.
+     */
+    IQueryClient getQueryController();
+    
 	/**
 	 * Return an unmodifiable index from {@link BOp.Annotations#BOP_ID} to
 	 * {@link BOp}. This index may contain operators which are not part of the
@@ -150,5 +163,15 @@ public interface IRunningQuery {
      * @return
      */
     Throwable getCause();
+    
+    /**
+     * Return an iterator which will drain the solutions from the query. The
+     * query will be cancelled if the iterator is
+     * {@link ICloseableIterator#close() closed}.
+     * 
+     * @throws UnsupportedOperationException
+     *             if this is not the query controller.
+     */
+    IAsynchronousIterator<IBindingSet[]> iterator();
     
 }

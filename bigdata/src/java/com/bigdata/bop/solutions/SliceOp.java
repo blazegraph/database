@@ -39,7 +39,7 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.bop.engine.RunningQuery;
+import com.bigdata.bop.engine.ChunkedRunningQuery;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
@@ -69,7 +69,7 @@ import com.bigdata.service.IBigdataFederation;
  *       <p>
  *       If we allow complex operator trees in which "subqueries" can also use a
  *       slice then either they need to run as their own query with their own
- *       {@link RunningQuery} state or the API for cancelling a running query as
+ *       {@link ChunkedRunningQuery} state or the API for cancelling a running query as
  *       used here needs to only cancel evaluation of the child operators.
  *       Otherwise we could cancel all operator evaluation for the query,
  *       including operators which are ancestors of the {@link SliceOp}.

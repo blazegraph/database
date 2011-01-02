@@ -362,7 +362,7 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
                     -1, // partitionId
                     newBindingSetIterator(initialBindings));
         }
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 initialChunkMessage);
 
         // verify solutions.
@@ -607,7 +607,7 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
                     -1, // partitionId
                     newBindingSetIterator(initialBindings));
         }
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 initialChunkMessage);
 
         // verify solutions.
@@ -847,7 +847,7 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
                     -1, // partitionId
                     newBindingSetIterator(initialBindings));
         }
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 initialChunkMessage);
 
         // verify solutions.

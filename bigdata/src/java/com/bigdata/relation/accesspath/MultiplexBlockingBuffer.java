@@ -32,23 +32,20 @@ import java.util.LinkedHashSet;
 import java.util.concurrent.Future;
 import java.util.concurrent.locks.ReentrantLock;
 
-
 /**
- * A factory for skins which may be used to multiplex writes against a
- * {@link BlockingBuffer}. Each skin writes through to the backing
+ * A factory for skins which may be used to multiplex writes against a shared
+ * {@link BlockingBuffer} instance. Each skin writes through to the backing
  * {@link BlockingBuffer} but may be closed independently of the backing
  * {@link BlockingBuffer}. This allows multiple produces to share a single
  * {@link BlockingBuffer} as long as they use a subset of the
  * {@link IBlockingBuffer} API (they can not set the {@link Future} on the
  * objects returned by this factory or obtain its
- * {@link IBlockingBuffer#iterator()}.
+ * {@link IBlockingBuffer#iterator()}, but those operations can be performed
+ * against the shared {@link IBlockingBuffer}).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
- * 
- * @todo Does this need to close automatically when the last open inner buffer
- *       is closed or should it be closed explicitly and close all inner buffers
- *       when it is closed?
+ * @version $Id: MultiplexBlockingBuffer.java 3830 2010-10-20 18:30:25Z
+ *          thompsonbry $
  */
 public class MultiplexBlockingBuffer<E> {
 
@@ -73,7 +70,12 @@ public class MultiplexBlockingBuffer<E> {
     public boolean isOpen() {
         return b.isOpen();
     }
-    
+
+    /**
+     * Create a new skin for the shared buffer, incrementing the count of the
+     * #of open skins that buffer. The shared buffer will be closed atomically
+     * once all open skins have been closed.
+     */
     public IBlockingBuffer<E> newInstance() {
         lock.lock();
         try {
@@ -125,7 +127,7 @@ public class MultiplexBlockingBuffer<E> {
      */
     private class InnerBlockingBuffer implements IBlockingBuffer<E> {
 
-        public InnerBlockingBuffer() {
+        protected InnerBlockingBuffer() {
         }
 
         private boolean innerBufferOpen = true;

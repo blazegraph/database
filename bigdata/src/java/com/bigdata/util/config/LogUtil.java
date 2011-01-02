@@ -96,12 +96,12 @@ public class LogUtil {
         } else {
         
             System.err.println("ERROR: " + LogUtil.class.getName()
-                     + " : Could not initialize Log4J logging utility.  "
+                     + " : Could not initialize Log4J logging utility.\n"
                      + "Set system property "
                      +"'-Dlog4j.configuration="
-                     +"file:bigdata/src/resources/logging/log4j.properties"
-                     +"\n       and/or \n"
-                     +"      set system property "
+                     +"file:bigdata/src/resources/logging/log4j.properties'"
+                     +"\n  and / or \n"
+                     +"Set system property "
                      +"'-Dlog4j.primary.configuration="
                      +"file:<installDir>/"
                      +"bigdata/src/resources/logging/log4j.properties'");

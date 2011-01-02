@@ -1,6 +1,6 @@
 package com.bigdata.bop.fed;
 
-import com.bigdata.bop.engine.RunningQuery;
+import com.bigdata.bop.engine.AbstractRunningQuery;
 
 /**
  * {@link Runnable} will halt the query, interrupting any operators which are
@@ -8,7 +8,7 @@ import com.bigdata.bop.engine.RunningQuery;
  */
 class CancelQuery implements Runnable {
 
-    private final RunningQuery q;
+    private final AbstractRunningQuery q;
 
     private final Throwable cause;
 
@@ -20,7 +20,7 @@ class CancelQuery implements Runnable {
      *            The cause (optional). When not give, the normal termination
      *            semantics apply.
      */
-    public CancelQuery(final RunningQuery q, final Throwable cause) {
+    public CancelQuery(final AbstractRunningQuery q, final Throwable cause) {
 
         if (q == null)
             throw new IllegalArgumentException();

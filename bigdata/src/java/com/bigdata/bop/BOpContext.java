@@ -413,40 +413,4 @@ public class BOpContext<E> extends BOpContextBase {
 //
 //    }
 
-//    /**
-//     * Copy data from the source to the sink. The sink will be flushed and
-//     * closed. The source will be closed.
-//     */
-//    public void copySourceToSink() {
-//
-//        // source.
-//        final IAsynchronousIterator<IBindingSet[]> source = (IAsynchronousIterator) getSource();
-//
-//        // default sink
-//        final IBlockingBuffer<IBindingSet[]> sink = (IBlockingBuffer) getSink();
-//
-//        final BOpStats stats = getStats();
-//
-//        try {
-//
-//            // copy binding sets from the source.
-//            BOpUtility.copy(source, sink, null/* sink2 */,
-//                    null/* constraints */, stats);
-//
-//            // flush the sink.
-//            sink.flush();
-//
-//        } finally {
-//
-//            sink.close();
-//
-//            if (sink2 != null)
-//                sink2.close();
-//
-//            source.close();
-//
-//        }
-//
-//    }
-
 }
