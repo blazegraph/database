@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,45 +22,66 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Oct 22, 2010
+ * Created on Jan 1, 2011
  */
 
 package com.bigdata.bop.engine;
 
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Future;
 
-import com.bigdata.bop.BufferAnnotations;
-import com.bigdata.bop.PipelineOp;
-import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
- * Extended to use the {@link BufferAnnotations} to provision the
- * {@link BlockingBuffer} and to track the {@link BOpStats} as chunks are added
- * to the buffer.
+ * Delegation pattern handles the {@link SinkTransitionMetadata}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: BlockingBufferWithStats.java 3838 2010-10-22 19:45:33Z
- *          thompsonbry $
- * 
- * @todo replace with {@link OutputStatsBuffer}? (It is still used by the
- *       {@link ChunkedRunningQuery} and by the query output buffer.)
+ * @version $Id$
  */
-public class BlockingBufferWithStats<E> extends BlockingBuffer<E> {
+public class OutputStatsBuffer<E> implements IBlockingBuffer<E> {
+
+    private final IBlockingBuffer<E> b;
 
     private final BOpStats stats;
-    
-    public BlockingBufferWithStats(final PipelineOp op, final BOpStats stats) {
 
-        super(op.getChunkOfChunksCapacity(), op.getChunkCapacity(), op
-                .getChunkTimeout(), BufferAnnotations.chunkTimeoutUnit);
+    public OutputStatsBuffer(final IBlockingBuffer<E> b, final BOpStats stats) {
+
+        this.b = b;
 
         this.stats = stats;
 
     }
 
+    public IAsynchronousIterator<E> iterator() {
+        return b.iterator();
+    }
+
+    public void setFuture(final Future future) {
+        b.setFuture(future);
+    }
+
+    public void abort(final Throwable cause) {
+        b.abort(cause);
+    }
+
+    public void close() {
+        b.close();
+    }
+
+    public Future getFuture() {
+        return b.getFuture();
+    }
+
+    public boolean isOpen() {
+        return b.isOpen();
+    }
+
+    public long flush() {
+        return b.flush();
+    }
+
     /**
-     * Overridden to track {@link BOpStats#unitsOut} and
-     * {@link BOpStats#chunksOut}.
+     * Tracks {@link BOpStats#unitsOut} and {@link BOpStats#chunksOut}.
      * <p>
      * Note: {@link BOpStats#chunksOut} will report the #of chunks added to this
      * buffer. However, the buffer MAY combine chunks either on add() or when
@@ -69,11 +90,9 @@ public class BlockingBufferWithStats<E> extends BlockingBuffer<E> {
      * <p>
      * {@inheritDoc}
      */
-    @Override
-    public boolean add(final E e, final long timeout, final TimeUnit unit)
-            throws InterruptedException {
+    public void add(final E e) {
 
-        final boolean ret = super.add(e, timeout, unit);
+        b.add(e);
 
         if (e.getClass().getComponentType() != null) {
 
@@ -87,8 +106,18 @@ public class BlockingBufferWithStats<E> extends BlockingBuffer<E> {
 
         stats.chunksOut.increment();
 
-        return ret;
-
+    }
+    
+    public boolean isEmpty() {
+        return b.isEmpty();
     }
 
+    public void reset() {
+        b.reset();
+    }
+
+    public int size() {
+        return b.size();
+    }
+    
 }

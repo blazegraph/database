@@ -43,7 +43,7 @@ public class StandaloneChunkHandler implements IChunkHandler {
 
     public static final IChunkHandler INSTANCE = new StandaloneChunkHandler();
     
-    public int handleChunk(final RunningQuery query, final int bopId,
+    public int handleChunk(final IRunningQuery query, final int bopId,
             final int sinkId, final IBindingSet[] chunk) {
 
         if (query == null)

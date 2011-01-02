@@ -32,9 +32,9 @@ import com.bigdata.bop.controller.JoinGraph;
 import com.bigdata.bop.controller.JoinGraph.JGraph;
 import com.bigdata.bop.controller.JoinGraph.Path;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
-import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -979,7 +979,7 @@ public class TestJoinGraphOnLubm extends TestCase2 {
 		final PipelineOp queryOp = JoinGraph.getQuery(idFactory, predOrder);
 
 		// submit query to runtime optimizer.
-		final RunningQuery q = queryEngine.eval(queryOp);
+		final IRunningQuery q = queryEngine.eval(queryOp);
 
 		// drain the query results.
 		long nout = 0;

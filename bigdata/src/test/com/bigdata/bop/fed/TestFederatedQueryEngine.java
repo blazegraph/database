@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.fed;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -55,10 +54,10 @@ import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
-import com.bigdata.bop.engine.PipelineDelayOp;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.engine.RunningQuery;
+import com.bigdata.bop.engine.ChunkedRunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
@@ -373,7 +372,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 }));
 
         final UUID queryId = UUID.randomUUID();
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId, -1 /* partitionId */,
                         newBindingSetIterator(new HashBindingSet())));
@@ -456,7 +455,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         ) };
 
         final UUID queryId = UUID.randomUUID();
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId,//
                         -1, /* partitionId */
@@ -605,7 +604,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         // run query with empty binding set, so nothing is bound on the join.
         final UUID queryId = UUID.randomUUID();
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId,//
                         -1, /* partitionId */
@@ -752,7 +751,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 //        new E("Mary", "Paul"),// 
 //        new E("Paul", "Leon"),// 
 
-        final RunningQuery runningQuery;
+        final IRunningQuery runningQuery;
         {
             final IBindingSet initialBindingSet = new HashBindingSet();
 
@@ -889,7 +888,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         ) };
 
         final UUID queryId = UUID.randomUUID();
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId,//
                         -1, /* partitionId */
@@ -1059,7 +1058,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                     newBindingSetIterator(initialBindings));
 
         }
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 initialChunkMessage);
 
         runningQuery.get();
@@ -1265,7 +1264,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                     -1, // partitionId
                     newBindingSetIterator(initialBindings));
         }
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 initialChunkMessage);
 
         // verify solutions.

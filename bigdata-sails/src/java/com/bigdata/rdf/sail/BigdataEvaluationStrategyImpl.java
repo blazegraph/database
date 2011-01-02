@@ -69,8 +69,8 @@ import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.constraint.OR;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.solutions.ISortOrder;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
@@ -97,7 +97,6 @@ import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.ElementFilter;
-import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -114,7 +113,6 @@ import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.RuleStats;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.IHit;
-import com.bigdata.striterator.ChunkedArraysIterator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.DistinctFilter;
@@ -1701,7 +1699,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 //                        startId, -1/* partitionId */,
 //                        newBindingSetIterator(new HashBindingSet())));
 
-        final RunningQuery runningQuery = queryEngine.eval(query);
+        final IRunningQuery runningQuery = queryEngine.eval(query);
 
         final IAsynchronousIterator<IBindingSet[]> it1 = 
             runningQuery.iterator();

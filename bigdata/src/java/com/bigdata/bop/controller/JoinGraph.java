@@ -61,9 +61,9 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.SampleIndex;
 import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
 import com.bigdata.bop.rdf.join.DataSetJoin;
@@ -1061,7 +1061,7 @@ public class JoinGraph extends PipelineOp {
 			
 			// run the cutoff sampling of the edge.
 			final UUID queryId = UUID.randomUUID();
-			final RunningQuery runningQuery = queryEngine.eval(queryId,
+			final IRunningQuery runningQuery = queryEngine.eval(queryId,
 					queryOp, new LocalChunkMessage<IBindingSet>(queryEngine,
 							queryId, joinOp.getId()/* startId */,
 							-1 /* partitionId */,
@@ -2834,7 +2834,7 @@ public class JoinGraph extends PipelineOp {
 			final QueryEngine queryEngine = parentContext.getRunningQuery()
 					.getQueryEngine();
 
-			final RunningQuery runningQuery = queryEngine
+			final IRunningQuery runningQuery = queryEngine
 					.eval(
 							queryId,
 							queryOp,

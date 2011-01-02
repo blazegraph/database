@@ -29,11 +29,16 @@ package com.bigdata.bop.engine;
 
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.service.IBigdataFederation;
 
 /**
@@ -133,5 +138,40 @@ public class MockRunningQuery implements IRunningQuery {
 		// TODO Auto-generated method stub
 		return null;
 	}
+
+    public IAsynchronousIterator<IBindingSet[]> iterator() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public boolean cancel(boolean mayInterruptIfRunning) {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    public Void get() throws InterruptedException, ExecutionException {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Void get(long timeout, TimeUnit unit) throws InterruptedException,
+            ExecutionException, TimeoutException {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public boolean isCancelled() {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    public boolean isDone() {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    public IQueryClient getQueryController() {
+        throw new UnsupportedOperationException();
+    }
 
 }

@@ -46,7 +46,7 @@ import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.engine.RunningQuery;
+import com.bigdata.bop.engine.ChunkedRunningQuery;
 import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
 import com.bigdata.journal.TemporaryStoreFactory;
 import com.bigdata.resources.ResourceManager;
@@ -54,7 +54,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ResourceService;
 
 /**
- * Extends {@link RunningQuery} to provide additional state and logic required
+ * Extends {@link ChunkedRunningQuery} to provide additional state and logic required
  * to support distributed query evaluation against an {@link IBigdataFederation}
  * .
  * 
@@ -62,7 +62,7 @@ import com.bigdata.service.ResourceService;
  * @version $Id: FederatedRunningQuery.java 3511 2010-09-06 20:45:37Z
  *          thompsonbry $
  */
-public class FederatedRunningQuery extends RunningQuery {
+public class FederatedRunningQuery extends ChunkedRunningQuery {
 
     private final static transient Logger log = Logger
             .getLogger(FederatedRunningQuery.class);
@@ -90,7 +90,7 @@ public class FederatedRunningQuery extends RunningQuery {
      *       life cycle of the intermediate results for sort within its operator
      *       implementation.
      * 
-     * @todo This map will eventually need to be moved into {@link RunningQuery}
+     * @todo This map will eventually need to be moved into {@link ChunkedRunningQuery}
      *       in order to support temporary graphs or other disk-backed resources
      *       associated with the evaluation of a query against a standalone
      *       database. However, the main use case are the resources associated
@@ -185,10 +185,10 @@ public class FederatedRunningQuery extends RunningQuery {
      * for some peers to never receive a chunk directly from the query
      * controller.
      * 
-     * FIXME {@link RunningQuery#lifeCycleSetUpQuery()} methods should be
+     * FIXME {@link ChunkedRunningQuery#lifeCycleSetUpQuery()} methods should be
      * registered here.
      * 
-     * FIXME {@link RunningQuery#lifeCycleSetUpOperator(int)} methods should be
+     * FIXME {@link ChunkedRunningQuery#lifeCycleSetUpOperator(int)} methods should be
      * registered here.
      */
     private final ConcurrentHashMap<IQueryPeer, IQueryPeer> peers; 
@@ -751,7 +751,7 @@ public class FederatedRunningQuery extends RunningQuery {
     }
 
     @Override
-    public IChunkHandler getChunkHandler() {
+    protected IChunkHandler getChunkHandler() {
         
         return FederationChunkHandler.INSTANCE;
         

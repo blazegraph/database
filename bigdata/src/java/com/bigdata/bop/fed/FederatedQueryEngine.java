@@ -47,7 +47,6 @@ import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryDecl;
 import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
@@ -420,7 +419,7 @@ public class FederatedQueryEngine extends QueryEngine {
                     msg.getQueryId());
 
             final FederatedRunningQuery q = newRunningQuery(
-                    FederatedQueryEngine.this, queryId, false/* controller */,
+                    /*FederatedQueryEngine.this,*/ queryId, false/* controller */,
                     msg.getQueryController(), query);
 
             return (FederatedRunningQuery) putIfAbsent(queryId, q);
@@ -433,7 +432,7 @@ public class FederatedQueryEngine extends QueryEngine {
 
         final UUID queryId = queryDecl.getQueryId();
         
-        final FederatedRunningQuery q = newRunningQuery(this, queryId,
+        final FederatedRunningQuery q = newRunningQuery(/*this, */queryId,
                 false/* controller */, queryDecl.getQueryController(),
                 queryDecl.getQuery());
         
@@ -504,11 +503,13 @@ public class FederatedQueryEngine extends QueryEngine {
     }
 
     /**
-     * Factory for {@link RunningQuery}s.
+     * {@inheritDoc}
+     * <p>
+     * Overridden to always use a {@link FederatedRunningQuery}.
      */
     @Override
     protected FederatedRunningQuery newRunningQuery(
-            final QueryEngine queryEngine, final UUID queryId,
+            /*final QueryEngine queryEngine,*/ final UUID queryId,
             final boolean controller, final IQueryClient clientProxy,
             final PipelineOp query) {
 

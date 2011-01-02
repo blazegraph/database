@@ -48,10 +48,9 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
-import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
- * The run state for a {@link RunningQuery}. This class is thread-safe.
+ * The run state for an {@link IRunningQuery}. This class is thread-safe.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -120,7 +119,7 @@ class RunState {
      * The query deadline (milliseconds since the epoch).
      * 
      * @see BOp.Annotations#TIMEOUT
-     * @see RunningQuery#getDeadline()
+     * @see IRunningQuery#getDeadline()
      */
     private final long deadline;
 
@@ -149,23 +148,22 @@ class RunState {
      */
     private final AtomicLong totalRunningCount = new AtomicLong();
 
-	/**
-	 * The #of {@link IChunkMessage} for the query which a running task has made
-	 * available but which have not yet been accepted for processing by another
-	 * task.
-	 * <p>
-	 * Note: {@link RunningQuery#handleOutputChunk(BOp, int, IBlockingBuffer)}
-	 * drops {@link IChunkMessage}s onto {@link RunningQuery#chunksIn} and drops
-	 * the {@link RunningQuery} on the {@link QueryEngine} as soon as output
-	 * {@link IChunkMessage}s are generated. A {@link IChunkMessage} MAY be
-	 * taken for evaluation as soon as it is published. This means that the
-	 * operator which will consume that {@link IChunkMessage} can begin to
-	 * execute <em>before</em> {@link RunningQuery#haltOp(HaltOpMessage)} is
-	 * invoked to indicate the end of the operator which produced that
-	 * {@link IChunkMessage}. Due to the potential overlap in these schedules
-	 * {@link RunState#totalAvailableCount} may be <em>transiently negative</em>
-	 * . This is the expected behavior.
-	 */
+    /**
+     * The #of {@link IChunkMessage} for the query which a running task has made
+     * available but which have not yet been accepted for processing by another
+     * task.
+     * <p>
+     * Note: {@link ChunkedRunningQuery} drops {@link IChunkMessage}s on the
+     * {@link QueryEngine} as soon as they are generated. A
+     * {@link IChunkMessage} MAY be taken for evaluation as soon as it is
+     * published to the {@link QueryEngine}. This means that the operator task
+     * which will consume that {@link IChunkMessage} can begin to execute
+     * <em>before</em> {@link ChunkedRunningQuery#haltOp(HaltOpMessage)} is invoked to
+     * indicate the end of the operator task which produced that
+     * {@link IChunkMessage}. Due to the potential overlap in these schedules
+     * {@link RunState#totalAvailableCount} may be <em>transiently negative</em>
+     * . This is the expected behavior.
+     */
     private final AtomicLong totalAvailableCount = new AtomicLong();
 
     /**
@@ -268,7 +266,7 @@ class RunState {
         return Collections.unmodifiableSet(startedSet);
     }
 
-    public RunState(final RunningQuery query) {
+    public RunState(final IRunningQuery query) {
 
         this(query.getQuery(), query.getQueryId(), query.getDeadline(),
                 query.getBOpIndex());
@@ -526,9 +524,6 @@ class RunState {
 
         haltOp(msg.bopId);
 
-        // true if this operator is done.
-        final boolean isOpDone = isOperatorDone(msg.bopId);
-
         // true if the entire query is done.
         final boolean isAllDone = getTotalRunningCount() == 0
                 && getTotalAvailableCount() == 0;
@@ -536,6 +531,21 @@ class RunState {
         if (isAllDone)
             this.allDone.set(true);
 
+        /*
+         * true if this operator is done.
+         * 
+         * Note: For the StandaloneChainedRunningQuery, it is possible for the
+         * per-operator availableMap counters to have not been updated yet but
+         * [isAllDone] to be true. In order to guarantee termination, this
+         * method must return true if the operator evaluation task is done.
+         * Since it is defacto done when [isAllDone] is satisfied, this tests
+         * for that condition first and then for isOperatorDone().
+         */
+        final boolean isOpDone = isAllDone||isOperatorDone(msg.bopId);
+        
+//        if (isAllDone && !isOpDone)
+//            throw new RuntimeException("Whoops!: "+this);
+        
         if (TableLog.tableLog.isInfoEnabled()) {
             final int fanOut = msg.sinkMessagesOut + msg.altSinkMessagesOut;
             TableLog.tableLog.info(getTableRow("haltOp", msg.serviceId,
