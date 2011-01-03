@@ -51,12 +51,7 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * solutions produced by the subquery are copied to the default sink. If no
  * solutions are produced, then the original binding set is copied to the
  * default sink (optional join semantics). Each subquery is run as a separate
- * query but is linked to the parent query in the operator is being evaluated.
- * 
- * FIXME Is this true?: "This operator must on the query controller." For an
- * optional join group in scale-out, we need to concentrate the solutions back
- * to the controller if this is true. If it is not a requirement, then we can
- * just issue the subquery from ANY node.
+ * query but will be cancelled if the parent query is cancelled.
  * 
  * FIXME Parallel evaluation of subqueries is not implemented. What is the
  * appropriate parallelism for this operator? More parallelism should reduce
@@ -241,21 +236,32 @@ public class OptionalJoinGroup extends PipelineOp {
                 final IAsynchronousIterator<IBindingSet[]> sitr = context
                         .getSource();
                 
-                // @todo test for interrupt/halted query?
                 while(sitr.hasNext()) {
                     
                     final IBindingSet[] chunk = sitr.next();
                     
                     for(IBindingSet bset : chunk) {
 
-                        final FutureTask<IRunningQuery> ft = new FutureTask<IRunningQuery>(
+                        FutureTask<IRunningQuery> ft = new FutureTask<IRunningQuery>(
                                 new SubqueryTask(bset, subquery, context));
 
                         // run the subquery.
                         executor.execute(ft);
-                        
-                        // wait for the outcome.
-                        ft.get();
+
+                        try {
+
+                            // wait for the outcome.
+                            ft.get();
+
+                        } finally {
+                            
+                            /*
+                             * Ensure that the inner task is cancelled if the
+                             * outer task is interrupted.
+                             */
+                            ft.cancel(true/* mayInterruptIfRunning */);
+                            
+                        }
                         
                     }
                     
