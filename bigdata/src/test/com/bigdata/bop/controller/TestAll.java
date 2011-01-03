@@ -28,8 +28,6 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import com.bigdata.bop.controller.JoinGraph;
-import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlan2;
 
 /**
@@ -60,11 +58,9 @@ public class TestAll extends TestCase {
      * Returns a test that will run each of the implementation specific test
      * suites in turn.
      * 
-     * @todo Test the static optimization approach based on
-     *       {@link DefaultEvaluationPlan2}, which will have to be reworked to
-     *       remove its dependencies on the {@link IRule} model.
-     * 
-     * @todo Test runtime optimization based on {@link JoinGraph}s.
+     * @todo If the static optimization is reworked as a controller operator
+     *       based on {@link DefaultEvaluationPlan2}, then add a test suite for
+     *       that operator here.
      */
     public static Test suite()
     {
