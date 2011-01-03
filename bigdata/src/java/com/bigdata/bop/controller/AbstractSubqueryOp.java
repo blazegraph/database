@@ -55,8 +55,9 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * executed independently. By default, the subqueries are run with unlimited
  * parallelism.
  * <p>
- * Note: This operator must on the query controller. The
- * {@link PipelineOp.Annotations#SINK_REF} of each child operand should be
+ * Note: This operator must execute on the query controller.
+ * <p>
+ * The {@link PipelineOp.Annotations#SINK_REF} of each child operand should be
  * overridden to specify the parent of the this operator. If you fail to do
  * this, then the intermediate results of the subqueries will be routed to this
  * operator, which DOES NOT pass them on. This may cause unnecessary network
@@ -193,10 +194,10 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
             this.latch = new CountDownLatch(controllerOp.arity());
 
             /*
-             * Create FutureTasks for each subquery. The futures are submitted
-             * to the Executor yet. That happens in call(). By deferring the
-             * evaluation until call() we gain the ability to cancel all
-             * subqueries if any subquery fails.
+             * Create FutureTasks for each subquery. The futures are not
+             * submitted to the Executor yet. That happens in call(). By
+             * deferring the evaluation until call() we gain the ability to
+             * cancel all subqueries if any subquery fails.
              */
             for (BOp op : controllerOp.args()) {
 

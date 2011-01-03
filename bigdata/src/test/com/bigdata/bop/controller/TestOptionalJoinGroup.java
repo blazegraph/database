@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 23, 2010
  */
 
-package com.bigdata.bop.engine;
+package com.bigdata.bop.controller;
 
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -56,8 +56,12 @@ import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
-import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.constraint.NEConstant;
+import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.engine.IChunkMessage;
+import com.bigdata.bop.engine.IRunningQuery;
+import com.bigdata.bop.engine.LocalChunkMessage;
+import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.BufferMode;
@@ -84,23 +88,20 @@ import com.bigdata.striterator.ICloseableIterator;
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestQueryEngine.java 3950 2010-11-17 02:14:08Z thompsonbry $
- * 
- * @deprecated This test suite has been moved to the com.bigdata.bop.engine
- *             package and should be removed from this package.
+ * @version $Id$
  */
-public class TestQueryEngineOptionalJoins extends TestCase2 {
+public class TestOptionalJoinGroup extends TestCase2 {
 
     /**
      * 
      */
-    public TestQueryEngineOptionalJoins() {
+    public TestOptionalJoinGroup() {
     }
 
     /**
      * @param name
      */
-    public TestQueryEngineOptionalJoins(String name) {
+    public TestOptionalJoinGroup(String name) {
         super(name);
     }
 
@@ -117,8 +118,8 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
     }
 
     static private final String namespace = "ns";
-    Journal jnl;
-    QueryEngine queryEngine;
+    private Journal jnl;
+    private QueryEngine queryEngine;
     
     public void setUp() throws Exception {
         
@@ -223,11 +224,9 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
 
     /**
      * Unit test for optional join group. Three joins are used and target a
-     * {@link SliceOp}. The 2nd and 3rd joins are an optional join group.
-     * Intermediate results which do not succeed on the optional join are
-     * forwarded to the {@link SliceOp} which is the target specified by the
-     * {@link PipelineOp.Annotations#ALT_SINK_REF}.
-     * 
+     * {@link SliceOp}. The 2nd and 3rd joins are embedded in an
+     * {@link OptionalJoinGroup}.
+     * <P>
      * The optional join group takes the form:
      * 
      * <pre>
@@ -266,22 +265,24 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
      */
     public void test_query_join2_optionals() throws Exception {
 
+        // main query
         final int startId = 1; // 
         final int joinId1 = 2; //         : base join group.
         final int predId1 = 3; // (a b)
+        final int joinGroup1 = 9;
+        final int sliceId = 8; // 
+
+        // subquery
         final int joinId2 = 4; //         : joinGroup1
         final int predId2 = 5; // (b c)   
         final int joinId3 = 6; //         : joinGroup1
         final int predId3 = 7; // (c d)
-        final int sliceId = 8; // 
-        
+
         final IVariable<?> a = Var.var("a");
         final IVariable<?> b = Var.var("b");
         final IVariable<?> c = Var.var("c");
         final IVariable<?> d = Var.var("d");
 
-        final Integer joinGroup1 = Integer.valueOf(1);
-        
         final PipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
@@ -321,28 +322,47 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
                         new NV(Predicate.Annotations.BOP_ID, joinId1),//
                         new NV(PipelineJoin.Annotations.PREDICATE,pred1Op));
 
-		final PipelineOp join2Op = new PipelineJoin<E>(//
-				new BOp[] { join1Op },//
+        final PipelineOp subQuery;
+        {
+        final PipelineOp join2Op = new PipelineJoin<E>(//
+                new BOp[] { /*join1Op*/ },//
                 new NV(Predicate.Annotations.BOP_ID, joinId2),//
-                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op),//
-				// join is optional.
-//				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
-				// optional target is the same as the default target.
-				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
+//                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
+                new NV(PipelineJoin.Annotations.PREDICATE, pred2Op)//
+//                // join is optional.
+//                new NV(PipelineJoin.Annotations.OPTIONAL, true),//
+//                // optional target is the same as the default target.
+//                new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
+                );
 
-		final PipelineOp join3Op = new PipelineJoin<E>(//
-				new BOp[] { join2Op },//
-				new NV(Predicate.Annotations.BOP_ID, joinId3),//
-                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-				new NV(PipelineJoin.Annotations.PREDICATE, pred3Op),//
-				// join is optional.
-//				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
-				// optional target is the same as the default target.
-				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
+        final PipelineOp join3Op = new PipelineJoin<E>(//
+                new BOp[] { join2Op },//
+                new NV(Predicate.Annotations.BOP_ID, joinId3),//
+//                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
+                new NV(PipelineJoin.Annotations.PREDICATE, pred3Op)//
+//                // join is optional.
+//                new NV(PipelineJoin.Annotations.OPTIONAL, true),//
+//                // optional target is the same as the default target.
+//                new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
+                );
+        subQuery = join3Op;
+        }
 
+        final PipelineOp joinGroup1Op = new OptionalJoinGroup(new BOp[]{join1Op}, 
+                new NV(Predicate.Annotations.BOP_ID, joinGroup1),//
+//                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
+                new NV(OptionalJoinGroup.Annotations.SUBQUERY, subQuery),//
+                new NV(BOp.Annotations.CONTROLLER,true)//
+//                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+//                        BOpEvaluationContext.CONTROLLER)//
+//                // join is optional.
+//                new NV(PipelineJoin.Annotations.OPTIONAL, true),//
+//                // optional target is the same as the default target.
+//                new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
+        );
+        
         final PipelineOp sliceOp = new SliceOp(//
-                new BOp[]{join3Op},
+                new BOp[]{joinGroup1Op},
                 NV.asMap(new NV[] {//
                         new NV(BOp.Annotations.BOP_ID, sliceId),//
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -447,7 +467,7 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
         {
             // validate the stats map.
             assertNotNull(statsMap);
-            assertEquals(5, statsMap.size());
+            assertEquals(4, statsMap.size());
             if (log.isInfoEnabled())
                 log.info(statsMap.toString());
         }
@@ -456,11 +476,8 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
 
     /**
      * Unit test for optional join group with a filter. Three joins are used and
-     * target a {@link SliceOp}. The 2nd and 3rd joins are an optional join
-     * group. Intermediate results which do not succeed on the optional join are
-     * forwarded to the {@link SliceOp} which is the target specified by the
-     * {@link PipelineOp.Annotations#ALT_SINK_REF}. The optional join group
-     * contains a filter.
+     * target a {@link SliceOp}. The 2nd and 3rd joins are embedded in an
+     * optional join group. The optional join group contains a filter.
      * <p>
      * The optional join group takes the form:
      * 
@@ -508,21 +525,24 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
      */
     public void test_query_optionals_filter() throws Exception {
 
+        // main query
         final int startId = 1;
         final int joinId1 = 2; // 
         final int predId1 = 3; // (a,b)
+        final int joinGroup1 = 9;
+        final int sliceId = 8;
+        
+        // subquery
         final int joinId2 = 4; //       : group1
         final int predId2 = 5; // (b,c)
         final int joinId3 = 6; //       : group1
         final int predId3 = 7; // (c,d) 
-        final int sliceId = 8;
+
         
         final IVariable<?> a = Var.var("a");
         final IVariable<?> b = Var.var("b");
         final IVariable<?> c = Var.var("c");
         final IVariable<?> d = Var.var("d");
-
-        final Integer joinGroup1 = Integer.valueOf(1);
 
         final PipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
@@ -563,31 +583,51 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
                         new NV(Predicate.Annotations.BOP_ID, joinId1),//
                         new NV(PipelineJoin.Annotations.PREDICATE,pred1Op));
 
+        final PipelineOp subQuery;
+        {
 		final PipelineOp join2Op = new PipelineJoin<E>(//
-				new BOp[] { join1Op },//
+				new BOp[] { /*join1Op*/ },//
 				new NV(Predicate.Annotations.BOP_ID, joinId2),//
-                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op),//
-				// join is optional.
+//                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op)//
+//				// join is optional.
 //				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
-				// optional target is the same as the default target.
-				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
+//				// optional target is the same as the default target.
+//				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
+				);
 
 		final PipelineOp join3Op = new PipelineJoin<E>(//
 				new BOp[] { join2Op },//
 				new NV(Predicate.Annotations.BOP_ID, joinId3),//
-                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
+//                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
 				new NV(PipelineJoin.Annotations.PREDICATE, pred3Op),//
 				// constraint d != Leon
 				new NV(PipelineJoin.Annotations.CONSTRAINTS,
-						new IConstraint[] { new NEConstant(d, new Constant<String>("Leon")) }),
-				// join is optional.
+						new IConstraint[] { new NEConstant(d, new Constant<String>("Leon")) })
+//				// join is optional.
 //				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
-				// optional target is the same as the default target.
-				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
+//				// optional target is the same as the default target.
+//				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
+				);
+		
+		subQuery = join3Op;
+        }
+        
+        final PipelineOp joinGroup1Op = new OptionalJoinGroup(new BOp[]{join1Op}, 
+                new NV(Predicate.Annotations.BOP_ID, joinGroup1),//
+//                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
+                new NV(OptionalJoinGroup.Annotations.SUBQUERY, subQuery),//
+                new NV(BOp.Annotations.CONTROLLER,true)//
+//                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+//                        BOpEvaluationContext.CONTROLLER)//
+//                // join is optional.
+//                new NV(PipelineJoin.Annotations.OPTIONAL, true),//
+//                // optional target is the same as the default target.
+//                new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
+        );
 
         final PipelineOp sliceOp = new SliceOp(//
-                new BOp[]{join3Op},
+                new BOp[]{joinGroup1Op},
                 NV.asMap(new NV[] {//
                         new NV(BOp.Annotations.BOP_ID, sliceId),//
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -673,7 +713,7 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
         {
             // validate the stats map.
             assertNotNull(statsMap);
-            assertEquals(5, statsMap.size());
+            assertEquals(4, statsMap.size());
             if (log.isInfoEnabled())
                 log.info(statsMap.toString());
         }
@@ -683,11 +723,9 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
     /**
      * Unit test for optional join group with a filter on a variable outside the
      * optional join group. Three joins are used and target a {@link SliceOp}.
-     * The 2nd and 3rd joins are an optional join group. Intermediate results
-     * which do not succeed on the optional join are forwarded to the
-     * {@link SliceOp} which is the target specified by the
-     * {@link PipelineOp.Annotations#ALT_SINK_REF}. The optional join group
-     * contains a filter that uses a variable outside the optional join group.
+     * The 2nd and 3rd joins are in embedded an {@link OptionalJoinGroup}. The
+     * optional join group contains a filter that uses a variable outside the
+     * optional join group.
      * <P>
      * The query takes the form:
      * 
@@ -728,22 +766,26 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
      */
     public void test_query_optionals_filter2() throws Exception {
 
+        // main query
         final int startId = 1;
         final int joinId1 = 2;
         final int predId1 = 3; // (a,b)
         final int condId = 4;  // (a != Paul)
+        final int joinGroup1 = 10;
+        final int sliceId = 9;
+        
+        // subquery (iff condition is satisfied)
         final int joinId2 = 5; //             : group1
         final int predId2 = 6; // (b,c)
         final int joinId3 = 7; //             : group1
         final int predId3 = 8; // (c,d)
-        final int sliceId = 9;
         
         final IVariable<?> a = Var.var("a");
         final IVariable<?> b = Var.var("b");
         final IVariable<?> c = Var.var("c");
         final IVariable<?> d = Var.var("d");
 
-        final Integer joinGroup1 = Integer.valueOf(1);
+//        final Integer joinGroup1 = Integer.valueOf(1);
 
         /*
          * Not quite sure how to write this one.  I think it probably goes
@@ -796,38 +838,57 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
                         new NV(Predicate.Annotations.BOP_ID, joinId1),//
                         new NV(PipelineJoin.Annotations.PREDICATE,pred1Op));
 
-        final IConstraint condition = new EQConstant(a, new Constant<String>("Paul"));
+        final IConstraint condition = new NEConstant(a, new Constant<String>("Paul"));
         
         final ConditionalRoutingOp condOp = new ConditionalRoutingOp(new BOp[]{join1Op},
                 NV.asMap(new NV[]{//
                     new NV(BOp.Annotations.BOP_ID,condId),
-                    new NV(PipelineOp.Annotations.SINK_REF, sliceId), // a == Paul
-                    new NV(PipelineOp.Annotations.ALT_SINK_REF, joinId2), // a != Paul
+                    new NV(PipelineOp.Annotations.SINK_REF, joinGroup1), // a != Paul
+                    new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId), // a == Paul
                     new NV(ConditionalRoutingOp.Annotations.CONDITION, condition),
                 }));
 
+        final PipelineOp subQuery;
+        {
 		final PipelineOp join2Op = new PipelineJoin<E>(//
-				new BOp[] { condOp },//
+				new BOp[] { /*condOp*/ },//
 				new NV(Predicate.Annotations.BOP_ID, joinId2),//
-                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op),//
-				// join is optional.
+//                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op)//
+//				// join is optional.
 //				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
-				// optional target is the same as the default target.
-				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
+//				// optional target is the same as the default target.
+//				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
+				);
 
 		final PipelineOp join3Op = new PipelineJoin<E>(//
 				new BOp[] { join2Op },//
 				new NV(Predicate.Annotations.BOP_ID, joinId3),//
-                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-				new NV(PipelineJoin.Annotations.PREDICATE, pred3Op),//
-				// join is optional.
+//                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
+				new NV(PipelineJoin.Annotations.PREDICATE, pred3Op)//
+//				// join is optional.
 //				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
-				// optional target is the same as the default target.
-				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
-
+//				// optional target is the same as the default target.
+//				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
+				);
+        subQuery = join3Op;
+        }
+        
+        final PipelineOp joinGroup1Op = new OptionalJoinGroup(new BOp[]{condOp}, 
+                new NV(Predicate.Annotations.BOP_ID, joinGroup1),//
+//                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
+                new NV(OptionalJoinGroup.Annotations.SUBQUERY, subQuery),//
+                new NV(BOp.Annotations.CONTROLLER,true)//
+//                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+//                        BOpEvaluationContext.CONTROLLER)//
+//                // join is optional.
+//                new NV(PipelineJoin.Annotations.OPTIONAL, true),//
+//                // optional target is the same as the default target.
+//                new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
+        );
+        
         final PipelineOp sliceOp = new SliceOp(//
-                new BOp[]{join3Op},
+                new BOp[]{joinGroup1Op},
                 NV.asMap(new NV[] {//
                         new NV(BOp.Annotations.BOP_ID, sliceId),//
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -918,7 +979,7 @@ public class TestQueryEngineOptionalJoins extends TestCase2 {
         {
             // validate the stats map.
             assertNotNull(statsMap);
-            assertEquals(6, statsMap.size());
+            assertEquals(5, statsMap.size());
             if (log.isInfoEnabled())
                 log.info(statsMap.toString());
         }
