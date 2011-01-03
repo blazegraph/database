@@ -136,6 +136,12 @@ abstract public class PipelineOp extends BOpBase {
          * <p>
          * The value of the {@link #CONDITIONAL_GROUP} is an {@link Integer}
          * which uniquely identifies the group within the query.
+         * 
+         * @deprecated The binding set stack push/pop mechanisms are not
+         *             sufficient to support optional join groups. This
+         *             annotation will be removed unless it proves valuable for
+         *             marking the elements of a join group, in which case the
+         *             javadoc needs to be updated.
          */
 		String CONDITIONAL_GROUP = PipelineOp.class.getName() + ".conditionalGroup";
 
@@ -158,6 +164,10 @@ abstract public class PipelineOp extends BOpBase {
          * 
          * @see #CONDITIONAL_GROUP
          * @see #ALT_SINK_REF
+         * 
+         * @deprecated The binding set stack push/pop mechanisms are not
+         *             sufficient to support optional join groups. This
+         *             annotation will be removed.
          */
 		String ALT_SINK_GROUP = PipelineOp.class.getName() + ".altSinkGroup";
 
