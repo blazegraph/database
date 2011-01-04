@@ -33,7 +33,6 @@ import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.solutions.SliceOp;
 
 /**
  * Abstract base class for pipeline operators where the data moving along the
@@ -106,70 +105,70 @@ abstract public class PipelineOp extends BOpBase {
          */
 		String JOIN_GRAPH = PipelineOp.class.getName() + ".joinGraph";
 
-        /**
-         * Annotation used to mark a set of operators belonging to a conditional
-         * binding group. Bindings within with the group will be discarded if
-         * any required operator in the group fails. For example, if a binding
-         * set exits via the alternative sink for a required join then any
-         * conditional bindings within the group will be discarded.
-         * <p>
-         * Together with {@link #ALT_SINK_GROUP}, the {@link #CONDITIONAL_GROUP}
-         * annotation provides the information necessary in order to decide the
-         * re-entry point in the query plan when a join within an conditional
-         * binding group fails.
-         * <p>
-         * The {@link #CONDITIONAL_GROUP} annotation controls the
-         * {@link IBindingSet#push()} and {@link IBindingSet#pop(boolean)} of
-         * individual solutions as they propagate through the pipeline. When a
-         * pipeline starts, the {@link IBindingSet} stack contains only the top
-         * level symbol table (i.e., name/value bindings). When an intermediate
-         * solution enters a {@link PipelineOp} marked as belonging to a
-         * {@link #CONDITIONAL_GROUP}, a new symbol table is
-         * {@link IBindingSet#push() pushed} onto the stack for that solution.
-         * If the solution leaves the optional join group via the default sink,
-         * then the symbol table is "saved" when it is
-         * {@link IBindingSet#pop(boolean) popped} off of the stack. If the
-         * solution leaves the join group via the alternative sink, then the
-         * symbol table is discarded when it is {@link IBindingSet#pop(boolean)
-         * popped} off of the stack. This provides for conditional binding of
-         * variables within the operators of the group.
-         * <p>
-         * The value of the {@link #CONDITIONAL_GROUP} is an {@link Integer}
-         * which uniquely identifies the group within the query.
-         * 
-         * @deprecated The binding set stack push/pop mechanisms are not
-         *             sufficient to support optional join groups. This
-         *             annotation will be removed unless it proves valuable for
-         *             marking the elements of a join group, in which case the
-         *             javadoc needs to be updated.
-         */
-		String CONDITIONAL_GROUP = PipelineOp.class.getName() + ".conditionalGroup";
+//        /**
+//         * Annotation used to mark a set of operators belonging to a conditional
+//         * binding group. Bindings within with the group will be discarded if
+//         * any required operator in the group fails. For example, if a binding
+//         * set exits via the alternative sink for a required join then any
+//         * conditional bindings within the group will be discarded.
+//         * <p>
+//         * Together with {@link #ALT_SINK_GROUP}, the {@link #CONDITIONAL_GROUP}
+//         * annotation provides the information necessary in order to decide the
+//         * re-entry point in the query plan when a join within an conditional
+//         * binding group fails.
+//         * <p>
+//         * The {@link #CONDITIONAL_GROUP} annotation controls the
+//         * {@link IBindingSet#push()} and {@link IBindingSet#pop(boolean)} of
+//         * individual solutions as they propagate through the pipeline. When a
+//         * pipeline starts, the {@link IBindingSet} stack contains only the top
+//         * level symbol table (i.e., name/value bindings). When an intermediate
+//         * solution enters a {@link PipelineOp} marked as belonging to a
+//         * {@link #CONDITIONAL_GROUP}, a new symbol table is
+//         * {@link IBindingSet#push() pushed} onto the stack for that solution.
+//         * If the solution leaves the optional join group via the default sink,
+//         * then the symbol table is "saved" when it is
+//         * {@link IBindingSet#pop(boolean) popped} off of the stack. If the
+//         * solution leaves the join group via the alternative sink, then the
+//         * symbol table is discarded when it is {@link IBindingSet#pop(boolean)
+//         * popped} off of the stack. This provides for conditional binding of
+//         * variables within the operators of the group.
+//         * <p>
+//         * The value of the {@link #CONDITIONAL_GROUP} is an {@link Integer}
+//         * which uniquely identifies the group within the query.
+//         * 
+//         * @deprecated The binding set stack push/pop mechanisms are not
+//         *             sufficient to support optional join groups. This
+//         *             annotation will be removed unless it proves valuable for
+//         *             marking the elements of a join group, in which case the
+//         *             javadoc needs to be updated.
+//         */
+//		String CONDITIONAL_GROUP = PipelineOp.class.getName() + ".conditionalGroup";
 
-        /**
-         * Annotation used to designate the target when a required operator
-         * within an {@link #CONDITIONAL_GROUP} fails. The value of this
-         * annotation must be the {@link #CONDITIONAL_GROUP} identifier
-         * corresponding to the next conditional binding group in the query
-         * plan. If there is no such group, then the {@link #ALT_SINK_REF}
-         * should be used instead to specify the target operator in the
-         * pipeline, e.g., a {@link SliceOp}.
-         * <p>
-         * The target {@link #CONDITIONAL_GROUP} is specified (rather than the
-         * bopId of the target join) since the non-optional joins in the target
-         * {@link #CONDITIONAL_GROUP} be reordered by the query optimizer. The
-         * entry point for solutions redirected to the {@link #ALT_SINK_GROUP}
-         * is therefore the first operator in the target
-         * {@link #CONDITIONAL_GROUP}. This decouples the routing decisions from
-         * the join ordering decisions.
-         * 
-         * @see #CONDITIONAL_GROUP
-         * @see #ALT_SINK_REF
-         * 
-         * @deprecated The binding set stack push/pop mechanisms are not
-         *             sufficient to support optional join groups. This
-         *             annotation will be removed.
-         */
-		String ALT_SINK_GROUP = PipelineOp.class.getName() + ".altSinkGroup";
+//        /**
+//         * Annotation used to designate the target when a required operator
+//         * within an {@link #CONDITIONAL_GROUP} fails. The value of this
+//         * annotation must be the {@link #CONDITIONAL_GROUP} identifier
+//         * corresponding to the next conditional binding group in the query
+//         * plan. If there is no such group, then the {@link #ALT_SINK_REF}
+//         * should be used instead to specify the target operator in the
+//         * pipeline, e.g., a {@link SliceOp}.
+//         * <p>
+//         * The target {@link #CONDITIONAL_GROUP} is specified (rather than the
+//         * bopId of the target join) since the non-optional joins in the target
+//         * {@link #CONDITIONAL_GROUP} be reordered by the query optimizer. The
+//         * entry point for solutions redirected to the {@link #ALT_SINK_GROUP}
+//         * is therefore the first operator in the target
+//         * {@link #CONDITIONAL_GROUP}. This decouples the routing decisions from
+//         * the join ordering decisions.
+//         * 
+//         * @see #CONDITIONAL_GROUP
+//         * @see #ALT_SINK_REF
+//         * 
+//         * @deprecated The binding set stack push/pop mechanisms are not
+//         *             sufficient to support optional join groups. This
+//         *             annotation will be removed.
+//         */
+//		String ALT_SINK_GROUP = PipelineOp.class.getName() + ".altSinkGroup";
 
     }
 

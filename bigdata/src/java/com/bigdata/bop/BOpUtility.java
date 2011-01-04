@@ -425,56 +425,56 @@ public class BOpUtility {
         return Collections.unmodifiableMap(map);
     }
 
-    /**
-     * Lookup the first operator in the specified conditional binding group and
-     * return its bopId.
-     * 
-     * @param query
-     *            The query plan.
-     * @param groupId
-     *            The identifier for the desired conditional binding group.
-     * 
-     * @return The bopId of the first operator in that conditional binding group
-     *         -or- <code>null</code> if the specified conditional binding group
-     *         does not exist in the query plan.
-     *         
-     * @throws IllegalArgumentException
-     *             if either argument is <code>null</code>.
-     * 
-     * @see PipelineOp.Annotations#CONDITIONAL_GROUP
-     * @see PipelineOp.Annotations#ALT_SINK_GROUP
-     */
-    static public Integer getFirstBOpIdForConditionalGroup(final BOp query,
-            final Integer groupId) {
-        if (query == null)
-            throw new IllegalArgumentException();
-        if (groupId == null)
-            throw new IllegalArgumentException();
-        final Iterator<BOp> itr = postOrderIterator(query);
-        while (itr.hasNext()) {
-            final BOp t = itr.next();
-            final Object x = t.getProperty(PipelineOp.Annotations.CONDITIONAL_GROUP);
-            if (x != null) {
-                if (!(x instanceof Integer)) {
-                    throw new BadConditionalGroupIdTypeException(
-                            "Must be Integer, not: " + x.getClass() + ": "
-                                    + PipelineOp.Annotations.CONDITIONAL_GROUP);
-                }
-                final Integer id = (Integer) t
-                        .getProperty(PipelineOp.Annotations.CONDITIONAL_GROUP);
-                if(id.equals(groupId)) {
-                    /*
-                     * Return the BOpId associated with the first operator in
-                     * the pre-order traversal of the query plan which has the
-                     * specified groupId.
-                     */
-                    return t.getId();
-                }
-            }
-        }
-        // No such groupId in the query plan.
-        return null;
-    }
+//    /**
+//     * Lookup the first operator in the specified conditional binding group and
+//     * return its bopId.
+//     * 
+//     * @param query
+//     *            The query plan.
+//     * @param groupId
+//     *            The identifier for the desired conditional binding group.
+//     * 
+//     * @return The bopId of the first operator in that conditional binding group
+//     *         -or- <code>null</code> if the specified conditional binding group
+//     *         does not exist in the query plan.
+//     *         
+//     * @throws IllegalArgumentException
+//     *             if either argument is <code>null</code>.
+//     * 
+//     * @see PipelineOp.Annotations#CONDITIONAL_GROUP
+//     * @see PipelineOp.Annotations#ALT_SINK_GROUP
+//     */
+//    static public Integer getFirstBOpIdForConditionalGroup(final BOp query,
+//            final Integer groupId) {
+//        if (query == null)
+//            throw new IllegalArgumentException();
+//        if (groupId == null)
+//            throw new IllegalArgumentException();
+//        final Iterator<BOp> itr = postOrderIterator(query);
+//        while (itr.hasNext()) {
+//            final BOp t = itr.next();
+//            final Object x = t.getProperty(PipelineOp.Annotations.CONDITIONAL_GROUP);
+//            if (x != null) {
+//                if (!(x instanceof Integer)) {
+//                    throw new BadConditionalGroupIdTypeException(
+//                            "Must be Integer, not: " + x.getClass() + ": "
+//                                    + PipelineOp.Annotations.CONDITIONAL_GROUP);
+//                }
+//                final Integer id = (Integer) t
+//                        .getProperty(PipelineOp.Annotations.CONDITIONAL_GROUP);
+//                if(id.equals(groupId)) {
+//                    /*
+//                     * Return the BOpId associated with the first operator in
+//                     * the pre-order traversal of the query plan which has the
+//                     * specified groupId.
+//                     */
+//                    return t.getId();
+//                }
+//            }
+//        }
+//        // No such groupId in the query plan.
+//        return null;
+//    }
     
     /**
      * Return the parent of the operator in the operator tree (this does not

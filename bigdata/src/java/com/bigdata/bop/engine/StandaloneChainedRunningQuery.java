@@ -622,30 +622,33 @@ log.fatal(ex1,ex1); // FIXME remove log stmt.
              */
             sinkId = BOpUtility.getEffectiveDefaultSink(bop, p);
 
-            {
-                // altSink (null when not specified).
-                final Integer altSinkId = (Integer) op
-                        .getProperty(PipelineOp.Annotations.ALT_SINK_REF);
-                final Integer altSinkGroup = (Integer) op
-                        .getProperty(PipelineOp.Annotations.ALT_SINK_GROUP);
-                if (altSinkId != null && altSinkGroup != null)
-                    throw new RuntimeException(
-                            "Annotations are mutually exclusive: "
-                                    + PipelineOp.Annotations.ALT_SINK_REF
-                                    + " and "
-                                    + PipelineOp.Annotations.ALT_SINK_GROUP);
-                if (altSinkGroup != null) {
-                    /*
-                     * Lookup the first pipeline op in the conditional binding
-                     * group and use its bopId as the altSinkId.
-                     */
-                    this.altSinkId = BOpUtility.getFirstBOpIdForConditionalGroup(
-                            getQuery(), altSinkGroup);
-                } else {
-                    // MAY be null.
-                    this.altSinkId = altSinkId;
-                }
-            }
+            // altSink (null when not specified).
+            altSinkId = (Integer) op
+                    .getProperty(PipelineOp.Annotations.ALT_SINK_REF);
+//            {
+//                // altSink (null when not specified).
+//                final Integer altSinkId = (Integer) op
+//                        .getProperty(PipelineOp.Annotations.ALT_SINK_REF);
+//                final Integer altSinkGroup = (Integer) op
+//                        .getProperty(PipelineOp.Annotations.ALT_SINK_GROUP);
+//                if (altSinkId != null && altSinkGroup != null)
+//                    throw new RuntimeException(
+//                            "Annotations are mutually exclusive: "
+//                                    + PipelineOp.Annotations.ALT_SINK_REF
+//                                    + " and "
+//                                    + PipelineOp.Annotations.ALT_SINK_GROUP);
+//                if (altSinkGroup != null) {
+//                    /*
+//                     * Lookup the first pipeline op in the conditional binding
+//                     * group and use its bopId as the altSinkId.
+//                     */
+//                    this.altSinkId = BOpUtility.getFirstBOpIdForConditionalGroup(
+//                            getQuery(), altSinkGroup);
+//                } else {
+//                    // MAY be null.
+//                    this.altSinkId = altSinkId;
+//                }
+//            }
 
             if (altSinkId != null && !getBOpIndex().containsKey(altSinkId))
                 throw new NoSuchBOpException(altSinkId);
@@ -683,19 +686,20 @@ log.fatal(ex1,ex1); // FIXME remove log stmt.
             }
             assert stats != null;
 
-            // The groupId (if any) for this operator.
-            final Integer fromGroupId = (Integer) op
-                    .getProperty(PipelineOp.Annotations.CONDITIONAL_GROUP);
+//            // The groupId (if any) for this operator.
+//            final Integer fromGroupId = (Integer) op
+//                    .getProperty(PipelineOp.Annotations.CONDITIONAL_GROUP);
 
             if (p == null) {
                 sink = getQueryBuffer();
             } else {
-                final BOp targetOp = getBOpIndex().get(sinkId);
-                final Integer toGroupId = (Integer) targetOp
-                        .getProperty(PipelineOp.Annotations.CONDITIONAL_GROUP);
-                sink = newBuffer(op, sinkId, new SinkTransitionMetadata(
-                        fromGroupId, toGroupId, true/* isSink */),
-                        /*sinkMessagesOut,*/ stats);
+//                final BOp targetOp = getBOpIndex().get(sinkId);
+//                final Integer toGroupId = (Integer) targetOp
+//                        .getProperty(PipelineOp.Annotations.CONDITIONAL_GROUP);
+//                final SinkTransitionMetadata stm = new SinkTransitionMetadata(
+//                        fromGroupId, toGroupId, true/* isSink */);
+                sink = newBuffer(op, sinkId, //null/* stm */,
+                /* sinkMessagesOut, */stats);
             }
 
             if (altSinkId == null) {
@@ -708,11 +712,12 @@ log.fatal(ex1,ex1); // FIXME remove log stmt.
                  */ 
                 // altSink = sink;
             } else {
-                final BOp targetOp = getBOpIndex().get(altSinkId);
-                final Integer toGroupId = (Integer) targetOp
-                        .getProperty(PipelineOp.Annotations.CONDITIONAL_GROUP);
-                altSink = newBuffer(op, altSinkId, new SinkTransitionMetadata(
-                        fromGroupId, toGroupId, false/* isSink */),
+//                final BOp targetOp = getBOpIndex().get(altSinkId);
+//                final Integer toGroupId = (Integer) targetOp
+//                        .getProperty(PipelineOp.Annotations.CONDITIONAL_GROUP);
+//                final SinkTransitionMetadata stm = new SinkTransitionMetadata(
+//                        fromGroupId, toGroupId, false/* isSink */);
+                altSink = newBuffer(op, altSinkId, //null/*stm*/,
                         /*altSinkMessagesOut,*/ stats);
             }
 
@@ -744,7 +749,7 @@ log.fatal(ex1,ex1); // FIXME remove log stmt.
          */
         private IBlockingBuffer<IBindingSet[]> newBuffer(final PipelineOp op,
                 final int sinkId,
-                final SinkTransitionMetadata sinkTransitionMetadata,
+//                final SinkTransitionMetadata sinkTransitionMetadata,
                 /* final AtomicInteger sinkMessagesOut, */final BOpStats stats) {
 
             final MultiplexBlockingBuffer<IBindingSet[]> factory = operatorQueues
@@ -760,9 +765,11 @@ log.fatal(ex1,ex1); // FIXME remove log stmt.
              * operator writing on this sink. Wrap that to handle the sink
              * transition metadata.
              */
-            return new SinkTransitionBuffer(
+            return //new SinkTransitionBuffer(
                     new OutputStatsBuffer<IBindingSet[]>(factory.newInstance(),
-                            stats), sinkTransitionMetadata);
+                            stats)
+                            //, sinkTransitionMetadata)
+                            ;
 
         }
 

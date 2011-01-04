@@ -75,13 +75,7 @@ import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Test suite for handling of optional join groups during query evaluation
- * against a local database instance. Optional join groups are handled using
- * {@link IBindingSet#push()} when entering the join group and
- * {@link IBindingSet#pop(boolean)} when exiting the join group. If the join
- * group was successful for a given binding set, then <code>save:=true</code> is
- * specified for {@link IBindingSet#pop(boolean)} and the applied bindings will
- * be visible to the downstream consumer. Otherwise the bindings applied during
- * the join group are simply discarded.
+ * against a local database instance.
  * 
  * <pre>
  * -Dlog4j.configuration=bigdata/src/resources/logging/log4j.properties

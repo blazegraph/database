@@ -333,53 +333,53 @@ public abstract class TestIBindingSet extends TestCase2 {
         assertTrue ( "expected equal: same bindings after mutation", bs1.hashCode () == bs4.hashCode () ) ;
     }
 
-	/*
-	 * push()/pop() tests.
-	 * 
-	 * Note: In addition to testing push() and pop(save:boolean), we have to
-	 * test that copy() and clone() operate correctly in the presence of nested
-	 * symbol tables, and that the visitation patterns for the bindings operate
-	 * correctly when there are nested symbol tables. For example, if there "y"
-	 * is bound at level zero, a push() is executed, and then "x" is bound at
-	 * level one. The visitation pattern must visit both "x" and "y".
-	 */
-    
-    public void test_nestedSymbolTables() {
-
-        final Var<?> var1 = Var.var ( "a" ) ;
-        final Var<?> var2 = Var.var ( "b" ) ;
-        final Constant<Integer> val1 = new Constant<Integer> ( 1 ) ;
-        final Constant<Integer> val2 = new Constant<Integer> ( 2 ) ;
-
-		final IBindingSet bs1 = newBindingSet(2/* size */);
-		
-		bs1.set(var1,val1);
-
-		/*
-		 * push a symbol table onto the stack
-		 */
-		bs1.push();
-
-		bs1.set(var2, val2);
-
-		bs1.pop(false/* save */);
-
-		// verify the modified bindings were discarded.
-		assertEqual(bs1, new IVariable[] { var1 }, new IConstant[] { val1 });
-
-		/*
-		 * push a symbol table onto the stack
-		 */
-		bs1.push();
-
-		bs1.set(var2, val2);
-
-		bs1.pop(true/* save */);
-
-		// verify the modified bindings were saved.
-		assertEqual(bs1, new IVariable[] { var1, var2 }, new IConstant[] {
-				val1, val2 });
-	}
+//	/*
+//	 * push()/pop() tests.
+//	 * 
+//	 * Note: In addition to testing push() and pop(save:boolean), we have to
+//	 * test that copy() and clone() operate correctly in the presence of nested
+//	 * symbol tables, and that the visitation patterns for the bindings operate
+//	 * correctly when there are nested symbol tables. For example, if there "y"
+//	 * is bound at level zero, a push() is executed, and then "x" is bound at
+//	 * level one. The visitation pattern must visit both "x" and "y".
+//	 */
+//    
+//    public void test_nestedSymbolTables() {
+//
+//        final Var<?> var1 = Var.var ( "a" ) ;
+//        final Var<?> var2 = Var.var ( "b" ) ;
+//        final Constant<Integer> val1 = new Constant<Integer> ( 1 ) ;
+//        final Constant<Integer> val2 = new Constant<Integer> ( 2 ) ;
+//
+//		final IBindingSet bs1 = newBindingSet(2/* size */);
+//		
+//		bs1.set(var1,val1);
+//
+//		/*
+//		 * push a symbol table onto the stack
+//		 */
+//		bs1.push();
+//
+//		bs1.set(var2, val2);
+//
+//		bs1.pop(false/* save */);
+//
+//		// verify the modified bindings were discarded.
+//		assertEqual(bs1, new IVariable[] { var1 }, new IConstant[] { val1 });
+//
+//		/*
+//		 * push a symbol table onto the stack
+//		 */
+//		bs1.push();
+//
+//		bs1.set(var2, val2);
+//
+//		bs1.pop(true/* save */);
+//
+//		// verify the modified bindings were saved.
+//		assertEqual(bs1, new IVariable[] { var1, var2 }, new IConstant[] {
+//				val1, val2 });
+//	}
 
     public void test_serialization() {
     	

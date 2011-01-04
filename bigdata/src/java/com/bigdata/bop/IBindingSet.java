@@ -157,38 +157,38 @@ public interface IBindingSet extends Cloneable, Serializable {
 	 */
     public int hashCode();
 
-	/**
-	 * Make a copy of the current symbol table (aka current variable bindings)
-	 * and push it onto onto the stack. Variable bindings will be made against
-	 * the current symbol table. The symbol table stack is propagated by
-	 * {@link #clone()} and {@link #copy(IVariable[])}. Symbols tables may be
-	 * used to propagate conditional bindings through a data flow until a
-	 * decision point is reached, at which point they may be either discarded or
-	 * committed. This mechanism may be used to support SPARQL style optional
-	 * join groups.
-	 * 
-	 * @throws UnsupportedOperationException
-	 *             if the {@link IBindingSet} is not mutable.
-	 * 
-	 * @see #pop(boolean)
-	 */
-	public void push();
-
-	/**
-	 * Pop the current symbol table off of the stack.
-	 * 
-	 * @param save
-	 *            When <code>true</code>, the bindings on the current symbol
-	 *            table are copied to the parent symbol table before the current
-	 *            symbol table is popped off of the stack. If <code>false</code>
-	 *            , any bindings associated with that symbol table are
-	 *            discarded.
-	 * 
-	 * @throws IllegalStateException
-	 *             if there is no nested symbol table.
-	 * 
-	 * @see #push()
-	 */
-	public void pop(boolean save);
+//	/**
+//	 * Make a copy of the current symbol table (aka current variable bindings)
+//	 * and push it onto onto the stack. Variable bindings will be made against
+//	 * the current symbol table. The symbol table stack is propagated by
+//	 * {@link #clone()} and {@link #copy(IVariable[])}. Symbols tables may be
+//	 * used to propagate conditional bindings through a data flow until a
+//	 * decision point is reached, at which point they may be either discarded or
+//	 * committed. This mechanism may be used to support SPARQL style optional
+//	 * join groups.
+//	 * 
+//	 * @throws UnsupportedOperationException
+//	 *             if the {@link IBindingSet} is not mutable.
+//	 * 
+//	 * @see #pop(boolean)
+//	 */
+//	public void push();
+//
+//	/**
+//	 * Pop the current symbol table off of the stack.
+//	 * 
+//	 * @param save
+//	 *            When <code>true</code>, the bindings on the current symbol
+//	 *            table are copied to the parent symbol table before the current
+//	 *            symbol table is popped off of the stack. If <code>false</code>
+//	 *            , any bindings associated with that symbol table are
+//	 *            discarded.
+//	 * 
+//	 * @throws IllegalStateException
+//	 *             if there is no nested symbol table.
+//	 * 
+//	 * @see #push()
+//	 */
+//	public void pop(boolean save);
 
 }

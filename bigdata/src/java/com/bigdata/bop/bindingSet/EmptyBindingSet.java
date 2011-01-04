@@ -161,12 +161,12 @@ final public class EmptyBindingSet implements IBindingSet, Serializable {
         
     }
 
-	public void push() {
-		throw new IllegalStateException();
-	}
-    
-	public void pop(boolean save) {
-		throw new UnsupportedOperationException();
-	}
+//	public void push() {
+//		throw new IllegalStateException();
+//	}
+//    
+//	public void pop(boolean save) {
+//		throw new UnsupportedOperationException();
+//	}
 
 }

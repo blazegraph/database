@@ -34,6 +34,8 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
  * Delegation pattern handles the {@link SinkTransitionMetadata}.
+ * 
+ * @deprecated along with {@link SinkTransitionMetadata}
  */
 class SinkTransitionBuffer implements
         IBlockingBuffer<IBindingSet[]> {
