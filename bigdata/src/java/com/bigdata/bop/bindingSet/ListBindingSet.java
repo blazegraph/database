@@ -6,7 +6,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Stack;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -82,90 +81,94 @@ public class ListBindingSet implements IBindingSet {
 		}
 	};
 
-	/**
-	 * The stack of symbol tables. Each symbol table is a mapping from an
-	 * {@link IVariable} onto its non-<code>null</code> bound {@link IConstant}.
-	 * The stack is initialized with an empty symbol table. Symbol tables may be
-	 * pushed onto the stack or popped off of the stack, but the stack MAY NOT
-	 * become empty.
-	 */
-	private final Stack<List<E>> stack;
+//	/**
+//	 * The stack of symbol tables. Each symbol table is a mapping from an
+//	 * {@link IVariable} onto its non-<code>null</code> bound {@link IConstant}.
+//	 * The stack is initialized with an empty symbol table. Symbol tables may be
+//	 * pushed onto the stack or popped off of the stack, but the stack MAY NOT
+//	 * become empty.
+//	 */
+//	private final Stack<List<E>> stack;
+	private final List<E> current;
 
 	/**
 	 * Return the symbol table on the top of the stack.
 	 */
-	private List<E> current() {
+	final private List<E> current() {
 
-		return stack.peek();
+	    return current;
+//		return stack.peek();
 		
 	}
 	
-	public void push() {
-
-		// The current symbol table.
-		final List<E> cur = current();
-
-		// Create a new symbol table.
-		final List<E> tmp = new LinkedList<E>();
-
-		// Push the new symbol table onto the stack.
-		stack.push(tmp);
-
-		/*
-		 * Make a copy of each entry in the symbol table which was on the top of
-		 * the stack when we entered this method, inserting the entries into the
-		 * new symbol table as we go. This avoids side effects of mutation on
-		 * the nested symbol tables and also ensures that we do not need to read
-		 * through to the nested symbol tables when answering a query about the
-		 * current symbol table. The only down side of this is that naive
-		 * serialization is that much less compact.
-		 */
-		for (E e : cur) {
-
-			tmp.add(new E(e.var, e.val));
-
-		}
-		
-	}
-
-	public void pop(final boolean save) {
-
-		if (stack.size() < 2) {
-			/*
-			 * The stack may never become empty. Therefore there must be at
-			 * least two symbol tables on the stack for a pop() request.
-			 */
-			throw new IllegalArgumentException();
-		}
-		
-		// Pop the symbol table off of the top of the stack.
-		final List<E> old = stack.pop();
-
-		if (save) {
-
-			// discard the current symbol table.
-			stack.pop();
-			
-			// replacing it with the symbol table which we popped off the stack.
-			stack.push(old);
-
-		} else {
-			
-	        // clear the hash code.
-	        hash = 0;
-
-		}
-		
-	}
+//	public void push() {
+//
+//		// The current symbol table.
+//		final List<E> cur = current();
+//
+//		// Create a new symbol table.
+//		final List<E> tmp = new LinkedList<E>();
+//
+//		// Push the new symbol table onto the stack.
+//		stack.push(tmp);
+//
+//		/*
+//		 * Make a copy of each entry in the symbol table which was on the top of
+//		 * the stack when we entered this method, inserting the entries into the
+//		 * new symbol table as we go. This avoids side effects of mutation on
+//		 * the nested symbol tables and also ensures that we do not need to read
+//		 * through to the nested symbol tables when answering a query about the
+//		 * current symbol table. The only down side of this is that naive
+//		 * serialization is that much less compact.
+//		 */
+//		for (E e : cur) {
+//
+//			tmp.add(new E(e.var, e.val));
+//
+//		}
+//		
+//	}
+//
+//	public void pop(final boolean save) {
+//
+//		if (stack.size() < 2) {
+//			/*
+//			 * The stack may never become empty. Therefore there must be at
+//			 * least two symbol tables on the stack for a pop() request.
+//			 */
+//			throw new IllegalArgumentException();
+//		}
+//		
+//		// Pop the symbol table off of the top of the stack.
+//		final List<E> old = stack.pop();
+//
+//		if (save) {
+//
+//			// discard the current symbol table.
+//			stack.pop();
+//			
+//			// replacing it with the symbol table which we popped off the stack.
+//			stack.push(old);
+//
+//		} else {
+//			
+//	        // clear the hash code.
+//	        hash = 0;
+//
+//		}
+//		
+//	}
 
 	/**
 	 * Create an empty binding set. 
 	 */
 	public ListBindingSet() {
 
-		stack = new Stack<List<E>>();
-		
-		stack.push(new LinkedList<E>());
+//		stack = new Stack<List<E>>();
+//		
+//		stack.push(new LinkedList<E>());
+	    
+	    current = new LinkedList<E>();
 
 	}
 	
@@ -207,29 +210,31 @@ public class ListBindingSet implements IBindingSet {
 	protected ListBindingSet(final ListBindingSet src,
 			final IVariable[] variablesToKeep) {
 
-		stack = new Stack<List<E>>();
+//		stack = new Stack<List<E>>();
+//
+//		final int stackSize = src.stack.size();
+//
+//		int depth = 1;
+//		
+//		for (List<E> srcLst : src.stack) {
+//
+//			/*
+//			 * Copy the source bindings.
+//			 * 
+//			 * Note: If a restriction exists on the variables to be copied, then
+//			 * it is applied onto the the top level of the stack. If the symbol
+//			 * table is saved when it is pop()'d, then the modified bindings
+//			 * will replace the parent symbol table on the stack.
+//			 */
+//			final List<E> tmp = copy(srcLst,
+//					depth == stackSize ? variablesToKeep : null);
+//
+//			// Push onto the stack.
+//			stack.push(tmp);
+//
+//		}
 
-		final int stackSize = src.stack.size();
-
-		int depth = 1;
-		
-		for (List<E> srcLst : src.stack) {
-
-			/*
-			 * Copy the source bindings.
-			 * 
-			 * Note: If a restriction exists on the variables to be copied, then
-			 * it is applied onto the the top level of the stack. If the symbol
-			 * table is saved when it is pop()'d, then the modified bindings
-			 * will replace the parent symbol table on the stack.
-			 */
-			final List<E> tmp = copy(srcLst,
-					depth == stackSize ? variablesToKeep : null);
-
-			// Push onto the stack.
-			stack.push(tmp);
-
-		}
+        current = copy(src.current, variablesToKeep);
 
 	}
 

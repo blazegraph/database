@@ -33,7 +33,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Stack;
 import java.util.Map.Entry;
 
 import com.bigdata.bop.IBindingSet;
@@ -206,59 +205,61 @@ public class ArrayBindingSet implements IBindingSet {
 	 * pushed onto the stack or popped off of the stack, but the stack MAY NOT
 	 * become empty.
 	 */
-	private final Stack<ST> stack;
+//	private final Stack<ST> stack;
+	private final ST current;
 
 	/**
 	 * Return the symbol table on the top of the stack.
 	 */
 	private ST current() {
 
-		return stack.peek();
+	    return current;
+//		return stack.peek();
 		
 	}
 	
-	public void push() {
-
-		// The current symbol table.
-		final ST cur = current();
-
-		// Create a new symbol table.
-		final ST tmp = new ST(cur.nbound, cur.vars.clone(), cur.vals.clone());
-
-		// Push the new symbol table onto the stack.
-		stack.push(tmp);
-
-	}
-
-	public void pop(final boolean save) {
-
-		if (stack.size() < 2) {
-			/*
-			 * The stack may never become empty. Therefore there must be at
-			 * least two symbol tables on the stack for a pop() request.
-			 */
-			throw new IllegalArgumentException();
-		}
-		
-		// Pop the symbol table off of the top of the stack.
-		final ST old = stack.pop();
-
-		if (save) {
-
-			// discard the current symbol table.
-			stack.pop();
-			
-			// replacing it with the symbol table which we popped off the stack.
-			stack.push(old);
-
-		} else {
-			
-	        // clear the hash code.
-	        hash = 0;
-
-		}
-		
-	}
+//	public void push() {
+//
+//		// The current symbol table.
+//		final ST cur = current();
+//
+//		// Create a new symbol table.
+//		final ST tmp = new ST(cur.nbound, cur.vars.clone(), cur.vals.clone());
+//
+//		// Push the new symbol table onto the stack.
+//		stack.push(tmp);
+//
+//	}
+//
+//	public void pop(final boolean save) {
+//
+//		if (stack.size() < 2) {
+//			/*
+//			 * The stack may never become empty. Therefore there must be at
+//			 * least two symbol tables on the stack for a pop() request.
+//			 */
+//			throw new IllegalArgumentException();
+//		}
+//		
+//		// Pop the symbol table off of the top of the stack.
+//		final ST old = stack.pop();
+//
+//		if (save) {
+//
+//			// discard the current symbol table.
+//			stack.pop();
+//			
+//			// replacing it with the symbol table which we popped off the stack.
+//			stack.push(old);
+//
+//		} else {
+//			
+//	        // clear the hash code.
+//	        hash = 0;
+//
+//		}
+//		
+//	}
 
     /**
 	 * Copy constructor (used by clone, copy).
@@ -272,30 +273,32 @@ public class ArrayBindingSet implements IBindingSet {
 	protected ArrayBindingSet(final ArrayBindingSet src,
 			final IVariable[] variablesToKeep) {
 
-		stack = new Stack<ST>();
+//		stack = new Stack<ST>();
+//
+//		final int stackSize = src.stack.size();
+//
+//		int depth = 1;
+//		
+//		for (ST srcLst : src.stack) {
+//
+//			/*
+//			 * Copy the source bindings.
+//			 * 
+//			 * Note: If a restriction exists on the variables to be copied, then
+//			 * it is applied onto the the top level of the stack. If the symbol
+//			 * table is saved when it is pop()'d, then the modified bindings
+//			 * will replace the parent symbol table on the stack.
+//			 */
+//			final ST tmp = copy(srcLst,
+//					depth == stackSize ? variablesToKeep : null);
+//
+//			// Push onto the stack.
+//			stack.push(tmp);
+//
+//		}
 
-		final int stackSize = src.stack.size();
-
-		int depth = 1;
+        current = copy(src.current, variablesToKeep);
 		
-		for (ST srcLst : src.stack) {
-
-			/*
-			 * Copy the source bindings.
-			 * 
-			 * Note: If a restriction exists on the variables to be copied, then
-			 * it is applied onto the the top level of the stack. If the symbol
-			 * table is saved when it is pop()'d, then the modified bindings
-			 * will replace the parent symbol table on the stack.
-			 */
-			final ST tmp = copy(srcLst,
-					depth == stackSize ? variablesToKeep : null);
-
-			// Push onto the stack.
-			stack.push(tmp);
-
-		}
-
 	}
 
 	/**
@@ -458,9 +461,11 @@ public class ArrayBindingSet implements IBindingSet {
         if(vars.length != vals.length)
             throw new IllegalArgumentException();
 
-        stack = new Stack<ST>();
+//        stack = new Stack<ST>();
+//        
+//		stack.push(new ST(vars.length, vars, vals));
         
-		stack.push(new ST(vars.length, vars, vals));
+        current = new ST(vars.length, vars, vals);
 
     }
 
@@ -478,11 +483,14 @@ public class ArrayBindingSet implements IBindingSet {
 		if (capacity < 0)
 			throw new IllegalArgumentException();
 
-		stack = new Stack<ST>();
+//		stack = new Stack<ST>();
+//
+//		stack.push(new ST(0/* nbound */, new IVariable[capacity],
+//				new IConstant[capacity]));
 
-		stack.push(new ST(0/* nbound */, new IVariable[capacity],
-				new IConstant[capacity]));
-
+        current = new ST(0/* nbound */, new IVariable[capacity],
+                new IConstant[capacity]);
+		
     }
 
     /**

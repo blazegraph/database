@@ -74,7 +74,7 @@ public class TestInsert extends TestCase2 {
      *       The query engine refactor needs to respect these same mechanisms in
      *       order to co-exist with the existing design patterns.
      */
-    public void test_insert() {
+    public void test_something() {
 
         fail("write tests");
         

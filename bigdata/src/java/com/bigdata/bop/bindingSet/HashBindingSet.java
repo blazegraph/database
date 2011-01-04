@@ -32,7 +32,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Stack;
 import java.util.Map.Entry;
 
 import com.bigdata.bop.IBindingSet;
@@ -60,91 +59,97 @@ public class HashBindingSet implements IBindingSet {
 //  */
 // private final LinkedHashMap<IVariable, IConstant> map;
 
-	/**
-	 * The stack of symbol tables. Each symbol table is a mapping from an
-	 * {@link IVariable} onto its non-<code>null</code> bound {@link IConstant}.
-	 * The stack is initialized with an empty symbol table. Symbol tables may be
-	 * pushed onto the stack or popped off of the stack, but the stack MAY NOT
-	 * become empty.
-	 */
-	private final Stack<LinkedHashMap<IVariable, IConstant>> stack;
+//	/**
+//	 * The stack of symbol tables. Each symbol table is a mapping from an
+//	 * {@link IVariable} onto its non-<code>null</code> bound {@link IConstant}.
+//	 * The stack is initialized with an empty symbol table. Symbol tables may be
+//	 * pushed onto the stack or popped off of the stack, but the stack MAY NOT
+//	 * become empty.
+//	 */
+//	private final Stack<LinkedHashMap<IVariable, IConstant>> stack;
 
+    final private LinkedHashMap<IVariable,IConstant> current;
+    
 	/**
 	 * Return the symbol table on the top of the stack.
 	 */
 	private LinkedHashMap<IVariable, IConstant> current() {
 
-		return stack.peek();
+	    return current;
+	    
+//		return stack.peek();
 		
 	}
 	
-	public void push() {
+//	public void push() {
+//
+//		// The current symbol table.
+//		final LinkedHashMap<IVariable, IConstant> cur = current();
+//
+//		// Create a new symbol table.
+//		final LinkedHashMap<IVariable, IConstant> tmp = new LinkedHashMap<IVariable, IConstant>(
+//				cur.size());
+//
+//		// Push the new symbol table onto the stack.
+//		stack.push(tmp);
+//
+//		/*
+//		 * Make a copy of each entry in the symbol table which was on the top of
+//		 * the stack when we entered this method, inserting the entries into the
+//		 * new symbol table as we go. This avoids side effects of mutation on
+//		 * the nested symbol tables and also ensures that we do not need to read
+//		 * through to the nested symbol tables when answering a query about the
+//		 * current symbol table. The only down side of this is that naive
+//		 * serialization is that much less compact.
+//		 */
+//		for (Map.Entry<IVariable, IConstant> e : cur.entrySet()) {
+//
+//			tmp.put(e.getKey(), e.getValue());
+//
+//		}
+//		
+//	}
 
-		// The current symbol table.
-		final LinkedHashMap<IVariable, IConstant> cur = current();
-
-		// Create a new symbol table.
-		final LinkedHashMap<IVariable, IConstant> tmp = new LinkedHashMap<IVariable, IConstant>(
-				cur.size());
-
-		// Push the new symbol table onto the stack.
-		stack.push(tmp);
-
-		/*
-		 * Make a copy of each entry in the symbol table which was on the top of
-		 * the stack when we entered this method, inserting the entries into the
-		 * new symbol table as we go. This avoids side effects of mutation on
-		 * the nested symbol tables and also ensures that we do not need to read
-		 * through to the nested symbol tables when answering a query about the
-		 * current symbol table. The only down side of this is that naive
-		 * serialization is that much less compact.
-		 */
-		for (Map.Entry<IVariable, IConstant> e : cur.entrySet()) {
-
-			tmp.put(e.getKey(), e.getValue());
-
-		}
-		
-	}
-
-	public void pop(final boolean save) {
-
-		if (stack.size() < 2) {
-			/*
-			 * The stack may never become empty. Therefore there must be at
-			 * least two symbol tables on the stack for a pop() request.
-			 */
-			throw new IllegalArgumentException();
-		}
-		
-		// Pop the symbol table off of the top of the stack.
-		final LinkedHashMap<IVariable,IConstant> old = stack.pop();
-
-		if (save) {
-
-			// discard the current symbol table.
-			stack.pop();
-			
-			// replacing it with the symbol table which we popped off the stack.
-			stack.push(old);
-
-		} else {
-			
-	        // clear the hash code.
-	        hash = 0;
-
-		}
-		
-	}
+//	public void pop(final boolean save) {
+//
+//		if (stack.size() < 2) {
+//			/*
+//			 * The stack may never become empty. Therefore there must be at
+//			 * least two symbol tables on the stack for a pop() request.
+//			 */
+//			throw new IllegalArgumentException();
+//		}
+//		
+//		// Pop the symbol table off of the top of the stack.
+//		final LinkedHashMap<IVariable,IConstant> old = stack.pop();
+//
+//		if (save) {
+//
+//			// discard the current symbol table.
+//			stack.pop();
+//			
+//			// replacing it with the symbol table which we popped off the stack.
+//			stack.push(old);
+//
+//		} else {
+//			
+//	        // clear the hash code.
+//	        hash = 0;
+//
+//		}
+//		
+//	}
 
     /**
      * New empty binding set.
      */
     public HashBindingSet() {
 
-		stack = new Stack<LinkedHashMap<IVariable, IConstant>>();
-
-		stack.push(new LinkedHashMap<IVariable, IConstant>());
+//		stack = new Stack<LinkedHashMap<IVariable, IConstant>>();
+//
+//		stack.push(new LinkedHashMap<IVariable, IConstant>());
+        
+        current = new LinkedHashMap<IVariable, IConstant>();
         
     }
 
@@ -155,29 +160,31 @@ public class HashBindingSet implements IBindingSet {
      */
     protected HashBindingSet(final HashBindingSet src, final IVariable[] variablesToKeep) {
         
-		stack = new Stack<LinkedHashMap<IVariable,IConstant>>();
+//		stack = new Stack<LinkedHashMap<IVariable,IConstant>>();
+//
+//		final int stackSize = src.stack.size();
+//
+//		int depth = 1;
+//		
+//		for (LinkedHashMap<IVariable, IConstant> srcLst : src.stack) {
+//
+//			/*
+//			 * Copy the source bindings.
+//			 * 
+//			 * Note: If a restriction exists on the variables to be copied, then
+//			 * it is applied onto the the top level of the stack. If the symbol
+//			 * table is saved when it is pop()'d, then the modified bindings
+//			 * will replace the parent symbol table on the stack.
+//			 */
+//			final LinkedHashMap<IVariable,IConstant> tmp = copy(srcLst,
+//					depth == stackSize ? variablesToKeep : null);
+//
+//			// Push onto the stack.
+//			stack.push(tmp);
+//
+//		}
 
-		final int stackSize = src.stack.size();
-
-		int depth = 1;
-		
-		for (LinkedHashMap<IVariable, IConstant> srcLst : src.stack) {
-
-			/*
-			 * Copy the source bindings.
-			 * 
-			 * Note: If a restriction exists on the variables to be copied, then
-			 * it is applied onto the the top level of the stack. If the symbol
-			 * table is saved when it is pop()'d, then the modified bindings
-			 * will replace the parent symbol table on the stack.
-			 */
-			final LinkedHashMap<IVariable,IConstant> tmp = copy(srcLst,
-					depth == stackSize ? variablesToKeep : null);
-
-			// Push onto the stack.
-			stack.push(tmp);
-
-		}
+        current = copy(src.current, variablesToKeep);
 
 	}
 

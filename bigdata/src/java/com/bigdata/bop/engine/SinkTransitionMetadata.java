@@ -53,10 +53,10 @@ import com.bigdata.bop.PipelineOp;
  * 
  * @todo Unit tests of this class in isolation.
  * 
- * @todo It appears that this design can not be made to satisfy SPARQL optional
- *       group semantics. Therefore, we may be able to drop this class, support
- *       for it in the {@link ChunkedRunningQuery} and support for the symbol
- *       table stack in {@link IBindingSet}.
+ * @deprecated It appears that this design can not be made to satisfy SPARQL
+ *             optional group semantics. Therefore, we may be able to drop this
+ *             class, support for it in the {@link ChunkedRunningQuery} and
+ *             support for the symbol table stack in {@link IBindingSet}.
  */
 class SinkTransitionMetadata {
 
@@ -91,24 +91,25 @@ class SinkTransitionMetadata {
      *            The binding set.
      */
     public void handleBindingSet(final IBindingSet bset) {
-        if (fromGroupId == null) {
-            if (toGroupId == null)
-                return;
-            // Transition from no group to some group.
-            bset.push();
-            return;
-        } else {
-            if (toGroupId == null)
-                // Transition from a group to no group.
-                bset.pop(isSink/* save */);
-            else if (toGroupId.equals(fromGroupId)) {
-                // NOP (transition to the same group)
-            } else {
-                // Transition to a different group.
-                bset.pop(isSink/* save */);
-                bset.push();
-            }
-        }
+//        if (fromGroupId == null) {
+//            if (toGroupId == null)
+//                return;
+//            // Transition from no group to some group.
+//            bset.push();
+//            return;
+//        } else {
+//            if (toGroupId == null)
+//                // Transition from a group to no group.
+//                bset.pop(isSink/* save */);
+//            else if (toGroupId.equals(fromGroupId)) {
+//                // NOP (transition to the same group)
+//            } else {
+//                // Transition to a different group.
+//                bset.pop(isSink/* save */);
+//                bset.push();
+//            }
+//        }
+        throw new UnsupportedOperationException();
     }
 
 }

@@ -52,7 +52,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
@@ -798,7 +798,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         return eval(queryId, (PipelineOp) op,
                 new LocalChunkMessage<IBindingSet>(this/* queryEngine */,
                         queryId, startId, -1 /* partitionId */,
-                        newBindingSetIterator(new HashBindingSet())));
+                        newBindingSetIterator(new ListBindingSet())));
 
     }
 
