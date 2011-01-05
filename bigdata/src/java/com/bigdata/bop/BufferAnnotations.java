@@ -51,8 +51,10 @@ public interface BufferAnnotations {
 
     /**
      * Default for {@link #CHUNK_OF_CHUNKS_CAPACITY}
+     * 
+     * @todo Try smaller capacities in benchmarks
      */
-    int DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = 5;//trunk=1000
+    int DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = 5;//5;//trunk=1000
 
     /**
      * Sets the capacity of the {@link IBuffer}[]s used to accumulate a chunk of

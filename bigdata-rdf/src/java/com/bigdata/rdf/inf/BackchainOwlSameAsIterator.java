@@ -27,6 +27,8 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
     
     protected IV sameAs;
 
+    final int chunkSize = 100;//10000;
+
     protected IChunkedOrderedIterator<ISPO> src;
     
     public BackchainOwlSameAsIterator(IChunkedOrderedIterator<ISPO> src,

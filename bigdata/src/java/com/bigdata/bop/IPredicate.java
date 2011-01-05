@@ -42,6 +42,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.filter.Advancer;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ElementFilter;
@@ -258,7 +259,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * @todo Experiment with this. It should probably be something close to
          *       the branching factor, e.g., 100.
          */
-        int DEFAULT_FULLY_BUFFERED_READ_THRESHOLD = 100;//trunk=20*Bytes.kilobyte32
+        int DEFAULT_FULLY_BUFFERED_READ_THRESHOLD = 100;//trunk=20*Bytes.kilobyte32;
 
         /**
          * Specify the {@link IRangeQuery} flags for the {@link IAccessPath} (

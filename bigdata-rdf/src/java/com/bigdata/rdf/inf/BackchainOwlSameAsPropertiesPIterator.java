@@ -148,7 +148,7 @@ public class BackchainOwlSameAsPropertiesPIterator extends
 
         // use a buffer so that we can do a more efficient batch contains
         // to filter out existing statements
-        int chunkSize = 10000;
+//        int chunkSize = 10000;
         SPO[] spos = new SPO[chunkSize];
         int numSPOs = 0;
         // create a new link between {s,? sameAs s} X {o,? sameAs o} tuples
@@ -199,7 +199,6 @@ public class BackchainOwlSameAsPropertiesPIterator extends
     }
 
     public ISPO[] nextChunk() {
-        final int chunkSize = 10000;
         ISPO[] s = new ISPO[chunkSize];
         int n = 0;
         while (hasNext() && n < chunkSize) {

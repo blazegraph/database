@@ -61,7 +61,7 @@ public interface IChunkedIterator<E> extends ICloseableIterator<E> {
      * 
      * FIXME This is way too large.
      */
-    int DEFAULT_CHUNK_SIZE = 10000;
+    int DEFAULT_CHUNK_SIZE = 100;//00;
     
     /**
      * The next element available from the iterator.
