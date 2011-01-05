@@ -67,8 +67,8 @@ public class QueryLog {
     /**
      * Log rule execution statistics.
      * 
-     * @param stats
-     *            The rule execution statistics.
+     * @param q
+     *            The running query.
      *            
      *            @todo need start and end time for the query.
      */
