@@ -386,6 +386,22 @@ public class NanoSparqlServer extends AbstractHTTPD {
 					+ tripleStore.getMaxParallelSubqueries() + "\n");
 
 			/*
+			 * And show some interesting effective properties for the KB, SPO
+			 * relation, and lexicon relation.
+			 */
+			sb.append("-- Interesting KB effective properties --\n");
+			
+			sb
+					.append(AbstractTripleStore.Options.TERM_CACHE_CAPACITY
+							+ "="
+							+ tripleStore
+									.getLexiconRelation()
+									.getProperties()
+									.getProperty(
+											AbstractTripleStore.Options.TERM_CACHE_CAPACITY,
+											AbstractTripleStore.Options.DEFAULT_TERM_CACHE_CAPACITY) + "\n");
+
+			/*
 			 * And show several interesting properties with their effective
 			 * defaults.
 			 */
