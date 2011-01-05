@@ -248,7 +248,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
      */
     protected int getDefaultCapacity() {
         
-        return 100000;
+        return 100;//1000;//100000;
         
     }
     

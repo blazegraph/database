@@ -108,7 +108,7 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
             // all of which might be present in the source iterator already
             // use a buffer so that we can do a more efficient batch contains
             // to filter out existing statements
-            int chunkSize = 10000;
+//            int chunkSize = 10000;
             SPO[] spos = new SPO[chunkSize];
             int numSPOs = 0;
             // collect up the links between {s,? sameAs s} X {o,? sameAs o}
@@ -196,7 +196,7 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
     }
 
     public ISPO[] nextChunk() {
-        final int chunkSize = 10000;
+//        final int chunkSize = 10000;
         ISPO[] s = new ISPO[chunkSize];
         int n = 0;
         while (hasNext() && n < chunkSize) {

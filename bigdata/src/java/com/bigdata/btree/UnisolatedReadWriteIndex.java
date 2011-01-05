@@ -284,7 +284,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
      * main purpose of the capacity is to reduce the contention for the
      * {@link ReadWriteLock}.
      */
-    final static protected int DEFAULT_CAPACITY = 10000;
+    final static protected int DEFAULT_CAPACITY = 100;//10000;
     
     /**
      * Creates a view of an unisolated index that will enforce the concurrency
