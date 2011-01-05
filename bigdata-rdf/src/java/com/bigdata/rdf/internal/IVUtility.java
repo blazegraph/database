@@ -31,6 +31,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.UUID;
+
+import org.openrdf.query.algebra.MathExpr.MathOp;
+
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
@@ -160,6 +163,174 @@ public class IVUtility {
             return a == b ? 0 : a < b ? -1 : 1;
         }
         
+    }
+    
+    public static final IV numericalMath(final IV iv1, final IV iv2, 
+    		final MathOp op) {
+    	
+		if (!iv1.isInline())
+			throw new IllegalArgumentException(
+					"left term is not inline: left=" + iv1 + ", right=" + iv2);
+
+		if (!iv2.isInline())
+			throw new IllegalArgumentException(
+					"right term is not inline: left=" + iv1 + ", right=" + iv2);
+        
+		if (!iv1.isLiteral())
+			throw new IllegalArgumentException(
+					"left term is not literal: left=" + iv1 + ", right=" + iv2);
+
+		if (!iv2.isLiteral())
+			throw new IllegalArgumentException(
+					"right term is not literal: left=" + iv1 + ", right=" + iv2);
+
+        final DTE dte1 = iv1.getDTE();
+        final DTE dte2 = iv2.getDTE();
+
+        if (!dte1.isNumeric())
+			throw new IllegalArgumentException(
+					"right term is not numeric: left=" + iv1 + ", right=" + iv2);
+
+        if (!dte2.isNumeric())
+			throw new IllegalArgumentException(
+					"left term is not numeric: left=" + iv1 + ", right=" + iv2);
+
+        final AbstractLiteralIV num1 = (AbstractLiteralIV) iv1; 
+        final AbstractLiteralIV num2 = (AbstractLiteralIV) iv2; 
+        
+        // if one's a BigDecimal we should use the BigDecimal comparator for both
+        if (dte1 == DTE.XSDDecimal || dte2 == DTE.XSDDecimal) {
+            return numericalMath(num1.decimalValue(), num2.decimalValue(), op);
+        }
+        
+        // same for BigInteger
+        if (dte1 == DTE.XSDInteger || dte2 == DTE.XSDInteger) {
+            return numericalMath(num1.integerValue(), num2.integerValue(), op);
+        }
+        
+        // fixed length numerics
+        if (dte1.isFloatingPointNumeric() || dte2.isFloatingPointNumeric()) {
+            // non-BigDecimal floating points
+        	if (dte1 == DTE.XSDFloat && dte2 == DTE.XSDFloat)
+        		return numericalMath(num1.floatValue(), num2.floatValue(), op);
+        	else
+        		return numericalMath(num1.doubleValue(), num2.doubleValue(), op);
+        } else {
+            // non-BigInteger integers
+        	if (dte1 == DTE.XSDInt && dte2 == DTE.XSDInt)
+        		return numericalMath(num1.intValue(), num2.intValue(), op);
+        	else
+        		return numericalMath(num1.longValue(), num2.longValue(), op);
+        }
+        
+    }
+    
+    private static final IV numericalMath(final BigDecimal left, 
+    		final BigDecimal right, final MathOp op) {
+    	
+    	switch(op) {
+    	case PLUS:
+    		return new XSDDecimalIV(left.add(right));
+    	case MINUS:
+    		return new XSDDecimalIV(left.subtract(right));
+    	case MULTIPLY:
+    		return new XSDDecimalIV(left.multiply(right));
+    	case DIVIDE:
+    		return new XSDDecimalIV(left.divide(right));
+    	default:
+    		throw new UnsupportedOperationException();
+    	}
+    	
+    }
+    
+    private static final IV numericalMath(final BigInteger left, 
+    		final BigInteger right, final MathOp op) {
+    	
+    	switch(op) {
+    	case PLUS:
+    		return new XSDIntegerIV(left.add(right));
+    	case MINUS:
+    		return new XSDIntegerIV(left.subtract(right));
+    	case MULTIPLY:
+    		return new XSDIntegerIV(left.multiply(right));
+    	case DIVIDE:
+    		return new XSDIntegerIV(left.divide(right));
+    	default:
+    		throw new UnsupportedOperationException();
+    	}
+    	
+    }
+    
+    private static final IV numericalMath(final float left, 
+    		final float right, final MathOp op) {
+    	
+    	switch(op) {
+    	case PLUS:
+    		return new XSDFloatIV(left+right);
+    	case MINUS:
+    		return new XSDFloatIV(left-right);
+    	case MULTIPLY:
+    		return new XSDFloatIV(left*right);
+    	case DIVIDE:
+    		return new XSDFloatIV(left/right);
+    	default:
+    		throw new UnsupportedOperationException();
+    	}
+    	
+    }
+    
+    private static final IV numericalMath(final double left, 
+    		final double right, final MathOp op) {
+    	
+    	switch(op) {
+    	case PLUS:
+    		return new XSDDoubleIV(left+right);
+    	case MINUS:
+    		return new XSDDoubleIV(left-right);
+    	case MULTIPLY:
+    		return new XSDDoubleIV(left*right);
+    	case DIVIDE:
+    		return new XSDDoubleIV(left/right);
+    	default:
+    		throw new UnsupportedOperationException();
+    	}
+    	
+    }
+    
+    private static final IV numericalMath(final int left, 
+    		final int right, final MathOp op) {
+    	
+    	switch(op) {
+    	case PLUS:
+    		return new XSDIntIV(left+right);
+    	case MINUS:
+    		return new XSDIntIV(left-right);
+    	case MULTIPLY:
+    		return new XSDIntIV(left*right);
+    	case DIVIDE:
+    		return new XSDIntIV(left/right);
+    	default:
+    		throw new UnsupportedOperationException();
+    	}
+    	
+    }
+    
+    private static final IV numericalMath(final long left, 
+    		final long right, final MathOp op) {
+    	
+    	switch(op) {
+    	case PLUS:
+    		return new XSDLongIV(left+right);
+    	case MINUS:
+    		return new XSDLongIV(left-right);
+    	case MULTIPLY:
+    		return new XSDLongIV(left*right);
+    	case DIVIDE:
+    		return new XSDLongIV(left/right);
+    	default:
+    		throw new UnsupportedOperationException();
+    	}
+    	
     }
     
     /**

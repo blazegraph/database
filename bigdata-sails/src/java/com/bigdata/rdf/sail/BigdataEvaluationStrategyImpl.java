@@ -25,10 +25,13 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.Compare;
+import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Group;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.LeftJoin;
+import org.openrdf.query.algebra.MathExpr;
+import org.openrdf.query.algebra.MathExpr.MathOp;
 import org.openrdf.query.algebra.MultiProjection;
 import org.openrdf.query.algebra.Or;
 import org.openrdf.query.algebra.Order;
@@ -39,14 +42,13 @@ import org.openrdf.query.algebra.QueryModelNode;
 import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
 import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
-import org.openrdf.query.algebra.Compare.CompareOp;
-import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
@@ -57,11 +59,11 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
@@ -77,12 +79,14 @@ import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.internal.DummyIV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.InlineEQ;
 import com.bigdata.rdf.internal.constraints.InlineGE;
 import com.bigdata.rdf.internal.constraints.InlineGT;
 import com.bigdata.rdf.internal.constraints.InlineLE;
 import com.bigdata.rdf.internal.constraints.InlineLT;
 import com.bigdata.rdf.internal.constraints.InlineNE;
+import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
@@ -1589,70 +1593,85 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 compare.getOperator());
     }
 
+    /**
+     * FIXME: implement compare two variables and compare MathExpr
+     */
     private IConstraint generateConstraint(ValueExpr left, ValueExpr right,
             CompareOp operator) {
-        IVariable<IV> var = null;
-        BigdataValue constant = null;
+        IVariableOrConstant<IV> iv1, iv2;
+    	
         if (left instanceof Var) {
-            var = com.bigdata.bop.Var.var(((Var) left).getName());
+        	iv1 = com.bigdata.bop.Var.var(((Var) left).getName());
         } else if (left instanceof ValueConstant) {
-            constant = (BigdataValue) ((ValueConstant) left).getValue();
+            final IV iv = ((BigdataValue) ((ValueConstant) left).getValue()).getIV();
+            if (iv == null)
+            	return null;
+        	iv1 = new Constant<IV>(iv);
+        } else if (left instanceof MathExpr) {
+        	iv1 = generateMath((MathExpr) left);
+        	if (iv1 == null)
+        		return null;
         } else {
             return null;
         }
+
         if (right instanceof Var) {
-            var = com.bigdata.bop.Var.var(((Var) right).getName());
+        	iv2 = com.bigdata.bop.Var.var(((Var) right).getName());
         } else if (right instanceof ValueConstant) {
-            constant = (BigdataValue) ((ValueConstant) right).getValue();
+            final IV iv = ((BigdataValue) ((ValueConstant) right).getValue()).getIV();
+            if (iv == null)
+            	return null;
+        	iv2 = new Constant<IV>(iv);
+        } else if (right instanceof MathExpr) {
+        	iv2 = generateMath((MathExpr) right);
+        	if (iv2 == null)
+        		return null;	
         } else {
             return null;
         }
-        if (log.isDebugEnabled()) {
-            log.debug("var: " + var);
-            log.debug("constant: " + constant);
-            log.debug("constant.getIV(): " + constant.getIV());
-        }
-        if (var == null || constant == null || constant.getIV() == null) {
-            if (log.isDebugEnabled()) {
-                log.debug("left: " + left);
-                log.debug("right: " + right);
-            }
-            return null;
-        }
-        final IV iv = constant.getIV();
-        // we can do equals, not equals
-        if (inlineTerms && IVUtility.canNumericalCompare(iv)) {
-            if (log.isInfoEnabled()) {
-                log.debug("inline constant, using inline numerical comparison: " 
-                        + iv);
-            }
-            try {
-                switch (operator) {
-                case GT:
-                    return new InlineGT(var, iv);
-                case GE:
-                    return new InlineGE(var, iv);
-                case LT:
-                    return new InlineLT(var, iv);
-                case LE:
-                    return new InlineLE(var, iv);
-                case EQ:
-                    return new InlineEQ(var, iv);
-                case NE:
-                    return new InlineNE(var, iv);
-                default:
-                    return null;
-                }
-            } catch (Exception ex) {
-                return null;
-            }
-        } else if (operator == CompareOp.EQ) {
-            return new EQConstant(var, new Constant(iv));
-        } else if (operator == CompareOp.NE) {
-            return new NEConstant(var, new Constant(iv));
+        
+        return new CompareBOp(iv1, iv2, operator);
+    	
+    }
+    
+    private MathBOp generateMath(final MathExpr mathExpr) {
+    	final ValueExpr left = mathExpr.getLeftArg();
+    	final ValueExpr right = mathExpr.getRightArg();
+    	final MathOp op = mathExpr.getOperator();
+    	
+    	IVariableOrConstant<IV> iv1, iv2;
+    	
+        if (left instanceof Var) {
+        	iv1 = com.bigdata.bop.Var.var(((Var) left).getName());
+        } else if (left instanceof ValueConstant) {
+            final IV iv = ((BigdataValue) ((ValueConstant) left).getValue()).getIV();
+            if (iv == null)
+            	return null;
+        	iv1 = new Constant<IV>(iv);
+        } else if (left instanceof MathExpr) {
+        	iv1 = generateMath((MathExpr) left);
+        	if (iv1 == null)
+        		return null;
         } else {
             return null;
         }
+
+        if (right instanceof Var) {
+        	iv2 = com.bigdata.bop.Var.var(((Var) right).getName());
+        } else if (right instanceof ValueConstant) {
+            final IV iv = ((BigdataValue) ((ValueConstant) right).getValue()).getIV();
+            if (iv == null)
+            	return null;
+        	iv2 = new Constant<IV>(iv);
+        } else if (right instanceof MathExpr) {
+        	iv2 = generateMath((MathExpr) right);
+        	if (iv2 == null)
+        		return null;	
+        } else {
+            return null;
+        }
+    	
+        return new MathBOp(iv1, iv2, op);
         
     }
 

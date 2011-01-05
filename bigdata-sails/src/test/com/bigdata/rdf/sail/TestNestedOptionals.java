@@ -251,7 +251,7 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
 
     }
 
-    private void __testNestedOptionals1() throws Exception {
+    public void testNestedOptionals1() throws Exception {
 
         final BigdataSail sail = getSail();
         sail.initialize();
@@ -333,11 +333,11 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
             final Projection p = (Projection) root.getArg();
             final LeftJoin leftJoin = (LeftJoin) p.getArg();
             
-            final List<Tail> tails = collectTails(leftJoin);
+            final List<Op> tails = collectTails(leftJoin);
             
             if (INFO) {
                 System.err.println(query);
-                for (Tail t : tails) {
+                for (Op t : tails) {
                     System.err.println(t);    
                 }
             }
@@ -355,7 +355,7 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
 
     }
     
-    private void __testNestedOptionals2() throws Exception {
+    public void testNestedOptionals2() throws Exception {
 
         final BigdataSail sail = getSail();
         sail.initialize();
@@ -446,7 +446,7 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
                 "    ?s <"+RDF.TYPE+"> <"+T4+"> .\n" +       // tail=A, group=1, parent=0
                 "    ?s <"+RDF.TYPE+"> <"+T5+"> .\n" +       // tail=B, group=1, parent=0
                 "    ?s <"+P4+"> ?p4 .\n" +                  // tail=C, group=1, parent=0
-                "    FILTER ( ?p4 > 30 ) .\n" +                  
+                "    FILTER ( ?p4 > (?p1*?p0+10+20) ) .\n" +                  
                 "    OPTIONAL { ?s <"+P5+"> ?p5 . }\n" +     // tail=D, group=2, parent=1
                 "    OPTIONAL { ?s <"+P6+"> ?p6 . }\n" +     // tail=E, group=3, parent=1
                 "  }\n" +
@@ -490,11 +490,11 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
             final Projection p = (Projection) root.getArg();
             final LeftJoin leftJoin = (LeftJoin) p.getArg();
             
-            final List<Tail> tails = collectTails(leftJoin);
+            final List<Op> tails = collectTails(leftJoin);
             
             if (INFO) {
                 System.err.println(query);
-                for (Tail t : tails) {
+                for (Op t : tails) {
                     System.err.println(t);    
                 }
             }
@@ -513,9 +513,9 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
 
     }
     
-    private List<Tail> collectTails(final LeftJoin root) {
+    private List<Op> collectTails(final LeftJoin root) {
     
-        final List<Tail> tails = new LinkedList<Tail>();
+        final List<Op> tails = new LinkedList<Op>();
         
         log.info("\n"+root);
 
@@ -530,11 +530,17 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
         return ++group;
     }
     
-    private void collectTails(final List<Tail> tails, final LeftJoin leftJoin, 
+    private void collectTails(final List<Op> tails, final LeftJoin leftJoin, 
             final boolean rslj, final int g, final int pg) {
         
-        final ValueExpr condition = leftJoin.getCondition();
+        final ValueExpr ve = leftJoin.getCondition();
         // conditional for tails in this group
+        if (ve != null) {
+        	final Constraint c = new Constraint(ve);
+        	c.setGroup(g);
+        	c.setParentGroup(pg);
+        	tails.add(c);
+        }
         
         final TupleExpr left = leftJoin.getLeftArg();
         
@@ -571,7 +577,7 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
         
     }
     
-    private void collectTails(final List<Tail> tails, final Join join, 
+    private void collectTails(final List<Op> tails, final Join join, 
             final boolean rslj, final int g, final int pg) {
         
         final TupleExpr left = join.getLeftArg();
@@ -604,11 +610,17 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
         
     }
     
-    private void collectTails(final List<Tail> tails, final Filter filter, 
+    private void collectTails(final List<Op> tails, final Filter filter, 
             final boolean rslj, final int g, final int pg) {
         
         final ValueExpr ve = filter.getCondition();
         // make a constraint, attach it to the rule
+        if (ve != null) {
+        	final Constraint c = new Constraint(ve);
+        	c.setGroup(g);
+        	c.setParentGroup(pg);
+        	tails.add(c);
+        }
         
         final TupleExpr arg = filter.getArg();
 
@@ -626,7 +638,7 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
         
     }
     
-    private void collectTails(final List<Tail> tails, final StatementPattern sp, 
+    private void collectTails(final List<Op> tails, final StatementPattern sp, 
             final boolean rslj, final int g, final int pg) {
 
         final Tail t = new Tail(sp);
@@ -637,7 +649,19 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
         
     }
     
-    private static class Tail {
+    private static interface Op {
+    	
+    	void setGroup(int g);
+    	
+    	int getGroup();
+    	
+    	void setParentGroup(int pg);
+    	
+    	int getParentGroup();
+    	
+    }
+    
+    private static class Tail implements Op {
         
         private StatementPattern sp;
         
@@ -708,6 +732,56 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
             return v.hasValue() ? 
                     v.getValue().stringValue().substring(v.getValue().stringValue().indexOf('#')) 
                     : "?"+v.getName();
+            
+        }
+        
+    }
+    
+    private static class Constraint implements Op {
+        
+        private ValueExpr ve;
+        
+        private int group, parent;
+        
+        public Constraint(ValueExpr ve) {
+            
+            this.ve = ve;
+            
+        }
+        
+        public void setGroup(final int group) {
+            
+            this.group = group;
+            
+        }
+        
+        public int getGroup() {
+            
+            return group;
+            
+        }
+        
+        public void setParentGroup(final int parent) {
+            
+            this.parent = parent;
+            
+        }
+        
+        public int getParentGroup() {
+            
+            return parent;
+            
+        }
+        
+        public String toString() {
+
+            StringBuilder sb = new StringBuilder();
+            
+            sb.append("Constraint: group=").append(group);
+            sb.append(", parent=").append(parent);
+            sb.append(", filter=").append(ve);
+            
+            return sb.toString();
             
         }
         
