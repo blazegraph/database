@@ -73,6 +73,9 @@ import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.LRUNexus;
+import com.bigdata.bop.BufferAnnotations;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
@@ -90,7 +93,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.AbstractDistributedFederation;
-import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.sparse.ITPS;
@@ -347,9 +349,6 @@ public class NanoSparqlServer extends AbstractHTTPD {
             sb.append(BigdataSail.Options.STAR_JOINS + "="
                     + conn.getRepository().getSail().isStarJoins() + "\n");
 
-			sb.append(AbstractResource.Options.MAX_PARALLEL_SUBQUERIES + "="
-					+ tripleStore.getMaxParallelSubqueries() + "\n");
-
 			sb.append("-- All properties.--\n");
 			
 			// get the triple store's properties from the global row store.
@@ -361,6 +360,79 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			for (String key : properties.keySet()) {
 				sb.append(key + "=" + properties.get(key)+"\n");
 			}
+
+			/*
+			 * And show some properties which can be inherited from
+			 * AbstractResource. These have been mainly phased out in favor of
+			 * BOP annotations, but there are a few places where they are still
+			 * in use.
+			 */
+            
+			sb.append("-- Interesting AbstractResource effective properties --\n");
+            
+			sb.append(AbstractResource.Options.CHUNK_CAPACITY + "="
+					+ tripleStore.getChunkCapacity() + "\n");
+
+			sb.append(AbstractResource.Options.CHUNK_OF_CHUNKS_CAPACITY + "="
+					+ tripleStore.getChunkOfChunksCapacity() + "\n");
+
+			sb.append(AbstractResource.Options.CHUNK_TIMEOUT + "="
+					+ tripleStore.getChunkTimeout() + "\n");
+
+			sb.append(AbstractResource.Options.FULLY_BUFFERED_READ_THRESHOLD + "="
+					+ tripleStore.getFullyBufferedReadThreshold() + "\n");
+
+			sb.append(AbstractResource.Options.MAX_PARALLEL_SUBQUERIES + "="
+					+ tripleStore.getMaxParallelSubqueries() + "\n");
+
+			/*
+			 * And show several interesting properties with their effective
+			 * defaults.
+			 */
+
+			sb.append("-- Interesting Effective BOP Annotations --\n");
+
+			sb.append(BufferAnnotations.CHUNK_CAPACITY
+					+ "="
+					+ tripleStore.getProperties().getProperty(
+							BufferAnnotations.CHUNK_CAPACITY,
+							"" + BufferAnnotations.DEFAULT_CHUNK_CAPACITY)
+					+ "\n");
+
+			sb
+					.append(BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY
+							+ "="
+							+ tripleStore
+									.getProperties()
+									.getProperty(
+											BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY,
+											""
+													+ BufferAnnotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY)
+							+ "\n");
+
+			sb.append(BufferAnnotations.CHUNK_TIMEOUT
+					+ "="
+					+ tripleStore.getProperties().getProperty(
+							BufferAnnotations.CHUNK_TIMEOUT,
+							"" + BufferAnnotations.DEFAULT_CHUNK_TIMEOUT)
+					+ "\n");
+
+			sb.append(PipelineJoin.Annotations.MAX_PARALLEL
+					+ "="
+					+ tripleStore.getProperties().getProperty(
+							PipelineJoin.Annotations.MAX_PARALLEL,
+							"" + PipelineJoin.Annotations.DEFAULT_MAX_PARALLEL) + "\n");
+
+			sb
+					.append(IPredicate.Annotations.FULLY_BUFFERED_READ_THRESHOLD
+							+ "="
+							+ tripleStore
+									.getProperties()
+									.getProperty(
+											IPredicate.Annotations.FULLY_BUFFERED_READ_THRESHOLD,
+											""
+													+ IPredicate.Annotations.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD)
+							+ "\n");
 
 			// sb.append(tripleStore.predicateUsage());
 
