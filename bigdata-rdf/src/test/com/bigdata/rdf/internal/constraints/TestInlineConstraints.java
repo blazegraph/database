@@ -27,8 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.constraints;
 
-import java.util.Properties;
 import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.query.algebra.Compare.CompareOp;
+import org.openrdf.query.algebra.MathExpr.MathOp;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
@@ -140,7 +141,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                                    new InlineGT(a, _35.getIV())
+                                    new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GT)
                                 });
                 
                 try {
@@ -242,7 +243,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                                    new InlineGE(a, _35.getIV())
+                                    new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GE)
                                 });
                 
                 try {
@@ -346,7 +347,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                                    new InlineLT(a, _35.getIV())
+                        			new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LT)
                                 });
                 
                 if (log.isInfoEnabled())
@@ -454,7 +455,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                                    new InlineLE(a, _35.getIV())
+                                	new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LE)
                                 });
                 
                 if (log.isInfoEnabled())
@@ -485,6 +486,117 @@ public class TestInlineConstraints extends ProxyTestCase {
                     }
                     
                     assertEquals("wrong # of solutions", 2, numSolutions);
+                    
+                } catch(Exception ex) {
+                    
+                    ex.printStackTrace();
+                    
+                }
+                
+            }
+
+        } finally {
+            
+            db.__tearDownUnitTest();
+            
+        }
+        
+    }
+
+    public void testMath() {
+        
+        // store with no owl:sameAs closure
+        AbstractTripleStore db = getStore();
+
+        // do not run if we are not inlining
+        if (!db.getLexiconRelation().isInlineLiterals()) {
+            return;
+        }
+        
+        try {
+
+            BigdataValueFactory vf = db.getValueFactory();
+            
+            final BigdataURI A = vf.createURI("http://www.bigdata.com/A");
+            final BigdataURI B = vf.createURI("http://www.bigdata.com/B");
+            final BigdataURI C = vf.createURI("http://www.bigdata.com/C");
+            final BigdataURI D = vf.createURI("http://www.bigdata.com/D");
+            final BigdataURI X = vf.createURI("http://www.bigdata.com/X");
+            final BigdataURI AGE = vf.createURI("http://www.bigdata.com/AGE");
+            final BigdataLiteral _5 = vf.createLiteral((double) 5);
+            final BigdataLiteral _30 = vf.createLiteral((double) 30);
+            final BigdataLiteral _25 = vf.createLiteral((double) 25);
+            final BigdataLiteral _35 = vf.createLiteral((long) 35);
+            final BigdataLiteral _45 = vf.createLiteral((long) 45);
+            
+            db.addTerms( new BigdataValue[] { A, B, C, X, AGE, _25, _35, _45, D, _5, _30 } );
+            
+            {
+                StatementBuffer buffer = new StatementBuffer
+                    ( db, 100/* capacity */
+                      );
+
+                buffer.add(A, RDF.TYPE, X);
+                buffer.add(A, AGE, _25);
+                buffer.add(B, RDF.TYPE, X);
+                buffer.add(B, AGE, _45);
+                buffer.add(C, RDF.TYPE, X);
+                buffer.add(C, AGE, _35);
+                buffer.add(D, AGE, _30);
+                
+                // write statements on the database.
+                buffer.flush();
+                
+            }
+            
+            if (log.isInfoEnabled())
+                log.info("\n" +db.dumpStore(true, true, false));
+  
+            { // works great
+                
+                final String SPO = db.getSPORelation().getNamespace();
+                final IVariable<IV> s = Var.var("s");
+                final IConstant<IV> type = new Constant<IV>(db.getIV(RDF.TYPE));
+                final IConstant<IV> x = new Constant<IV>(X.getIV());
+                final IConstant<IV> age = new Constant<IV>(AGE.getIV());
+                final IVariable<IV> a = Var.var("a");
+                final IConstant<IV> d = new Constant<IV>(D.getIV());
+                final IVariable<IV> dAge = Var.var("dAge");
+                
+                final IRule rule =
+                        new Rule("test_math", null, // head
+                                new IPredicate[] {
+                        			new SPOPredicate(SPO, d, age, dAge),
+                                    new SPOPredicate(SPO, s, type, x),
+                                    new SPOPredicate(SPO, s, age, a) 
+                                },
+                                // constraints on the rule.
+                                new IConstraint[] {
+                                    new CompareBOp(a, new MathBOp(dAge, new Constant<IV>(_5.getIV()), MathOp.PLUS), CompareOp.GT)
+                                });
+                
+                try {
+                
+                    int numSolutions = 0;
+                    
+                    IChunkedOrderedIterator<ISolution> solutions = runQuery(db, rule);
+                    
+                    while (solutions.hasNext()) {
+                        
+                        ISolution solution = solutions.next();
+                        
+                        IBindingSet bs = solution.getBindingSet();
+                        
+                        System.err.println(bs);
+                        
+                        assertEquals(bs.get(s).get(), B.getIV());
+                        assertEquals(bs.get(a).get(), _45.getIV());
+                        
+                        numSolutions++;
+                        
+                    }
+                    
+                    assertEquals("wrong # of solutions", 1, numSolutions);
                     
                 } catch(Exception ex) {
                     
