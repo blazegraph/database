@@ -1,9 +1,17 @@
 package com.bigdata.rdf.spo;
 
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicLong;
-
+import org.apache.log4j.Logger;
+import com.bigdata.rdf.changesets.ChangeRecord;
+import com.bigdata.rdf.changesets.IChangeLog;
+import com.bigdata.rdf.changesets.IChangeRecord.ChangeAction;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
@@ -18,6 +26,8 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  */
 public class StatementWriter implements Callable<Long>{
 
+    protected static final Logger log = Logger.getLogger(StatementWriter.class);
+    
     private final AbstractTripleStore database;
     private final AbstractTripleStore statementStore;
     private final boolean copyOnly;
@@ -27,7 +37,9 @@ public class StatementWriter implements Callable<Long>{
      * Incremented by the #of statements written on the statements indices.
      */
     public final AtomicLong nwritten;
-
+    
+    private final IChangeLog changeLog;
+    
     /**
      * @param database
      *            The database. If statement identifiers are being generated
@@ -51,7 +63,17 @@ public class StatementWriter implements Callable<Long>{
     public StatementWriter(AbstractTripleStore database,
             AbstractTripleStore statementStore, boolean copyOnly,
             IChunkedOrderedIterator<ISPO> itr, AtomicLong nwritten) {
-    
+
+        this(database, statementStore, copyOnly, itr, nwritten, 
+                null/* changeLog */);
+        
+    }
+        
+    public StatementWriter(final AbstractTripleStore database,
+            final AbstractTripleStore statementStore, final boolean copyOnly,
+            final IChunkedOrderedIterator<ISPO> itr, final AtomicLong nwritten,
+            final IChangeLog changeLog) {
+        
         if (database == null)
             throw new IllegalArgumentException();
         
@@ -73,7 +95,9 @@ public class StatementWriter implements Callable<Long>{
         this.itr = itr;
 
         this.nwritten = nwritten;
-
+        
+        this.changeLog = changeLog;
+        
     }
 
     /**
@@ -85,11 +109,29 @@ public class StatementWriter implements Callable<Long>{
 
         final long begin = System.currentTimeMillis();
 
-        nwritten.addAndGet(database.addStatements(statementStore, copyOnly,
-                itr, null/* filter */));
+        final long n;
+        
+        if (changeLog == null) {
+            
+            n = database.addStatements(statementStore, copyOnly,
+                    itr, null/* filter */);
+            
+        } else {
 
+            n = com.bigdata.rdf.changesets.StatementWriter.addStatements(
+                    database, 
+                    statementStore, 
+                    copyOnly, 
+                    null/* filter */, 
+                    itr, 
+                    changeLog);
+            
+        }
+        
+        nwritten.addAndGet(n);
+        
         return System.currentTimeMillis() - begin;
 
     }
-
+    
 }
