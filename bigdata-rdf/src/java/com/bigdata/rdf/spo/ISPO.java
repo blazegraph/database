@@ -332,7 +332,7 @@ public interface ISPO {
         
         public static ModifiedEnum[] fromBooleans(final boolean[] b, final int n) {
             
-            assert n < b.length && n % 2 == 0;
+            assert n <= b.length && n % 2 == 0 : "n="+n+", b.length="+b.length;
             
             final ModifiedEnum[] m = new ModifiedEnum[n/2];
             for (int i = 0; i < n; i+=2) {
