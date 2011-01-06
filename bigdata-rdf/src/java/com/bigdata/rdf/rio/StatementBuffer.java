@@ -40,6 +40,9 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.changesets.ChangeRecord;
+import com.bigdata.rdf.changesets.IChangeLog;
+import com.bigdata.rdf.changesets.IChangeRecord.ChangeAction;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataResource;
@@ -252,6 +255,16 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     
     private boolean readOnly = false;
     
+    public void setChangeLog(final IChangeLog changeLog) {
+        
+        this.changeLog = changeLog;
+        
+    }
+    
+    protected IChangeLog changeLog;
+    
+
+    
     /**
      * Create a buffer that converts Sesame {@link Value} objects to {@link SPO}s
      * and writes on the <i>database</i> when it is {@link #flush()}ed. This
@@ -297,7 +310,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     public StatementBuffer(final TempTripleStore statementStore,
             final AbstractTripleStore database, final int capacity) {
-            
+        
         if (database == null)
             throw new IllegalArgumentException();
 
@@ -362,7 +375,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * @todo this implementation always returns ZERO (0).
      */
     public long flush() {
- 
+       
         log.info("");
 
         /*
@@ -866,21 +879,6 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 //        final long nwritten = writeSPOs(sids ? tmp.clone() : tmp, numStmts);
         final long nwritten = writeSPOs(tmp.clone(), numStmts);
 
-        // Copy the state of the isModified() flag
-        {
-
-            for (int i = 0; i < numStmts; i++) {
-
-                if (tmp[i].isModified()) {
-
-                    stmts[i].setModified(true);
-
-                }
-                
-            }
-            
-        }
-        
         if (sids) {
 
             /*
@@ -952,6 +950,34 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                 
         }
 
+        // Copy the state of the isModified() flag
+        for (int i = 0; i < numStmts; i++) {
+
+            if (tmp[i].isModified()) {
+
+                stmts[i].setModified(tmp[i].getModified());
+                
+                if (changeLog != null) {
+                    
+                    switch(stmts[i].getModified()) {
+                    case INSERTED:
+                        changeLog.changeEvent(new ChangeRecord(stmts[i], ChangeAction.INSERTED));
+                        break;
+                    case UPDATED:
+                        changeLog.changeEvent(new ChangeRecord(stmts[i], ChangeAction.UPDATED));
+                        break;
+                    case REMOVED:
+                        throw new AssertionError();
+                    default:
+                        break;
+                    }
+                    
+                }
+
+            }
+            
+        }
+        
         return nwritten;
         
     }

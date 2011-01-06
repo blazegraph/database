@@ -1,5 +1,6 @@
 package com.bigdata.rdf.sail;
 
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.StringTokenizer;
@@ -22,6 +23,8 @@ import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.repository.sail.SailTupleQuery;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
+import com.bigdata.rdf.changesets.IChangeLog;
+import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.bench.NanoSparqlClient;
 import com.bigdata.rdf.sail.bench.NanoSparqlClient.QueryType;
@@ -44,6 +47,11 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     @Override
     public BigdataSailRepository getRepository() {
         return (BigdataSailRepository)super.getRepository();
+    }
+    
+    @Override
+    public BigdataSailConnection getSailConnection() {
+        return (BigdataSailConnection)super.getSailConnection();
     }
     
     /**
@@ -154,6 +162,34 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
         super.commit();
         
     }
+
+//    /**
+//     * Commit any changes made in the connection, providing detailed feedback
+//     * on the change set that occurred as a result of this commit.
+//     * <p>
+//     * Note: auto-commit is an EXTREMELY bad idea. Performance will be terrible.
+//     * The database will swell to an outrageous size. TURN OFF AUTO COMMIT.
+//     * 
+//     * @see BigdataSail.Options#ALLOW_AUTO_COMMIT
+//     */
+//    public Iterator<IChangeRecord> commit2() throws RepositoryException {
+//        
+//        // auto-commit is heinously inefficient
+//        if (isAutoCommit() && 
+//            !((BigdataSailConnection) getSailConnection()).getAllowAutoCommit()) {
+//            
+//            throw new RepositoryException("please set autoCommit to false");
+//
+//        }
+//        
+//        try {
+//            return getSailConnection().commit2();
+//        }
+//        catch (SailException e) {
+//            throw new RepositoryException(e);
+//        }
+//        
+//    }
 
     /**
      * Flush the statement buffers. The {@link BigdataSailConnection} heavily
@@ -296,6 +332,19 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
         } catch (ParseException e) {
             throw new MalformedQueryException(e.getMessage(), e);
         }
+    }
+    
+    /**
+     * Set the change log on the SAIL connection.  See {@link IChangeLog} and
+     * {@link IChangeRecord}.
+     * 
+     * @param log
+     *          the change log
+     */
+    public void setChangeLog(final IChangeLog log) {
+        
+        getSailConnection().setChangeLog(log);
+        
     }
 
 }
