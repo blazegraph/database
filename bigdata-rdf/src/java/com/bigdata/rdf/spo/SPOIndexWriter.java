@@ -57,6 +57,7 @@ import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBufferHandler;
 import com.bigdata.io.ByteArrayBuffer;
+import com.bigdata.rdf.spo.ISPO.ModifiedEnum;
 import com.bigdata.rdf.spo.SPOIndexWriteProc.IndexWriteProcConstructor;
 import com.bigdata.relation.accesspath.IElementFilter;
 
@@ -283,7 +284,7 @@ public class SPOIndexWriter implements Callable<Long> {
          */
         final long _begin = System.currentTimeMillis();
         
-        final long writeCount;
+        long writeCount = 0;
         if (reportMutation) {
 
             /*
@@ -294,7 +295,7 @@ public class SPOIndexWriter implements Callable<Long> {
              */
 
             final ResultBitBufferHandler aggregator = new ResultBitBufferHandler(
-                    numToAdd);
+                    numToAdd,2);
 
             ndx.submit(0/* fromIndex */, numToAdd/* toIndex */, keys, vals,
                     IndexWriteProcConstructor.REPORT_MUTATION, aggregator);
@@ -303,11 +304,11 @@ public class SPOIndexWriter implements Callable<Long> {
 
             final boolean[] bits = modified.getResult();
             
-            writeCount = modified.getOnCount();
-
+            final ModifiedEnum[] m = ModifiedEnum.fromBooleans(bits, bits.length);
+            
             for (int i = 0; i < numToAdd; i++) {
 
-                if (bits[i]) {
+                if (m[i] != ModifiedEnum.NONE) {
 
                     /*
                      * Note: This only turns on the modified flag. It will not
@@ -319,7 +320,9 @@ public class SPOIndexWriter implements Callable<Long> {
                      * explicitly cleared it in between those writes).
                      */
                     
-                    denseStmts[i].setModified(bits[i]);
+                    denseStmts[i].setModified(m[i]);
+                    
+                    writeCount++;
 
                 }
 

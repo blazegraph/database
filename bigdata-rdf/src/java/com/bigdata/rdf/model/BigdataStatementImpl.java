@@ -66,7 +66,8 @@ public class BigdataStatementImpl implements BigdataStatement {
     private StatementEnum type;
     private boolean userFlag;
     private transient boolean override = false;
-    private transient boolean modified = false;
+//    private transient boolean modified = false;
+    private transient ModifiedEnum modified = ModifiedEnum.NONE;
     
     /**
      * Used by {@link BigdataValueFactory}
@@ -227,7 +228,7 @@ public class BigdataStatementImpl implements BigdataStatement {
         
         return "<" + s + ", " + p + ", " + o + (c == null ? "" : ", " + c)
                 + ">" + (type == null ? "" : " : " + type)
-                + (modified ? " : modified" : "");
+                + (isModified() ? " : modified("+modified+")" : "");
 
     }
 
@@ -353,14 +354,20 @@ public class BigdataStatementImpl implements BigdataStatement {
     
     public boolean isModified() {
         
-        return modified;
+        return modified != ModifiedEnum.NONE;
         
     }
 
-    public void setModified(final boolean modified) {
+    public void setModified(final ModifiedEnum modified) {
 
         this.modified = modified;
 
+    }
+    
+    public ModifiedEnum getModified() {
+        
+        return modified;
+        
     }
 
 }

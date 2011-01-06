@@ -1998,10 +1998,12 @@ ${postInstallMessage}</echo>
 	<fileset dir="${bigdata.dir}/bigdata/lib">
 		<include name="**/*.jar" />
 	</fileset>
+<!-- Jini should not be required for the Sesame WAR.
 	<fileset dir="${bigdata.dir}/bigdata-jini/lib/jini/lib">
 		<include name="jini-core.jar" />
 		<include name="jini-ext.jar" />
 	</fileset>
+	-->
 </copy>
 
 <!-- copy resources to Workbench webapp. -->

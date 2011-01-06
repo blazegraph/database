@@ -39,6 +39,7 @@ import java.io.InputStream;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.OutputStream;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -795,18 +796,34 @@ abstract public class AbstractKeyArrayIndexProcedure extends
             IResultHandler<ResultBitBuffer, ResultBitBuffer> {
 
         private final boolean[] results;
+        
+        /**
+         * I added this so I could encode information about tuple modification
+         * that takes more than one boolean to encode.  For example, SPOs can
+         * be: INSERTED, REMOVED, UPDATED, NO_OP (2 bits).
+         */
+        private final int multiplier;
+        
         private final AtomicInteger onCount = new AtomicInteger();
 
         public ResultBitBufferHandler(final int nkeys) {
+            
+            this(nkeys, 1);
+            
+        }
+        
+        public ResultBitBufferHandler(final int nkeys, final int multiplier) {
 
-            results = new boolean[nkeys];
+            results = new boolean[nkeys*multiplier];
+            this.multiplier = multiplier;
 
         }
 
         public void aggregate(final ResultBitBuffer result, final Split split) {
 
-            System.arraycopy(result.getResult(), 0, results, split.fromIndex,
-                    split.ntuples);
+            System.arraycopy(result.getResult(), 0, results, 
+                    split.fromIndex*multiplier,
+                    split.ntuples*multiplier);
             
             onCount.addAndGet(result.getOnCount());
 
