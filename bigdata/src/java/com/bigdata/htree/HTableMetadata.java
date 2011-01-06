@@ -90,14 +90,12 @@ public class HTableMetadata implements Externalizable {
 
 	}
 
-	@Override
 	public void readExternal(ObjectInput in) throws IOException,
 			ClassNotFoundException {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
 	}
 
-	@Override
 	public void writeExternal(ObjectOutput out) throws IOException {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();

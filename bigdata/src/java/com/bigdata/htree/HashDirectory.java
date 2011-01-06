@@ -513,7 +513,6 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 		
 	}
 
-	@Override
 	public void delete() throws IllegalStateException {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
@@ -616,7 +615,6 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 			
 		}
 
-		@Override
 		public HashBucket next() {
 
 			if (!hasNext())
@@ -630,7 +628,6 @@ public class HashDirectory extends AbstractHashPage<HashDirectory> {
 
 		}
 
-		@Override
 		public void remove() {
 			throw new UnsupportedOperationException();
 		}
