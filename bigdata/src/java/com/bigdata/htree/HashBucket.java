@@ -473,24 +473,20 @@ public class HashBucket extends AbstractHashPage<HashBucket>//
 
 		}
 
-		@Override
 		public boolean hasNext() {
 			return current < size;
 		}
 
-		@Override
 		public Integer next() {
 			return entries[current++];
 		}
 
-		@Override
 		public void remove() {
 			throw new UnsupportedOperationException();
 		}
 
 	}
 
-	@Override
 	public void delete() throws IllegalStateException {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException();
