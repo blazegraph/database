@@ -75,6 +75,7 @@ import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.BaseAxioms;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
+import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.inf.IJustificationIterator;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.JustificationIterator;
@@ -87,6 +88,7 @@ import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
@@ -2236,6 +2238,13 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    final public BigdataStatement getStatement(final Statement s) {
+
+        return getStatement(s.getSubject(), s.getPredicate(), 
+                s.getObject(), s.getContext());
+        
+    }
+
     final public BigdataStatement getStatement(final Resource s, final URI p,
             final Value o) {
 
@@ -3017,6 +3026,18 @@ abstract public class AbstractTripleStore extends
             final AbstractTripleStore dst,//
             final IElementFilter<ISPO> filter,//
             final boolean copyJustifications//
+            ) {        
+            
+        return copyStatements(dst, filter, copyJustifications,
+                null/* changeLog */);
+        
+    }
+    
+    public long copyStatements(//
+            final AbstractTripleStore dst,//
+            final IElementFilter<ISPO> filter,//
+            final boolean copyJustifications,//
+            final IChangeLog changeLog
             ) {
 
         if (dst == this)
@@ -3030,9 +3051,23 @@ abstract public class AbstractTripleStore extends
 
             if (!copyJustifications) {
 
-                // add statements to the target store.
-                return dst
-                        .addStatements(dst, true/* copyOnly */, itr, null/* filter */);
+                if (changeLog == null) {
+                
+                    // add statements to the target store.
+                    return dst
+                            .addStatements(dst, true/* copyOnly */, itr, null/* filter */);
+                    
+                } else {
+                    
+                    return com.bigdata.rdf.changesets.StatementWriter.addStatements(
+                                    dst, 
+                                    dst, 
+                                    true/* copyOnly */, 
+                                    null/* filter */, 
+                                    itr, 
+                                    changeLog);
+                    
+                }
 
             } else {
 
@@ -3055,8 +3090,8 @@ abstract public class AbstractTripleStore extends
                 final AtomicLong nwritten = new AtomicLong();
 
                 // task will write SPOs on the statement indices.
-                tasks.add(new StatementWriter(this, dst, true/* copyOnly */,
-                        itr, nwritten));
+                tasks.add(new StatementWriter(dst, dst, true/* copyOnly */,
+                        itr, nwritten, changeLog));
 
                 // task will write justifications on the justifications index.
                 final AtomicLong nwrittenj = new AtomicLong();

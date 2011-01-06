@@ -88,22 +88,10 @@ import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.service.DataService;
-import com.bigdata.service.EmbeddedClient;
-import com.bigdata.service.IBigdataClient;
-import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.jini.JiniClient;
 import com.bigdata.util.ChecksumUtility;
 
 /**
  * <p>
-<<<<<<< .working
- * The journal is an append-only persistence capable data structure supporting
- * atomic commit, named indices, and transactions. Writes are logically appended
- * to the journal to minimize disk head movement.
- * </p>
- * <p>
-=======
  * The journal is a persistence capable data structure supporting atomic commit,
  * named indices, and full transactions. The {@link BufferMode#DiskRW} mode
  * provides an persistence scheme based on reusable allocation slots while the
@@ -111,50 +99,13 @@ import com.bigdata.util.ChecksumUtility;
  * Journals may be configured in highly available quorums.
  * </p>
  * <p>
->>>>>>> .merge-right.r3391
  * This class is an abstract implementation of the {@link IJournal} interface
  * that does not implement the {@link IConcurrencyManager},
-<<<<<<< .working
- * {@link IResourceManager}, or {@link ITransactionService} interfaces. There
- * are several classes which DO support all of these features, relying on the
- * {@link AbstractJournal} for their underlying persistence store. These
- * include:
- * <dl>
- * <dt>{@link Journal}</dt>
- * <dd>A concrete implementation that may be used for a standalone immortal
- * database complete with concurrency control and transaction management.</dd>
- * <dt>{@link DataService}</dt>
- * <dd>A class supporting remote clients, key-range partitioned indices,
- * concurrency, and scale-out.</dd>
- * <dt>{@link IBigdataClient}</dt>
- * <dd>Clients connect to an {@link IBigdataFederation}, which is the basis for
- * the scale-out architecture. There are several variants of a federation
- * available, including:
- * <dl>
- * <dt>{@link LocalDataServiceClient}</dt>
- * <dd>Purely local operations against a {@link DataService} with full
- * concurrency controls and transaction management</dd>
- * <dt>{@link EmbeddedClient}</dt>
- * <dd>Operations against a collection of services running in the same JVM with
- * full concurrency controls, transaction management, and key-range partitioned
- * indices.</dd>
- * <dt>{@link JiniClient}</dt>
- * <dd>Operations against a collection of services running on a distributed
- * services framework such as Jini with full concurrency controls, transaction
- * management, and key-range partitioned indices. This is the scale-out
- * solution.</dd>
- * </dl>
- * </dd>
- * </dl>
- * </p>
- * <h2>Limitations</h2>
-=======
  * {@link IResourceManager}, or {@link ITransactionService} interfaces. The
  * {@link Journal} provides a concrete implementation that may be used for a
  * standalone database complete with concurrency control and transaction
  * management.
  * </p> <h2>Limitations</h2>
->>>>>>> .merge-right.r3391
  * <p>
  * The {@link IIndexStore} implementation on this class is NOT thread-safe. The
  * basic limitation is that the mutable {@link BTree} is NOT thread-safe. The
