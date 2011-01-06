@@ -175,127 +175,106 @@ public class MutableBucketData implements IBucketData {
 
 	}
 	
-	@Override
 	public int getHash(int index) {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public int getKeyCount() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public int getLengthMSB() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public Iterator<Integer> hashIterator(int h) {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	@Override
 	public boolean getDeleteMarker(int index) {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	@Override
 	public long getNextAddr() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public long getPriorAddr() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public int getValueCount() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public IRaba getValues() {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	@Override
 	public long getVersionTimestamp(int index) {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public boolean hasDeleteMarkers() {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	@Override
 	public boolean hasVersionTimestamps() {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	@Override
 	public boolean isDoubleLinked() {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	@Override
 	public AbstractFixedByteArrayBuffer data() {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	@Override
 	public IRaba getKeys() {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	@Override
 	public long getMaximumVersionTimestamp() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public long getMinimumVersionTimestamp() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public int getSpannedTupleCount() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public boolean isCoded() {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	@Override
 	public boolean isLeaf() {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	@Override
 	public boolean isReadOnly() {
 		// TODO Auto-generated method stub
 		return false;
