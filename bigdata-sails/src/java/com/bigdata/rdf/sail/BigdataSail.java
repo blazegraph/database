@@ -426,6 +426,18 @@ public class BigdataSail extends SailBase implements Sail {
     }
     
     /**
+     * Return <code>true</code> if the SAIL is using automated truth
+     * maintenance.
+     * 
+     * @see Options#TRUTH_MAINTENANCE
+     */
+    public boolean isTruthMaintenance() {
+        
+        return truthMaintenance;
+        
+    }
+    
+    /**
      * Return <code>true</code> iff star joins are enabled.
      */
     public boolean isStarJoins() {
