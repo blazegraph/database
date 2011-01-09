@@ -44,7 +44,7 @@ import com.bigdata.rawstore.IRawStore;
  * @version $Id$
  */
 public interface IBufferStrategy extends IRawStore, IMRMW {
-    
+
     /**
      * The next offset at which a data item would be written on the store as an
      * offset into the <em>user extent</em>.
@@ -203,50 +203,70 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
     public IAddressManager getAddressManager();
 
     /**
-     * A method that removes assumptions of how a specific strategy determines whether a transaction commit is required.
+     * A method that removes assumptions of how a specific strategy determines
+     * whether a transaction commit is required.
      * 
      * @param block
-     * 			The root block held by the client, can be checked against the state of the Buffer Strategy
+     *            The root block held by the client, can be checked against the
+     *            state of the Buffer Strategy
      * @return whether any modification has occurred.
      */
-	public boolean requiresCommit(IRootBlockView block);
+    public boolean requiresCommit(IRootBlockView block);
 
     /**
-     * A method that removes assumptions of how a specific strategy commits data.  For most strategies the action is void
-     * since the client WORM DISK strategy writes data as allocated.  For the Read Write Strategy more data must be managed
-     * as part of the protocol outside of the RootBlock, and this is the method that triggers that management.
+     * A method that removes assumptions of how a specific strategy commits
+     * data. For most strategies the action is void since the client WORM DISK
+     * strategy writes data as allocated. For the Read Write Strategy more data
+     * must be managed as part of the protocol outside of the RootBlock, and
+     * this is the method that triggers that management. The caller MUST provide
+     * appropriate synchronization.
+     * 
+     * @param abstractJournal
      */
-	public void commit();
+    public void commit(IJournal journal);
 
     /**
      * A method that requires the implementation to discard its buffered write
      * set (if any). The caller is responsible for any necessary synchronization
      * as part of the abort protocol.
      */
-	public void abort();
-	
-	/**
-	 * The RWStrategy requires meta allocation info in the root block, this method is the hook to enable access.
-	 * The metaStartAddr is the address in the file where the allocation blocks are stored.
-	 * 
-	 * @return the metaStartAddr for the root block if any
-	 */
-	 public long getMetaStartAddr();
-		/**
-		 * The RWStrategy requires meta allocation info in the root block, this method is the hook to enable access.
-		 * The metaBitsAddr is the address in the file where the metaBits that control the allocation of the allocation
-		 * blocks themselves is stored.
-		 * 
-		 * @return the metaBitsAddr for the root block if any
-		 */
-	 public long getMetaBitsAddr();
-		/**
-		 * @return the number of bits available in the address to define offset
-		 */
+    public void abort();
 
-	 public int getOffsetBits();
-		/**
-		 * @return the maximum record size supported by this strategy
-		 */
-	 public int getMaxRecordSize();
+    /**
+     * The RWStrategy requires meta allocation info in the root block, this
+     * method is the hook to enable access. The metaStartAddr is the address in
+     * the file where the allocation blocks are stored.
+     * 
+     * @return the metaStartAddr for the root block if any
+     */
+    public long getMetaStartAddr();
+
+    /**
+     * The RWStrategy requires meta allocation info in the root block, this
+     * method is the hook to enable access. The metaBitsAddr is the address in
+     * the file where the metaBits that control the allocation of the allocation
+     * blocks themselves is stored.
+     * 
+     * @return the metaBitsAddr for the root block if any
+     */
+    public long getMetaBitsAddr();
+
+    /**
+     * @return the number of bits available in the address to define offset
+     */
+
+    public int getOffsetBits();
+
+    /**
+     * @return the maximum record size supported by this strategy
+     */
+    public int getMaxRecordSize();
+
+    /**
+     * Return <code>true</code> if the store uses per-record checksums. When
+     * <code>true</code>, an additional 4 bytes are written after the record on
+     * the disk. Those bytes contain the checksum of the record.
+     */
+    public boolean useChecksums();
+
 }

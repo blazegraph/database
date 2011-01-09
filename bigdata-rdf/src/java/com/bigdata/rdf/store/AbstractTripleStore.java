@@ -902,6 +902,19 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_INLINE_BNODES = "false";
 
         /**
+         * Set up database to inline date/times directly into the statement
+         * indices rather than using the lexicon to map them to term identifiers
+         * and back. Date times will be converted to UTC, then stored as
+         * milliseconds since the epoch. Thus if you inline date/times you will
+         * lose the canonical representation of the date/time, and you will not
+         * be able to recover the original time zone of the date/time.
+         */
+        String INLINE_DATE_TIMES = AbstractTripleStore.class.getName()
+                + ".inlineDateTimes";
+
+        String DEFAULT_INLINE_DATE_TIMES = "false";
+        
+        /**
          * The name of the {@link IExtensionFactory} class. The implementation 
          * MUST declare a constructor that accepts an 
          * {@link IDatatypeURIResolver} as its only argument.  The 
@@ -1293,6 +1306,21 @@ abstract public class AbstractTripleStore extends
         // set property that will let the contained relations locate their container.
         tmp.setProperty(RelationSchema.CONTAINER, getNamespace());
         
+
+        if (Boolean.valueOf(tmp.getProperty(Options.TEXT_INDEX,
+                Options.DEFAULT_TEXT_INDEX))) {
+
+            /*
+             * If the text index is enabled for a new kb instance, then disable
+             * the fieldId component of the full text index key since it is not
+             * used by the RDF database and will just waste space in the index.
+             * 
+             * Note: Also see below where this is set on the global row store.
+             */
+            tmp.setProperty(FullTextIndex.Options.FIELDS_ENABLED, "false");
+            
+        }
+       
         final IResourceLock resourceLock = acquireExclusiveLock();
 
         try {
@@ -1392,6 +1420,14 @@ abstract public class AbstractTripleStore extends
                     // vocabulary.
                     map.put(TripleStoreSchema.VOCABULARY, vocab);
 
+                    if (lexiconRelation.isTextIndex()) {
+                        /*
+                         * Per the logic and commentary at the top of create(),
+                         * disable this option on the global row store.
+                         */
+                        map.put(FullTextIndex.Options.FIELDS_ENABLED, "false");
+                    }
+                    
                     // Write the map on the row store.
                     getIndexManager().getGlobalRowStore().write(
                             RelationSchema.INSTANCE, map);
@@ -2789,7 +2825,7 @@ abstract public class AbstractTripleStore extends
         
             final StringBuilder sb = new StringBuilder();
 
-            while (itr.hasNext()) {
+            while (itr2.hasNext()) {
 
                 final BigdataValue term = itr2.next();
 

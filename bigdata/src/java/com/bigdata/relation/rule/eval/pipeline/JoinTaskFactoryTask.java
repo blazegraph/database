@@ -3,7 +3,9 @@ package com.bigdata.relation.rule.eval.pipeline;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+
 import org.apache.log4j.Logger;
+
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
@@ -18,7 +20,6 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
-import com.bigdata.relation.rule.eval.IRuleState;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.StoreManager.ManagedJournal;
 import com.bigdata.service.AbstractDistributedFederation;

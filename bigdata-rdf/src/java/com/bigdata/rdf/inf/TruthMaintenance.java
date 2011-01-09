@@ -507,7 +507,7 @@ public class TruthMaintenance {
 
         final long elapsed = System.currentTimeMillis() - begin;
         
-        stats.elapsed += elapsed;
+        stats.elapsed.add(elapsed);
 
         if (INFO)
             log.info("Computed closure in " + elapsed + "ms");

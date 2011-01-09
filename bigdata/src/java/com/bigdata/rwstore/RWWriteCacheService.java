@@ -24,136 +24,55 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
-import com.bigdata.io.WriteCache;
-import com.bigdata.io.WriteCache.FileChannelScatteredWriteCache;
-import com.bigdata.io.WriteCacheService;
+import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.io.writecache.WriteCacheService;
+import com.bigdata.io.writecache.WriteCache.FileChannelScatteredWriteCache;
+import com.bigdata.quorum.Quorum;
 
 /**
  * Defines the WriteCacheService to be used by the RWStore.
+ * 
  * @author mgc
- *
  */
 public class RWWriteCacheService extends WriteCacheService {
 
     protected static final Logger log = Logger.getLogger(RWWriteCacheService.class);
     
-	/**
-     * Simple implementation for a {@link RandomAccessFile} to handle the direct backing store.
-     */
-    private static class ReopenFileChannel implements
-            IReopenChannel<FileChannel> {
+    public RWWriteCacheService(final int nbuffers, final long fileExtent,
+            final IReopenChannel<? extends Channel> opener,
+            final Quorum quorum) throws InterruptedException,
+            IOException {
 
-        final private File file;
-
-        private final String mode;
-
-        private volatile RandomAccessFile raf;
-
-        public ReopenFileChannel(final File file, final RandomAccessFile raf, final String mode)
-                throws IOException {
-
-            this.file = file;
-
-            this.mode = mode;
-            
-            this.raf = raf;
-
-            reopenChannel();
-
-        }
-
-        public String toString() {
-
-            return file.toString();
-
-        }
-
-        /**
-         * Hook used by the unit tests to destroy their test files.
-         */
-        public void destroy() {
-            try {
-                raf.close();
-            } catch (IOException e) {
-                if (!file.delete())
-                    log.warn("Could not delete file: " + file);
-            }
-        }
-
-        synchronized public FileChannel reopenChannel() throws IOException {
-
-            if (raf != null && raf.getChannel().isOpen()) {
-
-                /*
-                 * The channel is still open. If you are allowing concurrent
-                 * reads on the channel, then this could indicate that two
-                 * readers each found the channel closed and that one was able
-                 * to re-open the channel before the other such that the channel
-                 * was open again by the time the 2nd reader got here.
-                 */
-
-                return raf.getChannel();
-
-            }
-
-            // open the file.
-            this.raf = new RandomAccessFile(file, mode);
-
-            if (log.isInfoEnabled())
-                log.info("(Re-)opened file: " + file);
-
-            return raf.getChannel();
-
-        }
-
-    };
-
-    public RWWriteCacheService(int nbuffers, final File file, final RandomAccessFile raf, final String mode) throws InterruptedException, IOException {
-		super(nbuffers, new ReopenFileChannel(file, raf, mode));
-		// TODO Auto-generated constructor stub
-	}
+        super(nbuffers, true/* useChecksum */, fileExtent, opener,
+                quorum);
+    }
 
     /**
      * Provide default FileChannelScatteredWriteCache
      */
-	@Override
-	protected WriteCache newWriteCache(ByteBuffer buf, IReopenChannel<? extends Channel> opener)
-			throws InterruptedException {
-		return new FileChannelScatteredWriteCache(buf, (IReopenChannel<FileChannel>) opener);
-	}
+    @Override
+    public WriteCache newWriteCache(final ByteBuffer buf,
+            final boolean useChecksum,
+            final boolean bufferHasData,
+            final IReopenChannel<? extends Channel> opener)
+            throws InterruptedException {
 
-	/**
-	 * Called to check if a write has already been flushed.  This is only made if a write has been made to
-	 * previously committed data (in the current RW session)
-	 * 
-	 * If dirt writeCaches are flushed in order then it does not matter, however, if we want to be able to combine
-	 * writeCaches then it makes sense that there are no duplicate writes.
-	 * 
-	 * On reflection this is more likely needed since for the RWStore, depending on session parameters, the same
-	 * cached area could be overwritten. We could still maintain multiple writes but we need a guarantee of order
-	 * when retrieving data from the write cache (newest first).
-	 * 
-	 * So the question is, whether it is better to keep cache consistent or to constrain with read order.
+        final boolean highlyAvailable = getQuorum() != null
+                && getQuorum().isHighlyAvailable();
 
-	 * @param addr the address to check
-	 */
-	public void clearWrite(long addr) {
-		WriteCache cache = recordMap.get(addr);
-		if (cache != null) {
-			cache.clearAddrMap(addr);
-			recordMap.remove(addr);
-		}
-	}
+        return new FileChannelScatteredWriteCache(buf, true/* useChecksum */,
+        		highlyAvailable,
+        		bufferHasData,
+                (IReopenChannel<FileChannel>) opener, null);
 
+    }
+    
 }

@@ -30,6 +30,7 @@ package com.bigdata.rawstore;
 import java.nio.ByteBuffer;
 
 import com.bigdata.LRUNexus;
+import com.bigdata.rwstore.IAllocationContext;
 
 /**
  * Abstract base class for {@link IRawStore} implementations. This class uses a
@@ -75,5 +76,24 @@ abstract public class AbstractRawStore implements IRawStore {
      */
 	public void delete(long addr) {
 	    // NOP.
+	}
+
+	public void delete(long addr, IAllocationContext context) {
+		delete(addr);
+	}
+
+	public long write(ByteBuffer data, IAllocationContext context) {
+		return write(data);
+	}
+
+	public long write(ByteBuffer data, long oldAddr, IAllocationContext context) {
+		return write(data, oldAddr);
+	}
+
+    /**
+     * The default implementation is a NOP.
+     */
+	public void detachContext(IAllocationContext context) {
+		// NOP
 	}
 }

@@ -32,7 +32,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceArray;
@@ -865,9 +864,13 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
                 // remove from cache and free the oldChildAddr if the Strategy
                 // supports it
-                if(btree.storeCache!=null)
+                if (btree.storeCache!=null) {
+                    // remove from cache.
                     btree.storeCache.remove(oldChildAddr);
+                }
+                // free the oldChildAddr if the Strategy supports it
                 btree.store.delete(oldChildAddr);
+                // System.out.println("Deleting " + oldChildAddr);
 
                 // Stash reference to the new child.
                 // childRefs[i] = btree.newRef(newChild);

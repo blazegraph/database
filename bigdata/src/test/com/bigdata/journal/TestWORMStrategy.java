@@ -38,10 +38,13 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * Test suite for {@link BufferMode#DiskWORM} journals.
+ * Test suite for {@link WORMStrategy} journal.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see TestWORMStrategyNoCache
+ * @see TestWORMStrategyOneCacheBuffer
  */
 public class TestWORMStrategy extends AbstractJournalTestCase {
 
@@ -238,6 +241,7 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
                     + writeCacheEnabled);
 
             return new Journal(properties).getBufferStrategy();
+//            return new Journal(properties);
 
         }
 
@@ -337,21 +341,10 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
     }
 
     /**
-     * Note: The write cache is allocated by the {@link WORMStrategy} from
-     * the {@link DirectBufferPool} and should be released back to that pool as
-     * well, so the size of the {@link DirectBufferPool} SHOULD NOT grow as we
-     * run these tests. If it does, then there is probably a unit test which is
-     * not tearing down its {@link Journal} correctly.
+     * The write cache is enabled for this version of the test suite and the
+     * default #of write cache buffers will be used as specified by
+     * {@link Options#DEFAULT_WRITE_CACHE_BUFFER_COUNT}.
      */
-//    /**
-//     * Note: Since the write cache is a direct ByteBuffer we have to make it
-//     * very small (or disable it entirely) when running the test suite or the
-//     * JVM will run out of memory - this is exactly the same (Sun) bug which
-//     * motivates us to reuse the same ByteBuffer when we overflow a journal
-//     * using a write cache. Since small write caches are disallowed, we wind up
-//     * testing with the write cache disabled!
-//     */
     private static final boolean writeCacheEnabled = true;
     
 }
-    

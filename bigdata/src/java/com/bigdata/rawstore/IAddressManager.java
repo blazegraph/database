@@ -27,11 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rawstore;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
-
-import com.bigdata.btree.Node;
 
 /**
  * An interface that encapsulates operations on opaque identifiers used to
@@ -84,12 +79,15 @@ public interface IAddressManager {
     public long getOffset(long addr);
 
     /**
-     * The length of the datum in bytes.
+     * The length of the datum in bytes. This must be the actual length of the
+     * record on the disk, not the length of the caller's byte[]. This is
+     * necessary in order to support transparent checksums and/or compression
+     * for records in the {@link IRawStore}.
      * 
      * @param addr
      *            The opaque identifier that is the within store locator for
      *            some datum.
-     *            
+     * 
      * @return The offset of that datum.
      */
     public int getByteCount(long addr);

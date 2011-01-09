@@ -49,6 +49,7 @@ import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.RWStrategy;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -230,8 +231,8 @@ public class DataLoader {
 
         if (buffer != null) {
 
-            if(log.isInfoEnabled())
-                log.info("Flushing the buffer.");
+            if(log.isDebugEnabled())
+                log.debug("Flushing the buffer.");
             
             buffer.flush();
             
@@ -610,7 +611,7 @@ public class DataLoader {
             
             database.commit();
 
-            totals.commitTime += System.currentTimeMillis() - beginCommit;
+            totals.commitTime.add(System.currentTimeMillis() - beginCommit);
 
             if (log.isInfoEnabled())
                 log.info("commit: latency="+totals.commitTime+"ms");
@@ -753,20 +754,19 @@ public class DataLoader {
 
             if (rdfStream == null) {
 
-                /*
-                 * If we do not find as a Resource then try the file system.
-                 */
+            /*
+             * If we do not find as a Resource then try the file system.
+             */
             
-                final File file = new File(resource);
+            final File file = new File(resource);
             
-                if(file.exists()) {
+            if(file.exists()) {
                 
-                    loadFiles(totals, 0/* depth */, file, baseURL,
+                loadFiles(totals, 0/* depth */, file, baseURL,
                         rdfFormat, null, filter, endOfBatch);
 
-                    return;
+                return;
                 
-                }
             }
             
         }
@@ -801,6 +801,8 @@ public class DataLoader {
 
             rdfStream.close();
 
+        }
+        
         }
         
     }
@@ -854,8 +856,8 @@ public class DataLoader {
 
         if (file.isDirectory()) {
 
-            if (log.isInfoEnabled())
-                log.info("loading directory: " + file);
+            if (log.isDebugEnabled())
+                log.debug("loading directory: " + file);
 
 //            final LoadStats loadStats = new LoadStats();
 
@@ -870,7 +872,7 @@ public class DataLoader {
 //                        rdfFormat);
 
                 loadFiles(totals, depth + 1, f, baseURI, rdfFormat, defaultGraph, filter,
-                        (depth == 0 && i < files.length ? false : endOfBatch));
+                        (depth == 0 && i < (files.length-1) ? false : endOfBatch));
                 
             }
             
@@ -920,7 +922,7 @@ public class DataLoader {
 
             try {
 
-                // baseURI for this file. @todo do we need to encode this URI?
+                // baseURI for this file.
                 final String s = baseURI != null ? baseURI : file.toURI()
                         .toString();
 
@@ -1022,9 +1024,9 @@ public class DataLoader {
 
             final long nstmts = loader.getStatementsAdded();
 
-            stats.toldTriples = nstmts;
+            stats.toldTriples.set( nstmts );
 
-            stats.loadTime = System.currentTimeMillis() - begin;
+            stats.loadTime.set(System.currentTimeMillis() - begin);
 
             if (closureEnum == ClosureEnum.Incremental
                     || (endOfBatch && closureEnum == ClosureEnum.Batch)) {
@@ -1052,20 +1054,24 @@ public class DataLoader {
 
                 database.commit();
 
-                stats.commitTime = System.currentTimeMillis() - beginCommit;
+                stats.commitTime.set(System.currentTimeMillis() - beginCommit);
 
                 if (log.isInfoEnabled())
                     log.info("commit: latency=" + stats.commitTime + "ms");
 
             }
 
-            stats.totalTime = System.currentTimeMillis() - begin;
+            stats.totalTime.set(System.currentTimeMillis() - begin);
+
+            // aggregate stats
+            totals.add(stats);
 
             if (log.isInfoEnabled()) {
-                log.info(stats.toString());
+				log.info("file:: " + stats + "; totals:: " + totals);
                 if (buffer != null
                         && buffer.getDatabase() instanceof AbstractLocalTripleStore) {
-                    log.info(((AbstractLocalTripleStore) buffer.getDatabase())
+                	if(log.isDebugEnabled())
+                    log.debug(((AbstractLocalTripleStore) buffer.getDatabase())
                             .getLocalBTreeBytesWritten(new StringBuilder())
                             .toString());
                 }
@@ -1074,6 +1080,9 @@ public class DataLoader {
             return;
             
         } catch ( Exception ex ) {
+
+        	// aggregate stats even for exceptions.
+            totals.add(stats);
 
             /*
              * Note: discard anything in the buffer in case auto-flush is
@@ -1111,10 +1120,10 @@ public class DataLoader {
             
             throw ex2;
             
-        } finally {
-            
-            // aggregate regardless of the outcome.
-            totals.add(stats);
+//        } finally {
+//            
+//            // aggregate regardless of the outcome.
+//            totals.add(stats);
             
         }
 
@@ -1131,12 +1140,6 @@ public class DataLoader {
      */
     public ClosureStats doClosure() {
         
-        if (buffer == null)
-            throw new IllegalStateException();
-        
-        // flush anything in the buffer.
-        buffer.flush();
-        
         final ClosureStats stats;
         
         switch (closureEnum) {
@@ -1147,6 +1150,12 @@ public class DataLoader {
             /*
              * Incremental truth maintenance.
              */
+            
+            if (buffer == null)
+                throw new IllegalStateException();
+            
+            // flush anything in the buffer.
+            buffer.flush();
             
             stats = new TruthMaintenance(inferenceEngine)
                     .assertAll((TempTripleStore) buffer.getStatementStore());
@@ -1194,7 +1203,7 @@ public class DataLoader {
      * support multiple data files within a single archive.
      * 
      * @param args
-     *            [-closure][-namespace <i>namespace</i>] propertyFile (fileOrDir)+
+     *            [-closure][-verbose][-namespace <i>namespace</i>] propertyFile (fileOrDir)+
      * 
      * @throws IOException
      */
@@ -1203,6 +1212,7 @@ public class DataLoader {
         // default namespace.
         String namespace = "kb";
         boolean doClosure = false;
+        boolean verbose = false;
         RDFFormat rdfFormat = null;
         String baseURI = null;
         
@@ -1230,6 +1240,10 @@ public class DataLoader {
 
                     doClosure = true;
 
+                } else if (arg.equals("-verbose")) {
+
+                    verbose = true;
+
                 } else {
 
                     System.err.println("Unknown argument: " + arg);
@@ -1250,7 +1264,7 @@ public class DataLoader {
         
         final int remaining = args.length - i;
 
-        if (remaining < 2) {
+        if (remaining < 1/*allow run w/o any named files or directories*/) {
 
             System.err.println("Not enough arguments.");
 
@@ -1339,8 +1353,10 @@ public class DataLoader {
         	
             jnl = new Journal(properties);
             
-            final long firstOffset = jnl.getRootBlockView().getNextOffset();
-            
+            // #of bytes on the journal before (user extent).
+//            final long firstOffset = jnl.getRootBlockView().getNextOffset();
+            final long userData0 = jnl.getBufferStrategy().size();
+
             System.out.println("Journal file: "+jnl.getFile());
 
             AbstractTripleStore kb = (AbstractTripleStore) jnl
@@ -1356,7 +1372,8 @@ public class DataLoader {
             }
 
             final LoadStats totals = new LoadStats();
-            final DataLoader dataLoader = kb.getDataLoader();
+            final DataLoader dataLoader = //kb.getDataLoader();
+            	new DataLoader(properties,kb); // use the override properties.
             
             for (File fileOrDir : files) {
 
@@ -1372,8 +1389,18 @@ public class DataLoader {
             dataLoader.endSource();
 
 			System.out.println("Load: " + totals);
-            
-			if (dataLoader.closureEnum == ClosureEnum.None && doClosure) {
+			
+        	if (dataLoader.closureEnum == ClosureEnum.None && doClosure) {
+
+				if (verbose) {
+
+					System.out.println(jnl.getCounters().toString());
+
+					System.out
+							.println(((AbstractLocalTripleStore) dataLoader.database)
+									.getLocalBTreeBytesWritten(
+											new StringBuilder()).toString());
+				}
 
 				System.out.println("Computing closure.");
 
@@ -1382,13 +1409,38 @@ public class DataLoader {
                 System.out.println("Closure: "+stats.toString());
 
 			}
-            
-            jnl.commit();
-            
-            final long lastOffset = jnl.getRootBlockView().getNextOffset();
 
-			System.out.println("Wrote: " + (lastOffset - firstOffset)
-					+ " bytes.");
+			jnl.commit();
+
+			if (verbose) {
+
+				System.out.println(jnl.getCounters().toString());
+
+				System.out
+						.println(((AbstractLocalTripleStore) dataLoader.database)
+								.getLocalBTreeBytesWritten(new StringBuilder())
+								.toString());
+
+				if (jnl.getBufferStrategy() instanceof RWStrategy) {
+
+					final StringBuilder sb = new StringBuilder();
+
+					((RWStrategy) jnl.getBufferStrategy()).getRWStore()
+							.showAllocators(sb);
+
+					System.out.println(sb);
+
+				}
+
+			}
+
+            // #of bytes on the journal (user data only).
+            final long userData1 = jnl.getBufferStrategy().size();
+            
+            // #of bytes written (user data only)
+            final long bytesWritten = (userData1 - userData0);
+
+			System.out.println("Wrote: " + bytesWritten + " bytes.");
 
 			final long elapsedTotal = System.currentTimeMillis() - begin;
 			
@@ -1408,7 +1460,7 @@ public class DataLoader {
 
     private static void usage() {
         
-        System.err.println("usage: [-namespace namespace] propertyFile (fileOrDir)+");
+        System.err.println("usage: [-closure][-verbose][-namespace namespace] propertyFile (fileOrDir)+");
 
         System.exit(1);
         
@@ -1451,8 +1503,8 @@ public class DataLoader {
                     || (name.endsWith(".gz") && RDFFormat.forFileName(name
                             .substring(0, name.length() - 3)) != null);
 
-			if (log.isInfoEnabled())
-				log.info("dir=" + dir + ", name=" + name + " : isRDF=" + isRDF);
+			if (log.isDebugEnabled())
+				log.debug("dir=" + dir + ", name=" + name + " : isRDF=" + isRDF);
 
             return isRDF;
 

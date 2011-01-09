@@ -2,8 +2,6 @@ package com.bigdata.search;
 
 import java.util.ArrayList;
 
-import org.apache.lucene.analysis.Token;
-
 /**
  * Mutable metadata for the occurrences of a term within a field of some
  * document.
@@ -33,8 +31,7 @@ public class TermMetadata {
      */
     public double localTermWeight;
 
-    // @todo make private?
-    ArrayList<String> occurrences = new ArrayList<String>();
+    private final ArrayList<String> occurrences = new ArrayList<String>();
     
     /**
      * Add an occurrence.

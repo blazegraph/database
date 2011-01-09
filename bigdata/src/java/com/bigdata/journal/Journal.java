@@ -49,6 +49,9 @@ import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.config.IntegerValidator;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.locator.ILocatableResource;
@@ -77,11 +80,28 @@ import com.bigdata.util.concurrent.ShutdownHelper;
 public class Journal extends AbstractJournal implements IConcurrencyManager,
         /*ILocalTransactionManager,*/ IResourceManager {
 
+//    /*
+//     * These fields were historically marked as [final] and set by the
+//     * constructor. With the introduction of high availability these fields can
+//     * not be final because the CREATE of the journal must be deferred until a
+//     * quorum leader has been elected.
+//     * 
+//     * The pattern for these fields is that they are assigned by create() and
+//     * are thereafter immutable. The fields are marked as [volatile] so the
+//     * state change when they are set will be visible without explicit
+//     * synchronization (many methods use volatile reads on these fields).
+//     */
+    
     /**
      * Object used to manage local transactions. 
      */
     private final AbstractLocalTransactionManager localTransactionManager; 
-    
+
+    /**
+     * Object used to manage tasks executing against named indices.
+     */
+    private final ConcurrencyManager concurrencyManager;
+
     /**
      * Options understood by the {@link Journal}.
      * 
@@ -145,8 +165,15 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      */
     public Journal(final Properties properties) {
         
-        super(properties);
-     
+        this(properties, null/* quorum */);
+    
+    }
+
+    public Journal(final Properties properties,
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum) {
+
+        super(properties, quorum);
+
         tempStoreFactory = new TemporaryStoreFactory(properties);
         
         executorService = Executors.newCachedThreadPool(new DaemonThreadFactory
@@ -193,13 +220,59 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         concurrencyManager = new ConcurrencyManager(properties,
                 localTransactionManager, this);
+        
+     }
 
-    }
-
+//    public void init() {
+//        
+//        super.init();
+//        
+//        localTransactionManager = newLocalTransactionManager();
+//
+//        concurrencyManager = new ConcurrencyManager(properties,
+//                localTransactionManager, this);
+//        
+//    }
+    
     protected AbstractLocalTransactionManager newLocalTransactionManager() {
 
         final JournalTransactionService abstractTransactionService = new JournalTransactionService(
-                properties, this).start();
+                properties, this) {
+
+            {
+                
+                final long lastCommitTime = Journal.this.getLastCommitTime();
+                
+                if (lastCommitTime != 0L) {
+
+                    /*
+                     * Notify the transaction service on startup so it can set
+                     * the effective release time based on the last commit time
+                     * for the store.
+                     */
+                    updateReleaseTimeForBareCommit(lastCommitTime);
+                    
+                }
+                
+            }
+            
+            protected void activateTx(final TxState state) {
+                final IBufferStrategy bufferStrategy = Journal.this.getBufferStrategy();
+                if(bufferStrategy instanceof RWStrategy) {
+                    ((RWStrategy)bufferStrategy).getRWStore().activateTx();
+                }
+                super.activateTx(state);
+            }
+
+            protected void deactivateTx(final TxState state) {
+                super.deactivateTx(state);
+                final IBufferStrategy bufferStrategy = Journal.this.getBufferStrategy();
+                if(bufferStrategy instanceof RWStrategy) {
+                    ((RWStrategy)bufferStrategy).getRWStore().deactivateTx();
+                }
+            }
+            
+        }.start();
 
         return new AbstractLocalTransactionManager() {
 
@@ -212,6 +285,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             /**
              * Extended to shutdown the embedded transaction service.
              */
+            @Override
             public void shutdown() {
 
                 ((JournalTransactionService) getTransactionService())
@@ -224,6 +298,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             /**
              * Extended to shutdown the embedded transaction service.
              */
+            @Override
             public void shutdownNow() {
 
                 ((JournalTransactionService) getTransactionService())
@@ -245,20 +320,15 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     public CounterSet getCounters() {
 
-//        if (counters == null) {
-
         final CounterSet counters = super.getCounters();
             
         counters.attach(concurrencyManager.getCounters());
 
         counters.attach(localTransactionManager.getCounters());
             
-//        }
-        
         return counters;
         
     }
-//    private CounterSet counters;
     
     /*
      * IResourceManager
@@ -682,8 +752,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
         try {
 
-            return localTransactionManager.getTransactionService().newTx(
-                    timestamp);
+			return getTransactionService().newTx(timestamp);
 
         } catch (IOException e) {
 
@@ -796,8 +865,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * IConcurrencyManager
      */
     
-    private final ConcurrencyManager concurrencyManager;
-
     public ConcurrencyManager getConcurrencyManager() {
         
         return concurrencyManager;
@@ -871,13 +938,20 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      */
     synchronized public void shutdownNow() {
 
-        if(!isOpen()) return;
+        if (!isOpen())
+            return;
 
-        executorService.shutdownNow();
-        
-        concurrencyManager.shutdownNow();
-        
-        localTransactionManager.shutdownNow();
+        // Note: can be null if error in ctor.
+        if (executorService != null)
+            executorService.shutdownNow();
+
+        // Note: can be null if error in ctor.
+        if (concurrencyManager != null)
+            concurrencyManager.shutdownNow();
+
+        // Note: can be null if error in ctor.
+        if (localTransactionManager != null)
+            localTransactionManager.shutdownNow();
 
         super.shutdownNow();
         
@@ -887,8 +961,10 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
         super.deleteResources();
         
-        tempStoreFactory.closeAll();
-        
+        // Note: can be null if error in ctor.
+        if (tempStoreFactory != null)
+            tempStoreFactory.closeAll();
+
     }
 
     public <T> Future<T> submit(AbstractTask<T> task) {
@@ -923,6 +999,12 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         return concurrencyManager.getTransactionManager();
         
+    }
+    
+    public ITransactionService getTransactionService() {
+    	
+    	return getTransactionManager().getTransactionService();
+
     }
 
     public WriteExecutorService getWriteService() {
@@ -985,7 +1067,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * @throws UnsupportedOperationException
      *             since {@link #overflow()} is not supported.
      */
-    public File getIndexSegmentFile(final IndexMetadata indexMetadata) {
+    public File getIndexSegmentFile(IndexMetadata indexMetadata) {
         
         throw new UnsupportedOperationException();
         
@@ -1168,7 +1250,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         return resourceLockManager;
         
     }
-    private ResourceLockService resourceLockManager;
+    private final ResourceLockService resourceLockManager;
 
     public ExecutorService getExecutorService() {
         

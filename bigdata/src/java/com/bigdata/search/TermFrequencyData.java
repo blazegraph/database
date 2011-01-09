@@ -27,8 +27,9 @@ public class TermFrequencyData {
      */
     final public HashMap<String,TermMetadata> terms = new HashMap<String,TermMetadata>(); 
     
-    public TermFrequencyData(long docId, int fieldId, String token) {
-        
+    public TermFrequencyData(final long docId, final int fieldId,
+            final String token) {
+
         this.docId = docId;
         
         this.fieldId = fieldId;
@@ -43,9 +44,10 @@ public class TermFrequencyData {
      * @param token
      *            The token.
      * 
-     * @return true iff the termText did not previously exist for this {@link TermFrequencyData}.
+     * @return true iff the termText did not previously exist for this
+     *         {@link TermFrequencyData}.
      */
-    public boolean add(String token) {
+    public boolean add(final String token) {
         
         final String termText = token;
         
@@ -127,7 +129,7 @@ public class TermFrequencyData {
 
         for(TermMetadata md : terms.values()) { 
             
-            int termFreq = md.termFreq();
+            final int termFreq = md.termFreq();
 
             md.localTermWeight = (double)termFreq / magnitude;
             

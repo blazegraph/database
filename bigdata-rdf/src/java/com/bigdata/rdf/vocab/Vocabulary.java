@@ -29,7 +29,7 @@ package com.bigdata.rdf.vocab;
 
 import java.util.Iterator;
 import org.openrdf.model.Value;
-
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.bop.IConstant;
 import com.bigdata.rdf.internal.IV;
 

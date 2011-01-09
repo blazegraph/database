@@ -475,23 +475,23 @@ public class TaskATest
             
             
             // Explicit + (Entailments = Axioms + Inferred)
-            final long totalTriples = loadStats[run].toldTriples
-                    + (closureStats!=null?closureStats.mutationCount : 0);
+            final long totalTriples = loadStats[run].toldTriples.get()
+                    + (closureStats!=null?closureStats.mutationCount.get() : 0);
 
             // loadTime + closureTime + commitTime.
-            final long totalTime = loadStats[run].loadTime
-                    + (closureStats != null ? closureStats.elapsed : 0)
-                    + loadStats[run].commitTime;
+            final long totalTime = loadStats[run].loadTime.get()
+                    + (closureStats != null ? closureStats.elapsed.get() : 0)
+                    + loadStats[run].commitTime.get();
             
             System.out.println( all_sources[ run * 3 ]+ ", " +
                     ( errors[ run ] == null
                       ? "Ok"
                             +", "+loadStats[run].toldTriples
-                            +", "+loadStats[run].loadTime/1000
-                            +", "+tps(loadStats[run].toldTriples,loadStats[run].loadTime)
-                            +", "+(closureStats!=null?closureStats.mutationCount:"")
-                            +", "+(closureStats!=null?closureStats.elapsed/1000:"")
-                            +", "+(closureStats!=null?tps(closureStats.mutationCount,closureStats.elapsed):"")
+                            +", "+loadStats[run].loadTime.get()/1000
+                            +", "+tps(loadStats[run].toldTriples.get(),loadStats[run].loadTime.get())
+                            +", "+(closureStats!=null?closureStats.mutationCount.get():"")
+                            +", "+(closureStats!=null?closureStats.elapsed.get()/1000:"")
+                            +", "+(closureStats!=null?tps(closureStats.mutationCount.get(),closureStats.elapsed.get()):"")
                             +", "+loadStats[run].commitTime
                             +", "+tps(totalTriples,totalTime)
 

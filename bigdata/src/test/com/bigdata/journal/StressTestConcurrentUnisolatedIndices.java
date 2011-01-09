@@ -103,6 +103,11 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         
         final Journal journal = new Journal(properties);
 
+//        final IBufferStrategy bufferStrategy = journal.getBufferStrategy();
+//        if (bufferStrategy instanceof RWStrategy) {
+//            ((RWStrategy)bufferStrategy).getRWStore().activateTx();
+//        }
+
         try {
         
 //        if(journal.getBufferStrategy() instanceof MappedBufferStrategy) {
@@ -118,17 +123,20 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 //        }
 
         doConcurrentClientTest(journal,//
-                10,// timeout
+                30,// timeout
                 20,// nresources
                 1, // minLocks
                 3, // maxLocks
-                1000, // ntrials
+                100, // ntrials
                 3, // keyLen
-                100, // nops
+                1000, // nops
                 0.02d // failureRate
         );
         
         } finally {
+//            if (bufferStrategy instanceof RWStrategy) {
+//                ((RWStrategy)bufferStrategy).getRWStore().deactivateTx();
+//            }
             
             journal.destroy();
             
@@ -404,76 +412,73 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
          */
         public Object doTask() throws Exception {
 
-            // the index names on which the writer holds a lock.
-            final String[] resource = getResource();
-            
-            final IIndex[] indices = new IIndex[resource.length];
-            
-            for (int i = 0; i < resource.length; i++) {
+			// the index names on which the writer holds a lock.
+			final String[] resource = getResource();
 
-                indices[i] = getJournal().getIndex(resource[i]);
+			final IIndex[] indices = new IIndex[resource.length];
 
-                final Thread t = Thread.currentThread();
-                
-                if (btrees.putIfAbsent(indices[i], t) != null) {
+			for (int i = 0; i < resource.length; i++) {
+				indices[i] = getJournal().getIndex(resource[i]);
 
-                    throw new AssertionError(
-                            "Unisolated index already in use: " + resource[i]);
+				final Thread t = Thread.currentThread();
 
-                }
+				if (btrees.putIfAbsent(indices[i], t) != null) {
 
-            }
-            
-            try {
+					throw new AssertionError("Unisolated index already in use: " + resource[i]);
 
-                // Random write operations on the named index(s).
+				}
 
-                for (int i = 0; i < nops; i++) {
+			}
 
-                    final IIndex ndx = indices[i % resource.length];
-                    
-                    final byte[] key = new byte[keyLen];
+			try {
 
-                    r.nextBytes(key);
+				// Random write operations on the named index(s).
 
-                    if (r.nextInt(100) > 10) {
+				for (int i = 0; i < nops; i++) {
 
-                        byte[] val = new byte[5];
+					final IIndex ndx = indices[i % resource.length];
 
-                        r.nextBytes(val);
+					final byte[] key = new byte[keyLen];
 
-                        ndx.insert(key, val);
+					r.nextBytes(key);
 
-                    } else {
+					if (r.nextInt(100) > 10) {
 
-                        ndx.remove(key);
+						byte[] val = new byte[5];
 
-                    }
+						r.nextBytes(val);
 
-                }
+						ndx.insert(key, val);
 
-                if (r.nextDouble() < failureRate) {
+					} else {
 
-                    throw new SpuriousException();
+						ndx.remove(key);
 
-                }
+					}
 
-                return null;
-                
-            } finally {
+				}
 
-                for(int i=0; i<resource.length; i++) {
+				if (r.nextDouble() < failureRate) {
 
-                    final IIndex ndx = indices[i];
-                    
-                    if (ndx != null)
-                        btrees.remove(ndx);
-                    
-                }
+					throw new SpuriousException();
 
-            }
-            
-        }
+				}
+
+				return null;
+
+			} finally {
+
+				for (int i = 0; i < resource.length; i++) {
+
+					final IIndex ndx = indices[i];
+
+					if (ndx != null)
+						btrees.remove(ndx);
+
+				}
+
+			}
+		}
         
     }
     

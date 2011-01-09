@@ -145,13 +145,13 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
              * "get()" this task since that will block and the 'interrupt' task
              * will not run.
              */
+            final long maxWaitMillis = 5*1000;
             journal.submit(new AbstractTask(journal,ITx.UNISOLATED,new String[]{}){
 
                 protected Object doTask() throws Exception {
                     
-                    // sleep for 10 seconds.
-                    
-                    Thread.sleep(10*1000);
+                    // sleep for a bit.
+                    Thread.sleep(maxWaitMillis/*millis*/);
                     
                     throw new AssertionError("Not expecting to wake up.");
                     
@@ -182,11 +182,18 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             
             log.warn("Waiting for the write service to commit or abort");
             
+            final long begin = System.currentTimeMillis();
             while (journal.getConcurrencyManager().writeService.getAbortCount() == 0
                     && journal.getConcurrencyManager().writeService
                             .getGroupCommitCount() == 0) {
                 
-                Thread.sleep(10);
+                final long elapsed = System.currentTimeMillis() - begin;
+
+                if (elapsed > maxWaitMillis) {
+                    fail("Did not abort/commit after " + elapsed + "ms");
+                }
+                
+                Thread.sleep(10/*ms*/);
                 
             }
             
@@ -241,7 +248,10 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             final BTree ndx = (BTree) getIndex(getOnlyResource());
 
             // write on the index.
-            ndx.insert(new byte[]{},new byte[]{});
+//            final byte[] val = new byte[Bytes.kilobyte32];
+//            for (int i = 0; i < (Bytes.megabyte32 / Bytes.kilobyte32) + 1; i++)
+//                ndx.insert(new byte[i], val);
+            ndx.insert(new byte[0], new byte[0]);
 
             /*
              * Now provoke a ClosedByInterruptException.
@@ -260,10 +270,10 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
 
             } catch(Exception ex) {
 
-                assertTrue(isInnerCause(ex, ClosedByInterruptException.class));
+//                log.warn("Provoked expected root cause exception: " + ex, ex);
+//                
+//                assertTrue(isInnerCause(ex, ClosedByInterruptException.class));
 
-                log.info("Provoked expected root cause exception: " + ex);
-                
                 throw ex;
                 
             } catch(Throwable t) {
@@ -283,7 +293,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
      * {@link FileChannel} after a {@link ClosedByInterruptException}.
      * <p>
      * The test uses the {@link IRawStore} API. It writes an initial record on
-     * the store and commits. It then interrupts the main thread and then
+     * the store. It then interrupts the main thread and then
      * performs another low level write on the store. The store is then forced
      * to disk to ensure that a {@link ClosedByInterruptException} is triggered
      * (during an IO), (alternatively, an {@link InterruptedException} can be
@@ -308,14 +318,14 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
 
             final long addr1 = store.write(rec1);
 
-            if (store instanceof IAtomicStore) {
-                
-                assertNotSame(0L, ((IAtomicStore)store).commit());
-                
-            } else if (store instanceof RWStrategy) {
-            	RWStrategy rws = (RWStrategy)store;
-            	rws.commit();
-            }
+//            if (store instanceof IAtomicStore) {
+//                
+//                assertNotSame(0L, ((IAtomicStore)store).commit());
+//                
+//            } else if (store instanceof RWStrategy) {
+//            	RWStrategy rws = (RWStrategy)store;
+//            	rws.commit(null);
+//            }
 
             try {
 
@@ -325,7 +335,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
                 
                 store.force(true);
 
-                fail("Expecting: " + ClosedByInterruptException.class);
+                fail("Expecting to be interrupted.");
 
             } catch (Throwable t) {
 

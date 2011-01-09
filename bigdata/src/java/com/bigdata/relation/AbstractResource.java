@@ -299,7 +299,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * @todo figure out how good this value is.
          * @deprecated by {@link BOp} annotations.
          */
-        String DEFAULT_FULLY_BUFFERED_READ_THRESHOLD = ""+20*Bytes.kilobyte32;
+        String DEFAULT_FULLY_BUFFERED_READ_THRESHOLD = "200";//""+20*Bytes.kilobyte32;
 
         /**
          * When <code>true</code> ({@value #DEFAULT_FORCE_SERIAL_EXECUTION}),

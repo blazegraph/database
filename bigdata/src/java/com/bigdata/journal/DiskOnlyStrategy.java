@@ -482,7 +482,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * Note that the internal call to flush the writeCache must be synchronized
      * or concurrent writers to the cache will cause problems.
      */
-    public void commit() {
+    public void commit(IJournal journal) {
     	if (writeCache != null) {
 	    	synchronized(this) {
 	    		flushWriteCache();
@@ -1262,14 +1262,14 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     DiskOnlyStrategy(final long maximumExtent, final FileMetadata fileMetadata) {
 
         super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
-                fileMetadata.nextOffset, fileMetadata.bufferMode,
+                fileMetadata.nextOffset, fileMetadata.getBufferMode(),
                 fileMetadata.readOnly);
 
         this.file = fileMetadata.file;
 
         this.fileMode = fileMetadata.fileMode;
         
-        this.temporaryStore = (fileMetadata.bufferMode==BufferMode.Temporary);
+        this.temporaryStore = (fileMetadata.getBufferMode()==BufferMode.Temporary);
         
         this.raf = fileMetadata.raf;
         
@@ -2552,9 +2552,16 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
     }
 
-	@Override
 	public void delete(long addr) {
 		// void behaviour
+	}
+
+	public void setNextOffset(long lastOffset) {
+		// void for standard Disk strategy
+	}
+
+	public void setCommitRecordIndex(CommitRecordIndex commitRecordIndex) {
+		// NOP
 	}
     
 }

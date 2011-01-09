@@ -14,17 +14,17 @@ import org.apache.log4j.Logger;
  */
 public class Hit implements IHit, Comparable<Hit>{
 
-    final protected static Logger log = Logger.getLogger(Hit.class);
+    final private static transient Logger log = Logger.getLogger(Hit.class);
 
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
+//    /**
+//     * True iff the {@link #log} level is INFO or less.
+//     */
+//    final protected static boolean INFO = log.isInfoEnabled();
+//
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    final protected static boolean DEBUG = log.isDebugEnabled();
    
     /** note: defaults to an illegal value. */
     private long docId = -1;
@@ -47,7 +47,7 @@ public class Hit implements IHit, Comparable<Hit>{
 
     }
     
-    void setDocId(long docId) {
+    void setDocId(final long docId) {
         
         this.docId = docId;
 
@@ -77,13 +77,13 @@ public class Hit implements IHit, Comparable<Hit>{
     /**
      * Adds another component to the cosine.
      */
-    public void add(String term, double weight) {
+    public void add(final String term, final double weight) {
         
         cosine += weight;
 
         nterms ++;
 
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
         
             log.debug("docId=" + docId + ", term: " + term + ", nterms="
                     + nterms + ", weight=" + weight + ", cosine=" + cosine);
@@ -102,7 +102,7 @@ public class Hit implements IHit, Comparable<Hit>{
      * Sorts {@link Hit}s into decreasing cosine order with ties broken by the
      * the <code>docId</code>.
      */
-    public int compareTo(Hit o) {
+    public int compareTo(final Hit o) {
 
         if (cosine < o.cosine)
             return 1;

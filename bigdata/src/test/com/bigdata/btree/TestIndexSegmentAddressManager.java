@@ -218,6 +218,8 @@ public class TestIndexSegmentAddressManager extends AbstractBTreeTestCase {
 
             final boolean compactingMerge = r.nextBoolean();
             
+            final boolean useChecksums= r.nextBoolean();
+            
             checkpoint = new IndexSegmentCheckpoint(
                 offsetBits,//
                 1, // height
@@ -235,6 +237,7 @@ public class TestIndexSegmentAddressManager extends AbstractBTreeTestCase {
                 addrLastLeaf,//
                 length,//
                 compactingMerge,//
+                useChecksums,//
                 UUID.randomUUID(),// segmentUUID,
                 System.currentTimeMillis()//commitTime
                 );

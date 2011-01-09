@@ -30,12 +30,10 @@ package com.bigdata.btree;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.channels.FileChannel;
 import java.util.UUID;
 
 import junit.framework.TestCase;
 
-import com.bigdata.io.IReopenChannel;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
 
@@ -108,6 +106,7 @@ public class TestIndexSegmentCheckpoint extends TestCase {
         final long addrLastLeaf;
         final long length;
         final boolean compactingMerge = true; // @todo also test when false.
+        final boolean useChecksums = true; // @todo also test when false.
         final UUID segmentUUID = UUID.randomUUID();
         final long commitTime = System.currentTimeMillis();
         {
@@ -168,6 +167,7 @@ public class TestIndexSegmentCheckpoint extends TestCase {
                 addrLastLeaf,//
                 length,//
                 compactingMerge,//
+                useChecksums,//
                 segmentUUID,//
                 commitTime//
                 );
@@ -181,7 +181,7 @@ public class TestIndexSegmentCheckpoint extends TestCase {
                 maxNodeOrLeafLength, offsetLeaves, extentLeaves, offsetNodes,
                 extentNodes, offsetBlobs, extentBlobs, addrRoot, addrMetadata,
                 addrBloom, addrFirstLeaf, addrLastLeaf, length, compactingMerge,
-                segmentUUID, commitTime);
+                useChecksums, segmentUUID, commitTime);
         
         System.err.println("Expected: "+expected);
         

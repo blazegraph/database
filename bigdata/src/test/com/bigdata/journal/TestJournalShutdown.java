@@ -68,9 +68,9 @@ public class TestJournalShutdown extends TestCase2 {
             /*
              * FIXME Disabled for now since causing CI to fail.
              */
-            log.error("Enable test.");
+            fail("Enable test.");
 
-            return;
+//            return;
         }
 
         final int limit = 200;

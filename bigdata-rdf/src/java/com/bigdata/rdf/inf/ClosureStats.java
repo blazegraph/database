@@ -24,6 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.inf;
 
+import com.bigdata.counters.CAT;
+
 /**
  * Statistics collected when performing inference.
  * 
@@ -38,13 +40,13 @@ public class ClosureStats {
      * change in the #of statements in the database across the closure
      * operation.
      */
-    public long mutationCount;
+    public final CAT mutationCount = new CAT();
 
     /**
      * Time to compute the entailments and store them within the database
      * (milliseconds).
      */
-    public long elapsed;
+    public final CAT elapsed = new CAT();
 
     public ClosureStats() {
         
@@ -55,26 +57,32 @@ public class ClosureStats {
      * @param mutationCount
      * @param elapsed
      */
-    public ClosureStats(long mutationCount,long elapsed) {
+    public ClosureStats(final long mutationCount,final long elapsed) {
         
-        this.mutationCount = mutationCount;
+        this.mutationCount.set(mutationCount);
         
-        this.elapsed = elapsed;
-        
-    }
-    
-    public synchronized void add(ClosureStats o) {
-        
-        this.mutationCount += o.mutationCount;
-        
-        this.elapsed += o.elapsed;
+        this.elapsed.set( elapsed);
         
     }
     
+    public void add(final ClosureStats o) {
+        
+        this.mutationCount.add( o.mutationCount.get());
+        
+        this.elapsed.add(o.elapsed.get());
+        
+    }
+    
+    public long triplesPerSecond() {
+
+        return ((long) (((double) mutationCount.get()) / ((double) elapsed.get()) * 1000d));
+
+    }
+
     public String toString() {
 
-        return getClass().getSimpleName() + "{mutationCount=" + mutationCount
-                + ", elapsed=" + elapsed + "ms}";
+        return getClass().getSimpleName() + "{mutationCount=" + mutationCount.estimate_get()
+                + ", elapsed=" + elapsed.estimate_get() + "ms, rate="+triplesPerSecond()+"}";
         
     }
     

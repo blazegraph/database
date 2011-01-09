@@ -36,10 +36,8 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
-
 import com.bigdata.BigdataStatics;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;

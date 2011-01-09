@@ -627,7 +627,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    final public KeyBuilder append(double d) {
+    final public KeyBuilder append(final double d) {
         
         // performance tweak.
         if (len + 8 > buf.length) ensureCapacity(len+8);
@@ -648,7 +648,7 @@ public class KeyBuilder implements IKeyBuilder {
 
     }
 
-    static public double decodeDouble(byte[] key,int off) {
+    static public double decodeDouble(final byte[] key,final int off) {
         
         long v = decodeLong(key, off);
         
@@ -663,7 +663,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    final public KeyBuilder append(float f) {
+    final public KeyBuilder append(final float f) {
 
         // performance tweak.
         if (len + 4 > buf.length) ensureCapacity(len+4);

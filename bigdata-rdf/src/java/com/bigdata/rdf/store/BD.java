@@ -1,44 +1,25 @@
-/**
+/*
 
-The Notice below must appear in each file of the Source Code of any
-copy you distribute of the Licensed Product.  Contributors to any
-Modifications may add their own copyright notices to identify their
-own contributions.
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
 
-License:
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
 
-The contents of this file are subject to the CognitiveWeb Open Source
-License Version 1.1 (the License).  You may not copy or use this file,
-in either source code or executable form, except in compliance with
-the License.  You may obtain a copy of the License from
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
 
-  http://www.CognitiveWeb.org/legal/license/
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-Software distributed under the License is distributed on an AS IS
-basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
-the License for the specific language governing rights and limitations
-under the License.
-
-Copyrights:
-
-Portions created by or assigned to CognitiveWeb are Copyright
-(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
-information for CognitiveWeb is available at
-
-  http://www.CognitiveWeb.org
-
-Portions Copyright (c) 2002-2003 Bryan Thompson.
-
-Acknowledgements:
-
-Special thanks to the developers of the Jabber Open Source License 1.0
-(JOSL), from which this License was derived.  This License contains
-terms that differ from JOSL.
-
-Special thanks to the CognitiveWeb Open Source Contributors for their
-suggestions and support of the Cognitive Web.
-
-Modifications:
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
@@ -65,6 +46,16 @@ public interface BD {
      * The namespace used for bigdata specific extensions.
      */
     String NAMESPACE = "http://www.bigdata.com/rdf#";
+    
+    /**
+     * The namespace used for magic search predicates.
+     * <p>
+     * @see #SEARCH
+     * @see #RELEVANCE
+     * @see #RANK
+     * @see #NUM_MATCHED_TOKENS
+     */
+    final String SEARCH_NAMESPACE = "http://www.bigdata.com/rdf/search#";
 
     /**
      * The name of a per-statement attribute whose value is recognized in
@@ -142,7 +133,56 @@ public interface BD {
      * Note: The context position should be unbound when using statement
      * identifiers.
      */
-    URI SEARCH = new URIImpl(NAMESPACE+"search");
+//    URI SEARCH = new URIImpl(NAMESPACE+"search");
+    final URI SEARCH = new URIImpl(SEARCH_NAMESPACE+"search");
+    
+    /**
+     * Magic predicate used to query for free text search metadata.  Use 
+     * in conjunction with {@link #SEARCH} as follows:
+     * <p>
+     * <pre>
+     * 
+     * select ?s ?relevance
+     * where {
+     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bd:relevance ?relevance .
+     * }
+     * 
+     * </pre>
+     */
+    final URI RELEVANCE = new URIImpl(SEARCH_NAMESPACE+"relevance");
+    
+    /**
+     * Magic predicate used to query for free text search metadata.  Use 
+     * in conjunction with {@link #SEARCH} as follows:
+     * <p>
+     * <pre>
+     * 
+     * select ?s ?rank
+     * where {
+     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bd:maxHits "5"^^xsd:int .
+     * }
+     * 
+     * </pre>
+     */
+    final URI MAX_HITS = new URIImpl(SEARCH_NAMESPACE+"maxHits");
+    
+    /**
+     * Magic predicate used to query for free text search metadata.  Use 
+     * in conjunction with {@link #SEARCH} as follows:
+     * <p>
+     * <pre>
+     * 
+     * select ?s ?matched
+     * where {
+     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bd:minRelevance "0.5"^^xsd:double .
+     * }
+     * 
+     * </pre>
+     */
+    final URI MIN_RELEVANCE = new URIImpl(SEARCH_NAMESPACE+"minRelevance");
 
     /**
      * Sesame has the notion of a "null" graph. Any time you insert a statement
@@ -159,14 +199,14 @@ public interface BD {
      */
     URI NULL_GRAPH = new URIImpl(NAMESPACE + "nullGraph");
     
-    /**
-     * We need the abiltiy to do atomic add+drop in one operation via the
-     * remoting interface.  Thus we need the ability to place 
-     * statements to add and to delete in the same serialized document sent
-     * across the wire.  This separator key, when included in a comment, will
-     * mark the separation point between statements to drop (above the 
-     * separator) and statements to add (below the separator).
-     */
-    URI ATOMIC_UPDATE_SEPARATOR_KEY = new URIImpl(NAMESPACE + "atomicUpdateSeparatorKey");
+//    /**
+//     * We need the ability to do atomic add+drop in one operation via the
+//     * remoting interface.  Thus we need the ability to place 
+//     * statements to add and to delete in the same serialized document sent
+//     * across the wire.  This separator key, when included in a comment, will
+//     * mark the separation point between statements to drop (above the 
+//     * separator) and statements to add (below the separator).
+//     */
+//    URI ATOMIC_UPDATE_SEPARATOR_KEY = new URIImpl(NAMESPACE + "atomicUpdateSeparatorKey");
     
 }

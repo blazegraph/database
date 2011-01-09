@@ -32,18 +32,21 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
-import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.BNodeImpl;
 import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.LiteralImpl;
@@ -74,9 +77,18 @@ import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.journal.BufferMode;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.XSDDoubleIV;
+import com.bigdata.rdf.lexicon.ITextIndexer;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.search.Hiterator;
+import com.bigdata.search.IHit;
 
 /**
  * Test suite for high-level query against a graph containing statements about
@@ -674,4 +686,261 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
         
     }
 
+    public void testWithMetadata() throws Exception {
+        
+        final BigdataSail sail = getSail();
+        try {
+            
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        final BigdataSailRepositoryConnection cxn = 
+            (BigdataSailRepositoryConnection) repo.getConnection();
+        cxn.setAutoCommit(false);
+        
+        try {
+            
+        	final ValueFactory vf = sail.getValueFactory();
+
+        	final URI s1 = vf.createURI(BD.NAMESPACE+"s1");
+        	final URI s2 = vf.createURI(BD.NAMESPACE+"s2");
+        	final URI s3 = vf.createURI(BD.NAMESPACE+"s3");
+        	final URI s4 = vf.createURI(BD.NAMESPACE+"s4");
+        	final URI s5 = vf.createURI(BD.NAMESPACE+"s5");
+        	final URI s6 = vf.createURI(BD.NAMESPACE+"s6");
+        	final URI s7 = vf.createURI(BD.NAMESPACE+"s7");
+        	final Literal l1 = vf.createLiteral("how");
+        	final Literal l2 = vf.createLiteral("now");
+        	final Literal l3 = vf.createLiteral("brown");
+        	final Literal l4 = vf.createLiteral("cow");
+        	final Literal l5 = vf.createLiteral("how now");
+        	final Literal l6 = vf.createLiteral("brown cow");
+        	final Literal l7 = vf.createLiteral("how now brown cow");
+        	
+            cxn.add(s1, RDFS.LABEL, l1);
+            cxn.add(s2, RDFS.LABEL, l2);
+            cxn.add(s3, RDFS.LABEL, l3);
+            cxn.add(s4, RDFS.LABEL, l4);
+            cxn.add(s5, RDFS.LABEL, l5);
+            cxn.add(s6, RDFS.LABEL, l6);
+            cxn.add(s7, RDFS.LABEL, l7);
+            
+            /*
+             * Note: The either flush() or commit() is required to flush the
+             * statement buffers to the database before executing any operations
+             * that go around the sail.
+             */
+            cxn.commit();
+            
+            final Map<IV, Literal> literals = new LinkedHashMap<IV, Literal>();
+            literals.put(((BigdataValue)l1).getIV(), l1);
+            literals.put(((BigdataValue)l2).getIV(), l2);
+            literals.put(((BigdataValue)l3).getIV(), l3);
+            literals.put(((BigdataValue)l4).getIV(), l4);
+            literals.put(((BigdataValue)l5).getIV(), l5);
+            literals.put(((BigdataValue)l6).getIV(), l6);
+            literals.put(((BigdataValue)l7).getIV(), l7);
+            
+            final Map<IV, URI> uris = new LinkedHashMap<IV, URI>();
+            uris.put(((BigdataValue)l1).getIV(), s1);
+            uris.put(((BigdataValue)l2).getIV(), s2);
+            uris.put(((BigdataValue)l3).getIV(), s3);
+            uris.put(((BigdataValue)l4).getIV(), s4);
+            uris.put(((BigdataValue)l5).getIV(), s5);
+            uris.put(((BigdataValue)l6).getIV(), s6);
+            uris.put(((BigdataValue)l7).getIV(), s7);
+            
+/**/            
+            if (log.isInfoEnabled()) {
+                log.info("\n" + sail.getDatabase().dumpStore());
+            }
+            
+            { 
+            	final String searchQuery = "how now brown cow";
+            	
+                final String query = 
+                    "select ?s ?o ?score " + 
+                    "where " +
+                    "{ " +
+                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
+                    "} " +
+                    "order by desc(?score)";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                int i = 0;
+                while (result.hasNext()) {
+                	System.err.println(i++ + ": " + result.next().toString());
+                }
+                assertTrue("wrong # of results", i == 7);
+                
+                result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            false, // prefixMatch
+                            0d, // minCosine
+                            10000, // maxRank (=maxResults + 1)
+                            1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = new TermId(VTE.LITERAL, hit.getDocId());
+                	final Literal score = vf.createLiteral(hit.getCosine());
+                	final URI s = uris.get(id);
+                	final Literal o = literals.get(id);
+                    final BindingSet bs = createBindingSet(
+                    		new BindingImpl("s", s),
+                    		new BindingImpl("o", o),
+                    		new BindingImpl("score", score));
+                	System.err.println(bs);
+                    answer.add(bs);
+                }
+                
+                compare(result, answer);
+
+            }
+
+            { 
+            	final String searchQuery = "how now brown cow";
+            	final int maxHits = 5;
+            	
+                final String query = 
+                    "select ?s ?o ?score " + 
+                    "where " +
+                    "{ " +
+                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
+//                    "    ?o <"+BD.MIN_RELEVANCE+"> \"0.6\" . " +
+                    "    ?o <"+BD.MAX_HITS+"> \""+maxHits+"\" . " +
+                    "} " +
+                    "order by desc(?score)";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                int i = 0;
+                while (result.hasNext()) {
+                	System.err.println(i++ + ": " + result.next().toString());
+                }
+                assertTrue("wrong # of results", i == 5);
+                
+                result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            false, // prefixMatch
+                            0d, // minCosine
+                            maxHits+1, // maxRank (=maxResults + 1)
+                            1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = new TermId(VTE.LITERAL, hit.getDocId());
+                	final Literal score = vf.createLiteral(hit.getCosine());
+                	final URI s = uris.get(id);
+                	final Literal o = literals.get(id);
+                    final BindingSet bs = createBindingSet(
+                    		new BindingImpl("s", s),
+                    		new BindingImpl("o", o),
+                    		new BindingImpl("score", score));
+                	System.err.println(bs);
+                    answer.add(bs);
+                }
+                
+                compare(result, answer);
+
+            }
+
+            { 
+            	final String searchQuery = "how now brown cow";
+            	final double minRelevance = 0.6d;
+            	
+                final String query = 
+                    "select ?s ?o ?score " + 
+                    "where " +
+                    "{ " +
+                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
+                    "    ?o <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
+//                    "    ?o <"+BD.MAX_HITS+"> \"5\" . " +
+                    "} " +
+                    "order by desc(?score)";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                int i = 0;
+                while (result.hasNext()) {
+                	System.err.println(i++ + ": " + result.next().toString());
+                }
+                assertTrue("wrong # of results", i == 3);
+                
+                result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            false, // prefixMatch
+                            minRelevance, // minCosine
+                            10000, // maxRank (=maxResults + 1)
+                            1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = new TermId(VTE.LITERAL, hit.getDocId());
+                	final Literal score = vf.createLiteral(hit.getCosine());
+                	final URI s = uris.get(id);
+                	final Literal o = literals.get(id);
+                    final BindingSet bs = createBindingSet(
+                    		new BindingImpl("s", s),
+                    		new BindingImpl("o", o),
+                    		new BindingImpl("score", score));
+                	System.err.println(bs);
+                    answer.add(bs);
+                }
+                
+                compare(result, answer);
+
+            }
+
+        } finally {
+            cxn.close();
+        }
+        } finally {
+            sail.__tearDownUnitTest();
+        }
+        
+    }
+    
 }

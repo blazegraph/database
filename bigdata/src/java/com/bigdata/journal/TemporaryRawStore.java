@@ -40,11 +40,11 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.mdi.AbstractResourceMetadata;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.IMRMW;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.ILocatableResource;
-import com.bigdata.util.ChecksumUtility;
 
 /**
  * A non-restart-safe store for temporary data that buffers data in memory until
@@ -280,13 +280,13 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
                 false, // readOnly
                 ForceEnum.No, // forceWrites
                 offsetBits,//
-//                0, // readCacheCapacity
-//                0, // readCacheMaxRecordSize
                 true, // writeCacheEnabled
+                3, // writeCacheBufferCount
                 false, // validateChecksum (desperation option for restart).
                 createTime,//
-                new ChecksumUtility(), // checker (root blocks generated but not saved).
-                false // alternateRootBlock
+                Quorum.NO_QUORUM,// Temporary stores are not HA.
+                false, // alternateRootBlock,
+                null // properties
         );
         
         buf = new DiskOnlyStrategy(maximumExtent, //
@@ -317,7 +317,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
             
         } catch (Throwable t) {
             
-            t.printStackTrace(System.err);
+            log.error("Ignoring: " + t, t);
             
         }
         

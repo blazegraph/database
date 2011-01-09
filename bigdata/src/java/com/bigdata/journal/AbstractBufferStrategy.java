@@ -76,7 +76,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * offset plus record length exceeds the {@link #nextOffset} on which data
      * would be written may be easily detected.
      */
-    protected static final String ERR_ADDRESS_NOT_WRITTEN = "Address never written.";
+    public static final String ERR_ADDRESS_NOT_WRITTEN = "Address never written.";
     
     /**
      * Text of the error message used when a ZERO (0L) is passed as an address
@@ -99,19 +99,19 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * array or native memory (both are limited to int32 bytes since they
      * are addressed by a Java <code>int</code>).
      */
-    protected static final String ERR_INT32 = "Would exceed int32 bytes (not allowed unless backed by disk).";
+    public static final String ERR_INT32 = "Would exceed int32 bytes (not allowed unless backed by disk).";
     
     /**
      * Text of the error message used when
      * {@link IBufferStrategy#truncate(long)} would truncate data that has
      * already been written.
      */
-    protected static final String ERR_TRUNCATE = "Would truncate written data.";
+    public static final String ERR_TRUNCATE = "Would truncate written data.";
     
     /**
      * Error message used when the writes are not allowed.
      */
-    protected static final String ERR_READ_ONLY = "Read only";
+    public static final String ERR_READ_ONLY = "Read only";
 
     /**
      * Error message used when the record size is invalid (e.g., negative).
@@ -119,12 +119,19 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * @todo There is some overlap with {@link #ERR_RECORD_LENGTH_ZERO} and
      *       {@link #ERR_BUFFER_EMPTY}.
      */
-    protected static final String ERR_BAD_RECORD_SIZE = "Bad record size";
+    public static final String ERR_BAD_RECORD_SIZE = "Bad record size";
     
     /**
-     * Error message used when the store is closed. 
+     * Error message used when the store is closed but the operation requires
+     * that the store is open. 
      */
     public static final String ERR_NOT_OPEN = "Not open";
+
+    /**
+     * Error message used when the store is open by the operation requires that
+     * the store is closed. 
+     */
+    public static final String ERR_OPEN = "Open";
 
     /**
      * Error message used when an operation would write more data than would be
@@ -627,10 +634,9 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
     }
 
     /** The default is a NOP. */
-    public void commit() {
+	public void commit(IJournal journal) {
 
         // NOP for WORM.
-
     }
 
     /** The default is a NOP. */
@@ -655,9 +661,22 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         return getNextOffset() > block.getNextOffset();
     }
 
+    /**
+     * The maximum size of a record for the address manager less 4 bytes iff
+     * checksums are enabled.
+     */
     public int getMaxRecordSize() {
-        return getAddressManager().getMaxByteCount();
 
+        return getAddressManager().getMaxByteCount() - (useChecksums() ? 4 : 0);
+
+    }
+
+    /**
+     * <code>false</code> by default since these were added for HA with the
+     * {@link WORMStrategy} and the {@link RWStrategy}.
+     */
+    public boolean useChecksums() {
+        return false;
     }
 
 }

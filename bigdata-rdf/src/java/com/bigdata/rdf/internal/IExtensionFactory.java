@@ -41,8 +41,12 @@ public interface IExtensionFactory {
      * 
      * @param resolver
      *          the datatype URI resolver
+     * @param inlineDateTimes
+     * 			if true, inine the xsd:dateTime datatype using the
+     * 			{@link DateTimeExtension} class.          
      */
-    void init(final IDatatypeURIResolver resolver);
+    void init(final IDatatypeURIResolver resolver, 
+    		final boolean inlineDateTimes);
     
     /**
      * Return the supported extensions.

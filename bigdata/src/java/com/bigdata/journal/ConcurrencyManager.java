@@ -1002,9 +1002,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
      */
     synchronized public CounterSet getCounters() {
         
-        if (countersRoot == null){
+//        if (countersRoot == null){
 
-            countersRoot = new CounterSet();
+            CounterSet countersRoot = new CounterSet();
 
             // elapsed time since the service started (milliseconds).
             countersRoot.addCounter("elapsed",
@@ -1050,12 +1050,12 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             }
 
-        }
+//        }
         
         return countersRoot;
         
     }
-    private CounterSet countersRoot;
+//    private CounterSet countersRoot;
     
     /**
      * Submit a task (asynchronous). Tasks will execute asynchronously in the
