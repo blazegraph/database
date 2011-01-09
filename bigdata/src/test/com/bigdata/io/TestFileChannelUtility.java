@@ -35,6 +35,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Random;
 
+import org.apache.system.SystemUtil;
+
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.rawstore.Bytes;
 
@@ -348,6 +350,13 @@ public class TestFileChannelUtility extends TestCase {
      */
     public void test_transferAllFrom() throws IOException {
 
+        if(SystemUtil.isOSX()) {
+            /*
+             * FIXME For some reason, this unit test is hanging under OS X.
+             */
+            fail("Unit test hangs under OS X");
+        }
+        
         final File sourceFile = File.createTempFile("TestFileChannelUtility", getName());
 
         sourceFile.deleteOnExit();
@@ -358,7 +367,7 @@ public class TestFileChannelUtility extends TestCase {
 
         final RandomAccessFile source = new RandomAccessFile(sourceFile, "rw");
         
-        final RandomAccessFile target = new RandomAccessFile(sourceFile, "rw");
+        final RandomAccessFile target = new RandomAccessFile(targetFile, "rw");
        
         try {
             
@@ -377,6 +386,7 @@ public class TestFileChannelUtility extends TestCase {
             // write ground truth onto the file.
             FileChannelUtility.writeAll(source.getChannel(), ByteBuffer
                     .wrap(expected), 0L/* pos */);
+            target.setLength(FILE_SIZE);            
             
             // do a bunch of trials of random transfers.
             for(int trial=0; trial<1000; trial++) { 
