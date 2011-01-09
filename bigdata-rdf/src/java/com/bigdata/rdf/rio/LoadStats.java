@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.rio;
 
+import com.bigdata.counters.CAT;
 import com.bigdata.rdf.inf.ClosureStats;
 
 /**
@@ -34,12 +35,12 @@ import com.bigdata.rdf.inf.ClosureStats;
  */
 public class LoadStats {
 
-    public long toldTriples;
-    public long loadTime;
-    public long commitTime;
-    public long totalTime;
+    public final CAT toldTriples = new CAT();
+    public final CAT loadTime = new CAT();
+    public final CAT commitTime = new CAT();
+    public final CAT totalTime = new CAT();
     
-    private transient long lastReportTime = 0l;
+    private transient volatile long lastReportTime = 0l;
 
     /**
      * The internal with which this class will log on {@link System#out} in
@@ -55,19 +56,19 @@ public class LoadStats {
 
     public long triplesPerSecond() {
 
-        return ((long) (((double) toldTriples) / ((double) totalTime) * 1000d));
+        return ((long) (((double) toldTriples.estimate_get()) / ((double) totalTime.estimate_get()) * 1000d));
 
     }
 
     public void add(final LoadStats stats) {
 
-        toldTriples += stats.toldTriples;
+        toldTriples.add(stats.toldTriples.get());
 
-        loadTime += stats.loadTime;
+        loadTime.add(stats.loadTime.get());
 
-        commitTime += stats.commitTime;
+        commitTime.add(stats.commitTime.get());
 
-        totalTime += stats.totalTime;
+        totalTime.add(stats.totalTime.get());
 
         if (stats.closureStats != null) {
 
@@ -82,7 +83,7 @@ public class LoadStats {
 
         if (lastReportTime == 0L) {
 
-            if (loadTime >= REPORT_INTERVAL) {
+            if (loadTime.estimate_get() >= REPORT_INTERVAL) {
 
                 System.out.println("loading: " + toString());
 
@@ -111,14 +112,14 @@ public class LoadStats {
 
         return toldTriples
                 + " stmts added in "
-                + ((double) loadTime)
+                + ((double) loadTime.estimate_get())
                 / 1000d
                 + " secs, rate= "
                 + triplesPerSecond()
                 + ", commitLatency="
-                + commitTime
+                + commitTime.estimate_get()
                 + "ms"
-                + (closureStats.elapsed!=0L? "\n"+closureStats.toString() : "");
+                + (closureStats.elapsed.estimate_get()!=0L? "\n"+closureStats.toString() : "");
 
     }
     

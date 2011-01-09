@@ -30,7 +30,9 @@ package com.bigdata.relation.rule;
 import java.util.Map;
 
 import junit.framework.TestCase2;
-
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstraint;

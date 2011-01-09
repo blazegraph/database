@@ -41,6 +41,8 @@ import com.bigdata.jini.start.config.JiniCoreServicesConfiguration.JiniCoreServi
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.util.LookupStarter;
 import com.bigdata.util.config.NicUtil;
+import com.bigdata.service.jini.util.LookupStarter;
+import com.bigdata.util.config.NicUtil;
 
 /**
  * Class for starting the jini services.

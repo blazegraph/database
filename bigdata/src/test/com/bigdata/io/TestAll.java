@@ -71,12 +71,6 @@ public class TestAll extends TestCase {
         // test suite for FileChannel IO utility class.
         suite.addTestSuite(TestFileChannelUtility.class);
 
-        // test suite for the write cache mechanisms.
-        suite.addTestSuite(TestWriteCache.class);
-
-        // test suite for the write cache service.
-        suite.addTestSuite(TestWriteCacheService.class);
-
         // test suite for FileLock and advisory locking class.
         suite.addTestSuite(TestFileLockUtility.class);
         
@@ -86,7 +80,13 @@ public class TestAll extends TestCase {
         suite.addTest(TestAll_Buffers.suite());
         
         suite.addTest(com.bigdata.io.compression.TestAll.suite());
-        
+
+//        /*
+//         * Note: This is added into the test suite at a different location since
+//         * there is a dependency on the com.bigdata.quorum package.
+//         */
+//        suite.addTest(com.bigdata.io.writecache.TestAll.suite());
+
         return suite;
         
     }

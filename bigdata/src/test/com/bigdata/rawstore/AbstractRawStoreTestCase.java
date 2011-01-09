@@ -30,7 +30,7 @@ package com.bigdata.rawstore;
 import java.nio.ByteBuffer;
 import java.util.Random;
 
-import junit.framework.TestCase2;
+import com.bigdata.io.TestCase3;
 
 /**
  * Base class for writing tests of the {@link IRawStore} interface.
@@ -38,7 +38,7 @@ import junit.framework.TestCase2;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractRawStoreTestCase extends TestCase2 {
+abstract public class AbstractRawStoreTestCase extends TestCase3 {
 
     /**
      * 
@@ -62,79 +62,81 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
      */
     abstract protected IRawStore getStore();
 
-    /**
-     * Helper method verifies that the contents of <i>actual</i> from
-     * position() to limit() are consistent with the expected byte[]. A
-     * read-only view of <i>actual</i> is used to avoid side effects on the
-     * position, mark or limit properties of the buffer.
-     * 
-     * @param expected
-     *            Non-null byte[].
-     * @param actual
-     *            Buffer.
-     * 
-     * @todo optimize test helper when ByteBuffer is backed by an array, but
-     *       also compensate for the arrayOffset.
-     */
-    static public void assertEquals(final byte[] expected, ByteBuffer actual) {
-
-        if( expected == null ) throw new IllegalArgumentException();
-        
-        if( actual == null ) fail("actual is null");
-
-        if(actual.hasArray() && actual.arrayOffset()==0) {
-        
-            assertEquals(expected,actual.array());
-            
-            return;
-            
-        }
-        
-        /* Create a read-only view on the buffer so that we do not mess with
-         * its position, mark, or limit.
-         */
-        actual = actual.asReadOnlyBuffer();
-        
-        final int len = actual.remaining();
-        
-        final byte[] actual2 = new byte[len];
-        
-        actual.get(actual2);
-
-        assertEquals(expected,actual2);
-        
-    }
-
-    /**
-     * Helper method verifies that the contents of <i>actual</i> from position()
-     * to limit() are consistent with the expected byte[]. A read-only view of
-     * both <i>expected</i> and <i>actual</i> is used to avoid side effects on
-     * the position, mark or limit properties of the buffer.
-     * 
-     * @param expected
-     *            Non-null {@link ByteBuffer}.
-     * @param actual
-     *            A {@link ByteBuffer}.
-     */
-    static public void assertEquals(ByteBuffer expected, final ByteBuffer actual) {
-
-        if (expected == null)
-            throw new IllegalArgumentException();
-         
-        /* Create a read-only view on the buffer so that we do not mess with
-         * its position, mark, or limit.
-         */
-        expected = expected.asReadOnlyBuffer();
-        
-        final int len = expected.remaining();
-        
-        final byte[] expected2 = new byte[len];
-        
-        expected.get(expected2);
-
-        assertEquals(expected2,actual);
-        
-    }
+//    /**
+//     * Helper method verifies that the contents of <i>actual</i> from
+//     * position() to limit() are consistent with the expected byte[]. A
+//     * read-only view of <i>actual</i> is used to avoid side effects on the
+//     * position, mark or limit properties of the buffer.
+//     * 
+//     * @param expected
+//     *            Non-null byte[].
+//     * @param actual
+//     *            Buffer.
+//     * 
+//     * @todo optimize test helper when ByteBuffer is backed by an array, but
+//     *       also compensate for the arrayOffset.
+//     */
+//    static public void assertEquals(final byte[] expected, ByteBuffer actual) {
+//
+//        if( expected == null ) throw new IllegalArgumentException();
+//        
+//        if( actual == null ) fail("actual is null");
+//
+//        if (actual.hasArray() && actual.arrayOffset() == 0
+//                && actual.position() == 0
+//                && actual.limit() == actual.capacity()) {
+//
+//            assertEquals(expected, actual.array());
+//            
+//            return;
+//            
+//        }
+//        
+//        /* Create a read-only view on the buffer so that we do not mess with
+//         * its position, mark, or limit.
+//         */
+//        actual = actual.asReadOnlyBuffer();
+//        
+//        final int len = actual.remaining();
+//        
+//        final byte[] actual2 = new byte[len];
+//        
+//        actual.get(actual2);
+//
+//        assertEquals(expected,actual2);
+//        
+//    }
+//
+//    /**
+//     * Helper method verifies that the contents of <i>actual</i> from position()
+//     * to limit() are consistent with the expected byte[]. A read-only view of
+//     * both <i>expected</i> and <i>actual</i> is used to avoid side effects on
+//     * the position, mark or limit properties of the buffer.
+//     * 
+//     * @param expected
+//     *            Non-null {@link ByteBuffer}.
+//     * @param actual
+//     *            A {@link ByteBuffer}.
+//     */
+//    static public void assertEquals(ByteBuffer expected, final ByteBuffer actual) {
+//
+//        if (expected == null)
+//            throw new IllegalArgumentException();
+//         
+//        /* Create a read-only view on the buffer so that we do not mess with
+//         * its position, mark, or limit.
+//         */
+//        expected = expected.asReadOnlyBuffer();
+//        
+//        final int len = expected.remaining();
+//        
+//        final byte[] expected2 = new byte[len];
+//        
+//        expected.get(expected2);
+//
+//        assertEquals(expected2,actual);
+//        
+//    }
 
     /**
      * Test verifies correct rejection of a write operation when the caller
@@ -425,7 +427,12 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
          */
         assertEquals(0,actual.position());
         assertEquals(expected.length,actual.limit());
-        assertEquals(actual.limit(),actual.capacity());
+        /*
+         * Note: Assertion is violated when cache is disabled and checksums
+         * are in use because the returned buffer may be a slice on a larger
+         * buffer which also includes the trailing checksum field.
+         */
+//        assertEquals(actual.limit(),actual.capacity());
         
         } finally {
 

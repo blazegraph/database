@@ -93,10 +93,6 @@ public class ZLockImpl implements ZLock {
 
     final static protected Logger log = Logger.getLogger(ZLockImpl.class);
 
-    final static protected boolean INFO = log.isInfoEnabled();
-
-    final static protected boolean DEBUG = log.isDebugEnabled();
-
     /**
      * The suffix for a marker that is a <strong>sibling</strong> of the lock
      * node. The presence of this marker indicates that the queue is being
@@ -274,7 +270,7 @@ public class ZLockImpl implements ZLock {
      * Inner class provides watcher for the lock. The watcher will continue to
      * receive {@link WatchedEvent}s until the lock node is either invalidated
      * or destroyed or until the watcher has been cancelled and has further
-     * satisified itself that the EPHEMERAL znode corresponding to the lock
+     * satisfied itself that the EPHEMERAL znode corresponding to the lock
      * request no longer exists.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -326,7 +322,7 @@ public class ZLockImpl implements ZLock {
         private volatile boolean knownDeleted = false;
 
         /**
-         * Set to <code>true</code> anytime we are disconnected from the
+         * Set to <code>true</code> any time we are disconnected from the
          * zookeeper ensemble. Disconnects are transient. The {@link ZooKeeper}
          * client can either become reconnected or can transition to an
          * {@link #expired} state, which is absorbing.
@@ -387,7 +383,7 @@ public class ZLockImpl implements ZLock {
 
         public void process(final WatchedEvent event) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(event.toString());
 
             switch (event.getState()) {
@@ -415,7 +411,7 @@ public class ZLockImpl implements ZLock {
                 if (disconnected) {
                     // Reconnect
                     disconnected = false;
-                    if(INFO)
+                    if(log.isInfoEnabled())
                         log.info("Reconnect: "+this);
                 }
             } 
@@ -456,7 +452,7 @@ public class ZLockImpl implements ZLock {
                     try {
                         zookeeper.delete(zpath + "/" + zchild, -1);
                         knownDeleted = true;
-                        if (INFO)
+                        if (log.isInfoEnabled())
                             log.info("released lock: " + this);
                     } catch (NoNodeException ex) {
                         /*
@@ -499,7 +495,7 @@ public class ZLockImpl implements ZLock {
                     if(isConditionSatisified()) {
                         zlockGranted = true;
                         zlock.signal();
-                        if(INFO)
+                        if(log.isInfoEnabled())
                             log.info("ZLock granted.");
                         return;
                     } else if (cancelled) {
@@ -515,7 +511,7 @@ public class ZLockImpl implements ZLock {
                          * zlock the next time they test ZLockImpl#isLockHeld().
                          */
                         zlock.signal();
-                        if(INFO)
+                        if(log.isInfoEnabled())
                             log.info("ZLock request cancelled.");
                         return;
                     }
@@ -582,7 +578,7 @@ public class ZLockImpl implements ZLock {
                 while ((nanos -= (System.nanoTime() - begin)) > 0
                         && !zlockGranted && !cancelled) {
 
-                    if (DEBUG)
+                    if (log.isDebugEnabled())
                         log.debug("remaining="
                                 + TimeUnit.NANOSECONDS.toMillis(nanos) + "ms");
 
@@ -597,7 +593,7 @@ public class ZLockImpl implements ZLock {
 
                             zlockGranted = true;
 
-                            if(DEBUG)
+                            if(log.isDebugEnabled())
                                 log.debug("Condition satisified.");
                             
                             break;
@@ -648,7 +644,7 @@ public class ZLockImpl implements ZLock {
 
                 }
 
-                if (DEBUG)
+                if (log.isDebugEnabled())
                     log.debug("nanos remaining=" + nanos);
                 
                 // lock granted iff nanos remaining is GT zero.
@@ -752,7 +748,7 @@ public class ZLockImpl implements ZLock {
                 // wrap as list again.
                 children = Arrays.asList(a);
 
-                // if(INFO)
+                // if(log.isInfoEnabled())
                 // log.info("queue: "+children);
 
             } catch (NoNodeException ex) {
@@ -791,7 +787,7 @@ public class ZLockImpl implements ZLock {
 
                 priorChildZNode = null;
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("ZLock granted: " + this);
 
                 return true;
@@ -809,17 +805,17 @@ public class ZLockImpl implements ZLock {
                  * asynchronously deleted.
                  */
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Prior child was asynchronously deleted: " + this);
 
                 return isConditionSatisified();
                 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Process in queue: pos=" + pos + " out of "
                         + children.size() + " children, " + this
-                        + (DEBUG ? " : children=" + children.toString() : ""));
+                        + (log.isDebugEnabled() ? " : children=" + children.toString() : ""));
 
             return false;
 
@@ -875,7 +871,7 @@ public class ZLockImpl implements ZLock {
      */
     public boolean isLockHeld() throws InterruptedException, KeeperException {
 
-//        if (DEBUG)
+//        if (log.isDebugEnabled())
 //            log.debug(this.toString());
 
         lock.lockInterruptibly(); 
@@ -891,7 +887,7 @@ public class ZLockImpl implements ZLock {
             
             if (watcher == null|| !watcher.zlockGranted || watcher.cancelled) {
 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("Caller does not hold lock.");
                 
                 // It is already known that we do not hold the lock.
@@ -902,14 +898,14 @@ public class ZLockImpl implements ZLock {
             // verify that we hold the lock (synchronous).
             if(!watcher.isConditionSatisified()) {
 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("Caller does not hold lock.");
 
                 return false;
                 
             }
             
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("Caller holds lock.");
 
             return true;
@@ -947,7 +943,7 @@ public class ZLockImpl implements ZLock {
     public void lock(final long timeout, final TimeUnit unit)
             throws KeeperException, InterruptedException, TimeoutException {
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug(this.toString());
 
         lock.lockInterruptibly();
@@ -995,7 +991,7 @@ public class ZLockImpl implements ZLock {
             // last path component is the znode of the child.
             final String zchild = s.substring(s.lastIndexOf('/') + 1);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Seeking lock: zpath=" + zpath + ", zchild=" + zchild);
 
             this.watcher = new ZLockWatcher(zchild);
@@ -1004,7 +1000,7 @@ public class ZLockImpl implements ZLock {
 
             try {
                 /* Note: The state reported here is incomplete since [priorZChild] is not set until we test things in awaitZLockNanos(). */
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("Will await zlock: "+this);
                 
                 if(!watcher.awaitZLockNanos(nanos)) {
@@ -1016,7 +1012,7 @@ public class ZLockImpl implements ZLock {
 
 //                watcher.lockCount = 1;
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("ZLock granted: zpath=" + zpath + ", zchild="
                             + zchild);
 
@@ -1141,7 +1137,7 @@ public class ZLockImpl implements ZLock {
             
             watcher.cancelled = true;
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug(this.toString());
 
             // // clear watch.
@@ -1161,7 +1157,7 @@ public class ZLockImpl implements ZLock {
 
                 watcher.knownDeleted = true;
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("released lock: " + watcher);
 
             } catch (NoNodeException ex) {

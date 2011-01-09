@@ -129,6 +129,7 @@ public class TestJournalBasics extends TestCase {
          */
         suite.addTestSuite(StressTestConcurrentTx.class);
 
+
         /*
          * Test suite for low-level data replication.
          * 

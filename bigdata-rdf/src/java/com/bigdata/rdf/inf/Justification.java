@@ -29,7 +29,6 @@ import java.util.Arrays;
 import java.util.UUID;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;

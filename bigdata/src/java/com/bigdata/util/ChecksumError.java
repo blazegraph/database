@@ -39,8 +39,16 @@ public class ChecksumError extends RuntimeException {
     
     private static final long serialVersionUID = -9067118459184074756L;
 
+    public ChecksumError() {
+        super();
+    }
+
     public ChecksumError(String msg) {
         super( msg );
     }
     
+    public ChecksumError(Throwable cause) {
+        super(cause);
+    }
+
 }

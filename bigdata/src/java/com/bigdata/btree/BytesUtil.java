@@ -27,6 +27,7 @@ import it.unimi.dsi.fastutil.bytes.custom.CustomByteArrayFrontCodedList;
 import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.io.OutputBitStream;
 
+import java.nio.ByteBuffer;
 import java.util.Comparator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -1019,4 +1020,81 @@ public class BytesUtil {
     static final private Pattern PATTERN_BYTE_COUNT = Pattern.compile(
             "([0-9]+)(k|kb|m|mb|g|gb)?", Pattern.CASE_INSENSITIVE);
 
+    /**
+     * Return a byte[] having the data in the {@link ByteBuffer} from the
+     * {@link ByteBuffer#position()} to the {@link ByteBuffer#limit()}. The
+     * position, limit, and mark are not affected by this operation. When the
+     * {@link ByteBuffer} has a backing array, the array offset is ZERO (0), and
+     * the {@link ByteBuffer#limit()} is equal to the
+     * {@link ByteBuffer#capacity()} then the backing array is returned.
+     * Otherwise, a new byte[] is allocated and the data are copied into that
+     * byte[], which is then returned.
+     * 
+     * @param b
+     *            The {@link ByteBuffer}.
+     * 
+     * @return The byte[].
+     */
+    static public byte[] toArray(final ByteBuffer b) {
+
+        return toArray(b, false/* forceCopy */);
+
+    }
+
+    /**
+     * Return a byte[] having the data in the {@link ByteBuffer} from the
+     * {@link ByteBuffer#position()} to the {@link ByteBuffer#limit()}. The
+     * position, limit, and mark are not affected by this operation.
+     * <p>
+     * Under certain circumstances it is possible and may be desirable to return
+     * the backing {@link ByteBuffer#array}. This behavior is enabled by
+     * <code>forceCopy := false</code>.
+     * <p>
+     * It is possible to return the backing byte[] when the {@link ByteBuffer}
+     * has a backing array, the array offset is ZERO (0), and the
+     * {@link ByteBuffer#limit()} is equal to the {@link ByteBuffer#capacity()}
+     * then the backing array is returned. Otherwise, a new byte[] must be
+     * allocated, and the data are copied into that byte[], which may then be
+     * returned.
+     * 
+     * @param b
+     *            The {@link ByteBuffer}.
+     * @param forceCopy
+     *            When <code>false</code>, the backing array will be returned if
+     *            possible.
+     * 
+     * @return The byte[].
+     */
+    static public byte[] toArray(final ByteBuffer b, final boolean forceCopy) {
+
+        if (b.hasArray() && b.arrayOffset() == 0 && b.position() == 0) {
+
+//            && b.limit() == b.capacity()
+
+            final byte[] a = b.array();
+
+            if (a.length == b.limit()) {
+
+                return a;
+
+            }
+
+        }
+
+        /*
+         * Copy the data into a byte[] using a read-only view on the buffer so
+         * that we do not mess with its position, mark, or limit.
+         */
+        final ByteBuffer tmp = b.asReadOnlyBuffer();
+
+        final int len = tmp.remaining();
+
+        final byte[] a = new byte[len];
+
+        tmp.get(a);
+
+        return a;
+
+    }
+    
 }

@@ -396,6 +396,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     AbstractTripleStore.Options.INLINE_BNODES,
                     AbstractTripleStore.Options.DEFAULT_INLINE_BNODES));
             
+            inlineDateTimes = Boolean.parseBoolean(getProperty(
+                    AbstractTripleStore.Options.INLINE_DATE_TIMES,
+                    AbstractTripleStore.Options.DEFAULT_INLINE_DATE_TIMES));
+            
             try {
                 
                 final Class<IExtensionFactory> xfc = 
@@ -403,7 +407,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 final IExtensionFactory xFactory = xfc.newInstance();
                 
                 lexiconConfiguration = new LexiconConfiguration(
-                        inlineLiterals, inlineBNodes, xFactory);
+                        inlineLiterals, inlineBNodes, inlineDateTimes, xFactory);
                 
             } catch (InstantiationException e) {
                 throw new IllegalArgumentException(
@@ -583,6 +587,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      */
     final private boolean inlineBNodes;
     
+    /**
+     * Are xsd:dateTime litersls being inlined into the statement indices.
+     * 
+     * {@link AbstractTripleStore.Options#INLINE_DATE_TIMES}
+     */
+    final private boolean inlineDateTimes;
     
     /**
      * Return <code>true</code> if datatype literals are being inlined into

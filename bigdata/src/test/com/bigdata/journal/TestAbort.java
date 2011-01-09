@@ -139,7 +139,7 @@ public class TestAbort extends ProxyTestCase<Journal> {
         }
         
     }
-        
+
     /**
      * Test of abort semantics when registering named {@link BTree}s (this tests
      * the integration of {@link Name2Addr} with abort).
@@ -169,7 +169,6 @@ public class TestAbort extends ProxyTestCase<Journal> {
             // make sure the offset has not been changed.
             assertEquals(firstOffset, store.getRootBlockView()
                     .getNextOffset());
-
             // write some data onto the store.
             for (int i = 0; i < nrecs; i++) {
 
@@ -227,7 +226,16 @@ public class TestAbort extends ProxyTestCase<Journal> {
              * After writing that big record, now register a named index.
              * 
              * Note: This ordering (big record, then index registered) is based
-             * on a bug pattern.
+             * on a bug pattern. The problem arises (for the WORM) when the
+             * large record is written out to disk immediately leaving some
+             * smaller records in a partially filled WriteCache. The WriteCache
+             * is not flushed until we add some more records and do the commit.
+             * At that point we have now partly overwritten our larger record
+             * with the WriteCache's data. Basically, the WORM requires that all
+             * writes onto the backing file are serialized. When it sees a
+             * record which is too large for the write cache it needs to evict
+             * the current write cache, then write the large record, and then
+             * continue with an empty cache.
              */
             {
             
@@ -259,7 +267,6 @@ public class TestAbort extends ProxyTestCase<Journal> {
             // verify the write.
             assertEquals(new byte[] { 2, 4 }, ndx
                     .lookup(new byte[] { 1, 3 }));
-
         } finally {
 
             store.destroy();
@@ -268,4 +275,20 @@ public class TestAbort extends ProxyTestCase<Journal> {
 
     }
 
+    /**
+     * Run {@link #test_abort()} a bunch of times to look for path dependent
+     * problems.
+     */
+    public void test_stressTestAbort() {
+
+        final int LIMIT = 10; // temporary reduction while fix to RWStore reopen
+        					  // that currently takes too long
+
+        for (int i = 0; i < LIMIT; i++) {
+            test_abort();
+
+        }
+
+    }
+    
 }

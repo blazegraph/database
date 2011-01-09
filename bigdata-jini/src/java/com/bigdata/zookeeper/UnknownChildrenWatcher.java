@@ -24,10 +24,6 @@ public class UnknownChildrenWatcher implements Watcher {
 
     final static protected Logger log = Logger.getLogger(UnknownChildrenWatcher.class);
 
-    final static protected boolean INFO = log.isInfoEnabled();
-
-    final static protected boolean DEBUG = log.isDebugEnabled();
-
     final private ZooKeeper zookeeper;
     final private String zpath;
     private boolean cancelled = false;
@@ -66,7 +62,7 @@ public class UnknownChildrenWatcher implements Watcher {
 
         this.zpath = zpath;
         
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("watching: "+zpath);
         
         // loop until we are able to set the watch.
@@ -87,7 +83,7 @@ public class UnknownChildrenWatcher implements Watcher {
                 
             } catch (Throwable t) {
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("will retry: " + this + " : " + t);
 
                 // sleep, but if we are interrupted then exit/
@@ -99,7 +95,7 @@ public class UnknownChildrenWatcher implements Watcher {
         
     }
 
-    synchronized public void process(WatchedEvent event) {
+    synchronized public void process(final WatchedEvent event) {
 
         if(cancelled) {
             
@@ -108,7 +104,7 @@ public class UnknownChildrenWatcher implements Watcher {
             
         }
         
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info(event.toString());
 
         switch(event.getState()) {
@@ -157,7 +153,7 @@ public class UnknownChildrenWatcher implements Watcher {
             
         }
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("added " + nadded + " : known=" + known.size());
 
     }
@@ -190,14 +186,14 @@ public class UnknownChildrenWatcher implements Watcher {
             
             // can be ignored since [cancelled] was set.
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(toString() + ":" + ex);
             
         } catch(ConnectionLossException ex) {
 
             // can be ignored since [cancelled] was set.
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(toString() + ":" + ex);
             
         } catch (Exception e) {

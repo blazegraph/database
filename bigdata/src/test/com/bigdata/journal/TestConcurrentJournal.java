@@ -1653,6 +1653,10 @@ public class TestConcurrentJournal extends ProxyTestCase {
         properties.setProperty(Options.WRITE_SERVICE_MAXIMUM_POOL_SIZE, "1");
 
         final Journal journal = new Journal(properties);
+//        final IBufferStrategy bufferStrategy = journal.getBufferStrategy();
+//        if (bufferStrategy instanceof RWStrategy) {
+//            ((RWStrategy)bufferStrategy).getRWStore().activateTx();
+//        }
 
         try {
         
@@ -1784,7 +1788,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
                 
                 for(Future f : futures) {
                 
-                    if(f.isDone()) {
+                    if(f.isDone()&&!f.isCancelled()) {
                         // all tasks that complete should have done so without error.
                         f.get();
                     }
@@ -1801,6 +1805,10 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         } finally {
         
+//            if (bufferStrategy instanceof RWStrategy) {
+//                ((RWStrategy)bufferStrategy).getRWStore().deactivateTx();
+//            }
+
             journal.destroy();
             
         }

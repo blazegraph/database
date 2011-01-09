@@ -29,10 +29,7 @@ package com.bigdata.journal;
 
 import java.io.File;
 import java.util.Date;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.Properties;
-import java.util.TreeMap;
 
 import org.apache.log4j.Logger;
 
@@ -44,15 +41,6 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.relation.IDatabase;
-import com.bigdata.relation.IRelation;
-import com.bigdata.relation.RelationSchema;
-import com.bigdata.sparse.GlobalRowStoreHelper;
-import com.bigdata.sparse.GlobalRowStoreSchema;
-import com.bigdata.sparse.ITPS;
-import com.bigdata.sparse.ITPV;
-import com.bigdata.sparse.Schema;
-import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -60,7 +48,7 @@ import com.bigdata.util.InnerCause;
  * blocks and metadata about the indices on a journal file.
  * 
  * @todo add an option to collect histograms over index records so that "fat" in
- *       the indices may be targeted. We can always report histograms for the
+ *       the indices may be targetted. We can always report histograms for the
  *       raw key and value data. However, with either an extensible serializer
  *       or with some application aware logic we are also able to report type
  *       specific histograms.
@@ -91,49 +79,35 @@ public class DumpJournal {
     public DumpJournal() {
         
     }
-
+    
     /**
      * Dump one or more journal files.
      * 
      * @param args
      *            The name(s) of the journal file to open.
      *            <dl>
-     *            <dt>-history</dt>
+     *            <dt>-history </dt>
      *            <dd>Dump metadata for indices in all commit records (default
      *            only dumps the metadata for the indices as of the most current
      *            committed state).</dd>
-     *            <dt>-GRS</dt>
-     *            <dd>Dump the records in the global row store (this contains
-     *            the various {@link IDatabase} and {@link IRelation}
-     *            declarations).</dd>
-     *            <dt>-GRSAll</dt>
-     *            <dd>Dump the records in the global row store (this contains
-     *            the various {@link IDatabase} and {@link IRelation}
-     *            declarations). For each property in the global row store, show
-     *            all property value updates together with their timestamps.</dd>
      *            <dt>-indices</dt>
      *            <dd>Dump the indices (does not show the tuples by default).</dd>
      *            <dt>-tuples</dt>
      *            <dd>Dump the records in the indices.</dd>
      *            </dl>
      */
-    public static void main(final String[] args) {
-
-        if (args.length == 0) {
-
-            System.err
-                    .println("usage: (-history|-GRS|-GRSAll|-indices|-tuples) <filename>+");
-
+    public static void main(String[] args) {
+        
+        if(args.length==0) {
+            
+            System.err.println("usage: (-history) <filename>+");
+            
             System.exit(1);
             
         }
 
         int i = 0;
-
-        boolean dumpGRS = false;
-
-        boolean dumpGRSCurrentOnly = true;
-
+        
         boolean dumpHistory = false;
         
         boolean dumpIndices = false;
@@ -156,21 +130,7 @@ public class DumpJournal {
                 dumpHistory = true;
                 
             }
-
-            if(arg.equals("-GRS")) {
-                
-                dumpGRS = true;
-                
-            }
-
-            if(arg.equals("-GRSAll")) {
-                
-                dumpGRS = true;
-
-                dumpGRSCurrentOnly = false;
-                
-            }
-
+            
             if(arg.equals("-indices")) {
                 
                 dumpIndices = true;
@@ -184,33 +144,30 @@ public class DumpJournal {
             }
             
         }
-
-        for (; i < args.length; i++) {
-
+        
+        for(; i<args.length; i++) {
+            
             final File file = new File(args[i]);
 
             try {
 
-                dumpJournal(file, dumpHistory, dumpGRS, dumpGRSCurrentOnly,
-                        dumpIndices, showTuples);
-
-            } catch (RuntimeException ex) {
-
+                dumpJournal(file,dumpHistory,dumpIndices,showTuples);
+                
+            } catch( RuntimeException ex) {
+                
                 ex.printStackTrace();
 
-                System.err.println("Error: " + ex + " on file: " + file);
-
+                System.err.println("Error: "+ex+" on file: "+file);
+                
             }
-
+            
             System.err.println("==================================");
 
         }
         
     }
     
-    public static void dumpJournal(final File file, final boolean dumpHistory,
-            final boolean dumpGRS, final boolean dumpGRSCurrentOnly,
-            final boolean dumpIndices, final boolean showTuples) {
+    public static void dumpJournal(File file,boolean dumpHistory,boolean dumpIndices,boolean showTuples) {
         
         /*
          * Stat the file and report on its size, etc.
@@ -249,7 +206,6 @@ public class DumpJournal {
         
             properties.setProperty(Options.READ_ONLY, "" + true);
             
-            // FIXME We should auto-discover this from the root blocks!
             properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
         
         }
@@ -260,7 +216,7 @@ public class DumpJournal {
 
         try {
             
-            final FileMetadata fmd = journal.fileMetadata;
+            final FileMetadata fmd = journal.getFileMetadata();
 
             // dump the MAGIC and VERSION.
             System.err.println("magic="+Integer.toHexString(fmd.magic));
@@ -294,10 +250,10 @@ public class DumpJournal {
 
                 System.err.println("Historical commit points follow in temporal sequence (first to last):");
                 
-                final CommitRecordIndex commitRecordIndex = journal.getCommitRecordIndex();
+                CommitRecordIndex commitRecordIndex = journal.getCommitRecordIndex();
 //                CommitRecordIndex commitRecordIndex = journal._commitRecordIndex;
                 
-                final ITupleIterator<CommitRecordIndex.Entry> itr = commitRecordIndex.rangeIterator();
+                ITupleIterator<CommitRecordIndex.Entry> itr = commitRecordIndex.rangeIterator();
                 
                 while(itr.hasNext()) {
                     
@@ -310,28 +266,25 @@ public class DumpJournal {
                     
                     final ICommitRecord commitRecord = journal
                             .getCommitRecord(entry.commitTime);
-
+                    
                     System.err.println(commitRecord.toString());
 
-                    dumpNamedIndicesMetadata(journal, commitRecord
-                            .getTimestamp(), dumpGRS, dumpGRSCurrentOnly,
-                            dumpIndices, showTuples);
-
+                    dumpNamedIndicesMetadata(journal,commitRecord,dumpIndices,showTuples);
+                    
                 }
-
+                
             } else {
 
                 /*
                  * Dump the current commit record.
                  */
-
+                
                 final ICommitRecord commitRecord = journal.getCommitRecord();
-
+                
                 System.err.println(commitRecord.toString());
 
-                dumpNamedIndicesMetadata(journal, commitRecord.getTimestamp(),
-                        dumpGRS, dumpGRSCurrentOnly, dumpIndices, showTuples);
-
+                dumpNamedIndicesMetadata(journal,commitRecord,dumpIndices,showTuples);
+                
             }
 
         } finally {
@@ -346,41 +299,15 @@ public class DumpJournal {
      * Dump metadata about each named index as of the specified commit record.
      * 
      * @param journal
-     *
+     * @param commitRecord
      */
-    private static void dumpNamedIndicesMetadata(final AbstractJournal journal,
-            final long timestamp, final boolean dumpGRS,
-            final boolean dumpGRSCurrentOnly, final boolean dumpIndices,
-            final boolean showTuples) {
+    private static void dumpNamedIndicesMetadata(AbstractJournal journal,
+            ICommitRecord commitRecord, boolean dumpIndices, boolean showTuples) {
 
         // view as of that commit record.
-        final IIndex name2Addr = journal.getName2Addr(timestamp);
+        final IIndex name2Addr = journal.getName2Addr(commitRecord.getTimestamp());
 
-        if (dumpGRS) {
-         
-            // Look up the GRS as of that timestamp.
-            final SparseRowStore rowStore = new GlobalRowStoreHelper(journal)
-                    .get(timestamp);
-            
-            if (rowStore == null) {
-            
-                System.err.println("GlobalRowStore does not exist: timestamp="
-                        + timestamp);
-                
-            } else {
-
-//                dumpRowStore(rowStore, GlobalRowStoreSchema.INSTANCE,
-//                        dumpGRSCurrentOnly);
-                
-                dumpRowStore(rowStore, RelationSchema.INSTANCE,
-                        dumpGRSCurrentOnly);
-
-            }
-            
-        }
-        
-        // the named indices
-        final ITupleIterator<?> itr = name2Addr.rangeIterator();
+        final ITupleIterator itr = name2Addr.rangeIterator(null,null);
 
         while (itr.hasNext()) {
 
@@ -433,74 +360,6 @@ public class DumpJournal {
     }
 
     /**
-     * Dump the contents of a row store, typically this will be the global row
-     * store, but it can be used for any row store.
-     * 
-     * @param rowStore
-     *            The row store to be dumped.
-     * @param schema
-     *            The schema to be dumped. Other schemas will be ignored (the
-     *            schema name serves as a key prefix such that different schemas
-     *            occupy disjoint key-ranges in the row store).
-     * @param currentOnly
-     *            When <code>true</code>, only the value having the most current
-     *            timestamp for each property will be dumped. When
-     *            <code>false</code>, all values for each property will be
-     *            dumped as {property,timestamp,value} tuples.
-     */
-    private static void dumpRowStore(final SparseRowStore rowStore,
-            final Schema schema, final boolean currentOnly) {
-
-        if (rowStore == null)
-            throw new IllegalArgumentException();
-
-        if (schema == null)
-            throw new IllegalArgumentException();
-
-        final Iterator<? extends ITPS> itr = rowStore.rangeIterator(schema);
-
-        while (itr.hasNext()) {
-
-            final ITPS tps = itr.next();
-
-            System.err.println(tps.getSchema().getName() + "::"
-                    + tps.getPrimaryKey());
-            
-            if (currentOnly) {
-
-                // visit in sorted order.
-                final Iterator<Map.Entry<String, Object>> eitr = new TreeMap<String, Object>(
-                        tps.asMap()).entrySet().iterator();
-
-                while (eitr.hasNext()) {
-
-                    final Map.Entry<String, Object> e = eitr.next();
-
-                    System.err.println("\t" + e.getKey() + "=" + e.getValue());
-
-                }
-
-            } else {
-
-                // visit in order by ascending timestamp.
-                final Iterator<ITPV> eitr = tps.iterator();
-
-                while (eitr.hasNext()) {
-
-                    final ITPV tpv = eitr.next();
-
-                    System.err.println("\t" + tpv.getName() + "[@"
-                            + tpv.getTimestamp() + "]" + "=" + tpv.getValue());
-
-                }
-                
-            }
-            
-        }
-
-    }
-    
-    /**
      * Utility method using an {@link ITupleIterator} to dump the keys and
      * values in an {@link AbstractBTree}.
      * 
@@ -510,11 +369,10 @@ public class DumpJournal {
      *            be displayed. Otherwise the scan will simply exercise the
      *            iterator.
      */
-    public static void dumpIndex(final AbstractBTree btree,
-            final boolean showTuples) {
-
+    public static void dumpIndex(AbstractBTree btree, boolean showTuples) {
+        
         // @todo offer the version metadata also if the index supports isolation.
-        final ITupleIterator<?> itr = btree.rangeIterator();
+        final ITupleIterator itr = btree.rangeIterator(null, null);
         
         final long begin = System.currentTimeMillis();
         
@@ -522,7 +380,7 @@ public class DumpJournal {
         
         while(itr.hasNext()) {
             
-            final ITuple<?> tuple = itr.next();
+            final ITuple tuple = itr.next();
 
             if(showTuples) {
 
@@ -540,9 +398,9 @@ public class DumpJournal {
         
     }
     
-    private static String dumpTuple(ITuple<?> tuple) {
+    private static String dumpTuple(ITuple tuple) {
         
-        final ITupleSerializer<?, ?> tupleSer = tuple.getTupleSerializer();
+        final ITupleSerializer tupleSer = tuple.getTupleSerializer();
         
         final StringBuilder sb = new StringBuilder();
         

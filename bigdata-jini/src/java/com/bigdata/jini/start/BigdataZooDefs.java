@@ -13,6 +13,7 @@ import com.bigdata.jini.start.config.IServiceConstraint;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.IResourceLockService;
+import com.bigdata.quorum.zk.ZKQuorum;
 import com.bigdata.service.jini.TransactionServer;
 import com.bigdata.zookeeper.DumpZookeeper;
 import com.bigdata.zookeeper.ZLock;
@@ -143,6 +144,8 @@ import com.bigdata.zookeeper.ZLock;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see ZKQuorum
  */
 public interface BigdataZooDefs {
 
@@ -216,18 +219,20 @@ public interface BigdataZooDefs {
      * The relative zpath to a node whose children are {@link ZLock} acquired
      * using the {@link IResourceLockService}.
      */
-    String LOCKS_RESOURCES = LOCKS + "/" + "resources";
-    
+    String LOCKS_RESOURCES = LOCKS + ZSLASH + "resources";
+
     /**
      * The prefix for the name of a znode that represents a logical service.
      * This znode is a {@link CreateMode#PERSISTENT_SEQUENTIAL} child of the
-     * {@link #CONFIG} znode. This znode should have two children:
-     * {@link #PHYSICAL_SERVICES_CONTAINER} and {@link #MASTER_ELECTION}.
+     * {@link #CONFIG} znode. This znode should have children:
+     * {@link #PHYSICAL_SERVICES_CONTAINER} (the children are the list of
+     * physical service instances) and {@link ZKQuorum#QUORUM} (the znode
+     * spanning the quorum state for the logical service).
      */
     String LOGICAL_SERVICE_PREFIX = "logicalService";
 
     /**
-     * The name of the znodes whose children represent the physical service
+     * The name of the znode whose children represent the physical service
      * instances.
      * <p>
      * Most bigdata services are persistent. Each service has a persistent
@@ -263,6 +268,9 @@ public interface BigdataZooDefs {
      * for that logical service.
      * 
      * @see ZLock
+     * 
+     * @deprecated by {@link #QUORUM}. The leader of a met quorum is
+     *             the first child of <code>quorum/joined></code>.
      */
     String MASTER_ELECTION = "masterElection";
 

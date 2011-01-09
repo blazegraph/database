@@ -53,7 +53,7 @@ public class LexiconConfiguration<V extends BigdataValue>
     protected static final Logger log = 
         Logger.getLogger(LexiconConfiguration.class);
     
-    private final boolean inlineLiterals, inlineBNodes;
+    private final boolean inlineLiterals, inlineBNodes, inlineDateTimes;
 
     private final IExtensionFactory xFactory;
     
@@ -62,10 +62,12 @@ public class LexiconConfiguration<V extends BigdataValue>
     private final Map<String, IExtension> datatypes;
     
     public LexiconConfiguration(final boolean inlineLiterals, 
-            final boolean inlineBNodes, final IExtensionFactory xFactory) {
+            final boolean inlineBNodes, final boolean inlineDateTimes, 
+            final IExtensionFactory xFactory) {
         
         this.inlineLiterals = inlineLiterals;
         this.inlineBNodes = inlineBNodes;
+        this.inlineDateTimes = inlineDateTimes;
         this.xFactory = xFactory;
         
         termIds = new HashMap<TermId, IExtension>();
@@ -75,7 +77,7 @@ public class LexiconConfiguration<V extends BigdataValue>
     
 	public void initExtensions(final IDatatypeURIResolver resolver) {
 
-		xFactory.init(resolver);
+		xFactory.init(resolver, inlineDateTimes);
 
 		for (IExtension extension : xFactory.getExtensions()) {
 			BigdataURI datatype = extension.getDatatype();

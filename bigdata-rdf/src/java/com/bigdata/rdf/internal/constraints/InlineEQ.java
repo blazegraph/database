@@ -28,7 +28,6 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.internal.IV;
 
 /**

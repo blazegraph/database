@@ -29,6 +29,8 @@ package com.bigdata.zookeeper;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.BindException;
 import java.net.ServerSocket;
 import java.util.Arrays;
@@ -40,6 +42,7 @@ import junit.framework.TestCase2;
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationProvider;
 
+import org.apache.log4j.Level;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
@@ -267,67 +270,68 @@ public abstract class AbstractZooTestCase extends TestCase2 {
         }
         
     }
-    
+
     /**
-     * Return a new {@link Zookeeper} instance that is connected to the same
-     * zookeeper ensemble but which has a distinct session.
+     * Return a new {@link ZooKeeperAccessor} instance connects to the same
+     * zookeeper ensemble but which uses distinct {@link ZooKeeper} session.
      * 
-     * @return
-     * @throws IOException
      * @throws InterruptedException
      */
-    protected ZooKeeper getDistinctZooKeeperWithDistinctSession()
-            throws IOException, InterruptedException {
+    protected ZooKeeperAccessor getZooKeeperAccessorWithDistinctSession()
+            throws InterruptedException {
 
-        final ZooKeeper zookeeper2 = new ZooKeeper(zookeeperAccessor.hosts,
-                zookeeperAccessor.sessionTimeout, new Watcher() {
-                    public void process(WatchedEvent e) {
-
-                    }
-                });
+        return new ZooKeeperAccessor(zookeeperAccessor.hosts,
+                zookeeperAccessor.sessionTimeout);
         
-        /*
-         * Wait until this instance is connected.
-         */
-        final long timeout = TimeUnit.MILLISECONDS.toNanos(1000/* ms */);
-
-        final long begin = System.nanoTime();
-
-        while (zookeeper2.getState() != ZooKeeper.States.CONNECTED
-                && zookeeper2.getState().isAlive()) {
-
-            final long elapsed = System.nanoTime() - begin;
-
-            if (elapsed > timeout) {
-
-                fail("ZooKeeper session did not connect? elapsed="
-                        + TimeUnit.NANOSECONDS.toMillis(elapsed));
-
-            }
-
-            if (log.isInfoEnabled()) {
-
-                log.info("Awaiting connected.");
-
-            }
-
-            Thread.sleep(100/* ms */);
-
-        }
-
-        if (!zookeeper2.getState().isAlive()) {
-
-            fail("Zookeeper died?");
-
-        }
-
-        if(log.isInfoEnabled())
-            log.info("Zookeeper connected.");
-        
-        return zookeeper2;
+//        final ZooKeeper zookeeper2 = new ZooKeeper(zookeeperAccessor.hosts,
+//                zookeeperAccessor.sessionTimeout, new Watcher() {
+//                    public void process(WatchedEvent e) {
+//
+//                    }
+//                });
+//        
+//        /*
+//         * Wait until this instance is connected.
+//         */
+//        final long timeout = TimeUnit.MILLISECONDS.toNanos(1000/* ms */);
+//
+//        final long begin = System.nanoTime();
+//
+//        while (zookeeper2.getState() != ZooKeeper.States.CONNECTED
+//                && zookeeper2.getState().isAlive()) {
+//
+//            final long elapsed = System.nanoTime() - begin;
+//
+//            if (elapsed > timeout) {
+//
+//                fail("ZooKeeper session did not connect? elapsed="
+//                        + TimeUnit.NANOSECONDS.toMillis(elapsed));
+//
+//            }
+//
+//            if (log.isInfoEnabled()) {
+//
+//                log.info("Awaiting connected.");
+//
+//            }
+//
+//            Thread.sleep(100/* ms */);
+//
+//        }
+//
+//        if (!zookeeper2.getState().isAlive()) {
+//
+//            fail("Zookeeper died?");
+//
+//        }
+//
+//        if(log.isInfoEnabled())
+//            log.info("Zookeeper connected.");
+//        
+//        return zookeeper2;
 
     }
-    
+
     /**
      * Return a new {@link ZooKeeper} instance that is connected to the same
      * zookeeper ensemble as the given instance and is using the same session
@@ -345,8 +349,9 @@ public abstract class AbstractZooTestCase extends TestCase2 {
      * @throws IOException
      * @throws InterruptedException
      */
-    protected ZooKeeper getDistinctZooKeeperForSameSession(ZooKeeper zookeeper1)
-            throws IOException, InterruptedException {
+    protected ZooKeeper getDistinctZooKeeperForSameSession(
+            final ZooKeeper zookeeper1) throws IOException,
+            InterruptedException {
 
         final ZooKeeper zookeeper2 = new ZooKeeper(zookeeperAccessor.hosts,
                 zookeeperAccessor.sessionTimeout, new Watcher() {
@@ -589,6 +594,42 @@ public abstract class AbstractZooTestCase extends TestCase2 {
             log.info("delete: " + zpath);
 
         zookeeper.delete(zpath, -1/* version */);
+
+    }
+
+    /**
+     * Conditionally logs the zookeeper state.
+     * 
+     * @param level
+     *            The log level.
+     * @param message
+     *            A message output with the dump (optional).
+     * @param zpath
+     *            The zpath to be dumped.
+     * 
+     * @throws KeeperException
+     * @throws InterruptedException
+     */
+    protected void dumpZoo(final Level level, final String message,
+            final String zpath) throws KeeperException, InterruptedException {
+
+        if (log.isEnabledFor(level)) {
+
+            final StringWriter sw = new StringWriter();
+
+            final PrintWriter pw = new PrintWriter(sw);
+
+            if (message != null)
+                pw.println(message);
+
+            new DumpZookeeper(zookeeper)
+                    .dump(pw, true/* showData */, zpath, 0/* depth */);
+
+            pw.flush();
+
+            log.log(level, sw.toString(), null/* Throwable */);
+
+        }
 
     }
 

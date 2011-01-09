@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.zookeeper;
 
 import java.io.IOException;
+import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.List;
 
@@ -101,9 +103,10 @@ public class DumpZookeeper {
                 });
 
         try {
-            
-            new DumpZookeeper(z).dump(showData, zooClientConfig.zroot, 0);
-            
+
+            new DumpZookeeper(z).dump(new PrintWriter(System.out), showData,
+                    zooClientConfig.zroot, 0/*depth*/);
+
         } finally {
 
             z.close();
@@ -113,12 +116,23 @@ public class DumpZookeeper {
     }
 
     /**
-     * @throws InterruptedException
-     * @throws KeeperException
+     * Recursively dumps some or all of the zookeeper hierarchy.
      * 
+     * @param w
+     *            Where to write the dump.
+     * @param showData
+     *            <code>true</code> to show the deserialized data.
+     * @param zpath
+     *            The zpath at which the dump will begin.
+     * @param depth
+     *            The level of the dump (controls indenting and should be zero
+     *            for the top-level invocation of this method).
+     * @throws KeeperException
+     * @throws InterruptedException
      */
-    private void dump(final boolean showData, final String zpath,
-            final int depth) throws KeeperException, InterruptedException {
+    public void dump(final PrintWriter w, final boolean showData,
+            final String zpath, final int depth) throws KeeperException,
+            InterruptedException {
 
         final Stat stat = new Stat();
 
@@ -129,7 +143,7 @@ public class DumpZookeeper {
             
         } catch (NoNodeException ex) {
             
-            System.err.println("Not found: [" + zpath + "]");
+            w.println("Not found: [" + zpath + "]");
             
             return;
             
@@ -154,13 +168,13 @@ public class DumpZookeeper {
 
         } catch (NoNodeException ex) {
 
-            System.err.println("Not found: [" + zpath + "]");
+            w.println("Not found: [" + zpath + "]");
             
             return;
 
         }
 
-        System.out.print(i(depth)
+        w.print(i(depth)
                 + znode
                 + (children.isEmpty()?"":"("+children.size()+" children)")
                 + (stat.getEphemeralOwner() != 0 ? " (Ephemeral"
@@ -192,16 +206,16 @@ public class DumpZookeeper {
                         obj = "bytes[" + data.length + "]";
                     }
                 }
-                System.out.print(obj);
+                w.print(obj);
 
             }
         }
             
-        System.out.println();
+        w.println();
 
         for (String child : children) {
 
-            dump(showData, zpath + "/" + child, depth + 1);
+            dump(w,showData, zpath + "/" + child, depth + 1);
 
         }
         

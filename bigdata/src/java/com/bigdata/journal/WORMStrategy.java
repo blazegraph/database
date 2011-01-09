@@ -27,13 +27,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.AsynchronousCloseException;
-import java.nio.channels.ClosedChannelException;
+import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Exchanger;
-import java.util.concurrent.Executors;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -44,15 +41,21 @@ import com.bigdata.btree.BTree.Counter;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
-import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.counters.striped.StripedCounters;
+import com.bigdata.ha.QuorumRead;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
-import com.bigdata.io.WriteCache;
-import com.bigdata.io.WriteCacheService;
+import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.io.writecache.WriteCacheService;
+import com.bigdata.journal.ha.HAWriteMessage;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.ChecksumError;
+import com.bigdata.util.ChecksumUtility;
 
 /**
- * Disk-based journal strategy.
+ * Disk-based Write Once Read Many (WORM) journal strategy. The phsyical layout
+ * on the disk is the journal header, the root blocks, and then the user extent.
  * <p>
  * Writes are buffered in a write cache. The cache is flushed when it would
  * overflow. As a result only large sequential writes are performed on the
@@ -78,7 +81,8 @@ import com.bigdata.rawstore.IRawStore;
  * http://msdn2.microsoft.com/en-us/library/aa365165.aspx,
  * http://www.jasonbrome.com/blog/archives/2004/04/03/writecache_enabled.html,
  * http://support.microsoft.com/kb/811392,
- * http://mail-archives.apache.org/mod_mbox/db-derby-dev/200609.mbox/%3C44F820A8.6000000@sun.com%3E
+ * http://mail-archives.apache.org/mod_mbox
+ * /db-derby-dev/200609.mbox/%3C44F820A8.6000000@sun.com%3E
  * 
  * <pre>
  *                /sbin/hdparm -W 0 /dev/hda 0 Disable write caching
@@ -86,58 +90,10 @@ import com.bigdata.rawstore.IRawStore;
  * </pre>
  * 
  * @todo report whether or not the on-disk write cache is enabled for each
- *       platform in {@link AbstractStatisticsCollector}. offer guidence on how
+ *       platform in {@link AbstractStatisticsCollector}. offer guidance on how
  *       to disable that write cache.
  * 
- * @todo The flush of the write cache could be made asynchronous if we had two
- *       write buffers, but that increases the complexity significantly. It
- *       would have to be synchronous if invoked from {@link #force(boolean)} in
- *       any case (or rather force would have to flush all buffers).
- *       <p>
- *       Reconsider a 2nd buffer so that we can avoid waiting on the writes to
- *       disk. Use
- *       {@link Executors#newSingleThreadExecutor(java.util.concurrent.ThreadFactory)
- *       to obtain the 2nd (daemon) thread and an. {@link Exchanger}.
- *       <p>
- *       Consider the generalization where a WriteCache encapsulates the logic
- *       that exists in this class and where we have a {@link BlockingQueue} of
- *       available write caches. There is one "writable" writeCache object at
- *       any given time, unless we are blocked waiting for one to show up on the
- *       availableQueue. When a WriteCache is full it is placed onto a
- *       writeQueue. A thread reads from the writeQueue and performs writes,
- *       placing empty WriteCache objects onto the availableQueue. Sync places
- *       the current writeCache on the writeQueue and then waits on the
- *       writeQueue to be empty. Large objects could be wrapped and written out
- *       using the same mechanisms but should not become "available" again after
- *       they are written.
- *       <p>
- *       Consider that a WriteCache also doubles as a read cache IF we create
- *       write cache objects encapsulating reads that we read directly from the
- *       disk rather than from a WriteCache. In this case we might do a larger
- *       read so as to populate more of the WriteCache object in the hope that
- *       we will have more hits in that part of the journal.
- *       <p>
- *       modify force to use an atomic handoff of the write cache so that the
- *       net result is atomic from the perspective of the caller. This may
- *       require locking on the write cache so that we wait until concurrent
- *       writes have finished before flushing to the disk or I may be able to
- *       use nextOffset to make an atomic determination of the range of the
- *       buffer to be forced, create a view of that range, and use the view to
- *       force to disk so that the position and limits are not changed by force
- *       nor by concurrent writers - this may also be a problem for the Direct
- *       mode and the Mapped mode, at least if they use a write cache.
- *       <p>
- *       Async cache writes are also useful if the disk cache is turned off and
- *       could gain importance in offering tighter control over IO guarantees.
- * 
- * @todo test verifying that large records are written directly and that the
- *       write cache is properly flush beforehand.
- * 
  * @todo test verifying that the write cache can be disabled.
- * 
- * @todo test verifying that {@link #writeCacheOffset} is restored correctly on
- *       restart (ie., you can continue to append to the store after restart and
- *       the result is valid).
  * 
  * @todo test verifying that the buffer position and limit are updated correctly
  *       by {@link #write(ByteBuffer)} regardless of the code path.
@@ -158,7 +114,7 @@ import com.bigdata.rawstore.IRawStore;
  * @see BufferMode#Temporary
  */
 public class WORMStrategy extends AbstractBufferStrategy implements
-        IDiskBasedStrategy {
+        IDiskBasedStrategy, IHABufferStrategy {
     
     /**
      * The file.
@@ -205,12 +161,17 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     /**
      * Extent of the file. This value should be valid since we obtain an
      * exclusive lock on the file when we open it.
+     * 
+     * @todo Atomic long to ensure visibility of changes?
      */
     private long extent;
 
     private long userExtent;
 
     private final long minimumExtension;
+
+    private final Quorum<?,?> quorum;
+//    private final AtomicReference<Quorum<?,?>> quorumRef;
 
     /**
      * This lock is used to exclude readers when the extent of the backing file
@@ -222,59 +183,75 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     final private ReentrantReadWriteLock extensionLock = new ReentrantReadWriteLock();
 
     /**
-     * Optional {@link WriteCache}. This field is never <code>null</code>, but
-     * the reference MAY be <code>null</code>, in which case there is no write
-     * cache. {@link #closeForWrites()} will atomically clear this field, at
-     * which point readers will no longer be able to acquire the write cache.
-     * This should not be a performance hit since those records will generally
-     * be in the {@link LRUNexus} in any case.
+     * The service responsible for migrating dirty records onto the backing file
+     * and (for HA) onto the other members of the {@link Quorum}.
      * 
-     * FIXME Replace with the {@link WriteCacheService}
+     * @todo This MAY be <code>null</code> for a read-only store or if the write
+     *       cache is disabled.
+     * 
+     * @todo Is HA read-only allowed? If so, then since the
+     *       {@link WriteCacheService} handles failover reads it should be
+     *       enabled for HA read-only.
      */
-    private final AtomicReference<WriteCache> writeCache;
+    private final WriteCacheService writeCacheService;
 
+    /**
+     * <code>true</code> iff the backing store has record level checksums.
+     */
+    private final boolean useChecksums;
+
+    /**
+     * <code>true</code> if the backing store will be used in an HA
+     * {@link Quorum} (this is passed through to the {@link WriteCache} objects
+     * which use this flag to conditionally track the checksum of the entire
+     * write cache buffer).
+     */
+    private final boolean isHighlyAvailable;
+    
+    /**
+     * The {@link UUID} which identifies the journal (this is the same for each
+     * replicated journal is a quorum, so it is really a logical store UUID).
+     */
+    private final UUID storeUUID;
+    
+    @Override
+    public boolean useChecksums() {
+        return useChecksums;
+    }
+    
     /**
      * Issues the disk writes for the write cache and recycles the write cache
      * to receive new writes.
-     * 
-     * FIXME When we integrate the {@link WriteCacheService} this will no longer
-     * be invoked by {@link #write(ByteBuffer)}. Instead, it will only be
-     * invoked by {@link #force(boolean)} and can be moved in line there.
      */
     private void flushWriteCache() {
 
-        final WriteCache writeCache = this.writeCache.get();
+        if (writeCacheService != null) {
 
-        if (writeCache == null)
-            return;
+            try {
 
-        try {
+                /*
+                 * Issue the disk writes (does not force to the disk).
+                 * 
+                 * Note: This will wind up calling writeOnDisk().
+                 * 
+                 * Note: It is critical that this operation is atomic with
+                 * regard to writes on the cache. Otherwise new writes can enter
+                 * the cache after it was flushed to the backing channel but
+                 * before it is reset. Those writes will then be lost. This
+                 * issue does not arise for the {@link WriteCacheService} since
+                 * it atomically moves the full buffer onto a dirty list.
+                 */
 
-            /*
-             * Issue the disk writes (does not force to the disk).
-             * 
-             * Note: This will wind up calling writeOnDisk().
-             * 
-             * Note: It is critical that this operation is atomic with regard to
-             * writes on the cache. Otherwise new writes can enter the cache
-             * after it was flushed to the backing channel but before it is
-             * reset. Those writes will then be lost. This issue does not arise
-             * for the {@link WriteCacheService} since it atomically moves the
-             * full buffer onto a dirty list.
-             */
-        
-            writeCache.flushAndReset(false/* force */);
-            
-        } catch (IOException e) {
+                writeCacheService.flush(false/* force */);
+                
+            } catch (InterruptedException e) {
+                
+                throw new RuntimeException(e);
+                
+            }
 
-            throw new RuntimeException(e);
-            
-        } catch (InterruptedException e) {
-            
-            throw new RuntimeException(e);
-            
         }
-
+        
     }
     
     final public int getHeaderSize() {
@@ -317,151 +294,155 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     }
 
     /**
-     * Counters for {@link IRawStore} access, including operations that read or
-     * write through to the underlying media.
+     * Striped performance counters for {@link IRawStore} access, including
+     * operations that read or write through to the underlying media.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
+     * @param <T>
      * 
      * @todo report elapsed time and average latency for force, reopen, and
      *       writeRootBlock.
-     * 
-     *       FIXME Counters should be thread-local or stripped with periodic
-     *       {@link #add(StoreCounters)} to the shared counters to provide
-     *       eventually consistent values with low-to-no
-     *       contention/synchronization (was counters need to be atomic if we
-     *       want to avoid the possibility of concurrent <code>x++</code>
-     *       operations failing to correctly increment <code>x</code> for each
-     *       request).
+     *       
+     * FIXME  CAT may be much faster than striped locks (2-3x faster).
      */
-    public static class StoreCounters {
-        
+    static public class StoreCounters<T extends StoreCounters<T>> extends
+            StripedCounters<T> {
+
         /**
          * #of read requests.
          */
-        public long nreads;
+        public volatile long nreads;
 
         /**
          * #of read requests that read through to the backing file.
          */
-        public long ndiskRead;
+        public volatile long ndiskRead;
         
         /**
          * #of bytes read.
          */
-        public long bytesRead;
+        public volatile long bytesRead;
 
         /**
          * #of bytes that have been read from the disk.
          */
-        public long bytesReadFromDisk;
-        
-        /**
-         * The size of the largest record read.
-         */
-        public long maxReadSize;
+        public volatile long bytesReadFromDisk;
         
         /**
          * Total elapsed time for reads.
          */
-        public long elapsedReadNanos;
+        public volatile long elapsedReadNanos;
 
         /**
          * Total elapsed time for reading on the disk.
          */
-        public long elapsedDiskReadNanos;
+        public volatile long elapsedDiskReadNanos;
+
+        /**
+         * The #of checksum errors while reading on the local disk.
+         */
+        public volatile long checksumErrorCount;
         
         /**
          * #of write requests.
          */
-        public long nwrites;
+        public volatile long nwrites;
         
         /**
          * #of write requests that write through to the backing file.
          */
-        public long ndiskWrite;
+        public volatile long ndiskWrite;
 
+        /**
+         * The size of the largest record read.
+         */
+        public volatile long maxReadSize;
+        
         /**
          * The size of the largest record written.
          */
-        public long maxWriteSize;
+        public volatile long maxWriteSize;
         
         /**
          * #of bytes written.
          */
-        public long bytesWritten;
+        public volatile long bytesWritten;
         
         /**
          * #of bytes that have been written on the disk.
          */
-        public long bytesWrittenOnDisk;
+        public volatile long bytesWrittenOnDisk;
         
         /**
          * Total elapsed time for writes.
          */
-        public long elapsedWriteNanos;
+        public volatile long elapsedWriteNanos;
         
         /**
          * Total elapsed time for writing on the disk.
          */
-        public long elapsedDiskWriteNanos;
+        public volatile long elapsedDiskWriteNanos;
         
         /**
          * #of times the data were forced to the disk.
          */
-        public long nforce;
+        public volatile long nforce;
         
         /**
          * #of times the length of the file was changed (typically, extended).
          */
-        public long ntruncate;
+        public volatile long ntruncate;
         
         /**
          * #of times the file has been reopened after it was closed by an
          * interrupt.
          */
-        public long nreopen;
+        public volatile long nreopen;
         
         /**
          * #of times one of the root blocks has been written.
          */
-        public long nwriteRootBlock;
+        public volatile long nwriteRootBlock;
 
         /**
-         * Initialize a new set of counters.
+         * {@inheritDoc}
          */
         public StoreCounters() {
-            
+            super();
         }
-        
-        /**
-         * Copy ctor.
-         * @param o
-         */
-        public StoreCounters(final StoreCounters o) {
-            
-            add( o );
-            
-        }
-        
-        /**
-         * Adds counters to the current counters.
-         * 
-         * @param o
-         */
-        public void add(final StoreCounters o) {
 
+        /**
+         * {@inheritDoc}
+         */
+        public StoreCounters(final int batchSize) {
+            super(batchSize);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public StoreCounters(final int nstripes, final int batchSize) {
+            super(nstripes, batchSize);
+        }
+
+        @Override
+        public void add(final T o) {
+
+            super.add(o);
+            
             nreads += o.nreads;
             ndiskRead += o.ndiskRead;
             bytesRead += o.bytesRead;
             bytesReadFromDisk += o.bytesReadFromDisk;
-            maxReadSize += o.maxReadSize;
+            maxReadSize = Math.max(maxReadSize, o.maxReadSize);
             elapsedReadNanos += o.elapsedReadNanos;
             elapsedDiskReadNanos += o.elapsedDiskReadNanos;
+            checksumErrorCount += o.checksumErrorCount;
 
             nwrites += o.nwrites;
             ndiskWrite += o.ndiskWrite;
-            maxWriteSize += o.maxWriteSize;
+            maxWriteSize = Math.max(maxWriteSize, o.maxWriteSize);
             bytesWritten += o.bytesWritten;
             bytesWrittenOnDisk += o.bytesWrittenOnDisk;
             elapsedWriteNanos += o.elapsedWriteNanos;
@@ -474,31 +455,25 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             
         }
 
-        /**
-         * Returns a new {@link StoreCounters} containing the current counter values
-         * minus the given counter values.
-         * 
-         * @param o
-         * 
-         * @return
-         */
-        public StoreCounters subtract(final StoreCounters o) {
+        @Override
+        public T subtract(final T o) {
 
             // make a copy of the current counters.
-            final StoreCounters t = new StoreCounters(this);
+            final T t = super.subtract(o);
             
             // subtract out the given counters.
             t.nreads -= o.nreads;
             t.ndiskRead -= o.ndiskRead;
             t.bytesRead -= o.bytesRead;
             t.bytesReadFromDisk -= o.bytesReadFromDisk;
-            t.maxReadSize -= o.maxReadSize;
+            t.maxReadSize -= o.maxReadSize; // @todo report max? min?
             t.elapsedReadNanos -= o.elapsedReadNanos;
             t.elapsedDiskReadNanos -= o.elapsedDiskReadNanos;
+            t.checksumErrorCount -= o.checksumErrorCount;
 
             t.nwrites -= o.nwrites;
             t.ndiskWrite -= o.ndiskWrite;
-            t.maxWriteSize -= o.maxWriteSize;
+            t.maxWriteSize -= o.maxWriteSize; // @todo report max? min?
             t.bytesWritten -= o.bytesWritten;
             t.bytesWrittenOnDisk -= o.bytesWrittenOnDisk;
             t.elapsedWriteNanos -= o.elapsedWriteNanos;
@@ -513,253 +488,273 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             
         }
         
+        @Override
+        public void clear() {
+
+            // subtract out the given counters.
+            nreads = 0;
+            ndiskRead = 0;
+            bytesRead = 0;
+            bytesReadFromDisk = 0;
+            maxReadSize = 0;
+            elapsedReadNanos = 0;
+            elapsedDiskReadNanos = 0;
+            checksumErrorCount = 0;
+
+            nwrites = 0;
+            ndiskWrite = 0;
+            maxWriteSize = 0;
+            bytesWritten = 0;
+            bytesWrittenOnDisk = 0;
+            elapsedWriteNanos = 0;
+            elapsedDiskWriteNanos = 0;
+
+            nforce = 0;
+            ntruncate = 0;
+            nreopen = 0;
+            nwriteRootBlock = 0;
+
+        }
+        
+        @Override
         public CounterSet getCounters() {
 
-            final CounterSet root = new CounterSet();
+            final CounterSet root = super.getCounters();
 
-                // IRawStore API
-                {
+            // IRawStore API
+            {
 
-                    /*
-                     * reads
-                     */
+                /*
+                 * reads
+                 */
 
-                    root.addCounter("nreads", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nreads);
-                        }
-                    });
+                root.addCounter("nreads", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(nreads);
+                    }
+                });
 
-                    root.addCounter("bytesRead", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(bytesRead);
-                        }
-                    });
+                root.addCounter("bytesRead", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(bytesRead);
+                    }
+                });
 
-                    root.addCounter("readSecs", new Instrument<Double>() {
-                        public void sample() {
-                            final double elapsedReadSecs = (elapsedReadNanos / 1000000000.);
-                            setValue(elapsedReadSecs);
-                        }
-                    });
+                root.addCounter("readSecs", new Instrument<Double>() {
+                    public void sample() {
+                        final double elapsedReadSecs = (elapsedReadNanos / 1000000000.);
+                        setValue(elapsedReadSecs);
+                    }
+                });
 
-                    root.addCounter("bytesReadPerSec",
-                            new Instrument<Double>() {
-                                public void sample() {
-                                    final double readSecs = (elapsedReadNanos / 1000000000.);
-                                    final double bytesReadPerSec = (readSecs == 0L ? 0d
-                                            : (bytesRead / readSecs));
-                                    setValue(bytesReadPerSec);
-                                }
-                            });
+                root.addCounter("bytesReadPerSec", new Instrument<Double>() {
+                    public void sample() {
+                        final double readSecs = (elapsedReadNanos / 1000000000.);
+                        final double bytesReadPerSec = (readSecs == 0L ? 0d
+                                : (bytesRead / readSecs));
+                        setValue(bytesReadPerSec);
+                    }
+                });
 
-                    root.addCounter("maxReadSize", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(maxReadSize);
-                        }
-                    });
+                root.addCounter("maxReadSize", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(maxReadSize);
+                    }
+                });
 
-                    /*
-                     * writes
-                     */
+                root.addCounter("checksumErrorCount", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(checksumErrorCount);
+                    }
+                });
 
-                    root.addCounter("nwrites", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nwrites);
-                        }
-                    });
+                /*
+                 * writes
+                 */
 
-                    root.addCounter("bytesWritten", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(bytesWritten);
-                        }
-                    });
+                root.addCounter("nwrites", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(nwrites);
+                    }
+                });
 
-                    root.addCounter("writeSecs", new Instrument<Double>() {
-                        public void sample() {
-                            final double writeSecs = (elapsedWriteNanos / 1000000000.);
-                            setValue(writeSecs);
-                        }
-                    });
+                root.addCounter("bytesWritten", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(bytesWritten);
+                    }
+                });
 
-                    root.addCounter("bytesWrittenPerSec",
-                            new Instrument<Double>() {
-                                public void sample() {
-                                    final double writeSecs = (elapsedWriteNanos / 1000000000.);
-                                    final double bytesWrittenPerSec = (writeSecs == 0L ? 0d
-                                            : (bytesWritten / writeSecs));
-                                    setValue(bytesWrittenPerSec);
-                                }
-                            });
+                root.addCounter("writeSecs", new Instrument<Double>() {
+                    public void sample() {
+                        final double writeSecs = (elapsedWriteNanos / 1000000000.);
+                        setValue(writeSecs);
+                    }
+                });
 
-                    root.addCounter("maxWriteSize", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(maxWriteSize);
-                        }
-                    });
+                root.addCounter("bytesWrittenPerSec", new Instrument<Double>() {
+                    public void sample() {
+                        final double writeSecs = (elapsedWriteNanos / 1000000000.);
+                        final double bytesWrittenPerSec = (writeSecs == 0L ? 0d
+                                : (bytesWritten / writeSecs));
+                        setValue(bytesWrittenPerSec);
+                    }
+                });
 
-                }
+                root.addCounter("maxWriteSize", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(maxWriteSize);
+                    }
+                });
 
-                // disk statistics
-                {
-                    final CounterSet disk = root.makePath("disk");
+            } // IRawStore
 
-                    /*
-                     * read
-                     */
+            // disk statistics
+            {
+                final CounterSet disk = root.makePath("disk");
 
-                    disk.addCounter("nreads", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(ndiskRead);
-                        }
-                    });
+                /*
+                 * read
+                 */
 
-                    disk.addCounter("bytesRead", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(bytesReadFromDisk);
-                        }
-                    });
+                disk.addCounter("nreads", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(ndiskRead);
+                    }
+                });
 
-                    disk.addCounter("bytesPerRead", new Instrument<Double>() {
-                        public void sample() {
-                            final double bytesPerDiskRead = (ndiskRead == 0 ? 0d
-                                    : (bytesReadFromDisk / (double)ndiskRead));
-                            setValue(bytesPerDiskRead);
-                        }
-                    });
+                disk.addCounter("bytesRead", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(bytesReadFromDisk);
+                    }
+                });
 
-                    disk.addCounter("readSecs", new Instrument<Double>() {
-                        public void sample() {
-                            final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
-                            setValue(diskReadSecs);
-                        }
-                    });
+                disk.addCounter("bytesPerRead", new Instrument<Double>() {
+                    public void sample() {
+                        final double bytesPerDiskRead = (ndiskRead == 0 ? 0d
+                                : (bytesReadFromDisk / (double) ndiskRead));
+                        setValue(bytesPerDiskRead);
+                    }
+                });
 
-                    disk.addCounter("bytesReadPerSec",
-                            new Instrument<Double>() {
-                                public void sample() {
-                                    final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
-                                    final double bytesReadPerSec = (diskReadSecs == 0L ? 0d
-                                            : bytesReadFromDisk / diskReadSecs);
-                                    setValue(bytesReadPerSec);
-                                }
-                            });
+                disk.addCounter("readSecs", new Instrument<Double>() {
+                    public void sample() {
+                        final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
+                        setValue(diskReadSecs);
+                    }
+                });
 
-                    disk.addCounter("secsPerRead", new Instrument<Double>() {
-                        public void sample() {
-                            final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
-                            final double readLatency = (diskReadSecs == 0 ? 0d
-                                    : diskReadSecs / ndiskRead);
-                            setValue(readLatency);
-                        }
-                    });
+                disk.addCounter("bytesReadPerSec", new Instrument<Double>() {
+                    public void sample() {
+                        final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
+                        final double bytesReadPerSec = (diskReadSecs == 0L ? 0d
+                                : bytesReadFromDisk / diskReadSecs);
+                        setValue(bytesReadPerSec);
+                    }
+                });
 
-                    /*
-                     * write
-                     */
+                disk.addCounter("secsPerRead", new Instrument<Double>() {
+                    public void sample() {
+                        final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
+                        final double readLatency = (diskReadSecs == 0 ? 0d
+                                : diskReadSecs / ndiskRead);
+                        setValue(readLatency);
+                    }
+                });
 
-                    disk.addCounter("nwrites", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(ndiskWrite);
-                        }
-                    });
+                /*
+                 * write
+                 */
 
-                    disk.addCounter("bytesWritten", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(bytesWrittenOnDisk);
-                        }
-                    });
+                disk.addCounter("nwrites", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(ndiskWrite);
+                    }
+                });
 
-                    disk.addCounter("bytesPerWrite", new Instrument<Double>() {
-                        public void sample() {
-                            final double bytesPerDiskWrite = (ndiskWrite == 0 ? 0d
-                                    : (bytesWrittenOnDisk / (double)ndiskWrite));
-                            setValue(bytesPerDiskWrite);
-                        }
-                    });
+                disk.addCounter("bytesWritten", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(bytesWrittenOnDisk);
+                    }
+                });
 
-                    disk.addCounter("writeSecs", new Instrument<Double>() {
-                        public void sample() {
-                            final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
-                            setValue(diskWriteSecs);
-                        }
-                    });
+                disk.addCounter("bytesPerWrite", new Instrument<Double>() {
+                    public void sample() {
+                        final double bytesPerDiskWrite = (ndiskWrite == 0 ? 0d
+                                : (bytesWrittenOnDisk / (double) ndiskWrite));
+                        setValue(bytesPerDiskWrite);
+                    }
+                });
 
-                    disk.addCounter("bytesWrittenPerSec",
-                            new Instrument<Double>() {
-                                public void sample() {
-                                    final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
-                                    final double bytesWrittenPerSec = (diskWriteSecs == 0L ? 0d
-                                            : bytesWrittenOnDisk
-                                                    / diskWriteSecs);
-                                    setValue(bytesWrittenPerSec);
-                                }
-                            });
+                disk.addCounter("writeSecs", new Instrument<Double>() {
+                    public void sample() {
+                        final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
+                        setValue(diskWriteSecs);
+                    }
+                });
 
-                    disk.addCounter("secsPerWrite", new Instrument<Double>() {
-                        public void sample() {
-                            final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
-                            final double writeLatency = (diskWriteSecs == 0 ? 0d
-                                    : diskWriteSecs / ndiskWrite);
-                            setValue(writeLatency);
-                        }
-                    });
+                disk.addCounter("bytesWrittenPerSec", new Instrument<Double>() {
+                    public void sample() {
+                        final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
+                        final double bytesWrittenPerSec = (diskWriteSecs == 0L ? 0d
+                                : bytesWrittenOnDisk / diskWriteSecs);
+                        setValue(bytesWrittenPerSec);
+                    }
+                });
 
-                    /*
-                     * other
-                     */
+                disk.addCounter("secsPerWrite", new Instrument<Double>() {
+                    public void sample() {
+                        final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
+                        final double writeLatency = (diskWriteSecs == 0 ? 0d
+                                : diskWriteSecs / ndiskWrite);
+                        setValue(writeLatency);
+                    }
+                });
 
-                    disk.addCounter("nforce", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nforce);
-                        }
-                    });
+                /*
+                 * other
+                 */
 
-                    disk.addCounter("nextend", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(ntruncate);
-                        }
-                    });
+                disk.addCounter("nforce", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(nforce);
+                    }
+                });
 
-                    disk.addCounter("nreopen", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nreopen);
-                        }
-                    });
+                disk.addCounter("nextend", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(ntruncate);
+                    }
+                });
 
-                    disk.addCounter("rootBlockWrites", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nwriteRootBlock);
-                        }
-                    });
+                disk.addCounter("nreopen", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(nreopen);
+                    }
+                });
 
-                }
+                disk.addCounter("rootBlockWrites", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(nwriteRootBlock);
+                    }
+                });
 
+            } // disk
+            
             return root;
 
-        }
-//        private CounterSet root;
+        } // getCounters()
         
-        /**
-         * Human readable representation of the counters.
-         */
-        public String toString() {
-
-            return getCounters().toString();
-            
-        }
-        
-    }
+    } // class StoreCounters
     
     /**
-     * Performance counters for this class.
+     * Striped performance counters for this class.
      */
-    private final AtomicReference<StoreCounters> storeCounters = new AtomicReference<StoreCounters>(new StoreCounters());
+    private final AtomicReference<StoreCounters> storeCounters = new AtomicReference<StoreCounters>();
 
     /**
-     * Returns the performance counters for the store.
+     * Returns the striped performance counters for the store.
      */
-    public StoreCounters getStoreCounters() {
+    public StoreCounters<?> getStoreCounters() {
 
         return storeCounters.get();
 
@@ -774,7 +769,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * @throws IllegalArgumentException
      *             if the argument is <code>null</code>.
      */
-    public void setStoreCounters(final StoreCounters storeCounters) {
+    public void setStoreCounters(final StoreCounters<?> storeCounters) {
 
         if (storeCounters == null)
             throw new IllegalArgumentException();
@@ -802,25 +797,17 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             }
         });
 
+        // attach the most recently updated values from the striped counters.
         root.attach(storeCounters.get().getCounters());
 
-        /*
-         * Write cache.
-         */
-        final WriteCache writeCache = WORMStrategy.this.writeCache.get();
-
-        if (writeCache != null) {
+        if (writeCacheService != null) {
 
             final CounterSet tmp = root.makePath("writeCache");
 
-            tmp.attach(writeCache.getCounters());
-
-            // add counter for the write cache capacity.
-            tmp.addCounter("capacity",
-                    new OneShotInstrument<Integer>(writeCache.capacity()));
+            tmp.attach(writeCacheService.getCounters());
 
         }
-
+        
         return root;
 
     }
@@ -831,17 +818,18 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * @param fileMetadata
      */
     WORMStrategy(final long maximumExtent, final long minimumExtension,
-            final FileMetadata fileMetadata) {
+            final FileMetadata fileMetadata,
+            final Quorum<?, ?> quorum) {
 
         super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
-                fileMetadata.nextOffset, fileMetadata.bufferMode,
+                fileMetadata.nextOffset, fileMetadata.getBufferMode(),
                 fileMetadata.readOnly);
 
         this.file = fileMetadata.file;
 
         this.fileMode = fileMetadata.fileMode;
         
-        this.temporaryStore = (fileMetadata.bufferMode==BufferMode.Temporary);
+        this.temporaryStore = (fileMetadata.getBufferMode()==BufferMode.Temporary);
         
         this.raf = fileMetadata.raf;
         
@@ -862,6 +850,15 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         this.minimumExtension = minimumExtension;
 
+        this.quorum = quorum;
+
+        this.useChecksums = fileMetadata.useChecksums;
+
+        this.storeUUID = fileMetadata.rootBlock.getUUID();
+        
+        // initialize striped performance counters for this store.
+        this.storeCounters.set(new StoreCounters(10/* batchSize */));
+        
         /*
          * Enable the write cache?
          * 
@@ -875,28 +872,52 @@ public class WORMStrategy extends AbstractBufferStrategy implements
          * direct byte buffer for disk read/write operations on a heap buffer
          * AND there is a bug in the release of those buffers. Therefore do NOT
          * pass in a heap byte buffer for the write cache!!!
+         * 
+         * Note: HA MUST use a write cache service (the write cache service
+         * handles the write pipeline to the downstream quorum members).
          */
+//        final Quorum<?,?> quorum = quorumRef.get();
         
-        this.writeCache = new AtomicReference<WriteCache>();
-        
-        if (fileMetadata.writeCacheEnabled && !fileMetadata.readOnly
-                && fileMetadata.closeTime == 0L) {
+        isHighlyAvailable = quorum != null && quorum.isHighlyAvailable();
 
+        final boolean useWriteCacheService = fileMetadata.writeCacheEnabled
+                && !fileMetadata.readOnly && fileMetadata.closeTime == 0L
+                || isHighlyAvailable;
+        
+        if (useWriteCacheService) {
+            /*
+             * WriteCacheService.
+             */
             try {
-
-                this.writeCache.set(new WriteCacheImpl(0/* baseOffset */,
-                        null/* buf */, opener));
-
+                this.writeCacheService = new WriteCacheService(
+                        fileMetadata.writeCacheBufferCount, useChecksums,
+                        extent, opener, quorum) {
+                    @Override
+                    public WriteCache newWriteCache(final ByteBuffer buf,
+                            final boolean useChecksum,
+                            final boolean bufferHasData,
+                            final IReopenChannel<? extends Channel> opener)
+                            throws InterruptedException {
+                        return new WriteCacheImpl(0/* baseOffset */, buf,
+                                useChecksum, bufferHasData,
+                                (IReopenChannel<FileChannel>) opener);
+                    }
+                };
+                this._checkbuf = null;
             } catch (InterruptedException e) {
-
                 throw new RuntimeException(e);
-
             }
-            
+        } else {
+            this.writeCacheService = null;
+            this._checkbuf = useChecksums ? ByteBuffer.allocateDirect(4) : null;
         }
 
-        // System.err.println("WARNING: alpha impl: " + this.getClass().getName());
-        
+//        System.err.println("WARNING: alpha impl: "
+//                + this.getClass().getName()
+//                + (writeCacheService != null ? " : writeCacheBuffers="
+//                        + fileMetadata.writeCacheBufferCount : " : No cache")
+//                + ", useChecksums=" + useChecksums);
+
     }
 
     /**
@@ -910,18 +931,22 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     private class WriteCacheImpl extends WriteCache.FileChannelWriteCache {
 
         public WriteCacheImpl(final long baseOffset, final ByteBuffer buf,
+                final boolean useChecksum,
+                final boolean bufferHasData,
                 final IReopenChannel<FileChannel> opener)
                 throws InterruptedException {
 
-            super(baseOffset, buf, opener);
-            
+            super(baseOffset, buf, useChecksum, isHighlyAvailable,
+                    bufferHasData, opener);
+
         }
 
         @Override
         protected boolean writeOnChannel(final ByteBuffer data,
-                final Map<Long, RecordMetadata> recordMap, final long nanos)
-                throws InterruptedException, IOException {
-            
+                final long firstOffset,
+                final Map<Long, RecordMetadata> recordMapIsIgnored,
+                final long nanos) throws InterruptedException, IOException {
+
             final long begin = System.nanoTime();
             
             long remaining = nanos;
@@ -937,16 +962,30 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             try {
 
                 remaining -= (System.nanoTime() - begin);
-                
+
+                final int dpos = data.position();
                 final int nbytes = data.remaining();
 
-                final int nwrites = writeOnDisk(data, getFirstOffset());
+                /*
+                 * Note: We are holding the readLock (above). This is Ok since
+                 * file extension occurs when the record is accepted for write
+                 * while only the readLock is required to actually write on the
+                 * file.
+                 */
+                final int nwrites = writeOnDisk(data, firstOffset);
 
                 final WriteCacheCounters counters = this.counters.get();
                 counters.nwrite += nwrites;
                 counters.bytesWritten += nbytes;
                 counters.elapsedWriteNanos += (System.nanoTime() - begin);
 
+                if (WriteCache.log.isTraceEnabled()) {
+                    WriteCache.log.trace("wroteOnDisk: dpos=" + dpos
+                            + ", nbytes=" + nbytes + ", firstOffset="
+                            + firstOffset + ", nrecords="
+                            + recordMapIsIgnored.size());
+                }
+                
                 return true;
                 
             } finally {
@@ -987,7 +1026,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
             }
 
-            storeCounters.get().nforce++;
+            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+                    .acquire();
+            try {
+                c.nforce++;
+            } finally {
+                c.release();
+            }
 
         } catch (IOException ex) {
 
@@ -998,41 +1043,35 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
     /**
      * Flushes the write cache (if enabled).
+     * 
+     * @todo Should be a NOP for the WORM? Check
+     *       {@link AbstractJournal#commitNow(long)}
      */
-    public void commit() {
-
-        if (writeCache == null)
-            return;
+    @Override
+    public void commit(IJournal journal) {
 
         flushWriteCache();
 
     }
-    
+
     /**
-     * Resets the write cache (if enabled).
+     * Resets the {@link WriteCacheService} (if enabled).
+     *<p>
+     * Note: This assumes the caller is synchronized appropriately otherwise
+     * writes belonging to other threads will be discarded from the cache!
      */
+    @Override
     public void abort() {
 
-        final WriteCache writeCache = this.writeCache.get();
-        
-        if (writeCache == null)
-            return;
-
-        try {
-
-            /*
-             * Note: This assumes the caller is synchronized appropriately
-             * otherwise writes belonging to other threads will be discarded
-             * from the cache!
-             */
-            writeCache.reset();
-
-        } catch (InterruptedException e) {
-
-            throw new RuntimeException(e);
-
+        if (writeCacheService != null) {
+            try {
+                writeCacheService.reset();
+                writeCacheService.setExtent(extent);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
         }
-
+        
     }
     
     /**
@@ -1089,7 +1128,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         }
         
-        if( fileOpened && file.exists() && ! file.delete() ) {
+        if (fileOpened && file.exists() && !file.delete()) {
             
             log.warn("Could not delete file: " + file.getAbsoluteFile());
             
@@ -1110,12 +1149,92 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     }
 
     /**
-     * Note: {@link ClosedChannelException} and
-     * {@link AsynchronousCloseException} can get thrown out of this method
-     * (wrapped as {@link RuntimeException}s) if a reader task is interrupted.
+     * Extended to handle {@link ChecksumError}s by reading on another node when
+     * the {@link Quorum} (iff the quorum is highly available).
+     * <p>
+     * {@inheritDoc}
+     * 
+     * @todo hook for monitoring (nagios, etc). bad reads indicate a problem
+     *       with the disk which should be tracked over time.
+     * 
+     * @todo If we see a read error from a checksum and want to update the
+     *       record on the backing file then we would have to go around the
+     *       write cache to do a direct disk write since (at least for the WORM)
+     *       the assumption is pure append for the write cache.
+     *       <p>
+     *       An attempt to overwrite a bad record on the disk could itself be a
+     *       bad idea. If it was just a high write, then it might be Ok. But
+     *       many other kinds of errors are likely to have long pauses while the
+     *       OS attempts to get a good read/write from the file system.
+     * 
+     * @todo If the record can be successfully read from the remote quorum, then
+     *       it will generally be inserted into the {@link LRUNexus} which will
+     *       reduce the likelihood that we will attempt to read it from the
+     *       backing file "soon.
+     *       <p>
+     *       We might want to maintain a set of known bad records and fail the
+     *       node when the size of that set grows too large. That would also
+     *       help us to avoid "hanging" on a bad read when we know that we have
+     *       to get the data from another node based on past experience for that
+     *       record.
      */
     public ByteBuffer read(final long addr) {
 
+        try {
+            // Try reading from the local store.
+            return readFromLocalStore(addr);
+        } catch (InterruptedException e) {
+            // wrap and rethrow.
+            throw new RuntimeException(e);
+        } catch (ChecksumError e) {
+            /*
+             * Note: This assumes that the ChecksumError is not wrapped by
+             * another exception. If it is, then the ChecksumError would not be
+             * caught.
+             */
+            // log the error.
+            try {
+                log.error(e + " : addr=" + toString(addr), e);
+            } catch (Throwable ignored) {
+                // ignore error in logging system.
+            }
+            // update the performance counters.
+            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+                    .acquire();
+            try {
+                c.checksumErrorCount++;
+            } finally {
+                c.release();
+            }
+//            final Quorum<?, ?> quorum = quorumRef.get();
+            if (quorum != null && quorum.isHighlyAvailable()) {
+                if (quorum.isQuorumMet()) {
+                    try {
+                        // Read on another node in the quorum.
+                        final byte[] a = ((QuorumRead<?>) quorum.getMember())
+                                .readFromQuorum(storeUUID, addr);
+                        return ByteBuffer.wrap(a);
+                    } catch (Throwable t) {
+                        throw new RuntimeException("While handling: " + e, t);
+                    }
+                }
+            }
+            // Otherwise rethrow the checksum error.
+            throw e;
+        }
+        
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This implementation tests the {@link WriteCacheService} first
+     * and then reads through to the local disk on a cache miss. This is
+     * automatically invoked by {@link #read(long)}. 
+     */
+    public ByteBuffer readFromLocalStore(final long addr)
+            throws InterruptedException {
+        
         final long begin = System.nanoTime();
         
         if (addr == 0L)
@@ -1137,67 +1256,59 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         }
 
-        final StoreCounters storeCounters = this.storeCounters.get();
-
-        if (nbytes > storeCounters.maxReadSize) {
-
-            // @todo not atomic.
-            storeCounters.maxReadSize = nbytes;
-
+        {
+            final StoreCounters<?> storeCounters = (StoreCounters<?>) this.storeCounters
+                    .get().acquire();
+            try {
+                if (nbytes > storeCounters.maxReadSize) {
+                    storeCounters.maxReadSize = nbytes;
+                }
+            } finally {
+                storeCounters.release();
+            }
         }
 
-        final WriteCache writeCache = this.writeCache.get();
-        
-        if (writeCache != null) {
+        if (writeCacheService != null) {
 
             /*
-             * Test the write cache for a hit. The write cache handles
+             * Test the write cache for a hit. The WriteCacheService handles
              * synchronization internally.
+             * 
+             * Note: WriteCacheService#read(long) DOES NOT throw an
+             * IllegalStateException for an asynchronous close. However, it will
+             * throw a RuntimeException if there is a checksum error on the
+             * record.
              */
-            ByteBuffer tmp;
-            try {
-                tmp = writeCache.read(offset);
-            } catch (IllegalStateException e) {
-                /*
-                 * This code does not guard against a concurrent close of the
-                 * write cache since we obtain the write cache reference above
-                 * without holding any locks. This is ok. We just need to handle
-                 * the IllegalStateException here.
-                 */
-                if (this.writeCache.get() == null) {
-                    if (log.isInfoEnabled())
-                        log
-                                .info("Concurrent close of write cache: will read through to the disk.");
-                    tmp = null;
-                    // fall through.
-                } else {
-                    throw e;
-                }
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-
+            // Note: Can throw ChecksumError, InterruptedException
+            ByteBuffer tmp = writeCacheService.read(offset);
             if (tmp != null) {
-
                 /*
                  * Hit on the write cache.
                  * 
                  * Update the store counters.
                  */
-
-                storeCounters.nreads++;
-                storeCounters.bytesRead += nbytes;
-                storeCounters.elapsedReadNanos += (System.nanoTime() - begin);
-
-                if(log.isTraceEnabled())
-                    log.trace("cacheHit: addr="+toString(addr));
-                
+                final StoreCounters<?> c = (StoreCounters<?>) storeCounters
+                        .get().acquire();
+                try {
+                    c.nreads++;
+                    c.bytesRead += nbytes;
+                    c.elapsedReadNanos += (System.nanoTime() - begin);
+                } finally {
+                    c.release();
+                }
+//                if (log.isTraceEnabled())
+//                    log.trace("cacheRead: addr=" + toString(addr));
                 return tmp;
-                
             }
             
-        }
+        } // if(writeCacheService!=null)
 
+        /*
+         * Read through to the disk.
+         * 
+         * Note: Strip off the checksum from the end of the record and validate
+         * it.
+         */
         final Lock readLock = extensionLock.readLock();
         readLock.lock();
         try {
@@ -1211,10 +1322,20 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             try {
 
                 // the offset into the disk file.
-                final long pos = offset + headerSize;
+                final long pos = headerSize + offset;
 
-                storeCounters.ndiskRead += FileChannelUtility.readAll(opener,
-                        dst, pos);
+                // read on the disk.
+                final int ndiskRead = FileChannelUtility.readAll(opener, dst,
+                        pos);
+
+                // update performance counters.
+                final StoreCounters<?> c = (StoreCounters<?>) storeCounters
+                        .get().acquire();
+                try {
+                    c.ndiskRead += ndiskRead;
+                } finally {
+                    c.release();
+                }
 
             } catch (IOException ex) {
 
@@ -1225,14 +1346,35 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             // flip for reading.
             dst.flip();
 
-            /*
-             * Update counters @todo synchronized.
-             */
-            storeCounters.nreads++;
-            storeCounters.bytesRead += nbytes;
-            storeCounters.bytesReadFromDisk += nbytes;
-            storeCounters.elapsedReadNanos += (System.nanoTime() - begin);
-            storeCounters.elapsedDiskReadNanos += (System.nanoTime() - beginDisk);
+            if(useChecksums) {
+
+                // extract the checksum.
+                final int chk = dst.getInt(nbytes - 4);
+
+                // adjust the record length to exclude the checksum.
+                dst.limit(nbytes - 4);
+                
+                if (chk != ChecksumUtility.threadChk.get().checksum(dst)) {
+                    
+                    throw new ChecksumError("offset=" + offset + ", nbytes="
+                            + nbytes);
+                
+                }
+
+            }
+            
+            // Update counters.
+            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+                    .acquire();
+            try {
+                c.nreads++;
+                c.bytesRead += nbytes;
+                c.bytesReadFromDisk += nbytes;
+                c.elapsedReadNanos += (System.nanoTime() - begin);
+                c.elapsedDiskReadNanos += (System.nanoTime() - beginDisk);
+            } finally {
+                c.release();
+            }
 
             if (log.isTraceEnabled())
                 log.trace("diskRead: addr=" + toString(addr));
@@ -1247,7 +1389,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         }
 
     }
-
+    
     /**
      * Used to re-open the {@link FileChannel} in this class.
      */
@@ -1361,7 +1503,14 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
             }
 
-            storeCounters.get().nreopen++;
+            // Update counters.
+            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+                    .acquire();
+            try {
+                c.nreopen++;
+            } finally {
+                c.release();
+            }
 
             return raf.getChannel();
 
@@ -1428,15 +1577,22 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         if (isReadOnly())
             throw new IllegalStateException(ERR_READ_ONLY);
         
-        // #of bytes to store.
-        final int nbytes = data.remaining();
+        // #of bytes in the record.
+        final int remaining = data.remaining();
+        
+        // #of bytes to write onto the file (includes the optional checksum).
+        final int nwrite = remaining + (useChecksums ? 4 : 0);
 
-        if (nbytes == 0)
+        if (remaining == 0)
             throw new IllegalArgumentException(ERR_BUFFER_EMPTY);
 
         final long begin = System.nanoTime();
         
-        final StoreCounters storeCounters = this.storeCounters.get();
+//        final StoreCounters storeCounters = this.storeCounters.get();
+
+        // get checksum for the buffer contents.
+        final int chk = useChecksums ? ChecksumUtility.threadChk.get()
+                .checksum(data) : 0;
 
         final long addr; // address in the store.
         try {
@@ -1471,90 +1627,75 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                  * (concurrent readers are allowed, but will be interrupted by
                  * close()).
                  */
-                addr = allocate(nbytes);
+                // Note: allocation must include the optional checksum.
+                addr = allocate(nwrite);
 
                 offset = getOffset(addr);
 
                 boolean wroteOnCache = false;
-                final WriteCache writeCache = this.writeCache.get();
-                if (writeCache != null) {
-                    if (nbytes <= writeCache.capacity()) {
-                        // FIXME integrate with the writeCacheService
-                        // Queue up the write in the writeCache.
-                        if (!writeCache.write(offset, data)) {
-                            // cache is full, so flush to the disk.
-                            writeCache.flushAndReset(false/* force */);
-                            if (!writeCache.write(offset, data)) {
-                                throw new AssertionError(
-                                        "Could not write record on cache: nbytes="
-                                                + nbytes + ", cache.capacity="
-                                                + writeCache.capacity());
-                            }
-                        }
-                        assert data.position() == data.limit() : "pos="
-                                + data.position() + " != limit=" + data.limit();
-                        wroteOnCache = true;
-                        if (log.isTraceEnabled())
-                            log.trace("cacheWrite: addr=" + toString(addr));
-                    } else {
-                        /*
-                         * Evict the cache before writing on the disk. This is
-                         * necessary to keep the write cache dense so that it is
-                         * a mirror of what we will put down on the disk.
-                         */
-                        writeCache.flushAndReset(false/*force*/);
-                    }
-                    if (!wroteOnCache) {
+                if (writeCacheService != null) {
+                    if (!writeCacheService.write(offset, data, chk))
+                        throw new AssertionError();
+                    wroteOnCache = true;
+                }
+                if (!wroteOnCache) {
 
-                        /*
-                         * The writeCache is disabled or the record is too large
-                         * for the write cache, so just write the record
-                         * directly on the disk.
-                         * 
-                         * Note: At this point the backing file is already
-                         * extended.
-                         * 
-                         * Note: Unlike writes on the cache, the order in which
-                         * we lay down this write onto the disk does not matter.
-                         * We have already made the allocation and now the
-                         * caller will block until the record is on the disk.
-                         */
+                    /*
+                     * The writeCache is disabled or the record is too large for
+                     * the write cache, so just write the record directly on the
+                     * disk.
+                     * 
+                     * Note: At this point the backing file is already extended.
+                     * 
+                     * Note: Unlike writes on the cache, the order in which we
+                     * lay down this write onto the disk does not matter. We
+                     * have already made the allocation and now the caller will
+                     * block until the record is on the disk.
+                     */
 
-                        final Lock readLock = extensionLock.readLock();
-                        readLock.lock();
-                        try {
+                    final Lock readLock = extensionLock.readLock();
+                    readLock.lock();
+                    try {
 
-                            writeOnDisk(data, offset);
-                            
-                            if (log.isTraceEnabled())
-                                log.trace("diskWrite: addr=" + toString(addr));
+                        writeOnDisk(data, offset);
 
-                        } finally {
-                            
-                            readLock.unlock();
-                            
+                        if (useChecksums) {
+                            /*
+                             * Note: If [useChecksums] is enabled but we are not
+                             * using the WriteCacheService then we also need to
+                             * write the checksum on the file here.
+                             */
+                            final ByteBuffer b = _checkbuf;
+                            b.clear();
+                            b.putInt(chk);
+                            b.flip();
+                            writeOnDisk(b, offset + remaining);
                         }
 
+                    } finally {
+
+                        readLock.unlock();
+
                     }
-                }
-                /*
-                 * Update counters while we are synchronized. If done outside of
-                 * the synchronization block then we need to use AtomicLongs
-                 * rather than primitive longs.
-                 */
-                storeCounters.nwrites++;
-                storeCounters.bytesWritten += nbytes;
-                storeCounters.elapsedWriteNanos += (System.nanoTime() - begin);
-                if (nbytes > storeCounters.maxWriteSize) {
-                    storeCounters.maxWriteSize = nbytes;
-                }
+
+                } // if(!wroteOnCache)
 
             } // synchronized(writeOnCacheLock)
 
-        } catch(IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
+            // Update counters.
+            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+                    .acquire();
+            try {
+                c.nwrites++;
+                c.bytesWritten += nwrite;
+                c.elapsedWriteNanos += (System.nanoTime() - begin);
+                if (nwrite > c.maxWriteSize) {
+                    c.maxWriteSize = nwrite;
+                }
+            } finally {
+                c.release();
+            }
+
         } catch(InterruptedException ex) {
             
             throw new RuntimeException(ex);
@@ -1572,6 +1713,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      */
     private final Object writeOnCacheLock = new Object();
 
+    /**
+     * A small direct {@link ByteBuffer} used if we need to write the checksum
+     * on the backing file directly because the {@link WriteCacheService} is not
+     * in use.
+     */
+    private final ByteBuffer _checkbuf;
+    
     /**
      * Make sure that the file is large enough to accept a write of
      * <i>nbytes</i> starting at <i>offset</i> bytes into the file. This is only
@@ -1666,13 +1814,10 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      *            blocks).
      * 
      * @return The #of write operations against the disk.
-     * 
-     * @todo When we see a read error from a checksum and attempt to update the
-     *       record on the disk we will have to go around the write cache to do
-     *       a direct disk write since (at least for the WORM) the assumption is
-     *       pure append for the write cache
      */
     private int writeOnDisk(final ByteBuffer data, final long offset) {
+        
+        assert offset >= 0 : "offset=" + offset;
         
         // Thread MUST have either the read or write lock.
         assert extensionLock.getReadHoldCount() > 0
@@ -1680,7 +1825,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         
         final long begin = System.nanoTime();
 
-        final StoreCounters storeCounters = this.storeCounters.get();
+//        final StoreCounters storeCounters = this.storeCounters.get();
 
         createBackingFile();
         
@@ -1691,7 +1836,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
          * (this is adjusted for the root blocks).
          */
 
-        final long pos = offset + headerSize;
+        final long pos = headerSize + offset;
 
         final int nwrites;
         try {
@@ -1708,10 +1853,17 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
             nwrites = FileChannelUtility.writeAll(opener, data, pos);
 
+            // Update counters.
             final long elapsed = (System.nanoTime() - begin);
-            storeCounters.ndiskWrite += nwrites;
-            storeCounters.bytesWrittenOnDisk += nbytes;
-            storeCounters.elapsedDiskWriteNanos += elapsed;
+            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+                    .acquire();
+            try {
+                c.ndiskWrite += nwrites;
+                c.bytesWrittenOnDisk += nbytes;
+                c.elapsedDiskWriteNanos += elapsed;
+            } finally {
+                c.release();
+            }
             
             if (log.isTraceEnabled()) {
                 /*
@@ -1725,10 +1877,10 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                         + TimeUnit.NANOSECONDS.toMillis(elapsed)
                         + "ms; totals: write="
                         + TimeUnit.NANOSECONDS
-                                .toMillis(storeCounters.elapsedDiskWriteNanos)
+                                .toMillis(storeCounters.get().elapsedDiskWriteNanos)
                         + "ms, read="
                         + TimeUnit.NANOSECONDS
-                                .toMillis(storeCounters.elapsedDiskReadNanos)
+                                .toMillis(storeCounters.get().elapsedDiskReadNanos)
                         + "ms");
             }
 
@@ -1832,13 +1984,30 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                      * force it to the disk when we change the file size (unless
                      * the file system updates other aspects of file metadata
                      * during normal writes).
+                     * 
+                     * @todo make sure the journal has already forced the
+                     * writes, that forcing an empty cache buffer is a NOP, and
+                     * that we want to just force the channel after we write the
+                     * root blocks since writes were already forced on each node
+                     * in the quorum before we wrote the root blocks and the
+                     * root blocks are transmitted using RMI not the write
+                     * pipeline.
                      */
                     
-                    force(forceOnCommit == ForceEnum.ForceMetadata);
+                    // sync the disk.
+                    getChannel().force(forceOnCommit == ForceEnum.ForceMetadata);
+//                    force(forceOnCommit == ForceEnum.ForceMetadata);
                     
                 }
 
-                storeCounters.get().nwriteRootBlock++;
+                // Update counters.
+                final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+                        .acquire();
+                try {
+                    c.nwriteRootBlock++;
+                } finally {
+                    c.release();
+                }
                 
             } finally {
 
@@ -1885,8 +2054,34 @@ public class WORMStrategy extends AbstractBufferStrategy implements
              */
             createBackingFile();
 
-            // extend (or truncate) the file.
+            /*
+             * Extend (or truncate) the file.
+             * 
+             * FIXME I could see how this might fail with a concurrent interrupt
+             * of a reader. This "extend" needs to be robust just writeAll() on
+             * FileChannelUtility. It must use the opener and retry if there is
+             * a ClosedByInterruptException. [See the notes below in the catch
+             * clause.]
+             */
             getRandomAccessFile().setLength(newExtent);
+
+            if (writeCacheService != null) {
+                /*
+                 * Inform the write cache service that the file extent has
+                 * changed. It will propagate this message along the write
+                 * pipeline when HA is enabled.
+                 */
+                try {
+                    writeCacheService.setExtent(newExtent);
+                } catch (InterruptedException t) {
+                    throw new RuntimeException(t);
+                }
+            }
+
+            // Update fields and counters while holding the lock.
+            this.userExtent = newUserExtent;
+            this.extent = newExtent;
+            storeCounters.get().ntruncate++;
 
             /*
              * Since we just changed the file length we force the data to disk
@@ -1904,15 +2099,27 @@ public class WORMStrategy extends AbstractBufferStrategy implements
              */
             if (!temporaryStore) {
 
-                force(true);
+                /*
+                 * We need to force the file data and metadata to the disk. When
+                 * integrated with the WriteCacheService the FileChannel#force()
+                 * request will be executed in a different thread and would
+                 * deadlock unless we first release the WriteLock since
+                 * writeOnChannel needs to acquire the ReadLock to proceed.
+                 * 
+                 * We address this by doing acquiring the ReadLock (we are
+                 * already holding the WriteLock so this will not block) and
+                 * then releasing the WriteLock so other threads may now also
+                 * acquire the ReadLock.
+                 * 
+                 * Note: An alternative would be to directly invoke force(true)
+                 * on the FileChannel.
+                 */
+                extensionLock.readLock().lock();
+                extensionLock.writeLock().unlock();
+                force(true/*metadata*/);
+//              opener.reopenChannel().force(true/*metadata*/);
 
             }
-
-            this.userExtent = newUserExtent;
-
-            this.extent = newExtent;
-
-            storeCounters.get().ntruncate++;
 
             if (WARN)
                 log.warn("newLength=" + cf.format(newExtent) + ", file="+ file);
@@ -1936,13 +2143,17 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         } finally {
 
-            writeLock.unlock();
+//            writeLock.unlock();
+            extensionLock.readLock().unlock();
 
         }
 
     }
 
-    // @todo why is this synchronized?  the operation should be safe.
+    /*
+     * @todo why is this synchronized? the operation should be safe. maybe
+     * against a concurrent close?
+     */
     synchronized public long transferTo(final RandomAccessFile out)
             throws IOException {
         
@@ -1981,38 +2192,25 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         releaseWriteCache();
         
     }
-    
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: {@link #read(long)} has logic to handle the concurrent close of the
+     * {@link WriteCacheService}, passing through the operation to the disk.
+     * 
+     * @todo Should this get invoked from {@link #closeForWrites()} for HA? If
+     *       read failover is handled by the {@link WriteCacheService} then we
+     *       can not close it out here.
+     */
     private final void releaseWriteCache() {
 
-        final WriteCache writeCache = this.writeCache.get();
-
-        if (writeCache == null) 
-            return;
-
-        try {
-
-            /*
-             * Clear the reference so new requests will not discover the write
-             * cache object.
-             */
-            this.writeCache.set(null);
-
-            /*
-             * Close the write cache (makes it invalid).
-             * 
-             * Note: This will not effect requests in progress against the write
-             * cache, but new requests will fail. Since concurrent write
-             * requests are not allowed during close() or closeForWrites(), this
-             * is only an issue for readers. read(long) has logic to handle the
-             * concurrent close of the write cache, passing through the
-             * operation to the disk.
-             */
-            writeCache.close();
-        
-        } catch (InterruptedException e) {
-            
-            throw new RuntimeException(e);
-            
+        if (writeCacheService != null) {
+            try {
+                writeCacheService.close();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
         }
             
     }
@@ -2021,9 +2219,23 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * This implementation can not release storage allocations and invocations
      * of this method are ignored.
      */
-	@Override
 	public void delete(long addr) {
 		// NOP
 	}
-    
+
+    public void writeRawBuffer(final HAWriteMessage msg, final ByteBuffer b)
+            throws IOException, InterruptedException {
+
+        writeCacheService.newWriteCache(b, useChecksums,
+                true/* bufferHasData */, opener).flush(false/* force */);
+
+    }
+
+    public void setExtentForLocalStore(final long extent) throws IOException,
+            InterruptedException {
+
+        truncate(extent);
+
+    }
+
 }

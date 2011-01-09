@@ -271,7 +271,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         /**
          * A reasonable maximum branching factor for a {@link BTree}.
          */
-        int MAX_BTREE_BRANCHING_FACTOR = 1024;
+        int MAX_BTREE_BRANCHING_FACTOR = 4196;
 
         /**
          * A reasonable maximum branching factor for an {@link IndexSegment}.

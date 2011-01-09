@@ -3350,6 +3350,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          * @todo Actually, I think that this is just a fence post in ringbuffer
          * beforeOffer() method and the code might work without the synchronized
          * block if the fence post was fixed.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/201
          */
 
         synchronized (this) {
@@ -3682,6 +3684,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         
         // write the serialized node or leaf onto the store.
         final long addr;
+        final long oldAddr;
         {
 
             final long begin = System.nanoTime();
@@ -3691,7 +3694,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             
             // now we have a new address, delete previous identity if any
             if (node.isPersistent()) {
-            	store.delete(node.getIdentity());
+            	oldAddr = node.getIdentity();
+            } else {
+            	oldAddr = 0;
             }
 
             btreeCounters.writeNanos += System.nanoTime() - begin;
@@ -3708,6 +3713,13 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          */
 
         node.setIdentity(addr);
+        if (oldAddr != 0L) {
+            if (storeCache!=null) {
+                // remove from cache.
+            	storeCache.remove(oldAddr);
+            }
+        	store.delete(oldAddr);
+        }
 
         node.setDirty(false);
 
@@ -3821,9 +3833,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             
             assert tmp.position() == 0;
             
-            assert tmp.limit() == store.getByteCount(addr) : "limit="
-                    + tmp.limit() + ", byteCount(addr)="
-                    + store.getByteCount(addr)+", addr="+store.toString(addr);
+            // Note: This assertion is invalidated when checksums are inlined in the store records.
+//            assert tmp.limit() == store.getByteCount(addr) : "limit="
+//                    + tmp.limit() + ", byteCount(addr)="
+//                    + store.getByteCount(addr)+", addr="+store.toString(addr);
 
             btreeCounters.readNanos.addAndGet( System.nanoTime() - begin );
             

@@ -1201,7 +1201,7 @@ public class TestNamedGraphs extends QuadsTestCase {
     /**
      * Unit test focusing on queries against a default graph comprised of the
      * RDF merge of zero or more graphs where the query involves joins and hence
-     * is routed through the {@link BigdataEvaluationStrategyImpl}.
+     * is routed through the {@link BigdataEvaluationStrategyImpl2}.
      * 
      * @throws RepositoryException
      * @throws SailException

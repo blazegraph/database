@@ -57,7 +57,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.bigdata.rdf.sail;
 
-import info.aduna.collections.iterators.EmptyIterator;
 import info.aduna.iteration.CloseableIteration;
 
 import java.io.IOException;
@@ -121,11 +120,9 @@ import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.changesets.StatementWriter;
-import com.bigdata.rdf.changesets.IChangeRecord.ChangeAction;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -368,6 +365,15 @@ public class BigdataSail extends SailBase implements Sail {
                 + ".starJoins";
         
         public static final String DEFAULT_STAR_JOINS = "false";
+        
+        /**
+         * Option specifies the namespace of the designed KB instance (default
+         * {@value #DEFAULT_NAMESPACE}).
+         */
+        public static final String NAMESPACE = BigdataSail.class.getPackage()
+                .getName()+ ".namespace";
+
+        public static final String DEFAULT_NAMESPACE = "kb";
         
     }
 
@@ -647,7 +653,9 @@ public class BigdataSail extends SailBase implements Sail {
         final ITransactionService txService = 
             journal.getTransactionManager().getTransactionService();
         
-        final String namespace = "kb";
+        final String namespace = properties.getProperty(
+                BigdataSail.Options.NAMESPACE,
+                BigdataSail.Options.DEFAULT_NAMESPACE);
         
         // throws an exception if there are inconsistent properties
         checkProperties(properties);
@@ -3160,8 +3168,9 @@ public class BigdataSail extends SailBase implements Sail {
         }
         
         /**
-         * Removes all "inferred" statements from the database (does NOT commit
-         * the database).
+         * Removes all "inferred" statements from the database and the proof
+         * chains (if any) associated with those inferences (does NOT commit the
+         * database).
          */
         public synchronized void removeAllEntailments() throws SailException {
             

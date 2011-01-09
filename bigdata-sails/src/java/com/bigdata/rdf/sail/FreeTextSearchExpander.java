@@ -15,6 +15,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.XSDDoubleIV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
@@ -22,7 +23,6 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.search.Hiterator;
@@ -55,12 +55,18 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
     
     private final AbstractTripleStore database;
     
-    private final Literal query;
+    private final Literal query, maxHits, minRelevance;
     
     private Set<URI> graphs;
     
     public FreeTextSearchExpander(final AbstractTripleStore database,
             final Literal query) {
+    	this(database, query, null, null);
+    }
+    
+    public FreeTextSearchExpander(final AbstractTripleStore database,
+            final Literal query, final Literal maxHits, 
+            final Literal minRelevance) {
 
         if (database == null)
             throw new IllegalArgumentException();
@@ -71,6 +77,10 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
         this.database = database;
         
         this.query = query;
+        
+        this.maxHits = maxHits;
+        
+        this.minRelevance = minRelevance;
         
     }
     
@@ -134,8 +144,10 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
 //                final long begin = System.nanoTime();
                 hiterator = database.getLexiconRelation()
                         .getSearchEngine().search(query.getLabel(),
-                                query.getLanguage(), false/* prefixMatch */,
-                                0d/* minCosine */, 10000/* maxRank */,
+                                query.getLanguage(), 
+                                false/* prefixMatch */,
+                                minRelevance == null ? 0d : minRelevance.doubleValue()/* minCosine */, 
+                                maxHits == null ? 10000 : maxHits.intValue()+1/* maxRank */,
                                 1000L/* timeout */, TimeUnit.MILLISECONDS);
 //                hiterator = database.getSearchEngine().search
 //                    ( query.getLabel(),
@@ -305,9 +317,12 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
             }
             ISPO[] spos = new ISPO[hits.length];
             for (int i = 0; i < hits.length; i++) {
-                IV s = new TermId(VTE.LITERAL, hits[i].getDocId());
-                if (INFO) log.info("hit: " + s);
-                spos[i] = new SPO(s, null, null);
+                final IV s = new TermId(VTE.LITERAL, hits[i].getDocId());
+                final IV p = new XSDDoubleIV(hits[i].getCosine());
+                final IV o = null; // reserved
+                final IV c = null; // reserved
+                spos[i] = new SPO(s, p, o, c);
+                if (INFO) log.info("hit: " + spos[i]);
             }
 //            Arrays.sort(spos, SPOKeyOrder.SPO.getComparator());
             return spos;
@@ -316,9 +331,12 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
         private ISPO[] convertWhenBound(IHit[] hits) {
             ISPO[] result = new ISPO[0];
             for (IHit hit : hits) {
-                IV s = new TermId(VTE.LITERAL, hit.getDocId());
+                final IV s = new TermId(VTE.LITERAL, hit.getDocId());
                 if (s == boundVal) {
-                    result = new ISPO[] { new SPO(s, null, null) };
+                    final IV p = new XSDDoubleIV(hit.getCosine());
+                    final IV o = null; // reserved
+                    final IV c = null; // reserved
+                    result = new ISPO[] { new SPO(s, p, o, c) };
                     break;
                 }
             }

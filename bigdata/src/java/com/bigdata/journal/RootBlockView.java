@@ -28,11 +28,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
+import java.sql.Date;
+import java.text.DateFormat;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.WormAddressManager;
@@ -60,13 +63,15 @@ public class RootBlockView implements IRootBlockView {
     static final transient short SIZEOF_COUNTER    = Bytes.SIZEOF_LONG;
     static final transient short SIZEOF_OFFSET     = Bytes.SIZEOF_LONG;
     static final transient short SIZEOF_CHECKSUM   = Bytes.SIZEOF_INT;
+    static final transient short SIZEOF_QTOKEN     = Bytes.SIZEOF_LONG;
     /**
      * This is a chunk of reserved bytes from which new fields in the root block
      * are allocated from time to time.
      */
     static final transient short SIZEOF_UNUSED = 256 - (//
-            Bytes.SIZEOF_LONG + // metaBitsAddr since version 0x01.
-            Bytes.SIZEOF_LONG + // metaStartAddr since version 0x01.
+            SIZEOF_QTOKEN     + // quorum token since version 0x02.
+            SIZEOF_ADDR       + // metaBitsAddr since version 0x01.
+            SIZEOF_ADDR       + // metaStartAddr since version 0x01.
             Bytes.SIZEOF_BYTE + // storeType since version 0x01.  assume zero before that.
             Bytes.SIZEOF_UUID + // uuid
             Bytes.SIZEOF_BYTE + // offsetBits
@@ -89,23 +94,26 @@ public class RootBlockView implements IRootBlockView {
     static final transient short OFFSET_CLOSE_TIME = OFFSET_CREATE_TIME + SIZEOF_TIMESTAMP;
     static final transient short OFFSET_UNUSED     = OFFSET_CLOSE_TIME  + SIZEOF_TIMESTAMP;
 //    static final transient short OFFSET_UNUSED     = OFFSET_COMMIT_NDX  + SIZEOF_ADDR;
-    static final transient short OFFSET_META_BITS  = OFFSET_UNUSED      + SIZEOF_UNUSED;
+    static final transient short OFFSET_QTOKEN     = OFFSET_UNUSED      + SIZEOF_UNUSED;
+    static final transient short OFFSET_META_BITS  = OFFSET_QTOKEN      + SIZEOF_QTOKEN;
     static final transient short OFFSET_META_START = OFFSET_META_BITS   + SIZEOF_ADDR;
     static final transient short OFFSET_STORETYPE  = OFFSET_META_START  + SIZEOF_ADDR;
     static final transient short OFFSET_UUID       = OFFSET_STORETYPE   + Bytes.SIZEOF_BYTE;
     static final transient short OFFSET_CHALLIS1   = OFFSET_UUID        + Bytes.SIZEOF_UUID;
     static final transient short OFFSET_CHECKSUM   = OFFSET_CHALLIS1    + SIZEOF_TIMESTAMP;  
+    public 
     static final transient short SIZEOF_ROOT_BLOCK = OFFSET_CHECKSUM    + SIZEOF_CHECKSUM;
+    // Note: SIZEOF_ROOT_BLOCK := 340 Bytes.  This is an invariant.
 
     /**
      * Magic value for root blocks.
      */
-    final int MAGIC = 0x65fe21bc;
+    static final int MAGIC = 0x65fe21bc;
 
     /**
      * Original version.
      */
-    final int VERSION0 = 0x0;
+    static final int VERSION0 = 0x0;
 
     /**
      * This version supports the {@link RWStore} as well as the log-structured
@@ -119,18 +127,21 @@ public class RootBlockView implements IRootBlockView {
      * <dt>storeType</dt>
      * <dd>A byte value which specifies whether the backing store is a journal
      * (log-structured store or WORM) or a read-write store. Only two values are
-     * defined at present. See {@link StoreTypeEnum}.</dd>
+     * defined at present. See {@link StoreTypeEnum}. The default value of this
+     * field before {@link #VERSION1} is {@link StoreTypeEnum#WORM}.</dd>
      * <dt>metaBitsAddr</dt>
      * <dd>Where we will read the metadata bits from. When we start the store up
      * we need to retrieve the metabits from this address. This is a byte offset
      * into the file and is stored as a long integer. Normal addresses are
-     * calculated with reference to the allocation blocks.</dd>
+     * calculated with reference to the allocation blocks. The value for a WORM
+     * store and the default value before {@link #VERSION1} are both ZERO (0).</dd>
      * <dt>metaStartAddr</dt>
      * <dd>The start of the area of the file where the allocation blocks are
      * allocated. This is also a byte offset into the file and is stored as a
      * 64-bit integer. It is called metaStartAddr because that is the offset
      * that is used with the metaBitsAddr to determine how to find the
-     * allocation blocks.</dd>
+     * allocation blocks. The value for a WORM store and the default value
+     * before {@link #VERSION1} are both ZERO (0).</dd>
      * </dl>
      * In addition, the semantics of the following fields are different for the
      * {@link RWStore}
@@ -150,9 +161,30 @@ public class RootBlockView implements IRootBlockView {
      * 
      * @todo allocation block sizes to allocate?
      */
-    final int VERSION1 = 0x1;
+    static final int VERSION1 = 0x1;
 
-    final int currentVersion;
+    /**
+     * This version supports the HA journal.
+     * <p>
+     * The new fields for this version include:
+     * <dl>
+     * <dt>quorumToken</dt>
+     * <dd>The {@link Quorum} token associated with the commit point. The
+     * default value before {@link #VERSION2} is {@link Quorum#NO_QUORUM}.</dd>
+     * </dl>
+     */
+    static final int VERSION2 = 0x2;
+
+    /**
+     * The current version for new root blocks. While different kinds of backing
+     * store (e.g., the RW and WORM as of this time) may have some fields which
+     * are not used by the other kinds of backing stores, they ALL share the
+     * same root block versioning system. Further, all evolutions in the root
+     * block versioning MUST be backwards compatible (earlier versions must be
+     * readable). Finally, new root block images MUST be formed using the
+     * {@link #currentVersion}.
+     */
+    static final int currentVersion = VERSION2;
     
     /**
      * The buffer holding the backing data.
@@ -208,7 +240,7 @@ public class RootBlockView implements IRootBlockView {
         if(addr==0L) return;
         
         // TODO develop protocol to support address checking
-        if (am instanceof RWStrategy.RWAddressManager) return;
+        if (am instanceof RWAddressManager) return;
         
         final long offset = am.getOffset(addr);
         
@@ -228,7 +260,29 @@ public class RootBlockView implements IRootBlockView {
         }
 
     }
+
+    /**
+     * @deprecated Let's keep just one ctor to create root blocks from state
+     *             parameters and one to create root blocks from a
+     *             {@link ByteBuffer}.
+     */
+    RootBlockView(boolean rootBlock0, int offsetBits, long nextOffset,
+            long firstCommitTime, long lastCommitTime, long commitCounter,
+            long commitRecordAddr, long commitRecordIndexAddr, UUID uuid,
+            long quorumToken,
+            long createTime, long closeTime, ChecksumUtility checker) {
+
+        this(rootBlock0, offsetBits, nextOffset,
+                firstCommitTime, lastCommitTime, commitCounter,
+                commitRecordAddr, commitRecordIndexAddr, uuid,
+                quorumToken, //
+                0L, // metaStartAddr
+                0L, // metaBitsAddr
+                StoreTypeEnum.WORM, //
+                createTime, closeTime, checker);
     
+    }
+
     /**
      * Create a new read-only root block image with a unique timestamp. The
      * other fields are populated from the supplied parameters.
@@ -262,10 +316,29 @@ public class RootBlockView implements IRootBlockView {
      * @param commitRecordIndexAddr
      *            The address at which the {@link IndexMetadata} for the
      *            {@link CommitRecordIndex} was written or 0L if there are no
-     *            historical {@link ICommitRecord}s (this is true when the
-     *            store is first created).
+     *            historical {@link ICommitRecord}s (this is true when the store
+     *            is first created).
      * @param uuid
      *            The unique journal identifier.
+     * @param quorumToken
+     *            The current quorum token if this commit point is part of a
+     *            {@link Quorum}.
+     * @param metaStartAddr
+     *            For the {@link StoreTypeEnum#RW} store, the start of the area
+     *            of the file where the allocation blocks are allocated. This is
+     *            also a byte offset into the file and is stored as a 64-bit
+     *            integer. It is called metaStartAddr because that is the offset
+     *            that is used with the metaBitsAddr to determine how to find
+     *            the allocation blocks. The value for a WORM store is ZERO (0).
+     * @param metaBitsAddr
+     *            For the {@link StoreTypeEnum#RW} store, where we will read the
+     *            metadata bits from. When we start the store up we need to
+     *            retrieve the metabits from this address. This is a byte offset
+     *            into the file and is stored as a long integer. Normal
+     *            addresses are calculated with reference to the allocation
+     *            blocks. The value for a WORM store is ZERO (0).
+     * @param storeTypeEnum
+     *            The kind of persistence store. See {@link StoreTypeEnum}.
      * @param checker
      *            An object that is used to compute the checksum to be stored in
      *            the root block (required).
@@ -281,44 +354,58 @@ public class RootBlockView implements IRootBlockView {
      *            is no longer available for writing (because it has been
      *            superseded by another journal).
      */
-    RootBlockView(boolean rootBlock0, int offsetBits, long nextOffset,
-            long firstCommitTime, long lastCommitTime, long commitCounter,
-            long commitRecordAddr, long commitRecordIndexAddr, UUID uuid,
-            long createTime, long closeTime, ChecksumUtility checker) {
-        this(rootBlock0, offsetBits, nextOffset,
-                firstCommitTime, lastCommitTime, commitCounter,
-                commitRecordAddr, commitRecordIndexAddr, uuid,
-                0L, 0L, StoreTypeEnum.WORM,
-                createTime, closeTime, checker);
-    }
-
-    RootBlockView(boolean rootBlock0, int offsetBits, long nextOffset,
-            long firstCommitTime, long lastCommitTime, long commitCounter,
-            long commitRecordAddr, long commitRecordIndexAddr, UUID uuid,
-            long metaStartAddr, long metaBitsAddr, StoreTypeEnum storeTypeEnum,
-            long createTime, long closeTime, ChecksumUtility checker)
+    RootBlockView(//
+            final boolean rootBlock0, final int offsetBits,
+            final long nextOffset, final long firstCommitTime,
+            final long lastCommitTime, final long commitCounter,
+            final long commitRecordAddr, final long commitRecordIndexAddr,
+            final UUID uuid,
+            final long quorumToken, // VERSION2
+            final long metaStartAddr, // VERSION1
+            final long metaBitsAddr, // VERSION1
+            final StoreTypeEnum storeTypeEnum, // VERSION1
+            final long createTime, final long closeTime,
+            final ChecksumUtility checker)
     {
-        assert SIZEOF_UNUSED > 0 : "Out of unused space in the root block? : "+SIZEOF_UNUSED;
 
-        WormAddressManager.assertOffsetBits(offsetBits);
+        // Note: There is a unit test specifically for this condition.
+//        if (SIZEOF_UNUSED < 0)
+//            throw new RootBlockException(
+//                    "Out of unused space in the root block? : " + SIZEOF_UNUSED);
 
-        // Note: used for assertions only and by toString().
-        if (StoreTypeEnum.RW == storeTypeEnum) {
-        	am = new RWStrategy.RWAddressManager();
-        	currentVersion = VERSION1;
-        } else {
-        	am = new WormAddressManager(offsetBits);
-        	currentVersion = VERSION0;
+        if (storeTypeEnum == null) {
+
+            throw new IllegalArgumentException("storeType is null");
+
         }
 
-        if (am instanceof WormAddressManager) {
-         
-            /*
-             * FIXME Use RW vs WORM address manager and check this based on the
-             * StoreType, not the interface.
-             */
-            ((WormAddressManager) am).assertOffset(nextOffset);
+        switch (storeTypeEnum) {
+        case RW: {
+            // @todo check metaStartAddr
+            // @todo check metaBitsAddr
+            am = new RWAddressManager();
+            // @todo check nextOffset
+            break;
+        }
+        case WORM: {
 
+            if (metaStartAddr != 0L)
+                throw new RootBlockException("metaStartAddr must be ZERO (0L) for WORM.");
+            
+            if (metaBitsAddr != 0L)
+                throw new RootBlockException("metaBitsAddr must be ZERO (0L) for WORM.");
+            
+            am = new WormAddressManager(offsetBits);
+            
+            WormAddressManager.assertOffsetBits(offsetBits);
+            
+            ((WormAddressManager) am).assertOffset(nextOffset);
+            
+            break;
+            
+        }
+        default:
+            throw new RootBlockException("Unknown storeType: " + storeTypeEnum);
         }
         
         if( firstCommitTime == 0L && lastCommitTime != 0L) {
@@ -379,6 +466,16 @@ public class RootBlockView implements IRootBlockView {
 
         }
         
+        if (commitRecordAddr != 0 && commitCounter == 0) {
+
+            throw new IllegalArgumentException(
+                    "The commit counter must be greter than zero if there is a commit record: commitRecordAddr="
+                            + commitRecordAddr
+                            + ", but commitCounter="
+                            + commitCounter);
+            
+        }
+        
         if (commitRecordAddr != 0 && commitRecordIndexAddr == 0) {
 
             throw new IllegalArgumentException(
@@ -405,6 +502,20 @@ public class RootBlockView implements IRootBlockView {
             
         }
 
+        /*
+         * @todo Once we nail down the quorumToken assignment semantics (e.g.,
+         * based on commitTime, commitCounter, pure non-negative sequences as
+         * assigned by zookeeper, etc) both this test and the unit tests should
+         * be modified to conform with the quorumToken validity constraints.
+         */
+        if (quorumToken < 0L && quorumToken != Quorum.NO_QUORUM) {
+
+            throw new IllegalArgumentException(
+                    "quorum is negative but value is not NO_QUORUM("
+                            + Quorum.NO_QUORUM + ")");
+            
+        }
+        
         if (createTime == 0L) {
 
             throw new IllegalArgumentException("Create time is zero.");
@@ -436,7 +547,7 @@ public class RootBlockView implements IRootBlockView {
          * and (b) since it is written at both the start and the end of the root
          * block, to verify that the entire root block was made stable.
          * 
-         * Note: I have choosen to use the commitCounter rather than a timestamp
+         * Note: I have chosen to use the commitCounter rather than a timestamp
          * field here for several reasons. First, the commitCounter is already
          * on hand and the caller has responsibility for verifying that the
          * commit counters are strictly increasing. Second, we do not have to
@@ -465,9 +576,10 @@ public class RootBlockView implements IRootBlockView {
         buf.putLong(createTime);
         buf.putLong(closeTime);
         buf.position(buf.position()+SIZEOF_UNUSED); // skip unused region.
-        buf.putLong(metaBitsAddr);
-        buf.putLong(metaStartAddr);
-        buf.put(storeTypeEnum.getType());
+        buf.putLong(quorumToken); // VERSION2
+        buf.putLong(metaBitsAddr); // VERSION1
+        buf.putLong(metaStartAddr); // VERSION1
+        buf.put(storeTypeEnum.getType()); // VERSION1
         buf.putLong(uuid.getMostSignificantBits());
         buf.putLong(uuid.getLeastSignificantBits());
         buf.putLong(challisField);
@@ -477,6 +589,7 @@ public class RootBlockView implements IRootBlockView {
         assert buf.limit() == SIZEOF_ROOT_BLOCK;
 
         buf.position(0);
+        
     }
 
     public ByteBuffer asReadOnlyBuffer() {
@@ -527,14 +640,30 @@ public class RootBlockView implements IRootBlockView {
          * buffer and then save a reference to the clone.
          */
         this.buf = buf.asReadOnlyBuffer();
-        
-        currentVersion = getVersion();
-        
+
+        // flag indicating whether this is rootBlock ZERO or ONE.
         this.rootBlock0 = rootBlock0;
 
-        final int offsetBits = getOffsetBits();
+        switch (getStoreType()) {
+        case RW: {
+         
+            am = new RWAddressManager();
+            
+            break;
+            
+        }
+        case WORM: {
 
-        am = currentVersion == VERSION1 ? new RWStrategy.RWAddressManager() : new WormAddressManager(offsetBits);
+            final int offsetBits = getOffsetBits();
+            
+            am = new WormAddressManager(offsetBits);
+            
+            break;
+            
+        }
+        default:
+            throw new RootBlockException("Unknown storeType=" + getStoreType());
+        }
 
         if (checker == null) {
             
@@ -542,6 +671,7 @@ public class RootBlockView implements IRootBlockView {
             
         }
 
+        // Check sum checker.
         this.checker = checker;
 
         valid();
@@ -660,6 +790,7 @@ public class RootBlockView implements IRootBlockView {
         switch (version) {
         case VERSION0:
         case VERSION1:
+        case VERSION2:
             break;
         default:
             throw new RootBlockException("Unknown version: " + version);
@@ -761,52 +892,89 @@ public class RootBlockView implements IRootBlockView {
 
     public String toString() {
     
-        StringBuilder sb = new StringBuilder();
+        final DateFormat df = DateFormat.getDateTimeInstance(
+                DateFormat.FULL/* dateStyle */, DateFormat.FULL/* timeStyle */);
+        
+        final StringBuilder sb = new StringBuilder();
         
         sb.append("rootBlock");
         
-        sb.append("{ rootBlock="+(isRootBlock0()?0:1));
-        sb.append(", challisField="+getChallisField());
-        sb.append(", version="+getVersion());
-        sb.append(", nextOffset="+getNextOffset());
-        sb.append(", localTime="+getLocalTime());
-        sb.append(", firstCommitTime="+getFirstCommitTime());
-        sb.append(", lastCommitTime="+getLastCommitTime());
-        sb.append(", commitCounter="+getCommitCounter());
-        sb.append(", commitRecordAddr="+am.toString(getCommitRecordAddr()));
+        sb.append("{ rootBlock=" + (isRootBlock0() ? 0 : 1));
+        sb.append(", challisField=" + getChallisField());
+        sb.append(", version=" + getVersion());
+        sb.append(", nextOffset=" + getNextOffset());
+        sb.append(", localTime=" + toString(df, getLocalTime()));
+        sb.append(", firstCommitTime=" + toString(df, getFirstCommitTime()));
+        sb.append(", lastCommitTime=" + toString(df, getLastCommitTime()));
+        sb.append(", commitCounter=" + getCommitCounter());
+        sb.append(", commitRecordAddr=" + am.toString(getCommitRecordAddr()));
         sb.append(", commitRecordIndexAddr="+am.toString(getCommitRecordIndexAddr()));
-        sb.append(", metaBitsAddr="+getMetaBitsAddr());
-        sb.append(", metaStartAddr="+getMetaStartAddr());
-        sb.append(", storeType="+getStoreType().getType());
-        sb.append(", uuid="+getUUID());
-        sb.append(", offsetBits="+getOffsetBits());
+        sb.append(", quorumToken=" + getQuorumToken());
+        sb.append(", metaBitsAddr=" + getMetaBitsAddr());
+        sb.append(", metaStartAddr=" + getMetaStartAddr());
+        sb.append(", storeType=" + getStoreType());
+        sb.append(", uuid=" + getUUID());
+        sb.append(", offsetBits=" + getOffsetBits());
         sb.append(", checksum="+(checker==null?"N/A":""+calcChecksum(checker)));
-        sb.append(", createTime="+getCreateTime());
-        sb.append(", closeTime="+getCloseTime());
-        
+        sb.append(", createTime=" + toString(df, getCreateTime()));
+        sb.append(", closeTime=" + toString(df, getCloseTime()));
+
         sb.append("}");
         
         return sb.toString();
         
     }
 
+    private static final String toString(final DateFormat df, final long t) {
+     
+        return Long.toString(t)
+                + (t != 0L ? " [" + df.format(new Date(t)) + "]" : "");
+        
+    }
+    
     public long getMetaBitsAddr() {
+        if (getVersion() < VERSION1) {
+            // Always WORM store before VERSION1
+            return 0L;
+        }
         return buf.getLong(OFFSET_META_BITS);
     }
 
     public long getMetaStartAddr() {
+        if (getVersion() < VERSION1) {
+            // Always WORM store before VERSION1
+            return 0L;
+        }
         return buf.getLong(OFFSET_META_START);
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The {@link #OFFSET_STORETYPE} field was defined in
+     * {@link #VERSION1}. The default value for that field before
+     * {@link #VERSION1} is {@link StoreTypeEnum#WORM} since only the WORM
+     * persistence store existed in earlier versions of the root block.
+     */
     public StoreTypeEnum getStoreType() {
-        switch (getVersion()) {
-        case VERSION0:
+        if (getVersion() < VERSION1) {
+            // Always WORM store before VERSION1
             return StoreTypeEnum.WORM;
-        case VERSION1:
-            return StoreTypeEnum.RW;
-        default:
-            return StoreTypeEnum.valueOf(buf.get(OFFSET_STORETYPE));
         }
+        return StoreTypeEnum.valueOf(buf.get(OFFSET_STORETYPE));
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The quorum token was introduced in {@link #VERSION2}. The default
+     * value for that field before {@link #VERSION2} is {Quorum#NO_QUORUM}.
+     */
+    public long getQuorumToken() {
+        if (getVersion() < VERSION2) {
+            return Quorum.NO_QUORUM;
+        }
+        return buf.getLong(OFFSET_QTOKEN);
     }
 
 }

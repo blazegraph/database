@@ -30,6 +30,7 @@ package com.bigdata.journal;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.WormAddressManager;
 
 /**
@@ -111,9 +112,17 @@ public interface IRootBlockView {
      * The root block version number.
      */
     public int getVersion();
-    
+
     /**
      * The next offset at which a data item would be written on the store.
+     * 
+     * FIXME The RWStore has different semantics for this field. Document those
+     * semantics and modify {@link AbstractJournal} so we can directly decide
+     * how many bytes were "written" (for the WORM) or were "allocated" (for the
+     * RWStore, in which case it should probably be the net of the bytes
+     * allocated and released). Update all the locations in the code which rely
+     * on {@link #getNextOffset()} to compute the #of bytes written onto the
+     * store.
      */
     public long getNextOffset();
 
@@ -189,6 +198,26 @@ public interface IRootBlockView {
      * The unique journal identifier
      */
     public UUID getUUID();
+
+    /*
+     * @todo Consider putting the logical service UUID into the root blocks. It
+     * is already in the service Entry[] (and the file system path) for
+     * scale-out.
+     */
+//    /**
+//     * The unique identifier for the logical service to which this journal
+//     * belongs. All physical services for the same logical service will have the
+//     * same logical service {@link UUID}. The logical service {@link UUID} is
+//     * generated when the quorum leader creates the initial journal for a
+//     * service and is written into the root blocks. From the root blocks it is
+//     * replicated to the {@link Quorum} followers.
+//     * <p>
+//     * Note: The physical service UUID is NOT stored in the root blocks since
+//     * that would make the root blocks incompatible when they are replicated to
+//     * other nodes in the same logical service and high availability maintains
+//     * binary compatibility when replicating a journal.
+//     */
+//    public UUID getLogicalServiceUUID();
     
     /**
      * The #of bits in a 64-bit long integer address that are dedicated to the
@@ -212,26 +241,38 @@ public interface IRootBlockView {
     /**
      * A byte value which specifies whether the backing store is a journal
      * (log-structured store or WORM) or a read-write store. Only two values are
-     * defined at present. ZERO (0) is a WORM; ONE is a read/write store.
+     * defined at present. ZERO (0) is a WORM; ONE (1) is a read/write store.
      */
     public StoreTypeEnum getStoreType();
 
     /**
-     * Where we will read the metadata bits from. When we start the store up we
-     * need to retrieve the metabits from this address. This is a byte offset
-     * into the file and is stored as a long integer. Normal addresses are
-     * calculated with reference to the allocation blocks.
+     * For the {@link StoreTypeEnum#RW} store, where we will read the metadata
+     * bits from. When we start the store up we need to retrieve the metabits
+     * from this address. This is a byte offset into the file and is stored as a
+     * long integer. Normal addresses are calculated with reference to the
+     * allocation blocks. The value for a WORM store is ZERO (0).
      */
     public long getMetaBitsAddr();
 
     /**
-     * The start of the area of the file where the allocation blocks are
-     * allocated. This is also a byte offset into the file and is stored as a
-     * 64-bit integer. It is called metaStartAddr because that is the offset
-     * that is used with the metaBitsAddr to determine how to find the
-     * allocation blocks.
+     * For the {@link StoreTypeEnum#RW} store, the start of the area of the file
+     * where the allocation blocks are allocated. This is also a byte offset
+     * into the file and is stored as a 64-bit integer. It is called
+     * metaStartAddr because that is the offset that is used with the
+     * metaBitsAddr to determine how to find the allocation blocks. The value
+     * for a WORM store is ZERO (0).
      */
     public long getMetaStartAddr();
+
+    /**
+     * The {@link Quorum} token associated with this commit point or
+     * {@link Quorum#NO_QUORUM} if there was no quorum.
+     * <p>
+     * Note: If commit points are part of the resynchronization protocol, they
+     * MUST NOT use the current quorum token unless the service is synchronized
+     * with the quorum at that commit point.
+     */
+    public long getQuorumToken();
 
     /**
      * A read-only buffer whose contents are the root block. The position,
@@ -239,5 +280,5 @@ public interface IRootBlockView {
      * returned by this method.
      */
     public ByteBuffer asReadOnlyBuffer();
-    
+
 }

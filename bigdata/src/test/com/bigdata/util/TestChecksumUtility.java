@@ -41,9 +41,9 @@ import junit.framework.TestCase;
  */
 public class TestChecksumUtility extends TestCase {
 
-    Random r = new Random();
+    private Random r;
     
-    ChecksumUtility chk = new ChecksumUtility();
+    private ChecksumUtility chk;
     
     /**
      * 
@@ -58,6 +58,25 @@ public class TestChecksumUtility extends TestCase {
         super(arg0);
     }
 
+    protected void setUp() throws Exception {
+        
+        super.setUp();
+        
+        r = new Random();
+        
+        chk = new ChecksumUtility();
+        
+    }
+    
+    protected void tearDown() throws Exception {
+        
+        r = null;
+        
+        chk = null;
+        
+        super.tearDown();
+        
+    }
     
     /**
      * Test verifies that the checksum of the buffer is being computed
@@ -150,12 +169,55 @@ public class TestChecksumUtility extends TestCase {
         
     }
 
+    public void test_checksum04_direct() {
+        
+        byte[] data = new byte[100];
+        r.nextBytes(data);
+
+        Adler32 adler32 = new Adler32();
+        adler32.update(data);
+        final int expectedChecksum = (int) adler32.getValue();
+
+        assertEquals(expectedChecksum, chk.checksum(ByteBuffer.wrap(data), 0,
+                data.length));
+        
+        ByteBuffer direct = ByteBuffer.allocateDirect(data.length);
+        direct.put(data);
+        assertEquals(expectedChecksum, chk.checksum(direct, 0,
+                data.length));
+        
+    }
+
     /**
      * Verify that the computed checksum is the same whether the buffer is
      * backed by an array or not when the checksum is computed for only a region
-     * of the buffer.
+     * of the buffer (java heap buffer version).
      */
     public void test_checksum05() {
+
+        byte[] data = new byte[100];
+        r.nextBytes(data);
+
+        Adler32 adler32 = new Adler32();
+        adler32.update(data, 20, 100 - 10 - 20);
+        final int expectedChecksum = (int) adler32.getValue();
+
+        assertEquals(expectedChecksum, chk.checksum(ByteBuffer.wrap(data), 20,
+                data.length - 10));
+
+        ByteBuffer direct = ByteBuffer.allocate(data.length);
+        direct.put(data);
+        assertEquals(expectedChecksum, chk.checksum(direct, 20,
+                data.length - 10));
+
+    }
+
+    /**
+     * Verify that the computed checksum is the same whether the buffer is
+     * backed by an array or not when the checksum is computed for only a region
+     * of the buffer (native heap buffer version).
+     */
+    public void test_checksum05_direct() {
         
         byte[] data = new byte[100];
         r.nextBytes(data);
@@ -167,7 +229,7 @@ public class TestChecksumUtility extends TestCase {
         assertEquals(expectedChecksum, chk.checksum(ByteBuffer.wrap(data), 20,
                 data.length-10));
         
-        ByteBuffer direct = ByteBuffer.allocate(data.length);
+        ByteBuffer direct = ByteBuffer.allocateDirect(data.length);
         direct.put(data);
         assertEquals(expectedChecksum, chk.checksum(direct, 20,
                 data.length-10));

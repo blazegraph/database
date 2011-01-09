@@ -125,7 +125,7 @@ public class JournalTransactionService extends AbstractTransactionService {
         
     }
 
-    protected long findNextCommitTime(long commitTime) {
+    protected long findNextCommitTime(final long commitTime) {
         
         final ICommitRecord commitRecord = journal.getCommitRecordIndex()
                 .findNext(commitTime);
@@ -442,26 +442,32 @@ public class JournalTransactionService extends AbstractTransactionService {
         
     }
 
-    /**
-     * Ignored since the {@link Journal} records the last commit time
-     * in its root blocks.
+    /* @todo This is only true for the WORM.  For the RWStore, the release time
+     * will advance normally and things can get aged out of the store.
      */
-    public void notifyCommit(long commitTime) {
-    
-        // NOP
-        
-    }
+//    /**
+//     * Ignored since the {@link Journal} records the last commit time
+//     * in its root blocks.
+//     */
+//    public void notifyCommit(long commitTime) {
+//    
+//        // NOP
+//        
+//    }
 
-    /**
-     * Always returns ZERO (0L) since history can not be released on the
-     * {@link Journal}.
+    /* @todo This is only true for the WORM.  For the RWStore, the release time
+     * will advance normally and things can get aged out of the store.
      */
-    @Override
-    public long getReleaseTime() {
-
-        return 0L;
-        
-    }
+//    /**
+//     * Always returns ZERO (0L) since history can not be released on the
+//     * {@link Journal}.
+//     */
+//    @Override
+//    public long getReleaseTime() {
+//
+//        return 0L;
+//        
+//    }
 
     /**
      * Throws exception since distributed transactions are not used for a single
@@ -496,4 +502,42 @@ public class JournalTransactionService extends AbstractTransactionService {
         
     }
 
+//	/**
+//	 * Invoke a method with the {@link AbstractTransactionService}'s lock held.
+//	 * 
+//	 * @param <T>
+//	 * @param callable
+//	 * @return
+//	 * @throws Exception
+//	 */
+//	public <T> T callWithLock(final Callable<T> callable) throws Exception {
+//		lock.lock();
+//		try {
+//			return callable.call();
+//		} finally {
+//			lock.unlock();
+//		}
+//	}
+//    
+//	/**
+//	 * Invoke a method with the {@link AbstractTransactionService}'s lock held.
+//	 * 
+//	 * But throw immediate exception if try fails.
+//	 * 
+//	 * @param <T>
+//	 * @param callable
+//	 * @return
+//	 * @throws Exception
+//	 */
+//	public <T> T tryCallWithLock(final Callable<T> callable, long waitFor, TimeUnit unit) throws Exception {
+//		if (!lock.tryLock(waitFor,unit)) {
+//			throw new RuntimeException("Lock not available");
+//		}
+//		try {
+//			return callable.call();
+//		} finally {
+//			lock.unlock();
+//		}
+//	}
+    
 }

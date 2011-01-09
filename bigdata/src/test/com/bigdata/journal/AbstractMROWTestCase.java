@@ -270,6 +270,8 @@ abstract public class AbstractMROWTestCase extends AbstractRawStoreTestCase {
             
         }
         
+        System.err.println(store.getCounters().toString());
+        
         System.err.println("#clients=" + nclients + ", ntrials=" + ntrials
                 + ", nok=" + nok + ", ncancelled=" + ncancelled + ", nerrors="
                 + nerr.get() + " in " + elapsed + "ms (" + nok * 1000 / elapsed

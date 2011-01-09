@@ -123,7 +123,7 @@ public interface IRawStore extends IAddressManager {
      */
     public long write(ByteBuffer data);
     
-    /**
+ 	/**
      * 
      * @param data
      *            The data. The bytes from the current

@@ -32,7 +32,6 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-
 import org.apache.log4j.Logger;
 import org.deri.iris.api.IProgramOptimisation.Result;
 import org.deri.iris.api.basics.ILiteral;
@@ -46,7 +45,8 @@ import org.deri.iris.basics.BasicFactory;
 import org.deri.iris.builtins.BuiltinsFactory;
 import org.deri.iris.optimisations.magicsets.MagicSets;
 import org.deri.iris.terms.TermFactory;
-
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;

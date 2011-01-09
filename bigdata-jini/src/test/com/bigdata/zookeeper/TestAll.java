@@ -52,6 +52,9 @@ public class TestAll extends TestCase {
         // test ability to handle an expired session.
         suite.addTestSuite(TestZookeeperAccessor.class);
 
+        // test suite for EPHEMERAL_SEQUENTIAL semantics.
+        suite.addTestSuite(TestEphemeralSemantics.class);
+
         // a watcher for a znode to be created.
         suite.addTestSuite(TestZNodeCreatedWatcher.class);
         

@@ -145,7 +145,10 @@
 		<java classname="com.bigdata.rdf.store.DataLoader" fork="true" failonerror="true" dir="${build.dir}/bin">
 			<arg line="-namespace ${bsbm.namespace} ${bsbm.journalPropertyFile} ${bsbm.outputFile}.${bsbm.outputType}${bsbm.compressType}" />
 			<!-- specify/override the journal file name. -->
-			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}" />
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}
+				-Dcom.bigdata.rdf.store.DataLoader.bufferCapacity=1000000
+				-Dcom.bigdata.io.DirectBufferPool.bufferCapacity=10485760
+				" />
 			<classpath>
 				<path refid="runtime.classpath" />
 			</classpath>

@@ -1085,7 +1085,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
             /*
              * #of explicit statements loaded.
              */
-            toldTriples = loadStats.toldTriples;
+            toldTriples = loadStats.toldTriples.get();
             
             /*
              * This is the elapsed time for the entire transaction in which the file
@@ -1093,19 +1093,19 @@ public class TestMetrics extends AbstractMetricsTestCase {
              * store, and the time required to perform the transaction commit.
              */
 //            transactionTime = System.currentTimeMillis() - begin;
-            transactionTime = loadStats.totalTime;
+            transactionTime = loadStats.totalTime.get();
 
             /*
              * This is the time required to load the triples exclusive of the
              * startup and commit time for the transaction.
              */
-            loadTime = loadStats.loadTime;
+            loadTime = loadStats.loadTime.get();
 
             /*
              * A pragmatic estimate of the commit time that assumes the transaction
              * start time is zero. 
              */
-            commitTime = loadStats.commitTime;
+            commitTime = loadStats.commitTime.get();
 //            commitTime = transactionTime - loadTime;
 
             /*
@@ -1132,7 +1132,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
 
             statementsAdded = statementCount1 - statementCount0;
 //            inferencesAdded = inferenceCount1 - inferenceCount0;
-            inferencesAdded = loadStats.closureStats.mutationCount;
+            inferencesAdded = loadStats.closureStats.mutationCount.get();
 //            int explicitAdded   = statementsAdded - inferencesAdded;
             proofsAdded     = proofCount1 - proofCount0;
             urisAdded       = uriCount1 - uriCount0;

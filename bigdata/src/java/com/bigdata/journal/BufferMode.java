@@ -56,7 +56,7 @@ public enum BufferMode {
      * 
      * @see TransientBufferStrategy
      */
-    Transient(false/* stable */, true/* fullyBuffered */),
+    Transient(false/* stable */, true/* fullyBuffered */,StoreTypeEnum.WORM),
 
     /**
      * <strong>This mode is not being actively developed and should not be used
@@ -77,7 +77,7 @@ public enum BufferMode {
      * 
      * @see DirectBufferStrategy
      */
-    Direct(true/* stable */, true/* fullyBuffered */),
+    Direct(true/* stable */, true/* fullyBuffered */,StoreTypeEnum.WORM),
 
     /**
      * <strong>This mode is not being actively developed and should not be used
@@ -100,7 +100,7 @@ public enum BufferMode {
      * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038
      * @see MappedBufferStrategy
      */
-    Mapped(true/* stable */, false/* fullyBuffered */),
+    Mapped(true/* stable */, false/* fullyBuffered */,StoreTypeEnum.WORM),
 
     /**
      * <p>
@@ -109,7 +109,7 @@ public enum BufferMode {
      * 
      * @see WORMStrategy
      */
-    Disk(true/* stable */, false/* fullyBuffered */),
+    Disk(true/* stable */, false/* fullyBuffered */,StoreTypeEnum.WORM),
 
     /**
      * <p>
@@ -121,7 +121,7 @@ public enum BufferMode {
      * 
      * @see WORMStrategy
      */
-    DiskWORM(true/* stable */, false/* fullyBuffered */),
+    DiskWORM(true/* stable */, false/* fullyBuffered */,StoreTypeEnum.WORM),
 
     /**
      * <p>
@@ -135,7 +135,19 @@ public enum BufferMode {
      * 
      * @see RWStrategy
      */
-    DiskRW(true/* stable */, false/* fullyBuffered */),
+    DiskRW(true/* stable */, false/* fullyBuffered */,StoreTypeEnum.RW),
+
+    /**
+     * <p>
+     * A variant on the DiskRW backed by a temporary file.  Options enable
+     * part of the store to be held with Direct ByteBuffers.  A significant
+     * use case would be an in-memory store but with disk overflow if
+     * required.
+     * </p>
+     * 
+     * @see RWStrategy
+     */
+    TemporaryRW(false/* stable */, false/* fullyBuffered */,StoreTypeEnum.RW),
 
     /**
      * <p>
@@ -148,16 +160,21 @@ public enum BufferMode {
      * 
      * @see DiskOnlyStrategy
      */
-    Temporary(false/* stable */, false/* fullyBuffered */);
+    Temporary(false/* stable */, false/* fullyBuffered */,StoreTypeEnum.WORM);
 
     private final boolean stable;
     private final boolean fullyBuffered;
-    
-    private BufferMode(final boolean stable, final boolean fullyBuffered) {
-        
+
+    private final StoreTypeEnum storeType;
+
+    private BufferMode(final boolean stable, final boolean fullyBuffered,
+            final StoreTypeEnum storeType) {
+
         this.stable = stable;
-        
+
         this.fullyBuffered = fullyBuffered;
+
+        this.storeType = storeType;
         
     }
     
@@ -182,5 +199,25 @@ public enum BufferMode {
         return fullyBuffered;
         
     }
+
+    /**
+     * The kind of persistence store (RW or WORM).
+     * 
+     * @see StoreTypeEnum
+     */
+    public StoreTypeEnum getStoreType() {
+
+        return storeType;
+        
+    }
     
+    public static BufferMode getDefaultBufferMode(StoreTypeEnum storeType) {
+    	switch (storeType) {
+    	case RW:
+    		return DiskRW;
+    	default:
+    		return DiskWORM;
+    	}    	
+    }
+
 }

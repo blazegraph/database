@@ -31,7 +31,6 @@ import java.util.Arrays;
 import java.util.Properties;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
-
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.Var;

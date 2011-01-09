@@ -39,6 +39,7 @@ import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.config.ServiceConfiguration;
+import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
@@ -80,10 +81,6 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
     protected static final Logger log = Logger
             .getLogger(ManageLogicalServiceTask.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
-    
     protected final JiniFederation fed;
     protected final IServiceListener listener;
     protected final String configZPath;
@@ -118,7 +115,7 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
 
         final int n = children.size();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("serviceCount=" + config.serviceCount + ", actual="
                     + children.size() + ", configZPath=" + configZPath);
 
@@ -132,7 +129,7 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
 
         } else {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("No action required: zpath=" + configZPath);
 
         }
@@ -178,7 +175,7 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
      */
     protected void newLogicalService() throws KeeperException, InterruptedException {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("className=" + config.className);
 
         /*
@@ -220,6 +217,12 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
                 + BigdataZooDefs.MASTER_ELECTION, new byte[0], acl,
                 CreateMode.PERSISTENT);
 
+        /*
+         * Setup the quorum state.
+         */
+        ZKQuorumImpl.setupQuorum(logicalServiceZPath, fed.getZookeeperAccessor(),
+                acl);
+
         try {
 
             /*
@@ -248,7 +251,7 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
                             .serialize(logicalServiceZPath), acl,
                             CreateMode.PERSISTENT);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Created lock node: " + lockNodeZPath);
 
         } catch (NodeExistsException ex) {

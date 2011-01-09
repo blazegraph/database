@@ -24,8 +24,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore;
 
-import java.util.*;
-import java.io.*;
+import java.io.DataInputStream;
+import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicLong;
+
+import com.bigdata.rwstore.RWStore.AllocationStats;
+
 
 public interface Allocator extends Comparable {
   public int getBlockSize();
@@ -34,18 +38,21 @@ public interface Allocator extends Comparable {
   public long getStartAddr();
   public boolean addressInRange(int addr);
   public boolean free(int addr, int size);
-  public int alloc(RWStore store, int size);
-  public long getDiskAddr();
-  public void setDiskAddr(long addr);
+  public int alloc(RWStore store, int size, IAllocationContext context);
+  public int getDiskAddr();
+  public void setDiskAddr(int addr);
   public long getPhysicalAddress(int offset);
+  public boolean isAllocated(int offset);
   public int getPhysicalSize(int offset);
   public byte[] write();
   public void read(DataInputStream str);
   public boolean hasFree();
   public void setFreeList(ArrayList list);
-  public String getStats();
-  public void preserveSessionData();
+  public String getStats(AtomicLong counter);
   public void addAddresses(ArrayList addrs);
   public int getRawStartAddr();
   public int getIndex();
+  public void appendShortStats(StringBuilder str, AllocationStats[] stats);
+  public boolean canImmediatelyFree(int addr, int size, IAllocationContext context);
 }
+	

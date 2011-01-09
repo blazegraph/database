@@ -90,7 +90,9 @@
 		<java classname="com.bigdata.rdf.store.DataLoader" fork="true" failonerror="true">
 			<arg line="-closure -namespace ${lubm.namespace} ${lubm.journalPropertyFile} ${lubm.ontologyFile} ${lubm.dataDir}" />
 			<!-- specify/override the journal file name. -->
-			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${lubm.journalFile}" />
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${lubm.journalFile}
+				-Dcom.bigdata.io.DirectBufferPool.bufferCapacity=10485760
+				" />
 			<classpath>
 				<path refid="runtime.classpath" />
 			</classpath>

@@ -61,7 +61,7 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("r/w store");
 
-        suite.addTestSuite(com.bigdata.rwstore.TestRWJournal.class);
+        suite.addTest(com.bigdata.rwstore.TestRWJournal.suite());
 
         return suite;
 

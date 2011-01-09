@@ -49,48 +49,52 @@ import org.apache.zookeeper.data.Stat;
 import com.bigdata.btree.IRangeQuery;
 
 /**
- * This class accepts a dynamic set of watch criteria pump events into a queue
- * when any watch was triggered. Hooks are defined that you can use to identify
- * new watch criteria based on {@link WatchedEvent}s. By default, this will
- * extend a watch over the transitive closure of the children of some znode.
- * However, you can limit the set of watch criteria using some hook methods. For
- * example, only following certain children for a given path.
+ * This class accepts a dynamic set of watch criteria and pump events into a
+ * queue when any watch was triggered. Hooks are defined that you can use to
+ * identify new watch criteria based on {@link WatchedEvent}s. By default, this
+ * will extend a watch over the transitive closure of the children of some
+ * znode. However, you can limit the set of watch criteria using some hook
+ * methods. For example, only following certain children for a given path.
  * <p>
- * {@link WatchedEvent}s are recieved in the zookeeper event thread. In order
- * to minimize the work performed in that thread, events are triaged. The triage
+ * {@link WatchedEvent}s are received in the zookeeper event thread. In order to
+ * minimize the work performed in that thread, events are triaged. The triage
  * determines the "type" of the znode for which the event was received. Types
  * reflect application considerations. For example, a change in the #of children
- * of a logical service vs a change in the data for a service configuration. If
- * the typed event adds or removes children that are of interest (by default,
+ * of a logical service versus a change in the data for a service configuration.
+ * If the typed event adds or removes children that are of interest (by default,
  * all children are of interest, but you may place restrictions on that), then
  * new watch criteria are added for the newly identified children. The typed
- * event is then placed an unbounded {@link BlockingQueue}. The application is
- * responsible for draining the queue. The ctor establishes the initial watch on
- * the root of the hierarchy of interest and then returns control to the
- * application. All other work by this class happens in the zookeeper event
- * thread.
+ * event is then placed on an unbounded {@link BlockingQueue}. The application
+ * is responsible for draining the queue. The constructor establishes the
+ * initial watch on the root of the hierarchy of interest and then returns
+ * control to the application. All other work by this class happens in the
+ * zookeeper event thread.
  * <p>
- * Events are consumed by the application.
- * <p>
- * Zookeeper DOES NOT provide a guarentee that we will see all events of
+ * Zookeeper DOES NOT provide a guarantee that we will see all events of
  * interest since state changes may occur after a watch has been triggered and
  * before the {@link WatchedEvent} is received and before we have the chance to
  * reset the watch. By queuing events we reduce the time in the zookeeper event
  * thread and thus increase responsiveness and reduce the opportunity for missed
- * events, but we DO NOT guarentee that the application will see all events.
+ * events, but we DO NOT guarantee that the application will see all events.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo This re-establishes the watcher when the event is handled in the
+ *       zookeeper thread. That is probably not a good idea as it increases the
+ *       demand on the zookeeper thread. Instead, when the application sees the
+ *       wrapped event it should read the data, re-establishing the watch as a
+ *       side-effect, and then issue whatever actions are necessary based on the
+ *       delta between the historical state of the znode/children and their
+ *       current state. This pattern guarantees that no state changes are
+ *       missed, but requires the application to track the old state of each
+ *       znode/children of interest.
  */
 abstract public class HierarchicalZNodeWatcher implements Watcher,
         HierarchicalZNodeWatcherFlags {
 
     final static protected Logger log = Logger
             .getLogger(UnknownChildrenWatcher.class);
-
-    final static protected boolean INFO = log.isInfoEnabled();
-
-    final static protected boolean DEBUG = log.isDebugEnabled();
 
     private ZooKeeper zookeeper;
     
@@ -129,7 +133,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
     private final LinkedHashMap<String/* zpath */, Integer/* flags */> watched = new LinkedHashMap<String, Integer>();
 
     /**
-     * Sets a watch on the <i>zroot</i> and any descendents selected by
+     * Sets a watch on the <i>zroot</i> and any descendants selected by
      * <i>flags</i> and {@link #watch(String, String)}.
      * <p>
      * If {@link HierarchicalZNodeWatcherFlags#CHILDREN} is set, then watches
@@ -176,7 +180,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
      * @throws KeeperException
      */
     public HierarchicalZNodeWatcher(final ZooKeeper zookeeper,
-            final String zroot, int flags, boolean pumpMockEventsDuringStartup)
+            final String zroot, int flags, final boolean pumpMockEventsDuringStartup)
             throws InterruptedException, KeeperException {
 
         if (zookeeper == null)
@@ -194,7 +198,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
 
         this.zroot = zroot;
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("zroot=" + zroot + ", flags=" + flagString(flags));
 
         /*
@@ -226,7 +230,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
      * Note: Synchronized for mutex with {@link #cancel()}.
      */
     synchronized 
-    public void process(WatchedEvent event) {
+    public void process(final WatchedEvent event) {
 
         if(cancelled) {
             
@@ -236,7 +240,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
             
         }
         
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info(event.toString());
 
         /*
@@ -244,7 +248,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
          * 
          * Note: This does NOT mean that the application will see all state
          * changes for watched znodes. Zookeeper DOES NOT provide that
-         * guarentee. The application CAN miss events between the time that a
+         * guarantee. The application CAN miss events between the time that a
          * state change triggers a WatchedEvent and the time that the
          * application handles the event and resets the watch.
          */
@@ -280,7 +284,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
             } catch (KeeperException e1) {
                 log.error("path=" + path, e1);
             } catch (InterruptedException e1) {
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("path=" + path);
             }
 
@@ -302,7 +306,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
                 } catch (KeeperException e1) {
                     log.error("path=" + path, e1);
                 } catch (InterruptedException e1) {
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("path=" + path);
                 }
 
@@ -323,7 +327,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
             } catch (KeeperException e1) {
                 log.error("path=" + path, e1);
             } catch (InterruptedException e1) {
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("path=" + path);
             }
 
@@ -339,7 +343,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
             } catch (KeeperException e) {
                 log.error(this, e);
             } catch (InterruptedException e1) {
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("path=" + path);
             }
             return;
@@ -363,7 +367,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
     protected void setWatch(final String path, final int flags)
             throws KeeperException, InterruptedException {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("zpath=" + path + ", flags=" + flagString(flags));
 
         watched.put(path, flags);
@@ -394,7 +398,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
                  * and we will handle them then.
                  */
                 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("No children: "+path);
                 
             }
@@ -436,14 +440,14 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
 
         if (flags == null){ 
          
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("path=" + path + " : Not watched");
 
             return NONE;
 
         }
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("path=" + path + " : " + flagString(flags));
 
         return flags;
@@ -475,7 +479,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
     private void clearWatch(final String path, final int flags)
             throws KeeperException, InterruptedException {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("zpath=" + path + ", flags=" + flagString(flags));
 
         if ((flags & EXISTS) != 0) {
@@ -528,7 +532,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
 
             final int flags = watch(path, child);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("watch? " + zpath + " : flags=" + flagString(flags));
 
             if (flags != 0) {
@@ -579,7 +583,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
             
         }
         
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("path=" + path + ", flags=" + flagString(flags));
 
         if ((flags & EXISTS) != 0) {
@@ -683,7 +687,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
          */
         cancelled = true;
         
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("Cancelling watches: #watched="+watched.size());
         
         final Iterator<Map.Entry<String, Integer>> itr = watched.entrySet()
@@ -710,7 +714,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
                  * cancels this watcher it is NOT connected to zookeeper and
                  */
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("path=" + path + " : " + e);
 
             } catch (SessionExpiredException e) {
@@ -722,7 +726,7 @@ abstract public class HierarchicalZNodeWatcher implements Watcher,
                  * cancels this watcher it is NOT connected to zookeeper and
                  */
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("path=" + path + " : " + e);
 
             } catch (KeeperException e) {

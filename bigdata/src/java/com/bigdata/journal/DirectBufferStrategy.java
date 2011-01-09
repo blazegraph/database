@@ -153,5 +153,11 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
         }
         
     }
+
+    /**
+     * Not needed for directBuffers
+     */
+	public void setNextOffset(long lastOffset) {
+	}
     
 }

@@ -35,6 +35,8 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileLockUtility;
+import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.resources.ResourceManager;
@@ -217,12 +219,22 @@ public interface Options {
 //    String READ_CACHE_MAX_RECORD_SIZE = AbstractJournal.class.getName()+".readCacheMaxRecordSize";
 
     /**
-     * Option may be used to disable the write cache on the
-     * {@link DiskOnlyStrategy}. Generally, this option is only used by some
-     * unit tests to avoid direct buffer allocation using the
+     * Option may be used to disable the {@link WriteCacheService} on the
+     * {@link WORMStrategy}. Generally, this option is only used by some unit
+     * tests to avoid direct buffer allocation using the
      * {@link DirectBufferPool}.
+     * 
+     * @see #DEFAULT_WRITE_CACHE_ENABLED
      */
     String WRITE_CACHE_ENABLED = AbstractJournal.class.getName()+".writeCacheEnabled";
+
+    /**
+     * Option may be used to override the #of {@link WriteCache} buffers which
+     * will be used with a {@link WriteCacheService}.
+     * 
+     * @see #DEFAULT_WRITE_CACHE_BUFFER_COUNT
+     */
+    String WRITE_CACHE_BUFFER_COUNT = AbstractJournal.class.getName()+".writeCacheBufferCount";
     
 //    /**
 //     * An integer property whose value controls the size of the write cache (in
@@ -503,11 +515,18 @@ public interface Options {
 //    String DEFAULT_WRITE_CACHE_CAPACITY = ""+(1 * Bytes.megabyte32);
     
     /**
-     * The {@link DiskOnlyStrategy} write cache is enabled by default.
+     * The {@link WriteCacheService} is enabled by default.
      * 
      * @see #WRITE_CACHE_ENABLED
      */
     String DEFAULT_WRITE_CACHE_ENABLED = "true";
+    
+    /**
+     * The #of {@link WriteCache} buffers used by the {@link WriteCacheService}.
+     * 
+     *  @see #WRITE_CACHE_BUFFER_COUNT
+     */
+    String DEFAULT_WRITE_CACHE_BUFFER_COUNT = "6";
     
     /**
      * The default for {@link #READ_CACHE_CAPACITY}.

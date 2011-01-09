@@ -27,13 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -70,6 +69,7 @@ import com.bigdata.resources.NoSuchStoreException;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.resources.StaleLocatorReason;
+import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
@@ -358,7 +358,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         /*
          * Note: getIndex() sets the listener on the BTree. That listener is
-         * reponsible for putting dirty indices onto the commit list.
+         * responsible for putting dirty indices onto the commit list.
          */
         commitList = new ConcurrentHashMap<String,DirtyListener>(resource.length);
         
@@ -602,14 +602,29 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
             synchronized (name2Addr) {
 
+                /*
+                 * FIXME In order to use shadow allocations, the unisolated
+                 * index MUST be loaded using the IsolatedActionJournal. There
+                 * are two places immediate below where it tests the cache and
+                 * where it loads using the AbstractJournal, both of which are
+                 * not appropriate as they fail to impose the
+                 * IsolatedActionJournal with the consequence that the
+                 * allocation contexts are not isolated.
+                 */
+                
                 // recover from unisolated index cache.
                 btree = name2Addr.getIndexCache(name);
+//                btree = null; // do not use the name2Addr cache.
                 
                 if (btree == null) {
 
+                    final IJournal tmp;
+                    tmp = resourceManager.getLiveJournal();
+//                  tmp = getJournal();// wrap with the IsolatedActionJournal.
+                    
                     // re-load btree from the store.
                     btree = BTree.load(//
-                            resourceManager.getLiveJournal(),//
+                            tmp, // backing store.
                             entry.checkpointAddr,//
                             false// readOnly
                             );
@@ -949,6 +964,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
             l.btree.writeCheckpoint();
 
+            ((IsolatedActionJournal) getJournal()).detachContext();
+            
         }
         
         if(INFO) { 
@@ -1239,7 +1256,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                      * which the operation isolated by that transaction has
                      * requested. Transaction commits are placed into a partial
                      * order to avoid deadlocks where that ordered is determined
-                     * by sorting the resources declared by the tx througout its
+                     * by sorting the resources declared by the tx throughout its
                      * life cycle and the obtaining locks on all of those
                      * resources (in the distributed transaction service) before
                      * the commit may start. This is very similar to how we
@@ -2037,6 +2054,16 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                 // invoke doTask() on AbstractTask with locks.
                 final T ret = delegate.doTask();
 
+                /*
+                 * FIXME If there is an error in the task execution, then for
+                 * RWStore we need to explicitly undo the allocations for the
+                 * B+Tree(s) on which this task wrote. If we do not take this
+                 * step, then the records already written onto the store up to
+                 * that point will never be released if the groupCommit
+                 * succeeds. This is essentially a persistent memory leak on the
+                 * store.
+                 */
+                
                 // checkpoint while holding locks.
                 delegate.checkpointNanoTime = delegate.checkpointTask();
 
@@ -2123,7 +2150,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    class IsolatedActionJournal implements IJournal {
+    class IsolatedActionJournal implements IJournal, IAllocationContext {
         
         private final AbstractJournal delegate;
         private final IResourceLocator resourceLocator;
@@ -2460,21 +2487,48 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.toString(addr);
         }
 
-//        public long unpackAddr(DataInput in) throws IOException {
-//            return delegate.unpackAddr(in);
-//        }
+        public IRootBlockView getRootBlock(long commitTime) {
+            return delegate.getRootBlock(commitTime);
+        }
 
+        public Iterator<IRootBlockView> getRootBlocks(long startTime) {
+            return delegate.getRootBlocks(startTime);
+        }
+
+        /*
+         * IAllocationContext
+         * 
+         * The journal write() and delete() methods are overridden here to use
+         * the IsolatedActionJournal as the IAllocationContext. This causes the
+         * allocations to be scoped to the AbstractTask.
+         */
+        
         public long write(ByteBuffer data) {
-            return delegate.write(data);
+            return delegate.write(data, this);
         }
 
         public long write(ByteBuffer data, long oldAddr) {
-        	return write(data);
+            return delegate.write(data, oldAddr, this);
         }
 
-		public void delete(long addr) {
-			// void
-			
+        public void delete(long addr) {
+            delegate.delete(addr, this);
+        }
+
+//		public void delete(long addr, IAllocationContext context) {
+//			delegate.delete(addr, context);
+//		}
+//
+//		public long write(ByteBuffer data, IAllocationContext context) {
+//			return delegate.write(data, context);
+//		}
+//
+//		public long write(ByteBuffer data, long oldAddr, IAllocationContext context) {
+//			return delegate.write(data, oldAddr, context);
+//		}
+
+		public void detachContext() {
+			delegate.detachContext(this);
 		}
 
     }
@@ -2754,13 +2808,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             throw new UnsupportedOperationException();
         }
         
+        public void delete(long addr) {
+            throw new UnsupportedOperationException();
+        }
+
         /*
          * Methods that delegate directly to the backing journal.
          */
-        
-//        public IKeyBuilder getKeyBuilder() {
-//            return delegate.getKeyBuilder();
-//        }
         
         public int getByteCount(long addr) {
             return delegate.getByteCount(addr);
@@ -2822,10 +2876,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.isStable();
         }
 
-//        public void packAddr(DataOutput out, long addr) throws IOException {
-//            delegate.packAddr(out, addr);
-//        }
-
         public ByteBuffer read(long addr) {
             return delegate.read(addr);
         }
@@ -2842,13 +2892,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.toString(addr);
         }
 
-//        public long unpackAddr(DataInput in) throws IOException {
-//            return delegate.unpackAddr(in);
-//        }
+		public IRootBlockView getRootBlock(long commitTime) {
+			return delegate.getRootBlock(commitTime);
+		}
 
-		public void delete(long addr) {
-			// TODO Auto-generated method stub
-			
+		public Iterator<IRootBlockView> getRootBlocks(long startTime) {
+			return delegate.getRootBlocks(startTime);
 		}
 
     }

@@ -49,6 +49,7 @@ import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.JiniCoreServicesProcessHelper;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.util.LookupStarter;
+import com.bigdata.service.jini.util.LookupStarter;
 import com.sun.jini.start.NonActivatableServiceDescriptor;
 import com.sun.jini.start.ServiceStarter;
 

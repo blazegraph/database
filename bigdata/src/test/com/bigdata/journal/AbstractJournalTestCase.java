@@ -30,6 +30,8 @@ package com.bigdata.journal;
 import java.io.File;
 import java.util.Properties;
 
+import com.bigdata.LRUNexus;
+
 import junit.framework.TestCase;
 
 /**
@@ -87,13 +89,13 @@ abstract public class AbstractJournalTestCase
         
     }
     
-    public void tearDown() throws Exception {
-        
-        super.tearDown();
-        
-        deleteTestFile();
-        
-    }
+//    public void tearDown() throws Exception {
+//        
+//        super.tearDown();
+//        
+//        deleteTestFile();
+//        
+//    }
 
     /**
      * Note: your unit must close the store for delete to work.
@@ -190,7 +192,7 @@ abstract public class AbstractJournalTestCase
         
     }
 
-    final protected Journal getStore(final Properties properties) {
+    protected Journal getStore(final Properties properties) {
         
         return new Journal(properties);
         
@@ -209,6 +211,15 @@ abstract public class AbstractJournalTestCase
      *                re-opened, e.g., from failure to obtain a file lock, etc.
      */
     protected Journal reopenStore(final Journal store) {
+
+        if (LRUNexus.INSTANCE != null) {
+            /*
+             * Drop the record cache for this store on reopen. This makes it
+             * easier to find errors related to a difference in the bytes on the
+             * disk versus the bytes in the record cache.
+             */
+            LRUNexus.INSTANCE.deleteCache(store.getUUID());
+        }
         
         // close the store.
         store.close();

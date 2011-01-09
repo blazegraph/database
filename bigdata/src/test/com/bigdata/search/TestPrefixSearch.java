@@ -36,8 +36,10 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.ProxyTestCase;
 
 /**
- * Unit test for prefix search. Prefix search allows a query "bro" to match
- * "brown" rather than requiring an exact match on the search term(s).
+ * Unit test for prefix and exact match searches. Prefix search allows a query
+ * "bro" to match "brown" rather than requiring an exact match on the search
+ * term(s). Exact match searches should only visit tuples which match the full
+ * length of the token (once encoded as a Unicode sort key).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -148,12 +150,28 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
             }
 
             /*
+             * Search (one term, prefix match on that term in both documents
+             * (the prefix match is an exact match in this case)).
+             */
+            {
+
+                final Hiterator itr = ndx
+                        .search("brown", languageCode, false/* prefixMatch */);
+
+                if (INFO)
+                    log.info("hits:" + itr);
+
+                assertEquals(2, itr.size());
+
+            }
+
+            /*
              * Search (one term, exact match on that term in both documents).
              */
             {
 
                 final Hiterator itr = ndx
-                        .search("brown", languageCode, false/*prefixMatch*/);
+                        .search("brown", languageCode, true/* prefixMatch */);
 
                 if(INFO) log.info("hits:" + itr);
 
@@ -176,13 +194,60 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
             }
 
             /*
+             * Search (one term, no exact match on that term).
+             */
+            {
+
+                final Hiterator itr = ndx
+                        .search("bro", languageCode, false/* prefixMatch */);
+
+                if (INFO)
+                    log.info("hits:" + itr);
+
+                assertEquals(0, itr.size());
+
+            }
+            
+            /*
              * Search (one term, prefix match on that term in one document).
              */
             {
 
-                final Hiterator itr = ndx.search("qui", languageCode);
+                final Hiterator itr = ndx
+                        .search("qui", languageCode, true/* prefixMatch */);
 
-                if(INFO) log.info("hits:" + itr);
+                if (INFO)
+                    log.info("hits:" + itr);
+
+                assertEquals(1, itr.size());
+
+            }
+
+            /*
+             * Search (one term, no exact match on that term).
+             */
+            {
+
+                final Hiterator itr = ndx
+                        .search("qui", languageCode, false/* prefixMatch */);
+
+                if (INFO)
+                    log.info("hits:" + itr);
+
+                assertEquals(0, itr.size());
+
+            }
+
+            /*
+             * Search (one term, exact match on that term in one document).
+             */
+            {
+
+                final Hiterator itr = ndx
+                        .search("quick", languageCode, false/* prefixMatch */);
+
+                if (INFO)
+                    log.info("hits:" + itr);
 
                 assertEquals(1, itr.size());
 

@@ -16,7 +16,6 @@ import org.apache.zookeeper.data.Id;
 
 import com.bigdata.jini.util.ConfigMath;
 
-
 /**
  * Helper class for the {@link ZooKeeper} client configuration.
  * 
@@ -28,10 +27,6 @@ public class ZookeeperClientConfig {
     final static protected Logger log = Logger
             .getLogger(ZookeeperClientConfig.class);
 
-    final static protected boolean INFO = log.isInfoEnabled();
-
-    final static protected boolean DEBUG = log.isDebugEnabled();
-    
     /**
      * Zookeeper client options.
      * 
@@ -147,7 +142,7 @@ public class ZookeeperClientConfig {
                 Ids.OPEN_ACL_UNSAFE.toArray(new ACL[0])//
                 ));
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info(this.toString());
         
     }

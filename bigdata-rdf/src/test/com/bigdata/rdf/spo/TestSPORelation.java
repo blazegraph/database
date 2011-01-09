@@ -30,7 +30,6 @@ package com.bigdata.rdf.spo;
 
 import java.util.Map;
 import java.util.Properties;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;

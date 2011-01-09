@@ -33,7 +33,6 @@ import java.util.Set;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDFS;
-
 import com.bigdata.bop.IConstant;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
