@@ -40,6 +40,7 @@ public final class SystemUtil
     private static final String m_osVersion;
     private static final boolean m_windows;
     private static final boolean m_linux;
+    private static final boolean m_osx;
 
     private static final Logger log = Logger.getLogger(SystemUtil.class);
     
@@ -82,6 +83,7 @@ public final class SystemUtil
         m_cpuInfo = info;
         m_windows = SystemUtil.operatingSystem().startsWith("Windows");
         m_linux = SystemUtil.operatingSystem().startsWith("Linux");
+        m_osx = SystemUtil.operatingSystem().contains("OS X");
         
         if(log.isInfoEnabled()) {
         log.info("architecture: "+m_architecture);
@@ -174,6 +176,12 @@ public final class SystemUtil
     public static final boolean isLinux() {
 
         return m_linux;
+        
+    }
+    
+    public static final boolean isOSX() {
+        
+        return m_osx;
         
     }
 
