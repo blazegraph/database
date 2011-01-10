@@ -78,6 +78,15 @@ public class OptionalJoinGroup extends PipelineOp {
         String SUBQUERY = OptionalJoinGroup.class.getName() + ".subquery";
 
         /**
+         * When <code>true</code> the subquery has optional semantics (if the
+         * subquery fails, the original binding set will be passed along to the
+         * downstream sink anyway).
+         */
+        String OPTIONAL = OptionalJoinGroup.class.getName() + ".optional";
+
+        boolean DEFAULT_OPTIONAL = true;
+        
+        /**
          * The maximum parallelism with which the subqueries will be evaluated
          * (default {@value #DEFAULT_MAX_PARALLEL}). 
          */
@@ -163,6 +172,7 @@ public class OptionalJoinGroup extends PipelineOp {
         private final BOpContext<IBindingSet> context;
 //        private final List<FutureTask<IRunningQuery>> tasks = new LinkedList<FutureTask<IRunningQuery>>();
 //        private final CountDownLatch latch;
+        private final boolean optional;
         private final int nparallel;
         private final PipelineOp subquery;
         private final Executor executor;
@@ -178,6 +188,9 @@ public class OptionalJoinGroup extends PipelineOp {
             this.controllerOp = controllerOp;
             
             this.context = context;
+
+            this.optional = controllerOp.getProperty(Annotations.OPTIONAL,
+                    Annotations.DEFAULT_OPTIONAL);
 
             this.nparallel = controllerOp.getProperty(Annotations.MAX_PARALLEL,
                     Annotations.DEFAULT_MAX_PARALLEL);
@@ -385,7 +398,7 @@ public class OptionalJoinGroup extends PipelineOp {
                     // wait for the subquery.
                     runningQuery.get();
 
-                    if (ncopied == 0L) {
+                    if (ncopied == 0L && optional) {
 
                         /*
                          * Since there were no solutions for the subquery, copy
