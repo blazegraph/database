@@ -27,18 +27,18 @@ import org.openrdf.query.algebra.MathExpr.MathOp;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 
 /**
- * A math expression involving a left and right IVariableOrConstant operand.
+ * A math expression involving a left and right IValueExpression operand.
  */
 final public class MathBOp extends ImmutableBOp 
-		implements IVariableOrConstant<IV> {
+		implements IValueExpression<IV> {
 
     /**
 	 * 
@@ -55,19 +55,6 @@ final public class MathBOp extends ImmutableBOp
 
     }
     
-    final public boolean isVar() {
-        
-        return ((IVariableOrConstant) get(0)).isVar() ||
-        	((IVariableOrConstant) get(1)).isVar();
-        
-    }
-
-    final public boolean isConstant() {
-        
-        return !isVar();
-        
-    }
-
     /**
      * Required deep copy constructor.
      * 
@@ -79,8 +66,8 @@ final public class MathBOp extends ImmutableBOp
         
     }
 
-    public MathBOp(final IVariableOrConstant<IV> left, 
-    		final IVariableOrConstant<IV> right, final MathOp op) {
+    public MathBOp(final IValueExpression<IV> left, 
+    		final IValueExpression<IV> right, final MathOp op) {
 
         super(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op)));
 
@@ -98,12 +85,12 @@ final public class MathBOp extends ImmutableBOp
 //        
 //    }
 
-    public IVariableOrConstant<IV> left() {
-    	return (IVariableOrConstant<IV>) get(0);
+    public IValueExpression<IV> left() {
+    	return (IValueExpression<IV>) get(0);
     }
     
-    public IVariableOrConstant<IV> right() {
-    	return (IVariableOrConstant<IV>) get(1);
+    public IValueExpression<IV> right() {
+    	return (IValueExpression<IV>) get(1);
     }
     
     public MathOp op() {
@@ -133,13 +120,11 @@ final public class MathBOp extends ImmutableBOp
 
     }
     
-    final public boolean equals(final IVariableOrConstant<IV> o) {
+    final public boolean equals(final IValueExpression<IV> o) {
 
         if(!(o instanceof MathBOp)) {
-            
             // incomparable types.
             return false;
-            
         }
         
         return equals((MathBOp) o);
@@ -176,18 +161,6 @@ final public class MathBOp extends ImmutableBOp
 
 	}
 
-    final public IV get() {
-        
-        final IV left = left().get();
-        final IV right = right().get();
-        
-        if (left == null || right == null)
-        	return null;
-        
-        return IVUtility.numericalMath(left, right, op());
-        
-    }
-
     final public IV get(final IBindingSet bindingSet) {
         
         final IV left = left().get(bindingSet);
@@ -198,12 +171,6 @@ final public class MathBOp extends ImmutableBOp
         
         return IVUtility.numericalMath(left, right, op());
 
-    }
-
-    final public String getName() {
-     
-        throw new UnsupportedOperationException();
-        
     }
 
 }

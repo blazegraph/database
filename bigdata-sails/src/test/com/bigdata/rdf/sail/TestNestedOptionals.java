@@ -28,7 +28,7 @@ package com.bigdata.rdf.sail;
 
 import java.util.Collection;
 import java.util.LinkedList;
-import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
@@ -36,19 +36,13 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQueryResult;
-import org.openrdf.query.algebra.Filter;
-import org.openrdf.query.algebra.Join;
-import org.openrdf.query.algebra.LeftJoin;
 import org.openrdf.query.algebra.Projection;
 import org.openrdf.query.algebra.QueryRoot;
-import org.openrdf.query.algebra.SingletonSet;
-import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
-import org.openrdf.query.algebra.ValueExpr;
-import org.openrdf.query.algebra.Var;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.sail.SailRepository;
@@ -57,17 +51,43 @@ import org.openrdf.sail.Sail;
 import org.openrdf.sail.memory.MemoryStore;
 
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.sail.sop.SOp;
+import com.bigdata.rdf.sail.sop.SOpTree;
+import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
+import com.bigdata.rdf.sail.sop.SOpTree.SOpGroups;
+import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
  * Unit tests the optionals aspects of the {@link BigdataSail} implementation.
  * 
+ * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
 public class TestNestedOptionals extends ProxyBigdataSailTestCase {
 
+	/*
+	 * TODO
+	 * 
+	 * 1. arrange sesame operator tree into bigdata predicates with optional
+	 * group specified.
+	 * 
+	 * 2. re-work how constraints are attached - need to be attached to the
+	 * first appearance of a variable within its group, not globally across all
+	 * predicates (constraints are group-local)
+	 * 
+	 * 3. some constraints will be conditional routing op instead of an
+	 * actual constraint on a predicate. this occurs when the variables in
+	 * the constraint do not appear anywhere in the optional group
+	 * 
+	 * 4. need to punt the query if we can't evaluate a filter inside an
+	 * optional group natively, need to recognize this
+	 * 
+	 * 5. 
+	 */
+	
     protected static final Logger log = Logger.getLogger(TestNestedOptionals.class);
 
     protected static final boolean INFO = log.isInfoEnabled();
@@ -305,40 +325,41 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
 
             // get P1 for all T1 and P2 only if also T2
             String query = 
-                "select *\n" +
-                "where {\n" +
-                "  ?s <"+RDF.TYPE+"> <"+T1+"> .\n" +
-                "  ?s <"+P1+"> ?p1 .\n" +
-                "  OPTIONAL {\n" +
-                "    ?s <"+RDF.TYPE+"> <"+T2+"> .\n" +
-                "    ?s <"+P2+"> ?p2 .\n" +
-                "    ?s <"+P3+"> ?p3 .\n" +
-                "  }\n" +
+                "prefix rdf: <"+RDF.NAMESPACE+">" +
+                "prefix bd: <"+BD.NAMESPACE+">" +
+                "select * " +
+                "where { " +
+                "  ?a bd:knows ?b . " +
+                "  optional { " +
+                "    ?b bd:knows ?c . " +
+                "    ?c bd:knows ?d . " +
+                "    filter (?b != bd:Mike) . " +
+                "  } " +
                 "}"; 
 
             final BigdataSailTupleQuery tupleQuery = (BigdataSailTupleQuery) 
                 cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
             tupleQuery.setIncludeInferred(false /* includeInferred */);
             
-//            if (INFO) log.info(tupleQuery.getTupleExpr());
+            if (INFO) log.info(tupleQuery.getTupleExpr());
 //              
-            if (INFO) {
-                final TupleQueryResult result = tupleQuery.evaluate();
-                while (result.hasNext()) {
-                    log.info(result.next());
-                }
-            }
+//            if (INFO) {
+//                final TupleQueryResult result = tupleQuery.evaluate();
+//                while (result.hasNext()) {
+//                    log.info(result.next());
+//                }
+//            }
             
             final QueryRoot root = (QueryRoot) tupleQuery.getTupleExpr();
             final Projection p = (Projection) root.getArg();
-            final LeftJoin leftJoin = (LeftJoin) p.getArg();
-            
-            final List<Op> tails = collectTails(leftJoin);
+            final TupleExpr tupleExpr = p.getArg();
+            final SOpTreeBuilder stb = new SOpTreeBuilder();
+            final SOpTree tree = stb.collectSOps(tupleExpr);
             
             if (INFO) {
                 System.err.println(query);
-                for (Op t : tails) {
-                    System.err.println(t);    
+                for (SOp bop : tree) {
+                    System.err.println(bop);    
                 }
             }
               
@@ -355,7 +376,7 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
 
     }
     
-    public void testNestedOptionals2() throws Exception {
+    private void _testNestedOptionals2() throws Exception {
 
         final BigdataSail sail = getSail();
         sail.initialize();
@@ -439,45 +460,48 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
             String query = 
                 "select *\n" +
                 "where {\n" +
-                "  ?s <"+RDF.TYPE+"> <"+T1+"> .\n" +         // tail=F, group=0
-                "  ?s <"+P0+"> ?p0 .\n" +                    // tail=G, group=0
-                "  ?s <"+P1+"> ?p1 .\n" +                    // tail=H, group=0
-                "  OPTIONAL {\n" +
-                "    ?s <"+RDF.TYPE+"> <"+T4+"> .\n" +       // tail=A, group=1, parent=0
-                "    ?s <"+RDF.TYPE+"> <"+T5+"> .\n" +       // tail=B, group=1, parent=0
-                "    ?s <"+P4+"> ?p4 .\n" +                  // tail=C, group=1, parent=0
-                "    FILTER ( ?p4 > (?p1*?p0+10+20) ) .\n" +                  
-                "    OPTIONAL { ?s <"+P5+"> ?p5 . }\n" +     // tail=D, group=2, parent=1
-                "    OPTIONAL { ?s <"+P6+"> ?p6 . }\n" +     // tail=E, group=3, parent=1
+                "  { " +
+                "    ?s <"+RDF.TYPE+"> <"+T1+"> .\n" +                  		// g = 1, pg = 0
+                
+                "    { ?s <"+P0+"> ?p0 . }\n" +                    					// g = 1, pg = 0
+                "    UNION { ?s <"+P1+"> ?p1 .} \n" +                    					// g = 1, pg = 0
+                "    OPTIONAL {\n" +
+                "      { " +
+                "        ?s <"+RDF.TYPE+"> <"+T4+"> .\n" +       				// g = 3, pg = 2
+                "        ?s <"+RDF.TYPE+"> <"+T5+"> .\n" +       				// g = 3, pg = 2
+                "        ?s <"+P4+"> ?p4 .\n" +                  				// g = 3, pg = 2
+                "        FILTER ( ?p4 > (?p1*?p0+10+20) || !bound(?p4)) .\n" +  // g = 3, pg = 2
+                "        FILTER (!bound(?p4)) .\n" +							// g = 3, pg = 2
+                "        OPTIONAL { ?s <"+P5+"> ?p5 . }\n" +     				// g = 4, pg = 3
+                "        OPTIONAL { ?s <"+P6+"> ?p6 . }\n" +     				// g = 5, pg = 3
+                "      } " +
+                "      UNION " +												// g = 2, pg = 1
+                "      { " +
+                "        ?s <"+P2+"> ?p200 . " +								// g = 6, pg = 2
+                "      }\n" + 
+                "    }\n" +
+                "    OPTIONAL {\n" +
+                "      ?s <"+RDF.TYPE+"> <"+T2+"> .\n" +       					// g = 7, pg = 1
+                "      ?s <"+RDF.TYPE+"> <"+T3+"> .\n" +      				 	// g = 7, pg = 1
+                "      ?s <"+P2+"> ?p2 .\n" +                  					// g = 7, pg = 1
+                "      OPTIONAL { ?s <"+P3+"> ?p3 . }\n" +     					// g = 8, pg = 7
+                "    }\n" +
+                "  } " +
+                "  UNION " +													// g = 0
+                "  {" +
+                "    ?s <"+RDF.TYPE+"> <"+RDFS.RESOURCE+"> .\n" +       		// g = 2, pg = 0
                 "  }\n" +
-                "  OPTIONAL {\n" +
-                "    ?s <"+RDF.TYPE+"> <"+T2+"> .\n" +       // tail=I, group=4, parent=0
-                "    ?s <"+RDF.TYPE+"> <"+T3+"> .\n" +       // tail=J, group=4, parent=0
-                "    ?s <"+P2+"> ?p2 .\n" +                  // tail=K, group=4, parent=0
-                "    OPTIONAL { ?s <"+P3+"> ?p3 . }\n" +     // tail=L, group=5, parent=4
+                "  UNION " +													// g = 0
+                "  {" +
+                "    ?s <"+RDF.TYPE+"> <"+RDF.PROPERTY+"> .\n" +       		    // g = 2, pg = 0
                 "  }\n" +
                 "}";
             
-            /*
-             *  1: F
-             *  2: G
-             *  3: H
-             *  4: A, goto=9
-             *  5: B, goto=9
-             *  6: C, goto=9
-             *  7: D, goto=8
-             *  8: E, goto=9
-             *  9: I, goto=end
-             *  10: J, goto=end
-             *  11: K, goto=end
-             *  12: L, goto=end
-             */
-
-            final BigdataSailTupleQuery tupleQuery = (BigdataSailTupleQuery) 
+          final BigdataSailTupleQuery tupleQuery = (BigdataSailTupleQuery) 
                 cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
             tupleQuery.setIncludeInferred(false /* includeInferred */);
             
-//            if (INFO) log.info(tupleQuery.getTupleExpr());
+            if (INFO) log.info(tupleQuery.getTupleExpr());
             
 //            if (INFO) {
 //                final TupleQueryResult result = tupleQuery.evaluate();
@@ -488,17 +512,36 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
             
             final QueryRoot root = (QueryRoot) tupleQuery.getTupleExpr();
             final Projection p = (Projection) root.getArg();
-            final LeftJoin leftJoin = (LeftJoin) p.getArg();
-            
-            final List<Op> tails = collectTails(leftJoin);
+            final TupleExpr tupleExpr = p.getArg();
+            final SOpTreeBuilder stb = new SOpTreeBuilder();
+            final SOpTree tree = stb.collectSOps(tupleExpr);
             
             if (INFO) {
                 System.err.println(query);
-                for (Op t : tails) {
-                    System.err.println(t);    
+                for (SOp bop : tree) {
+                    System.err.println(bop);    
+                }
+                
+                for (Map.Entry<Integer, SOpGroup> e : tree.allGroups.entrySet()) {
+                	final SOpGroup g = e.getValue();
+                	System.err.println(e.getKey() + ": g=" + g.getGroup() + " pg=" + g.getParentGroup());
+                	for (SOp sop : e.getValue()) {
+                		System.err.println("  " + sop);
+                	}
+                }
+                for (Map.Entry<Integer, SOpGroup> e : tree.parents.entrySet()) {
+                	System.err.println(e.getKey() + ": " + e.getValue().getGroup());
+                }
+                for (Map.Entry<Integer, SOpGroups> e : tree.children.entrySet()) {
+                	final SOpGroups groups = e.getValue();
+                	StringBuilder sb = new StringBuilder();
+                	for (SOpGroup g : groups) {
+                		sb.append(g.getGroup()).append(", ");
+                	}
+                	sb.setLength(sb.length()-2);
+                	System.err.println(e.getKey() + ": {" + sb.toString() + "}");
                 }
             }
-                
             
             final Collection<BindingSet> answer = new LinkedList<BindingSet>();
             answer.add(createBindingSet());
@@ -513,278 +556,5 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
 
     }
     
-    private List<Op> collectTails(final LeftJoin root) {
-    
-        final List<Op> tails = new LinkedList<Op>();
-        
-        log.info("\n"+root);
-
-        collectTails(tails, root, false, 0, -1);
-        
-        return tails;
-        
-    }
-    
-    private int group = 0;
-    public int getNextGroupId() {
-        return ++group;
-    }
-    
-    private void collectTails(final List<Op> tails, final LeftJoin leftJoin, 
-            final boolean rslj, final int g, final int pg) {
-        
-        final ValueExpr ve = leftJoin.getCondition();
-        // conditional for tails in this group
-        if (ve != null) {
-        	final Constraint c = new Constraint(ve);
-        	c.setGroup(g);
-        	c.setParentGroup(pg);
-        	tails.add(c);
-        }
-        
-        final TupleExpr left = leftJoin.getLeftArg();
-        
-        if (left instanceof StatementPattern) {
-            collectTails(tails, (StatementPattern) left, rslj, g, pg);
-        } else if (left instanceof Filter) {
-            collectTails(tails, (Filter) left, rslj, g, pg);
-        } else if (left instanceof Join) {
-            collectTails(tails, (Join) left, rslj, g, pg);
-        } else if (left instanceof LeftJoin) {
-            collectTails(tails, (LeftJoin) left, rslj, g, pg);
-        } else if (left instanceof SingletonSet){
-            // do nothing
-        } else {
-            throw new RuntimeException();
-        }
-        
-        final TupleExpr right = leftJoin.getRightArg();
-        
-        if (right instanceof StatementPattern) {
-            collectTails(tails, (StatementPattern) right, true, getNextGroupId(), g);
-        } else if (right instanceof Filter) {
-            collectTails(tails, (Filter) right, true, getNextGroupId(), g);
-        } else if (right instanceof Join) {
-            collectTails(tails, (Join) right, true, getNextGroupId(), g);
-        } else if (right instanceof LeftJoin) {
-            if (left instanceof SingletonSet)
-                collectTails(tails, (LeftJoin) right, true, g, pg);
-            else
-                collectTails(tails, (LeftJoin) right, true, getNextGroupId(), g);
-        } else {
-            throw new RuntimeException();
-        }
-        
-    }
-    
-    private void collectTails(final List<Op> tails, final Join join, 
-            final boolean rslj, final int g, final int pg) {
-        
-        final TupleExpr left = join.getLeftArg();
-        
-        if (left instanceof StatementPattern) {
-            collectTails(tails, (StatementPattern) left, rslj, g, pg);
-        } else if (left instanceof Filter) {
-            collectTails(tails, (Filter) left, rslj, g, pg);
-        } else if (left instanceof Join) {
-            collectTails(tails, (Join) left, rslj, g, pg);
-        } else if (left instanceof LeftJoin) {
-            collectTails(tails, (LeftJoin) left, rslj, getNextGroupId(), g);
-        } else {
-            throw new RuntimeException();
-        }
-        
-        final TupleExpr right = join.getRightArg();
-        
-        if (right instanceof StatementPattern) {
-            collectTails(tails, (StatementPattern) right, rslj, g, pg);
-        } else if (right instanceof Filter) {
-            collectTails(tails, (Filter) right, rslj, g, pg);
-        } else if (right instanceof Join) {
-            collectTails(tails, (Join) right, rslj, g, pg);
-        } else if (right instanceof LeftJoin) {
-            collectTails(tails, (LeftJoin) right, rslj, getNextGroupId(), g);
-        } else {
-            throw new RuntimeException();
-        }
-        
-    }
-    
-    private void collectTails(final List<Op> tails, final Filter filter, 
-            final boolean rslj, final int g, final int pg) {
-        
-        final ValueExpr ve = filter.getCondition();
-        // make a constraint, attach it to the rule
-        if (ve != null) {
-        	final Constraint c = new Constraint(ve);
-        	c.setGroup(g);
-        	c.setParentGroup(pg);
-        	tails.add(c);
-        }
-        
-        final TupleExpr arg = filter.getArg();
-
-        if (arg instanceof StatementPattern) {
-            collectTails(tails, (StatementPattern) arg, rslj, g, pg);
-        } else if (arg instanceof Filter) {
-            collectTails(tails, (Filter) arg, rslj, g, pg);
-        } else if (arg instanceof Join) {
-            collectTails(tails, (Join) arg, rslj, g, pg);
-        } else if (arg instanceof LeftJoin) {
-            collectTails(tails, (LeftJoin) arg, rslj, getNextGroupId(), g);
-        } else {
-            throw new RuntimeException();
-        }
-        
-    }
-    
-    private void collectTails(final List<Op> tails, final StatementPattern sp, 
-            final boolean rslj, final int g, final int pg) {
-
-        final Tail t = new Tail(sp);
-        t.setGroup(g);
-        t.setParentGroup(pg);
-        t.setOptional(rslj);
-        tails.add(t);
-        
-    }
-    
-    private static interface Op {
-    	
-    	void setGroup(int g);
-    	
-    	int getGroup();
-    	
-    	void setParentGroup(int pg);
-    	
-    	int getParentGroup();
-    	
-    }
-    
-    private static class Tail implements Op {
-        
-        private StatementPattern sp;
-        
-        private int group, parent;
-        
-        private boolean optional;
-        
-        public Tail(StatementPattern sp) {
-            
-            this.sp = sp;
-            
-        }
-        
-        public void setGroup(final int group) {
-            
-            this.group = group;
-            
-        }
-        
-        public int getGroup() {
-            
-            return group;
-            
-        }
-        
-        public void setParentGroup(final int parent) {
-            
-            this.parent = parent;
-            
-        }
-        
-        public int getParentGroup() {
-            
-            return parent;
-            
-        }
-        
-        public void setOptional(final boolean optional) {
-            
-            this.optional = optional;
-            
-        }
-        
-        public boolean getOptional() {
-            
-            return optional;
-            
-        }
-        
-        public String toString() {
-
-            StringBuilder sb = new StringBuilder();
-            
-            sb.append("Tail: optional=").append(optional);
-            sb.append(", group=").append(group);
-            sb.append(", parent=").append(parent);
-            sb.append(", (");
-            sb.append(toString(sp.getSubjectVar())).append(" ");
-            sb.append(toString(sp.getPredicateVar())).append(" ");
-            sb.append(toString(sp.getObjectVar())).append(")");
-            
-            return sb.toString();
-            
-        }
-        
-        private String toString(Var v) {
-            
-            return v.hasValue() ? 
-                    v.getValue().stringValue().substring(v.getValue().stringValue().indexOf('#')) 
-                    : "?"+v.getName();
-            
-        }
-        
-    }
-    
-    private static class Constraint implements Op {
-        
-        private ValueExpr ve;
-        
-        private int group, parent;
-        
-        public Constraint(ValueExpr ve) {
-            
-            this.ve = ve;
-            
-        }
-        
-        public void setGroup(final int group) {
-            
-            this.group = group;
-            
-        }
-        
-        public int getGroup() {
-            
-            return group;
-            
-        }
-        
-        public void setParentGroup(final int parent) {
-            
-            this.parent = parent;
-            
-        }
-        
-        public int getParentGroup() {
-            
-            return parent;
-            
-        }
-        
-        public String toString() {
-
-            StringBuilder sb = new StringBuilder();
-            
-            sb.append("Constraint: group=").append(group);
-            sb.append(", parent=").append(parent);
-            sb.append(", filter=").append(ve);
-            
-            return sb.toString();
-            
-        }
-        
-    }
     
 }

@@ -37,7 +37,7 @@ import java.io.Serializable;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IVariableOrConstant<E> extends BOp, Serializable {
+public interface IVariableOrConstant<E> extends IValueExpression<E> {
 
     /**
      * Return <code>true</code> iff this is a variable.
@@ -63,24 +63,6 @@ public interface IVariableOrConstant<E> extends BOp, Serializable {
      */
     E get();
 
-    /**
-     * Return the <i>as bound</i> value of the variable or constant. The <i>as
-     * bound</i> value of an {@link IConstant} is the contant's value. The <i>as
-     * bound</i> value of an {@link IVariable} is the bound value in the given
-     * {@link IBindingSet} -or- <code>null</code> if the variable is not bound
-     * in the {@link IBindingSet}.
-     * 
-     * @param bindingSet
-     *            The binding set.
-     * 
-     * @return The as bound value of the constant or variable.
-     * 
-     * @throws IllegalArgumentException
-     *             if this is an {@link IVariable} and the <i>bindingSet</i> is
-     *             <code>null</code>.
-     */
-    E get(IBindingSet bindingSet);
-    
     /**
      * Return the name of a variable.
      * 

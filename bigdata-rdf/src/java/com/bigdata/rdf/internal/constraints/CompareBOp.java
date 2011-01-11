@@ -30,6 +30,7 @@ import org.openrdf.query.algebra.Compare.CompareOp;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
@@ -73,8 +74,8 @@ public class CompareBOp extends BOpConstraint {
         super(op);
     }
 
-    public CompareBOp(final IVariableOrConstant<IV> left, 
-    		final IVariableOrConstant<IV> right, final CompareOp op) {
+    public CompareBOp(final IValueExpression<IV> left, 
+    		final IValueExpression<IV> right, final CompareOp op) {
     	
         super(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op)));
         
@@ -85,8 +86,8 @@ public class CompareBOp extends BOpConstraint {
     
     public boolean accept(final IBindingSet s) {
         
-    	final IV left = ((IVariableOrConstant<IV>) get(0)).get(s);
-    	final IV right = ((IVariableOrConstant<IV>) get(1)).get(s);
+    	final IV left = ((IValueExpression<IV>) get(0)).get(s);
+    	final IV right = ((IValueExpression<IV>) get(1)).get(s);
 
     	if (left == null || right == null)
             return true; // not yet bound.

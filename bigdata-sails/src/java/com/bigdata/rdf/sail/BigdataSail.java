@@ -3244,12 +3244,14 @@ public class BigdataSail extends SailBase implements Sail {
                 dataset = (Dataset) newVals[0];
                 bindings = (BindingSet) newVals[1];
 
-            final TripleSource tripleSource = new BigdataTripleSource(this,
-                    includeInferred);
+            final BigdataTripleSource tripleSource = 
+            	new BigdataTripleSource(this, includeInferred);
 
-            final BigdataEvaluationStrategyImpl strategy = new BigdataEvaluationStrategyImpl(
-                    (BigdataTripleSource) tripleSource, dataset,
-                    nativeJoins, starJoins, database.isInlineLiterals());
+            final BigdataEvaluationStrategyImpl strategy = 
+            	new BigdataEvaluationStrategyImpl(
+            			tripleSource, dataset, nativeJoins 
+            			,starJoins, database.isInlineLiterals()
+            			);
 
             final QueryOptimizerList optimizerList = new QueryOptimizerList();
             optimizerList.add(new BindingAssigner());
@@ -3325,12 +3327,14 @@ public class BigdataSail extends SailBase implements Sail {
                 dataset = (Dataset) newVals[0];
                 bindings = (BindingSet) newVals[1];
 
-                final TripleSource tripleSource = new BigdataTripleSource(this,
-                        includeInferred);
+                final BigdataTripleSource tripleSource = 
+                	new BigdataTripleSource(this, includeInferred);
 
-                final BigdataEvaluationStrategyImpl strategy = new BigdataEvaluationStrategyImpl(
-                        (BigdataTripleSource) tripleSource, dataset,
-                        nativeJoins, starJoins, database.isInlineLiterals());
+                final BigdataEvaluationStrategyImpl strategy = 
+                	new BigdataEvaluationStrategyImpl(
+                        tripleSource, dataset, nativeJoins
+            			,starJoins, database.isInlineLiterals()
+                        );
 
                 final QueryOptimizerList optimizerList = new QueryOptimizerList();
                 optimizerList.add(new BindingAssigner());
