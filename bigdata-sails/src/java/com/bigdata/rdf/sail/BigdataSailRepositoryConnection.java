@@ -51,7 +51,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     
     @Override
     public BigdataSailConnection getSailConnection() {
-        return (BigdataSailConnection)super.getSailConnection();
+    	return (BigdataSailConnection)super.getSailConnection();
     }
     
     /**

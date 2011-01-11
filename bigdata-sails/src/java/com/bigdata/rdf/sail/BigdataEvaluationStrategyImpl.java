@@ -1607,10 +1607,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             if (iv == null)
             	return null;
         	iv1 = new Constant<IV>(iv);
-        } else if (left instanceof MathExpr) {
-        	iv1 = generateMath((MathExpr) left);
-        	if (iv1 == null)
-        		return null;
+//        } else if (left instanceof MathExpr) {
+//        	iv1 = generateMath((MathExpr) left);
+//        	if (iv1 == null)
+//        		return null;
         } else {
             return null;
         }
@@ -1622,10 +1622,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             if (iv == null)
             	return null;
         	iv2 = new Constant<IV>(iv);
-        } else if (right instanceof MathExpr) {
-        	iv2 = generateMath((MathExpr) right);
-        	if (iv2 == null)
-        		return null;	
+//        } else if (right instanceof MathExpr) {
+//        	iv2 = generateMath((MathExpr) right);
+//        	if (iv2 == null)
+//        		return null;	
         } else {
             return null;
         }
@@ -1648,10 +1648,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             if (iv == null)
             	return null;
         	iv1 = new Constant<IV>(iv);
-        } else if (left instanceof MathExpr) {
-        	iv1 = generateMath((MathExpr) left);
-        	if (iv1 == null)
-        		return null;
+//        } else if (left instanceof MathExpr) {
+//        	iv1 = generateMath((MathExpr) left);
+//        	if (iv1 == null)
+//        		return null;
         } else {
             return null;
         }
@@ -1663,10 +1663,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             if (iv == null)
             	return null;
         	iv2 = new Constant<IV>(iv);
-        } else if (right instanceof MathExpr) {
-        	iv2 = generateMath((MathExpr) right);
-        	if (iv2 == null)
-        		return null;	
+//        } else if (right instanceof MathExpr) {
+//        	iv2 = generateMath((MathExpr) right);
+//        	if (iv2 == null)
+//        		return null;	
         } else {
             return null;
         }
