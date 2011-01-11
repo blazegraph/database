@@ -345,8 +345,8 @@ public class TestOptionalJoinGroup extends TestCase2 {
         final PipelineOp joinGroup1Op = new OptionalJoinGroup(new BOp[]{join1Op}, 
                 new NV(Predicate.Annotations.BOP_ID, joinGroup1),//
 //                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-                new NV(OptionalJoinGroup.Annotations.SUBQUERY, subQuery),//
-                new NV(BOp.Annotations.CONTROLLER,true)//
+                new NV(OptionalJoinGroup.Annotations.SUBQUERY, subQuery)//
+//                , new NV(BOp.Annotations.CONTROLLER,true)//
 //                new NV(BOp.Annotations.EVALUATION_CONTEXT,
 //                        BOpEvaluationContext.CONTROLLER)//
 //                // join is optional.
@@ -610,8 +610,8 @@ public class TestOptionalJoinGroup extends TestCase2 {
         final PipelineOp joinGroup1Op = new OptionalJoinGroup(new BOp[]{join1Op}, 
                 new NV(Predicate.Annotations.BOP_ID, joinGroup1),//
 //                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-                new NV(OptionalJoinGroup.Annotations.SUBQUERY, subQuery),//
-                new NV(BOp.Annotations.CONTROLLER,true)//
+                new NV(OptionalJoinGroup.Annotations.SUBQUERY, subQuery)//
+//                new NV(BOp.Annotations.CONTROLLER,true)//
 //                new NV(BOp.Annotations.EVALUATION_CONTEXT,
 //                        BOpEvaluationContext.CONTROLLER)//
 //                // join is optional.
@@ -871,8 +871,8 @@ public class TestOptionalJoinGroup extends TestCase2 {
         final PipelineOp joinGroup1Op = new OptionalJoinGroup(new BOp[]{condOp}, 
                 new NV(Predicate.Annotations.BOP_ID, joinGroup1),//
 //                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-                new NV(OptionalJoinGroup.Annotations.SUBQUERY, subQuery),//
-                new NV(BOp.Annotations.CONTROLLER,true)//
+                new NV(OptionalJoinGroup.Annotations.SUBQUERY, subQuery)//
+//                new NV(BOp.Annotations.CONTROLLER,true)//
 //                new NV(BOp.Annotations.EVALUATION_CONTEXT,
 //                        BOpEvaluationContext.CONTROLLER)//
 //                // join is optional.

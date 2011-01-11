@@ -129,8 +129,8 @@ public class OptionalJoinGroup extends PipelineOp {
 
         getRequiredProperty(Annotations.SUBQUERY);
         
-        if (!getProperty(Annotations.CONTROLLER, Annotations.DEFAULT_CONTROLLER))
-            throw new IllegalArgumentException(Annotations.CONTROLLER);
+//        if (!getProperty(Annotations.CONTROLLER, Annotations.DEFAULT_CONTROLLER))
+//            throw new IllegalArgumentException(Annotations.CONTROLLER);
         
 //        // The id of this operator (if any).
 //        final Integer thisId = (Integer)getProperty(Annotations.BOP_ID);
