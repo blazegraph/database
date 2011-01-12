@@ -92,16 +92,13 @@ public class CompareBOp extends BOpConstraint {
     	if (left == null || right == null)
             return true; // not yet bound.
 
-    	if (IVUtility.canNumericalCompare(left) &&
-    			IVUtility.canNumericalCompare(right)) {
-    		
-    		return _accept(IVUtility.numericalCompare(left, right));
-	        
-    	} else {
-    		
-    		return _accept(left.compareTo(right));
-    		
-    	}
+    	if (!IVUtility.canNumericalCompare(left))
+        	throw new NotNumericalException("cannot numerical compare: " + left);
+    	
+    	if (!IVUtility.canNumericalCompare(right))
+        	throw new NotNumericalException("cannot numerical compare: " + right);
+    	
+		return _accept(IVUtility.numericalCompare(left, right));
     	
     }
     
@@ -125,6 +122,31 @@ public class CompareBOp extends BOpConstraint {
     	default:
     		throw new UnsupportedOperationException();
     	}
+    	
+    }
+    
+    public static class NotNumericalException extends RuntimeException {
+
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = -8853739187628588335L;
+
+		public NotNumericalException() {
+			super();
+		}
+
+		public NotNumericalException(String s, Throwable t) {
+			super(s, t);
+		}
+
+		public NotNumericalException(String s) {
+			super(s);
+		}
+
+		public NotNumericalException(Throwable t) {
+			super(t);
+		}
     	
     }
     

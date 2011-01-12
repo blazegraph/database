@@ -61,7 +61,7 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class OptionalJoinGroup extends PipelineOp {
+public class SubqueryOp extends PipelineOp {
 
     /**
      * 
@@ -72,25 +72,25 @@ public class OptionalJoinGroup extends PipelineOp {
 
         /**
          * The subquery to be evaluated for each binding sets presented to the
-         * {@link OptionalJoinGroup} (required). This should be a
+         * {@link SubqueryOp} (required). This should be a
          * {@link PipelineOp}.
          */
-        String SUBQUERY = OptionalJoinGroup.class.getName() + ".subquery";
+        String SUBQUERY = SubqueryOp.class.getName() + ".subquery";
 
         /**
          * When <code>true</code> the subquery has optional semantics (if the
          * subquery fails, the original binding set will be passed along to the
          * downstream sink anyway).
          */
-        String OPTIONAL = OptionalJoinGroup.class.getName() + ".optional";
+        String OPTIONAL = SubqueryOp.class.getName() + ".optional";
 
-        boolean DEFAULT_OPTIONAL = true;
+        boolean DEFAULT_OPTIONAL = false;
         
         /**
          * The maximum parallelism with which the subqueries will be evaluated
          * (default {@value #DEFAULT_MAX_PARALLEL}). 
          */
-        String MAX_PARALLEL = OptionalJoinGroup.class.getName()
+        String MAX_PARALLEL = SubqueryOp.class.getName()
                 + ".maxParallel";
 
         int DEFAULT_MAX_PARALLEL = 1;
@@ -108,7 +108,7 @@ public class OptionalJoinGroup extends PipelineOp {
     /**
      * Deep copy constructor.
      */
-    public OptionalJoinGroup(final OptionalJoinGroup op) {
+    public SubqueryOp(final SubqueryOp op) {
         super(op);
     }
     
@@ -118,7 +118,7 @@ public class OptionalJoinGroup extends PipelineOp {
      * @param args
      * @param annotations
      */
-    public OptionalJoinGroup(final BOp[] args,
+    public SubqueryOp(final BOp[] args,
             final Map<String, Object> annotations) {
 
         super(args, annotations);
@@ -147,7 +147,7 @@ public class OptionalJoinGroup extends PipelineOp {
 
     }
 
-    public OptionalJoinGroup(final BOp[] args, NV... annotations) {
+    public SubqueryOp(final BOp[] args, NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
@@ -168,7 +168,7 @@ public class OptionalJoinGroup extends PipelineOp {
      */
     private static class ControllerTask implements Callable<Void> {
 
-        private final OptionalJoinGroup controllerOp;
+        private final SubqueryOp controllerOp;
         private final BOpContext<IBindingSet> context;
 //        private final List<FutureTask<IRunningQuery>> tasks = new LinkedList<FutureTask<IRunningQuery>>();
 //        private final CountDownLatch latch;
@@ -177,7 +177,7 @@ public class OptionalJoinGroup extends PipelineOp {
         private final PipelineOp subquery;
         private final Executor executor;
         
-        public ControllerTask(final OptionalJoinGroup controllerOp, final BOpContext<IBindingSet> context) {
+        public ControllerTask(final SubqueryOp controllerOp, final BOpContext<IBindingSet> context) {
 
             if (controllerOp == null)
                 throw new IllegalArgumentException();

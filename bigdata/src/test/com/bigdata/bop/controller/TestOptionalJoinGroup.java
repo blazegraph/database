@@ -219,7 +219,7 @@ public class TestOptionalJoinGroup extends TestCase2 {
     /**
      * Unit test for optional join group. Three joins are used and target a
      * {@link SliceOp}. The 2nd and 3rd joins are embedded in an
-     * {@link OptionalJoinGroup}.
+     * {@link SubqueryOp}.
      * <P>
      * The optional join group takes the form:
      * 
@@ -342,10 +342,10 @@ public class TestOptionalJoinGroup extends TestCase2 {
         subQuery = join3Op;
         }
 
-        final PipelineOp joinGroup1Op = new OptionalJoinGroup(new BOp[]{join1Op}, 
+        final PipelineOp joinGroup1Op = new SubqueryOp(new BOp[]{join1Op}, 
                 new NV(Predicate.Annotations.BOP_ID, joinGroup1),//
 //                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-                new NV(OptionalJoinGroup.Annotations.SUBQUERY, subQuery)//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subQuery)//
 //                , new NV(BOp.Annotations.CONTROLLER,true)//
 //                new NV(BOp.Annotations.EVALUATION_CONTEXT,
 //                        BOpEvaluationContext.CONTROLLER)//
@@ -607,10 +607,10 @@ public class TestOptionalJoinGroup extends TestCase2 {
 		subQuery = join3Op;
         }
         
-        final PipelineOp joinGroup1Op = new OptionalJoinGroup(new BOp[]{join1Op}, 
+        final PipelineOp joinGroup1Op = new SubqueryOp(new BOp[]{join1Op}, 
                 new NV(Predicate.Annotations.BOP_ID, joinGroup1),//
 //                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-                new NV(OptionalJoinGroup.Annotations.SUBQUERY, subQuery)//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subQuery)//
 //                new NV(BOp.Annotations.CONTROLLER,true)//
 //                new NV(BOp.Annotations.EVALUATION_CONTEXT,
 //                        BOpEvaluationContext.CONTROLLER)//
@@ -717,7 +717,7 @@ public class TestOptionalJoinGroup extends TestCase2 {
     /**
      * Unit test for optional join group with a filter on a variable outside the
      * optional join group. Three joins are used and target a {@link SliceOp}.
-     * The 2nd and 3rd joins are in embedded an {@link OptionalJoinGroup}. The
+     * The 2nd and 3rd joins are in embedded an {@link SubqueryOp}. The
      * optional join group contains a filter that uses a variable outside the
      * optional join group.
      * <P>
@@ -868,10 +868,10 @@ public class TestOptionalJoinGroup extends TestCase2 {
         subQuery = join3Op;
         }
         
-        final PipelineOp joinGroup1Op = new OptionalJoinGroup(new BOp[]{condOp}, 
+        final PipelineOp joinGroup1Op = new SubqueryOp(new BOp[]{condOp}, 
                 new NV(Predicate.Annotations.BOP_ID, joinGroup1),//
 //                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-                new NV(OptionalJoinGroup.Annotations.SUBQUERY, subQuery)//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subQuery)//
 //                new NV(BOp.Annotations.CONTROLLER,true)//
 //                new NV(BOp.Annotations.EVALUATION_CONTEXT,
 //                        BOpEvaluationContext.CONTROLLER)//

@@ -39,7 +39,6 @@ import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.StatementPattern;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IConstraint;
@@ -48,7 +47,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.bop.controller.OptionalJoinGroup;
+import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.rdf.sail.Rule2BOpUtility;
@@ -67,22 +66,23 @@ public class SOp2BOpUtility {
     		final AtomicInteger idFactory, final AbstractTripleStore db,
     		final QueryEngine queryEngine, final Properties queryHints) {
     	
+    	if (log.isDebugEnabled()) {
+    		log.debug("converting:\n" + sopTree);
+    	}
+
     	final SOpGroup root = sopTree.getRoot();
-    	return convert(sopTree, root, idFactory, db, queryEngine, queryHints);
+    	return convert(root, idFactory, db, queryEngine, queryHints);
     	
     }
     
-    public static PipelineOp convert(
-    		final SOpTree sopTree, final SOpGroup sopGroup, 
+    public static PipelineOp convert(final SOpGroup sopGroup, 
     		final AtomicInteger idFactory, final AbstractTripleStore db,
     		final QueryEngine queryEngine, final Properties queryHints) {
     
     	if (isUnion(sopGroup)) {
-    		return union(sopTree, sopGroup, idFactory, db, queryEngine, 
-    				queryHints);
-    	} else {
-			return join(sopTree, sopGroup, idFactory, db, queryEngine,
-					queryHints);
+			return union(sopGroup, idFactory, db, queryEngine, queryHints);
+		} else {
+			return join(sopGroup, idFactory, db, queryEngine, queryHints);
     	}
     	
     }
@@ -106,10 +106,9 @@ public class SOp2BOpUtility {
      * optional tails get placed in their own singleton subgroup without any
      * child subgroups of their own, and always on the right side of a LeftJoin.
      */
-    private static boolean isSingleOptional(
-    		final SOpTree tree, final SOpGroup sopGroup) {
+    private static boolean isSingleOptional(final SOpGroup sopGroup) {
 
-    	if (sopGroup.size() == 1 && tree.getChildren(sopGroup) == null) {
+    	if (sopGroup.size() == 1 && sopGroup.getChildren() == null) {
     		final SOp sop = sopGroup.getSingletonSOp();
     		return (sop.getOperator() instanceof StatementPattern) &&
     			sop.isRightSideLeftJoin();
@@ -123,7 +122,6 @@ public class SOp2BOpUtility {
     	if (sopGroup.size() == 0) {
     		throw new IllegalArgumentException();
     	}
-    	
     	final SOp sop = sopGroup.iterator().next();
     	return sop.isRightSideLeftJoin();
     	
@@ -153,8 +151,7 @@ public class SOp2BOpUtility {
     }
     
 
-    protected static PipelineOp join(
-    		final SOpTree tree, final SOpGroup join, 
+    protected static PipelineOp join(final SOpGroup join, 
             final AtomicInteger idFactory, final AbstractTripleStore db,
             final QueryEngine queryEngine, final Properties queryHints) {
 
@@ -166,92 +163,73 @@ public class SOp2BOpUtility {
     	final Collection<IConstraint> conditionals = 
     		new LinkedList<IConstraint>();
     	
-    	final IRule rule = rule(tree, join, conditionals);
+    	final IRule rule = rule(join, conditionals);
     	
     	final PipelineOp joinGroup = Rule2BOpUtility.convert(
-    			rule, idFactory, db, queryEngine, queryHints);
-    	
-    	/*
-    	 * Figure out how to use my conditionals to create ConditionalRoutingOps
-    	 * that go around the joinGroup (and its subqueries).
-    	 */
-    	// HELP ME!
+    			rule, conditionals, idFactory, db, queryEngine, queryHints);
     	
     	/*
     	 * Start with left=<this join group> and add a SubqueryOp for each
     	 * sub group.
     	 */
     	PipelineOp left = joinGroup;
-    	for (SOpGroup child : tree.getChildren(join)) {
-    		if (isSingleOptional(tree, child)) {
-    			// handled by the rule() conversion above
-    			continue;
-    		}
-    		final PipelineOp subquery = convert(
-    				tree, child, idFactory, db, queryEngine, queryHints);
-    		final boolean optional = isOptional(child);
-    		final int subqueryId = idFactory.incrementAndGet();
-    		left = new OptionalJoinGroup(new BOp[]{left}, 
-                    new NV(Predicate.Annotations.BOP_ID, subqueryId),//
-                    new NV(OptionalJoinGroup.Annotations.SUBQUERY, subquery),//
-                    new NV(OptionalJoinGroup.Annotations.OPTIONAL,optional)//
-            );
+    	
+    	final SOpGroups children = join.getChildren();
+    	if (children != null) {
+	    	for (SOpGroup child : join.getChildren()) {
+	    		if (isSingleOptional(child)) {
+	    			// handled by the rule() conversion above
+	    			continue;
+	    		}
+	    		final PipelineOp subquery = convert(
+	    				child, idFactory, db, queryEngine, queryHints);
+	    		final boolean optional = isOptional(child);
+	    		final int subqueryId = idFactory.incrementAndGet();
+	    		left = new SubqueryOp(new BOp[]{left}, 
+	                    new NV(Predicate.Annotations.BOP_ID, subqueryId),//
+	                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
+	                    new NV(SubqueryOp.Annotations.OPTIONAL,optional)//
+	            );
+	    	}
     	}
     
     	return left;
     	
     }
     
-    public static Union union(
-    		final SOpTree sopTree, final SOpGroup union,
+    public static Union union(final SOpGroup union,
             final AtomicInteger idFactory, final AbstractTripleStore db,
             final QueryEngine queryEngine, final Properties queryHints) {
 
-		final SOpGroups children = sopTree.getChildren(union);
-    	
+		final SOpGroups children = union.getChildren();
+		if (children == null) {
+			throw new IllegalArgumentException();
+		}
+		
         // The bopId for the UNION or STEP.
         final int thisId = idFactory.incrementAndGet();
-
         final int arity = children.size();
-
         final BOp[] args = new BOp[arity];
 
         int i = 0;
         for (SOpGroup child : children) {
-
             // convert the child IStep
-            final BOpBase tmp = convert(sopTree, child, idFactory, db, 
-            		queryEngine, queryHints);
-
-            /*
-             * @todo Route binding sets around the UNION/STEPS operator. We need
-             * the id of the parent of the UNION/STEPS operator to do this. This
-             * only matters if the UNION / STEPS operator feeds something which
-             * does not execute on the query controller.
-             */
-//            tmp = tmp.setProperty(PipelineOp.Annotations.SINK_REF, thisId);
-
-            args[i] = tmp;
-            
+			args[i] = convert(child, idFactory, db, queryEngine, queryHints);
         }
         
         final LinkedList<NV> anns = new LinkedList<NV>();
-        
         anns.add(new NV(Union.Annotations.BOP_ID, thisId));
-        
         anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
                 BOpEvaluationContext.CONTROLLER));
-        
         anns.add(new NV(Union.Annotations.CONTROLLER, true));
         
         final Union thisOp = new Union(args, NV
                     .asMap(anns.toArray(new NV[anns.size()])));
-
         return thisOp;
 
     }
 
-    protected static IRule rule(final SOpTree tree, final SOpGroup group,
+    protected static IRule rule(final SOpGroup group,
     		final Collection<IConstraint> conditionals) {
     	
     	final Collection<IPredicate> preds = new LinkedList<IPredicate>();
@@ -262,7 +240,7 @@ public class SOp2BOpUtility {
     	 */
     	final Set<IVariable<?>> variables = new HashSet<IVariable<?>>();
     	SOpGroup parent = group;
-    	while ((parent = group.getParent()) != null) {
+    	while ((parent = parent.getParent()) != null) {
     		if (isNonOptionalJoinGroup(parent))
     			collectPredicateVariables(variables, parent);
     	}
@@ -273,6 +251,10 @@ public class SOp2BOpUtility {
     			preds.add((IPredicate) bop);
     		} else if (bop instanceof IConstraint) {
     			final IConstraint c = (IConstraint) bop;
+    			/*
+    			 * This constraint is a conditional if all of its variables
+    			 * appear in non-optional parent join groups
+    			 */
                 final Iterator<IVariable<?>> vars = 
                 	BOpUtility.getSpannedVariables(c);
                 boolean conditional = true;
@@ -285,7 +267,7 @@ public class SOp2BOpUtility {
     			else
     				constraints.add(c);
     		} else {
-    			throw new IllegalArgumentException("illegal operator: " + bop);
+    			throw new IllegalArgumentException("illegal operator: " + sop);
     		}
     	}
     	
@@ -294,15 +276,20 @@ public class SOp2BOpUtility {
     	 * become single-operator (predicate) join groups without any children
     	 * of their own.
     	 */
-    	for (SOpGroup child : tree.getChildren(group)) {
-    		if (isSingleOptional(tree, child)) {
-    			final SOp sop = child.getSingletonSOp();
-    			final BOp bop = sop.getBOp();
-				final IPredicate pred = (IPredicate) bop.setProperty(
-						IPredicate.Annotations.OPTIONAL, "true");
-				preds.add(pred);
-    		}
+    	final SOpGroups children = group.getChildren();
+    	if (children != null) {
+	    	for (SOpGroup child : group.getChildren()) {
+	    		if (isSingleOptional(child)) {
+	    			final SOp sop = child.getSingletonSOp();
+	    			final BOp bop = sop.getBOp();
+					final IPredicate pred = (IPredicate) bop.setProperty(
+							IPredicate.Annotations.OPTIONAL, "true");
+					preds.add(pred);
+	    		}
+	    	}
     	}
+    	
+    	final IVariable<?>[] required = group.getTree().getRequiredVars();
     	
 		final IRule rule = new Rule(
 				"dummy rule",
@@ -314,7 +301,7 @@ public class SOp2BOpUtility {
 						constraints.toArray(
 								new IConstraint[constraints.size()]) : null,
 				null/* constants */, null/* taskFactory */, 
-				null/* requiredVars */);    	
+				required);    	
     	
 		return rule;
 		

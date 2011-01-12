@@ -59,7 +59,7 @@ public class SOp {
 
         StringBuilder sb = new StringBuilder();
         
-        sb.append("Tail: id=").append(id);
+        sb.append("SOp: id=").append(id);
         sb.append(", rslj=").append(rslj);
         sb.append(", group=").append(group);
         sb.append(", parent=").append(parent);
@@ -72,7 +72,11 @@ public class SOp {
             sb.append(toString(sp.getObjectVar()));
             sb.append(")");
         } else {
-        	sb.append(op.toString().replaceAll("\n", " "));
+        	String s = op.toString().replaceAll("\n", " ");
+        	while (s.contains("  ")) {
+        		s = s.replaceAll("  ", " ");
+        	}
+        	sb.append(s);       	
         }
         
         return sb.toString();

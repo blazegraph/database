@@ -37,8 +37,6 @@ import org.openrdf.query.algebra.MathExpr.MathOp;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.internal.constraints.AbstractInlineConstraint;
-import com.bigdata.rdf.internal.constraints.InlineGT;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 

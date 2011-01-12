@@ -14,6 +14,7 @@ import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueExpr;
 
+import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroups;
 

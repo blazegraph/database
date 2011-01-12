@@ -7,10 +7,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import org.openrdf.query.algebra.StatementPattern;
+import com.bigdata.bop.IVariable;
 
 public class SOpTree implements Iterable<SOp> {
 
+	private IVariable<?>[] required;
+	
 	private final Collection<SOp> sops;
 	
 	public final Map<Integer, SOpGroup> allGroups;
@@ -20,6 +22,11 @@ public class SOpTree implements Iterable<SOp> {
 	public final Map<Integer, SOpGroups> children;
 	
 	public SOpTree(final Collection<SOp> sops) {
+		this(sops, null);
+	}
+	
+	public SOpTree(final Collection<SOp> sops, final IVariable<?>[] required) {
+		this.required = required;
 		this.sops = sops;
 		this.allGroups = new LinkedHashMap<Integer, SOpGroup>();
 		this.parents = new LinkedHashMap<Integer, SOpGroup>();
@@ -87,6 +94,14 @@ public class SOpTree implements Iterable<SOp> {
 	public SOpGroups getChildren(SOpGroup group) {
 		return children.get(group.getGroup());
 	}
+	
+	public void setRequiredVars(final IVariable<?>[] required) {
+		this.required = required;
+	}
+	
+	public IVariable<?>[] getRequiredVars() {
+		return required;
+	}
 
 	public class SOpGroup implements Iterable<SOp> {
 
@@ -134,6 +149,10 @@ public class SOpTree implements Iterable<SOp> {
 			return SOpTree.this.getChildren(this);
 		}
 		
+		public SOpTree getTree() {
+			return SOpTree.this;
+		}
+		
 	}
 
 	public class SOpGroups implements Iterable<SOpGroup> {
@@ -153,6 +172,38 @@ public class SOpTree implements Iterable<SOp> {
 			return groups.size();
 		}
 		
+	}
+	
+	public String toString() {
+        final StringBuilder sb = new StringBuilder();
+        final String nl = System.getProperty("line.separator");
+//        for (SOp sop : sops) {
+//        	sb.append(sop).append(nl);
+//        }
+        sb.append("SOps by group:").append(nl);
+        for (Map.Entry<Integer, SOpGroup> e : this.allGroups.entrySet()) {
+        	final SOpGroup g = e.getValue();
+        	sb.append(e.getKey() + ": g=" + g.getGroup() + " pg=" + g.getParentGroup());
+        	sb.append(nl);
+        	for (SOp sop : e.getValue()) {
+        		sb.append("  " + sop).append(nl);
+        	}
+        }
+        sb.append("SOp -> parent:").append(nl);
+        for (Map.Entry<Integer, SOpGroup> e : this.parents.entrySet()) {
+        	sb.append(e.getKey() + " -> " + e.getValue().getGroup()).append(nl);
+        }
+        sb.append("SOp -> children:").append(nl);
+        for (Map.Entry<Integer, SOpGroups> e : this.children.entrySet()) {
+        	final SOpGroups groups = e.getValue();
+        	StringBuilder sb2 = new StringBuilder();
+        	for (SOpGroup g : groups) {
+        		sb2.append(g.getGroup()).append(", ");
+        	}
+        	sb2.setLength(sb2.length()-2);
+        	sb.append(e.getKey() + " -> {" + sb2.toString() + "}");
+        }
+        return sb.toString();
 	}
 
 }

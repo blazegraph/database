@@ -54,6 +54,7 @@ import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -252,7 +253,8 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * @version $Id: BigdataEvaluationStrategyImpl.java 2272 2009-11-04 02:10:19Z
  *          mrpersonick $
  */
-public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl {
+public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl 
+		implements BigdataEvaluationStrategy {
     
     /**
      * Logger.
@@ -604,6 +606,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl {
     	final IVariable[] required = 
     		gatherRequiredVariables(root, sesameFilters);
     	
+    	sopTree.setRequiredVars(required);
+    	
         final QueryEngine queryEngine = tripleSource.getSail().getQueryEngine();
 
 		final PipelineOp query;
@@ -620,7 +624,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl {
 					queryEngine, queryHints);
 
 			if (log.isInfoEnabled())
-				log.info(query);
+				log.info(BOpUtility.toString(query));
 
 		}
 

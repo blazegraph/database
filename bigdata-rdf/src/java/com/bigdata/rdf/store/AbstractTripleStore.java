@@ -912,7 +912,7 @@ abstract public class AbstractTripleStore extends
         String INLINE_DATE_TIMES = AbstractTripleStore.class.getName()
                 + ".inlineDateTimes";
 
-        String DEFAULT_INLINE_DATE_TIMES = "false";
+        String DEFAULT_INLINE_DATE_TIMES = "true";
         
         /**
          * The name of the {@link IExtensionFactory} class. The implementation 
