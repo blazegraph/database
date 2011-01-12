@@ -222,7 +222,7 @@ public class SOpTreeBuilder {
         final ValueExpr ve = filter.getCondition();
         // make a constraint, attach it to the rule
         if (ve != null) {
-        	sops.add(new SOp(sopId.incrementAndGet(), ve, g, pg, rslj));
+        	sops.add(new SOp(sopId.incrementAndGet(), filter, g, pg, rslj));
         }
         
         final TupleExpr arg = filter.getArg();

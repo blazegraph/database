@@ -548,7 +548,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	 * bigdata constraint, we can run it as a FilterIterator after the
     	 * query has run natively.
     	 */
-    	final Collection<ValueExpr> sesameFilters = new LinkedList<ValueExpr>();
+    	final Collection<Filter> sesameFilters = new LinkedList<Filter>();
     	
     	/*
     	 * We need to prune Sesame filters that we cannot translate into native
@@ -563,7 +563,19 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	for (SOp sop : sopTree) {
     		final QueryModelNode op = sop.getOperator();
     		if (op instanceof ValueExpr) {
+    			/*
+    			 * If we have a raw ValueExpr and not a Filter we know it must
+    			 * be the condition of a LeftJoin, in which case we cannot
+    			 * use the Sesame FilterIterator to safely evaluate it.  A
+    			 * UnsupportedOperatorException here must just flow through
+    			 * to Sesame evaluation of the entire query.
+    			 */
     			final ValueExpr ve = (ValueExpr) op;
+				final IConstraint bop = toConstraint(ve);
+				sop.setBOp(bop);
+    		} else if (op instanceof Filter) {
+    			final Filter filter = (Filter) op;
+    			final ValueExpr ve = filter.getCondition();
     			try {
     				final IConstraint bop = toConstraint(ve);
     				sop.setBOp(bop);
@@ -580,7 +592,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     				 */
     				if (sop.getGroup() == SOpTreeBuilder.ROOT_GROUP_ID) {
     					sopsToPrune.add(sop);
-    					sesameFilters.add(ve);
+    					sesameFilters.add(filter);
     				} else {
     					throw ex;
     				}
@@ -635,7 +647,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     protected CloseableIteration<BindingSet, QueryEvaluationException> 
 		_evaluateNatively(final PipelineOp query, final BindingSet bs,
 			final QueryEngine queryEngine, 
-			final Collection<ValueExpr> sesameConstraints) 
+			final Collection<Filter> sesameFilters) 
 			throws QueryEvaluationException {
 	    
     	try {
@@ -658,10 +670,12 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	        runningQuery.get();
 		    
 		    // use the basic filter iterator for remaining filters
-		    if (sesameConstraints != null) {
-		        for (ValueExpr ve : sesameConstraints) {
-		        	final Filter filter = new Filter(null, ve);
-		            result = new FilterIterator(filter, result, this);
+		    if (sesameFilters != null) {
+		        for (Filter f : sesameFilters) {
+		        	if (log.isDebugEnabled()) {
+		        		log.debug("attaching sesame filter: " + f);
+		        	}
+		            result = new FilterIterator(f, result, this);
 		        }
 		    }
 
@@ -1093,7 +1107,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     }
 
     protected IVariable[] gatherRequiredVariables(final TupleExpr root, 
-    		final Collection<ValueExpr> sesameFilters) {
+    		final Collection<Filter> sesameFilters) {
     	
         /*
          * Collect a set of variables required beyond just the join (i.e.
@@ -1116,8 +1130,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         }
 
         if (sesameFilters.size() > 0) {
-            for (ValueExpr ve : sesameFilters) {
-                required.addAll(collectVariables((UnaryTupleOperator) ve));
+            for (Filter f : sesameFilters) {
+                required.addAll(collectVariables(f.getCondition()));
             }
         }
 
@@ -1140,48 +1154,47 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
      * they can be added to the list of required variables in the query for
      * correct binding set pruning.
      * 
-     * @param uto
+     * @param op
      *          the <code>UnaryTupleOperator</code>
      * @return
      *          the variables it uses
      */
-    protected Set<String> collectVariables(UnaryTupleOperator uto) {
+    protected Set<String> collectVariables(final QueryModelNode op) {
 
         final Set<String> vars = new HashSet<String>();
-        if (uto instanceof Projection) {
-            List<ProjectionElem> elems = 
-                ((Projection) uto).getProjectionElemList().getElements();
+        if (op instanceof Projection) {
+            final List<ProjectionElem> elems = 
+                ((Projection) op).getProjectionElemList().getElements();
             for (ProjectionElem elem : elems) {
                 vars.add(elem.getSourceName());
             }
-        } else if (uto instanceof MultiProjection) {
-            List<ProjectionElemList> elemLists = 
-                ((MultiProjection) uto).getProjections();
+        } else if (op instanceof MultiProjection) {
+            final List<ProjectionElemList> elemLists = 
+                ((MultiProjection) op).getProjections();
             for (ProjectionElemList list : elemLists) {
                 List<ProjectionElem> elems = list.getElements();
                 for (ProjectionElem elem : elems) {
                     vars.add(elem.getSourceName());
                 }
             }
-        } else if (uto instanceof Filter) {
-            Filter f = (Filter) uto;
-            ValueExpr ve = f.getCondition();
+        } else if (op instanceof ValueExpr) {
+            final ValueExpr ve = (ValueExpr) op;
             ve.visit(new QueryModelVisitorBase<RuntimeException>() {
                 @Override
                 public void meet(Var v) {
                     vars.add(v.getName());
                 }
             });
-        } else if (uto instanceof Group) {
-            Group g = (Group) uto;
+        } else if (op instanceof Group) {
+            final Group g = (Group) op;
             g.visit(new QueryModelVisitorBase<RuntimeException>() {
                 @Override
                 public void meet(Var v) {
                     vars.add(v.getName());
                 }
             });
-        } else if (uto instanceof Order) {
-            Order o = (Order) uto;
+        } else if (op instanceof Order) {
+            final Order o = (Order) op;
             o.visit(new QueryModelVisitorBase<RuntimeException>() {
                 @Override
                 public void meet(Var v) {
