@@ -92,6 +92,13 @@ public class CompareBOp extends BOpConstraint {
     	if (left == null || right == null)
             return true; // not yet bound.
 
+    	final CompareOp op = (CompareOp) getProperty(Annotations.OP);
+    	
+    	if (left.isTermId() && right.isTermId() &&
+    			(op == CompareOp.EQ || op == CompareOp.NE)) {
+    		return _accept(left.compareTo(right));
+    	}
+    	
     	if (!IVUtility.canNumericalCompare(left))
         	throw new NotNumericalException("cannot numerical compare: " + left);
     	
