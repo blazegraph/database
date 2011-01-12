@@ -1,0 +1,3 @@
+SELECT p.nr, p.name, p.mbox_sha1sum, p.country, r2.nr, r2.product, r2.title
+FROM review r, person p, review r2
+WHERE r.nr=@ReviewXYZ@ AND r.person=p.nr AND r2.person=p.nr

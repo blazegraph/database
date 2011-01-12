@@ -1,0 +1,7 @@
+SELECT distinct top 5,10 p.nr, p.label, p.propertyTex1
+FROM product p, producttypeproduct ptp
+WHERE p.nr=ptp.product AND ptp.productType=@ProductType@
+	AND p.nr IN (SELECT distinct product FROM productfeatureproduct WHERE productFeature=@ProductFeature1@)
+	AND ((propertyNum1>@x@ AND p.nr IN (SELECT distinct product FROM productfeatureproduct WHERE productFeature=@ProductFeature2@)
+) OR (propertyNum2>@y@ AND p.nr IN (SELECT distinct product FROM productfeatureproduct WHERE productFeature=@ProductFeature3@)))
+ORDER BY label

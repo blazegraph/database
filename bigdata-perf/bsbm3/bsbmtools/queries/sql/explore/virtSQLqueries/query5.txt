@@ -1,0 +1,7 @@
+SELECT distinct top 5 p.nr, p.label
+FROM product p, product po,
+    (Select distinct pfp1.product FROM productfeatureproduct pfp1, (SELECT pfp2i.productFeature FROM productfeatureproduct pfp2i WHERE pfp2i.product=@ProductXYZ@) pfp2 WHERE pfp2.productFeature=pfp1.productFeature) pfp
+	WHERE p.nr=pfp.product AND po.nr=@ProductXYZ@ AND p.nr<>po.nr
+	AND p.propertyNum1<(po.propertyNum1+120) AND p.propertyNum1>(po.propertyNum1-120)
+	AND p.propertyNum2<(po.propertyNum2+170) AND p.propertyNum2>(po.propertyNum2-170)
+ORDER BY p.label

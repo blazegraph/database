@@ -67,7 +67,7 @@ public class SOpTree implements Iterable<SOp> {
 		
 	}
 	
-	@Override
+//	@Override
 	public Iterator<SOp> iterator() {
 		return sops.iterator();
 	}
@@ -101,7 +101,7 @@ public class SOpTree implements Iterable<SOp> {
 			this.sops = sops;
 		}
 		
-		@Override
+//		@Override
 		public Iterator<SOp> iterator() {
 			return sops.iterator();
 		}
@@ -144,7 +144,7 @@ public class SOpTree implements Iterable<SOp> {
 			this.groups = groups;
 		}
 		
-		@Override
+//		@Override
 		public Iterator<SOpGroup> iterator() {
 			return groups.iterator();
 		}
