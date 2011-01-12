@@ -1,0 +1,4 @@
+SELECT *
+FROM (select label from product where nr=@ProductXYZ@) p left join 
+((select o.nr as onr, o.price, v.nr as vnr, v.label from offer o, vendor v where @ProductXYZ@=o.product AND o.vendor=v.nr AND v.country='DE' AND o.validTo>'@currentDate@') ov right join
+(select r.nr as rnr, r.title, pn.nr as pnnr, pn.name, r.rating1, r.rating2 from review r, person pn where r.product=@ProductXYZ@ AND r.person=pn.nr) rpn on (1=1)) on (1=1)

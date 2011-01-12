@@ -1,0 +1,1 @@
+querymix=queries/sql/explore/sqlQueries

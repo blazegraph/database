@@ -1,0 +1,7 @@
+SELECT distinct top 10 nr, label
+FROM product p, producttypeproduct ptp
+WHERE p.nr = ptp.product AND ptp.productType=@ProductType@
+	AND propertyNum1 > @x@
+	AND p.nr IN (SELECT distinct product FROM productfeatureproduct WHERE productFeature=@ProductFeature1@)
+	AND p.nr IN (SELECT distinct product FROM productfeatureproduct WHERE productFeature=@ProductFeature2@)
+ORDER BY label
