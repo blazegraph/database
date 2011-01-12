@@ -93,7 +93,7 @@ import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.Var;
-import org.openrdf.query.algebra.evaluation.TripleSource;
+import org.openrdf.query.algebra.evaluation.EvaluationStrategy;
 import org.openrdf.query.algebra.evaluation.impl.BindingAssigner;
 import org.openrdf.query.algebra.evaluation.impl.CompareOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
@@ -374,6 +374,15 @@ public class BigdataSail extends SailBase implements Sail {
                 .getName()+ ".namespace";
 
         public static final String DEFAULT_NAMESPACE = "kb";
+        
+        /**
+         * Option to use the new query plan generator (default
+         * {@value #DEFAULT_NEW_EVAL_STRATEGY}).
+         */
+        public static final String NEW_EVAL_STRATEGY = BigdataSail.class.getPackage()
+                .getName()+ ".newEvalStrategy";
+
+        public static final String DEFAULT_NEW_EVAL_STRATEGY = "false";
         
     }
 
@@ -3247,11 +3256,23 @@ public class BigdataSail extends SailBase implements Sail {
             final BigdataTripleSource tripleSource = 
             	new BigdataTripleSource(this, includeInferred);
 
-            final BigdataEvaluationStrategyImpl strategy = 
-            	new BigdataEvaluationStrategyImpl(
+            final boolean newEvalStrategy = 
+            	Boolean.parseBoolean(properties.getProperty(
+                    BigdataSail.Options.NEW_EVAL_STRATEGY,
+                    BigdataSail.Options.DEFAULT_NEW_EVAL_STRATEGY));
+            
+            final BigdataEvaluationStrategy strategy;
+            
+            if (newEvalStrategy) {
+            	strategy = new BigdataEvaluationStrategyImpl3(
+            			tripleSource, dataset, nativeJoins 
+            			);
+            } else {
+            	strategy = new BigdataEvaluationStrategyImpl(
             			tripleSource, dataset, nativeJoins 
             			,starJoins, database.isInlineLiterals()
             			);
+            }
 
             final QueryOptimizerList optimizerList = new QueryOptimizerList();
             optimizerList.add(new BindingAssigner());
@@ -3330,11 +3351,23 @@ public class BigdataSail extends SailBase implements Sail {
                 final BigdataTripleSource tripleSource = 
                 	new BigdataTripleSource(this, includeInferred);
 
-                final BigdataEvaluationStrategyImpl strategy = 
-                	new BigdataEvaluationStrategyImpl(
-                        tripleSource, dataset, nativeJoins
-            			,starJoins, database.isInlineLiterals()
-                        );
+                final boolean newEvalStrategy = 
+                	Boolean.parseBoolean(properties.getProperty(
+                        BigdataSail.Options.NEW_EVAL_STRATEGY,
+                        BigdataSail.Options.DEFAULT_NEW_EVAL_STRATEGY));
+                
+                final BigdataEvaluationStrategy strategy;
+                
+                if (newEvalStrategy) {
+                	strategy = new BigdataEvaluationStrategyImpl3(
+                			tripleSource, dataset, nativeJoins 
+                			);
+                } else {
+                	strategy = new BigdataEvaluationStrategyImpl(
+                			tripleSource, dataset, nativeJoins 
+                			,starJoins, database.isInlineLiterals()
+                			);
+                }
 
                 final QueryOptimizerList optimizerList = new QueryOptimizerList();
                 optimizerList.add(new BindingAssigner());

@@ -139,8 +139,8 @@ public class ConditionalRoutingOp extends PipelineOp {
 
             this.sink2 = context.getSink2();
 
-            if (sink2 == null)
-                throw new IllegalArgumentException();
+//            if (sink2 == null)
+//                throw new IllegalArgumentException();
             
             if (sink == sink2)
                 throw new IllegalArgumentException();
@@ -186,7 +186,7 @@ public class ConditionalRoutingOp extends PipelineOp {
 //                        stats.unitsOut.add(ndef);
                     }
 
-                    if (nalt > 0) {
+                    if (nalt > 0 && sink2 != null) {
                         if (nalt == alt.length)
                             sink2.add(alt);
                         else
@@ -198,14 +198,16 @@ public class ConditionalRoutingOp extends PipelineOp {
                 }
 
                 sink.flush();
-                sink2.flush();
+                if (sink2 != null)
+                	sink2.flush();
                 
                 return null;
                 
             } finally {
                 
                 sink.close();
-                sink2.close();
+                if (sink2 != null)
+                	sink2.close();
                 
             }
 

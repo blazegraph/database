@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.constraints;
 
+import java.util.GregorianCalendar;
+
+import javax.xml.datatype.XMLGregorianCalendar;
+
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.MathExpr.MathOp;
@@ -39,6 +43,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -58,6 +63,7 @@ import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.sun.org.apache.xerces.internal.jaxp.datatype.XMLGregorianCalendarImpl;
 
 /**
  * @author <a href="mailto:mpersonick@users.sourceforge.net">Mike Personick</a>
@@ -591,6 +597,137 @@ public class TestInlineConstraints extends ProxyTestCase {
                         
                         assertEquals(bs.get(s).get(), B.getIV());
                         assertEquals(bs.get(a).get(), _45.getIV());
+                        
+                        numSolutions++;
+                        
+                    }
+                    
+                    assertEquals("wrong # of solutions", 1, numSolutions);
+                    
+                } catch(Exception ex) {
+                    
+                    ex.printStackTrace();
+                    
+                }
+                
+            }
+
+        } finally {
+            
+            db.__tearDownUnitTest();
+            
+        }
+        
+    }
+
+    public void testCompareDates() {
+        
+        // store with no owl:sameAs closure
+        AbstractTripleStore db = getStore();
+
+        // do not run if we are not inlining
+        if (!db.getLexiconRelation().isInlineLiterals()) {
+            return;
+        }
+        
+        try {
+
+            BigdataValueFactory vf = db.getValueFactory();
+            
+            final BigdataURI A = vf.createURI("http://www.bigdata.com/A");
+            final BigdataURI B = vf.createURI("http://www.bigdata.com/B");
+            final BigdataURI C = vf.createURI("http://www.bigdata.com/C");
+            final BigdataURI X = vf.createURI("http://www.bigdata.com/X");
+            final BigdataURI BIRTHDAY = vf.createURI("http://www.bigdata.com/BIRTHDAY");
+            
+            final XMLGregorianCalendar c1 = new XMLGregorianCalendarImpl(
+            		new GregorianCalendar(1976/* year */, 12/* month */, 2/* day */));
+            final XMLGregorianCalendar c2 = new XMLGregorianCalendarImpl(
+            		new GregorianCalendar(1986/* year */, 10/* month */, 15/* day */));
+            final XMLGregorianCalendar c3 = new XMLGregorianCalendarImpl(
+            		new GregorianCalendar(1996/* year */, 5/* month */, 30/* day */));
+            
+            final BigdataLiteral l1 = vf.createLiteral(c1);
+            final BigdataLiteral l2 = vf.createLiteral(c2);
+            final BigdataLiteral l3 = vf.createLiteral(c3);
+            
+            db.addTerms( new BigdataValue[] { A, B, C, X, BIRTHDAY, l1, l2, l3 } );
+            
+            {
+                StatementBuffer buffer = new StatementBuffer
+                    ( db, 100/* capacity */
+                      );
+
+                buffer.add(A, RDF.TYPE, X);
+                buffer.add(A, BIRTHDAY, l1);
+                buffer.add(B, RDF.TYPE, X);
+                buffer.add(B, BIRTHDAY, l2);
+                buffer.add(C, RDF.TYPE, X);
+                buffer.add(C, BIRTHDAY, l3);
+                
+                // write statements on the database.
+                buffer.flush();
+                
+            }
+            
+            if (log.isInfoEnabled())
+                log.info("\n" +db.dumpStore(true, true, false));
+  
+            { // works great
+                
+                final String SPO = db.getSPORelation().getNamespace();
+                final IVariable<IV> s = Var.var("s");
+                final IConstant<IV> type = new Constant<IV>(db.getIV(RDF.TYPE));
+                final IConstant<IV> x = new Constant<IV>(X.getIV());
+                final IConstant<IV> birthday = new Constant<IV>(BIRTHDAY.getIV());
+                final IVariable<IV> a = Var.var("a");
+                
+                final IRule rule =
+                        new Rule("test_greater_than", null, // head
+                                new IPredicate[] {
+                                    new SPOPredicate(SPO, s, type, x),
+                                    new SPOPredicate(SPO, s, birthday, a) 
+                                },
+                                // constraints on the rule.
+                                new IConstraint[] {
+                                    new CompareBOp(a, new Constant<IV>(l2.getIV()), CompareOp.GT)
+                                });
+                
+                try {
+
+                	final IV left = l3.getIV();
+                	final IV right = l2.getIV();
+                	
+                	System.err.println(left + ": " + left.isInline() + ", " + left.isLiteral() + ", " + left.isNumeric());
+                	System.err.println(right + ": " + right.isInline() + ", " + right.isLiteral() + ", " + right.isNumeric());
+                	
+                	if (IVUtility.canNumericalCompare(left) &&
+                			IVUtility.canNumericalCompare(right)) {
+                		
+                		final int compare = IVUtility.numericalCompare(left, right);
+                		
+                		System.err.println("can numerical compare: " + compare);
+            	        
+                	} else {
+                		
+                		final int compare = (left.compareTo(right));
+                		
+                		System.err.println("cannot numerical compare: " + compare);
+            	        
+                	}
+
+                    int numSolutions = 0;
+                    
+                    IChunkedOrderedIterator<ISolution> solutions = runQuery(db, rule);
+                    
+                    while (solutions.hasNext()) {
+                        
+                        ISolution solution = solutions.next();
+                        
+                        IBindingSet bs = solution.getBindingSet();
+                        
+                        assertEquals(bs.get(s).get(), C.getIV());
+                        assertEquals(bs.get(a).get(), l3.getIV());
                         
                         numSolutions++;
                         

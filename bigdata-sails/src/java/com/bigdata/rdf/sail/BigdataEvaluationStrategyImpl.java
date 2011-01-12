@@ -66,10 +66,8 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.constraint.EQ;
-import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.constraint.NE;
-import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.constraint.OR;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
@@ -78,14 +76,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.internal.DummyIV;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
-import com.bigdata.rdf.internal.constraints.InlineEQ;
-import com.bigdata.rdf.internal.constraints.InlineGE;
-import com.bigdata.rdf.internal.constraints.InlineGT;
-import com.bigdata.rdf.internal.constraints.InlineLE;
-import com.bigdata.rdf.internal.constraints.InlineLT;
-import com.bigdata.rdf.internal.constraints.InlineNE;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
@@ -257,8 +248,9 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * @version $Id: BigdataEvaluationStrategyImpl.java 2272 2009-11-04 02:10:19Z
  *          mrpersonick $
  */
-public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
-    
+public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl
+		implements BigdataEvaluationStrategy {
+ 
     /**
      * Logger.
      */

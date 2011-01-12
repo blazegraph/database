@@ -30,6 +30,7 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -43,19 +44,21 @@ import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.Projection;
 import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.TupleExpr;
-import org.openrdf.repository.Repository;
+import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.repository.RepositoryConnection;
-import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.repository.sail.SailTupleQuery;
-import org.openrdf.sail.Sail;
-import org.openrdf.sail.memory.MemoryStore;
 
+import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.sop.SOp;
+import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroups;
 import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
@@ -120,12 +123,17 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
         super(arg0);
     }
     
-    public void testNestedOptionals() throws Exception {
+    public void testSimplestNestedOptional() throws Exception {
     	
-        final Sail sail = new MemoryStore();
-        sail.initialize();
-        final Repository repo = new SailRepository(sail);
-        final RepositoryConnection cxn = repo.getConnection();
+//        final Sail sail = new MemoryStore();
+//        sail.initialize();
+//        final Repository repo = new SailRepository(sail);
+
+    	final BigdataSail sail = getSail();
+    	sail.initialize();
+    	final BigdataSailRepository repo = new BigdataSailRepository(sail);
+    	
+    	final RepositoryConnection cxn = repo.getConnection();
         cxn.setAutoCommit(false);
         
         try {
@@ -179,25 +187,267 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
 	            final SailTupleQuery tupleQuery = (SailTupleQuery)
 	                cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
 	            tupleQuery.setIncludeInferred(false /* includeInferred */);
-	            
-	            if (INFO) {
+	           
+	            if (log.isInfoEnabled()) {
+	            	
+		            final BigdataSailTupleQuery bdTupleQuery =
+		            	(BigdataSailTupleQuery) tupleQuery;
+		            final QueryRoot root = (QueryRoot) bdTupleQuery.getTupleExpr();
+		            final Projection p = (Projection) root.getArg();
+		            final TupleExpr tupleExpr = p.getArg();
+		            final SOpTreeBuilder stb = new SOpTreeBuilder();
+		            final SOpTree tree = stb.collectSOps(tupleExpr);
+	           
+	                log.info(tree);
 	            	log.info(query);
-	                final TupleQueryResult result = tupleQuery.evaluate();
+
+	            	final TupleQueryResult result = tupleQuery.evaluate();
 	                while (result.hasNext()) {
 	                    log.info(result.next());
 	                }
+	                
 	            }
 	            
 	            final Collection<BindingSet> answer = new LinkedList<BindingSet>();
-	            answer.add(createBindingSet());
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", paul),
+	            		new BindingImpl("b", brad)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", john),
+	            		new BindingImpl("b", brad)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", mary),
+	            		new BindingImpl("b", brad)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", brad),
+	            		new BindingImpl("b", fred)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", brad),
+	            		new BindingImpl("b", leon)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", paul),
+	            		new BindingImpl("b", mary),
+	            		new BindingImpl("c", brad),
+	            		new BindingImpl("d", fred)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", paul),
+	            		new BindingImpl("b", mary),
+	            		new BindingImpl("c", brad),
+	            		new BindingImpl("d", leon)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", john),
+	            		new BindingImpl("b", mary),
+	            		new BindingImpl("c", brad),
+	            		new BindingImpl("d", fred)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", john),
+	            		new BindingImpl("b", mary),
+	            		new BindingImpl("c", brad),
+	            		new BindingImpl("d", leon)
+	            		));
 	            
-	//                result = tupleQuery.evaluate();
-	//                compare(result, answer);
+	            final TupleQueryResult result = tupleQuery.evaluate();
+                compare(result, answer);
 
             }
             
-            {
-            	
+        } finally {
+            cxn.close();
+            sail.shutDown();
+        }
+
+    }
+
+    public void testSimpleNestedOptionalWithFilter() throws Exception {
+	    	
+	//      final Sail sail = new MemoryStore();
+	//      sail.initialize();
+	//      final Repository repo = new SailRepository(sail);
+	
+	  	final BigdataSail sail = getSail();
+	  	sail.initialize();
+	  	final BigdataSailRepository repo = new BigdataSailRepository(sail);
+	  	
+	  	final RepositoryConnection cxn = repo.getConnection();
+	        cxn.setAutoCommit(false);
+	      
+	    try {
+	  
+			final ValueFactory vf = sail.getValueFactory();
+
+			/*
+			 * Create some terms.
+			 */
+			final URI john = vf.createURI(BD.NAMESPACE + "john");
+			final URI mary = vf.createURI(BD.NAMESPACE + "mary");
+			final URI leon = vf.createURI(BD.NAMESPACE + "leon");
+			final URI paul = vf.createURI(BD.NAMESPACE + "paul");
+			final URI brad = vf.createURI(BD.NAMESPACE + "brad");
+			final URI fred = vf.createURI(BD.NAMESPACE + "fred");
+			final URI knows = vf.createURI(BD.NAMESPACE + "knows");
+
+			/*
+			 * Create some statements.
+			 */
+			cxn.add(paul, knows, mary);
+			cxn.add(paul, knows, brad);
+
+			cxn.add(john, knows, mary);
+			cxn.add(john, knows, brad);
+
+			cxn.add(mary, knows, brad);
+			cxn.add(brad, knows, fred);
+			cxn.add(brad, knows, leon);
+
+			/*
+			 * Note: The either flush() or commit() is required to flush the
+			 * statement buffers to the database before executing any operations
+			 * that go around the sail.
+			 */
+			cxn.commit();
+	          
+			{
+
+	            String query =
+	            	"prefix bd: <"+BD.NAMESPACE+"> " +
+	                "select * " +
+	                "where { " +
+	                "  ?a bd:knows ?b . " +
+	                "  OPTIONAL { " +
+	                "    ?b bd:knows ?c . " +
+	                "    ?c bd:knows ?d . " +
+	                "    filter(?d != bd:leon) " +
+	                "  } " +
+	                "}"; 
+
+				final SailTupleQuery tupleQuery = (SailTupleQuery) cxn
+						.prepareTupleQuery(QueryLanguage.SPARQL, query);
+				tupleQuery.setIncludeInferred(false /* includeInferred */);
+
+				if (log.isInfoEnabled()) {
+
+					final BigdataSailTupleQuery bdTupleQuery = (BigdataSailTupleQuery) tupleQuery;
+					final QueryRoot root = (QueryRoot) bdTupleQuery
+							.getTupleExpr();
+					final Projection p = (Projection) root.getArg();
+					final TupleExpr tupleExpr = p.getArg();
+					final SOpTreeBuilder stb = new SOpTreeBuilder();
+					final SOpTree tree = stb.collectSOps(tupleExpr);
+
+					log.info(tree);
+					log.info(query);
+
+					final TupleQueryResult result = tupleQuery.evaluate();
+					while (result.hasNext()) {
+						log.info(result.next());
+					}
+
+				}
+
+	            final Collection<BindingSet> answer = new LinkedList<BindingSet>();
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", paul),
+	            		new BindingImpl("b", brad)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", john),
+	            		new BindingImpl("b", brad)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", mary),
+	            		new BindingImpl("b", brad)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", brad),
+	            		new BindingImpl("b", fred)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", brad),
+	            		new BindingImpl("b", leon)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", paul),
+	            		new BindingImpl("b", mary),
+	            		new BindingImpl("c", brad),
+	            		new BindingImpl("d", fred)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", john),
+	            		new BindingImpl("b", mary),
+	            		new BindingImpl("c", brad),
+	            		new BindingImpl("d", fred)
+	            		));
+
+				final TupleQueryResult result = tupleQuery.evaluate();
+				compare(result, answer);
+
+			}
+	          
+		} finally {
+			cxn.close();
+			sail.shutDown();
+		}
+	
+	}
+
+    public void testSimpleNestedOptionalWithConditional() throws Exception {
+    	
+//      final Sail sail = new MemoryStore();
+//      sail.initialize();
+//      final Repository repo = new SailRepository(sail);
+
+  	final BigdataSail sail = getSail();
+  	sail.initialize();
+  	final BigdataSailRepository repo = new BigdataSailRepository(sail);
+  	
+  	final RepositoryConnection cxn = repo.getConnection();
+      cxn.setAutoCommit(false);
+      
+      try {
+  
+          final ValueFactory vf = sail.getValueFactory();
+
+          /*
+           * Create some terms.
+           */
+          final URI john = vf.createURI(BD.NAMESPACE + "john");
+          final URI mary = vf.createURI(BD.NAMESPACE + "mary");
+          final URI leon = vf.createURI(BD.NAMESPACE + "leon");
+          final URI paul = vf.createURI(BD.NAMESPACE + "paul");
+          final URI brad = vf.createURI(BD.NAMESPACE + "brad");
+          final URI fred = vf.createURI(BD.NAMESPACE + "fred");
+          final URI knows = vf.createURI(BD.NAMESPACE + "knows");
+
+          /*
+           * Create some statements.
+           */
+          cxn.add(paul, knows, mary);
+          cxn.add(paul, knows, brad);
+          
+          cxn.add(john, knows, mary);
+          cxn.add(john, knows, brad);
+
+          cxn.add(mary, knows, brad);
+          cxn.add(brad, knows, fred);
+          cxn.add(brad, knows, leon);
+
+          /*
+           * Note: The either flush() or commit() is required to flush the
+           * statement buffers to the database before executing any operations
+           * that go around the sail.
+           */
+          cxn.commit();
+          
+          {
+          	
 	            String query =
 	            	"prefix bd: <"+BD.NAMESPACE+"> " +
 	                "select * " +
@@ -213,65 +463,78 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
 	            final SailTupleQuery tupleQuery = (SailTupleQuery)
 	                cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
 	            tupleQuery.setIncludeInferred(false /* includeInferred */);
-	            
-	            if (INFO) {
+	           
+	            if (log.isInfoEnabled()) {
+	            	
+		            final BigdataSailTupleQuery bdTupleQuery =
+		            	(BigdataSailTupleQuery) tupleQuery;
+		            final QueryRoot root = (QueryRoot) bdTupleQuery.getTupleExpr();
+		            final Projection p = (Projection) root.getArg();
+		            final TupleExpr tupleExpr = p.getArg();
+		            final SOpTreeBuilder stb = new SOpTreeBuilder();
+		            final SOpTree tree = stb.collectSOps(tupleExpr);
+	           
+	                log.info(tree);
 	            	log.info(query);
-	                final TupleQueryResult result = tupleQuery.evaluate();
+
+	            	final TupleQueryResult result = tupleQuery.evaluate();
 	                while (result.hasNext()) {
 	                    log.info(result.next());
 	                }
+	                
 	            }
 	            
 	            final Collection<BindingSet> answer = new LinkedList<BindingSet>();
-	            answer.add(createBindingSet());
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", paul),
+	            		new BindingImpl("b", brad)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", john),
+	            		new BindingImpl("b", brad)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", mary),
+	            		new BindingImpl("b", brad)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", brad),
+	            		new BindingImpl("b", fred)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", brad),
+	            		new BindingImpl("b", leon)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", paul),
+	            		new BindingImpl("b", mary)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", john),
+	            		new BindingImpl("b", mary),
+	            		new BindingImpl("c", brad),
+	            		new BindingImpl("d", fred)
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", john),
+	            		new BindingImpl("b", mary),
+	            		new BindingImpl("c", brad),
+	            		new BindingImpl("d", leon)
+	            		));
 	            
-	//                result = tupleQuery.evaluate();
-	//                compare(result, answer);
+				final TupleQueryResult result = tupleQuery.evaluate();
+				compare(result, answer);
 
-            }
-            
-            {
-            	
-	            String query =
-	            	"prefix bd: <"+BD.NAMESPACE+"> " +
-	                "select * " +
-	                "where { " +
-	                "  ?a bd:knows ?b . " +
-	                "  OPTIONAL { " +
-	                "    ?b bd:knows ?c . " +
-	                "    ?c bd:knows ?d . " +
-	                "    filter(?d != bd:leon) " +
-	                "  } " +
-	                "}"; 
-	
-	            final SailTupleQuery tupleQuery = (SailTupleQuery)
-	                cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-	            tupleQuery.setIncludeInferred(false /* includeInferred */);
-	            
-	            if (INFO) {
-	            	log.info(query);
-	                final TupleQueryResult result = tupleQuery.evaluate();
-	                while (result.hasNext()) {
-	                    log.info(result.next());
-	                }
-	            }
-	            
-	            final Collection<BindingSet> answer = new LinkedList<BindingSet>();
-	            answer.add(createBindingSet());
-	            
-	//                result = tupleQuery.evaluate();
-	//                compare(result, answer);
+			}
 
-            }
-            
-        } finally {
-            cxn.close();
-            sail.shutDown();
-        }
+		} finally {
+			cxn.close();
+			sail.shutDown();
+		}
 
-    }
+	}
 
-    public void testNestedOptionals1() throws Exception {
+    private void __testNestedOptionals1() throws Exception {
 
         final BigdataSail sail = getSail();
         sail.initialize();

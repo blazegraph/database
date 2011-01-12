@@ -45,12 +45,10 @@ import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.constraint.OR;
-import com.bigdata.rdf.internal.constraints.InlineEQ;
-import com.bigdata.rdf.internal.constraints.InlineGE;
-import com.bigdata.rdf.internal.constraints.InlineGT;
-import com.bigdata.rdf.internal.constraints.InlineLE;
-import com.bigdata.rdf.internal.constraints.InlineLT;
-import com.bigdata.rdf.internal.constraints.InlineNE;
+import com.bigdata.rdf.internal.constraints.CompareBOp;
+import com.bigdata.rdf.internal.constraints.IsInline;
+import com.bigdata.rdf.internal.constraints.IsLiteral;
+import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.rules.RejectAnythingSameAsItself;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.spo.SPOStarJoin;
@@ -99,12 +97,10 @@ public class TestDeepCopy extends TestCase2 {
             SPOStarJoin.class,//
             com.bigdata.rdf.magic.MagicPredicate.class,//
             // com.bigdata.rdf.internal.constraint
-            InlineEQ.class,//
-            InlineGE.class,//
-            InlineLT.class,//
-            InlineLE.class,//
-            InlineGT.class,//
-            InlineNE.class,//
+            CompareBOp.class,//
+            IsInline.class,//
+            IsLiteral.class,//
+            MathBOp.class,//
             // com.bigdata.rdf.inf
             RejectAnythingSameAsItself.class,
 

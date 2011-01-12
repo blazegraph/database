@@ -63,6 +63,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.controller.Steps;
 import com.bigdata.bop.controller.Union;
@@ -326,6 +327,16 @@ public class Rule2BOpUtility {
             final AtomicInteger idFactory, final AbstractTripleStore db,
             final QueryEngine queryEngine, final Properties queryHints) {
 
+    	return convert(rule, null/* conditionals */, idFactory, db, queryEngine, 
+    			queryHints);
+    	
+    }
+    
+    public static PipelineOp convert(final IRule<?> rule,
+    		final Collection<IConstraint> conditionals,
+            final AtomicInteger idFactory, final AbstractTripleStore db,
+            final QueryEngine queryEngine, final Properties queryHints) {
+
 //        // true iff the database is in quads mode.
 //        final boolean isQuadsQuery = db.isQuads();
         
@@ -537,6 +548,22 @@ public class Rule2BOpUtility {
         }
         
         PipelineOp left = startOp;
+        
+        if (conditionals != null) {
+        	for (IConstraint c : conditionals) {
+        		final int condId = idFactory.incrementAndGet();
+                final PipelineOp condOp = applyQueryHints(
+                	new ConditionalRoutingOp(new BOp[]{left},
+                        NV.asMap(new NV[]{//
+                            new NV(BOp.Annotations.BOP_ID,condId),
+                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
+                        })), queryHints);
+                left = condOp;
+                if (log.isDebugEnabled()) {
+                	log.debug("adding conditional routing op: " + condOp);
+                }
+        	}
+        }
         
         for (int i = 0; i < order.length; i++) {
             

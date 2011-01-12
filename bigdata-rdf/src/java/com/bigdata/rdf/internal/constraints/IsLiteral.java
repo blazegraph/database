@@ -24,58 +24,61 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal.constraints;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.constraint.BOpConstraint;
 import com.bigdata.rdf.internal.IV;
 
 /**
- * Imposes the constraint <code>x != y</code>.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: NE.java 2889 2010-05-20 16:11:35Z mrpersonick $
- * 
- * FIXME Write unit tests for this.
+ * Imposes the constraint <code>isLiteral(x)</code>.
  */
-public class IsLiteral {//extends AbstractInlineConstraint implements IConstraint {
+public class IsLiteral extends BOpConstraint {
 
     /**
 	 * 
 	 */
 	private static final long serialVersionUID = 3125106876006900339L;
 
-	public final IVariable x;
+    /**
+     * Required shallow copy constructor.
+     */
+    public IsLiteral(final BOp[] values,
+            final Map<String, Object> annotations) {
+        super(values, annotations);
+    }
 
-	private final boolean stringsOnly;
-    
-	public IsLiteral(final IVariable x) {
-		this(x, false);
-	}
-	
-    public IsLiteral(final IVariable x, final boolean stringsOnly) {
+    /**
+     * Required deep copy constructor.
+     */
+    public IsLiteral(final IsInline op) {
+        super(op);
+    }
+
+    public IsLiteral(final IVariable<IV> x) {
+        
+        super(new BOp[] { x }, null/*annocations*/);
         
         if (x == null)
             throw new IllegalArgumentException();
 
-        this.x = x;
-        this.stringsOnly = stringsOnly;
-        
     }
     
     public boolean accept(IBindingSet s) {
         
         // get binding for "x".
-        final IConstant x = s.get(this.x);
+        final IConstant<IV> x = s.get((IVariable<IV>) get(0)/*x*/);
        
         if (x == null)
             return true; // not yet bound.
 
-        IV iv = (IV) x.get();
-        if (stringsOnly)
-        	return iv.isLiteral() && !iv.isInline();
-        else
-        	return iv.isLiteral(); 
+        final IV iv = x.get();
+
+    	return iv.isLiteral(); 
 
    }
 
