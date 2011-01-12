@@ -404,50 +404,50 @@ public class TestNestedOptionals extends ProxyBigdataSailTestCase {
 //      sail.initialize();
 //      final Repository repo = new SailRepository(sail);
 
-  	final BigdataSail sail = getSail();
-  	sail.initialize();
-  	final BigdataSailRepository repo = new BigdataSailRepository(sail);
-  	
-  	final RepositoryConnection cxn = repo.getConnection();
-      cxn.setAutoCommit(false);
-      
-      try {
-  
-          final ValueFactory vf = sail.getValueFactory();
+		final BigdataSail sail = getSail();
+		sail.initialize();
+		final BigdataSailRepository repo = new BigdataSailRepository(sail);
 
-          /*
-           * Create some terms.
-           */
-          final URI john = vf.createURI(BD.NAMESPACE + "john");
-          final URI mary = vf.createURI(BD.NAMESPACE + "mary");
-          final URI leon = vf.createURI(BD.NAMESPACE + "leon");
-          final URI paul = vf.createURI(BD.NAMESPACE + "paul");
-          final URI brad = vf.createURI(BD.NAMESPACE + "brad");
-          final URI fred = vf.createURI(BD.NAMESPACE + "fred");
-          final URI knows = vf.createURI(BD.NAMESPACE + "knows");
+		final RepositoryConnection cxn = repo.getConnection();
+		cxn.setAutoCommit(false);
 
-          /*
-           * Create some statements.
-           */
-          cxn.add(paul, knows, mary);
-          cxn.add(paul, knows, brad);
-          
-          cxn.add(john, knows, mary);
-          cxn.add(john, knows, brad);
+		try {
 
-          cxn.add(mary, knows, brad);
-          cxn.add(brad, knows, fred);
-          cxn.add(brad, knows, leon);
+			final ValueFactory vf = sail.getValueFactory();
 
-          /*
-           * Note: The either flush() or commit() is required to flush the
-           * statement buffers to the database before executing any operations
-           * that go around the sail.
-           */
-          cxn.commit();
-          
-          {
-          	
+			/*
+			 * Create some terms.
+			 */
+			final URI john = vf.createURI(BD.NAMESPACE + "john");
+			final URI mary = vf.createURI(BD.NAMESPACE + "mary");
+			final URI leon = vf.createURI(BD.NAMESPACE + "leon");
+			final URI paul = vf.createURI(BD.NAMESPACE + "paul");
+			final URI brad = vf.createURI(BD.NAMESPACE + "brad");
+			final URI fred = vf.createURI(BD.NAMESPACE + "fred");
+			final URI knows = vf.createURI(BD.NAMESPACE + "knows");
+
+			/*
+			 * Create some statements.
+			 */
+			cxn.add(paul, knows, mary);
+			cxn.add(paul, knows, brad);
+
+			cxn.add(john, knows, mary);
+			cxn.add(john, knows, brad);
+
+			cxn.add(mary, knows, brad);
+			cxn.add(brad, knows, fred);
+			cxn.add(brad, knows, leon);
+
+			/*
+			 * Note: The either flush() or commit() is required to flush the
+			 * statement buffers to the database before executing any operations
+			 * that go around the sail.
+			 */
+			cxn.commit();
+
+			{
+
 	            String query =
 	            	"prefix bd: <"+BD.NAMESPACE+"> " +
 	                "select * " +
