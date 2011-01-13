@@ -272,7 +272,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
      */
     public BigdataEvaluationStrategyImpl3(
             final BigdataTripleSource tripleSource, final Dataset dataset,
-            final boolean nativeJoins) {
+            final boolean nativeJoins, 
+            final boolean allowSesameQueryEvaluation) {
         
         super(tripleSource, dataset);
         
@@ -280,6 +281,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         this.dataset = dataset;
         this.database = tripleSource.getDatabase();
         this.nativeJoins = nativeJoins;
+        this.allowSesameQueryEvaluation = allowSesameQueryEvaluation;
         
     }
 
@@ -287,6 +289,12 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
      * If true, use native evaluation on the sesame operator tree if possible.
      */
     private boolean nativeJoins;
+    
+    /**
+     * If true, allow queries that cannot be executed natively to be executed
+     * by Sesame.
+     */
+    private final boolean allowSesameQueryEvaluation;
     
     /**
      * A set of properties that act as query hints during evaluation.
@@ -364,18 +372,30 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
             
         } catch (UnsupportedOperatorException ex) {
             
-            // Use Sesame 2 evaluation
-            
-            log.warn("could not evaluate natively, using Sesame evaluation"); 
-            
-            if (log.isInfoEnabled()) {
-                log.info(ex.getOperator());
-            }
-            
-            nativeJoins = false;
-            
-            return super.evaluate(union, bs);
-            
+        	if (allowSesameQueryEvaluation) {
+	            
+        		// Use Sesame 2 evaluation
+	            
+        		log.warn("could not evaluate natively, using Sesame evaluation"); 
+	            
+        		if (log.isInfoEnabled()) {
+	                log.info(ex.getOperator());
+	            }
+	            
+        		// turn off native joins for the remainder, we can't do
+	            // partial execution
+	            nativeJoins = false;
+	            
+	            // defer to Sesame
+	            return super.evaluate(union, bs);
+	            
+        	} else {
+        		
+        		// allow the query to fail
+        		throw ex;
+        		
+        	}
+
         }
         
     }
@@ -409,17 +429,29 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
             
         } catch (UnsupportedOperatorException ex) {
             
-            // Use Sesame 2 evaluation
-            
-            log.warn("could not evaluate natively, using Sesame evaluation"); 
-            
-            if (log.isInfoEnabled()) {
-                log.info(ex.getOperator());
-            }
-            
-            nativeJoins = false;
-            
-            return super.evaluate(join, bs);
+        	if (allowSesameQueryEvaluation) {
+	            
+        		// Use Sesame 2 evaluation
+	            
+        		log.warn("could not evaluate natively, using Sesame evaluation"); 
+	            
+        		if (log.isInfoEnabled()) {
+	                log.info(ex.getOperator());
+	            }
+	            
+        		// turn off native joins for the remainder, we can't do
+	            // partial execution
+	            nativeJoins = false;
+	            
+	            // defer to Sesame
+	            return super.evaluate(join, bs);
+	            
+        	} else {
+        		
+        		// allow the query to fail
+        		throw ex;
+        		
+        	}
             
         }
         
@@ -454,17 +486,29 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
             
         } catch (UnsupportedOperatorException ex) {
             
-            // Use Sesame 2 evaluation
-            
-            log.warn("could not evaluate natively, using Sesame evaluation"); 
-            
-            if (log.isInfoEnabled()) {
-                log.info(ex.getOperator());
-            }
-            
-            nativeJoins = false;
-            
-            return super.evaluate(leftJoin, bs);
+        	if (allowSesameQueryEvaluation) {
+	            
+        		// Use Sesame 2 evaluation
+	            
+        		log.warn("could not evaluate natively, using Sesame evaluation"); 
+	            
+        		if (log.isInfoEnabled()) {
+	                log.info(ex.getOperator());
+	            }
+	            
+        		// turn off native joins for the remainder, we can't do
+	            // partial execution
+	            nativeJoins = false;
+	            
+	            // defer to Sesame
+	            return super.evaluate(leftJoin, bs);
+	            
+        	} else {
+        		
+        		// allow the query to fail
+        		throw ex;
+        		
+        	}
             
         }
         
@@ -476,6 +520,9 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 		try {
 			return _evaluateNatively(tupleExpr, bs);
 		} catch (UnrecognizedValueException ex) {
+			if (log.isInfoEnabled()) {
+				log.info("unrecognized value in query: " + ex.getValue());
+			}
 			return new EmptyIteration<BindingSet, QueryEvaluationException>();
 		} catch (QueryEvaluationException ex) {
 			throw ex;
@@ -651,6 +698,10 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 			throws QueryEvaluationException {
 	    
     	try {
+    		
+    		if (log.isDebugEnabled()) {
+    			log.debug("running native query: " + BOpUtility.toString(query));
+    		}
     		
 		    final IRunningQuery runningQuery = queryEngine.eval(query);
 		
