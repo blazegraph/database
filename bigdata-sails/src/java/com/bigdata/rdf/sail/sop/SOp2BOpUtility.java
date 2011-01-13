@@ -173,7 +173,8 @@ public class SOp2BOpUtility {
                 BOpEvaluationContext.CONTROLLER)) {
             /*
              * Wrap with an operator which will be evaluated on the query
-             * controller.
+             * controller so the results will be streamed back to the query
+             * controller in scale-out.
              */
             left = new SliceOp(new BOp[] { left }, NV.asMap(//
                     new NV(BOp.Annotations.BOP_ID, idFactory
