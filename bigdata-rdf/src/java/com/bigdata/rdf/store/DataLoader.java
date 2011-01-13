@@ -948,19 +948,31 @@ public class DataLoader {
         }
 
     }
-    
+
     /**
      * Loads data from the <i>source</i>. The caller is responsible for closing
      * the <i>source</i> if there is an error.
      * 
+     * @param totals
+     *            Used to report out the total {@link LoadStats}.
      * @param source
      *            A {@link Reader} or {@link InputStream}.
      * @param baseURL
+     *            The baseURI (optional, when not specified the name of the each
+     *            file load is converted to a URL and used as the baseURI for
+     *            that file).
      * @param rdfFormat
+     *            The format of the file (optional, when not specified the
+     *            format is deduced for each file in turn using the
+     *            {@link RDFFormat} static methods).
+     * @param defaultGraph
+     *            The value that will be used for the graph/context co-ordinate
+     *            when loading data represented in a triple format into a quad
+     *            store.
      * @param endOfBatch
-     * @return
+     *            Signal indicates the end of a batch.
      */
-    protected void loadData3(final LoadStats totals, final Object source,
+    public void loadData3(final LoadStats totals, final Object source,
             final String baseURL, final RDFFormat rdfFormat,
             final String defaultGraph, final boolean endOfBatch) throws IOException {
 
@@ -1203,7 +1215,23 @@ public class DataLoader {
      * support multiple data files within a single archive.
      * 
      * @param args
-     *            [-closure][-verbose][-namespace <i>namespace</i>] propertyFile (fileOrDir)+
+     *            <code>[-quiet][-closure][-verbose][-namespace <i>namespace</i>] propertyFile (fileOrDir)*</code>
+     *            where
+     *            <dl>
+     *            <dt>-quiet</dt>
+     *            <dd>Suppress all stdout messages.</dd>
+     *            <dt>-verbose</dt>
+     *            <dd>Show additional messages detailing the load performance.</dd>
+     *            <dt>-closure</dt>
+     *            <dd>Compute the RDF(S)+ closure.</dd>
+     *            <dt>-namespace</dt>
+     *            <dd>The namespace of the KB instance.</dd>
+     *            <dt>propertyFile</dt>
+     *            <dd>The configuration file for the database instance.</dd>
+     *            <dt>fileOrDir</dt>
+     *            <dd>Zero or more files or directories containing the data to
+     *            be loaded.</dd>
+     *            </dl>
      * 
      * @throws IOException
      */
@@ -1213,6 +1241,7 @@ public class DataLoader {
         String namespace = "kb";
         boolean doClosure = false;
         boolean verbose = false;
+        boolean quiet = false;
         RDFFormat rdfFormat = null;
         String baseURI = null;
         
@@ -1243,6 +1272,12 @@ public class DataLoader {
                 } else if (arg.equals("-verbose")) {
 
                     verbose = true;
+                    quiet = false;
+
+                } else if (arg.equals("-quiet")) {
+
+                    quiet = true;
+                    verbose = false;
 
                 } else {
 
@@ -1282,7 +1317,8 @@ public class DataLoader {
 
         final Properties properties = new Properties();
         {
-            System.out.println("Reading properties: "+propertyFile);
+            if(!quiet)
+                System.out.println("Reading properties: "+propertyFile);
             final InputStream is = new FileInputStream(propertyFile);
             try {
                 properties.load(is);
@@ -1295,7 +1331,7 @@ public class DataLoader {
 //				// Override/set from the environment.
 //				final String file = System
 //						.getProperty(com.bigdata.journal.Options.FILE);
-//				System.out.println("Using: " + com.bigdata.journal.Options.FILE
+//				if(!quiet) System.out.println("Using: " + com.bigdata.journal.Options.FILE
 //						+ "=" + file);
 //                properties.setProperty(com.bigdata.journal.Options.FILE, file);
 //            }
@@ -1323,7 +1359,8 @@ public class DataLoader {
                 if (System.getProperty(s) != null) {
                     // Override/set from the environment.
                     final String v = System.getProperty(s);
-                    System.out.println("Using: " + s + "=" + v);
+                    if(!quiet)
+                        System.out.println("Using: " + s + "=" + v);
                     properties.setProperty(s, v);
                 }
             }
@@ -1342,7 +1379,8 @@ public class DataLoader {
             
             files.add(fileOrDir);
             
-            System.out.println("Will load from: " + fileOrDir);
+            if(!quiet)
+                System.out.println("Will load from: " + fileOrDir);
 
         }
             
@@ -1357,7 +1395,8 @@ public class DataLoader {
 //            final long firstOffset = jnl.getRootBlockView().getNextOffset();
             final long userData0 = jnl.getBufferStrategy().size();
 
-            System.out.println("Journal file: "+jnl.getFile());
+            if(!quiet)
+                System.out.println("Journal file: "+jnl.getFile());
 
             AbstractTripleStore kb = (AbstractTripleStore) jnl
                     .getResourceLocator().locate(namespace, ITx.UNISOLATED);
@@ -1388,7 +1427,8 @@ public class DataLoader {
             
             dataLoader.endSource();
 
-			System.out.println("Load: " + totals);
+			if(!quiet)
+			    System.out.println("Load: " + totals);
 			
         	if (dataLoader.closureEnum == ClosureEnum.None && doClosure) {
 
@@ -1402,11 +1442,16 @@ public class DataLoader {
 											new StringBuilder()).toString());
 				}
 
-				System.out.println("Computing closure.");
+                if (!quiet)
+                    System.out.println("Computing closure.");
+                log.info("Computing closure.");
 
                 final ClosureStats stats = dataLoader.doClosure();
                 
-                System.out.println("Closure: "+stats.toString());
+                if(!quiet)
+                    System.out.println("Closure: "+stats.toString());
+                if (log.isInfoEnabled())
+                    log.info("Closure: " + stats.toString());
 
 			}
 
@@ -1440,12 +1485,16 @@ public class DataLoader {
             // #of bytes written (user data only)
             final long bytesWritten = (userData1 - userData0);
 
-			System.out.println("Wrote: " + bytesWritten + " bytes.");
+            if (!quiet)
+                System.out.println("Wrote: " + bytesWritten + " bytes.");
 
-			final long elapsedTotal = System.currentTimeMillis() - begin;
-			
-			System.out.println("Total elapsed=" + elapsedTotal + "ms");
-			
+            final long elapsedTotal = System.currentTimeMillis() - begin;
+
+            if (!quiet)
+                System.out.println("Total elapsed=" + elapsedTotal + "ms");
+            if (log.isInfoEnabled())
+                log.info("Total elapsed=" + elapsedTotal + "ms");
+
         } finally {
 
             if (jnl != null) {
