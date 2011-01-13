@@ -380,9 +380,18 @@ public class TestJoinGraphOnLubm extends TestCase2 {
 
 			}
 
-			final LoadStats tmp = closureStore.getDataLoader()
+			final LoadStats tmp;
+			try {
+			
+			    tmp = closureStore.getDataLoader()
 					.loadData(is, baseURI, RDFFormat.RDFXML);
-
+			    
+            } finally {
+                
+                is.close();
+                
+            }
+            
 			totals.add(tmp);
 			
 		}

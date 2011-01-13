@@ -637,7 +637,7 @@ public class DataLoader {
     public LoadStats loadData(final Reader reader, final String baseURL,
             final RDFFormat rdfFormat) throws IOException {
 
-        try {
+//        try {
 
             final LoadStats totals = new LoadStats();
 
@@ -645,11 +645,11 @@ public class DataLoader {
             
             return totals;
         
-        } finally {
-            
-            reader.close();
-            
-        }
+//        } finally {
+//            
+//            reader.close();
+//            
+//        }
         
     }
 
@@ -665,7 +665,7 @@ public class DataLoader {
     public LoadStats loadData(final InputStream is, final String baseURL,
             final RDFFormat rdfFormat) throws IOException {
 
-        try {
+//        try {
 
             final LoadStats totals = new LoadStats();
             
@@ -673,11 +673,11 @@ public class DataLoader {
             
             return totals;
             
-        } finally {
-            
-            is.close();
-            
-        }
+//        } finally {
+//            
+//            is.close();
+//            
+//        }
 
     }
 

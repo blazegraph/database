@@ -48,6 +48,7 @@ Modifications:
 package com.bigdata.rdf.rio;
 
 import java.io.IOException;
+import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
@@ -514,8 +515,13 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
 
                 log.info("Reading RDF/XML into temp store.");
 
-                tempStore.getDataLoader().loadData(new StringReader(rdfXml),
+                final Reader r = new StringReader(rdfXml);
+                try {
+                tempStore.getDataLoader().loadData(r,
                         ""/* baseURL */, RDFFormat.RDFXML);
+                } finally {
+                    r.close();
+                }
 
                 /*
                  * Verify the structure of the graph.
@@ -688,8 +694,13 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
             
             log.info("Reading RDF/XML into temp store.");
             
-            tempStore.getDataLoader().loadData(new StringReader(rdfXml),
+            final Reader r = new StringReader(rdfXml);
+            try {
+            tempStore.getDataLoader().loadData(r,
                 ""/* baseURL */, RDFFormat.RDFXML);
+            } finally {
+                r.close();
+            }
 
             /*
              * Re-define the vocabulary so that it does not use the term
