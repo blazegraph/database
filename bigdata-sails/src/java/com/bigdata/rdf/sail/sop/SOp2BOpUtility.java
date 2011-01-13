@@ -50,6 +50,7 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.rdf.sail.Rule2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroups;
@@ -165,14 +166,26 @@ public class SOp2BOpUtility {
     	
     	final IRule rule = rule(join, conditionals);
     	
-    	final PipelineOp joinGroup = Rule2BOpUtility.convert(
+    	PipelineOp left = Rule2BOpUtility.convert(
     			rule, conditionals, idFactory, db, queryEngine, queryHints);
+    	
+        if (!left.getEvaluationContext().equals(
+                BOpEvaluationContext.CONTROLLER)) {
+            /*
+             * Wrap with an operator which will be evaluated on the query
+             * controller.
+             */
+            left = new SliceOp(new BOp[] { left }, NV.asMap(//
+                    new NV(BOp.Annotations.BOP_ID, idFactory
+                            .incrementAndGet()), //
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER)));
+        }
     	
     	/*
     	 * Start with left=<this join group> and add a SubqueryOp for each
     	 * sub group.
     	 */
-    	PipelineOp left = joinGroup;
     	
     	final SOpGroups children = join.getChildren();
     	if (children != null) {
