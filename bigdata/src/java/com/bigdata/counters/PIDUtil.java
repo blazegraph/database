@@ -48,10 +48,10 @@ import org.apache.system.SystemUtil;
  */
 public class PIDUtil {
 
-    static protected final Logger log = Logger
+    static private final Logger log = Logger
             .getLogger(PIDUtil.class);
 
-    static protected final boolean INFO = log.isInfoEnabled();
+//    static protected final boolean INFO = log.isInfoEnabled();
     
     /**
      * Return the PID of the Java VM under Linux using bash.
@@ -156,7 +156,7 @@ public class PIDUtil {
 
         final int pid = Integer.parseInt(matcher.group(1));
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("pid=" + pid);
 
         return pid;
