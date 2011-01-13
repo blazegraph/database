@@ -384,6 +384,20 @@ public class BigdataSail extends SailBase implements Sail {
 
         public static final String DEFAULT_NEW_EVAL_STRATEGY = "false";
         
+        /**
+         * Option as to whether or not to allow Sesame evaluation of queries
+         * that cannot be run natively (if false, these queries will throw
+         * exceptions.  If true, these queries will run heinously slow but they
+         * will run. (default
+         * {@value #DEFAULT_NEW_EVAL_STRATEGY}).
+         */
+        public static final String ALLOW_SESAME_QUERY_EVALUATION = BigdataSail.class.getPackage()
+                .getName()+ ".allowSesameQueryEvaluation";
+
+        public static final String DEFAULT_ALLOW_SESAME_QUERY_EVALUATION = "false";
+        
+        
+        
     }
 
     /**
@@ -529,6 +543,14 @@ public class BigdataSail extends SailBase implements Sail {
      * @See {@link Options#STAR_JOINS}
      */
     final private boolean starJoins;
+    
+    /**
+     * When true, allow queries that cannot be executed natively to be
+     * executed by Sesame.
+     * 
+     * @See {@link Options#ALLOW_SESAME_QUERY_EVALUATION}
+     */
+    final private boolean allowSesameQueryEvaluation;
     
     /**
      * <code>true</code> iff the {@link BigdataSail} has been
@@ -952,6 +974,19 @@ public class BigdataSail extends SailBase implements Sail {
             if (log.isInfoEnabled())
                 log.info(BigdataSail.Options.STAR_JOINS + "="
                         + starJoins);
+            
+        }
+
+        // Sesame query evaluation
+        { 
+            
+            allowSesameQueryEvaluation = Boolean.parseBoolean(properties.getProperty(
+                    BigdataSail.Options.ALLOW_SESAME_QUERY_EVALUATION,
+                    BigdataSail.Options.DEFAULT_ALLOW_SESAME_QUERY_EVALUATION));
+
+            if (log.isInfoEnabled())
+                log.info(BigdataSail.Options.ALLOW_SESAME_QUERY_EVALUATION + "="
+                        + allowSesameQueryEvaluation);
             
         }
 
@@ -3265,7 +3300,8 @@ public class BigdataSail extends SailBase implements Sail {
             
             if (newEvalStrategy) {
             	strategy = new BigdataEvaluationStrategyImpl3(
-            			tripleSource, dataset, nativeJoins 
+            			tripleSource, dataset, nativeJoins, 
+            			allowSesameQueryEvaluation
             			);
             } else {
             	strategy = new BigdataEvaluationStrategyImpl(
@@ -3360,7 +3396,8 @@ public class BigdataSail extends SailBase implements Sail {
                 
                 if (newEvalStrategy) {
                 	strategy = new BigdataEvaluationStrategyImpl3(
-                			tripleSource, dataset, nativeJoins 
+                			tripleSource, dataset, nativeJoins, 
+                			allowSesameQueryEvaluation 
                 			);
                 } else {
                 	strategy = new BigdataEvaluationStrategyImpl(

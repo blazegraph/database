@@ -57,7 +57,7 @@ public class BigdataSailRepository extends SailRepository {
      * 
      * @return a read-only connection to the database
      */
-    public SailRepositoryConnection getReadOnlyConnection() 
+    public BigdataSailRepositoryConnection getReadOnlyConnection() 
         throws RepositoryException {
         
         return new BigdataSailRepositoryConnection(this, 
@@ -71,7 +71,7 @@ public class BigdataSailRepository extends SailRepository {
      * 
      * @return a read-only connection to the database
      */
-    public SailRepositoryConnection getReadOnlyConnection(long timestamp) 
+    public BigdataSailRepositoryConnection getReadOnlyConnection(long timestamp) 
         throws RepositoryException {
         
         return new BigdataSailRepositoryConnection(this, 
@@ -79,7 +79,7 @@ public class BigdataSailRepository extends SailRepository {
         
     }
     
-    public SailRepositoryConnection getReadWriteConnection() 
+    public BigdataSailRepositoryConnection getReadWriteConnection() 
         throws RepositoryException {
         
         try {
@@ -95,7 +95,7 @@ public class BigdataSailRepository extends SailRepository {
         
     }
     
-    public SailRepositoryConnection getUnisolatedConnection() 
+    public BigdataSailRepositoryConnection getUnisolatedConnection() 
         throws RepositoryException {
         
         try {

@@ -214,7 +214,7 @@ public class SOp2BOpUtility {
         int i = 0;
         for (SOpGroup child : children) {
             // convert the child IStep
-			args[i] = convert(child, idFactory, db, queryEngine, queryHints);
+			args[i++] = convert(child, idFactory, db, queryEngine, queryHints);
         }
         
         final LinkedList<NV> anns = new LinkedList<NV>();
@@ -225,6 +225,7 @@ public class SOp2BOpUtility {
         
         final Union thisOp = new Union(args, NV
                     .asMap(anns.toArray(new NV[anns.size()])));
+        
         return thisOp;
 
     }
@@ -283,7 +284,7 @@ public class SOp2BOpUtility {
 	    			final SOp sop = child.getSingletonSOp();
 	    			final BOp bop = sop.getBOp();
 					final IPredicate pred = (IPredicate) bop.setProperty(
-							IPredicate.Annotations.OPTIONAL, "true");
+							IPredicate.Annotations.OPTIONAL, Boolean.TRUE);
 					preds.add(pred);
 	    		}
 	    	}

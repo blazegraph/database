@@ -86,7 +86,8 @@ public class SOp {
     private String toString(final Var v) {
     	if (v.hasValue()) {
     		final String s = v.getValue().stringValue();
-    		return s.substring(s.indexOf('#'));
+    		final int i = s.indexOf('#');
+    		return i >= 0 ? s.substring(s.indexOf('#')) : s;
     	} else {
     		return "?"+v.getName();
     	}
