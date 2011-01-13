@@ -109,8 +109,9 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
     	 */
     	final long l = iv.getDelegate().longValue();
     	
-    	final GregorianCalendar c = 
-    		new GregorianCalendar(TimeZone.getTimeZone("GMT"));
+    	final GregorianCalendar c = new GregorianCalendar(
+//    			TimeZone.getTimeZone("GMT")
+    			);
     	c.setTimeInMillis(l);
     	
     	try {
