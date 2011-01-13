@@ -40,6 +40,7 @@ import org.openrdf.query.algebra.ProjectionElem;
 import org.openrdf.query.algebra.ProjectionElemList;
 import org.openrdf.query.algebra.QueryModelNode;
 import org.openrdf.query.algebra.QueryRoot;
+import org.openrdf.query.algebra.Regex;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.StatementPattern.Scope;
@@ -52,6 +53,7 @@ import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
+import org.openrdf.query.parser.serql.AnonymousVarGenerator;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
@@ -617,15 +619,27 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     			 * UnsupportedOperatorException here must just flow through
     			 * to Sesame evaluation of the entire query.
     			 */
-    			final ValueExpr ve = (ValueExpr) op;
-				final IConstraint bop = toConstraint(ve);
-				sop.setBOp(bop);
+//    			if (op instanceof Regex) {
+//        			final Regex regex = (Regex) op;
+//    				final IPredicate bop = toPredicate(regex);
+//    				sop.setBOp(bop);
+//    			} else {
+	    			final ValueExpr ve = (ValueExpr) op;
+					final IConstraint bop = toConstraint(ve);
+					sop.setBOp(bop);
+//    			}
     		} else if (op instanceof Filter) {
     			final Filter filter = (Filter) op;
     			final ValueExpr ve = filter.getCondition();
     			try {
-    				final IConstraint bop = toConstraint(ve);
-    				sop.setBOp(bop);
+//    				if (ve instanceof Regex) {
+//            			final Regex regex = (Regex) ve;
+//        				final IPredicate bop = toPredicate(regex);
+//        				sop.setBOp(bop);
+//        			} else {
+        				final IConstraint bop = toConstraint(ve);
+        				sop.setBOp(bop);
+//        			}
     			} catch (UnsupportedOperatorException ex) {
     				/*
     				 * If we encounter a sesame filter (ValueExpr) that we
@@ -1439,6 +1453,19 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 //        
 //    }
 
+    private IPredicate toPredicate(final Regex regex) 
+    		throws QueryEvaluationException {
+    	
+    	final Var s = (Var) regex.getLeftArg();
+    	final ValueConstant vc = (ValueConstant) regex.getRightArg();
+    	final Var p = new Var();
+    	p.setValue(BD.SEARCH);
+    	final Var o = new Var();
+    	o.setValue(vc.getValue());
+    	return toPredicate(new StatementPattern(s, p, o));
+    	
+    }
+    
     /**
      * Generate a bigdata {@link IPredicate} (tail) for the supplied
      * StatementPattern.
