@@ -271,7 +271,13 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 //                null/* languageCode */, createURI(arg0.getXMLSchemaType()
 //                        .toString()));
         
-        return new BigdataLiteralImpl(this, arg0.toString(),
+    	String s = arg0.toString();
+    	final int i = s.lastIndexOf('.');
+    	if (i >= 0) {
+    		s = s.substring(0, i);
+    	}
+    	
+        return new BigdataLiteralImpl(this, s,
                 null/* languageCode */, createURI(XMLDatatypeUtil.qnameToURI(
                         arg0.getXMLSchemaType()).stringValue()));
 
