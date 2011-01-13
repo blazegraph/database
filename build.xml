@@ -115,7 +115,7 @@
 	</target>
 
 	<!-- Builds the bigdata JAR and bundles it together with all of its dependencies in the ${build.dir}/lib directory. -->
-	<target name="bundleJar" depends="bundle, jar" description="Builds the bigdata JAR and bundles it together with all of its dependencies in the ${build.dir}/lib directory.">
+	<target name="bundleJar" depends="clean, bundle, jar" description="Builds the bigdata JAR and bundles it together with all of its dependencies in the ${build.dir}/lib directory.">
 		<copy file="${build.dir}/${version}.jar" todir="${build.dir}/lib" />
 		<!--<property name="myclasspath" refid="runtime.classpath" />
 		<echo message="${myclasspath}"/>-->
@@ -1599,6 +1599,18 @@ ${postInstallMessage}</echo>
       <property name="test.codebase.dir" value="${dist.lib.dl}" />
       <property name="test.codebase" value="http://${this.hostname}:${test.codebase.port}/jsk-dl.jar" />
 
+      <!-- These zookeeper configuration properties used to inform the test -->
+      <!-- suite about the zookeeper instance which will be used by the     -->
+      <!-- tests. These properties MUST be consistent with the actual       -->
+      <!-- zookeeper configuration.  Zookeeper is assumed (by the tests) to -->
+      <!-- be running on the localhost.                                     -->
+      <property name="test.zookeeper.tickTime" value="2000" />
+      <property name="test.zookeeper.clientPort" value="2888" />
+      <property name="test.zookeeper.leaderPort" value="3888" />
+
+      <!-- The zookeeper install directory. -->
+      <property name="test.zookeeper.installDir" value="${zookeeper.installDir}" />
+
       <property name="java.security.policy" value="${dist.var.config.policy}/policy.all" />
       <property name="log4j.configuration" value="${bigdata.test.log4j.rel}" />
       <property name="java.net.preferIPv4Stack" value="true" />
@@ -1608,6 +1620,7 @@ ${postInstallMessage}</echo>
       <copy file="${build.properties.from.file}"
             todir="${build.properties.test.to.path}" />
 
+      <antcall target="startZookeeper" />
       <antcall target="startHttpd" />
       <antcall target="startLookup" />
 
@@ -1616,6 +1629,7 @@ ${postInstallMessage}</echo>
 
       <antcall target="stopLookup" />
       <antcall target="stopHttpd" />
+      <antcall target="stopZookeeper" />
 
       <!-- This message is noticed by the hudson build and is used to trigger
            after various after actions. -->
@@ -1688,6 +1702,22 @@ ${postInstallMessage}</echo>
         <sysproperty key="default.nic" value="${default.nic}" />
         <arg value="-stop" />
       </java>
+    </target>
+
+    <target name="startZookeeper">
+    	<echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
+        <echo>bin/zkServer.sh start
+</echo>
+    	<exec command="bin/zkServer.sh start" dir="${test.zookeeper.installDir}" logerror="true">
+</exec>
+    </target>
+
+    <target name="stopZookeeper">
+	<echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
+    <echo>bin/zkServer.sh start
+</echo>
+	<exec command="bin/zkServer.sh stop" dir="${test.zookeeper.installDir}" logerror="true">
+</exec>
     </target>
 
     <!-- runs all junit tests -->
