@@ -1722,15 +1722,6 @@ ${postInstallMessage}</echo>
 	</exec>
     </target>
 
-    <target name="statusZookeeper">
-	<echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
-    <echo>bin/zkServer.sh status
-</echo>
-	<exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true">
-		<arg value="status"/>
-	</exec>
-    </target>
-
     <!-- runs all junit tests -->
     <target name="run-junit">
 
