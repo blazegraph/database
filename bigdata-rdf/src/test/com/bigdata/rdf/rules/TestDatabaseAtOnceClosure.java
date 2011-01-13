@@ -771,8 +771,16 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
                     }
 
+                    try {
+                    
                     closureStore.getDataLoader().loadData(is, baseURI,
                             RDFFormat.RDFXML);
+                    
+                    } finally {
+                        
+                        is.close();
+                        
+                    }
                 
                 }
 
