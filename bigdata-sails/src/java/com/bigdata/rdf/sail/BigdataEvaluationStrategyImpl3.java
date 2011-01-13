@@ -699,10 +699,6 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	    
     	try {
     		
-    		if (log.isDebugEnabled()) {
-    			log.debug("running native query: " + BOpUtility.toString(query));
-    		}
-    		
 		    final IRunningQuery runningQuery = queryEngine.eval(query);
 		
 		    final IAsynchronousIterator<IBindingSet[]> it1 = 
