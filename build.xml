@@ -1708,16 +1708,27 @@ ${postInstallMessage}</echo>
     	<echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
         <echo>bin/zkServer.sh start
 </echo>
-    	<exec command="bin/zkServer.sh start" dir="${test.zookeeper.installDir}" logerror="true">
-</exec>
+    	<exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true">
+    		<arg value="start"/>
+		</exec>
     </target>
 
     <target name="stopZookeeper">
 	<echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
-    <echo>bin/zkServer.sh start
+    <echo>bin/zkServer.sh stop
 </echo>
-	<exec command="bin/zkServer.sh stop" dir="${test.zookeeper.installDir}" logerror="true">
-</exec>
+	<exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true">
+		<arg value="stop"/>
+	</exec>
+    </target>
+
+    <target name="statusZookeeper">
+	<echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
+    <echo>bin/zkServer.sh status
+</echo>
+	<exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true">
+		<arg value="status"/>
+	</exec>
     </target>
 
     <!-- runs all junit tests -->
