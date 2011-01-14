@@ -260,7 +260,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * 
          * @deprecated by {@link BOp} annotations.
          */
-        String DEFAULT_CHUNK_CAPACITY = "1000"; // was 100
+        String DEFAULT_CHUNK_CAPACITY = "100"; // was 100
 
         /**
          * The timeout in milliseconds that the {@link BlockingBuffer} will wait
