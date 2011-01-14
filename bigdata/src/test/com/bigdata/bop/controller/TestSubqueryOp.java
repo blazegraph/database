@@ -345,12 +345,12 @@ public class TestSubqueryOp extends TestCase2 {
         final PipelineOp joinGroup1Op = new SubqueryOp(new BOp[]{join1Op}, 
                 new NV(Predicate.Annotations.BOP_ID, joinGroup1),//
 //                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-                new NV(SubqueryOp.Annotations.SUBQUERY, subQuery)//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subQuery),//
 //                , new NV(BOp.Annotations.CONTROLLER,true)//
 //                new NV(BOp.Annotations.EVALUATION_CONTEXT,
 //                        BOpEvaluationContext.CONTROLLER)//
-//                // join is optional.
-//                new NV(PipelineJoin.Annotations.OPTIONAL, true),//
+                // join is optional.
+                new NV(SubqueryOp.Annotations.OPTIONAL, true)//
 //                // optional target is the same as the default target.
 //                new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
         );
@@ -610,12 +610,12 @@ public class TestSubqueryOp extends TestCase2 {
         final PipelineOp joinGroup1Op = new SubqueryOp(new BOp[]{join1Op}, 
                 new NV(Predicate.Annotations.BOP_ID, joinGroup1),//
 //                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-                new NV(SubqueryOp.Annotations.SUBQUERY, subQuery)//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subQuery),//
 //                new NV(BOp.Annotations.CONTROLLER,true)//
 //                new NV(BOp.Annotations.EVALUATION_CONTEXT,
 //                        BOpEvaluationContext.CONTROLLER)//
-//                // join is optional.
-//                new NV(PipelineJoin.Annotations.OPTIONAL, true),//
+                // join is optional.
+                new NV(SubqueryOp.Annotations.OPTIONAL, true)//
 //                // optional target is the same as the default target.
 //                new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
         );
@@ -871,12 +871,12 @@ public class TestSubqueryOp extends TestCase2 {
         final PipelineOp joinGroup1Op = new SubqueryOp(new BOp[]{condOp}, 
                 new NV(Predicate.Annotations.BOP_ID, joinGroup1),//
 //                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-                new NV(SubqueryOp.Annotations.SUBQUERY, subQuery)//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subQuery),//
 //                new NV(BOp.Annotations.CONTROLLER,true)//
 //                new NV(BOp.Annotations.EVALUATION_CONTEXT,
 //                        BOpEvaluationContext.CONTROLLER)//
-//                // join is optional.
-//                new NV(PipelineJoin.Annotations.OPTIONAL, true),//
+                // join is optional.
+                new NV(SubqueryOp.Annotations.OPTIONAL, true)//
 //                // optional target is the same as the default target.
 //                new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
         );
