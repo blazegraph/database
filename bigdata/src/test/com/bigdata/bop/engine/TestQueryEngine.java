@@ -1543,12 +1543,6 @@ public class TestQueryEngine extends TestCase2 {
      * which do not succeed on the optional join are forwarded to the
      * {@link SliceOp} which is the target specified by the
      * {@link PipelineOp.Annotations#ALT_SINK_REF}.
-     * 
-     * @todo Write unit test for optional join groups. Here the goal is to
-     *       verify that intermediate results may skip more than one join. This
-     *       was a problem for the old query evaluation approach since binding
-     *       sets had to cascade through the query one join at a time. However,
-     *       the new query engine design should handle this case.
      */
     public void test_query_join2_optionals() throws Exception {
 

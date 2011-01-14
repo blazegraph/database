@@ -123,6 +123,14 @@ public class TestQueryEngine_Slice extends TestCase2 {
 
     }
 
+//    public void testStressThreadSafe() throws Exception {
+//        
+//        for(int i=0; i<1000; i++) {
+//            test_slice_threadSafe();
+//        }
+//        
+//    }
+    
     public void test_slice_threadSafe() throws Exception {
 
         final long timeout = 10000; // ms
