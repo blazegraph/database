@@ -49,9 +49,10 @@ import com.bigdata.util.concurrent.LatchedExecutor;
 /**
  * For each binding set presented, this operator executes a subquery. Any
  * solutions produced by the subquery are copied to the default sink. If no
- * solutions are produced, then the original binding set is copied to the
- * default sink (optional join semantics). Each subquery is run as a separate
- * query but will be cancelled if the parent query is cancelled.
+ * solutions are produced and {@link Annotations#OPTIONAL} is <code>true</code>,
+ * then the original binding set is copied to the default sink (optional join
+ * semantics). Each subquery is run as a separate query but will be cancelled if
+ * the parent query is cancelled.
  * 
  * FIXME Parallel evaluation of subqueries is not implemented. What is the
  * appropriate parallelism for this operator? More parallelism should reduce

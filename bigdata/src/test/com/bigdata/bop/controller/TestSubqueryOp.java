@@ -84,18 +84,18 @@ import com.bigdata.striterator.ICloseableIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestOptionalJoinGroup extends TestCase2 {
+public class TestSubqueryOp extends TestCase2 {
 
     /**
      * 
      */
-    public TestOptionalJoinGroup() {
+    public TestSubqueryOp() {
     }
 
     /**
      * @param name
      */
-    public TestOptionalJoinGroup(String name) {
+    public TestSubqueryOp(String name) {
         super(name);
     }
 
