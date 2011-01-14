@@ -88,7 +88,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
      * @param state
      *            Application specified state (optional).
      * @param src
-     *            The source iterator (will be closed exhausted or when this
+     *            The source iterator (will be closed or exhausted when this
      *            iterator is closed).
      * @param buffer
      *            The {@link BlockingBuffer} on which the resolved chunks will
