@@ -73,7 +73,7 @@ public class TestAll extends TestCase {
         // test STEPS
 //        suite.addTestSuite(TestUnion.class);
 
-        suite.addTestSuite(TestOptionalJoinGroup.class);
+        suite.addTestSuite(TestSubqueryOp.class);
 
         // @todo test STAR (transitive closure).
 //        suite.addTestSuite(TestStar.class);
