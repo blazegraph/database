@@ -42,8 +42,10 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**
@@ -361,6 +363,7 @@ public class SubqueryOp extends PipelineOp {
             public IRunningQuery call() throws Exception {
 
                 IAsynchronousIterator<IBindingSet[]> subquerySolutionItr = null;
+                IRunningQuery runningQuery = null;
                 try {
 
                     final QueryEngine queryEngine = parentContext.getRunningQuery()
@@ -376,7 +379,7 @@ public class SubqueryOp extends PipelineOp {
                     final UUID queryId = UUID.randomUUID();
 
                     // execute the subquery, passing in the source binding set.
-                    final IRunningQuery runningQuery = queryEngine
+                    runningQuery = queryEngine
                             .eval(
                                     queryId,
                                     (PipelineOp) subQueryOp,
@@ -415,13 +418,25 @@ public class SubqueryOp extends PipelineOp {
                 } catch (Throwable t) {
 
                     /*
-                     * If a subquery fails, then propagate the error to the
-                     * parent and rethrow the first cause error out of the
-                     * subquery.
+                     * Note: SliceOp will cause other operators to be
+                     * interrupted during normal evaluation but we do not want
+                     * to terminate the parent query when this occurs.
                      */
-                    throw new RuntimeException(ControllerTask.this.context
-                            .getRunningQuery().halt(t));
+                    if (!InnerCause.isInnerCause(t, InterruptedException.class)
+                     && !InnerCause.isInnerCause(t, BufferClosedException.class)) {
 
+                        /*
+                         * If a subquery fails, then propagate the error to the
+                         * parent and rethrow the first cause error out of the
+                         * subquery.
+                         */
+                        throw new RuntimeException(ControllerTask.this.context
+                                .getRunningQuery().halt(t));
+
+                    }
+
+                    return runningQuery;
+                    
                 } finally {
 
                     if (subquerySolutionItr != null)

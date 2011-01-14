@@ -50,6 +50,7 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.service.IBigdataFederation;
@@ -798,7 +799,13 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
         try {
 
-            if (!InnerCause.isInnerCause(t, InterruptedException.class))
+            /*
+             * Note: SliceOp will cause other operators to be interrupted
+             * during normal evaluation so it is not useful to log an
+             * InterruptedException @ ERROR.
+             */
+            if (!InnerCause.isInnerCause(t, InterruptedException.class)
+             && !InnerCause.isInnerCause(t, BufferClosedException.class))
                 log.error(toString(), t);
 
             try {
