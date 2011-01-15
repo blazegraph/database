@@ -31,7 +31,6 @@ import org.openrdf.query.algebra.Compare.CompareOp;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.constraint.BOpConstraint;
@@ -53,7 +52,7 @@ public class CompareBOp extends BOpConstraint {
     public interface Annotations extends PipelineOp.Annotations {
 
         /**
-         * The compare operator
+         * The compare operator, which is a {@link CompareOp} enum value.
          */
         String OP = CompareBOp.class.getName() + ".op";
 
