@@ -239,9 +239,11 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
                 
             } finally {
 
-                src.close();
-                
-                buffer.close();
+				try {
+					src.close();
+				} finally {
+					buffer.close();
+            	}
 
             }
 
@@ -336,7 +338,11 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
             log.info("lastIndex=" + lastIndex + ", chunkSize="
                     + (chunk != null ? "" + chunk.length : "N/A"));
 
-        // asynchronous close by the consumer of the producer's buffer.
+		/*
+		 * Asynchronous close by the consumer of the producer's buffer. This
+		 * will cause the ChunkConsumerTask to abort if it is still running and
+		 * that will cause the [src] to be closed.
+		 */
         buffer.close();
 
         chunk = null;

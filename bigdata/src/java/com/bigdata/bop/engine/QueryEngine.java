@@ -58,6 +58,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.sail.bench.NanoSparqlClient;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.resources.IndexManager;
@@ -967,17 +968,20 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 		}
 
     }
-    
+
 	/**
-	 * Return the {@link AbstractRunningQuery} associated with that query identifier.
+	 * Return the {@link AbstractRunningQuery} associated with that query
+	 * identifier.
 	 * 
 	 * @param queryId
 	 *            The query identifier.
 	 * 
-	 * @return The {@link AbstractRunningQuery} -or- <code>null</code> if there is no
-	 *         query associated with that query identifier.
+	 * @return The {@link AbstractRunningQuery} -or- <code>null</code> if there
+	 *         is no query associated with that query identifier.
+	 * 
+	 * @todo Exposed to {@link NanoSparqlServer}
 	 */
-    protected AbstractRunningQuery getRunningQuery(final UUID queryId) {
+    public /*protected*/ AbstractRunningQuery getRunningQuery(final UUID queryId) {
 
         if(queryId == null)
             throw new IllegalArgumentException();
@@ -1164,4 +1168,10 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     }
 
+	public UUID[] getRunningQueries() {
+
+		return runningQueries.keySet().toArray(new UUID[0]);
+
+	}
+	
 }

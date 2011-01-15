@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop.engine;
 
+import java.nio.channels.ClosedByInterruptException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -783,26 +784,33 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
         public void run() {
 
-            super.run();
+			try {
 
-            /*
-             * This task is done executing so remove its Future before we
-             * attempt to schedule another task for the same
-             * (bopId,partitionId).
-             */
-            final ConcurrentHashMap<ChunkFutureTask, ChunkFutureTask> map = operatorFutures
-                    .get(new BSBundle(t.bopId, t.partitionId));
+				super.run();
+				
+			} finally {
 
-            if (map != null) {
+				/*
+				 * This task is done executing so remove its Future before we
+				 * attempt to schedule another task for the same
+				 * (bopId,partitionId).
+				 */
 
-                map.remove(this, this);
+				final ConcurrentHashMap<ChunkFutureTask, ChunkFutureTask> map = operatorFutures
+						.get(new BSBundle(t.bopId, t.partitionId));
 
-            }
+				if (map != null) {
 
-            // Schedule another task if any messages are waiting.
-            ChunkedRunningQuery.this.scheduleNext(new BSBundle(
-                    t.bopId, t.partitionId));
-        
+					map.remove(this, this);
+
+				}
+
+			}
+
+			// Schedule another task if any messages are waiting.
+			ChunkedRunningQuery.this.scheduleNext(new BSBundle(t.bopId,
+					t.partitionId));
+
         }
         
     }
@@ -852,6 +860,21 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 				final long begin = System.currentTimeMillis();
 				try {
 					t.call();
+				} catch(Throwable t) {
+					/*
+					 * Note: SliceOp will cause other operators to be
+					 * interrupted during normal evaluation. Therefore, while
+					 * these exceptions should cause the query to terminate,
+					 * they should not be reported as errors to the query
+					 * controller.
+					 */
+					if (!InnerCause.isInnerCause(t, InterruptedException.class)
+			 		 && !InnerCause.isInnerCause(t, BufferClosedException.class)
+			 		 && !InnerCause.isInnerCause(t, ClosedByInterruptException.class)
+			 		 ) {
+						// Not an error that we should ignore.
+						throw t;
+	                }
 				} finally {
 					t.context.getStats().elapsed.add(System.currentTimeMillis()
 							- begin);
@@ -876,19 +899,10 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 
             } catch (Throwable ex1) {
 
-				/*
-				 * Note: SliceOp will cause other operators to be interrupted
-				 * during normal evaluation so it is not useful to log an
-				 * InterruptedException @ ERROR.
-				 */
-				if (!InnerCause.isInnerCause(ex1, InterruptedException.class)
-		 		 && !InnerCause.isInnerCause(ex1, BufferClosedException.class)
-		 		 ) {
-					// Log an error.
-                    log.error("queryId=" + getQueryId() + ", bopId=" + t.bopId
-                            + ", bop=" + t.bop, ex1);
-                }
-
+				// Log an error.
+                log.error("queryId=" + getQueryId() + ", bopId=" + t.bopId
+                        + ", bop=" + t.bop, ex1);
+                
                 /*
                  * Mark the query as halted on this node regardless of whether
                  * we are able to communicate with the query controller.

@@ -259,6 +259,10 @@ public class TestNIOChunkMessage extends TestCase2 {
                 throws RemoteException {
         }
 
+		public UUID[] getRunningQueries() {
+			return null;
+		}
+
     }
 
     private static class MyNIOChunkMessage<E> extends NIOChunkMessage<E> {

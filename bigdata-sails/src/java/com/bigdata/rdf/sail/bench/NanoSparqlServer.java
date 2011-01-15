@@ -49,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.Vector;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -74,8 +75,12 @@ import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.LRUNexus;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.engine.IRunningQuery;
+import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.AbstractJournal;
@@ -709,7 +714,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
         return config.timestamp;
         
     }
-	
+
 	/**
 	 * Respond to a status request.
 	 * 
@@ -719,15 +724,27 @@ public class NanoSparqlServer extends AbstractHTTPD {
 	 * @param params
 	 * @return
 	 * @throws Exception
+	 * 
+	 * @todo add statistics for top-N queries based on query template
+	 *       identifiers, which can be communicated using query hints. See //
+	 *       wait for the subquery.
+	 * @todo Report on the average query latency, average concurrency of query
+	 *       evaluation, etc.
 	 */
 	public Response doStatus(final String uri, final String method,
 			final Properties header,
 			final LinkedHashMap<String, Vector<String>> params) throws Exception {
 
+		// SPARQL queries accepted by the SPARQL end point.
         final boolean showQueries = params.get("showQueries") != null;
 
+        // IRunningQuery objects currently running on the query controller.
+        final boolean showRunningQueries = params.get("showRunningQueries") != null;
+
+        // Information about the KB (stats, properties).
         final boolean showKBInfo = params.get("showKBInfo") != null;
 
+        // bigdata namespaces known to the index manager.
         final boolean showNamespaces = params.get("showNamespaces") != null;
 
         final StringBuilder sb = new StringBuilder();
@@ -789,15 +806,17 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			}
 
 			// show the disk access details.
-			sb.append(jnl.getBufferStrategy().getCounters().toString()+"\n\n");
+			sb.append(jnl.getBufferStrategy().getCounters().toString()+"\n");
 
 		}
 		
 		if(showQueries) {
 		    
 		    /*
-		     * Show the queries which are currently executing.
+		     * Show the queries which are currently executing (accepted by the NanoSparqlServer).
 		     */
+
+			sb.append("\n");
 			
 			final long now = System.nanoTime();
 			
@@ -848,6 +867,86 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 			}
 			
+		}
+		
+		if(showRunningQueries) {
+			
+			/*
+			 * Show the queries which are currently executing (actually running
+			 * on the QueryEngine).
+			 */
+			
+			sb.append("\n");
+			
+			final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
+					.getQueryController(indexManager);
+			
+			final UUID[] queryIds = queryEngine.getRunningQueries();
+			
+//			final long now = System.nanoTime();
+			
+			final TreeMap<Long, IRunningQuery> ages = new TreeMap<Long, IRunningQuery>(new Comparator<Long>() {
+				/**
+				 * Comparator puts the entries into descending order by the query
+				 * execution time (longest running queries are first).
+				 */
+				public int compare(final Long o1, final Long o2) {
+					if(o1.longValue()<o2.longValue()) return 1;
+					if(o1.longValue()>o2.longValue()) return -1;
+					return 0;
+				}
+			});
+
+			for(UUID queryId : queryIds) {
+				
+				final IRunningQuery query = queryEngine
+						.getRunningQuery(queryId);
+
+				if (query == null) {
+					// Already terminated.
+					continue;
+				}
+
+				ages.put(query.getElapsed(), query);
+
+			}
+			
+			{
+
+				final Iterator<IRunningQuery> itr = ages.values().iterator();
+
+				while (itr.hasNext()) {
+
+					final IRunningQuery query = itr.next();
+
+					if (query.isDone() && query.getCause() != null) {
+						// Already terminated (normal completion).
+						continue;
+					}
+					
+					/*
+					 * @todo The runstate and stats could be formatted into an
+					 * HTML table ala QueryLog or RunState.
+					 */
+					sb.append("age=" + query.getElapsed() + "ms\n");
+					sb.append("queryId=" + query.getQueryId() + "\n");
+					sb.append(query.toString());
+					sb.append("\n");
+					sb.append(BOpUtility.toString(query.getQuery()));
+					sb.append("\n");
+					sb.append("\n");
+					
+//					final long age = query.getElapsed();
+//					sb.append("age="
+//							+ java.util.concurrent.TimeUnit.NANOSECONDS
+//									.toMillis(age) + "ms, queryId="
+//							+ query.getQueryId() + "\nquery="
+//							+ BOpUtility.toString(query.getQuery()) + "\n");
+
+				}
+
+			}
+
 		}
 		
 		return new Response(HTTP_OK, MIME_TEXT_PLAIN, sb.toString());
