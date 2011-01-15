@@ -1435,12 +1435,14 @@ public class RWStore implements IStore {
 				/*
 				 * Note: ClosedByInterruptException can be thrown out of
 				 * FileChannelUtility.readAll(), typically because the LIMIT on
-				 * a query was satisified, but we do not want to log that as an
+				 * a query was satisfied, but we do not want to log that as an
 				 * error.
 				 */
 //				log.error(e,e);
 				
-				throw new IllegalArgumentException("Unable to read data", e);
+//				throw new IllegalArgumentException("Unable to read data: "+e, e);
+				throw new RuntimeException(e);
+
 			}
 		} finally {
 			readLock.unlock();
