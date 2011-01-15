@@ -35,7 +35,9 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 
 /**
- * A math expression involving a left and right IValueExpression operand.
+ * A math expression involving a left and right IValueExpression operand. The
+ * operation to be applied to the operands is specified by the
+ * {@link Annotations#OP} annotation.
  */
 final public class MathBOp extends ImmutableBOp 
 		implements IValueExpression<IV> {
@@ -48,8 +50,11 @@ final public class MathBOp extends ImmutableBOp
     public interface Annotations extends ImmutableBOp.Annotations {
 
         /**
-         * The {@link IVariable} which is bound to that constant value
-         * (optional).
+         * The operation to be applied to the left and right operands
+         * (required). The value of this annotation is a {@link MathOp}, such as
+         * {@link MathOp#PLUS}.
+         * 
+         * @see MathOp
          */
         String OP = MathBOp.class.getName() + ".op";
 
@@ -66,6 +71,16 @@ final public class MathBOp extends ImmutableBOp
         
     }
 
+    /**
+     * 
+     * @param left
+     *            The left operand.
+     * @param right
+     *            The right operand.
+     * @param op
+     *            The annotation specifying the operation to be performed on
+     *            those operands.
+     */
     public MathBOp(final IValueExpression<IV> left, 
     		final IValueExpression<IV> right, final MathOp op) {
 

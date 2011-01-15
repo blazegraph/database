@@ -858,10 +858,11 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 					final long age = now - query.begin;
 
-					sb.append("age="
-							+ java.util.concurrent.TimeUnit.NANOSECONDS
-									.toMillis(age) + "ms, queryId="
-							+ query.queryId + ", query=" + query.query+"\n");
+                    sb.append("age="
+                            + java.util.concurrent.TimeUnit.NANOSECONDS
+                                    .toMillis(age) + "ms, queryId="
+                            + query.queryId + "\n");
+                    sb.append(query.query + "\n");
 
 				}
 
