@@ -169,20 +169,6 @@ public class SOp2BOpUtility {
     	PipelineOp left = Rule2BOpUtility.convert(
     			rule, conditionals, idFactory, db, queryEngine, queryHints);
     	
-        if (!left.getEvaluationContext().equals(
-                BOpEvaluationContext.CONTROLLER)) {
-            /*
-             * Wrap with an operator which will be evaluated on the query
-             * controller so the results will be streamed back to the query
-             * controller in scale-out.
-             */
-            left = new SliceOp(new BOp[] { left }, NV.asMap(//
-                    new NV(BOp.Annotations.BOP_ID, idFactory
-                            .incrementAndGet()), //
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER)));
-        }
-    	
     	/*
     	 * Start with left=<this join group> and add a SubqueryOp for each
     	 * sub group.
@@ -207,6 +193,33 @@ public class SOp2BOpUtility {
 	    	}
     	}
     
+		if (!left.getEvaluationContext()
+				.equals(BOpEvaluationContext.CONTROLLER)
+				&& !(left instanceof SubqueryOp)) {
+			/*
+			 * Wrap with an operator which will be evaluated on the query
+			 * controller so the results will be streamed back to the query
+			 * controller in scale-out.
+			 * 
+			 * @todo For scale-out, we probably need to stream the results back
+			 * to the node from which the subquery was issued. If the subquery
+			 * is issued against the local query engine where the IBindingSet
+			 * was produced, then the that query engine is the query controller
+			 * for the subquery and a SliceOp on the subquery would bring the
+			 * results for the subquery back to that query controller. There is
+			 * no requirement that the query controller for the subquery and the
+			 * query controller for the parent query be the same node. [I am not
+			 * doing this currently in order to test whether there is a problem
+			 * with SliceOp which interactions with SubqueryOp to allow
+			 * incorrect termination under some circumstances.
+			 */
+            left = new SliceOp(new BOp[] { left }, NV.asMap(//
+                    new NV(BOp.Annotations.BOP_ID, idFactory
+                            .incrementAndGet()), //
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER)));
+        }
+    	
     	return left;
     	
     }

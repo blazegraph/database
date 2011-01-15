@@ -1074,6 +1074,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                             logTimeout += Math.min(maxLogTimeout, logTimeout);
 
+                            if(log.isInfoEnabled()) {
+                            
                             final String msg = "blocked: ntries="
                                     + ntries
                                     + ", elapsed="
@@ -1095,6 +1097,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                             } else {
                                 // issue warning.
                                 log.warn(msg);
+                            }
+                            
                             }
 
                         }

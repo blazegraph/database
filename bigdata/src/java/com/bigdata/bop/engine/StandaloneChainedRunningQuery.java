@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
+import java.nio.channels.ClosedByInterruptException;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -440,6 +441,21 @@ public class StandaloneChainedRunningQuery extends AbstractRunningQuery {
                 final long begin = System.currentTimeMillis();
                 try {
                     t.call();
+                } catch(Throwable t) {
+					/*
+					 * Note: SliceOp will cause other operators to be
+					 * interrupted during normal evaluation. Therefore, while
+					 * these exceptions should cause the query to terminate,
+					 * they should not be reported as errors to the query
+					 * controller.
+					 */
+					if (!InnerCause.isInnerCause(t, InterruptedException.class)
+			 		 && !InnerCause.isInnerCause(t, BufferClosedException.class)
+			 		 && !InnerCause.isInnerCause(t, ClosedByInterruptException.class)
+			 		 ) {
+						// Not an error that we should ignore.
+						throw t;
+	                }
                 } finally {
                     t.context.getStats().elapsed.add(System.currentTimeMillis()
                             - begin);
@@ -457,20 +473,11 @@ public class StandaloneChainedRunningQuery extends AbstractRunningQuery {
                 StandaloneChainedRunningQuery.this.haltOp(msg);
                 
             } catch (Throwable ex1) {
-log.fatal(ex1,ex1); // FIXME remove log stmt.
-                /*
-                 * Note: SliceOp will cause other operators to be interrupted
-                 * during normal evaluation so it is not useful to log an
-                 * InterruptedException @ ERROR.
-                 */
-                if (!InnerCause.isInnerCause(ex1, InterruptedException.class)
-                 && !InnerCause.isInnerCause(ex1, BufferClosedException.class)
-                 ) {
-                    // Log an error.
-                    log.error("queryId=" + getQueryId() + ", bopId=" + t.bopId
-                            + ", bop=" + t.bop, ex1);
-                }
 
+                // Log an error.
+                log.error("queryId=" + getQueryId() + ", bopId=" + t.bopId
+                        + ", bop=" + t.bop, ex1);
+                
                 /*
                  * Mark the query as halted on this node regardless of whether
                  * we are able to communicate with the query controller.

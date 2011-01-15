@@ -1725,6 +1725,11 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl
                 new BigdataBindingSetResolverator(database, it2).start(database
                         .getExecutorService()));
 
+		/*
+		 * FIXME This will deadlock in the buffer fills - see
+		 * BigdataEvaluationStrategyImpl3 which contains a new code pattern for
+		 * this.
+		 */
         try {
             // Wait for the Future (checks for errors).
             runningQuery.get();

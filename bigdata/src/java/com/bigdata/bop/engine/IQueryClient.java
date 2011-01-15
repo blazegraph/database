@@ -10,6 +10,13 @@ import com.bigdata.bop.PipelineOp;
  */
 public interface IQueryClient extends IQueryPeer {
 
+	/**
+	 * Return the set of queries which are running as of the moment when the
+	 * request was processed. Queries reported in the returned array may
+	 * terminate at any time.
+	 */
+	UUID[] getRunningQueries();
+	
     /**
      * Return the query.
      * 

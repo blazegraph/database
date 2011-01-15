@@ -163,7 +163,7 @@ public class FederatedQueryEngine extends QueryEngine {
      * {@inheritDoc}
      */
     @Override
-    protected FederatedRunningQuery getRunningQuery(final UUID queryId) {
+    public /*protected*/ FederatedRunningQuery getRunningQuery(final UUID queryId) {
 
         return (FederatedRunningQuery) super.getRunningQuery(queryId);
 

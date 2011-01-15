@@ -51,14 +51,14 @@
 				<exclude name="**/*.java" />
 				<exclude name="**/package.html" />
 			</fileset>
-			<!-- copy log4j configuration file. -->
-			<fileset dir="${bsbm.dir}/src/resources/logging" />
 		</copy>
 		<copy toDir="${build.dir}/bin">
 			<!-- copy benchmark data and queries. -->
 			<fileset dir="${bsbm.dir}/src/resources/bsbm-data" />
 			<!-- copy the journal configuration file. -->
 			<fileset file="${bsbm.dir}/*.properties" />
+			<!-- copy log4j configuration file. -->
+			<fileset dir="${bsbm.dir}/src/resources/logging" />
 		</copy>
 	</target>
 
@@ -143,7 +143,7 @@
 		<!-- delete file if it exists so we load into a new journal. -->
 		<delete file="${bsbm.journalFile}" />
 		<java classname="com.bigdata.rdf.store.DataLoader" fork="true" failonerror="true" dir="${build.dir}/bin">
-			<arg line="-namespace ${bsbm.namespace} ${bsbm.journalPropertyFile} ${bsbm.outputFile}.${bsbm.outputType}${bsbm.compressType}" />
+			<arg line="-verbose -namespace ${bsbm.namespace} ${bsbm.journalPropertyFile} ${bsbm.outputFile}.${bsbm.outputType}${bsbm.compressType}" />
 			<!-- specify/override the journal file name. -->
 			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}
 				-Dcom.bigdata.rdf.store.DataLoader.bufferCapacity=1000000

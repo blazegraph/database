@@ -711,24 +711,34 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 			final Collection<Filter> sesameFilters) 
 			throws QueryEvaluationException {
 	    
+	    IRunningQuery runningQuery = null;
     	try {
     		
-		    final IRunningQuery runningQuery = queryEngine.eval(query);
-		
+    		// Submit query for evaluation.
+    		runningQuery = queryEngine.eval(query);
+    		
+		    // Iterator draining the query results.
 		    final IAsynchronousIterator<IBindingSet[]> it1 = 
 		        runningQuery.iterator();
 		    
+		    // De-chunk the IBindingSet[] visited by that iterator.
 		    final IChunkedOrderedIterator<IBindingSet> it2 = 
 		    	new ChunkedWrappedIterator<IBindingSet>(
 		            new Dechunkerator<IBindingSet>(it1));
-		    
-		    CloseableIteration<BindingSet, QueryEvaluationException> result = 
+
+		    // Materialize IVs as RDF Values.
+		    CloseableIteration<BindingSet, QueryEvaluationException> result =
+		    	// Monitor IRunningQuery and cancel if Sesame iterator is closed.
+		    	new RunningQueryCloseableIteration<BindingSet, QueryEvaluationException>(runningQuery,
+    			// Convert bigdata binding sets to Sesame binding sets.
 		        new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
+	        		// Materialize IVs as RDF Values.
 		            new BigdataBindingSetResolverator(database, it2).start(
-		            		database.getExecutorService()));
+		            		database.getExecutorService())));
 		
-	        // Wait for the Future (checks for errors).
-	        runningQuery.get();
+//		    No - will deadlock if buffer fills up
+//	        // Wait for the Future (checks for errors).
+//	        runningQuery.get();
 		    
 		    // use the basic filter iterator for remaining filters
 		    if (sesameFilters != null) {
@@ -740,13 +750,13 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 		        }
 		    }
 
-		    return result;
-		    
-    	} catch (QueryEvaluationException ex) {
-    		throw ex;
-    	} catch (Exception ex) {
-    		throw new QueryEvaluationException(ex);
-    	}
+			return result;
+
+		} catch (Throwable t) {
+			if (runningQuery != null)
+				runningQuery.cancel(true/* mayInterruptIfRunning */);
+			throw new QueryEvaluationException(t);
+		}
     	
 	}
 

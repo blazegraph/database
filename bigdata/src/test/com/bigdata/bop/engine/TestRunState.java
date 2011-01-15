@@ -952,6 +952,10 @@ public class TestRunState extends TestCase2 {
                 throws RemoteException {
         }
 
+		public UUID[] getRunningQueries() {
+			return null;
+		}
+
     }
 
     /**

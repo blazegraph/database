@@ -228,8 +228,8 @@ public class BigdataSailGraphQuery extends SailGraphQuery
         
         try {
             
-            TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
-            BigdataSailConnection sailCon =
+        	final TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
+            final BigdataSailConnection sailCon =
                     (BigdataSailConnection) getConnection().getSailConnection();
             CloseableIteration<? extends BindingSet, QueryEvaluationException> bindingsIter =
                     sailCon.evaluate(
@@ -242,7 +242,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery
                             bindingsIter) {
                         @Override
                         protected boolean accept(BindingSet bindingSet) {
-                            Value context = bindingSet.getValue("context");
+                            final Value context = bindingSet.getValue("context");
                             return bindingSet.getValue("subject") instanceof Resource
                                     && bindingSet.getValue("predicate") instanceof URI
                                     && bindingSet.getValue("object") instanceof Value
@@ -254,15 +254,15 @@ public class BigdataSailGraphQuery extends SailGraphQuery
 
                 // Convert the BindingSet objects to actual RDF statements
                 final ValueFactory vf = getConnection().getRepository().getValueFactory();
-                CloseableIteration<Statement, QueryEvaluationException> stIter;
+                final CloseableIteration<Statement, QueryEvaluationException> stIter;
                 stIter = new ConvertingIteration<BindingSet, Statement, QueryEvaluationException>(bindingsIter) {
 
                     @Override
                     protected Statement convert(BindingSet bindingSet) {
-                        Resource subject = (Resource)bindingSet.getValue("subject");
-                        URI predicate = (URI)bindingSet.getValue("predicate");
-                        Value object = bindingSet.getValue("object");
-                        Resource context = (Resource)bindingSet.getValue("context");
+                    	final Resource subject = (Resource)bindingSet.getValue("subject");
+                        final URI predicate = (URI)bindingSet.getValue("predicate");
+                        final Value object = bindingSet.getValue("object");
+                        final Resource context = (Resource)bindingSet.getValue("context");
 
                         if (context == null) {
                             return vf.createStatement(subject, predicate, object);
@@ -277,10 +277,11 @@ public class BigdataSailGraphQuery extends SailGraphQuery
                 return new GraphQueryResultImpl(getParsedQuery().getQueryNamespaces(), stIter);
 
             } else {
+            	// native construct.
                 
                 // Convert the BindingSet objects to actual RDF statements
                 final ValueFactory vf = getConnection().getRepository().getValueFactory();
-                CloseableIteration<? extends Statement, QueryEvaluationException> stIter;
+                final CloseableIteration<? extends Statement, QueryEvaluationException> stIter;
                 stIter = new BigdataConstructIterator(sailCon.getTripleStore(),  bindingsIter, vf);
                 return new GraphQueryResultImpl(getParsedQuery()
                         .getQueryNamespaces(), stIter);

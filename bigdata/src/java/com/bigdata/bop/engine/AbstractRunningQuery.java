@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
@@ -799,19 +800,25 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
         try {
 
-            /*
-             * Note: SliceOp will cause other operators to be interrupted
-             * during normal evaluation so it is not useful to log an
-             * InterruptedException @ ERROR.
-             */
-            if (!InnerCause.isInnerCause(t, InterruptedException.class)
-             && !InnerCause.isInnerCause(t, BufferClosedException.class))
-                log.error(toString(), t);
-
             try {
 
-                // signal error condition.
-                return future.halt(t);
+                /*
+                 * Note: SliceOp will cause other operators to be interrupted
+                 * during normal evaluation so it is not useful to log an
+                 * InterruptedException @ ERROR.
+                 */
+    			if (!InnerCause.isInnerCause(t, InterruptedException.class)
+    			 && !InnerCause.isInnerCause(t, BufferClosedException.class)
+    			 && !InnerCause.isInnerCause(t, ClosedByInterruptException.class)) {
+					log.error(toString(), t);
+					// signal error condition.
+					return future.halt(t);
+				} else {
+					// normal termination.
+					future.halt((Void)null/* result */);
+					// the caller's cause.
+					return t;
+				}
 
             } finally {
 
@@ -990,16 +997,28 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     public String toString() {
         final StringBuilder sb = new StringBuilder(getClass().getName());
-        sb.append("{queryId=" + queryId);
-        sb.append(",deadline=" + deadline.get());
-        sb.append(",isDone=" + isDone());
-        sb.append(",isCancelled=" + isCancelled());
-        sb.append(",runState=" + runState);
-        sb.append(",controller=" + controller);
-        sb.append(",clientProxy=" + clientProxy);
-        sb.append(",query=" + query);
-        sb.append("}");
-        return sb.toString();
+		sb.append("{queryId=" + queryId);
+		/*
+		 * Note: Obtaining the lock here is required to avoid concurrent
+		 * modification exception in RunState's toString() when there is a
+		 * concurrent change in the RunState. It also makes the isDone() and
+		 * isCancelled() reporting atomic.
+		 */
+		lock.lock();
+		try {
+			sb.append(",elapsed=" + getElapsed());
+			sb.append(",deadline=" + deadline.get());
+			sb.append(",isDone=" + isDone());
+			sb.append(",isCancelled=" + isCancelled());
+			sb.append(",runState=" + runState);
+		} finally {
+			lock.unlock();
+		}
+		sb.append(",controller=" + controller);
+		sb.append(",clientProxy=" + clientProxy);
+		sb.append(",query=" + query);
+		sb.append("}");
+		return sb.toString();
     }
 
     // abstract protected IChunkHandler getChunkHandler();
