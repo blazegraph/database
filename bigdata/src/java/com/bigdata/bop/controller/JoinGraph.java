@@ -198,6 +198,10 @@ import com.bigdata.striterator.IChunkedIterator;
  *       approach should be able to handle queries without perfect / covering
  *       automatically. Then experiment with carrying fewer statement indices
  *       for quads.
+ *       
+ * @todo Unit test when there are no solutions to the query. In this case there
+ *       will be no paths identified by the optimizer and the final path length
+ *       becomes zero. 
  */
 public class JoinGraph extends PipelineOp {
 
@@ -1032,10 +1036,10 @@ public class JoinGraph extends PipelineOp {
 			 * path).
 			 */
 			final int joinId = 1;
-			final PipelineJoin joinOp = new PipelineJoin(new BOp[] {}, //
+			final Map<String,Object> anns = NV.asMap(//
 				new NV(BOp.Annotations.BOP_ID, joinId),//
-				new NV(PipelineJoin.Annotations.PREDICATE, vTarget.pred
-						.setBOpId(3)),
+				// @todo Why not use a factory which avoids bopIds already in use?
+				new NV(PipelineJoin.Annotations.PREDICATE, vTarget.pred.setBOpId(3)),
 				// disallow parallel evaluation.
 				new NV(PipelineJoin.Annotations.MAX_PARALLEL,0),
 				// disable access path coalescing 
@@ -1056,6 +1060,12 @@ public class JoinGraph extends PipelineOp {
 				new NV(PipelineJoin.Annotations.SHARED_STATE,true),
 				new NV(PipelineJoin.Annotations.EVALUATION_CONTEXT,BOpEvaluationContext.CONTROLLER)
 			);
+			if (vTarget.pred.getProperty(PipelineJoin.Annotations.CONSTRAINTS) != null) {
+				// Copy constraints from the predicate onto the join, which will apply them.
+				anns.put(PipelineJoin.Annotations.CONSTRAINTS, vTarget.pred
+						.getProperty(PipelineJoin.Annotations.CONSTRAINTS));
+			}
+			final PipelineJoin joinOp = new PipelineJoin(new BOp[] {}, anns);
 
 			final PipelineOp queryOp = joinOp;
 			
@@ -1805,8 +1815,13 @@ public class JoinGraph extends PipelineOp {
 		}
 
 		/**
+		 * Find a good join path in the data given the join graph. The join path
+		 * is not guaranteed to be the best join path (the search performed by
+		 * the runtime optimizer is not exhaustive) but it should always be a
+		 * "good" join path and may often be the "best" join path.
 		 * 
 		 * @param queryEngine
+		 *            The query engine.
 		 * @param limit
 		 *            The limit for sampling a vertex and the initial limit for
 		 *            cutoff join evaluation.
@@ -1818,10 +1833,25 @@ public class JoinGraph extends PipelineOp {
 		 *            a join path, the starting vertex will be the vertex of
 		 *            that edge having the lower cardinality.
 		 * 
+		 * @return The join path identified by the runtime query optimizer as
+		 *         the best path given the join graph and the data.
+		 * 
+		 * @throws NoSolutionsException
+		 *             If there are no solutions for the join graph in the data
+		 *             (the query does not have any results).
+		 * 
 		 * @throws Exception
+		 * 
+		 * @todo It is possible that this could throw a
+		 *       {@link NoSolutionsException} if the cutoff joins do not use a
+		 *       large enough sample to find a join path which produces at least
+		 *       one solution. We need to automatically increase the depth of
+		 *       search for queries where we have cardinality estimation
+		 *       underflows or punt to another method to decide the join order.
 		 */
 		public Path runtimeOptimizer(final QueryEngine queryEngine,
-				final int limit, final int nedges) throws Exception {
+				final int limit, final int nedges) throws Exception,
+				NoSolutionsException {
 
 			// Setup the join graph.
 			Path[] paths = round0(queryEngine, limit, nedges);
@@ -1838,12 +1868,19 @@ public class JoinGraph extends PipelineOp {
 
 			int round = 1;
 
-			while (round < nvertices - 1) {
+			while (paths.length > 0 && round < nvertices - 1) {
 
 				paths = expand(queryEngine, limit, round++, paths);
 
 			}
 
+			if (paths.length == 0) {
+
+				// There are no solutions for the join graph in the data.
+				throw new NoSolutionsException();
+				
+			}
+			
 			// Should be one winner.
 			assert paths.length == 1;
 
@@ -2257,6 +2294,10 @@ public class JoinGraph extends PipelineOp {
 					final boolean v1Found = x.contains(edgeInGraph.v1);
 					final boolean v2Found = x.contains(edgeInGraph.v2);
 
+					if (log.isTraceEnabled())
+						log.trace("Edge: " + edgeInGraph + ", v1Found="
+								+ v1Found + ", v2Found=" + v2Found);
+					
 					if (!v1Found && !v2Found) {
 						// Edge is not connected to this path.
 						continue;
@@ -2277,6 +2318,9 @@ public class JoinGraph extends PipelineOp {
 
 					if (used.contains(tVertex)) {
 						// Vertex already used to extend this path.
+						if (log.isTraceEnabled())
+							log.trace("Edge: " + edgeInGraph
+									+ " - already used to extend this path.");
 						continue;
 					}
 
@@ -2291,6 +2335,10 @@ public class JoinGraph extends PipelineOp {
 
 					// Add to the set of paths for this round.
 					tmp.add(p);
+
+					if (log.isTraceEnabled())
+						log.trace("Extended path with edge: " + edgeInGraph
+								+ ", new path=" + p);
 
 				}
 
@@ -2806,6 +2854,13 @@ public class JoinGraph extends PipelineOp {
 //
 //			anns.add(new NV(PipelineJoin.Annotations.SELECT, vars.toArray(new IVariable[vars.size()])));
 
+			if (p.getProperty(PipelineJoin.Annotations.CONSTRAINTS) != null) {
+				// Copy constraints from the predicate onto the join, which will
+				// apply them.
+				anns.add(new NV(PipelineJoin.Annotations.CONSTRAINTS, p
+						.getProperty(PipelineJoin.Annotations.CONSTRAINTS)));
+			}
+
 			final PipelineJoin joinOp = new PipelineJoin(
 					lastOp == null ? new BOp[0] : new BOp[] { lastOp },
 					anns.toArray(new NV[anns.size()]));
@@ -2935,4 +2990,34 @@ public class JoinGraph extends PipelineOp {
 
 	}
 
+	/**
+	 * Exception thrown when the join graph does not have any solutions in the
+	 * data (running the query does not produce any results).
+	 */
+	public static class NoSolutionsException extends RuntimeException
+	{
+
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
+
+		public NoSolutionsException() {
+			super();
+		}
+
+		public NoSolutionsException(String message, Throwable cause) {
+			super(message, cause);
+		}
+
+		public NoSolutionsException(String message) {
+			super(message);
+		}
+
+		public NoSolutionsException(Throwable cause) {
+			super(cause);
+		}
+		
+	}
+	
 }
