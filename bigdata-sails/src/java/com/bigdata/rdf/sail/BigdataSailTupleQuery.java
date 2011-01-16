@@ -31,28 +31,36 @@ public class BigdataSailTupleQuery extends SailTupleQuery
     }
 
     /**
-     * Overriden to use query hints from SPARQL queries. Query hints are
+     * Overridden to use query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
      * See {@link QueryHints#NAMESPACE} for more information.
      */
     @Override
     public TupleQueryResult evaluate() throws QueryEvaluationException {
-        TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
+        
+    	final TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
 
         try {
-            CloseableIteration<? extends BindingSet, QueryEvaluationException> bindingsIter;
+        
+			CloseableIteration<? extends BindingSet, QueryEvaluationException> bindingsIter;
 
-            BigdataSailConnection sailCon =
-                (BigdataSailConnection) getConnection().getSailConnection();
-            bindingsIter = sailCon.evaluate(tupleExpr, getActiveDataset(), getBindings(), getIncludeInferred(), queryHints);
+			final BigdataSailConnection sailCon = (BigdataSailConnection) getConnection()
+					.getSailConnection();
 
-            bindingsIter = enforceMaxQueryTime(bindingsIter);
+			bindingsIter = sailCon.evaluate(tupleExpr, getActiveDataset(),
+					getBindings(), getIncludeInferred(), queryHints);
 
-            return new TupleQueryResultImpl(new ArrayList<String>(tupleExpr.getBindingNames()), bindingsIter);
+			bindingsIter = enforceMaxQueryTime(bindingsIter);
+
+			return new TupleQueryResultImpl(new ArrayList<String>(tupleExpr
+					.getBindingNames()), bindingsIter);
+
+		} catch (SailException e) {
+
+			throw new QueryEvaluationException(e);
+			
         }
-        catch (SailException e) {
-            throw new QueryEvaluationException(e.getMessage(), e);
-        }
+
     }
 
     public TupleExpr getTupleExpr() throws QueryEvaluationException {
