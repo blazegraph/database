@@ -728,6 +728,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 				 * This is used for processing errors and also if this task is
 				 * interrupted (because the sink has been closed).
 				 */
+				// ensure query halts.
 				halt(t);
                 
 				// reset the unsync buffers.
@@ -759,7 +760,12 @@ public class PipelineJoin<E> extends PipelineOp implements
 					log.error(t2.getLocalizedMessage(), t2);
 				}
 
-				throw new RuntimeException(t);
+				if (getCause() != null) {
+					// abnormal termination.
+					throw new RuntimeException(t);
+				}
+				// normal termination - ignore exception.
+				return null;
 
 				// } finally {
 				//            	
@@ -1040,9 +1046,16 @@ public class PipelineJoin<E> extends PipelineOp implements
 					return null;
 
 				} catch (Throwable t) {
-	                
-					throw new RuntimeException(halt(t));
 
+					// ensure query halts.
+					halt(t);
+					if (getCause() != null) {
+						// abnormal termination.
+						throw new RuntimeException(t);
+					}
+					// normal terminate - ignore exception.
+					return null;
+					
 				}
 
 			}
@@ -1674,7 +1687,13 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 				} catch (Throwable t) {
 
-					throw new RuntimeException(halt(t));
+					// ensure query halts.
+					halt(t);
+					if (getCause() != null) {
+						// abnormal termination.
+						throw new RuntimeException(t);
+					}
+					// normal termination - ignore exception.
 
 				} finally {
 
@@ -1880,7 +1899,13 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 				} catch (Throwable t) {
 
-					throw new RuntimeException(halt(t));
+					// ensure query halts.
+					halt(t);
+					if (getCause() != null) {
+						// abnormal termination.
+						throw new RuntimeException(t);
+					}
+					// normal termination - ignore exception.
 
 				} finally {
 
@@ -2070,7 +2095,14 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 				} catch (Throwable t) {
 
-					throw new RuntimeException(halt(t));
+					// ensure query halts.
+					halt(t);
+					if (getCause() != null) {
+						// abnormal termination.
+						throw new RuntimeException(t);
+					}
+					// normal termination - ignore exception.
+					return null;
 
 				}
 
