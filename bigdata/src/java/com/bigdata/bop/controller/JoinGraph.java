@@ -779,8 +779,9 @@ public class JoinGraph extends PipelineOp {
 				throw new IllegalArgumentException();
 			if (shared == null)
 				throw new IllegalArgumentException();
-			if (shared.isEmpty())
-				throw new IllegalArgumentException();
+			// Note: We need to allow edges which do not share variables
+//			if (shared.isEmpty())
+//				throw new IllegalArgumentException();
 			this.v1 = v1;
 			this.v2 = v2;
 			this.shared = shared;
@@ -1782,6 +1783,11 @@ public class JoinGraph extends PipelineOp {
 			/*
 			 * Identify the edges by looking for shared variables among the
 			 * predicates.
+			 * 
+			 * Note: If a vertex does not share ANY variables then it is paired
+			 * with every other vertex. Such joins will always produce a full
+			 * cross product and they can be taken paired with any of the other
+			 * vertices.
 			 */
 			{
 
@@ -1789,10 +1795,15 @@ public class JoinGraph extends PipelineOp {
 
 				for (int i = 0; i < v.length; i++) {
 
+					// consider a source vertex.
 					final IPredicate<?> p1 = v[i];
 
+					// #of vertices which share a variable with source vertex.
+					int nmatched = 0;
+					
 					for (int j = i + 1; j < v.length; j++) {
 
+						// consider a possible target vertex.
 						final IPredicate<?> p2 = v[j];
 
 						final Set<IVariable<?>> shared = Rule.getSharedVars(p1,
@@ -1800,12 +1811,34 @@ public class JoinGraph extends PipelineOp {
 
 						if (shared != null && !shared.isEmpty()) {
 
+							// the source and target vertices share var(s).
 							tmp.add(new Edge(V[i], V[j], shared));
+							
+							nmatched++;
 
 						}
 
 					}
 
+					if (nmatched == 0) {
+
+						/*
+						 * The source vertex does not share any variables. In
+						 * order to explore join paths which include that vertex
+						 * we therefore pair it with each of the other vertices.
+						 */
+						for (int j = 0; j < v.length; j++) {
+
+							if (j == i)
+								continue;
+
+							tmp.add(new Edge(V[i], V[j], 
+									Collections.EMPTY_SET));
+
+						}
+
+					}
+					
 				}
 
 				E = tmp.toArray(new Edge[0]);
@@ -2698,8 +2731,10 @@ public class JoinGraph extends PipelineOp {
 
 			this.context = context;
 
+			// The initial cutoff sampling limit.
 			limit = getLimit();
 
+			// The initial number of edges (1 step paths) to explore.
 			nedges = getNEdges();
 
 			if (limit <= 0)
