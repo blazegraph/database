@@ -41,7 +41,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.config.LongValidator;
 import com.bigdata.journal.AbstractInterruptsTestCase;
 import com.bigdata.journal.AbstractJournalTestCase;
 import com.bigdata.journal.AbstractMRMWTestCase;
@@ -58,7 +57,7 @@ import com.bigdata.journal.TestJournalBasics;
 import com.bigdata.journal.Journal.Options;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.service.AbstractTransactionService;
+import com.bigdata.util.InnerCause;
 
 /**
  * Test suite for {@link BufferMode#DiskRW} journals.
@@ -1029,14 +1028,24 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				assertEquals(0L, bs.getPhysicalAddress(faddr));
 
-				try {
-					rdBuf = bs.read(faddr); // should fail with illegal argument
-					throw new RuntimeException("Fail");
-				} catch (Exception ise) {
-					assertTrue("Expected "+IllegalArgumentException.class.getName()+" reading from " + (faddr >> 32) + " instead got: "
-							+ ise, ise instanceof IllegalArgumentException
-							);
-				}
+                try {
+                    // should fail with PhysicalAddressResolutionException
+                    rdBuf = bs.read(faddr);
+                    fail("Expecting: "
+                            + PhysicalAddressResolutionException.class);
+                } catch (Throwable t) {
+                    if (InnerCause.isInnerCause(t,
+                            PhysicalAddressResolutionException.class)) {
+                        if (log.isInfoEnabled()) {
+                            log.info("Ignoring expected exception: " + t);
+                        }
+                    } else {
+                        fail("Expected: "
+                                + PhysicalAddressResolutionException.class
+                                        .getName() + " reading from "
+                                + (faddr >> 32) + ", instead got: " + t, t);
+                    }
+                }
 
 			} finally {
 
