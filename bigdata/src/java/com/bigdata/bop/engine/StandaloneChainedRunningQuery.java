@@ -444,8 +444,8 @@ public class StandaloneChainedRunningQuery extends AbstractRunningQuery {
                 } catch(Throwable t) {
 					halt(t);
 					if (getCause() != null) {
-						// Abnormal termination.
-						throw getCause();
+						// Abnormal termination - wrap and rethrow.
+						throw new RuntimeException(t);
 					}
 					// normal termination - swallow the exception.
                 } finally {
@@ -466,10 +466,6 @@ public class StandaloneChainedRunningQuery extends AbstractRunningQuery {
                 
             } catch (Throwable ex1) {
 
-                // Log an error.
-                log.error("queryId=" + getQueryId() + ", bopId=" + t.bopId
-                        + ", bop=" + t.bop, ex1);
-                
                 /*
                  * Mark the query as halted on this node regardless of whether
                  * we are able to communicate with the query controller.
@@ -481,6 +477,14 @@ public class StandaloneChainedRunningQuery extends AbstractRunningQuery {
                 
                 // ensure halted.
                 halt(ex1);
+                
+				if (getCause() != null) {
+
+					// Log an error.
+					log.error("queryId=" + getQueryId() + ", bopId=" + t.bopId
+							+ ", bop=" + t.bop, ex1);
+
+				}
 
                 final HaltOpMessage msg = new HaltOpMessage(getQueryId(), t.bopId,
                         -1/*partitionId*/, serviceId, getCause()/*firstCauseIfError*/, t.sinkId,
