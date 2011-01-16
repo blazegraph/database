@@ -814,7 +814,7 @@ public class TestSliceOp extends TestCase2 {
          * Overridden to close the sink so the slice will terminate.
          */
         @Override
-        public void halt() {
+        public void halt(Void v) {
             sink.close();
         }
 

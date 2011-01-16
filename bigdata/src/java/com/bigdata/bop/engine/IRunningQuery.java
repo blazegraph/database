@@ -29,7 +29,6 @@ package com.bigdata.bop.engine;
 
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Future;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
@@ -40,6 +39,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ICloseableIterator;
+import com.bigdata.util.concurrent.IHaltable;
 
 /**
  * Non-Remote interface exposing a limited set of the state of an executing
@@ -48,7 +48,7 @@ import com.bigdata.striterator.ICloseableIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IRunningQuery extends Future<Void>{
+public interface IRunningQuery extends IHaltable<Void> {
     
 	/**
 	 * The query.
@@ -134,35 +134,35 @@ public interface IRunningQuery extends Future<Void>{
     public long getElapsed();
     
     /**
-     * Cancel the running query (normal termination).
-     * <p>
-     * Note: This method provides a means for an operator to indicate that the
-     * query should halt immediately for reasons other than abnormal
-     * termination.
-     * <p>
-     * Note: For abnormal termination of a query, just throw an exception out of
-     * the query operator implementation.
-     */
-    void halt();
-
-    /**
-     * Cancel the query (abnormal termination).
-     * 
-     * @param t
-     *            The cause.
-     *            
-     * @return The first cause.
-     * 
-     * @throws IllegalArgumentException
-     *             if the argument is <code>null</code>.
-     */
-    Throwable halt(final Throwable t);
-
-    /**
-     * Return the cause if the query was terminated by an exception.
-     * @return
-     */
-    Throwable getCause();
+//     * Cancel the running query (normal termination).
+//     * <p>
+//     * Note: This method provides a means for an operator to indicate that the
+//     * query should halt immediately for reasons other than abnormal
+//     * termination.
+//     * <p>
+//     * Note: For abnormal termination of a query, just throw an exception out of
+//     * the query operator implementation.
+//     */
+//    void halt();
+//
+//    /**
+//     * Cancel the query (abnormal termination).
+//     * 
+//     * @param t
+//     *            The cause.
+//     *            
+//     * @return The argument.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if the argument is <code>null</code>.
+//     */
+//    Throwable halt(final Throwable t);
+//
+//    /**
+//     * Return the cause if the query was terminated by an exception.
+//     * @return
+//     */
+//    Throwable getCause();
     
     /**
      * Return an iterator which will drain the solutions from the query. The

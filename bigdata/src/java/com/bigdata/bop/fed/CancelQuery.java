@@ -34,7 +34,7 @@ class CancelQuery implements Runnable {
     public void run() {
 
         if (cause == null)
-            q.halt();
+            q.halt((Void)null);
         else
             q.halt(cause);
 

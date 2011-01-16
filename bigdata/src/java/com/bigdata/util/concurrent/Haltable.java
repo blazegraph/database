@@ -58,13 +58,15 @@ import com.bigdata.util.InnerCause;
  * <p>
  * This class embeds certain knowledge about which exceptions may be observed
  * during normal termination of asynchronous processes using I/O, thread pools,
- * and {@link IBlockingBuffer}s.
+ * and {@link IBlockingBuffer}s. See
+ * {@link #isNormalTerminationCause(Throwable)} for a list of the
+ * {@link Throwable} causes which are treated as normal termination.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: AbstractHaltableProcess.java 2265 2009-10-26 12:51:06Z
  *          thompsonbry $
  */
-public class Haltable<V> implements Future<V> {
+public class Haltable<V> implements IHaltable<V> {
 
     private final transient static Logger log = Logger
             .getLogger(Haltable.class);
@@ -140,25 +142,26 @@ public class Haltable<V> implements Future<V> {
      * the cause out of their own context.</strong>
      * 
      * @param cause
-     *            The cause.
+     *            The cause (required).
      * 
      * @return The argument.
-     * 
-     * @throws IllegalArgumentException
-     *             if the cause is <code>null</code>.
      */
     final public <T extends Throwable> T halt(final T cause) {
         final boolean didHalt;
         lock.lock();
         try {
             if (didHalt = !halt) {
+            	/*
+            	 * This is the first cause.
+            	 */
+            	// note the first cause (and handle an illegal null if found).
                 firstCause = (cause != null ? cause
                         : new IllegalArgumentException());
+                // note if abnormal termination (firstCause only)
+                error = !isNormalTerminationCause(firstCause);
                 try {
                     // signal *all* listeners.
                     halted.signalAll();
-                    // note if abnormal termination (firstCause only)
-                    error = !isNormalTerminationCause(cause);
                 } finally {
                     halt = true; // volatile write.
                 }
@@ -178,18 +181,20 @@ public class Haltable<V> implements Future<V> {
         return cause;
     }
 
-    /**
-     * Return unless processing has been halted. The method should be invoked
-     * from within the execution of the process itself so that it may notice
-     * asynchronous termination. It will throw out the wrapper first cause if
-     * the process is halted. External processes waiting on the {@link Future}
-     * interface should use {@link #isDone()} which does not have the semantics
-     * of asserting that the process should still be running.
-     * 
-     * @throws RuntimeException
-     *             wrapping the {@link #firstCause} iff processing has been
-     *             halted.
-     */
+	/**
+	 * Return unless processing has been halted. The method should be invoked
+	 * from within the execution of the process itself so that it may notice
+	 * asynchronous termination. It will throw out the wrapped first cause if
+	 * the process is halted.
+	 * <p>
+	 * Note: External processes waiting on the {@link Future} interface should
+	 * use {@link #isDone()} which does not have the semantics of asserting that
+	 * the process should still be running.
+	 * 
+	 * @throws RuntimeException
+	 *             wrapping the {@link #firstCause} iff processing has been
+	 *             halted.
+	 */
     final public void halted() {
 
         if (halt) {
@@ -313,23 +318,24 @@ public class Haltable<V> implements Future<V> {
 
     }
 
-    /**
-     * Return the first {@link Throwable} which caused this process to halt, but
-     * only for abnormal termination.
-     * 
-     * @return The first {@link Throwable} which caused this process to halt and
-     *         <code>null</code> if the process has not halted or if it halted
-     *         through normal termination.
-     */
-    final public Throwable getCause() {
+	final public Throwable getCause() {
 
-        if (!halt)
-            return null;
+		lock.lock();
+		try {
+		
+			if (!halt)
+				return null;
 
-        if (!error)
-            return null;
+			if (!error)
+				return null;
 
-        return firstCause;
+			return firstCause;
+
+		} finally {
+		
+			lock.unlock();
+			
+		}
 
     }
 
@@ -344,49 +350,50 @@ public class Haltable<V> implements Future<V> {
 
     }
 
-    /**
-     * Return <code>true</code> if the {@link Throwable} is a known normal
-     * termination cause for the process. The method inspects the stack trace,
-     * examining both the outer and {@link InnerCause}s. The following causes
-     * are interpreted as normal termination:
-     * <dl>
-     * <dt>{@link InterruptedException}</dt>
-     * <dd>The process was terminated by an interrupt. Interrupts are typically
-     * used to terminate asynchronous processes when their production limit has
-     * been satisfied or the consumer otherwise chooses to
-     * {@link IAsynchronousIterator#close()} the iterator through which they are
-     * consuming results from the process.</dd>
-     * <dt>{@link CancellationException}</dt>
-     * <dd>A process has been canceled using its {@link Future}.</dd>
-     * <dt>{@link ClosedByInterruptException}</dt>
-     * <dd>A process was interrupted during an IO operation.</dd>
-     * <dt>{@link RejectedExecutionException}</dt>
-     * <dd>A process was not executed because the pool against which it was
-     * submitted had been shutdown (this of course implies that the work queue
-     * was unbounded).</dd>
-     * <dt>{@link BufferClosedException}</dt>
-     * <dd>The {@link IBlockingBuffer} on which the process was writing was
-     * asynchronously closed.</dd>
-     * </dl>
-     * 
-     * @param cause
-     *            The {@link Throwable}.
-     * 
-     * @return <code>true</code> if the {@link Throwable} indicates normal
-     *         termination.
-     */
+	/**
+	 * Return <code>true</code> if the {@link Throwable} is a known normal
+	 * termination cause for the process. The method inspects the stack trace,
+	 * examining both the outer and {@link InnerCause}s. The following causes
+	 * are interpreted as normal termination:
+	 * <dl>
+	 * <dt>{@link InterruptedException}</dt>
+	 * <dd>The process was terminated by an interrupt. Interrupts are typically
+	 * used to terminate asynchronous processes when their production limit has
+	 * been satisfied or the consumer otherwise chooses to
+	 * {@link IAsynchronousIterator#close()} the iterator through which they are
+	 * consuming results from the process.</dd>
+	 * <dt>{@link CancellationException}</dt>
+	 * <dd>A process has been canceled using its {@link Future}.</dd>
+	 * <dt>{@link ClosedByInterruptException}</dt>
+	 * <dd>A process was interrupted during an IO operation.</dd>
+	 * <dt>{@link BufferClosedException}</dt>
+	 * <dd>The {@link IBlockingBuffer} on which the process was writing was
+	 * asynchronously closed.</dd>
+	 * <dt>{@link RejectedExecutionException}</dt>
+	 * <dd>A process was not executed because the pool against which it was
+	 * submitted had been shutdown (this of course implies that the work queue
+	 * was unbounded as a bounded pool will throw this exception if the work
+	 * queue is full).</dd>
+	 * </dl>
+	 * 
+	 * @param cause
+	 *            The {@link Throwable}.
+	 * 
+	 * @return <code>true</code> if the {@link Throwable} indicates normal
+	 *         termination.
+	 * 
+	 * @see #getCause()
+	 */
     protected boolean isNormalTerminationCause(final Throwable cause) {
-//        if (InnerCause.isInnerCause(cause, CancelledException.class))
-//            return true;
         if (InnerCause.isInnerCause(cause, InterruptedException.class))
             return true;
         if (InnerCause.isInnerCause(cause, CancellationException.class))
             return true;
         if (InnerCause.isInnerCause(cause, ClosedByInterruptException.class))
             return true;
-        if (InnerCause.isInnerCause(cause, RejectedExecutionException.class))
-            return true;
         if (InnerCause.isInnerCause(cause, BufferClosedException.class))
+            return true;
+        if (InnerCause.isInnerCause(cause, RejectedExecutionException.class))
             return true;
         return false;
     }

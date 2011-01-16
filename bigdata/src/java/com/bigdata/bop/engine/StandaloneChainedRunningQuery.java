@@ -442,20 +442,12 @@ public class StandaloneChainedRunningQuery extends AbstractRunningQuery {
                 try {
                     t.call();
                 } catch(Throwable t) {
-					/*
-					 * Note: SliceOp will cause other operators to be
-					 * interrupted during normal evaluation. Therefore, while
-					 * these exceptions should cause the query to terminate,
-					 * they should not be reported as errors to the query
-					 * controller.
-					 */
-					if (!InnerCause.isInnerCause(t, InterruptedException.class)
-			 		 && !InnerCause.isInnerCause(t, BufferClosedException.class)
-			 		 && !InnerCause.isInnerCause(t, ClosedByInterruptException.class)
-			 		 ) {
-						// Not an error that we should ignore.
-						throw t;
-	                }
+					halt(t);
+					if (getCause() != null) {
+						// Abnormal termination.
+						throw getCause();
+					}
+					// normal termination - swallow the exception.
                 } finally {
                     t.context.getStats().elapsed.add(System.currentTimeMillis()
                             - begin);
@@ -486,10 +478,12 @@ public class StandaloneChainedRunningQuery extends AbstractRunningQuery {
                  * error message is necessary in order to catch errors in
                  * clientProxy.haltOp() (above and below).
                  */
-                final Throwable firstCause = halt(ex1);
+                
+                // ensure halted.
+                halt(ex1);
 
                 final HaltOpMessage msg = new HaltOpMessage(getQueryId(), t.bopId,
-                        -1/*partitionId*/, serviceId, firstCause, t.sinkId,
+                        -1/*partitionId*/, serviceId, getCause()/*firstCauseIfError*/, t.sinkId,
                         0/*t.sinkMessagesOut.get()*/, t.altSinkId,
                         0/*t.altSinkMessagesOut.get()*/, t.context.getStats());
                 

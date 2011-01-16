@@ -305,17 +305,17 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
 
             public IRunningQuery call() throws Exception {
 
+            	IRunningQuery runningSubquery = null;
                 IAsynchronousIterator<IBindingSet[]> subquerySolutionItr = null;
                 try {
 
                     final QueryEngine queryEngine = parentContext.getRunningQuery()
                             .getQueryEngine();
 
-                    final IRunningQuery runningQuery = queryEngine
-                            .eval(subQueryOp);
+					runningSubquery = queryEngine.eval(subQueryOp);
 
                     // Iterator visiting the subquery solutions.
-                    subquerySolutionItr = runningQuery.iterator();
+                    subquerySolutionItr = runningSubquery.iterator();
 
                     // Copy solutions from the subquery to the query.
                     BOpUtility.copy(subquerySolutionItr, parentContext
@@ -323,20 +323,31 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
                             null/* stats */);
                     
                     // wait for the subquery.
-                    runningQuery.get();
+                    runningSubquery.get();
 
                     // done.
-                    return runningQuery;
+                    return runningSubquery;
                     
                 } catch (Throwable t) {
 
-                    /*
-                     * If a subquery fails, then propagate the error to the
-                     * parent and rethrow the first cause error out of the
-                     * subquery.
-                     */
-                    throw new RuntimeException(ControllerTask.this.context
-                            .getRunningQuery().halt(t));
+					if (runningSubquery == null
+							|| runningSubquery.getCause() != null) {
+						/*
+						 * If things fail before we start the subquery, or if a
+						 * subquery fails (due to abnormal termination), then
+						 * propagate the error to the parent and rethrow the
+						 * first cause error out of the subquery.
+						 * 
+						 * Note: IHaltable#getCause() considers exceptions
+						 * triggered by an interrupt to be normal termination.
+						 * Such exceptions are NOT propagated here and WILL NOT
+						 * cause the parent query to terminate.
+						 */
+						throw new RuntimeException(ControllerTask.this.context
+								.getRunningQuery().halt(runningSubquery.getCause()));
+					}
+					
+					return runningSubquery;
 
                 } finally {
 

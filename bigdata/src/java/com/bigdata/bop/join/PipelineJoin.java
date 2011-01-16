@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
+import java.nio.channels.ClosedByInterruptException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -77,6 +78,7 @@ import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.service.DataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Haltable;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
@@ -743,9 +745,8 @@ public class PipelineJoin<E> extends PipelineOp implements
 				 * This is used for processing errors and also if this task is
 				 * interrupted (because the sink has been closed).
 				 */
-
 				halt(t);
-
+                
 				// reset the unsync buffers.
 				try {
 					// resetUnsyncBuffers();
@@ -1056,10 +1057,8 @@ public class PipelineJoin<E> extends PipelineOp implements
 					return null;
 
 				} catch (Throwable t) {
-
-					halt(t);
-
-					throw new RuntimeException(t);
+	                
+					throw new RuntimeException(halt(t));
 
 				}
 
@@ -1692,9 +1691,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 				} catch (Throwable t) {
 
-					halt(t);
-
-					throw new RuntimeException(t);
+					throw new RuntimeException(halt(t));
 
 				} finally {
 
@@ -1900,9 +1897,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 				} catch (Throwable t) {
 
-					halt(t);
-
-					throw new RuntimeException(t);
+					throw new RuntimeException(halt(t));
 
 				} finally {
 
@@ -2092,9 +2087,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 				} catch (Throwable t) {
 
-					halt(t);
-
-					throw new RuntimeException(t);
+					throw new RuntimeException(halt(t));
 
 				}
 

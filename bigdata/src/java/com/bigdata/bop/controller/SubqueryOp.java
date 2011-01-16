@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.controller;
 
-import java.nio.channels.ClosedByInterruptException;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -43,10 +42,8 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
-import com.bigdata.util.InnerCause;
 
 /**
  * For each binding set presented, this operator executes a subquery. Any
@@ -425,7 +422,7 @@ public class SubqueryOp extends PipelineOp {
 						throw ex;
 						
 					}
-
+					
                     if (ncopied == 0L && optional) {
 
                         /*
@@ -442,28 +439,47 @@ public class SubqueryOp extends PipelineOp {
                     
                 } catch (Throwable t) {
 
-					/*
-					 * Note: SliceOp will cause other operators to be
-					 * interrupted during normal evaluation. Therefore, while
-					 * these exceptions should cause the subquery to terminate,
-					 * they should not be reported as errors to the parent
-					 * query.
-					 */
-        			if (!InnerCause.isInnerCause(t, InterruptedException.class)
-			 		 && !InnerCause.isInnerCause(t, BufferClosedException.class)
-			 		 && !InnerCause.isInnerCause(t, ClosedByInterruptException.class)) {
-    		
-                        /*
-                         * If a subquery fails, then propagate the error to the
-                         * parent and rethrow the first cause error out of the
-                         * subquery.
-                         */
-                        throw new RuntimeException(ControllerTask.this.context
-                                .getRunningQuery().halt(t));
+//					/*
+//					 * Note: SliceOp will cause other operators to be
+//					 * interrupted during normal evaluation. Therefore, while
+//					 * these exceptions should cause the subquery to terminate,
+//					 * they should not be reported as errors to the parent
+//					 * query.
+//					 */
+//        			if (!InnerCause.isInnerCause(t, InterruptedException.class)
+//			 		 && !InnerCause.isInnerCause(t, BufferClosedException.class)
+//			 		 && !InnerCause.isInnerCause(t, ClosedByInterruptException.class)) {
+//    		
+//                        /*
+//                         * If a subquery fails, then propagate the error to the
+//                         * parent and rethrow the first cause error out of the
+//                         * subquery.
+//                         */
+//                        throw new RuntimeException(ControllerTask.this.context
+//                                .getRunningQuery().halt(t));
+//
+//                    }
+//
+//                    return runningSubquery;
 
-                    }
-
-                    return runningSubquery;
+					if (runningSubquery == null
+							|| runningSubquery.getCause() != null) {
+						/*
+						 * If things fail before we start the subquery, or if a
+						 * subquery fails (due to abnormal termination), then
+						 * propagate the error to the parent and rethrow the
+						 * first cause error out of the subquery.
+						 * 
+						 * Note: IHaltable#getCause() considers exceptions
+						 * triggered by an interrupt to be normal termination.
+						 * Such exceptions are NOT propagated here and WILL NOT
+						 * cause the parent query to terminate.
+						 */
+						throw new RuntimeException(ControllerTask.this.context
+								.getRunningQuery().halt(runningSubquery.getCause()));
+					}
+					
+					return runningSubquery;
                     
                 } finally {
 
