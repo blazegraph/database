@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
-import java.nio.channels.ClosedByInterruptException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -78,7 +77,6 @@ import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.service.DataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
-import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Haltable;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
@@ -130,12 +128,6 @@ public class PipelineJoin<E> extends PipelineOp implements
 		 * variables are retained unless this annotation is specified.
 		 */
 		String SELECT = PipelineJoin.class.getName() + ".select";
-
-		/**
-		 * An optional {@link IConstraint}[] which places restrictions on the
-		 * legal patterns in the variable bindings.
-		 */
-		String CONSTRAINTS = PipelineJoin.class.getName() + ".constraints";
 
 		/**
 		 * Marks the join as "optional" in the SPARQL sense. Binding sets which
@@ -444,15 +436,6 @@ public class PipelineJoin<E> extends PipelineOp implements
 	}
 
 	/**
-	 * @see Annotations#CONSTRAINTS
-	 */
-	public IConstraint[] constraints() {
-
-		return getProperty(Annotations.CONSTRAINTS, null/* defaultValue */);
-
-	}
-
-	/**
 	 * @see Annotations#OPTIONAL
 	 */
 	public boolean isOptional() {
@@ -659,7 +642,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 			this.joinOp = joinOp;
 			this.predicate = joinOp.getPredicate();
-			this.constraints = joinOp.constraints();
+			this.constraints = predicate.constraints();
 			this.maxParallel = joinOp.getMaxParallel();
 			if (maxParallel < 0)
 				throw new IllegalArgumentException(Annotations.MAX_PARALLEL

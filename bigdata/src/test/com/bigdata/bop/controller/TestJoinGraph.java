@@ -90,6 +90,14 @@ public class TestJoinGraph extends TestCase2 {
     public void test_Path_addEdge() {
     	fail("write test");
     }
+
+    /**
+     * Test ability to identify shared variables appearing either as predicate
+     * operands or as part of CONSTRAINTS or FILTERS.
+     */
+    public void test_getSharedVariables() {
+        fail("write test");
+    }
     
 //    @Override
 //    public Properties getProperties() {

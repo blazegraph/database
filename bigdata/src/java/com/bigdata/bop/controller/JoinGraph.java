@@ -73,7 +73,6 @@ import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
-import com.bigdata.relation.rule.Rule;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.IChunkedIterator;
 
@@ -945,6 +944,13 @@ public class JoinGraph extends PipelineOp {
 				throw new IllegalStateException();
 			if (v2.sample == null) // vertex not sampled.
 				throw new IllegalStateException();
+            /*
+             * FIXME CONSTRAINT ORDERING : If a variable only appears in a
+             * CONSTRAINT for one of the two vertices then that vertex must be
+             * evaluated second. (If the vertices both have this problem then
+             * the edge can not be evaluated until some other vertex causes the
+             * variables of either one [v1] or [v2] to become bound.)
+             */
 			if (v1.sample.rangeCount < v2.sample.rangeCount) {
 				v = v1;
 				vp = v2;
@@ -1061,11 +1067,7 @@ public class JoinGraph extends PipelineOp {
 				new NV(PipelineJoin.Annotations.SHARED_STATE,true),
 				new NV(PipelineJoin.Annotations.EVALUATION_CONTEXT,BOpEvaluationContext.CONTROLLER)
 			);
-			if (vTarget.pred.getProperty(PipelineJoin.Annotations.CONSTRAINTS) != null) {
-				// Copy constraints from the predicate onto the join, which will apply them.
-				anns.put(PipelineJoin.Annotations.CONSTRAINTS, vTarget.pred
-						.getProperty(PipelineJoin.Annotations.CONSTRAINTS));
-			}
+
 			final PipelineJoin joinOp = new PipelineJoin(new BOp[] {}, anns);
 
 			final PipelineOp queryOp = joinOp;
@@ -1335,7 +1337,7 @@ public class JoinGraph extends PipelineOp {
 			/*
 			 * Scan the vertices of the caller's path. If any of those vertices
 			 * are NOT found in this path the paths are not unordered variations
-			 * of one aother.
+			 * of one another.
 			 */
 			for (int i = 0; i < v2.length; i++) {
 
@@ -1381,10 +1383,15 @@ public class JoinGraph extends PipelineOp {
 			for (Edge e : edges) {
 
 				if (tmp.isEmpty()) {
-					/*
-					 * The first edge is handled specially in order to report
-					 * the minimum cardinality vertex first.
-					 */
+                    /*
+                     * The first edge is handled specially in order to report
+                     * the minimum cardinality vertex first.
+                     * 
+                     * FIXME CONSTRAINT ORDERING : A vertex can not run until
+                     * all variables appearing in its CONSTRAINTS would be
+                     * bound. This can cause us to use and report an ordering
+                     * which does not place the minimum cardinality vertex 1st.
+                     */
 					tmp.add(e.getMinimumCardinalityVertex());
 					tmp.add(e.getMaximumCardinalityVertex());
 
@@ -1530,26 +1537,30 @@ public class JoinGraph extends PipelineOp {
 			// The new vertex, which is not part of this path.
 			final Vertex targetVertex = v1Found ? e.v2 : e.v1;
 
-			/*
-			 * Chain sample the edge.
-			 * 
-			 * Note: ROX uses the intermediate result I(p) for the existing path
-			 * as the input when sampling the edge. The corresponding concept
-			 * for us is the sample for this Path, which will have all variable
-			 * bindings produced so far. In order to estimate the cardinality of
-			 * the new join path we have to do a one step cutoff evaluation of
-			 * the new Edge, given the sample available on the current Path.
-			 * 
-			 * FIXME It is possible for the path sample to be empty. Unless the
-			 * sample also happens to be exact, this is an indication that the
-			 * estimated cardinality has underflowed. We track the estimated
-			 * cumulative cardinality, so this does not make the join path an
-			 * immediate winner, but it does mean that we can not probe further
-			 * on that join path as we lack any intermediate solutions to feed
-			 * into the downstream joins. [If we re-sampled the edges in the
-			 * join path in each round then this would help to establish a
-			 * better estimate in successive rounds.]
-			 */
+            /*
+             * Chain sample the edge.
+             * 
+             * Note: ROX uses the intermediate result I(p) for the existing path
+             * as the input when sampling the edge. The corresponding concept
+             * for us is the sample for this Path, which will have all variable
+             * bindings produced so far. In order to estimate the cardinality of
+             * the new join path we have to do a one step cutoff evaluation of
+             * the new Edge, given the sample available on the current Path.
+             * 
+             * FIXME It is possible for the path sample to be empty. Unless the
+             * sample also happens to be exact, this is an indication that the
+             * estimated cardinality has underflowed. We track the estimated
+             * cumulative cardinality, so this does not make the join path an
+             * immediate winner, but it does mean that we can not probe further
+             * on that join path as we lack any intermediate solutions to feed
+             * into the downstream joins. [If we re-sampled the edges in the
+             * join path in each round then this would help to establish a
+             * better estimate in successive rounds.]
+             * 
+             * FIXME CONSTRAINT ORDERING : It is illegal to add a vertex to the
+             * path if any variable appearing in its CONSTRAINTS would not be
+             * bound.
+             */
 
 			final EdgeSample edgeSample = e.estimateCardinality(queryEngine,
 					limit, sourceVertex, targetVertex,
@@ -1741,6 +1752,14 @@ public class JoinGraph extends PipelineOp {
 		 */
 		private final Edge[] E;
 
+        /**
+         * An unordered collection of vertices which do not share any variables
+         * with the other vertices in the join graph. These vertices are run
+         * last. Once the {@link #E edges} have been exhausted, these vertices
+         * are simply appended to the join path in an arbitrary order.
+         */
+		private final Vertex[] unshared;
+
 		public List<Vertex> getVertices() {
 			return Collections.unmodifiableList(Arrays.asList(V));
 		}
@@ -1756,6 +1775,10 @@ public class JoinGraph extends PipelineOp {
 			for (Vertex v : V) {
 				sb.append("\nV[" + v.pred.getId() + "]=" + v);
 			}
+            sb.append("\n],unshared=[");
+            for (Vertex v : unshared) {
+                sb.append("\n" + v);
+            }
 			sb.append("],E=[");
 			for (Edge e : E) {
 				sb.append("\n" + e);
@@ -1780,18 +1803,39 @@ public class JoinGraph extends PipelineOp {
 
 			}
 
-			/*
-			 * Identify the edges by looking for shared variables among the
-			 * predicates.
-			 * 
-			 * Note: If a vertex does not share ANY variables then it is paired
-			 * with every other vertex. Such joins will always produce a full
-			 * cross product and they can be taken paired with any of the other
-			 * vertices.
-			 */
+            /*
+             * Identify the edges by looking for shared variables among the
+             * predicates.
+             * 
+             * Note: Variables may appear in the arguments of the predicate,
+             * e.g., spo(?s,rdf:type,?o).
+             * 
+             * Note: Variables may ALSO appear in the CONSTRAINTS (imposed on
+             * the binding sets) or FILTERS (imposed either on the local or
+             * remote access path). For example, that a variable bound by
+             * another predicate must take on a value having some mathematical
+             * relationship to a variable bound by the predicate, e.g., BSBM Q5.
+             * When a variable appears in a constraint but does not appear as an
+             * argument to the predicate, then there is an additional
+             * requirement that the variable MUST become bound before the
+             * predicate may be evaluated (again, BSBM Q5 has this form).
+             * 
+             * Note: If a vertex does not share ANY variables (neither in the
+             * arguments of the predicate nor in its constraints or filters)
+             * then it can be paired with any of the other vertices. However, in
+             * such cases we always run such vertices last as they can not
+             * restrict the cardinality of the rest of the join graph. Such
+             * vertices are therefore inserted into a separate set and appended
+             * to the join path once all edges having shared variables have been
+             * exhausted.
+             */
 			{
 
-				final List<Edge> tmp = new LinkedList<Edge>();
+			    // The set of identified edges for vertices which share vars.
+                final List<Edge> tmp = new LinkedList<Edge>();
+                
+                // The set of vertices which do not share variables.
+                final List<Vertex> unshared = new LinkedList<Vertex>();
 
 				for (int i = 0; i < v.length; i++) {
 
@@ -1806,12 +1850,21 @@ public class JoinGraph extends PipelineOp {
 						// consider a possible target vertex.
 						final IPredicate<?> p2 = v[j];
 
-						final Set<IVariable<?>> shared = Rule.getSharedVars(p1,
-								p2);
+                        final Set<IVariable<?>> shared = getSharedVars(p1, p2);
 
 						if (shared != null && !shared.isEmpty()) {
 
-							// the source and target vertices share var(s).
+                            /*
+                             * The source and target vertices share var(s).
+                             * 
+                             * Note: A predicate having a variable which appears
+                             * in a CONSTRAINT MUST NOT be added to the join
+                             * path until that variable would be bound.
+                             * Therefore, when selecting the vertices to be used
+                             * to extend a join path, we must consider whether
+                             * or not the join path would bind the variable(s)
+                             * appearing in the CONSTRAINT.
+                             */
 							tmp.add(new Edge(V[i], V[j], shared));
 							
 							nmatched++;
@@ -1823,26 +1876,37 @@ public class JoinGraph extends PipelineOp {
 					if (nmatched == 0) {
 
 						/*
-						 * The source vertex does not share any variables. In
-						 * order to explore join paths which include that vertex
-						 * we therefore pair it with each of the other vertices.
+						 * The source vertex does not share any variables.
 						 */
-						for (int j = 0; j < v.length; j++) {
-
-							if (j == i)
-								continue;
-
-							tmp.add(new Edge(V[i], V[j], 
-									Collections.EMPTY_SET));
-
-						}
+					    
+					    unshared.add(V[i]);
 
 					}
 					
 				}
 
 				E = tmp.toArray(new Edge[0]);
+				
+				this.unshared = unshared.toArray(new Vertex[0]); 
 
+				if(!unshared.isEmpty()) {
+
+                    /*
+                     * FIXME This needs to be supported. We should explore and
+                     * generate the join paths based on only those vertices
+                     * which do share variables (and hence for which we have
+                     * defined edges). Once the vertices which share variables
+                     * have been exhausted, we should simply append edges for
+                     * the vertices which do not share variables in an arbitrary
+                     * order (they will be run last since they can not constrain
+                     * the evaluation).
+                     */
+
+				    throw new UnsupportedOperationException(
+                            "Some predicates do not share any variables with other predicates.");
+				    
+				}
+				
 			}
 
 		}
@@ -1889,13 +1953,21 @@ public class JoinGraph extends PipelineOp {
 			// Setup the join graph.
 			Path[] paths = round0(queryEngine, limit, nedges);
 
-			/*
-			 * The initial paths all have one edge, and hence two vertices. Each
-			 * round adds one more vertex to each path. We are done once we have
-			 * generated paths which include all vertices.
-			 * 
-			 * This occurs at round := nvertices - 1
-			 */
+            /*
+             * The initial paths all have one edge, and hence two vertices. Each
+             * round adds one more vertex to each path. We are done once we have
+             * generated paths which include all vertices.
+             * 
+             * This occurs at round := nvertices - 1
+             * 
+             * FIXME UNSHARED VERTICES : Add [unshared] vertices after all
+             * vertices with shared variables have been incorporated into the
+             * join paths. This should happen outside of the loop since the
+             * joins with unshared variables can not constraint the solutions.
+             * Therefore choose the best join path based on the vertices with
+             * the shared variables and then simply append the [unshared]
+             * vertices.
+             */
 
 			final int nvertices = V.length;
 
@@ -2000,25 +2072,29 @@ public class JoinGraph extends PipelineOp {
 
 		}
 
-		/**
-		 * Choose up to <i>nedges</i> edges to be the starting point.
-		 * 
-		 * @param queryEngine
-		 *            The query engine.
-		 * @param limit
-		 *            The cutoff used when sampling the vertices and when
-		 *            sampling the edges.
-		 * @param nedges
-		 *            The maximum #of edges to choose. Those having the smallest
-		 *            expected cardinality will be chosen.
-		 * 
-		 * @return An initial set of paths starting from any most <i>nedges</i>.
-		 *         For each of the <i>nedges</i> lowest cardinality edges, the
-		 *         starting vertex will be the vertex with the lowest
-		 *         cardinality for that edge.
-		 * 
-		 * @throws Exception
-		 */
+        /**
+         * Choose up to <i>nedges</i> edges to be the starting point. For each
+         * of the <i>nedges</i> lowest cardinality edges, the starting vertex
+         * will be the vertex with the lowest cardinality for that edge.
+         * <p>
+         * Note: An edge can not serve as a starting point for exploration if it
+         * uses variables (for example, in a CONSTRAINT) which are not bound by
+         * either vertex (since the variable(s) are not bound, the constraint
+         * would always fail).
+         * 
+         * @param queryEngine
+         *            The query engine.
+         * @param limit
+         *            The cutoff used when sampling the vertices and when
+         *            sampling the edges.
+         * @param nedges
+         *            The maximum #of edges to choose. Those having the smallest
+         *            expected cardinality will be chosen.
+         * 
+         * @return An initial set of paths starting from at most <i>nedges</i>.
+         * 
+         * @throws Exception
+         */
 		public Path[] round0(final QueryEngine queryEngine, final int limit,
 				final int nedges) throws Exception {
 
@@ -2889,13 +2965,6 @@ public class JoinGraph extends PipelineOp {
 //
 //			anns.add(new NV(PipelineJoin.Annotations.SELECT, vars.toArray(new IVariable[vars.size()])));
 
-			if (p.getProperty(PipelineJoin.Annotations.CONSTRAINTS) != null) {
-				// Copy constraints from the predicate onto the join, which will
-				// apply them.
-				anns.add(new NV(PipelineJoin.Annotations.CONSTRAINTS, p
-						.getProperty(PipelineJoin.Annotations.CONSTRAINTS)));
-			}
-
 			final PipelineJoin joinOp = new PipelineJoin(
 					lastOp == null ? new BOp[0] : new BOp[] { lastOp },
 					anns.toArray(new NV[anns.size()]));
@@ -3025,7 +3094,105 @@ public class JoinGraph extends PipelineOp {
 
 	}
 
-	/**
+    /**
+     * Return the variables in common for two {@link IPredicate}s. All variables
+     * spanned by either {@link IPredicate} are considered.
+     * <p>
+     * Note: Variables may appear in the predicates operands, in the
+     * {@link Annotations#CONSTRAINTS} associated with the
+     * predicate, and in the {@link IPredicate.Annotations#ACCESS_PATH_FILTER}
+     * or {@link IPredicate.Annotations#INDEX_LOCAL_FILTER}.
+     * <p>
+     * Note: A variable must become bound before it may be evaluated in
+     * {@link Annotations#CONSTRAINTS}, an
+     * {@link IPredicate.Annotations#ACCESS_PATH_FILTER} or an
+     * {@link IPredicate.Annotations#INDEX_LOCAL_FILTER}. This means that the
+     * {@link IPredicate}s which can bind the variable must be ordered before
+     * those which merely test the variable.
+     * 
+     * 
+     * @param p1
+     *            A predicate.
+     * 
+     * @param p2
+     *            A different predicate.
+     * 
+     * @return The variables in common -or- <code>null</code> iff there are no
+     *         variables in common.
+     * 
+     * @throws IllegalArgumentException
+     *             if the two predicates are the same reference.
+     * 
+     * @todo It should be an error if a variable appear in a test is not bound
+     *       by any possible join path. However, note that it may not be
+     *       possible to determine this by local examination of a join graph
+     *       since we do not know which variables may be presented as already
+     *       bound when the join graph is evaluated (but we can only run the
+     *       join graph currently against static source binding sets and for
+     *       that case this is knowable).
+     * 
+     * @todo When a variable is only optionally bound and it is discovered at
+     *       runtime that the variable is not bound when it is considered by a
+     *       CONSTRAINT, FILTER, etc., then the SPARQL semantics are that
+     *       evaluation should produce a 'type' error which would cause the
+     *       solution should fail (at least within its current join group). See
+     *       https://sourceforge.net/apps/trac/bigdata/ticket/179.
+     * 
+     * @todo Unit tests, including those which verify that variables appearing
+     *       in the constraints are reported as shared with those appearing in
+     *       the predicates operands.
+     */
+    static Set<IVariable<?>> getSharedVars(final IPredicate p1, final IPredicate p2) {
+        
+        // The set of variables which are shared by those predicates.
+        final Set<IVariable<?>> sharedVars = new LinkedHashSet<IVariable<?>>();
+        
+        /*
+         * Collect the variables appearing anyway in [p1], including the
+         * predicate's operands and its constraints, filters, etc.
+         */
+        final Set<IVariable<?>> p1vars = new LinkedHashSet<IVariable<?>>();
+        {
+
+            final Iterator<IVariable<?>> itr = BOpUtility
+                    .getSpannedVariables(p1);
+
+            while (itr.hasNext()) {
+
+                p1vars.add(itr.next());
+
+            }
+
+        }
+
+        /*
+         * Consider the variables appearing anyway in [p2], including the
+         * predicate's operands and its constraints, filters, etc.
+         */
+        {
+
+            final Iterator<IVariable<?>> itr = BOpUtility
+                    .getSpannedVariables(p2);
+
+            while (itr.hasNext()) {
+
+                final IVariable<?> avar = itr.next();
+                
+                if(p1vars.contains(avar)) {
+
+                    sharedVars.add(avar);
+                    
+                }
+
+            }
+
+        }
+        
+        return sharedVars;
+
+    }
+    
+    /**
 	 * Exception thrown when the join graph does not have any solutions in the
 	 * data (running the query does not produce any results).
 	 */

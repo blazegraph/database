@@ -1128,7 +1128,7 @@ public class TestQueryEngine extends TestCase2 {
 				new NV(Predicate.Annotations.BOP_ID, joinId),//
 				new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
 				// impose constraint on the join.
-				new NV(PipelineJoin.Annotations.CONSTRAINTS,
+				new NV(Annotations.CONSTRAINTS,
 						new IConstraint[] { new EQConstant(y,
 								new Constant<String>("Paul")) })//
 		);
@@ -1592,7 +1592,7 @@ public class TestQueryEngine extends TestCase2 {
 				new NV(Predicate.Annotations.BOP_ID, joinId2),//
 				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op),//
 				// constraint x == z
-				new NV(PipelineJoin.Annotations.CONSTRAINTS,
+				new NV(Annotations.CONSTRAINTS,
 						new IConstraint[] { new EQ(x, z) }),
 				// join is optional.
 				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
