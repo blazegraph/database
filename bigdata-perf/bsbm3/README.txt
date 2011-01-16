@@ -54,3 +54,33 @@ To get started:
 
 There are a variety of other ant tasks in that directory which may be used to
 run load and run the BSBM qualification data set, etc. 
+
+Performance should be extremely good for the reduced query mix, which can be
+enabled by editing:
+
+  bigdata-perf/bsbm3/bsbmtools/queries/explore/ignoreQueries
+  
+For the reduced query mix, "ignoreQueries" should contain "5 6". For the full
+query mix, it should be an empty file (the reduced query mix is enabled by
+default in SVN).
+
+Notes on the queries:
+
+The static query optimizer and vectored pipelined joins do a great job on most
+of the BSBM queries.  However, there are two queries which do not do so well out
+of the box:
+
+Query 5 has a bad join plan using the static query optimizer.  Good performance
+for query 5 can be achieved by replacing the contents of:
+
+   bigdata-perf/bsbm3/bsbmtools/queries/explore/query5.txt
+
+   bigdata-perf/bsbm3/bsbmtools/queries/explore/query5-explicit-order.txt
+
+The original version of query5 has also been saved as query5-original.txt
+
+Query 6 is uses a REGEX filter.  Bigdata does not have index support for REGEX,
+so this winds up visiting a lot of data and then filtering using the REGEX. This
+drags the overall performance down dramatically.  It is possible to integrate
+bigdata with Lucene, which does support indexed regular expressions, but that is
+not something which works out of the box.

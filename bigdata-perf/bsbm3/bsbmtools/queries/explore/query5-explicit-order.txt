@@ -1,0 +1,22 @@
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+PREFIX BIGDATA_QUERY_HINTS: <http://www.bigdata.com/queryHints#com.bigdata.rdf.sail.QueryHints.optimizer=None>
+
+SELECT DISTINCT ?product ?productLabel
+WHERE { 
+
+	%ProductXYZ% bsbm:productPropertyNumeric2 ?origProperty2 .
+	%ProductXYZ% bsbm:productPropertyNumeric1 ?origProperty1 .
+	%ProductXYZ% bsbm:productFeature ?prodFeature .
+	?product bsbm:productFeature ?prodFeature .
+	?product bsbm:productPropertyNumeric1 ?simProperty1 .
+	   FILTER (?simProperty1 < (?origProperty1 + 120) && ?simProperty1 > (?origProperty1 - 120))
+	?product bsbm:productPropertyNumeric2 ?simProperty2 .
+	   FILTER (?simProperty2 < (?origProperty2 + 170) && ?simProperty2 > (?origProperty2 - 170))
+	?product rdfs:label ?productLabel .
+       FILTER (%ProductXYZ% != ?product)
+
+}
+ORDER BY ?productLabel
+LIMIT 5
