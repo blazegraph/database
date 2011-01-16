@@ -385,6 +385,15 @@ public class Haltable<V> implements IHaltable<V> {
 	 * @see #getCause()
 	 */
     protected boolean isNormalTerminationCause(final Throwable cause) {
+    	if(isTerminationByInterrupt(cause))
+    		return true;
+        if (InnerCause.isInnerCause(cause, RejectedExecutionException.class))
+            return true;
+        return false;
+    }
+
+    static public boolean isTerminationByInterrupt(final Throwable cause) {
+    	
         if (InnerCause.isInnerCause(cause, InterruptedException.class))
             return true;
         if (InnerCause.isInnerCause(cause, CancellationException.class))
@@ -393,11 +402,11 @@ public class Haltable<V> implements IHaltable<V> {
             return true;
         if (InnerCause.isInnerCause(cause, BufferClosedException.class))
             return true;
-        if (InnerCause.isInnerCause(cause, RejectedExecutionException.class))
-            return true;
-        return false;
-    }
 
+        return false;
+        
+    }
+    
     /**
      * This logs all unexpected causes @ WARN (anything not reported as normal
      * termination by {@link #isNormalTerminationCause(Throwable)}), not just

@@ -35,6 +35,7 @@ import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -787,6 +788,20 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
 				super.run();
 				
+			} catch(Throwable t) {
+
+				// ensure query halts.
+				halt(t);
+				
+				if (getCause() != null) {
+
+					// abnormal termination. wrap and rethrow.
+					throw new RuntimeException(t);
+					
+				}
+				
+				// otherwise ignore exception (normal termination).
+				
 			} finally {
 
 				/*
@@ -859,11 +874,11 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 				final long begin = System.currentTimeMillis();
 				try {
 					t.call();
-				} catch(Throwable t) {
-					halt(t);
+				} catch(Throwable t2) {
+					halt(t2); // ensure query halts.
 					if (getCause() != null) {
-						// Abnormal termination.
-						throw new RuntimeException(getCause());
+						// Abnormal termination - wrap and rethrow.
+						throw new RuntimeException(t2);
 					}
 					// normal termination - swallow the exception.
 				} finally {
@@ -1251,8 +1266,17 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
         public Void call() throws Exception {
             if (log.isDebugEnabled())
                 log.debug("Running chunk: " + this);
-            ft.run(); // run
-            ft.get(); // verify success
+			try {
+	            ft.run(); // run
+				ft.get(); // verify success
+			} catch (Throwable t) {
+				halt(t);  // ensure query halts.
+				if (getCause() != null) {
+					// abnormal termination - wrap and rethrow.
+					throw new Exception(t);
+				}
+				// otherwise ignore exception (normal completion).
+			}
             // Done.
             return null;
         } // call()

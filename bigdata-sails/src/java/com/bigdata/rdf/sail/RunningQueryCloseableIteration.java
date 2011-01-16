@@ -74,8 +74,8 @@ public class RunningQueryCloseableIteration<E extends BindingSet, X extends Quer
 				 * Exception thrown by the runningQuery.
 				 */
 				if (runningQuery.getCause() != null) {
-					// abnormal termination.
-					throw (X) new QueryEvaluationException(runningQuery.getCause());
+					// abnormal termination - wrap and rethrow.
+					throw (X) new QueryEvaluationException(e);
 				}
 				// otherwise this is normal termination.
 			}

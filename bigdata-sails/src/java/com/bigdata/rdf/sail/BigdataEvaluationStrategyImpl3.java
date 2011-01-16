@@ -118,6 +118,7 @@ import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.DistinctFilter;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.util.concurrent.Haltable;
 
 /**
  * Extended to rewrite Sesame {@link TupleExpr}s onto native {@link Rule}s and
@@ -393,7 +394,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         	} else {
         		
         		// allow the query to fail
-        		throw ex;
+				throw new UnsupportedOperatorException(ex);
         		
         	}
 
@@ -450,7 +451,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         	} else {
         		
         		// allow the query to fail
-        		throw ex;
+        		throw new UnsupportedOperatorException(ex);
         		
         	}
             
@@ -507,7 +508,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         	} else {
         		
         		// allow the query to fail
-        		throw ex;
+        		throw new UnsupportedOperatorException(ex);
         		
         	}
             
@@ -525,6 +526,12 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 				log.info("unrecognized value in query: " + ex.getValue());
 			}
 			return new EmptyIteration<BindingSet, QueryEvaluationException>();
+		} catch(UnsupportedOperatorException ex) {
+			/*
+			 * Note: Do not wrap as a different exception type. The caller is
+			 * looking for this.
+			 */
+			throw new UnsupportedOperatorException(ex);
 		} catch (Throwable ex) {
 //			log.error("Remove log stmt:"+ex,ex);// FIXME remove this - I am just looking for the root cause of something in the SAIL.
 			throw new QueryEvaluationException(ex);
@@ -577,7 +584,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     				if (sop.isRightSideLeftJoin()) {
     					groupsToPrune.add(sopTree.getGroup(sop.getGroup()));
     				} else {
-    					throw ex;
+    					throw new UnrecognizedValueException(ex);
     				}
     			}
     		}
@@ -652,8 +659,12 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     				if (sop.getGroup() == SOpTreeBuilder.ROOT_GROUP_ID) {
     					sopsToPrune.add(sop);
     					sesameFilters.add(filter);
-    				} else {
-    					throw ex;
+					} else {
+						/*
+						 * Note: DO NOT wrap with a different exception type -
+						 * the caller is looking for this.
+						 */
+    					throw new UnsupportedOperatorException(ex);
     				}
     			}
     		}
@@ -699,14 +710,43 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 
 		}
 
-    	return _evaluateNatively(query, bs, queryEngine, sesameFilters);
-    	
+		/*
+		 * Begin native bigdata evaluation.
+		 */
+		CloseableIteration<BindingSet, QueryEvaluationException> result = _evaluateNatively(
+				query, bs, queryEngine);// , sesameFilters);
+
+		/*
+		 * Use the basic filter iterator for any remaining filters which will be
+		 * evaluated by Sesame.
+		 * 
+		 * Note: Some Sesame filters may pre-fetch one or more result(s). This
+		 * could potentially cause the IRunningQuery to be asynchronously
+		 * terminated by an interrupt. I have lifted the code to wrap the Sesame
+		 * filters around the bigdata evaluation out of the code which starts
+		 * the IRunningQuery evaluation in order to help clarify such
+		 * circumstances as they might relate to [1].
+		 * 
+		 * [1] https://sourceforge.net/apps/trac/bigdata/ticket/230
+		 */
+		if (sesameFilters != null) {
+			for (Filter f : sesameFilters) {
+				if (log.isDebugEnabled()) {
+					log.debug("attaching sesame filter: " + f);
+				}
+				result = new FilterIterator(f, result, this);
+			}
+		}
+
+		return result;
+
     }
     
-    protected CloseableIteration<BindingSet, QueryEvaluationException> 
+    private CloseableIteration<BindingSet, QueryEvaluationException> 
 		_evaluateNatively(final PipelineOp query, final BindingSet bs,
-			final QueryEngine queryEngine, 
-			final Collection<Filter> sesameFilters) 
+			final QueryEngine queryEngine 
+//			, final Collection<Filter> sesameFilters
+			) 
 			throws QueryEvaluationException {
 	    
 	    IRunningQuery runningQuery = null;
@@ -717,10 +757,20 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 
 			/*
 			 * Wrap up the native bigdata query solution iterator as Sesame
-			 * compatible iteration w/ any filters to be interpreted by Sesame.
+			 * compatible iteration with materialized RDF Values.
 			 */
-			return wrapQuery(runningQuery, sesameFilters);
+			return wrapQuery(runningQuery);//, sesameFilters);
 
+		} catch (UnsupportedOperatorException t) {
+			if (runningQuery != null) {
+				// ensure query is halted.
+				runningQuery.cancel(true/* mayInterruptIfRunning */);
+			}
+			/*
+			 * Note: Do not wrap as a different exception type. The caller is
+			 * looking for this.
+			 */
+			throw new UnsupportedOperatorException(t);
 		} catch (Throwable t) {
 			if (runningQuery != null) {
 				// ensure query is halted.
@@ -734,20 +784,19 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 
 	/**
 	 * Wrap the {@link IRunningQuery#iterator()}, returning a Sesame compatible
-	 * iteration which will visit the materialized binding sets.
+	 * iteration which will visit Sesame binding sets having materialized RDF
+	 * Values.
 	 * 
 	 * @param runningQuery
 	 *            The query.
-	 * @param sesameFilters
-	 *            Any filters to be applied by Sesame.
-	 *            
+	 * 
 	 * @return The iterator.
 	 * 
-	 * @throws QueryEvaluationException 
+	 * @throws QueryEvaluationException
 	 */
 	private CloseableIteration<BindingSet, QueryEvaluationException> wrapQuery(
-			final IRunningQuery runningQuery,
-			final Collection<Filter> sesameFilters) throws QueryEvaluationException {
+			final IRunningQuery runningQuery
+			) throws QueryEvaluationException {
 
 		// The iterator draining the query solutions.
 		final IAsynchronousIterator<IBindingSet[]> it1 = runningQuery
@@ -759,7 +808,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	            new Dechunkerator<IBindingSet>(it1));
 
 	    // Materialize IVs as RDF Values.
-	    CloseableIteration<BindingSet, QueryEvaluationException> result =
+	    final CloseableIteration<BindingSet, QueryEvaluationException> result =
 	    	// Monitor IRunningQuery and cancel if Sesame iterator is closed.
 	    	new RunningQueryCloseableIteration<BindingSet, QueryEvaluationException>(runningQuery,
 			// Convert bigdata binding sets to Sesame binding sets.
@@ -768,16 +817,6 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	            new BigdataBindingSetResolverator(database, it2).start(
 	            		database.getExecutorService())));
 	
-	    // use the basic filter iterator for remaining filters
-	    if (sesameFilters != null) {
-	        for (Filter f : sesameFilters) {
-	        	if (log.isDebugEnabled()) {
-	        		log.debug("attaching sesame filter: " + f);
-	        	}
-	            result = new FilterIterator(f, result, this);
-	        }
-	    }
-	    
 	    return result;
 
     }
@@ -2285,6 +2324,18 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 		private static final long serialVersionUID = 7409038222083458821L;
 		
 		private Value value;
+
+		/**
+		 * Wrap another instance of this exception class.
+		 * @param cause
+		 */
+		public UnrecognizedValueException(final UnrecognizedValueException cause) {
+		
+			super(cause);
+			
+			this.value = cause.value;
+			
+		}
 
         public UnrecognizedValueException(final Value value) {
             this.value = value;
