@@ -516,11 +516,11 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         
     }
     
-    private CloseableIteration<BindingSet, QueryEvaluationException> 
+    CloseableIteration<BindingSet, QueryEvaluationException> 
 		evaluateNatively(final TupleExpr tupleExpr, final BindingSet bs) 
 		    throws QueryEvaluationException, UnsupportedOperatorException {
 		try {
-			return _evaluateNatively(tupleExpr, bs);
+			return doEvaluateNatively(tupleExpr, bs);
 		} catch (UnrecognizedValueException ex) {
 			if (log.isInfoEnabled()) {
 				log.info("unrecognized value in query: " + ex.getValue());
@@ -538,8 +538,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 		}
 	}
 
-    private CloseableIteration<BindingSet, QueryEvaluationException> 
-    	_evaluateNatively(final TupleExpr root, final BindingSet bs)
+    CloseableIteration<BindingSet, QueryEvaluationException> 
+    	doEvaluateNatively(final TupleExpr root, final BindingSet bs)
     		throws UnsupportedOperatorException, UnrecognizedValueException, 
     				QueryEvaluationException {
     	
@@ -713,7 +713,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 		/*
 		 * Begin native bigdata evaluation.
 		 */
-		CloseableIteration<BindingSet, QueryEvaluationException> result = _evaluateNatively(
+		CloseableIteration<BindingSet, QueryEvaluationException> result = doEvaluateNatively(
 				query, bs, queryEngine);// , sesameFilters);
 
 		/*
@@ -742,8 +742,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 
     }
     
-    private CloseableIteration<BindingSet, QueryEvaluationException> 
-		_evaluateNatively(final PipelineOp query, final BindingSet bs,
+    CloseableIteration<BindingSet, QueryEvaluationException> 
+		doEvaluateNatively(final PipelineOp query, final BindingSet bs,
 			final QueryEngine queryEngine 
 //			, final Collection<Filter> sesameFilters
 			) 
@@ -794,7 +794,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	 * 
 	 * @throws QueryEvaluationException
 	 */
-	private CloseableIteration<BindingSet, QueryEvaluationException> wrapQuery(
+	CloseableIteration<BindingSet, QueryEvaluationException> wrapQuery(
 			final IRunningQuery runningQuery
 			) throws QueryEvaluationException {
 
