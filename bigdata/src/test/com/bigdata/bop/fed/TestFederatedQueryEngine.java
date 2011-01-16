@@ -717,7 +717,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 				new NV(Predicate.Annotations.EVALUATION_CONTEXT,
 						BOpEvaluationContext.SHARDED),//
 				// impose constraint on the join.
-				new NV(PipelineJoin.Annotations.CONSTRAINTS,
+				new NV(Annotations.CONSTRAINTS,
 						new IConstraint[] { new EQConstant(y,
 								new Constant<String>("Paul")) }));
         
@@ -1233,7 +1233,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 				new NV(Predicate.Annotations.EVALUATION_CONTEXT,
 						BOpEvaluationContext.SHARDED),//
 				// constraint x == z
-				new NV(PipelineJoin.Annotations.CONSTRAINTS,
+				new NV(Annotations.CONSTRAINTS,
 						new IConstraint[] { new EQ(x, z) }),
 				// join is optional.
 				new NV(PipelineJoin.Annotations.OPTIONAL, true),//

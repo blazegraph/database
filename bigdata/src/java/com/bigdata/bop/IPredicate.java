@@ -42,7 +42,6 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.filter.Advancer;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ElementFilter;
@@ -102,7 +101,10 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * <code>true</code> iff the predicate is optional (the right operand of
          * a left join).
          * 
-         * @deprecated This flag is being moved to the join operator.
+         * @deprecated This flag is being moved to the join operator (or should
+         *             it stay with the predicate so we can work with join
+         *             graphs more easily, but note that join graphs never
+         *             contain optional joins).
          */
         String OPTIONAL = "optional";
 
@@ -321,6 +323,12 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 		 */
 		String TIMESTAMP = BOp.class.getName() + ".timestamp";
 
+        /**
+         * An optional {@link IConstraint}[] which places restrictions on the
+         * legal patterns in the variable bindings.
+         */
+        String CONSTRAINTS = PipelineJoin.class.getName() + ".constraints";
+
     }
     
     /**
@@ -433,6 +441,22 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 //     */
 //    public IElementFilter<E> getConstraint();
 
+    /**
+     * Return the optional {@link IConstraint}[] to be applied by a join which
+     * evaluates this {@link IPredicate}.
+     * <p>
+     * Note: The {@link Annotations#CONSTRAINTS} are annotated on the
+     * {@link IPredicate} rather than the join operators so they may be used
+     * with join graphs, which are expressed solely as an unordered set of
+     * {@link IPredicate}s. Using join graphs, we are able to do nifty things
+     * such as runtime query optimization which would not be possible if the
+     * annotations were decorating the joins since we would be unable to
+     * dynamically generate the join operators with the necessary annotations.
+     * 
+     * @see Annotations#CONSTRAINTS
+     */
+    public IConstraint[] constraints();
+    
     /**
      * Return the optional filter to be evaluated local to the index.
      * 

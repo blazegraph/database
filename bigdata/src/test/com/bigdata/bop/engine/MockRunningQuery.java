@@ -80,12 +80,10 @@ public class MockRunningQuery implements IRunningQuery {
         return indexManager;
     }
 
-	@Override
 	public void halt(Void v) {
         log.warn("Mock object does not implement halt(Void)");
 	}
 
-	@Override
 	public <T extends Throwable> T halt(T cause) {
         log.warn("Mock object does not implement halt(Throwable)");
         return cause;

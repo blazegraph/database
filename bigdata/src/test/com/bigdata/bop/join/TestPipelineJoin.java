@@ -379,7 +379,7 @@ public class TestPipelineJoin extends TestCase2 {
 				new BOp[] { startOp },//
 				new NV(BOpBase.Annotations.BOP_ID, joinId),//
 				new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
-				new NV( PipelineJoin.Annotations.CONSTRAINTS,
+				new NV( Annotations.CONSTRAINTS,
 						new IConstraint[] { new INBinarySearch<String>(y, set) }));
 
         // the expected solution (just one).

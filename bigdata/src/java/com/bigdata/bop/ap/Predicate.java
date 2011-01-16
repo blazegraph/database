@@ -35,6 +35,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
@@ -243,6 +244,12 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 //        return (IElementFilter<E>) getProperty(Annotations.CONSTRAINT);
 //
 //    }
+
+    public IConstraint[] constraints() {
+
+        return getProperty(IPredicate.Annotations.CONSTRAINTS, null/* defaultValue */);
+
+    }
 
     final public IFilter getIndexLocalFilter() {
 

@@ -32,7 +32,6 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
-import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.internal.XSDIntIV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
@@ -341,7 +340,7 @@ public class TestJoinGraphOnBSBMData extends TestCase2 {
                      * the IPredicate and apply them to the constructed join
                      * operator.
                      */
-                    new NV(PipelineJoin.Annotations.CONSTRAINTS,
+                    new NV(Annotations.CONSTRAINTS,
                             new IConstraint[] {//
                             new NEConstant(product, new Constant(product53999
                                     .getIV())) //
@@ -391,7 +390,7 @@ public class TestJoinGraphOnBSBMData extends TestCase2 {
                     new NV(BOp.Annotations.BOP_ID, nextId++),//
                     new NV(Annotations.TIMESTAMP, timestamp),//
                     new NV(IPredicate.Annotations.RELATION_NAME, spoRelation),
-                    new NV(PipelineJoin.Annotations.CONSTRAINTS,
+                    new NV(Annotations.CONSTRAINTS,
                             new IConstraint[] {//
                                     new CompareBOp(new BOp[] {
                                             simProperty1,
@@ -435,7 +434,7 @@ public class TestJoinGraphOnBSBMData extends TestCase2 {
                     new NV(BOp.Annotations.BOP_ID, nextId++),//
                     new NV(Annotations.TIMESTAMP, timestamp),//
                     new NV(IPredicate.Annotations.RELATION_NAME, spoRelation),
-                    new NV(PipelineJoin.Annotations.CONSTRAINTS,
+                    new NV(Annotations.CONSTRAINTS,
                             new IConstraint[] {//
                                     new CompareBOp(new BOp[] {
                                             simProperty2,

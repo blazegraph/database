@@ -631,11 +631,6 @@ public class Rule2BOpUtility {
                 anns.add(new NV(PipelineJoin.Annotations.OPTIONAL, pred
                         .isOptional()));
             
-            if (!constraints.isEmpty())
-                anns.add(new NV(PipelineJoin.Annotations.CONSTRAINTS,
-                        constraints
-                                .toArray(new IConstraint[constraints.size()])));
-
             /*
              * Pull off annotations before we clear them from the predicate.
              */
@@ -652,6 +647,13 @@ public class Rule2BOpUtility {
             // strip off annotations that we do not want to propagate.
             pred = pred.clearAnnotations(new String[] { Annotations.SCOPE,
                     Annotations.QUADS, Annotations.DATASET });
+
+            if (!constraints.isEmpty()) {
+                // decorate the predicate with any constraints.
+                pred = (Predicate<?>) pred.setProperty(
+                        IPredicate.Annotations.CONSTRAINTS, constraints
+                                .toArray(new IConstraint[constraints.size()]));
+            }
 
             if (quads) {
 
