@@ -890,10 +890,6 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 
             } catch (Throwable ex1) {
 
-				// Log an error.
-                log.error("queryId=" + getQueryId() + ", bopId=" + t.bopId
-                        + ", bop=" + t.bop, ex1);
-                
                 /*
                  * Mark the query as halted on this node regardless of whether
                  * we are able to communicate with the query controller.
@@ -906,6 +902,14 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 // ensure halted.
                 halt(ex1);
 
+				if (getCause() != null) {
+
+					// Log an error (abnormal termination only).
+					log.error("queryId=" + getQueryId() + ", bopId=" + t.bopId
+							+ ", bop=" + t.bop, ex1);
+
+				}
+                
                 final HaltOpMessage msg = new HaltOpMessage(getQueryId(), t.bopId,
                         t.partitionId, serviceId, getCause()/*firstCauseIfError*/, t.sinkId,
                         t.sinkMessagesOut.get(), t.altSinkId,
