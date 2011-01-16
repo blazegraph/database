@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedByInterruptException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
@@ -51,12 +50,11 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Haltable;
+import com.bigdata.util.concurrent.IHaltable;
 
 /**
  * Abstract base class for various {@link IRunningQuery} implementations. The
@@ -184,7 +182,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      * Note: This is exposed to the {@link QueryEngine} to let it cache the
      * {@link Future} for recently finished queries.
      */
-    final protected Future<Void> getFuture() {
+    final protected IHaltable<Void> getFuture() {
 
         return future;
         
@@ -665,7 +663,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
                 if (runState.isAllDone()) {
 
                     // Normal termination.
-                    halt();
+                    halt((Void)null);
 
                 }
 
@@ -771,14 +769,14 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     }
 
-    public void halt() {
+    final public void halt(final Void v) {
 
-        lock.lock();
+    	lock.lock();
 
         try {
 
             // signal normal completion.
-            future.halt((Void) null);
+            future.halt((Void) v);
 
             // interrupt anything which is running.
             cancel(true/* mayInterruptIfRunning */);
@@ -791,7 +789,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     }
 
-    public Throwable halt(final Throwable t) {
+    final public <T extends Throwable> T halt(final T t) {
 
         if (t == null)
             throw new IllegalArgumentException();
@@ -802,23 +800,8 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
             try {
 
-                /*
-                 * Note: SliceOp will cause other operators to be interrupted
-                 * during normal evaluation so it is not useful to log an
-                 * InterruptedException @ ERROR.
-                 */
-    			if (!InnerCause.isInnerCause(t, InterruptedException.class)
-    			 && !InnerCause.isInnerCause(t, BufferClosedException.class)
-    			 && !InnerCause.isInnerCause(t, ClosedByInterruptException.class)) {
-					log.error(toString(), t);
-					// signal error condition.
-					return future.halt(t);
-				} else {
-					// normal termination.
-					future.halt((Void)null/* result */);
-					// the caller's cause.
-					return t;
-				}
+				// halt the query, return [t].
+				return future.halt(t);
 
             } finally {
 

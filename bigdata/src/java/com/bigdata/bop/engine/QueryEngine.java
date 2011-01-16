@@ -58,13 +58,14 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.sail.bench.NanoSparqlClient;
+import com.bigdata.rdf.sail.bench.NanoSparqlServer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.concurrent.IHaltable;
 
 /**
  * A class managing execution of concurrent queries against a local
@@ -367,13 +368,13 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 	 *       enough that we can not have a false cache miss on a system which is
 	 *       heavily loaded by a bunch of light queries.
 	 */
-	private LinkedHashMap<UUID, Future<Void>> doneQueries = new LinkedHashMap<UUID,Future<Void>>(
+	private LinkedHashMap<UUID, IHaltable<Void>> doneQueries = new LinkedHashMap<UUID,IHaltable<Void>>(
 			16/* initialCapacity */, .75f/* loadFactor */, true/* accessOrder */) {
 
 		private static final long serialVersionUID = 1L;
 
 		@Override
-		protected boolean removeEldestEntry(Map.Entry<UUID, Future<Void>> eldest) {
+		protected boolean removeEldestEntry(Map.Entry<UUID, IHaltable<Void>> eldest) {
 
 			return size() > 100/* maximumCacheCapacity */;
 

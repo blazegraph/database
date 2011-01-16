@@ -23,12 +23,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal.constraints;
 
+import java.util.Map;
+
 import org.openrdf.query.algebra.MathExpr.MathOp;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.internal.IV;
@@ -71,6 +72,27 @@ final public class MathBOp extends ImmutableBOp
         
     }
 
+	/**
+	 * Required shallow copy constructor.
+	 * 
+	 * @param args
+	 *            The operands.
+	 * @param op
+	 *            The operation.
+	 */
+    public MathBOp(final BOp[] args, Map<String,Object> anns) {
+    
+        super(args,anns);
+
+		if (args.length != 2 || args[0] == null || args[1] == null
+				|| getProperty(Annotations.OP) == null) {
+
+			throw new IllegalArgumentException();
+		
+		}
+
+    }
+
     /**
      * 
      * @param left
@@ -84,10 +106,7 @@ final public class MathBOp extends ImmutableBOp
     public MathBOp(final IValueExpression<IV> left, 
     		final IValueExpression<IV> right, final MathOp op) {
 
-        super(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op)));
-
-        if (left == null || right == null || op == null)
-            throw new IllegalArgumentException();
+        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op)));
 
     }
 

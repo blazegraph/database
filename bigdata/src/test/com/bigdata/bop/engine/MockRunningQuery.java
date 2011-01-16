@@ -80,17 +80,16 @@ public class MockRunningQuery implements IRunningQuery {
         return indexManager;
     }
 
-    /**
-     * NOP (you have to test things like slices with a full integration).
-     */
-    public void halt() {
-        log.warn("Mock object does not implement halt()");
-    }
+	@Override
+	public void halt(Void v) {
+        log.warn("Mock object does not implement halt(Void)");
+	}
 
-    public Throwable halt(Throwable t) {
+	@Override
+	public <T extends Throwable> T halt(T cause) {
         log.warn("Mock object does not implement halt(Throwable)");
-        return t;
-    }
+        return cause;
+	}
 
     public QueryEngine getQueryEngine() {
         throw new UnsupportedOperationException();

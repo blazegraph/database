@@ -3437,6 +3437,8 @@ public class BigdataSail extends SailBase implements Sail {
 
             } catch (QueryEvaluationException e) {
 
+//    			log.error("Remove log stmt"+e,e);// FIXME remove this - I am just looking for the root cause of something in the SAIL.
+
                 throw new SailException(e);
 
             }

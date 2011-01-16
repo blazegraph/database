@@ -55,7 +55,7 @@ public class IsLiteral extends BOpConstraint {
     /**
      * Required deep copy constructor.
      */
-    public IsLiteral(final IsInline op) {
+    public IsLiteral(final IsLiteral op) {
         super(op);
     }
 

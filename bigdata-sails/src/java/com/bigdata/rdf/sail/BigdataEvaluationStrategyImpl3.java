@@ -24,13 +24,11 @@ import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.And;
 import org.openrdf.query.algebra.Bound;
 import org.openrdf.query.algebra.Compare;
-import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Group;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.LeftJoin;
 import org.openrdf.query.algebra.MathExpr;
-import org.openrdf.query.algebra.MathExpr.MathOp;
 import org.openrdf.query.algebra.MultiProjection;
 import org.openrdf.query.algebra.Not;
 import org.openrdf.query.algebra.Or;
@@ -43,17 +41,18 @@ import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.Regex;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
-import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
 import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
+import org.openrdf.query.algebra.Compare.CompareOp;
+import org.openrdf.query.algebra.MathExpr.MathOp;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
-import org.openrdf.query.parser.serql.AnonymousVarGenerator;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
@@ -62,12 +61,12 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.constraint.AND;
 import com.bigdata.bop.constraint.BOUND;
@@ -91,9 +90,9 @@ import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.sop.SOp;
 import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree;
-import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
 import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
+import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
@@ -526,9 +525,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 				log.info("unrecognized value in query: " + ex.getValue());
 			}
 			return new EmptyIteration<BindingSet, QueryEvaluationException>();
-		} catch (QueryEvaluationException ex) {
-			throw ex;
-		} catch (Exception ex) {
+		} catch (Throwable ex) {
+//			log.error("Remove log stmt:"+ex,ex);// FIXME remove this - I am just looking for the root cause of something in the SAIL.
 			throw new QueryEvaluationException(ex);
 		}
 	}
@@ -716,50 +714,74 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     		
     		// Submit query for evaluation.
     		runningQuery = queryEngine.eval(query);
-    		
-		    // Iterator draining the query results.
-		    final IAsynchronousIterator<IBindingSet[]> it1 = 
-		        runningQuery.iterator();
-		    
-		    // De-chunk the IBindingSet[] visited by that iterator.
-		    final IChunkedOrderedIterator<IBindingSet> it2 = 
-		    	new ChunkedWrappedIterator<IBindingSet>(
-		            new Dechunkerator<IBindingSet>(it1));
 
-		    // Materialize IVs as RDF Values.
-		    CloseableIteration<BindingSet, QueryEvaluationException> result =
-		    	// Monitor IRunningQuery and cancel if Sesame iterator is closed.
-		    	new RunningQueryCloseableIteration<BindingSet, QueryEvaluationException>(runningQuery,
-    			// Convert bigdata binding sets to Sesame binding sets.
-		        new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
-	        		// Materialize IVs as RDF Values.
-		            new BigdataBindingSetResolverator(database, it2).start(
-		            		database.getExecutorService())));
-		
-//		    No - will deadlock if buffer fills up
-//	        // Wait for the Future (checks for errors).
-//	        runningQuery.get();
-		    
-		    // use the basic filter iterator for remaining filters
-		    if (sesameFilters != null) {
-		        for (Filter f : sesameFilters) {
-		        	if (log.isDebugEnabled()) {
-		        		log.debug("attaching sesame filter: " + f);
-		        	}
-		            result = new FilterIterator(f, result, this);
-		        }
-		    }
-
-			return result;
+			/*
+			 * Wrap up the native bigdata query solution iterator as Sesame
+			 * compatible iteration w/ any filters to be interpreted by Sesame.
+			 */
+			return wrapQuery(runningQuery, sesameFilters);
 
 		} catch (Throwable t) {
-			if (runningQuery != null)
+			if (runningQuery != null) {
+				// ensure query is halted.
 				runningQuery.cancel(true/* mayInterruptIfRunning */);
+			}
+//			log.error("Remove log stmt"+t,t);// FIXME remove this - I am just looking for the root cause of something in the SAIL.
 			throw new QueryEvaluationException(t);
 		}
     	
 	}
 
+	/**
+	 * Wrap the {@link IRunningQuery#iterator()}, returning a Sesame compatible
+	 * iteration which will visit the materialized binding sets.
+	 * 
+	 * @param runningQuery
+	 *            The query.
+	 * @param sesameFilters
+	 *            Any filters to be applied by Sesame.
+	 *            
+	 * @return The iterator.
+	 * 
+	 * @throws QueryEvaluationException 
+	 */
+	private CloseableIteration<BindingSet, QueryEvaluationException> wrapQuery(
+			final IRunningQuery runningQuery,
+			final Collection<Filter> sesameFilters) throws QueryEvaluationException {
+
+		// The iterator draining the query solutions.
+		final IAsynchronousIterator<IBindingSet[]> it1 = runningQuery
+				.iterator();
+
+	    // De-chunk the IBindingSet[] visited by that iterator.
+	    final IChunkedOrderedIterator<IBindingSet> it2 = 
+	    	new ChunkedWrappedIterator<IBindingSet>(
+	            new Dechunkerator<IBindingSet>(it1));
+
+	    // Materialize IVs as RDF Values.
+	    CloseableIteration<BindingSet, QueryEvaluationException> result =
+	    	// Monitor IRunningQuery and cancel if Sesame iterator is closed.
+	    	new RunningQueryCloseableIteration<BindingSet, QueryEvaluationException>(runningQuery,
+			// Convert bigdata binding sets to Sesame binding sets.
+	        new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
+        		// Materialize IVs as RDF Values.
+	            new BigdataBindingSetResolverator(database, it2).start(
+	            		database.getExecutorService())));
+	
+	    // use the basic filter iterator for remaining filters
+	    if (sesameFilters != null) {
+	        for (Filter f : sesameFilters) {
+	        	if (log.isDebugEnabled()) {
+	        		log.debug("attaching sesame filter: " + f);
+	        	}
+	            result = new FilterIterator(f, result, this);
+	        }
+	    }
+	    
+	    return result;
+
+    }
+    
 //    /**
 //     * This is the method that will attempt to take a top-level join or left
 //     * join and turn it into a native bigdata rule. The Sesame operators Join

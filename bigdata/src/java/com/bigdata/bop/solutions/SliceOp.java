@@ -336,7 +336,7 @@ public class SliceOp extends PipelineOp {
                         if (log.isInfoEnabled())
                             log.info("Slice will interrupt query.");
 
-                        context.getRunningQuery().halt();
+						context.getRunningQuery().halt((Void) null);
 
                     }
 

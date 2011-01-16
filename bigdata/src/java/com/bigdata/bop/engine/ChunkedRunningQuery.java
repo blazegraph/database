@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop.engine;
 
-import java.nio.channels.ClosedByInterruptException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -861,20 +860,12 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 				try {
 					t.call();
 				} catch(Throwable t) {
-					/*
-					 * Note: SliceOp will cause other operators to be
-					 * interrupted during normal evaluation. Therefore, while
-					 * these exceptions should cause the query to terminate,
-					 * they should not be reported as errors to the query
-					 * controller.
-					 */
-					if (!InnerCause.isInnerCause(t, InterruptedException.class)
-			 		 && !InnerCause.isInnerCause(t, BufferClosedException.class)
-			 		 && !InnerCause.isInnerCause(t, ClosedByInterruptException.class)
-			 		 ) {
-						// Not an error that we should ignore.
-						throw t;
-	                }
+					halt(t);
+					if (getCause() != null) {
+						// Abnormal termination.
+						throw new RuntimeException(getCause());
+					}
+					// normal termination - swallow the exception.
 				} finally {
 					t.context.getStats().elapsed.add(System.currentTimeMillis()
 							- begin);
@@ -911,10 +902,12 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                  * error message is necessary in order to catch errors in
                  * clientProxy.haltOp() (above and below).
                  */
-                final Throwable firstCause = halt(ex1);
+
+                // ensure halted.
+                halt(ex1);
 
                 final HaltOpMessage msg = new HaltOpMessage(getQueryId(), t.bopId,
-                        t.partitionId, serviceId, firstCause, t.sinkId,
+                        t.partitionId, serviceId, getCause()/*firstCauseIfError*/, t.sinkId,
                         t.sinkMessagesOut.get(), t.altSinkId,
                         t.altSinkMessagesOut.get(), t.context.getStats());
                 try {
@@ -1484,7 +1477,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 //          return sink.flush();
       }
 
-        public void abort(Throwable cause) {
+        public void abort(final Throwable cause) {
             open = false;
             q.halt(cause);
 //            sink.abort(cause);
