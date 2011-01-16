@@ -752,7 +752,14 @@ public class TestDriver {
 					multithreading = true;
 					nrThreads = Integer.parseInt(args[i++ + 1]);
 				} else if (args[i].equals("-seed")) {
-					seed = Long.parseLong(args[i++ + 1]);
+//					Modified 1/16/2011 by BBT to recognize "random" seeds.
+//					seed = Long.parseLong(args[i++ + 1]);
+					final String s = args[i++ + 1];
+					if (s.equals("random")) {
+						seed = System.nanoTime();
+					} else {
+						seed = Long.parseLong(s);
+					}
 				} else if (args[i].equals("-t")) {
 					timeout = Integer.parseInt(args[i++ + 1]);
 				} else if (args[i].equals("-dbdriver")) {
