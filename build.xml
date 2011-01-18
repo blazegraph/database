@@ -1606,7 +1606,6 @@ ${postInstallMessage}</echo>
       <!-- be running on the localhost.                                     -->
       <property name="test.zookeeper.tickTime" value="2000" />
       <property name="test.zookeeper.clientPort" value="2888" />
-      <property name="test.zookeeper.leaderPort" value="3888" />
 
       <!-- The zookeeper install directory. -->
       <property name="test.zookeeper.installDir" value="${zookeeper.installDir}" />
