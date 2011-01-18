@@ -1619,6 +1619,10 @@ ${postInstallMessage}</echo>
       <copy file="${build.properties.from.file}"
             todir="${build.properties.test.to.path}" />
 
+      <!-- Issue stop on zookeeper first since zkServer leaves a pid file   -->
+      <!-- around if the JVM is killed. That pid file needs to be cleaned   -->
+      <!-- up before we can start a new instance.                           -->
+      <antcall target="stopZookeeper" />
       <antcall target="startZookeeper" />
       <antcall target="startHttpd" />
       <antcall target="startLookup" />
