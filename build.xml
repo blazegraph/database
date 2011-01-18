@@ -1783,6 +1783,10 @@ ${postInstallMessage}</echo>
 </echo>
       <echo>    federation:   ${bigdata.fedname}
 </echo>
+      <echo>    zkClientPort: ${test.zookeeper.clientPort}
+</echo>
+      <echo>    zkTickTime:   ${test.zookeeper.tickTime}
+</echo>
       <echo>
 </echo>
 
