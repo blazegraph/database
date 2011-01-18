@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.BindException;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.util.Arrays;
 import java.util.Queue;
@@ -32,7 +33,6 @@ import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.start.config.ZookeeperServerConfiguration;
 import com.bigdata.jini.start.process.ProcessHelper;
-import com.bigdata.jini.start.process.ZookeeperProcessHelper;
 import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.resources.ResourceFileFilter;
@@ -47,6 +47,7 @@ import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
 import com.bigdata.service.jini.TransactionServer;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.config.NicUtil;
 import com.bigdata.zookeeper.ZooHelper;
 
 /**
@@ -267,10 +268,10 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
      */
     private int clientPort;
     
-    /**
-     * The directory in which zookeeper is running.
-     */
-    private File zooDataDir;
+//    /**
+//     * The directory in which zookeeper is running.
+//     */
+//    private File zooDataDir;
 
     /**
      * Starts all services and connects the {@link JiniClient} to the
@@ -374,27 +375,30 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
         final String[] options;
         {
 
-            // the zookeeper service directory.
-            zooDataDir = new File(fedServiceDir, "zookeeper");
-            
-            if(zooDataDir.exists()) {
-                
-                // clear out old zookeeper state first.
-                recursiveDelete(zooDataDir);
-                
-            }
-            
-            // create.
-            zooDataDir.mkdirs();
+//            // the zookeeper service directory.
+//            zooDataDir = new File(fedServiceDir, "zookeeper");
+//            
+//            if(zooDataDir.exists()) {
+//                
+//                // clear out old zookeeper state first.
+//                recursiveDelete(zooDataDir);
+//                
+//            }
+//            
+//            // create.
+//            zooDataDir.mkdirs();
 
-            try {
+//            try {
 
-                // find ports that are not in use.
-                clientPort = getPort(2181/* suggestedPort */);
-                final int peerPort = getPort(2888/* suggestedPort */);
-                final int leaderPort = getPort(3888/* suggestedPort */);
-                final String servers = "1=localhost:" + peerPort + ":"
-                        + leaderPort;
+//                // find ports that are not in use.
+//                clientPort = getPort(2181/* suggestedPort */);
+//                final int peerPort = getPort(2888/* suggestedPort */);
+//                final int leaderPort = getPort(3888/* suggestedPort */);
+//                final String servers = "1=localhost:" + peerPort + ":"
+//                        + leaderPort;
+
+                clientPort = Integer.valueOf(System
+                        .getProperty("test.zookeeper.clientPort","2181"));
 
                 options = new String[] {
                         // overrides the clientPort to be unique.
@@ -402,15 +406,15 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
                                 + "."
                                 + ZookeeperServerConfiguration.Options.CLIENT_PORT
                                 + "=" + clientPort,
-                        // overrides servers declaration.
-                        QuorumPeerMain.class.getName() + "."
-                                + ZookeeperServerConfiguration.Options.SERVERS
-                                + "=\"" + servers + "\"",
-                        // overrides the dataDir
-                        QuorumPeerMain.class.getName() + "."
-                                + ZookeeperServerConfiguration.Options.DATA_DIR
-                                + "=new java.io.File("
-                                + ConfigMath.q(zooDataDir.toString()) + ")"//
+//                        // overrides servers declaration.
+//                        QuorumPeerMain.class.getName() + "."
+//                                + ZookeeperServerConfiguration.Options.SERVERS
+//                                + "=\"" + servers + "\"",
+//                        // overrides the dataDir
+//                        QuorumPeerMain.class.getName() + "."
+//                                + ZookeeperServerConfiguration.Options.DATA_DIR
+//                                + "=new java.io.File("
+//                                + ConfigMath.q(zooDataDir.toString()) + ")"//
                 };
                 
                 System.err.println("options=" + Arrays.toString(options));
@@ -418,26 +422,38 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
                 final Configuration config = ConfigurationProvider
                         .getInstance(concat(args, options));
 
-                // start zookeeper (a server instance).
-                final int nstarted = ZookeeperProcessHelper.startZookeeper(
-                        config, serviceListener);
+//                // start zookeeper (a server instance).
+//                final int nstarted = ZookeeperProcessHelper.startZookeeper(
+//                        config, serviceListener);
+//
+//                if (nstarted != 1) {
+//
+//                    throw new RuntimeException(
+//                            "Expected to start one zookeeper instance, not "
+//                                    + nstarted);
+//                    
+//                }
 
-                if (nstarted != 1) {
-
-                    throw new RuntimeException(
-                            "Expected to start one zookeeper instance, not "
-                                    + nstarted);
-                    
+                // Verify zookeeper is running on the local host at the client port.
+                {
+                    final InetAddress localIpAddr = NicUtil.getInetAddress(null, 0,
+                            null, true);
+                    try {
+                        ZooHelper.ruok(localIpAddr, clientPort);
+                    } catch (Throwable t) {
+                        throw new RuntimeException("Zookeeper not running:: "
+                                + localIpAddr + ":" + clientPort, t);
+                    }
                 }
 
-            } catch (Throwable t) {
-
-                // don't leave around the dataDir if the setup fails.
-                recursiveDelete(zooDataDir);
-
-                throw new RuntimeException(t);
-
-            }
+//            } catch (Throwable t) {
+//
+//                // don't leave around the dataDir if the setup fails.
+//                recursiveDelete(zooDataDir);
+//
+//                throw new RuntimeException(t);
+//
+//            }
 
         }
         
@@ -679,30 +695,30 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
             
         }
         
-        try {
-         
-            ZooHelper.kill(clientPort);
-            
-        } catch (Throwable t) {
-            log.error("Could not kill zookeeper: clientPort=" + clientPort
-                    + " : " + t, t);
-        }
-
-        if (zooDataDir != null && zooDataDir.exists()) {
-
-            /*
-             * Wait a bit and then try and delete the zookeeper directory.
-             */
-            
-            try {
-                Thread.sleep(250);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-
-            recursiveDelete(zooDataDir);
-
-        }
+//        try {
+//         
+//            ZooHelper.kill(clientPort);
+//            
+//        } catch (Throwable t) {
+//            log.error("Could not kill zookeeper: clientPort=" + clientPort
+//                    + " : " + t, t);
+//        }
+//
+//        if (zooDataDir != null && zooDataDir.exists()) {
+//
+//            /*
+//             * Wait a bit and then try and delete the zookeeper directory.
+//             */
+//            
+//            try {
+//                Thread.sleep(250);
+//            } catch (InterruptedException e) {
+//                throw new RuntimeException(e);
+//            }
+//
+//            recursiveDelete(zooDataDir);
+//
+//        }
         
 //        // Stop the lookup service.
 //        new Thread(new Runnable() {

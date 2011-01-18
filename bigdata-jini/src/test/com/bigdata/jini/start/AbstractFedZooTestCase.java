@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.jini.start;
 
 import java.io.File;
+import java.net.InetAddress;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,18 +36,17 @@ import junit.framework.TestCase2;
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationProvider;
 
-import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.start.process.ProcessHelper;
-import com.bigdata.jini.start.process.ZookeeperProcessHelper;
 import com.bigdata.resources.ResourceFileFilter;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.util.config.NicUtil;
+import com.bigdata.zookeeper.ZooHelper;
 
 /**
  * Abstract base class for unit tests requiring a running zookeeper and a
@@ -122,8 +122,23 @@ public class AbstractFedZooTestCase extends TestCase2 {
 
         config = ConfigurationProvider.getInstance(args);
 
-        // if necessary, start zookeeper (a server instance).
-        ZookeeperProcessHelper.startZookeeper(config, listener);
+//        // if necessary, start zookeeper (a server instance).
+//        ZookeeperProcessHelper.startZookeeper(config, listener);
+
+        final int clientPort = Integer.valueOf(System
+                .getProperty("test.zookeeper.clientPort","2181"));
+
+        // Verify zookeeper is running on the local host at the client port.
+        {
+            final InetAddress localIpAddr = NicUtil.getInetAddress(null, 0,
+                    null, true);
+            try {
+                ZooHelper.ruok(localIpAddr, clientPort);
+            } catch (Throwable t) {
+                fail("Zookeeper not running:: " + localIpAddr + ":"
+                        + clientPort, t);
+            }
+        }
 
         /*
          * FIXME We need to start a jini lookup service for groups = {fedname}

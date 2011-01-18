@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.BindException;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.util.Arrays;
 import java.util.List;
@@ -60,6 +61,7 @@ import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.jini.start.process.ZookeeperProcessHelper;
 import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.resources.ResourceFileFilter;
+import com.bigdata.util.config.NicUtil;
 
 /**
  * Abstract base class for zookeeper integration tests.
@@ -145,7 +147,7 @@ public abstract class AbstractZooTestCase extends TestCase2 {
     
     protected final MockListener listener = new MockListener();
 
-    private File dataDir = null;
+//    private File dataDir = null;
     
     // the chosen client port.
     int clientPort = -1;
@@ -157,53 +159,71 @@ public abstract class AbstractZooTestCase extends TestCase2 {
         if (log.isInfoEnabled())
             log.info(getName());
         
-        // find ports that are not in use.
-        clientPort = getPort(2181/* suggestedPort */);
-        final int peerPort = getPort(2888/* suggestedPort */);
-        final int leaderPort = getPort(3888/* suggestedPort */);
-        final String servers = "1=localhost:" + peerPort + ":" + leaderPort;
-
-        // create a temporary file for zookeeper's state.
-        dataDir = File.createTempFile("test", ".zoo");
-        // delete the file so that it can be re-created as a directory.
-        dataDir.delete();
-        // recreate the file as a directory.
-        dataDir.mkdirs();
-
-        final String[] args = new String[] {
-        // The configuration file (overrides follow).
-                configFile,
-                // overrides the clientPort to be unique.
-                QuorumPeerMain.class.getName() + "."
-                        + ZookeeperServerConfiguration.Options.CLIENT_PORT + "="
-                        + clientPort,
-                // overrides servers declaration.
-                QuorumPeerMain.class.getName() + "."
-                        + ZookeeperServerConfiguration.Options.SERVERS + "=\""
-                        + servers + "\"",
-                // overrides the dataDir
-                QuorumPeerMain.class.getName() + "."
-                        + ZookeeperServerConfiguration.Options.DATA_DIR
-                        + "=new java.io.File("
-                        + ConfigMath.q(dataDir.toString()) + ")"//
-        };
+//        // find ports that are not in use.
+//        clientPort = getPort(2181/* suggestedPort */);
+//        final int peerPort = getPort(2888/* suggestedPort */);
+//        final int leaderPort = getPort(3888/* suggestedPort */);
+//        final String servers = "1=localhost:" + peerPort + ":" + leaderPort;
+//
+////        // create a temporary file for zookeeper's state.
+////        dataDir = File.createTempFile("test", ".zoo");
+////        // delete the file so that it can be re-created as a directory.
+////        dataDir.delete();
+////        // recreate the file as a directory.
+////        dataDir.mkdirs();
+//
+//        final String[] args = new String[] {
+//        // The configuration file (overrides follow).
+//                configFile,
+//                // overrides the clientPort to be unique.
+//                QuorumPeerMain.class.getName() + "."
+//                        + ZookeeperServerConfiguration.Options.CLIENT_PORT + "="
+//                        + clientPort,
+//                // overrides servers declaration.
+//                QuorumPeerMain.class.getName() + "."
+//                        + ZookeeperServerConfiguration.Options.SERVERS + "=\""
+//                        + servers + "\"",
+////                // overrides the dataDir
+////                QuorumPeerMain.class.getName() + "."
+////                        + ZookeeperServerConfiguration.Options.DATA_DIR
+////                        + "=new java.io.File("
+////                        + ConfigMath.q(dataDir.toString()) + ")"//
+//        };
+//        
+//        System.err.println("args=" + Arrays.toString(args));
+//
+//        final Configuration config = ConfigurationProvider.getInstance(args);
         
-        System.err.println("args=" + Arrays.toString(args));
+//        final int tickTime = (Integer) config.getEntry(QuorumPeerMain.class
+//                .getName(), ZookeeperServerConfiguration.Options.TICK_TIME,
+//                Integer.TYPE);
 
-        final Configuration config = ConfigurationProvider.getInstance(args);
-        
-        final int tickTime = (Integer) config.getEntry(QuorumPeerMain.class
-                .getName(), ZookeeperServerConfiguration.Options.TICK_TIME,
-                Integer.TYPE);
+        final int tickTime = Integer.valueOf(System
+                .getProperty("test.zookeeper.tickTime","2000"));
+
+        clientPort = Integer.valueOf(System.getProperty(
+                    "test.zookeeper.clientPort", "2181"));
 
         /*
-         * Note: This is the actual session timeout that the zookeeper service
-         * will impose on the client.
+         * Note: This MUST be the actual session timeout that the zookeeper
+         * service will impose on the client.  Some unit tests depend on this.
          */
         this.sessionTimeout = tickTime * 2;
 
-        // if necessary, start zookeeper (a server instance).
-        ZookeeperProcessHelper.startZookeeper(config, listener);
+        // Verify zookeeper is running on the local host at the client port.
+        {
+            final InetAddress localIpAddr = NicUtil.getInetAddress(null, 0,
+                    null, true);
+            try {
+                ZooHelper.ruok(localIpAddr, clientPort);
+            } catch (Throwable t) {
+                fail("Zookeeper not running:: " + localIpAddr + ":"
+                        + clientPort, t);
+            }
+        }
+        
+//        // if necessary, start zookeeper (a server instance).
+//        ZookeeperProcessHelper.startZookeeper(config, listener);
 
         zookeeperAccessor = new ZooKeeperAccessor("localhost:" + clientPort, sessionTimeout);
         
@@ -227,8 +247,8 @@ public abstract class AbstractZooTestCase extends TestCase2 {
 
         } catch (Throwable t) {
 
-            // don't leave around the dataDir if the setup fails.
-            recursiveDelete(dataDir);
+//            // don't leave around the dataDir if the setup fails.
+//            recursiveDelete(dataDir);
             
             throw new Exception(t);
             
@@ -256,12 +276,12 @@ public abstract class AbstractZooTestCase extends TestCase2 {
 
             }
 
-            if (dataDir != null) {
-
-                // clean out the zookeeper data dir.
-                recursiveDelete(dataDir);
-
-            }
+//            if (dataDir != null) {
+//
+//                // clean out the zookeeper data dir.
+//                recursiveDelete(dataDir);
+//
+//            }
 
         } catch (Throwable t) {
 
@@ -527,47 +547,47 @@ public abstract class AbstractZooTestCase extends TestCase2 {
 
     }
 
-    /**
-     * Recursively removes any files and subdirectories and then removes the
-     * file (or directory) itself.
-     * <p>
-     * Note: Files that are not recognized will be logged by the
-     * {@link ResourceFileFilter}.
-     * 
-     * @param f
-     *            A file or directory.
-     */
-    private void recursiveDelete(final File f) {
-
-        if (f.isDirectory()) {
-
-            final File[] children = f.listFiles();
-
-            if (children == null) {
-
-                // The directory does not exist.
-                return;
-                
-            }
-            
-            for (int i = 0; i < children.length; i++) {
-
-                recursiveDelete(children[i]);
-
-            }
-
-        }
-
-        if(log.isInfoEnabled())
-            log.info("Removing: " + f);
-
-        if (f.exists() && !f.delete()) {
-
-            log.warn("Could not remove: " + f);
-
-        }
-
-    }
+//    /**
+//     * Recursively removes any files and subdirectories and then removes the
+//     * file (or directory) itself.
+//     * <p>
+//     * Note: Files that are not recognized will be logged by the
+//     * {@link ResourceFileFilter}.
+//     * 
+//     * @param f
+//     *            A file or directory.
+//     */
+//    private void recursiveDelete(final File f) {
+//
+//        if (f.isDirectory()) {
+//
+//            final File[] children = f.listFiles();
+//
+//            if (children == null) {
+//
+//                // The directory does not exist.
+//                return;
+//                
+//            }
+//            
+//            for (int i = 0; i < children.length; i++) {
+//
+//                recursiveDelete(children[i]);
+//
+//            }
+//
+//        }
+//
+//        if(log.isInfoEnabled())
+//            log.info("Removing: " + f);
+//
+//        if (f.exists() && !f.delete()) {
+//
+//            log.warn("Could not remove: " + f);
+//
+//        }
+//
+//    }
 
     /**
      * Recursive delete of znodes.
