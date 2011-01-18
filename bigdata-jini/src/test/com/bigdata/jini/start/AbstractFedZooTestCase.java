@@ -86,13 +86,13 @@ public class AbstractFedZooTestCase extends TestCase2 {
     // ACL used for the unit tests.
     protected final List<ACL> acl = Ids.OPEN_ACL_UNSAFE;
 
-    Configuration config;
+    protected Configuration config;
 
     final protected MockListener listener = new MockListener();
 
-    JiniFederation fed;
+    protected JiniFederation<?> fed;
 
-    String zrootname = null;
+    protected String zrootname = null;
     
     public void setUp() throws Exception {
 

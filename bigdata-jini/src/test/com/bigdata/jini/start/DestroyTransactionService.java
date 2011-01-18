@@ -56,11 +56,11 @@ public class DestroyTransactionService {
     public static void main(String[] args) throws InterruptedException,
             RemoteException {
 
-        JiniFederation fed = JiniClient.newInstance(args).connect();
+        final JiniFederation<?> fed = JiniClient.newInstance(args).connect();
 
         try {
 
-            IService service = fed.getTransactionService();
+            final IService service = fed.getTransactionService();
 
             if (service == null) {
 

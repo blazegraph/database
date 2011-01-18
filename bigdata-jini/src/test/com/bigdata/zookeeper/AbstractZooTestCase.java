@@ -27,21 +27,17 @@
 
 package com.bigdata.zookeeper;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.BindException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 import junit.framework.TestCase2;
-import net.jini.config.Configuration;
-import net.jini.config.ConfigurationProvider;
 
 import org.apache.log4j.Level;
 import org.apache.zookeeper.CreateMode;
@@ -53,14 +49,9 @@ import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.KeeperException.SessionExpiredException;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.data.ACL;
-import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 
 import com.bigdata.jini.start.MockListener;
-import com.bigdata.jini.start.config.ZookeeperServerConfiguration;
 import com.bigdata.jini.start.process.ProcessHelper;
-import com.bigdata.jini.start.process.ZookeeperProcessHelper;
-import com.bigdata.jini.util.ConfigMath;
-import com.bigdata.resources.ResourceFileFilter;
 import com.bigdata.util.config.NicUtil;
 
 /**
@@ -150,7 +141,7 @@ public abstract class AbstractZooTestCase extends TestCase2 {
 //    private File dataDir = null;
     
     // the chosen client port.
-    int clientPort = -1;
+    protected int clientPort = -1;
     
     public void setUp() throws Exception {
 
