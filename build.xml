@@ -1846,6 +1846,9 @@ ${postInstallMessage}</echo>
         <sysproperty key="app.home" value="${app.home}" />
         <sysproperty key="default.nic" value="${default.nic}" />
 
+        <sysproperty key="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />
+        <sysproperty key="test.zookeeper.tickTime" value="${test.zookeeper.tickTime}" />
+
         <sysproperty key="classserver.jar" value="${dist.lib}/classserver.jar" />
         <sysproperty key="colt.jar" value="${dist.lib}/colt.jar" />
         <sysproperty key="cweb-commons.jar" value="${dist.lib}/cweb-commons.jar" />
