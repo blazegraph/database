@@ -1363,10 +1363,10 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     }
     
     /**
-     * {@link #flushWriteCache() flushs} the {@link #writeCache} before syncing
+     * {@link #flushWriteCache() flushes} the {@link #writeCache} before syncing
      * the disk.
      */
-    public void force(boolean metadata) {
+    public void force(final boolean metadata) {
 
         assertOpen();
         

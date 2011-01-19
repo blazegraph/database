@@ -109,7 +109,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
     /**
      * Forces the data to disk.
      */
-    public void force( boolean metadata ) {
+    public void force(final boolean metadata) {
         
         try {
 
