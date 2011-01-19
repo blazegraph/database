@@ -550,7 +550,7 @@ public class Rule2BOpUtility {
         
         PipelineOp left = startOp;
         
-        if (conditionals != null) {
+        if (conditionals != null) { // @todo lift into CONDITION on SubqueryOp
         	for (IConstraint c : conditionals) {
         		final int condId = idFactory.incrementAndGet();
                 final PipelineOp condOp = applyQueryHints(
