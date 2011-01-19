@@ -129,18 +129,27 @@ public class PipelineJoin<E> extends PipelineOp implements
 		 */
 		String SELECT = PipelineJoin.class.getName() + ".select";
 
-		/**
-		 * Marks the join as "optional" in the SPARQL sense. Binding sets which
-		 * fail the join will be routed to the alternative sink as specified by
-		 * either {@link PipelineOp.Annotations#ALT_SINK_REF} or
-		 * {@link PipelineOp.Annotations#ALT_SINK_GROUP}.
-		 * 
-		 * @see #DEFAULT_OPTIONAL
-		 */
-		String OPTIONAL = PipelineJoin.class.getName() + ".optional";
+//        /**
+//         * Marks the join as "optional" in the SPARQL sense. Binding sets which
+//         * fail the join will be routed to the alternative sink as specified by
+//         * either {@link PipelineOp.Annotations#ALT_SINK_REF} or
+//         * {@link PipelineOp.Annotations#ALT_SINK_GROUP}.
+//         * 
+//         * @see #DEFAULT_OPTIONAL
+//         * 
+//         * @deprecated We should just inspect
+//         *             {@link IPredicate.Annotations#OPTIONAL}.
+//         */
+//		String OPTIONAL = PipelineJoin.class.getName() + ".optional";
+//
+//		boolean DEFAULT_OPTIONAL = false;
 
-		boolean DEFAULT_OPTIONAL = false;
-
+        /**
+         * An {@link IConstraint}[] which places restrictions on the legal
+         * patterns in the variable bindings (optional).
+         */
+        String CONSTRAINTS = PipelineJoin.class.getName() + ".constraints";
+        
 		/**
 		 * The maximum parallelism with which the pipeline will consume the
 		 * source {@link IBindingSet}[] chunk.
@@ -435,15 +444,29 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 	}
 
-	/**
-	 * @see Annotations#OPTIONAL
-	 */
+    /**
+     * Return the value of {@link IPredicate#isOptional()} for the
+     * {@link IPredicate} associated with this join.
+     * 
+     * @see IPredicate.Annotations#OPTIONAL
+     */
 	public boolean isOptional() {
 
-		return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
+//		return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
+        return getPredicate().isOptional();
 
 	}
 
+	/**
+	 * 
+	 * @see Annotations#CONSTRAINTS
+	 */
+    public IConstraint[] constraints() {
+
+        return getProperty(Annotations.CONSTRAINTS, null/* defaultValue */);
+
+    }
+    
 	/**
 	 * @see Annotations#MAX_PARALLEL
 	 */
@@ -642,7 +665,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 			this.joinOp = joinOp;
 			this.predicate = joinOp.getPredicate();
-			this.constraints = predicate.constraints();
+			this.constraints = joinOp.constraints();
 			this.maxParallel = joinOp.getMaxParallel();
 			if (maxParallel < 0)
 				throw new IllegalArgumentException(Annotations.MAX_PARALLEL

@@ -75,6 +75,12 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestSubqueryOp.class);
 
+        suite.addTestSuite(TestPartitionedJoinGroup.class);
+        
+        suite.addTestSuite(TestJoinGraph.class);
+
+        suite.addTestSuite(TestJGraph.class);
+        
         // @todo test STAR (transitive closure).
 //        suite.addTestSuite(TestStar.class);
 

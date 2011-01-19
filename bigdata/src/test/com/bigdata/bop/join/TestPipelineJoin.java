@@ -379,7 +379,7 @@ public class TestPipelineJoin extends TestCase2 {
 				new BOp[] { startOp },//
 				new NV(BOpBase.Annotations.BOP_ID, joinId),//
 				new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
-				new NV( Annotations.CONSTRAINTS,
+				new NV(PipelineJoin.Annotations.CONSTRAINTS,
 						new IConstraint[] { new INBinarySearch<String>(y, set) }));
 
         // the expected solution (just one).
@@ -562,6 +562,7 @@ public class TestPipelineJoin extends TestCase2 {
 						new NV(Predicate.Annotations.RELATION_NAME,
 								new String[] { namespace }),//
 						new NV(Predicate.Annotations.BOP_ID, predId),//
+		                new NV(Predicate.Annotations.OPTIONAL, Boolean.TRUE),//
 						new NV(Annotations.TIMESTAMP,
 								ITx.READ_COMMITTED),//
 				})); 
@@ -569,8 +570,9 @@ public class TestPipelineJoin extends TestCase2 {
 		final PipelineJoin<E> query = new PipelineJoin<E>(
 				new BOp[] { startOp }, //
 				new NV(BOpBase.Annotations.BOP_ID, joinId),//
-				new NV(PipelineJoin.Annotations.PREDICATE, pred),//
-				new NV(PipelineJoin.Annotations.OPTIONAL, Boolean.TRUE));
+				new NV(PipelineJoin.Annotations.PREDICATE, pred)//
+//				new NV(PipelineJoin.Annotations.OPTIONAL, Boolean.TRUE)
+				);
 
         /*
          * Setup the source with two initial binding sets. One has nothing bound
@@ -665,6 +667,7 @@ public class TestPipelineJoin extends TestCase2 {
 						new NV(Predicate.Annotations.RELATION_NAME,
 								new String[] { namespace }),//
 						new NV(Predicate.Annotations.BOP_ID, predId),//
+						new NV(Predicate.Annotations.OPTIONAL, Boolean.TRUE),//
 						new NV(Annotations.TIMESTAMP,
 								ITx.READ_COMMITTED),//
 				}));
@@ -672,8 +675,9 @@ public class TestPipelineJoin extends TestCase2 {
 		final PipelineJoin<E> query = new PipelineJoin<E>(
 				new BOp[] { startOp },//
 				new NV(BOpBase.Annotations.BOP_ID, joinId),//
-				new NV(PipelineJoin.Annotations.PREDICATE, pred),//
-				new NV(PipelineJoin.Annotations.OPTIONAL, Boolean.TRUE));
+				new NV(PipelineJoin.Annotations.PREDICATE, pred)//
+//				new NV(PipelineJoin.Annotations.OPTIONAL, Boolean.TRUE)
+				);
 
         /*
          * Setup the source with two initial binding sets. One has nothing bound

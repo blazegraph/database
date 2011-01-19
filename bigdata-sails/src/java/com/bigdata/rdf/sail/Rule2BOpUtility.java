@@ -627,9 +627,10 @@ public class Rule2BOpUtility {
             anns.add(new NV(PipelineJoin.Annotations.SELECT,
                     selectVars[order[i]]));
             
-            if (pred.isOptional())
-                anns.add(new NV(PipelineJoin.Annotations.OPTIONAL, pred
-                        .isOptional()));
+            // No. The join just looks at the Predicate's optional annotation.
+//            if (pred.isOptional())
+//                anns.add(new NV(PipelineJoin.Annotations.OPTIONAL, pred
+//                        .isOptional()));
             
             /*
              * Pull off annotations before we clear them from the predicate.
@@ -649,10 +650,15 @@ public class Rule2BOpUtility {
                     Annotations.QUADS, Annotations.DATASET });
 
             if (!constraints.isEmpty()) {
-                // decorate the predicate with any constraints.
-                pred = (Predicate<?>) pred.setProperty(
-                        IPredicate.Annotations.CONSTRAINTS, constraints
-                                .toArray(new IConstraint[constraints.size()]));
+//                // decorate the predicate with any constraints.
+//                pred = (Predicate<?>) pred.setProperty(
+//                        IPredicate.Annotations.CONSTRAINTS, constraints
+//                                .toArray(new IConstraint[constraints.size()]));
+                // add constraints to the join for that predicate.
+                anns.add(new NV(PipelineJoin.Annotations.CONSTRAINTS,
+                        constraints
+                                .toArray(new IConstraint[constraints.size()])));
+
             }
 
             if (quads) {

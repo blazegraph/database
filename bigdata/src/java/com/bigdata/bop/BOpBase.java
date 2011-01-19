@@ -424,6 +424,12 @@ public class BOpBase implements BOp {
         
     }
 
+    public boolean isController() {
+        
+        return getProperty(Annotations.CONTROLLER, false);
+        
+    }
+    
     /**
      * Set an annotation.
      * <p>
