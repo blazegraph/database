@@ -31,7 +31,10 @@ import com.bigdata.bop.controller.JoinGraph.NoSolutionsException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
  * @todo However, how do we manage when there are things like conditional
- *       routing operators?
+ *       routing operators? [Answer - the CONDITION is raised onto the subquery
+ *       such that we only conditionally run the subquery rather than routing
+ *       out of the subquery if the condition is not satisfied - MikeP is making
+ *       this change.]
  * 
  * @todo The order of the {@link IPredicate}s in the tail plan is currently
  *       unchanged from their given order (optional joins without constraints
@@ -48,38 +51,97 @@ import com.bigdata.bop.controller.JoinGraph.NoSolutionsException;
  *       leave a variable unbound).
  * 
  * @todo runFirst flag on the expander (for free text search). this should be an
- *       annotation. this can be a headPlan. [There can be constraints which are
- *       evaluated against the head plan. They need to get attached to the joins
- *       generated for the head plan. MikeP writes: There is a free text search
- *       access path that replaces the actual access path for the predicate,
- *       which is meaningless in an of itself because the P is magical.]
- * 
- * @todo inline APs and get rid of DataSetJoin. Rewrite NG and DG first.
+ *       annotation. this can be a [headPlan]. [There can be constraints which
+ *       are evaluated against the head plan. They need to get attached to the
+ *       joins generated for the head plan. MikeP writes: There is a free text
+ *       search access path that replaces the actual access path for the
+ *       predicate, which is meaningless in an of itself because the P is
+ *       magical.]
  * 
  * @todo write a method which returns the set of constraints which should be run
  *       for the last predicate in a given join path (a join path is just an
  *       ordered array of predicates).
+ * 
+ *       FIXME Add a method to generate a runnable query plan from a collection
+ *       of predicates and constraints. This is a bit different for the join
+ *       graph and the optionals in the tail plan. The join graph itself should
+ *       either be a {@link JoinGraph} operator which gets evaluated at run time
+ *       or reordered by whichever optimizer is selected for the query (query
+ *       hints).
  */
 public class PartitionedJoinGroup {
 
-//    private final IPredicate<?>[] headPlan;
-//    
-//    private final IConstraint[] headPlanConstraints;
+    /**
+     * The set of variables bound by the non-optional predicates.
+     */
+    private final Set<IVariable<?>> joinGraphVars = new LinkedHashSet<IVariable<?>>();
     
-    private final IPredicate<?>[] joinGraphPredicates;
+    /**
+     * An unordered list of constraints which do not involve ANY variables.
+     * These constraints should be run first, before the join graph.
+     * 
+     * @todo integrate into evaluation.
+     */
+    private final List<IConstraint> runFirstConstraints = new LinkedList<IConstraint>();
 
-    private final IConstraint[] joinGraphConstraints;
+    /**
+     * The set of the {@link IPredicate}s which have been flagged as
+     * "run first". These must all be non-optional predicates. They are usually
+     * special access paths created using an expander which replaces a mock
+     * access path. For example, free text search.
+     */
+    private final List<IPredicate<?>> headPlan = new LinkedList<IPredicate<?>>();
 
-    private final IPredicate<?>[] tailPlan;
+    /**
+     * The set of constraints which can be evaluated with the head plan
+     * predicates because the variables appearing in those constraints are known
+     * to become bound within the head plan.
+     */
+    private final List<IConstraint> headPlanConstraints = new LinkedList<IConstraint>();
 
-//    private final IConstraint[] tailPlanConstraints;
-    
+    /**
+     * The set of non-optional predicates which represent the join graph.
+     */
+    private final List<IPredicate<?>> joinGraphPredicates = new LinkedList<IPredicate<?>>();
+
+    /**
+     * The set of constraints which can be evaluated with the join graph
+     * predicates because the variables appearing in those constraints are known
+     * to become bound within the join graph.
+     */
+    private final List<IConstraint> joinGraphConstraints = new LinkedList<IConstraint>();
+
+    /**
+     * A set of optional predicates which will be run after the join graph.
+     */
+    private final List<IPredicate<?>> tailPlan = new LinkedList<IPredicate<?>>();
+
+    /**
+     * An unordered list of those constraints containing at least one variable
+     * known be bound (and optionally) bound within the tail plan.
+     */
+    private final List<IConstraint> tailPlanConstraints = new LinkedList<IConstraint>();
+
+    /**
+     * A map indicating which constraints are run for which predicate in the
+     * tail plan. The keys are the bopIds of the predicates in the tail plan.
+     * The values are the sets of constraints to run for that tail.
+     */
+    private final Map<Integer/* predId */, List<IConstraint>> tailPlanConstraintMap = new LinkedHashMap<Integer, List<IConstraint>>();
+
+    /**
+     * The set of variables bound by the non-optional predicates.
+     */
+    public Set<IVariable<?>> getJoinGraphVars() {
+        return joinGraphVars;
+    }
 
     /**
      * The {@link IPredicate}s in the join graph (required joins).
      */
     public IPredicate<?>[] getJoinGraphPredicates() {
-        return joinGraphPredicates;
+        return joinGraphPredicates.toArray(new IPredicate[joinGraphPredicates
+                .size()]);
     }
 
     /**
@@ -91,7 +153,8 @@ public class PartitionedJoinGroup {
      * query optimizer when it decides on an evaluation order for those joins).
      */
     public IConstraint[] getJoinGraphConstraints() {
-        return joinGraphConstraints;
+        return joinGraphConstraints
+                .toArray(new IConstraint[joinGraphConstraints.size()]);
     }
 
     /**
@@ -101,25 +164,60 @@ public class PartitionedJoinGroup {
      * tail plan in which their variable(S) MIGHT have been bound.
      */
     public IPredicate<?>[] getTailPlan() {
-        return tailPlan;
+        return tailPlan.toArray(new IPredicate[tailPlan.size()]);
     }
 
-//    private PartitionedJoinGroup(//
-//            final IPredicate<?>[] headPlan,//
-//            final IConstraint[] headPlanConstraints,//
-//            final IPredicate<?>[] joinGraphPredicates,//
-//            final IConstraint[] joinGraphConstraints,//
-//            final IPredicate<?>[] tailPlan,//
-//            final IConstraint[] tailPlanConstraints//
-//    ) {
-//        this.headPlan = headPlan;
-//        this.headPlanConstraints = headPlanConstraints;
-//        this.joinGraphPredicates = joinGraphPredicates;
-//        this.joinGraphConstraints = joinGraphConstraints;
-//        this.tailPlan = tailPlan;
-//        this.tailPlanConstraints = tailPlanConstraints;
-//    }
+    /**
+     * Return the set of {@link IConstraint}s which should be evaluated when an
+     * identified predicate having SPARQL optional semantics is evaluated. For
+     * constraints whose variables are not known to be bound when entering the
+     * tail plan, the constraint should be evaluated at the last predicate for
+     * which its variables MIGHT become bound.
+     * 
+     * @param bopId
+     *            The identifier for an {@link IPredicate} appearing in the tail
+     *            plan.
+     * 
+     * @return The set of constraints to be imposed by the join which evaluates
+     *         that predicate. This will be an empty array if there are no
+     *         constraints which can be imposed when that predicate is
+     *         evaluated.
+     * 
+     * @throws IllegalArgumentException
+     *             if there is no such predicate in the tail plan.
+     */
+    public IConstraint[] getTailPlanConstraints(final int bopId) {
 
+        boolean found = false;
+
+        for (IPredicate<?> p : tailPlan) {
+
+            if (p.getId() == bopId) {
+
+                found = true;
+
+                break;
+
+            }
+
+        }
+        
+        if (!found)
+            throw new IllegalArgumentException(
+                    "No such predicate in tail plan: bopId=" + bopId);
+        
+        final List<IConstraint> constraints = tailPlanConstraintMap.get(bopId);
+
+        if (constraints == null) {
+
+            return new IConstraint[0];
+            
+        }
+
+        return constraints.toArray(new IConstraint[constraints.size()]);
+        
+    }
+    
     /**
      * Analyze a set of {@link IPredicate}s representing optional and
      * non-optional joins and a collection of {@link IConstraint}s, partitioning
@@ -156,52 +254,6 @@ public class PartitionedJoinGroup {
         }
         
         /*
-         * An unordered list of constraints which do not involve ANY variables.
-         * These constraints should be run first, before the join graph.
-         * 
-         * @todo add to the class instance fields.
-         */
-        final List<IConstraint> runFirstConstraints = new LinkedList<IConstraint>();
-
-//        final List<IPredicate<?>> headPlan = new LinkedList<IPredicate<?>>();
-//
-//        final List<IConstraint> headPlanConstraints = new LinkedList<IConstraint>();
-
-        /*
-         * The non-optional predicates.
-         */
-        final List<IPredicate<?>> joinGraphPredicates = new LinkedList<IPredicate<?>>();
-        
-        /*
-         * The set of variables bound by the non-optional predicates.
-         */
-        final Set<IVariable<?>> joinGraphVars = new LinkedHashSet<IVariable<?>>();
-        
-        /*
-         * An unordered list of those constraints whose variables are known to
-         * be bound by the non-optional predicates.
-         */
-        final List<IConstraint> joinGraphConstraints = new LinkedList<IConstraint>();
-        
-        /*
-         * The predicates representing the optional joins.
-         */
-        final List<IPredicate<?>> tailPlan = new LinkedList<IPredicate<?>>();
-        
-        /*
-         * An unordered list of those constraints containing at least one
-         * variable known to NOT be bound by the non-optional predicates.
-         */
-        final List<IConstraint> tailPlanConstraints = new LinkedList<IConstraint>();
-
-        /*
-         * Map indicating which constraints are run for which predicate in the
-         * tail plan. The keys are the bopIds of the predicates in the tail
-         * plan. The values are the sets of constraints to run for that tail.
-         */
-        final Map<Integer/* predId */, List<IConstraint>> tailPlanConstraintMap = new LinkedHashMap<Integer, List<IConstraint>>();
-
-        /*
          * First identify the predicates which correspond to non-optional joins.
          * All other pipeline operators are inserted into the tail plan in the
          * order in which they are given.
@@ -209,25 +261,38 @@ public class PartitionedJoinGroup {
         for (IPredicate<?> p : sourcePreds) {
             if (p == null)
                 throw new IllegalArgumentException();
-            if (!p.isOptional()) {
+            if (p.isOptional()) {
+                if (p.getAccessPathExpander() != null
+                        && p.getAccessPathExpander().runFirst())
+                    throw new IllegalStateException(
+                            "runFirst is not compatible with optional: " + p);
+                // an optional predicate
+                tailPlan.add(p);
+            } else {
                 // non-optional predicate.
-                joinGraphPredicates.add(p);
-                // variables which will be bound by the join graph.
+                if (p.getAccessPathExpander() != null
+                        && p.getAccessPathExpander().runFirst()) {
+                    headPlan.add(p);
+                } else {
+                    // part of the join graph.
+                    joinGraphPredicates.add(p);
+                }
+                /*
+                 * Add to the set of variables which will be bound by the time
+                 * the join graph is done executing.
+                 */
                 final Iterator<IVariable<?>> vitr = BOpUtility
                         .getArgumentVariables(p);
                 while (vitr.hasNext()) {
                     joinGraphVars.add(vitr.next());
                 }
-            } else {
-                // an optional predicate
-                tailPlan.add(p);
             }
         }
 
         /*
-         * Now break the constraints into two groups - those whose variables are
-         * bound by the predicates in the join graph (required joins) and those
-         * having at least one variable bound by an optional join.
+         * Now break the constraints into different groups based on their
+         * variables and when those variables are known to be bound (required
+         * joins) or might be bound (optionals).
          */
         for (IConstraint c : constraints) {
             boolean allFound = true;
@@ -239,7 +304,7 @@ public class PartitionedJoinGroup {
                  * we should evaluate it as soon as possible. I.e., before the
                  * join graph.
                  */
-                runFirstConstraints.add(c);
+                runFirstConstraints.add(c); // @todo unit test.
                 continue;
             }
             while (vitr.hasNext()) {
@@ -342,19 +407,6 @@ public class PartitionedJoinGroup {
 
         }
 
-        /*
-         * Assign to instance fields.
-         */
-        // @todo headPlan
-//        this.headPlan = null;
-//        this.headPlanConstraints = null;
-        this.joinGraphPredicates = joinGraphPredicates
-                .toArray(new IPredicate[joinGraphPredicates.size()]);
-        this.joinGraphConstraints = joinGraphConstraints
-                .toArray(new IConstraint[joinGraphConstraints.size()]);
-        this.tailPlan = tailPlan.toArray(new IPredicate[tailPlan.size()]);
-        // @todo tailPlanConstraintMap
-
     }
-
+    
 }
