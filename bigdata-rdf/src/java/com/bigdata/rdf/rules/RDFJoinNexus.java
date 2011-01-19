@@ -391,6 +391,7 @@ public class RDFJoinNexus extends AbstractJoinNexus implements IJoinNexus {
 //        }
 
         // @todo raise into SPORelation#getAccessPath/3?
+        // @see https://sourceforge.net/apps/trac/bigdata/ticket/231
         if(backchain && relation instanceof SPORelation) {
 
             if (expander == null || expander.backchain()) {
