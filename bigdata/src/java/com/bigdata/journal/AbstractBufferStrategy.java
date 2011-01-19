@@ -474,7 +474,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         final long count = src.getNextOffset();
 
         // the source channel.
-        final FileChannel srcChannel = src.getRandomAccessFile().getChannel();
+        final FileChannel srcChannel = src.getChannel();
         
         // the output channel.
         final FileChannel outChannel = out.getChannel();
