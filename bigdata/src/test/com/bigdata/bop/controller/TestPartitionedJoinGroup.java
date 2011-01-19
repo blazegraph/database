@@ -194,11 +194,11 @@ public class TestPartitionedJoinGroup extends TestCase2 {
 
             // verify all predicates were placed into the join graph.
             assertSameIteratorAnyOrder("joinGraph", preds, Arrays.asList(
-                    fixture.getJoinGraphPredicates()).iterator());
+                    fixture.getJoinGraph()).iterator());
 
             // there are no constraints.
-            assertEquals("joinGraphConstraints.size", 0, fixture
-                    .getJoinGraphConstraints().length);
+            assertEquals("joinGraphConstraints.size", new IConstraint[] {},
+                    fixture.getJoinGraphConstraints());
 
             // there is no tail plan.
             assertEquals("tailPlan", new IPredicate[] {}, fixture.getTailPlan());
@@ -225,7 +225,7 @@ public class TestPartitionedJoinGroup extends TestCase2 {
 
             // verify all predicates were placed into the join graph.
             assertSameIteratorAnyOrder("joinGraph", preds, Arrays.asList(
-                    fixture.getJoinGraphPredicates()).iterator());
+                    fixture.getJoinGraph()).iterator());
 
             // verify all constraints were place on the join graph.
             assertSameIteratorAnyOrder("joinGraphConstraints", constraints,
@@ -343,7 +343,7 @@ public class TestPartitionedJoinGroup extends TestCase2 {
 
             // verify predicates placed into the join graph.
             assertSameIteratorAnyOrder("joinGraph", new IPredicate[] { p0, p1,
-                    p5 }, Arrays.asList(fixture.getJoinGraphPredicates())
+                    p5 }, Arrays.asList(fixture.getJoinGraph())
                     .iterator());
 
             // there are no constraints on the join graph predicates.
@@ -392,7 +392,7 @@ public class TestPartitionedJoinGroup extends TestCase2 {
 
             // verify predicates placed into the join graph.
             assertSameIteratorAnyOrder("joinGraph", new IPredicate[] { p0, p1,
-                    p5 }, Arrays.asList(fixture.getJoinGraphPredicates())
+                    p5 }, Arrays.asList(fixture.getJoinGraph())
                     .iterator());
 
             // verify constraints on the join graph.
@@ -422,8 +422,6 @@ public class TestPartitionedJoinGroup extends TestCase2 {
     
     /**
      * @todo test with headPlan.
-     * 
-     * @todo test for runFirst constraints.
      * 
      * @todo test logic to attach constraints to non-optional joins based on a
      *       given join path (not yet written).
