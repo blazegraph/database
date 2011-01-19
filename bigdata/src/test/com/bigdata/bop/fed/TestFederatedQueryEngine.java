@@ -717,7 +717,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 				new NV(Predicate.Annotations.EVALUATION_CONTEXT,
 						BOpEvaluationContext.SHARDED),//
 				// impose constraint on the join.
-				new NV(Annotations.CONSTRAINTS,
+				new NV(PipelineJoin.Annotations.CONSTRAINTS,
 						new IConstraint[] { new EQConstant(y,
 								new Constant<String>("Paul")) }));
         
@@ -1212,7 +1212,9 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
                         // Note: local access path!
-                        new NV( Predicate.Annotations.REMOTE_ACCESS_PATH,false),
+                        new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,false),
+                        // join is optional.
+                        new NV(Predicate.Annotations.OPTIONAL, true),//
                         new NV(Predicate.Annotations.BOP_ID, predId2),//
                         new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
@@ -1233,10 +1235,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 				new NV(Predicate.Annotations.EVALUATION_CONTEXT,
 						BOpEvaluationContext.SHARDED),//
 				// constraint x == z
-				new NV(Annotations.CONSTRAINTS,
+				new NV(PipelineJoin.Annotations.CONSTRAINTS,
 						new IConstraint[] { new EQ(x, z) }),
-				// join is optional.
-				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
 				// optional target is the same as the default target.
 				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
 

@@ -47,13 +47,13 @@ import java.util.concurrent.FutureTask;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpIdFactory;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
@@ -80,10 +80,10 @@ import com.bigdata.striterator.IChunkedIterator;
  * A join graph with annotations for estimated cardinality and other details in
  * support of runtime query optimization. A join graph is a collection of
  * relations and joins which connect those relations. This boils down to a
- * collection of {@link IPredicate}s (selects on relations) and shared variables
- * (which identify joins). Operators other than standard joins (including
- * optional joins, sort, order by, etc.) must be handled downstream from the
- * join graph in a "tail plan".
+ * collection of {@link IPredicate}s (selects on relations), shared variables
+ * (which identify joins), and {@link IConstraint}s (which limit solutions).
+ * Operators other than standard joins (including optional joins, sort, order
+ * by, etc.) must be handled downstream from the join graph in a "tail plan".
  * 
  * @see http://arxiv.org/PS_cache/arxiv/pdf/0810/0810.4809v1.pdf, XQuery Join
  *      Graph Isolation.
@@ -197,10 +197,10 @@ import com.bigdata.striterator.IChunkedIterator;
  *       approach should be able to handle queries without perfect / covering
  *       automatically. Then experiment with carrying fewer statement indices
  *       for quads.
- *       
+ * 
  * @todo Unit test when there are no solutions to the query. In this case there
  *       will be no paths identified by the optimizer and the final path length
- *       becomes zero. 
+ *       becomes zero.
  */
 public class JoinGraph extends PipelineOp {
 
@@ -214,16 +214,23 @@ public class JoinGraph extends PipelineOp {
 	 */
 	public interface Annotations extends PipelineOp.Annotations {
 
-		/**
-		 * The vertices of the join graph expressed an an {@link IPredicate}[].
-		 */
-		String VERTICES = JoinGraph.class.getName() + ".vertices";
+        /**
+         * The vertices of the join graph, expressed an an {@link IPredicate}[]
+         * (required).
+         */
+        String VERTICES = JoinGraph.class.getName() + ".vertices";
 
-		/**
-		 * The initial limit for cutoff sampling (default
-		 * {@value #DEFAULT_LIMIT}).
-		 */
-		String LIMIT = JoinGraph.class.getName() + ".limit";
+        /**
+         * The constraints on the join graph, expressed an an
+         * {@link IConstraint}[] (optional, defaults to no constraints).
+         */
+        String CONSTRAINTS = JoinGraph.class.getName() + ".constraints";
+
+        /**
+         * The initial limit for cutoff sampling (default
+         * {@value #DEFAULT_LIMIT}).
+         */
+        String LIMIT = JoinGraph.class.getName() + ".limit";
 
 		int DEFAULT_LIMIT = 100;
 
@@ -240,11 +247,20 @@ public class JoinGraph extends PipelineOp {
 	/**
 	 * @see Annotations#VERTICES
 	 */
-	public IPredicate[] getVertices() {
+	public IPredicate<?>[] getVertices() {
 
 		return (IPredicate[]) getRequiredProperty(Annotations.VERTICES);
 
 	}
+
+    /**
+     * @see Annotations#CONSTRAINTS
+     */
+    public IConstraint[] getConstraints() {
+
+        return (IConstraint[]) getProperty(Annotations.CONSTRAINTS, null/* none */);
+
+    }
 
 	/**
 	 * @see Annotations#LIMIT
@@ -264,24 +280,41 @@ public class JoinGraph extends PipelineOp {
 
 	}
 
-	public JoinGraph(final NV... anns) {
+    public JoinGraph(final BOp[] args, final NV... anns) {
 
-		this(BOpBase.NOARGS, NV.asMap(anns));
+        this(args, NV.asMap(anns));
 
 	}
 
-	public JoinGraph(final BOp[] args, final Map<String, Object> anns) {
+    public JoinGraph(final BOp[] args, final Map<String, Object> anns) {
 
-		super(args, anns);
+        super(args, anns);
 
-		switch (getEvaluationContext()) {
-		case CONTROLLER:
-			break;
-		default:
-			throw new UnsupportedOperationException(
-					Annotations.EVALUATION_CONTEXT + "="
-							+ getEvaluationContext());
-		}
+        // required property.
+        final IPredicate<?>[] vertices = (IPredicate[]) getProperty(Annotations.VERTICES);
+
+        if (vertices == null)
+            throw new IllegalArgumentException(Annotations.VERTICES);
+
+        if (vertices.length == 0)
+            throw new IllegalArgumentException(Annotations.VERTICES);
+
+        if (getLimit() <= 0)
+            throw new IllegalArgumentException(Annotations.LIMIT);
+
+        if (getNEdges() <= 0)
+            throw new IllegalArgumentException(Annotations.NEDGES);
+
+        if (!isController())
+            throw new IllegalArgumentException();
+
+        switch (getEvaluationContext()) {
+        case CONTROLLER:
+            break;
+        default:
+            throw new IllegalArgumentException(Annotations.EVALUATION_CONTEXT
+                    + "=" + getEvaluationContext());
+        }
 
 	}
 
@@ -383,7 +416,7 @@ public class JoinGraph extends PipelineOp {
 		/**
 		 * The most recently taken sample of the {@link Vertex}.
 		 */
-		VertexSample sample = null;
+		transient VertexSample sample = null;
 
 		Vertex(final IPredicate<?> pred) {
 
@@ -768,7 +801,7 @@ public class JoinGraph extends PipelineOp {
 		 * the cutoff sample of a join path having this edge except for the
 		 * degenerate case where the edge is the first edge in the join path.
 		 */
-		public EdgeSample sample = null;
+		transient EdgeSample sample = null;
 
 		public Edge(final Vertex v1, final Vertex v2,
 				final Set<IVariable<?>> shared) {
@@ -1560,6 +1593,10 @@ public class JoinGraph extends PipelineOp {
              * FIXME CONSTRAINT ORDERING : It is illegal to add a vertex to the
              * path if any variable appearing in its CONSTRAINTS would not be
              * bound.
+             * 
+             * FIXME CONSTRAINT ORDERING : Rather than constraints imposing an
+             * ordering on joins, constraints need to be attached dynamically to
+             * the first join for which their variables are known to be bound.
              */
 
 			final EdgeSample edgeSample = e.estimateCardinality(queryEngine,
@@ -1787,7 +1824,31 @@ public class JoinGraph extends PipelineOp {
 			return sb.toString();
 		}
 
-		public JGraph(final IPredicate[] v) {
+        /**
+         * 
+         * @param v
+         *            The vertices of the join graph. These are
+         *            {@link IPredicate}s associated with required joins.
+         * @param constraints
+         *            The constraints of the join graph (optional). Since all
+         *            joins in the join graph are required, constraints are
+         *            dynamically attached to the first join in which all of
+         *            their variables are bound.
+         * 
+         * @throws IllegalArgumentException
+         *             if the vertices is <code>null</code>.
+         * @throws IllegalArgumentException
+         *             if the vertices is an empty array.
+         * @throws IllegalArgumentException
+         *             if any element of the vertices is <code>null</code>.
+         * @throws IllegalArgumentException
+         *             if any constraint uses a variable which is never bound by
+         *             the given predicates.
+         * 
+         * @todo unit test for a constraint using a variable which is never
+         *       bound.
+         */
+        public JGraph(final IPredicate[] v, final IConstraint[] constraints) {
 
 			if (v == null)
 				throw new IllegalArgumentException();
@@ -1797,7 +1858,10 @@ public class JoinGraph extends PipelineOp {
 
 			V = new Vertex[v.length];
 
-			for (int i = 0; i < v.length; i++) {
+            for (int i = 0; i < v.length; i++) {
+
+                if (v[i] == null)
+                    throw new IllegalArgumentException();
 
 				V[i] = new Vertex(v[i]);
 
@@ -1833,9 +1897,12 @@ public class JoinGraph extends PipelineOp {
 
 			    // The set of identified edges for vertices which share vars.
                 final List<Edge> tmp = new LinkedList<Edge>();
-                
+
+                // The set of vertices which share variables.
+                final Set<Vertex> sharedEdgeVertices = new LinkedHashSet<Vertex>();
+
                 // The set of vertices which do not share variables.
-                final List<Vertex> unshared = new LinkedList<Vertex>();
+                final List<Vertex> unsharedEdgeVertices = new LinkedList<Vertex>();
 
 				for (int i = 0; i < v.length; i++) {
 
@@ -1865,7 +1932,16 @@ public class JoinGraph extends PipelineOp {
                              * or not the join path would bind the variable(s)
                              * appearing in the CONSTRAINT.
                              */
+						    
+                            if (log.isDebugEnabled())
+                                log.debug("vertices shared variable(s): vars="
+                                        + shared + ", v1=" + p1 + ", v2=" + p2);
+						    
 							tmp.add(new Edge(V[i], V[j], shared));
+							
+                            sharedEdgeVertices.add(V[i]);
+                            
+                            sharedEdgeVertices.add(V[j]);
 							
 							nmatched++;
 
@@ -1873,13 +1949,17 @@ public class JoinGraph extends PipelineOp {
 
 					}
 
-					if (nmatched == 0) {
+                    if (nmatched == 0 && !sharedEdgeVertices.contains(V[i])) {
 
 						/*
 						 * The source vertex does not share any variables.
 						 */
-					    
-					    unshared.add(V[i]);
+
+                        log
+                                .warn("Vertex does not share any variables: "
+                                        + V[i]);
+                        
+					    unsharedEdgeVertices.add(V[i]);
 
 					}
 					
@@ -1887,9 +1967,9 @@ public class JoinGraph extends PipelineOp {
 
 				E = tmp.toArray(new Edge[0]);
 				
-				this.unshared = unshared.toArray(new Vertex[0]); 
+				this.unshared = unsharedEdgeVertices.toArray(new Vertex[0]); 
 
-				if(!unshared.isEmpty()) {
+				if(!unsharedEdgeVertices.isEmpty()) {
 
                     /*
                      * FIXME This needs to be supported. We should explore and
@@ -1902,8 +1982,9 @@ public class JoinGraph extends PipelineOp {
                      * the evaluation).
                      */
 
-				    throw new UnsupportedOperationException(
-                            "Some predicates do not share any variables with other predicates.");
+                    throw new UnsupportedOperationException(
+                            "Some predicates do not share any variables with other predicates: unshared="
+                                    + unsharedEdgeVertices);
 				    
 				}
 				
@@ -2794,7 +2875,7 @@ public class JoinGraph extends PipelineOp {
 
 		private final BOpContext<IBindingSet> context;
 
-		private final JGraph g;
+//		private final JGraph g;
 
 		private int limit;
 		
@@ -2813,22 +2894,20 @@ public class JoinGraph extends PipelineOp {
 			// The initial number of edges (1 step paths) to explore.
 			nedges = getNEdges();
 
-			if (limit <= 0)
-				throw new IllegalArgumentException();
+//			if (limit <= 0)
+//				throw new IllegalArgumentException();
+//
+//			if (nedges <= 0)
+//				throw new IllegalArgumentException();
 
-			if (nedges <= 0)
-				throw new IllegalArgumentException();
-
-			final IPredicate[] v = getVertices();
-
-			g = new JGraph(v);
+//            g = new JGraph(getVertices(), getConstraints());
 
 		}
 
 		public Void call() throws Exception {
 
 			// Create the join graph.
-			final JGraph g = new JGraph(getVertices());
+			final JGraph g = new JGraph(getVertices(), getConstraints());
 
 			// Find the best join path.
 			final Path p = g.runtimeOptimizer(context.getRunningQuery()
@@ -2839,7 +2918,7 @@ public class JoinGraph extends PipelineOp {
 
 			// Generate the query from the join path.
 			final PipelineOp queryOp = JoinGraph.getQuery(idFactory, p
-					.getPredicates());
+					.getPredicates(), getConstraints());
 
 			// Run the query, blocking until it is done.
 			JoinGraph.runSubquery(context, queryOp);
@@ -2850,26 +2929,26 @@ public class JoinGraph extends PipelineOp {
 
 	} // class JoinGraphTask
 
-	/**
-	 * Places vertices into order by the {@link BOp#getId()} associated with
-	 * their {@link IPredicate}.
-	 */
-	private static class BOpIdComparator implements Comparator<Vertex> {
-
-		private static final transient Comparator<Vertex> INSTANCE = new BOpIdComparator();
-
-//		@Override
-		public int compare(final Vertex o1, final Vertex o2) {
-			final int id1 = o1.pred.getId();
-			final int id2 = o2.pred.getId();
-			if (id1 < id2)
-				return -1;
-			if (id2 > id1)
-				return 1;
-			return 0;
-		}
-
-	}
+//	/**
+//	 * Places vertices into order by the {@link BOp#getId()} associated with
+//	 * their {@link IPredicate}.
+//	 */
+//	private static class BOpIdComparator implements Comparator<Vertex> {
+//
+//		private static final transient Comparator<Vertex> INSTANCE = new BOpIdComparator();
+//
+////		@Override
+//		public int compare(final Vertex o1, final Vertex o2) {
+//			final int id1 = o1.pred.getId();
+//			final int id2 = o2.pred.getId();
+//			if (id1 < id2)
+//				return -1;
+//			if (id2 > id1)
+//				return 1;
+//			return 0;
+//		}
+//
+//	}
 
 	/**
 	 * Places edges into order by ascending estimated cardinality. Edges which
@@ -2915,18 +2994,27 @@ public class JoinGraph extends PipelineOp {
 	 * we are not yet handling anything except standard joins in the runtime
 	 * optimizer.
 	 */
-	
-	/**
-	 * Generate a query plan from an ordered collection of predicates.
-	 * 
-	 * @param p
-	 *            The join path.
-	 *            
-	 * @return The query plan.
-	 */
-	static public PipelineOp getQuery(final BOpIdFactory idFactory,
-			final IPredicate[] preds) {
 
+    /**
+     * Generate a query plan from an ordered collection of predicates.
+     * 
+     * @param p
+     *            The join path.
+     * 
+     * @return The query plan.
+     * 
+     *         FIXME Verify that constraints are attached correctly to the
+     *         returned query.
+     */
+    static public PipelineOp getQuery(final BOpIdFactory idFactory,
+            final IPredicate[] preds, final IConstraint[] constraints) {
+
+        if (constraints != null && constraints.length != 0) {
+            // FIXME Constraints must be attached to joins.
+            throw new UnsupportedOperationException(
+                    "Constraints must be attached to joins!");
+        }
+        
 		final PipelineJoin[] joins = new PipelineJoin[preds.length];
 
 //        final PipelineOp startOp = new StartOp(new BOp[] {},
@@ -3191,7 +3279,7 @@ public class JoinGraph extends PipelineOp {
         return sharedVars;
 
     }
-    
+
     /**
 	 * Exception thrown when the join graph does not have any solutions in the
 	 * data (running the query does not produce any results).

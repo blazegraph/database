@@ -34,7 +34,6 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.filter.BOpFilterBase;
 import com.bigdata.bop.ap.filter.BOpTupleFilter;
 import com.bigdata.bop.ap.filter.DistinctFilter;
-import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleCursor;
@@ -85,7 +84,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/180 (Migrate
          *      the RDFS inference and truth maintenance logic to BOPs)
          */
-        String RELATION_NAME = "relationName";
+        String RELATION_NAME = IPredicate.class.getName() + ".relationName";
 
 //        /**
 //         * The {@link IKeyOrder} which will be used to read on the relation.
@@ -98,15 +97,9 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 //        String KEY_ORDER = "keyOrder";
 
         /**
-         * <code>true</code> iff the predicate is optional (the right operand of
-         * a left join).
-         * 
-         * @deprecated This flag is being moved to the join operator (or should
-         *             it stay with the predicate so we can work with join
-         *             graphs more easily, but note that join graphs never
-         *             contain optional joins).
+         * <code>true</code> iff the predicate has SPARQL optional semantics.
          */
-        String OPTIONAL = "optional";
+        String OPTIONAL = IPredicate.class.getName() + ".optional";
 
 //        /**
 //         * Constraints on the elements read from the relation.
@@ -146,7 +139,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * 
          * @see IRangeQuery#rangeIterator(byte[], byte[], int, int, IFilter)
          */
-        String INDEX_LOCAL_FILTER = "indexLocalFilter";
+        String INDEX_LOCAL_FILTER = IPredicate.class.getName() + ".indexLocalFilter";
 
         /**
          * An optional {@link BOpFilterBase} to be applied to the elements of
@@ -163,7 +156,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * one another. You can chain {@link FilterBase} filters together as
          * well.
          */
-        String ACCESS_PATH_FILTER = "accessPathFilter";
+        String ACCESS_PATH_FILTER = IPredicate.class.getName() + ".accessPathFilter";
 
         /**
          * Access path expander pattern. This allows you to wrap or replace the
@@ -192,13 +185,13 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * 
          * @see IAccessPathExpander
          */
-        String ACCESS_PATH_EXPANDER = "accessPathExpander";
+        String ACCESS_PATH_EXPANDER = IPredicate.class.getName() + ".accessPathExpander";
 
         /**
          * The partition identifier -or- <code>-1</code> if the predicate does
          * not address a specific shard.
          */
-        String PARTITION_ID = "partitionId";
+        String PARTITION_ID = IPredicate.class.getName() + ".partitionId";
         
         int DEFAULT_PARTITION_ID = -1;
 
@@ -240,7 +233,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * 
          * @see BOpEvaluationContext
          */
-        String REMOTE_ACCESS_PATH = "remoteAccessPath";
+        String REMOTE_ACCESS_PATH = IPredicate.class.getName() + ".remoteAccessPath";
         
         boolean DEFAULT_REMOTE_ACCESS_PATH = true;
         
@@ -307,9 +300,9 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 		 * Operators which read or write on the database must declare the
 		 * {@link Annotations#TIMESTAMP} associated with that operation.
 		 * 
-		 * @see Annotations#TIMESTAMP
+		 * @see #TIMESTAMP
 		 */
-		String MUTATION = BOp.class.getName() + ".mutation";
+		String MUTATION = IPredicate.class.getName() + ".mutation";
 
         boolean DEFAULT_MUTATION = false;
 
@@ -317,17 +310,15 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 		 * The timestamp (or transaction identifier) used by this operator if it
 		 * reads or writes on the database (no default).
 		 * 
-		 * @see com.bigdata.bop.IPredicate.Annotations#MUTATION
-		 * 
-		 * @todo Move to {@link IPredicate}?
+		 * @see #MUTATION
 		 */
-		String TIMESTAMP = BOp.class.getName() + ".timestamp";
+		String TIMESTAMP = IPredicate.class.getName() + ".timestamp";
 
-        /**
-         * An optional {@link IConstraint}[] which places restrictions on the
-         * legal patterns in the variable bindings.
-         */
-        String CONSTRAINTS = PipelineJoin.class.getName() + ".constraints";
+//        /**
+//         * An optional {@link IConstraint}[] which places restrictions on the
+//         * legal patterns in the variable bindings.
+//         */
+//        String CONSTRAINTS = PipelineJoin.class.getName() + ".constraints";
 
     }
     
@@ -404,14 +395,9 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * For mutation, some {@link IRelation}s may require that all variables
      * appearing in the head are bound. This and similar constraints can be
      * enforced using {@link IConstraint}s on the {@link IRule}.
-     * <p>
-     * More control over the behavior of optionals may be gained through the use
-     * of an {@link IAccessPathExpander} pattern.
      * 
      * @return <code>true</code> iff this predicate is optional when evaluating
      *         a JOIN.
-     * 
-     * @deprecated By {@link PipelineJoin.Annotations#OPTIONAL}
      */
     public boolean isOptional();
 
@@ -441,21 +427,21 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 //     */
 //    public IElementFilter<E> getConstraint();
 
-    /**
-     * Return the optional {@link IConstraint}[] to be applied by a join which
-     * evaluates this {@link IPredicate}.
-     * <p>
-     * Note: The {@link Annotations#CONSTRAINTS} are annotated on the
-     * {@link IPredicate} rather than the join operators so they may be used
-     * with join graphs, which are expressed solely as an unordered set of
-     * {@link IPredicate}s. Using join graphs, we are able to do nifty things
-     * such as runtime query optimization which would not be possible if the
-     * annotations were decorating the joins since we would be unable to
-     * dynamically generate the join operators with the necessary annotations.
-     * 
-     * @see Annotations#CONSTRAINTS
-     */
-    public IConstraint[] constraints();
+//    /**
+//     * Return the optional {@link IConstraint}[] to be applied by a join which
+//     * evaluates this {@link IPredicate}.
+//     * <p>
+//     * Note: The {@link Annotations#CONSTRAINTS} are annotated on the
+//     * {@link IPredicate} rather than the join operators so they may be used
+//     * with join graphs, which are expressed solely as an unordered set of
+//     * {@link IPredicate}s. Using join graphs, we are able to do nifty things
+//     * such as runtime query optimization which would not be possible if the
+//     * annotations were decorating the joins since we would be unable to
+//     * dynamically generate the join operators with the necessary annotations.
+//     * 
+//     * @see Annotations#CONSTRAINTS
+//     */
+//    public IConstraint[] constraints();
     
     /**
      * Return the optional filter to be evaluated local to the index.

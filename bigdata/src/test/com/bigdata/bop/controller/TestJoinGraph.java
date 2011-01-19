@@ -29,11 +29,24 @@ package com.bigdata.bop.controller;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpEvaluationContext;
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.Var;
+import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.constraint.NEConstant;
+
 /**
- * Unit tests for runtime query optimization using {@link JoinGraph}.
+ * Unit tests for the {@link JoinGraph} operator.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo Test evaluation of the operator as well. A lot of the guts of that are
+ *       tested by {@link TestJGraph}.
  */
 public class TestJoinGraph extends TestCase2 {
 
@@ -50,193 +63,224 @@ public class TestJoinGraph extends TestCase2 {
         super(name);
     }
 
-	/*
-	 * Among other things, there are some operations which depend on equality or
-	 * hash code behavior for vertices and perhaps edges so those things should
-	 * also be tested.
-	 */
+    public void test_ctor() {
+
+        // correct acceptance.
+        {
+            final IPredicate[] vertices = new IPredicate[] {
+                    new Predicate(new BOp[]{Var.var("x"),Var.var("y")}),//
+                    new Predicate(new BOp[]{Var.var("y"),Var.var("z")}),//
+            };
+            final IConstraint[] constraints = null;
+            final JoinGraph joinGraph = new JoinGraph(new BOp[0],//
+                    new NV(JoinGraph.Annotations.VERTICES, vertices),//
+                    new NV(JoinGraph.Annotations.CONTROLLER, true), //
+                    new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER)//
+            );
+            assertEquals("vertices", vertices, joinGraph.getVertices());
+            assertEquals("constraints", constraints, joinGraph.getConstraints());
+            assertEquals("limit", JoinGraph.Annotations.DEFAULT_LIMIT,
+                    joinGraph.getLimit());
+            assertEquals("nedges", JoinGraph.Annotations.DEFAULT_NEDGES,
+                    joinGraph.getNEdges());
+        }
+
+        // correct acceptance, different arguments.
+        {
+            final IPredicate[] vertices = new IPredicate[] {
+                    new Predicate(new BOp[]{Var.var("x"),Var.var("y")}),//
+                    new Predicate(new BOp[]{Var.var("y"),Var.var("z")}),//
+            };
+            final IConstraint[] constraints = new IConstraint[] { //
+            new NEConstant(Var.var("x"), new Constant<Long>(12L)) //
+            };
+            final JoinGraph joinGraph = new JoinGraph(new BOp[0],//
+                    new NV(JoinGraph.Annotations.VERTICES, vertices),//
+                    new NV(JoinGraph.Annotations.CONSTRAINTS, constraints),//
+                    new NV(JoinGraph.Annotations.CONTROLLER, true), //
+                    new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER)//
+            );
+            assertEquals("vertices", vertices, joinGraph.getVertices());
+            assertEquals("constraints", constraints, joinGraph.getConstraints());
+            assertEquals("limit", JoinGraph.Annotations.DEFAULT_LIMIT,
+                    joinGraph.getLimit());
+            assertEquals("nedges", JoinGraph.Annotations.DEFAULT_NEDGES,
+                    joinGraph.getNEdges());
+        }
+
+        // correct acceptance, different arguments.
+        {
+            final IPredicate[] vertices = new IPredicate[] {
+                    new Predicate(new BOp[]{Var.var("x"),Var.var("y")}),//
+                    new Predicate(new BOp[]{Var.var("y"),Var.var("z")}),//
+            };
+            final IConstraint[] constraints = new IConstraint[] { //
+            new NEConstant(Var.var("x"), new Constant<Long>(12L)) //
+            };
+            final int limit = 50;
+            final int nedges = 1;
+            final JoinGraph joinGraph = new JoinGraph(new BOp[0],//
+                    new NV(JoinGraph.Annotations.VERTICES, vertices),//
+                    new NV(JoinGraph.Annotations.CONSTRAINTS, constraints),//
+                    new NV(JoinGraph.Annotations.LIMIT, limit),//
+                    new NV(JoinGraph.Annotations.NEDGES, nedges),//
+                    new NV(JoinGraph.Annotations.CONTROLLER, true), //
+                    new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER)//
+            );
+            assertEquals("vertices", vertices, joinGraph.getVertices());
+            assertEquals("constraints", constraints, joinGraph.getConstraints());
+            assertEquals("limit", limit, joinGraph.getLimit());
+            assertEquals("nedges", nedges, joinGraph.getNEdges());
+        }
+
+    }
     
-    public void test_getMinimumCardinalityEdge() {
-    	fail("write test");
-    }
-
-    public void test_moreEdgesToExecute() {
-    	fail("write test");
-    }
-
-    // @todo also getEdgeCount()
-    public void test_getEdges() {
-    	fail("write test");
-    }
-    
-    public void test_getSelectedJoinPath() {
-    	fail("write test");
-    }
-
-    public void test_getBestAlternativeJoinPath() {
-    	fail("write test");
-    }
-
-    public void test_getVertex() {
-    	fail("write test");
-    }
-    
-    // getEdge(v1,v2)
-    public void test_getEdge() {
-    	fail("write test");
-    }
-    
-    // test ability to obtain a Path which extends another path.
-    public void test_Path_addEdge() {
-    	fail("write test");
-    }
-
-    /**
-     * Test ability to identify shared variables appearing either as predicate
-     * operands or as part of CONSTRAINTS or FILTERS.
-     */
-    public void test_getSharedVariables() {
-        fail("write test");
-    }
-    
-//    @Override
-//    public Properties getProperties() {
-//
-//        final Properties p = new Properties(super.getProperties());
-//
-//        p.setProperty(Journal.Options.BUFFER_MODE, BufferMode.Transient
-//                .toString());
-//
-//        return p;
-//        
-//    }
-//
-//    static private final String namespace = "ns";
-//    
-//    Journal jnl;
-//    
-//    R rel;
-//    
-//    public void setUp() throws Exception {
-//        
-//        jnl = new Journal(getProperties());
-//
-//    }
-//    
-//    /**
-//     * Create and populate relation in the {@link #namespace}.
-//     * 
-//     * @return The #of distinct entries.
-//     */
-//    private int loadData(final int scale) {
-//
-//		final String[] names = new String[] { "John", "Mary", "Saul", "Paul",
-//				"Leon", "Jane", "Mike", "Mark", "Jill", "Jake", "Alex", "Lucy" };
-//
-//		final Random rnd = new Random();
-//		
-//		// #of distinct instances of each name.
-//		final int populationSize = Math.max(10, (int) Math.ceil(scale / 10.));
-//		
-//		// #of trailing zeros for each name.
-//		final int nzeros = 1 + (int) Math.ceil(Math.log10(populationSize));
-//		
-////		System.out.println("scale=" + scale + ", populationSize="
-////				+ populationSize + ", nzeros=" + nzeros);
-//
-//		final NumberFormat fmt = NumberFormat.getIntegerInstance();
-//		fmt.setMinimumIntegerDigits(nzeros);
-//		fmt.setMaximumIntegerDigits(nzeros);
-//		fmt.setGroupingUsed(false);
-//		
-//        // create the relation.
-//        final R rel = new R(jnl, namespace, ITx.UNISOLATED, new Properties());
-//        rel.create();
-//
-//        // data to insert.
-//		final E[] a = new E[scale];
-//
-//		for (int i = 0; i < scale; i++) {
-//
-//			final String n1 = names[rnd.nextInt(names.length)]
-//					+ fmt.format(rnd.nextInt(populationSize));
-//
-//			final String n2 = names[rnd.nextInt(names.length)]
-//					+ fmt.format(rnd.nextInt(populationSize));
-//
-////			System.err.println("i=" + i + ", n1=" + n1 + ", n2=" + n2);
-//			
-//			a[i] = new E(n1, n2);
-//			
-//        }
-//
-//		// sort before insert for efficiency.
-//		Arrays.sort(a,R.primaryKeyOrder.getComparator());
-//		
-//        // insert data (the records are not pre-sorted).
-//        final long ninserts = rel.insert(new ChunkedArrayIterator<E>(a.length, a, null/* keyOrder */));
-//
-//        // Do commit since not scale-out.
-//        jnl.commit();
-//
-//        // should exist as of the last commit point.
-//        this.rel = (R) jnl.getResourceLocator().locate(namespace,
-//                ITx.READ_COMMITTED);
-//
-//        assertNotNull(rel);
-//
-//        return (int) ninserts;
-//        
-//    }
-//
-//    public void tearDown() throws Exception {
-//
-//        if (jnl != null) {
-//            jnl.destroy();
-//            jnl = null;
-//        }
-//        
-//        // clear reference.
-//        rel = null;
-//
-//    }
-
-    public void test_something() {
-
-////    	final int scale = 10000;
-////    	
-////        final int nrecords = loadData(scale);
-//        
-//        final IVariable<?> x = Var.var("x");
-//
-//		final IVariable<?> y = Var.var("y");
-//
-//		final IPredicate<E> p1 = new Predicate<E>(new BOp[] { x, y },
-//				new NV(IPredicate.Annotations.RELATION_NAME,
-//						new String[] { namespace }),//
-//				new NV(IPredicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED)//
-//		);
-//
-//		final IPredicate<E> p2 = new Predicate<E>(new BOp[] { x, y },
-//				new NV(IPredicate.Annotations.RELATION_NAME,
-//						new String[] { namespace }),//
-//				new NV(IPredicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED)//
-//		);
-//
-//		final IPredicate<E> p3 = new Predicate<E>(new BOp[] { x, y },
-//				new NV(IPredicate.Annotations.RELATION_NAME,
-//						new String[] { namespace }),//
-//				new NV(IPredicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED)//
-//		);
-//
-//		new JoinGraph(//
-//    			new NV(BOp.Annotations.BOP_ID, 1),//
-//    			new NV(JoinGraph.Annotations.VERTICES,new IPredicate[]{}),//
-//    			new NV(JoinGraph.Annotations.SAMPLE_SIZE, 100)//
-//    			);
-    	
-        fail("write tests");
+    public void test_ctor_correct_rejection() {
         
+        /*
+         * Correct rejection when required argument is not given (the VERTICES
+         * annotation is required).
+         */
+        try {
+            new JoinGraph(new BOp[0], //
+                    new NV("foo", "bar"), //
+                    new NV(JoinGraph.Annotations.CONTROLLER, true), //
+                    new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER)//
+            );
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+
+        // correct rejection when vertices array is null.
+        try {
+            final IPredicate[] vertices = null;
+            new JoinGraph(new BOp[0], //
+                    new NV(JoinGraph.Annotations.VERTICES, vertices), //
+                    new NV(JoinGraph.Annotations.CONTROLLER, true), //
+                    new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER)//
+            );
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+
+        // correct rejection when vertices array is empty.
+        try {
+            final IPredicate[] vertices = new IPredicate[] {
+
+            };
+            new JoinGraph(new BOp[0],//
+                    new NV(JoinGraph.Annotations.VERTICES, vertices),//
+                    new NV(JoinGraph.Annotations.CONTROLLER, true), //
+                    new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER)//
+            );
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+        
+        // correct rejection when CONTROLLER is not specified.
+        try {
+            final IPredicate[] vertices = new IPredicate[] {
+                    new Predicate(new BOp[]{Var.var("x"),Var.var("y")}),//
+                    new Predicate(new BOp[]{Var.var("y"),Var.var("z")}),//
+            };
+            new JoinGraph(new BOp[0],//
+                    new NV(JoinGraph.Annotations.VERTICES, vertices),//
+                    //new NV(JoinGraph.Annotations.CONTROLLER, true), //
+                    new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER)//
+            );
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+        
+        // correct rejection when EVALUATION_CONTEXT is not specified/wrong.
+        try {
+            final IPredicate[] vertices = new IPredicate[] {
+                    new Predicate(new BOp[]{Var.var("x"),Var.var("y")}),//
+                    new Predicate(new BOp[]{Var.var("y"),Var.var("z")}),//
+            };
+            new JoinGraph(new BOp[0],//
+                    new NV(JoinGraph.Annotations.VERTICES, vertices),//
+                    new NV(JoinGraph.Annotations.CONTROLLER, true), //
+                    new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.ANY)//
+            );
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+
+        // Correct rejection [limit].
+        {
+            try {
+                final IPredicate[] vertices = new IPredicate[] {
+                        new Predicate(new BOp[] { Var.var("x"), Var.var("y") }),//
+                        new Predicate(new BOp[] { Var.var("y"), Var.var("z") }),//
+                };
+                final IConstraint[] constraints = new IConstraint[] { //
+                new NEConstant(Var.var("x"), new Constant<Long>(12L)) //
+                };
+                final int limit = 0;
+                final int nedges = 1;
+                new JoinGraph(new BOp[0],//
+                        new NV(JoinGraph.Annotations.VERTICES, vertices),//
+                        new NV(JoinGraph.Annotations.CONSTRAINTS, constraints),//
+                        new NV(JoinGraph.Annotations.LIMIT, limit),//
+                        new NV(JoinGraph.Annotations.NEDGES, nedges),//
+                        new NV(JoinGraph.Annotations.CONTROLLER, true), //
+                        new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER)//
+                );
+                fail("Expecting: " + IllegalArgumentException.class);
+            } catch (IllegalArgumentException ex) {
+                if (log.isInfoEnabled())
+                    log.info("Ignoring expected exception: " + ex);
+            }
+        }
+
+        // Correct rejection [nedges].
+        {
+            try {
+                final IPredicate[] vertices = new IPredicate[] {
+                        new Predicate(new BOp[] { Var.var("x"), Var.var("y") }),//
+                        new Predicate(new BOp[] { Var.var("y"), Var.var("z") }),//
+                };
+                final IConstraint[] constraints = new IConstraint[] { //
+                new NEConstant(Var.var("x"), new Constant<Long>(12L)) //
+                };
+                final int limit = 10;
+                final int nedges = 0;
+                new JoinGraph(new BOp[0],//
+                        new NV(JoinGraph.Annotations.VERTICES, vertices),//
+                        new NV(JoinGraph.Annotations.CONSTRAINTS, constraints),//
+                        new NV(JoinGraph.Annotations.LIMIT, limit),//
+                        new NV(JoinGraph.Annotations.NEDGES, nedges),//
+                        new NV(JoinGraph.Annotations.CONTROLLER, true), //
+                        new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER)//
+                );
+                fail("Expecting: " + IllegalArgumentException.class);
+            } catch (IllegalArgumentException ex) {
+                if (log.isInfoEnabled())
+                    log.info("Ignoring expected exception: " + ex);
+            }
+        }
+
     }
-    
+
 }

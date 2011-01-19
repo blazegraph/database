@@ -245,11 +245,11 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 //
 //    }
 
-    public IConstraint[] constraints() {
-
-        return getProperty(IPredicate.Annotations.CONSTRAINTS, null/* defaultValue */);
-
-    }
+//    public IConstraint[] constraints() {
+//
+//        return getProperty(IPredicate.Annotations.CONSTRAINTS, null/* defaultValue */);
+//
+//    }
 
     final public IFilter getIndexLocalFilter() {
 

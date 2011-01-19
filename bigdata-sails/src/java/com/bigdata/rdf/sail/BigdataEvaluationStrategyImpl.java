@@ -1476,7 +1476,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl
         anns.add(new NV(IPredicate.Annotations.RELATION_NAME,
                 new String[] { database.getSPORelation().getNamespace() }));//
         
-        // is the join associated with this predicate optional? @todo move to the join.
+        // is the join associated with this predicate optional?
         if (optional)
             anns.add(new NV(IPredicate.Annotations.OPTIONAL, optional));
         

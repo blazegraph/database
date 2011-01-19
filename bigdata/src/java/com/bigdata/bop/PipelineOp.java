@@ -91,19 +91,19 @@ abstract public class PipelineOp extends BOpBase {
 
 		boolean DEFAULT_SHARED_STATE = false;
 
-        /**
-         * Annotation used to mark a set of (non-optional) joins which may be
-         * freely reordered by the query optimizer in order to minimize the
-         * amount of work required to compute the solutions.
-         * <p>
-         * Note: Optional joins MAY NOT appear within a join graph. Optional
-         * joins SHOULD be evaluated as part of the "tail plan" following the
-         * join graph, but before operations such as SORT, DISTINCT, etc. When
-         * the query plan includes {@link #CONDITIONAL_GROUP}s, those groups
-         * include a leading {@link #JOIN_GRAPH} (required joins) followed by
-         * zero or more optional joins.
-         */
-		String JOIN_GRAPH = PipelineOp.class.getName() + ".joinGraph";
+//        /**
+//         * Annotation used to mark a set of (non-optional) joins which may be
+//         * freely reordered by the query optimizer in order to minimize the
+//         * amount of work required to compute the solutions.
+//         * <p>
+//         * Note: Optional joins MAY NOT appear within a join graph. Optional
+//         * joins SHOULD be evaluated as part of the "tail plan" following the
+//         * join graph, but before operations such as SORT, DISTINCT, etc. When
+//         * the query plan includes {@link #CONDITIONAL_GROUP}s, those groups
+//         * include a leading {@link #JOIN_GRAPH} (required joins) followed by
+//         * zero or more optional joins.
+//         */
+//		String JOIN_GRAPH = PipelineOp.class.getName() + ".joinGraph";
 
 //        /**
 //         * Annotation used to mark a set of operators belonging to a conditional

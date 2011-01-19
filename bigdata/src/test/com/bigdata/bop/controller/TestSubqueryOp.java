@@ -596,7 +596,7 @@ public class TestSubqueryOp extends TestCase2 {
 //                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
 				new NV(PipelineJoin.Annotations.PREDICATE, pred3Op),//
 				// constraint d != Leon
-				new NV(Annotations.CONSTRAINTS,
+				new NV(PipelineJoin.Annotations.CONSTRAINTS,
 						new IConstraint[] { new NEConstant(d, new Constant<String>("Leon")) })
 //				// join is optional.
 //				new NV(PipelineJoin.Annotations.OPTIONAL, true),//

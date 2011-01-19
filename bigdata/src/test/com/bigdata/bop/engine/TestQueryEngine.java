@@ -79,7 +79,6 @@ import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.LatchedExecutor;
-import com.ibm.icu.impl.ByteBuffer;
 
 /**
  * Test suite for the {@link QueryEngine} against a local database instance.
@@ -1128,7 +1127,7 @@ public class TestQueryEngine extends TestCase2 {
 				new NV(Predicate.Annotations.BOP_ID, joinId),//
 				new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
 				// impose constraint on the join.
-				new NV(Annotations.CONSTRAINTS,
+				new NV(PipelineJoin.Annotations.CONSTRAINTS,
 						new IConstraint[] { new EQConstant(y,
 								new Constant<String>("Paul")) })//
 		);
@@ -1579,6 +1578,7 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId2),//
+                        new NV(Predicate.Annotations.OPTIONAL, true),//
                         new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
         
@@ -1592,10 +1592,9 @@ public class TestQueryEngine extends TestCase2 {
 				new NV(Predicate.Annotations.BOP_ID, joinId2),//
 				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op),//
 				// constraint x == z
-				new NV(Annotations.CONSTRAINTS,
+				new NV(PipelineJoin.Annotations.CONSTRAINTS,
 						new IConstraint[] { new EQ(x, z) }),
 				// join is optional.
-				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
 				// optional target is the same as the default target.
 				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
 

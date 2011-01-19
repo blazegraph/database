@@ -31,8 +31,6 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
-import com.bigdata.bop.IPredicate.Annotations;
-
 import cutthecrap.utils.striterators.IPropertySet;
 
 /**
@@ -182,6 +180,13 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
      */
     BOpEvaluationContext getEvaluationContext();
     
+    /**
+     * Return <code>true</code> iff this operator is a controller.
+     * 
+     * @see Annotations#CONTROLLER
+     */
+    boolean isController();
+    
 //    /**
 //     * Return <code>true</code> iff this operator is an access path which writes
 //     * on the database.
@@ -248,6 +253,8 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
         /**
          * This annotation determines where an operator will be evaluated
          * (default {@value #DEFAULT_EVALUATION_CONTEXT}).
+         * 
+         * @see BOpEvaluationContext
          */
         String EVALUATION_CONTEXT = BOp.class.getName() + ".evaluationContext";
 
@@ -260,6 +267,8 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
          * arguments. Thus control operators mark a boundary in pipelined
          * evaluation. Some examples of control operators include UNION, STEPS,
          * and STAR (aka transitive closure).
+         * 
+         * @see BOp#isController()
          */
         String CONTROLLER = BOp.class.getName()+".controller";
         
