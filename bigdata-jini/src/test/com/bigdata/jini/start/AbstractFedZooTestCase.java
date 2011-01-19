@@ -126,7 +126,7 @@ public class AbstractFedZooTestCase extends TestCase2 {
 //        ZookeeperProcessHelper.startZookeeper(config, listener);
 
         final int clientPort = Integer.valueOf(System
-                .getProperty("test.zookeeper.clientPort","2181"));
+                .getProperty("test.zookeeper.clientPort","2081"));
 
         // Verify zookeeper is running on the local host at the client port.
         {

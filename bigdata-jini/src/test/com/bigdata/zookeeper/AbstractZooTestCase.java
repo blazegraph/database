@@ -30,9 +30,7 @@ package com.bigdata.zookeeper;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.net.BindException;
 import java.net.InetAddress;
-import java.net.ServerSocket;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
@@ -73,32 +71,32 @@ public abstract class AbstractZooTestCase extends TestCase2 {
         super(name);
     }
     
-    /**
-     * Return an open port on current machine. Try the suggested port first. If
-     * suggestedPort is zero, just select a random port
-     */
-    protected static int getPort(final int suggestedPort) throws IOException {
-        
-        ServerSocket openSocket;
-        
-        try {
-        
-            openSocket = new ServerSocket(suggestedPort);
-            
-        } catch (BindException ex) {
-            
-            // the port is busy, so look for a random open port
-            openSocket = new ServerSocket(0);
-        
-        }
-
-        final int port = openSocket.getLocalPort();
-        
-        openSocket.close();
-
-        return port;
-        
-    }
+//    /**
+//     * Return an open port on current machine. Try the suggested port first. If
+//     * suggestedPort is zero, just select a random port
+//     */
+//    protected static int getPort(final int suggestedPort) throws IOException {
+//        
+//        ServerSocket openSocket;
+//        
+//        try {
+//        
+//            openSocket = new ServerSocket(suggestedPort);
+//            
+//        } catch (BindException ex) {
+//            
+//            // the port is busy, so look for a random open port
+//            openSocket = new ServerSocket(0);
+//        
+//        }
+//
+//        final int port = openSocket.getLocalPort();
+//        
+//        openSocket.close();
+//
+//        return port;
+//        
+//    }
 
     /**
      * A configuration file used by some of the unit tests in this package. It
@@ -193,7 +191,7 @@ public abstract class AbstractZooTestCase extends TestCase2 {
                 .getProperty("test.zookeeper.tickTime","2000"));
 
         clientPort = Integer.valueOf(System.getProperty(
-                    "test.zookeeper.clientPort", "2181"));
+                    "test.zookeeper.clientPort", "2081"));
 
         /*
          * Note: This MUST be the actual session timeout that the zookeeper
@@ -202,9 +200,9 @@ public abstract class AbstractZooTestCase extends TestCase2 {
         this.sessionTimeout = tickTime * 2;
 
         // Verify zookeeper is running on the local host at the client port.
+        final InetAddress localIpAddr = NicUtil.getInetAddress(null, 0,
+                null, true);
         {
-            final InetAddress localIpAddr = NicUtil.getInetAddress(null, 0,
-                    null, true);
             try {
                 ZooHelper.ruok(localIpAddr, clientPort);
             } catch (Throwable t) {
@@ -216,7 +214,9 @@ public abstract class AbstractZooTestCase extends TestCase2 {
 //        // if necessary, start zookeeper (a server instance).
 //        ZookeeperProcessHelper.startZookeeper(config, listener);
 
-        zookeeperAccessor = new ZooKeeperAccessor("localhost:" + clientPort, sessionTimeout);
+            zookeeperAccessor = new ZooKeeperAccessor(localIpAddr
+                    .getHostAddress()
+                    + ":" + clientPort, sessionTimeout);
         
         zookeeper = zookeeperAccessor.getZookeeper();
         

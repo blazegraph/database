@@ -1604,8 +1604,8 @@ ${postInstallMessage}</echo>
       <!-- tests. These properties MUST be consistent with the actual       -->
       <!-- zookeeper configuration.  Zookeeper is assumed (by the tests) to -->
       <!-- be running on the localhost.                                     -->
-      <property name="test.zookeeper.tickTime" value="2000" />
-      <property name="test.zookeeper.clientPort" value="2888" />
+      <property name="test.zookeeper.tickTime" value="${test.zookeeper.tickTime}" />
+      <property name="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />
 
       <!-- The zookeeper install directory. -->
       <property name="test.zookeeper.installDir" value="${zookeeper.installDir}" />
