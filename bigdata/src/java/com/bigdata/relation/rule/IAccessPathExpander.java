@@ -54,19 +54,24 @@ public interface IAccessPathExpander<E> extends Serializable {
      *         onto or otherwise override the given {@link IAccessPath}.
      */
     IAccessPath<E> getAccessPath(IAccessPath<E> accessPath);
-    
+
     /**
      * Add the backchainer on top of the expander.
      * 
      * @return true if the backchainer should run
+     * 
+     * @deprecated Never <code>true</code>. The backchainer is only run for
+     *             normal predicates in triples mode at this time. If it is to
+     *             be layer, it should be layered as an annotation.  See
+     *             https://sourceforge.net/apps/trac/bigdata/ticket/231.
      */
     boolean backchain();
-    
+
     /**
      * If true, the predicate for this expander will be given priority in the
      * join order.
      * 
-     *  @return true if the predicate should be run first
+     * @return true if the predicate should be run first
      */
     boolean runFirst();
     

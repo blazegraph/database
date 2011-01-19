@@ -247,7 +247,7 @@ public class DefaultGraphSolutionExpander implements IAccessPathExpander<ISPO> {
     
     public boolean backchain() {
         
-        return true;
+        return false;
         
     }
 

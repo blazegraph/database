@@ -180,7 +180,7 @@ public class NamedGraphSolutionExpander implements IAccessPathExpander<ISPO> {
     
     public boolean backchain() {
         
-        return true;
+        return false;
         
     }
 
