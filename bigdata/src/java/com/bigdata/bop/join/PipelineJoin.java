@@ -1684,16 +1684,11 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 							final IBindingSet bs = bindingSets[bindex];
 
-					        if (constraints != null) {
-
-					            // verify constraint.
-					            if(!BOpUtility.isConsistent(constraints, bs)) {
-					                // skip solutions which fail the constraint.
-					                continue;
-					            }
-					        
-					        }
-
+							if(!BOpUtility.isConsistent(constraints, bs)) {
+							    // Failed by the constraint on the join.
+							    continue;
+							}
+							
 							if (log.isTraceEnabled())
 								log
 										.trace("Passing on solution which fails an optional join: "
@@ -2077,6 +2072,21 @@ public class PipelineJoin<E> extends PipelineOp implements
 						int bindex = 0;
 						for (IBindingSet bset : bindingSets) {
 
+                            // #of binding sets accepted.
+						    naccepted++;
+						    
+                            /* #of elements accepted for this binding set.
+                             * 
+                             * Note: We count binding sets as accepted before we
+                             * apply the constraints. This has the effect that
+                             * an optional join which produces solutions that
+                             * are then rejected by a FILTER associated with the
+                             * optional predicate WILL NOT pass on the original
+                             * solution even if ALL solutions produced by the
+                             * join are rejected by the filter.
+                             */
+                            this.naccepted[bindex]++;
+
 							/*
 							 * Clone the binding set since it is tested for each
 							 * element visited.
@@ -2098,14 +2108,11 @@ public class PipelineJoin<E> extends PipelineOp implements
 								// Accept this binding set.
 								unsyncBuffer.add(bset);
 
-								// #of binding sets accepted.
-								naccepted++;
+//								// #of binding sets accepted.
+//								naccepted++;
 
 								// #of output solutions generated.
 								stats.outputSolutions.increment(); 
-
-								// #of elements accepted for this binding set.
-								this.naccepted[bindex]++;
 
 							}
 
