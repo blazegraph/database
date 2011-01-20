@@ -89,7 +89,8 @@ public class CompareBOp extends BOpConstraint {
     	final IV right = ((IValueExpression<IV>) get(1)).get(s);
 
     	if (left == null || right == null)
-            return true; // not yet bound.
+//            return true; // not yet bound.
+    		return false; // no longer allow unbound values
 
     	final CompareOp op = (CompareOp) getProperty(Annotations.OP);
     	
