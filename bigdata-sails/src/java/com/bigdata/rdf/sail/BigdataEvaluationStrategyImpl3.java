@@ -29,6 +29,7 @@ import org.openrdf.query.algebra.Group;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.LeftJoin;
 import org.openrdf.query.algebra.MathExpr;
+import org.openrdf.query.algebra.MathExpr.MathOp;
 import org.openrdf.query.algebra.MultiProjection;
 import org.openrdf.query.algebra.Not;
 import org.openrdf.query.algebra.Or;
@@ -41,15 +42,13 @@ import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.Regex;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
 import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
-import org.openrdf.query.algebra.Compare.CompareOp;
-import org.openrdf.query.algebra.MathExpr.MathOp;
-import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
@@ -61,12 +60,12 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.constraint.AND;
 import com.bigdata.bop.constraint.BOUND;
@@ -84,15 +83,16 @@ import com.bigdata.rdf.internal.DummyIV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.constraints.SameTermBOp;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.sop.SOp;
 import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree;
+import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
 import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
-import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
@@ -118,7 +118,6 @@ import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.DistinctFilter;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.util.concurrent.Haltable;
 
 /**
  * Extended to rewrite Sesame {@link TupleExpr}s onto native {@link Rule}s and
@@ -516,6 +515,59 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         
     }
     
+    @Override
+    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
+            final Filter filter, final BindingSet bs) 
+            throws QueryEvaluationException {
+        
+        if (!nativeJoins) {
+            // Use Sesame 2 evaluation
+            return super.evaluate(filter, bs);
+        }
+        
+        if (filter.getArg() instanceof StatementPattern) {
+        	// no need to run a query for this, a simple access path scan will do
+            return super.evaluate(filter, bs);
+        }
+
+        if (log.isInfoEnabled()) {
+            log.info("evaluating top-level Filter operator");
+        }
+        
+        try {
+            
+            return evaluateNatively(filter, bs);
+            
+        } catch (UnsupportedOperatorException ex) {
+            
+        	if (allowSesameQueryEvaluation) {
+	            
+        		// Use Sesame 2 evaluation
+	            
+        		log.warn("could not evaluate natively, using Sesame evaluation"); 
+	            
+        		if (log.isInfoEnabled()) {
+	                log.info(ex.getOperator());
+	            }
+	            
+        		// turn off native joins for the remainder, we can't do
+	            // partial execution
+	            nativeJoins = false;
+	            
+	            // defer to Sesame
+	            return super.evaluate(filter, bs);
+	            
+        	} else {
+        		
+        		// allow the query to fail
+        		throw new UnsupportedOperatorException(ex);
+        		
+        	}
+            
+        }
+        
+    }
+    
     CloseableIteration<BindingSet, QueryEvaluationException> 
 		evaluateNatively(final TupleExpr tupleExpr, final BindingSet bs) 
 		    throws QueryEvaluationException, UnsupportedOperatorException {
@@ -706,7 +758,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 					queryEngine, queryHints);
 
 			if (log.isInfoEnabled())
-				log.info(BOpUtility.toString(query));
+				log.info("\n"+BOpUtility.toString2(query));
 
 		}
 
@@ -737,6 +789,11 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 				result = new FilterIterator(f, result, this);
 			}
 		}
+		
+//		System.err.println("results");
+//		while (result.hasNext()) {
+//			System.err.println(result.next());
+//		}
 
 		return result;
 
@@ -1832,10 +1889,13 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     		toValueExpression(sameTerm.getLeftArg());
     	final IValueExpression<IV> iv2 = 
     		toValueExpression(sameTerm.getRightArg());
-        return new CompareBOp(iv1, iv2, CompareOp.EQ);
+        return new SameTermBOp(iv1, iv2);
     }
 
-    private IConstraint toConstraint(Compare compare) {
+    private IConstraint toConstraint(final Compare compare) {
+    	if (!database.isInlineLiterals()) {
+    		throw new UnsupportedOperatorException(compare);
+    	}
     	final IValueExpression<IV> iv1 = 
     		toValueExpression(compare.getLeftArg());
     	final IValueExpression<IV> iv2 = 

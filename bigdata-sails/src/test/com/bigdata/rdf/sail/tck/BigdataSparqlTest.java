@@ -212,6 +212,29 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
 //    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/basic/manifest#spoo-1",//BOOM
     		
 //          "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/graph/manifest#dawg-graph-05",
+
+    		/*
+    		 * working through the new query engine failures
+    		 */
+    		
+    		// please someone explain this shit to me
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-12"
+
+    		// this is that weird "well designed" optional shit P = A OPT (B OPT C) where A and C share variables not in B
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-1"
+    		
+    		// where do we put the !bound(?e) constraint???
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/bound/manifest#dawg-bound-query-001"
+
+    		// "a" and "a"^^xsd:string have different term ids?  also bnodes are different
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-07"
+    		
+    		// help, non-optional subquery??  wtf
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#filter-scope-1"
+    		
+    		// this uncovers an obvious bug in our SubqueryOp
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-001"
+    		
     });
 
     /**
