@@ -1441,7 +1441,7 @@ public class RWStore implements IStore {
 //				log.error(e,e);
 				
 //				throw new IllegalArgumentException("Unable to read data: "+e, e);
-				throw new RuntimeException(e);
+				throw new RuntimeException("addr=" + addr + " : cause=" + e, e);
 
 			}
 		} finally {
