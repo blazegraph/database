@@ -440,6 +440,10 @@ public class SubqueryOp extends PipelineOp {
                         /*
                          * Since there were no solutions for the subquery, copy
                          * the original binding set to the default sink.
+                         * 
+                         * @todo If we add a CONSTRAINTS annotation to the
+                         * SubqueryOp then we need to make sure that it is
+                         * applied to all solutions copied out of the subquery.
                          */
 
                     	parentContext.getSink().add(new IBindingSet[]{bset});
