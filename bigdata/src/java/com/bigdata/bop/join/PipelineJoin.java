@@ -48,6 +48,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
@@ -1682,6 +1683,16 @@ public class PipelineJoin<E> extends PipelineOp implements
 								continue;
 
 							final IBindingSet bs = bindingSets[bindex];
+
+					        if (constraints != null) {
+
+					            // verify constraint.
+					            if(!BOpUtility.isConsistent(constraints, bs)) {
+					                // skip solutions which fail the constraint.
+					                continue;
+					            }
+					        
+					        }
 
 							if (log.isTraceEnabled())
 								log
