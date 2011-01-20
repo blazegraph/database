@@ -234,7 +234,8 @@ public class SOpTreeBuilder {
         } else if (arg instanceof Join) {
             collectSOps(sops, (Join) arg, rslj, g, pg);
         } else if (arg instanceof LeftJoin) {
-            collectSOps(sops, (LeftJoin) arg, rslj, groupId.incrementAndGet(), g);
+//            collectSOps(sops, (LeftJoin) arg, rslj, groupId.incrementAndGet(), g);
+        	collectSOps(sops, (LeftJoin) arg, rslj, g, pg);
         } else {
             throw new UnsupportedOperatorException(arg);
         }

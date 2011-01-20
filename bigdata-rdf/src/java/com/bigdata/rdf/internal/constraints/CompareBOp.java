@@ -98,11 +98,17 @@ public class CompareBOp extends BOpConstraint {
     		return _accept(left.compareTo(right));
     	}
     	
-    	if (!IVUtility.canNumericalCompare(left))
-        	throw new NotNumericalException("cannot numerical compare: " + left);
-    	
-    	if (!IVUtility.canNumericalCompare(right))
-        	throw new NotNumericalException("cannot numerical compare: " + right);
+    	if (!IVUtility.canNumericalCompare(left) ||
+    			!IVUtility.canNumericalCompare(right)) {
+    		if (op == CompareOp.EQ) {
+    			return false;
+    		} else if (op == CompareOp.NE) {
+    			return true;
+    		} else {
+    			throw new NotNumericalException("cannot numerical compare: " 
+    					+ left + " " + op + " " + right);
+    		}
+    	}
     	
 		return _accept(IVUtility.numericalCompare(left, right));
     	

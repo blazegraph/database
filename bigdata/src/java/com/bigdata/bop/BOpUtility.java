@@ -737,6 +737,25 @@ public class BOpUtility {
         return sb.toString();
 
     }
+    
+    public static String toString2(final BOp bop) {
+
+        String s = toString(bop);
+        s = s.replaceAll("com.bigdata.bop.controller.", "");
+        s = s.replaceAll("com.bigdata.bop.join.", "");
+        s = s.replaceAll("com.bigdata.bop.solutions.", "");
+        s = s.replaceAll("com.bigdata.bop.rdf.filter.", "");
+        s = s.replaceAll("com.bigdata.bop.", "");
+        s = s.replaceAll("com.bigdata.rdf.sail.", "");
+        s = s.replaceAll("com.bigdata.rdf.spo.", "");
+//        s = s.replaceAll("com.bigdata.bop..", "");
+//        s = s.replaceAll("com.bigdata.bop..", "");
+//        s = s.replaceAll("com.bigdata.bop..", "");
+//        s = s.replaceAll("com.bigdata.bop..", "");
+//        s = s.replaceAll("com.bigdata.bop..", "");
+        return s;
+        
+    }
 
     private static void toString(final BOp bop, final StringBuilder sb,
             final int indent) {

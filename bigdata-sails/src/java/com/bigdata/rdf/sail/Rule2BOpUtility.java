@@ -598,27 +598,35 @@ public class Rule2BOpUtility {
             final Collection<IConstraint> constraints = 
                 new LinkedList<IConstraint>();
             
-            /*
-             * Peek through the predicate's args to find its variables. Use
-             * these to attach constraints to the join based on the variables
-             * that make their first appearance in this tail.
-             */
-            for (BOp arg : pred.args()) {
-                if (arg instanceof IVariable<?>) {
-                    final IVariable<?> v = (IVariable<?>) arg;
-                    /*
-                     * We do a remove because we don't ever need to run these
-                     * constraints again during subsequent joins once they have
-                     * been run once at the initial appearance of the variable.
-                     * 
-                     * @todo revisit this when we dynamically re-order running
-                     * joins
-                     */ 
-                    if (constraintsByVar.containsKey(v))
-                        constraints.addAll(constraintsByVar.remove(v));
-                }
+//            /*
+//             * Peek through the predicate's args to find its variables. Use
+//             * these to attach constraints to the join based on the variables
+//             * that make their first appearance in this tail.
+//             */
+//            for (BOp arg : pred.args()) {
+//                if (arg instanceof IVariable<?>) {
+//                    final IVariable<?> v = (IVariable<?>) arg;
+//                    /*
+//                     * We do a remove because we don't ever need to run these
+//                     * constraints again during subsequent joins once they have
+//                     * been run once at the initial appearance of the variable.
+//                     * 
+//                     * @todo revisit this when we dynamically re-order running
+//                     * joins
+//                     */ 
+//                    if (constraintsByVar.containsKey(v))
+//                        constraints.addAll(constraintsByVar.remove(v));
+//                }
+//            }
+
+            // just add all the constraints to the very last tail for now
+            if (i == (order.length-1) && rule.getConstraintCount() > 0) {
+            	final Iterator<IConstraint> it = rule.getConstraints();
+            	while (it.hasNext()) {
+            		constraints.add(it.next());
+            	}
             }
-           
+            
             // annotations for this join.
             final List<NV> anns = new LinkedList<NV>();
             

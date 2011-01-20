@@ -153,6 +153,10 @@ public class SOpTree implements Iterable<SOp> {
 			return SOpTree.this;
 		}
 		
+		public boolean isRoot() {
+			return group == 0;
+		}
+		
 	}
 
 	public class SOpGroups implements Iterable<SOpGroup> {
