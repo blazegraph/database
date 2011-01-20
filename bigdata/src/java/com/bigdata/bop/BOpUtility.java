@@ -745,14 +745,11 @@ public class BOpUtility {
         s = s.replaceAll("com.bigdata.bop.join.", "");
         s = s.replaceAll("com.bigdata.bop.solutions.", "");
         s = s.replaceAll("com.bigdata.bop.rdf.filter.", "");
+        s = s.replaceAll("com.bigdata.bop.bset", "");
         s = s.replaceAll("com.bigdata.bop.", "");
         s = s.replaceAll("com.bigdata.rdf.sail.", "");
         s = s.replaceAll("com.bigdata.rdf.spo.", "");
-//        s = s.replaceAll("com.bigdata.bop..", "");
-//        s = s.replaceAll("com.bigdata.bop..", "");
-//        s = s.replaceAll("com.bigdata.bop..", "");
-//        s = s.replaceAll("com.bigdata.bop..", "");
-//        s = s.replaceAll("com.bigdata.bop..", "");
+        s = s.replaceAll("com.bigdata.rdf.internal.constraints.", "");
         return s;
         
     }
@@ -1027,3 +1024,4 @@ public class BOpUtility {
 	}
 	
 }
+

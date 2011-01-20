@@ -41,11 +41,18 @@ import junit.framework.Test;
 import junit.framework.TestSuite;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Statement;
 import org.openrdf.query.Dataset;
+import org.openrdf.query.Query;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQuery;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.parser.sparql.ManifestTest;
 import org.openrdf.query.parser.sparql.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
+import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.RepositoryResult;
 import org.openrdf.repository.dataset.DatasetRepository;
 import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.sail.memory.MemoryStore;
@@ -55,8 +62,8 @@ import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSail.Options;
+import com.bigdata.rdf.sail.BigdataSailRepository;
 
 /**
  * Test harness for running the SPARQL test suites.
@@ -173,67 +180,70 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
      */
     static final Collection<String> testURIs = Arrays.asList(new String[] {
 
-//      busted with EvalStrategy1
-//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-2",
-//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#filter-scope-1",
-//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#join-scope-1",
-//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional/manifest#dawg-optional-complex-4",
-        
-//      busted with EvalStrategy2 with LeftJoin enabled
-//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-12",
-//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-1",
-//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#opt-filter-1",
-//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#opt-filter-2",
-//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional/manifest#dawg-optional-complex-3",
-//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-001",
-//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-004",
-        
-//      Dataset crap
-//         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/i18n/manifest#normalization-1",
-            
-//         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset/manifest#dawg-dataset-01",
-            
-//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2//manifest#",
-//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#dawg-str-1",
-//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#dawg-str-2",
-//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#dawg-datatype-1",
-//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#sameTerm-simple",
-//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#sameTerm-eq",
-//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#sameTerm-not-eq",
-//
-//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-equals/manifest#eq-graph-1",
-//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-equals/manifest#eq-graph-2",
-            
-    		/*
-    		 * Tests which fail with 2 data services.
-    		 */
-//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/basic/manifest#bgp-no-match",//Ok
-//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/basic/manifest#prefix-name-1",//OK
-//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/basic/manifest#spoo-1",//BOOM
-    		
-//          "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/graph/manifest#dawg-graph-05",
+	/*
+	 * working through the new query engine failures: 0 errors, 19 failures
+	 */
 
-    		/*
-    		 * working through the new query engine failures
-    		 */
-    		
-    		// please someone explain this shit to me
-//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-12"
-
-    		// this is that weird "well designed" optional shit P = A OPT (B OPT C) where A and C share variables not in B
-//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-1"
-    		
-    		// where do we put the !bound(?e) constraint???
-//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/bound/manifest#dawg-bound-query-001"
+			/*
+			 * Basically we are having a lot of problems with our compare
+			 * operator, which is supposed to do fuzzy comparisons that
+			 * sometimes requires materialized RDF values. These I feel I can
+			 * handle on my own.
+			 */
 
     		// "a" and "a"^^xsd:string have different term ids?  also bnodes are different
-//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-07"
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-07",
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-08",
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-10",
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-11",
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-12",
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-cmp-01",
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-cmp-02",
+
+			/*
+			 * These tests have to do with that that weird "well designed"
+			 * optional nesting P = A OPT (B OPT C) where A and C share
+			 * variables not in B.  I think I can handle these on my own.
+			 */
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-1",
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#join-scope-1",
+
+    		/*
+    		 * Everything below this point I need help with.
+    		 */
     		
-    		// help, non-optional subquery??  wtf
-//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#filter-scope-1"
-    		
-    		// this uncovers an obvious bug in our SubqueryOp
-//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-001"
+			/*
+			 * These failures have to do with nested UNIONs - we don't seem to
+			 * be handling them correctly at all.
+			 */
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#join-combo-1",
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#join-combo-2",
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional/manifest#dawg-optional-complex-2",
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional/manifest#dawg-optional-complex-4",
+
+			/*
+			 * This one is truly bizarre - involving a non-optional subquuery
+			 * plus an optional subquery. Don't even know where to start on this
+			 * guy.
+			 */
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#filter-scope-1",
+
+			/*
+			 * Sometimes, a filter is the entire join group, and it should not
+			 * be able to see variables outside the group.  Frankly I do not
+			 * understand this one.
+			 */
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#filter-nested-2",
+
+			/*
+			 * These demonstrate the problem of where to put non-optional
+			 * filters that need to be evaluated after optional tails and
+			 * optional join groups.
+			 */
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/bound/manifest#dawg-bound-query-001",
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional/manifest#dawg-optional-complex-1",
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-002",
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-003",
     		
     });
 
@@ -471,42 +481,42 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
     }
     
     
-//    @Override
-//    protected void runTest()
-//        throws Exception
-//    {
-//        RepositoryConnection con = getQueryConnection(dataRep);
-//        try {
-//
+    @Override
+    protected void runTest()
+        throws Exception
+    {
+        RepositoryConnection con = getQueryConnection(dataRep);
+        try {
+
 //            log.info("database dump:");
 //            RepositoryResult<Statement> stmts = con.getStatements(null, null, null, false);
 //            while (stmts.hasNext()) {
 //                log.info(stmts.next());
 //            }
-//            log.info("dataset:\n" + dataset);
-//
-//            String queryString = readQueryString();
-//            log.info("query:\n" + getQueryString());
-//            
-//            Query query = con.prepareQuery(QueryLanguage.SPARQL, queryString, queryFileURL);
-//            if (dataset != null) {
-//                query.setDataset(dataset);
-//            }
-//
-//            if (query instanceof TupleQuery) {
-//                TupleQueryResult queryResult = ((TupleQuery)query).evaluate();
-//                while (queryResult.hasNext()) {
-//                    log.info("query result:\n" + queryResult.next());
-//                }
-//            }
-//
-//        }
-//        finally {
-//            con.close();
-//        }
-//        
-//        super.runTest();
-//    }
+            log.info("dataset:\n" + dataset);
+
+            String queryString = readQueryString();
+            log.info("query:\n" + getQueryString());
+            
+            Query query = con.prepareQuery(QueryLanguage.SPARQL, queryString, queryFileURL);
+            if (dataset != null) {
+                query.setDataset(dataset);
+            }
+
+            if (query instanceof TupleQuery) {
+                TupleQueryResult queryResult = ((TupleQuery)query).evaluate();
+                while (queryResult.hasNext()) {
+                    log.info("query result:\n" + queryResult.next());
+                }
+            }
+
+        }
+        finally {
+            con.close();
+        }
+        
+        super.runTest();
+    }
     
     
 
