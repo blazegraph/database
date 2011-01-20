@@ -33,7 +33,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rwstore.FixedOutputStream;
-import com.bigdata.rwstore.IWriteCacheManager;
+//import com.bigdata.rwstore.IWriteCacheManager;
 
 /**
  * The SectorAllocator is designed as an alternative the the standard RWStore
@@ -126,11 +126,11 @@ public class SectorAllocator {
 	final ISectorManager m_store;
 	boolean m_onFreeList = false;
 	private long m_diskAddr;
-	private final IWriteCacheManager m_writes;
+//	private final IWriteCacheManager m_writes;
 
-	public SectorAllocator(ISectorManager store, IWriteCacheManager writes) {
+	public SectorAllocator(ISectorManager store) {//, IWriteCacheManager writes) {
 		m_store = store;
-		m_writes = writes;
+//		m_writes = writes;
 	}
 
 	/**
@@ -276,10 +276,10 @@ public class SectorAllocator {
 				m_store.addToFreeList(this);
 			}
 			
-			if (m_writes != null && m_writes.removeWriteToAddr(getPhysicalAddress(bit))) {
-				if (log.isTraceEnabled())
-					log.trace("Removed potential DUPLICATE");
-			}
+//			if (m_writes != null && m_writes.removeWriteToAddr(getPhysicalAddress(bit))) {
+//				if (log.isTraceEnabled())
+//					log.trace("Removed potential DUPLICATE");
+//			}
 		}
 		
 		return false;
