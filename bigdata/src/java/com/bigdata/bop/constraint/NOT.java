@@ -57,7 +57,7 @@ public class NOT extends BOpConstraint {
 
     public NOT(final IConstraint x) {
 
-        super(new BOp[] { x }, null/*annocations*/);
+        super(new BOp[] { x }, null/*Annotations*/);
 
         if (x == null)
             throw new IllegalArgumentException();
