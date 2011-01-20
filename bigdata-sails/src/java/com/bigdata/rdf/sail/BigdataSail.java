@@ -382,7 +382,7 @@ public class BigdataSail extends SailBase implements Sail {
         public static final String NEW_EVAL_STRATEGY = BigdataSail.class.getPackage()
                 .getName()+ ".newEvalStrategy";
 
-        public static final String DEFAULT_NEW_EVAL_STRATEGY = "true";
+        public static final String DEFAULT_NEW_EVAL_STRATEGY = "false";
         
         /**
          * Option as to whether or not to allow Sesame evaluation of queries
