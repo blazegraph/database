@@ -632,8 +632,8 @@ public class Rule2BOpUtility {
             
             anns.add(new NV(BOp.Annotations.BOP_ID, joinId));
 
-            anns.add(new NV(PipelineJoin.Annotations.SELECT,
-                    selectVars[order[i]]));
+//            anns.add(new NV(PipelineJoin.Annotations.SELECT,
+//                    selectVars[order[i]]));
             
             // No. The join just looks at the Predicate's optional annotation.
 //            if (pred.isOptional())
