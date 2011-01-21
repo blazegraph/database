@@ -620,12 +620,12 @@ public class Rule2BOpUtility {
 //            }
 
             // just add all the constraints to the very last tail for now
-//            if (i == (order.length-1) && rule.getConstraintCount() > 0) {
-//            	final Iterator<IConstraint> it = rule.getConstraints();
-//            	while (it.hasNext()) {
-//            		constraints.add(it.next());
-//            	}
-//            }
+            if (i == (order.length-1) && rule.getConstraintCount() > 0) {
+            	final Iterator<IConstraint> it = rule.getConstraints();
+            	while (it.hasNext()) {
+            		constraints.add(it.next());
+            	}
+            }
             
             // annotations for this join.
             final List<NV> anns = new LinkedList<NV>();
@@ -730,23 +730,23 @@ public class Rule2BOpUtility {
 
         }
         
-        if (rule.getConstraintCount() > 0) {
-        	final Iterator<IConstraint> it = rule.getConstraints();
-        	while (it.hasNext()) {
-        		final IConstraint c = it.next();
-        		final int condId = idFactory.incrementAndGet();
-                final PipelineOp condOp = applyQueryHints(
-                	new ConditionalRoutingOp(new BOp[]{left},
-                        NV.asMap(new NV[]{//
-                            new NV(BOp.Annotations.BOP_ID,condId),
-                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
-                        })), queryHints);
-                left = condOp;
-                if (log.isDebugEnabled()) {
-                	log.debug("adding conditional routing op: " + condOp);
-                }
-        	}
-        }
+//        if (rule.getConstraintCount() > 0) {
+//        	final Iterator<IConstraint> it = rule.getConstraints();
+//        	while (it.hasNext()) {
+//        		final IConstraint c = it.next();
+//        		final int condId = idFactory.incrementAndGet();
+//                final PipelineOp condOp = applyQueryHints(
+//                	new ConditionalRoutingOp(new BOp[]{left},
+//                        NV.asMap(new NV[]{//
+//                            new NV(BOp.Annotations.BOP_ID,condId),
+//                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
+//                        })), queryHints);
+//                left = condOp;
+//                if (log.isDebugEnabled()) {
+//                	log.debug("adding conditional routing op: " + condOp);
+//                }
+//        	}
+//        }
         
         if (log.isInfoEnabled()) {
             // just for now while i'm debugging

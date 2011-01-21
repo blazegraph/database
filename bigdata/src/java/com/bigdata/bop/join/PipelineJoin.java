@@ -1684,9 +1684,11 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 							final IBindingSet bs = bindingSets[bindex];
 
-							if(!BOpUtility.isConsistent(constraints, bs)) {
-							    // Failed by the constraint on the join.
-							    continue;
+							if (constraints != null) {
+								if(!BOpUtility.isConsistent(constraints, bs)) {
+								    // Failed by the constraint on the join.
+								    continue;
+								}
 							}
 							
 							if (log.isTraceEnabled())

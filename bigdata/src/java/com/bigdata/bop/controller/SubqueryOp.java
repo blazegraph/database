@@ -156,17 +156,17 @@ public class SubqueryOp extends PipelineOp {
         
     }
     
-    public String toString() {
-    	
-    	final StringBuilder sb = new StringBuilder(super.toString());
-    	sb.append("\n{\n");
-    	final PipelineOp subquery = (PipelineOp) 
-    		getRequiredProperty(Annotations.SUBQUERY);
-    	sb.append(BOpUtility.toString(subquery));
-    	sb.append("\n}");
-    	return sb.toString();
-    	
-    }
+//    public String toString() {
+//    	
+//    	final StringBuilder sb = new StringBuilder(super.toString());
+//    	sb.append("\n{\n");
+//    	final PipelineOp subquery = (PipelineOp) 
+//    		getRequiredProperty(Annotations.SUBQUERY);
+//    	sb.append(BOpUtility.toString(subquery));
+//    	sb.append("\n}");
+//    	return sb.toString();
+//    	
+//    }
 
     /**
      * Evaluates the arguments of the operator as subqueries. The arguments are
