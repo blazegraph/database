@@ -310,7 +310,7 @@ public class TestJoinGraphOnLubm extends AbstractJoinGraphTestCase {
 	 * 
 	 * @throws Exception
 	 */
-	public void test_query2() throws Exception {
+	public void test_LUBM_Q2() throws Exception {
 
 	    final String namespace = getNamespace();
 	    
@@ -449,7 +449,7 @@ public class TestJoinGraphOnLubm extends AbstractJoinGraphTestCase {
 	 * </pre>
 	 * @throws Exception 
 	 */
-	public void test_query8() throws Exception {
+	public void test_LUBM_Q8() throws Exception {
 
         final String namespace = getNamespace();
 
@@ -580,7 +580,7 @@ public class TestJoinGraphOnLubm extends AbstractJoinGraphTestCase {
 	 * 
 	 * @throws Exception
 	 */
-	public void test_query9() throws Exception {
+	public void test_LUBM_Q9() throws Exception {
 
         final String namespace = getNamespace();
 

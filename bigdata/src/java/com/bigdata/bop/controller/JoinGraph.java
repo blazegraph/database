@@ -67,7 +67,6 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
 import com.bigdata.bop.rdf.join.DataSetJoin;
-import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -75,6 +74,7 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.IChunkedIterator;
+import com.bigdata.util.concurrent.Haltable;
 
 /**
  * A join graph with annotations for estimated cardinality and other details in
@@ -1450,13 +1450,13 @@ public class JoinGraph extends PipelineOp {
 		 * 
 		 * @see #getVertices()
 		 */
-		public IPredicate[] getPredicates() {
+		public IPredicate<?>[] getPredicates() {
 
 			// The vertices in the selected evaluation order.
 			final Vertex[] vertices = getVertices();
 
 			// The predicates in the same order as the vertices.
-			final IPredicate[] preds = new IPredicate[vertices.length];
+			final IPredicate<?>[] preds = new IPredicate[vertices.length];
 
 			for (int i = 0; i < vertices.length; i++) {
 
@@ -1468,6 +1468,16 @@ public class JoinGraph extends PipelineOp {
 
 		}
 
+		/**
+         * Return the {@link BOp} identifiers of the predicates associated with
+         * each vertex in path order.
+		 */
+		public int[] getVertexIds() {
+		    
+		    return getVertexIds(edges);
+		    
+		}
+		
 		/**
 		 * Return the {@link BOp} identifiers of the predicates associated with
 		 * each vertex in path order.
@@ -1589,10 +1599,6 @@ public class JoinGraph extends PipelineOp {
              * into the downstream joins. [If we re-sampled the edges in the
              * join path in each round then this would help to establish a
              * better estimate in successive rounds.]
-             * 
-             * FIXME CONSTRAINT ORDERING : It is illegal to add a vertex to the
-             * path if any variable appearing in its CONSTRAINTS would not be
-             * bound.
              * 
              * FIXME CONSTRAINT ORDERING : Rather than constraints imposing an
              * ordering on joins, constraints need to be attached dynamically to
@@ -1848,7 +1854,7 @@ public class JoinGraph extends PipelineOp {
          * @todo unit test for a constraint using a variable which is never
          *       bound.
          */
-        public JGraph(final IPredicate[] v, final IConstraint[] constraints) {
+        public JGraph(final IPredicate<?>[] v, final IConstraint[] constraints) {
 
 			if (v == null)
 				throw new IllegalArgumentException();
@@ -1871,27 +1877,33 @@ public class JoinGraph extends PipelineOp {
              * Identify the edges by looking for shared variables among the
              * predicates.
              * 
-             * Note: Variables may appear in the arguments of the predicate,
-             * e.g., spo(?s,rdf:type,?o).
+             * Note: Variables appear in predicates or in constraints. Edges are
+             * created to represent possible joins between predicates based on
+             * those shared variables. There are two cases:
              * 
-             * Note: Variables may ALSO appear in the CONSTRAINTS (imposed on
-             * the binding sets) or FILTERS (imposed either on the local or
-             * remote access path). For example, that a variable bound by
-             * another predicate must take on a value having some mathematical
-             * relationship to a variable bound by the predicate, e.g., BSBM Q5.
-             * When a variable appears in a constraint but does not appear as an
-             * argument to the predicate, then there is an additional
-             * requirement that the variable MUST become bound before the
-             * predicate may be evaluated (again, BSBM Q5 has this form).
+             * (1) When the target predicate shares a variable with the source
+             * predicate, then we always create an edge between those predicates
+             * to represent a possible join.
              * 
-             * Note: If a vertex does not share ANY variables (neither in the
-             * arguments of the predicate nor in its constraints or filters)
-             * then it can be paired with any of the other vertices. However, in
-             * such cases we always run such vertices last as they can not
-             * restrict the cardinality of the rest of the join graph. Such
-             * vertices are therefore inserted into a separate set and appended
-             * to the join path once all edges having shared variables have been
-             * exhausted.
+             * (2) When the source predicate shares a variable with a constraint
+             * which also shares a variable with the target predicate, then we
+             * will also create an edge to represent a possible join.
+             * 
+             * The second case handles the case where variables are transitively
+             * shared through a constraint, but not directly shared between the
+             * predicates. BSBM Q5 is an example of this case.
+             * 
+             * Note: If applying these two rules fails to create any edges for
+             * some vertex, then it does not share ANY variables and can be
+             * paired with ANY of the other vertices. However, we always run
+             * such vertices last as they can not restrict the cumulative
+             * cardinality of the solutions. Such vertices are therefore
+             * inserted into a separate set and appended to the join path once
+             * all edges having shared variables have been exhausted.
+             * 
+             * FIXME VERTICES WHICH SHARE VARS THROUGH A CONSTRAINT.
+             * 
+             * FIXME VERTICES WITH NO SHARED VARS.
              */
 			{
 
@@ -1917,20 +1929,14 @@ public class JoinGraph extends PipelineOp {
 						// consider a possible target vertex.
 						final IPredicate<?> p2 = v[j];
 
-                        final Set<IVariable<?>> shared = getSharedVars(p1, p2);
+                        final Set<IVariable<?>> shared = BOpUtility
+                                .getSharedVars(p1, p2);
 
 						if (shared != null && !shared.isEmpty()) {
 
                             /*
-                             * The source and target vertices share var(s).
-                             * 
-                             * Note: A predicate having a variable which appears
-                             * in a CONSTRAINT MUST NOT be added to the join
-                             * path until that variable would be bound.
-                             * Therefore, when selecting the vertices to be used
-                             * to extend a join path, we must consider whether
-                             * or not the join path would bind the variable(s)
-                             * appearing in the CONSTRAINT.
+                             * The source and target vertices share one or more
+                             * variable(s).
                              */
 						    
                             if (log.isDebugEnabled())
@@ -1945,7 +1951,67 @@ public class JoinGraph extends PipelineOp {
 							
 							nmatched++;
 
-						}
+                        } else if (constraints != null) {
+
+                            /*
+                             * The source and target vertices do not directly
+                             * share any variable(s). However, there may be a
+                             * constraint which shares a variable with both the
+                             * source and target vertex. If such a constraint is
+                             * found, then we add an edge now as that join is
+                             * potentially constrained (less than the full
+                             * Cartesian cross product).
+                             * 
+                             * Note: While this identifies possible joins via a
+                             * constraint, such joins are only legal when all
+                             * variables used by the constraint are known to be
+                             * bound.
+                             * 
+                             * FIXME We have to reject edges unless there are
+                             * variable(s) which are directly shared between the
+                             * source and target vertex until all the variables
+                             * spanned by the constraint which licenses the join
+                             * have become bound. [Consider marking these edges
+                             * directly so we know that we need to test and see
+                             * whether or not a constraint exists which shares
+                             * at least one variable with both vertices and that
+                             * all variables in that constraint are bound.]
+                             * 
+                             * FIXME Since we can attach more than one
+                             * constraint to a vertex, we may have to ask
+                             * whether any set of the available constraints
+                             * shares at least one variable with the source and
+                             * target vertices. [That is, do they have to share
+                             * variables via the same constraint?!?]
+                             */
+
+                            for(IConstraint c : constraints) {
+                        
+						        if(BOpUtility.getSharedVars(p1, c).isEmpty())
+                                    continue;
+						        
+						        if(BOpUtility.getSharedVars(p2, c).isEmpty())
+						            continue;
+	                            
+                                if (log.isDebugEnabled())
+                                    log
+                                            .debug("vertices shared variable(s) via constraint: v1="
+                                                    + p1
+                                                    + ", v2="
+                                                    + p2
+                                                    + ", c=" + c);
+	                            
+	                            tmp.add(new Edge(V[i], V[j], shared));
+	                            
+	                            sharedEdgeVertices.add(V[i]);
+	                            
+	                            sharedEdgeVertices.add(V[j]);
+	                            
+	                            nmatched++;
+
+						    }
+
+                        }
 
 					}
 
@@ -1972,14 +2038,24 @@ public class JoinGraph extends PipelineOp {
 				if(!unsharedEdgeVertices.isEmpty()) {
 
                     /*
-                     * FIXME This needs to be supported. We should explore and
-                     * generate the join paths based on only those vertices
-                     * which do share variables (and hence for which we have
-                     * defined edges). Once the vertices which share variables
-                     * have been exhausted, we should simply append edges for
-                     * the vertices which do not share variables in an arbitrary
-                     * order (they will be run last since they can not constrain
-                     * the evaluation).
+                     * FIXME NO SHARED VARS : RUN LAST. This needs to be
+                     * supported. When vertices that do not share variables
+                     * either directly or via a constraint then they should run
+                     * last as they can not constrain the query. In this case,
+                     * they are not considered by the runtime optimizer when
+                     * building up the join path until all vertices which share
+                     * variables have been exhausted. At that point, the
+                     * remaining vertices are just appended to whatever join
+                     * path was selected as having the lowest cumulative
+                     * estimated cardinality.
+                     * 
+                     * However, if there exists for a vertex which otherwise
+                     * does not share variables a constraint which should be
+                     * evaluated against that vertex, then that constraint
+                     * provides the basis for a edge (aka join). In this case,
+                     * an edge must be created for the vertex based on the
+                     * shared variable in the constraint and its position in the
+                     * join path will be decided by the runtime optimizer.
                      */
 
                     throw new UnsupportedOperationException(
@@ -2917,8 +2993,8 @@ public class JoinGraph extends PipelineOp {
 			final BOpIdFactory idFactory = new BOpIdFactory();
 
 			// Generate the query from the join path.
-			final PipelineOp queryOp = JoinGraph.getQuery(idFactory, p
-					.getPredicates(), getConstraints());
+            final PipelineOp queryOp = PartitionedJoinGroup.getQuery(idFactory,
+                    p.getPredicates(), getConstraints());
 
 			// Run the query, blocking until it is done.
 			JoinGraph.runSubquery(context, queryOp);
@@ -2996,318 +3072,95 @@ public class JoinGraph extends PipelineOp {
 	 */
 
     /**
-     * Generate a query plan from an ordered collection of predicates.
-     * 
-     * @param p
-     *            The join path.
-     * 
-     * @return The query plan.
-     * 
-     *         FIXME Verify that constraints are attached correctly to the
-     *         returned query.
-     */
-    static public PipelineOp getQuery(final BOpIdFactory idFactory,
-            final IPredicate[] preds, final IConstraint[] constraints) {
-
-        if (constraints != null && constraints.length != 0) {
-            // FIXME Constraints must be attached to joins.
-            throw new UnsupportedOperationException(
-                    "Constraints must be attached to joins!");
-        }
-        
-		final PipelineJoin[] joins = new PipelineJoin[preds.length];
-
-//        final PipelineOp startOp = new StartOp(new BOp[] {},
-//                NV.asMap(new NV[] {//
-//                        new NV(Predicate.Annotations.BOP_ID, idFactory
-//                                .nextId()),//
-//                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
-//                                BOpEvaluationContext.CONTROLLER),//
-//                }));
-//
-//		PipelineOp lastOp = startOp;
-		PipelineOp lastOp = null;
-
-//		final Set<IVariable> vars = new LinkedHashSet<IVariable>();
-//		for(IPredicate p : preds) {
-//			for(BOp arg : p.args()) {
-//				if(arg instanceof IVariable) {
-//					vars.add((IVariable)arg);
-//				}
-//			}
-//		}
-		
-        for (int i = 0; i < preds.length; i++) {
-
-			// The next vertex in the selected join order.
-			final IPredicate p = preds[i];
-
-			final List<NV> anns = new LinkedList<NV>();
-
-			anns.add(new NV(PipelineJoin.Annotations.PREDICATE, p));
-
-			anns.add(new NV(PipelineJoin.Annotations.BOP_ID, idFactory
-					.nextId()));
-
-//			anns.add(new NV(PipelineJoin.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.ANY));
-//
-//			anns.add(new NV(PipelineJoin.Annotations.SELECT, vars.toArray(new IVariable[vars.size()])));
-
-			final PipelineJoin joinOp = new PipelineJoin(
-					lastOp == null ? new BOp[0] : new BOp[] { lastOp },
-					anns.toArray(new NV[anns.size()]));
-
-			joins[i] = joinOp;
-
-			lastOp = joinOp;
-
-		}
-
-//		final PipelineOp queryOp = lastOp;
-
-		/*
-		 * FIXME Why does wrapping with this slice appear to be
-		 * necessary? (It is causing runtime errors when not wrapped).
-		 * Is this a bopId collision which is not being detected?
-		 */
-		final PipelineOp queryOp = new SliceOp(new BOp[] { lastOp }, NV
-				.asMap(new NV[] {
-						new NV(JoinGraph.Annotations.BOP_ID, idFactory.nextId()), //
-						new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
-								BOpEvaluationContext.CONTROLLER) }) //
-		);
-
-		return queryOp;
-
-	}
-
-	/**
-	 * Execute the selected join path.
-	 * <p>
-	 * Note: When executing the query, it is actually being executed as a
-	 * subquery. Therefore we have to take appropriate care to ensure that the
-	 * results are copied out of the subquery and into the parent query. See
-	 * {@link AbstractSubqueryOp} for how this is done.
-	 * 
-	 * @todo When we execute the query, we should clear the references to the
-	 *       samples (unless they are exact, in which case they can be used as
-	 *       is) in order to release memory associated with those samples if the
-	 *       query is long running. Samples must be held until we have
-	 *       identified the final join path since each vertex will be used by
-	 *       each maximum length join path and we use the samples from the
-	 *       vertices to re-sample the surviving join paths in each round.
-	 * 
-	 * @todo If there is a slice on the outer query, then the query result may
-	 *       well be materialized by now.
-	 * 
-	 * @todo If there are source binding sets then they need to be applied above
-	 *       (when we are sampling) and below (when we evaluate the selected
-	 *       join path).
-	 * 
-	 *       FIXME runQuery() is not working correctly. The query is being
-	 *       halted by a {@link BufferClosedException} which appears before it
-	 *       has materialized the necessary results.
-	 */
-	static public void runSubquery(final BOpContext<IBindingSet> parentContext,
-			final PipelineOp queryOp) {
-
-		IAsynchronousIterator<IBindingSet[]> subquerySolutionItr = null;
-
-		try {
-			
-			if (log.isInfoEnabled())
-				log.info("Running: " + BOpUtility.toString(queryOp));
-
-			final PipelineOp startOp = (PipelineOp) BOpUtility
-					.getPipelineStart(queryOp);
-
-			if (log.isInfoEnabled())
-				log.info("StartOp: " + BOpUtility.toString(startOp));
-
-			// Run the query.
-			final UUID queryId = UUID.randomUUID();
-
-			final QueryEngine queryEngine = parentContext.getRunningQuery()
-					.getQueryEngine();
-
-			final IRunningQuery runningQuery = queryEngine
-					.eval(
-							queryId,
-							queryOp,
-							new LocalChunkMessage<IBindingSet>(
-									queryEngine,
-									queryId,
-									startOp.getId()/* startId */,
-									-1 /* partitionId */,
-									/*
-									 * @todo pass in the source binding sets
-									 * here and also when sampling the
-									 * vertices.
-									 */
-									new ThickAsynchronousIterator<IBindingSet[]>(
-											new IBindingSet[][] { new IBindingSet[] { new HashBindingSet() } })));
-
-			// Iterator visiting the subquery solutions.
-			subquerySolutionItr = runningQuery.iterator();
-
-			// Copy solutions from the subquery to the query.
-			final long nout = BOpUtility
-					.copy(subquerySolutionItr, parentContext.getSink(),
-							null/* sink2 */, null/* constraints */, null/* stats */);
-
-			System.out.println("nout=" + nout);
-			
-			// verify no problems.
-			runningQuery.get();
-
-			System.out.println("Future Ok");
-
-		} catch (Throwable t) {
-
-			log.error(t,t);
-			
-			/*
-			 * If a subquery fails, then propagate the error to the parent
-			 * and rethrow the first cause error out of the subquery.
-			 */
-			throw new RuntimeException(parentContext.getRunningQuery()
-					.halt(t));
-
-		} finally {
-
-			if (subquerySolutionItr != null)
-				subquerySolutionItr.close();
-
-		}
-
-	}
-
-    /**
-     * Return the variables in common for two {@link IPredicate}s. All variables
-     * spanned by either {@link IPredicate} are considered.
+     * Execute the selected join path.
      * <p>
-     * Note: Variables may appear in the predicates operands, in the
-     * {@link Annotations#CONSTRAINTS} associated with the
-     * predicate, and in the {@link IPredicate.Annotations#ACCESS_PATH_FILTER}
-     * or {@link IPredicate.Annotations#INDEX_LOCAL_FILTER}.
-     * <p>
-     * Note: A variable must become bound before it may be evaluated in
-     * {@link Annotations#CONSTRAINTS}, an
-     * {@link IPredicate.Annotations#ACCESS_PATH_FILTER} or an
-     * {@link IPredicate.Annotations#INDEX_LOCAL_FILTER}. This means that the
-     * {@link IPredicate}s which can bind the variable must be ordered before
-     * those which merely test the variable.
+     * Note: When executing the query, it is actually being executed as a
+     * subquery. Therefore we have to take appropriate care to ensure that the
+     * results are copied out of the subquery and into the parent query. See
+     * {@link AbstractSubqueryOp} for how this is done.
      * 
+     * @throws Exception
      * 
-     * @param p1
-     *            A predicate.
+     * @todo When we execute the query, we should clear the references to the
+     *       samples (unless they are exact, in which case they can be used as
+     *       is) in order to release memory associated with those samples if the
+     *       query is long running. Samples must be held until we have
+     *       identified the final join path since each vertex will be used by
+     *       each maximum length join path and we use the samples from the
+     *       vertices to re-sample the surviving join paths in each round.
      * 
-     * @param p2
-     *            A different predicate.
+     * @todo If there is a slice on the outer query, then the query result may
+     *       well be materialized by now.
      * 
-     * @return The variables in common -or- <code>null</code> iff there are no
-     *         variables in common.
+     * @todo If there are source binding sets then they need to be applied above
+     *       (when we are sampling) and below (when we evaluate the selected
+     *       join path).
      * 
-     * @throws IllegalArgumentException
-     *             if the two predicates are the same reference.
-     * 
-     * @todo It should be an error if a variable appear in a test is not bound
-     *       by any possible join path. However, note that it may not be
-     *       possible to determine this by local examination of a join graph
-     *       since we do not know which variables may be presented as already
-     *       bound when the join graph is evaluated (but we can only run the
-     *       join graph currently against static source binding sets and for
-     *       that case this is knowable).
-     * 
-     * @todo When a variable is only optionally bound and it is discovered at
-     *       runtime that the variable is not bound when it is considered by a
-     *       CONSTRAINT, FILTER, etc., then the SPARQL semantics are that
-     *       evaluation should produce a 'type' error which would cause the
-     *       solution should fail (at least within its current join group). See
-     *       https://sourceforge.net/apps/trac/bigdata/ticket/179.
-     * 
-     * @todo Unit tests, including those which verify that variables appearing
-     *       in the constraints are reported as shared with those appearing in
-     *       the predicates operands.
+     *       FIXME runQuery() is not working correctly. The query is being
+     *       halted by a {@link BufferClosedException} which appears before it
+     *       has materialized the necessary results.
      */
-    static Set<IVariable<?>> getSharedVars(final IPredicate p1, final IPredicate p2) {
-        
-        // The set of variables which are shared by those predicates.
-        final Set<IVariable<?>> sharedVars = new LinkedHashSet<IVariable<?>>();
-        
+    static private void runSubquery(
+            final BOpContext<IBindingSet> parentContext,
+            final PipelineOp queryOp) throws Exception {
+
+        final QueryEngine queryEngine = parentContext.getRunningQuery()
+                .getQueryEngine();
+
         /*
-         * Collect the variables appearing anyway in [p1], including the
-         * predicate's operands and its constraints, filters, etc.
+         * Run the query.
+         * 
+         * @todo pass in the source binding sets here and also when sampling the
+         * vertices.
          */
-        final Set<IVariable<?>> p1vars = new LinkedHashSet<IVariable<?>>();
-        {
 
-            final Iterator<IVariable<?>> itr = BOpUtility
-                    .getSpannedVariables(p1);
+        IAsynchronousIterator<IBindingSet[]> subquerySolutionItr = null;
 
-            while (itr.hasNext()) {
+        final IRunningQuery runningQuery = queryEngine.eval(queryOp);
 
-                p1vars.add(itr.next());
+        try {
+
+            // Iterator visiting the subquery solutions.
+            subquerySolutionItr = runningQuery.iterator();
+
+            // Copy solutions from the subquery to the query.
+            final long nout = BOpUtility.copy(subquerySolutionItr,
+                    parentContext.getSink(), null/* sink2 */,
+                    null/* constraints */, null/* stats */);
+
+            System.out.println("nout=" + nout);
+
+            // verify no problems.
+            runningQuery.get();
+
+            System.out.println("Future Ok");
+
+        } catch (Throwable t) {
+
+            if (Haltable.isTerminationByInterrupt(t)) {
+
+                // normal termination.
+                return;
 
             }
 
-        }
+            // log.error(t,t);
 
-        /*
-         * Consider the variables appearing anyway in [p2], including the
-         * predicate's operands and its constraints, filters, etc.
-         */
-        {
+            /*
+             * Propagate the error to the parent and rethrow the first cause
+             * error out of the subquery.
+             */
+            throw new RuntimeException(parentContext.getRunningQuery().halt(t));
 
-            final Iterator<IVariable<?>> itr = BOpUtility
-                    .getSpannedVariables(p2);
+        } finally {
 
-            while (itr.hasNext()) {
+            runningQuery.cancel(true/* mayInterruptIfRunning */);
 
-                final IVariable<?> avar = itr.next();
-                
-                if(p1vars.contains(avar)) {
-
-                    sharedVars.add(avar);
-                    
-                }
-
-            }
+            if (subquerySolutionItr != null)
+                subquerySolutionItr.close();
 
         }
-        
-        return sharedVars;
 
     }
 
-    /**
-	 * Exception thrown when the join graph does not have any solutions in the
-	 * data (running the query does not produce any results).
-	 */
-	public static class NoSolutionsException extends RuntimeException
-	{
-
-		/**
-		 * 
-		 */
-		private static final long serialVersionUID = 1L;
-
-		public NoSolutionsException() {
-			super();
-		}
-
-		public NoSolutionsException(String message, Throwable cause) {
-			super(message, cause);
-		}
-
-		public NoSolutionsException(String message) {
-			super(message);
-		}
-
-		public NoSolutionsException(Throwable cause) {
-			super(cause);
-		}
-		
-	}
-	
 }

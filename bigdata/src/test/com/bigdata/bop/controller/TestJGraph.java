@@ -87,7 +87,7 @@ public class TestJGraph extends TestCase2 {
 //        fail("write test");
 //    }
 //
-//    // @todo also getEdgeCount()
+//    // and also getEdgeCount()
 //    public void test_getEdges() {
 //        fail("write test");
 //    }

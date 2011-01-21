@@ -176,7 +176,7 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
         return new Journal(properties);
 
 	}
-	
+
     /**
      * BSBM Q5
      * 
@@ -201,6 +201,18 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
      * ORDER BY ?productLabel
      * LIMIT 5
      * </pre>
+     * 
+     * Note: There are two predicates which bind variables (origProperty1 and
+     * origProperty2) that are not used by the other predicates and therefore do
+     * not share any variables which would form "edges" that define joins. In
+     * general, a join without shared variables means the cross product of the
+     * sources will be materialized and such joins should be run last.
+     * <p>
+     * However, in this case there are SPARQL FILTERs which (a) use those
+     * variables (origProperty1 and origProperty2); and (b) can constrain the
+     * query. This means that running the predicates without shared variables
+     * and applying the constraints before the tail of the plan can in fact lead
+     * to a more efficient join path.
      * 
      * @throws Exception
      */
