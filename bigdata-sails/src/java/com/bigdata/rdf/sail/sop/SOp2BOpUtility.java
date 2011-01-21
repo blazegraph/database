@@ -273,12 +273,13 @@ public class SOp2BOpUtility {
         }
         
         final LinkedList<NV> anns = new LinkedList<NV>();
-        anns.add(new NV(Union.Annotations.BOP_ID, thisId));
-        anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
-                BOpEvaluationContext.CONTROLLER));
-        anns.add(new NV(Union.Annotations.CONTROLLER, true));
+        anns.add(new NV(BOp.Annotations.BOP_ID, thisId));
+        anns.add(new NV(Union.Annotations.SUBQUERIES,args));
+//        anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
+//                BOpEvaluationContext.CONTROLLER));
+//        anns.add(new NV(Union.Annotations.CONTROLLER, true));
         
-        final Union thisOp = new Union(args, NV
+        final Union thisOp = new Union(new BOp[]{}, NV
                     .asMap(anns.toArray(new NV[anns.size()])));
         
         return thisOp;

@@ -65,6 +65,7 @@ import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.controller.AbstractSubqueryOp;
 import com.bigdata.bop.controller.Steps;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.cost.ScanCostReport;
@@ -1304,13 +1305,11 @@ public class Rule2BOpUtility {
         // The bopId for the UNION or STEP.
         final int thisId = idFactory.incrementAndGet();
 
-        final int arity = program.stepCount();
-
-        final IStep[] steps = program.toArray();
+       final IStep[] steps = program.toArray();
         
-        final BOp[] args = new BOp[arity];
+        final BOp[] subqueries = new BOp[steps.length];
 
-        for (int i = 0; i < arity; i++) {
+        for (int i = 0; i < steps.length; i++) {
 
             // convert the child IStep
             final BOpBase tmp = convert(steps[i], idFactory, db, queryEngine,
@@ -1324,28 +1323,31 @@ public class Rule2BOpUtility {
              */
 //            tmp = tmp.setProperty(PipelineOp.Annotations.SINK_REF, thisId);
 
-            args[i] = tmp;
+            subqueries[i] = tmp;
             
         }
         
         final LinkedList<NV> anns = new LinkedList<NV>();
         
-        anns.add(new NV(Union.Annotations.BOP_ID, thisId));
-        
-        anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
-                BOpEvaluationContext.CONTROLLER));
-        
-        anns.add(new NV(Union.Annotations.CONTROLLER, true));
+        anns.add(new NV(BOp.Annotations.BOP_ID, thisId));
+
+        // the subqueries.
+        anns.add(new NV(AbstractSubqueryOp.Annotations.SUBQUERIES, subqueries));
+
+//        anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
+//                BOpEvaluationContext.CONTROLLER));
+//        
+//        anns.add(new NV(Union.Annotations.CONTROLLER, true));
         
         if (!isParallel)
             anns.add(new NV(Union.Annotations.MAX_PARALLEL, 1));
 
         final PipelineOp thisOp;
         if (isParallel) {
-            thisOp = new Union(args, NV
+            thisOp = new Union(new BOp[]{}, NV
                     .asMap(anns.toArray(new NV[anns.size()])));
         } else {
-            thisOp = new Steps(args, NV
+            thisOp = new Steps(new BOp[]{}, NV
                     .asMap(anns.toArray(new NV[anns.size()])));
         }
 

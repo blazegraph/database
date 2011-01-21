@@ -37,7 +37,7 @@ import com.bigdata.bop.PipelineOp;
  * STEPS(ops)
  * 
  * <pre>
- * STEPS([a,b,c],{})
+ * STEPS([],{subqueries=[a,b,c]})
  * </pre>
  * 
  * Will run the subqueries <i>a</i>, <i>b</i>, and <i>c</i> in sequence. Each
@@ -62,12 +62,11 @@ public class Steps extends AbstractSubqueryOp {
     public Steps(Steps op) {
         super(op);
     }
-    
+
     /**
      * Shallow copy constructor.
      * 
      * @param args
-     *            Two or more operators whose union is desired.
      * @param annotations
      */
     public Steps(final BOp[] args,

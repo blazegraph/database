@@ -38,7 +38,6 @@ import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
@@ -74,7 +73,7 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * 
  * <pre>
  * SLICE[1](
- *   UNION[2]([a{sinkRef=1},b{sinkRef=1},c{sinkRef=1}],{})
+ *   UNION[2]([...],{subqueries=[a{sinkRef=1},b{sinkRef=1},c{sinkRef=1}]})
  *   )
  * </pre>
  * 
@@ -94,6 +93,12 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends PipelineOp.Annotations {
+
+        /**
+         * The ordered {@link BOp}[] of subqueries to be evaluated for each
+         * binding set presented (required).
+         */
+        String SUBQUERIES = SubqueryOp.class.getName() + ".subqueries";
 
         /**
          * The maximum parallelism with which the subqueries will be evaluated
@@ -132,13 +137,19 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
 
         super(args, annotations);
 
-        if (!getEvaluationContext().equals(BOpEvaluationContext.CONTROLLER))
-            throw new IllegalArgumentException(Annotations.EVALUATION_CONTEXT
-                    + "=" + getEvaluationContext());
+//        if (!getEvaluationContext().equals(BOpEvaluationContext.CONTROLLER))
+//            throw new IllegalArgumentException(Annotations.EVALUATION_CONTEXT
+//                    + "=" + getEvaluationContext());
 
-        if (!getProperty(Annotations.CONTROLLER, Annotations.DEFAULT_CONTROLLER))
-            throw new IllegalArgumentException(Annotations.CONTROLLER);
-        
+//        if (!getProperty(Annotations.CONTROLLER, Annotations.DEFAULT_CONTROLLER))
+//            throw new IllegalArgumentException(Annotations.CONTROLLER);
+ 
+        // verify required annotation.
+        final BOp[] subqueries = (BOp[]) getRequiredProperty(Annotations.SUBQUERIES);
+
+        if (subqueries.length == 0)
+            throw new IllegalArgumentException(Annotations.SUBQUERIES);
+
 //        // The id of this operator (if any).
 //        final Integer thisId = (Integer)getProperty(Annotations.BOP_ID);
 //        
@@ -170,6 +181,7 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
     private static class ControllerTask implements Callable<Void> {
 
         private final AbstractSubqueryOp controllerOp;
+        private final BOp[] subqueries;
         private final BOpContext<IBindingSet> context;
         private final int nparallel;
         private final Executor executor;
@@ -186,6 +198,9 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
             this.controllerOp = controllerOp;
             
             this.context = context;
+
+            this.subqueries = (BOp[]) controllerOp
+                    .getRequiredProperty(Annotations.SUBQUERIES);
 
             this.nparallel = controllerOp.getProperty(Annotations.MAX_PARALLEL,
                     Annotations.DEFAULT_MAX_PARALLEL);
@@ -244,8 +259,8 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
             
             try {
 
-                final CountDownLatch latch = new CountDownLatch(controllerOp
-                        .arity());
+                final CountDownLatch latch = new CountDownLatch(
+                        subqueries.length);
 
                 /*
                  * Create FutureTasks for each subquery. The futures are not
@@ -253,7 +268,7 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
                  * deferring the evaluation until call() we gain the ability to
                  * cancel all subqueries if any subquery fails.
                  */
-                for (BOp op : controllerOp.args()) {
+                for (BOp op : subqueries) {
 
                     /*
                      * Task runs subquery and cancels all subqueries in [tasks]
