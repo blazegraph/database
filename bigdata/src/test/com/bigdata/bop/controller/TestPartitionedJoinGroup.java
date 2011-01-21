@@ -231,6 +231,40 @@ public class TestPartitionedJoinGroup extends TestCase2 {
             assertSameIteratorAnyOrder("joinGraphConstraints", constraints,
                     Arrays.asList(fixture.getJoinGraphConstraints()).iterator());
 
+            /*
+             * Verify the placement of each constraint for a variety of join
+             * paths.
+             */
+            {
+//                final int[] pathIds = BOpUtility.getPredIds(new IPredicate[] {
+//                        p0, p1, p2, p3, p4, p5 });
+//                final IConstraint[] actual = fixture
+//                        .getJoinGraphConstraints(pathIds);
+//                System.out.println(Arrays.toString(actual));
+
+                // c1 is applied when x is bound. x is bound by p0.
+                assertEquals(new IConstraint[] { c1 }, fixture
+                        .getJoinGraphConstraints(new int[] { p1.getId(),
+                                p0.getId() }));
+
+                /*
+                 * c1 is applied when x is bound. x is bound by p0. p0 is the
+                 * last predicate in this join path, so c1 is attached to p0.
+                 */
+                assertEquals(new IConstraint[] { c1 }, fixture
+                        .getJoinGraphConstraints(new int[] { p0.getId()}));
+
+                /*
+                 * c2 is applied when y is bound. y is bound by p1. p1 is the
+                 * last predicate in this join path, p1 is the last predicate in
+                 * this join path so c2 is attached to p1.
+                 */
+                assertEquals(new IConstraint[] { c2 }, fixture
+                        .getJoinGraphConstraints(new int[] { p0.getId(),
+                                p1.getId() }));
+                
+            }
+            
             // there is no tail plan.
             assertEquals("tailPlan", new IPredicate[] {}, fixture.getTailPlan());
        

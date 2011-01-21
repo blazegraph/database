@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
@@ -64,6 +66,9 @@ import com.bigdata.bop.controller.JoinGraph.NoSolutionsException;
  *       hints).
  */
 public class PartitionedJoinGroup {
+
+    private static final transient Logger log = Logger
+            .getLogger(PartitionedJoinGroup.class);
 
     /**
      * The set of variables bound by the non-optional predicates.
@@ -137,6 +142,206 @@ public class PartitionedJoinGroup {
         return joinGraphConstraints
                 .toArray(new IConstraint[joinGraphConstraints.size()]);
     }
+
+    /**
+     * Return the set of constraints which should be attached to the last join
+     * in the given the join path. All joins in the join path must be
+     * non-optional joins (that is, part of either the head plan or the join
+     * graph).
+     * <p>
+     * The rule followed by this method is that each constraint will be attached
+     * to the first non-optional join at which all of its variables are known to
+     * be bound. It is assumed that constraints are attached to each join in the
+     * join path by a consistent logic, e.g., as dictated by this method.
+     * 
+     * @param joinPath
+     *            An ordered array of predicate identifiers representing a
+     *            specific sequence of non-optional joins.
+     * 
+     * @return The constraints which should be attached to the last join in the
+     *         join path.
+     * 
+     * @throws IllegalArgumentException
+     *             if the join path is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the join path is empty.
+     * @throws IllegalArgumentException
+     *             if any element of the join path is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if any predicate specified in the join path is not known to
+     *             this class.
+     * @throws IllegalArgumentException
+     *             if any predicate specified in the join path is optional.
+     * 
+     *             FIXME implement and unit tests.
+     * 
+     * @todo Implement (or refactor) the logic to decide which variables need to
+     *       be propagated and which can be dropped. This decision logic will
+     *       need to be available to the runtime query optimizer.
+     * 
+     * @todo This does not pay attention to the head plan. If there can be
+     *       constraints on the head plan then either this should be modified
+     *       such that it can decide where they attach or we need to have a
+     *       method which does the same thing for the head plan.
+     */
+    public IConstraint[] getJoinGraphConstraints(final int[] pathIds) {
+
+        /*
+         * Verify arguments and resolve bopIds to predicates.
+         */
+        if (pathIds == null)
+            throw new IllegalArgumentException();
+
+        final IPredicate<?>[] path = new IPredicate[pathIds.length];
+
+        for (int i = 0; i < pathIds.length; i++) {
+
+            final int id = pathIds[i];
+            
+            IPredicate<?> p = null;
+
+            for (IPredicate<?> tmp : joinGraph) {
+
+                if (tmp.getId() == id) {
+
+                    p = tmp;
+
+                    break;
+
+                }
+
+            }
+
+            if (p == null)
+                throw new IllegalArgumentException("Not found: id=" + id);
+
+            if (p.isOptional())
+                throw new AssertionError(
+                        "Not expecting an optional predicate: " + p);
+
+            path[i] = p;
+
+        }
+
+        /*
+         * For each predicate in the path in the given order, figure out which
+         * constraint(s) would attach to that predicate based on which variables
+         * first become bound with that predicate. For the last predicate in the
+         * given join path, we return that set of constraints.
+         */
+
+        // the set of variables which are bound.
+        final Set<IVariable<?>> boundVars = new LinkedHashSet<IVariable<?>>(); 
+        
+        // the set of constraints which have been consumed.
+        final Set<IConstraint> used = new LinkedHashSet<IConstraint>();
+        
+        // the set of constraints for the last predicate in the join path.
+        final List<IConstraint> ret = new LinkedList<IConstraint>();
+        
+        for(int i = 0; i<path.length; i++) {
+
+            // true iff this is the last join in the path.
+            final boolean lastJoin = i == path.length - 1;
+            
+            // a predicate in the path.
+            final IPredicate<?> p = path[i];
+
+            {
+                /*
+                 * Visit the variables used by the predicate (and bound by it
+                 * since it is not an optional predicate) and add them into the
+                 * total set of variables which are bound at this point in the
+                 * join path.
+                 */
+                final Iterator<IVariable<?>> vitr = BOpUtility
+                        .getArgumentVariables(p);
+
+                while (vitr.hasNext()) {
+
+                    final IVariable<?> var = vitr.next();
+
+                    boundVars.add(var);
+
+                }
+            }
+            
+            // consider each constraint.
+            for(IConstraint c : joinGraphConstraints) {
+
+                if (used.contains(c)) {
+                    /*
+                     * Skip constraints which were already assigned to
+                     * predicates before this one in the join path.
+                     */
+                    continue;
+                }
+
+                /*
+                 * true iff all variables used by this constraint are bound at
+                 * this point in the join path.
+                 */
+                boolean allVarsBound = true;
+
+                // visit the variables used by this constraint.
+                final Iterator<IVariable<?>> vitr = BOpUtility
+                        .getSpannedVariables(c);
+
+                while (vitr.hasNext()) {
+
+                    final IVariable<?> var = vitr.next();
+                    
+                    if(!boundVars.contains(var)) {
+                        
+                        allVarsBound = false;
+
+                        break;
+
+                    }
+
+                }
+
+                if (allVarsBound) {
+
+                    /*
+                     * All variables have become bound for this constraint, so
+                     * add it to the set of "used" constraints.
+                     */
+                    
+                    used.add(c);
+
+//                    if (log.isDebugEnabled()) {
+//                        log.debug
+//                    }
+                    System.err.println("Constraint attached at index " + i + " of "
+                            + path.length + ", bopId=" + p.getId()
+                            + ", constraint=" + c);
+                    
+                    if (lastJoin) {
+
+                        /*
+                         * If we are on the last join in the join path, then
+                         * this constraint is one of the ones that we will
+                         * return.
+                         */
+                        
+                        ret.add(c);
+
+                    }
+
+                } // if(allVarsBound)
+                    
+            } // next constraint
+            
+        } // next predicate in the join path.
+
+        /*
+         * Return the set of constraints to be applied as of the last predicate
+         * in the join path.
+         */
+        return ret.toArray(new IConstraint[ret.size()]);
+        
+    }    
 
     /**
      * The {@link IPredicate}s representing optional joins. Any
