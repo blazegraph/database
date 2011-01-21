@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sop;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -47,6 +48,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
@@ -161,13 +163,22 @@ public class SOp2BOpUtility {
     	 * join groups, and thus should be translated into ConditionalRoutingOps
     	 * for maximum efficiency.
     	 */
-    	final Collection<IConstraint> conditionals = 
+    	final Collection<IConstraint> preConditionals = 
     		new LinkedList<IConstraint>();
     	
-    	final IRule rule = rule(join, conditionals);
+    	/*
+    	 * These are constraints that use variables bound by subqueries, and
+    	 * thus cannot be attached to the predicates in this group.  They are
+    	 * handled by ConditionalRoutingOps at the end of the group, after
+    	 * the subqueries have run. 
+    	 */
+    	final Collection<IConstraint> postConditionals = 
+    		new LinkedList<IConstraint>();
+    	
+    	final IRule rule = rule(join, preConditionals, postConditionals);
     	
     	PipelineOp left = Rule2BOpUtility.convert(
-    			rule, conditionals, idFactory, db, queryEngine, queryHints);
+    			rule, preConditionals, idFactory, db, queryEngine, queryHints);
     	
     	/*
     	 * Start with left=<this join group> and add a SubqueryOp for each
@@ -190,9 +201,26 @@ public class SOp2BOpUtility {
 	                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
 	                    new NV(SubqueryOp.Annotations.OPTIONAL,optional)//
 	            );
+	    		if (log.isInfoEnabled()) {
+	    			log.info("adding a subquery: " + subqueryId + "\n" + left);
+	    		}
 	    	}
     	}
     
+	    for (IConstraint c : postConditionals) {
+    		final int condId = idFactory.incrementAndGet();
+            final PipelineOp condOp = 
+            	new ConditionalRoutingOp(new BOp[]{left},
+                    NV.asMap(new NV[]{//
+                        new NV(BOp.Annotations.BOP_ID,condId),
+                        new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
+                    }));
+            left = condOp;
+            if (log.isDebugEnabled()) {
+            	log.debug("adding post-conditional routing op: " + condOp);
+            }
+	    }
+    	
 		if (!left.getEvaluationContext()
 				.equals(BOpEvaluationContext.CONTROLLER)
 				&& !(left instanceof SubqueryOp)) {
@@ -258,7 +286,8 @@ public class SOp2BOpUtility {
     }
 
     protected static IRule rule(final SOpGroup group,
-    		final Collection<IConstraint> conditionals) {
+    		final Collection<IConstraint> preConditionals,
+    		final Collection<IConstraint> postConditionals) {
     	
     	final Collection<IPredicate> preds = new LinkedList<IPredicate>();
     	final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
@@ -266,36 +295,20 @@ public class SOp2BOpUtility {
     	/*
     	 * Gather up all the variables used by non-optional parent join groups
     	 */
-    	final Set<IVariable<?>> variables = new HashSet<IVariable<?>>();
+    	final Set<IVariable<?>> nonOptParentVars = new HashSet<IVariable<?>>();
     	SOpGroup parent = group;
     	while ((parent = parent.getParent()) != null) {
     		if (isNonOptionalJoinGroup(parent))
-    			collectPredicateVariables(variables, parent);
+    			collectPredicateVariables(nonOptParentVars, parent);
     	}
     	
+    	/*
+    	 * Gather up all the predicates in this group.
+    	 */
     	for (SOp sop : group) {
     		final BOp bop = sop.getBOp();
     		if (bop instanceof IPredicate) {
     			preds.add((IPredicate) bop);
-    		} else if (bop instanceof IConstraint) {
-    			final IConstraint c = (IConstraint) bop;
-    			/*
-    			 * This constraint is a conditional if all of its variables
-    			 * appear in non-optional parent join groups
-    			 */
-                final Iterator<IVariable<?>> vars = 
-                	BOpUtility.getSpannedVariables(c);
-                boolean conditional = true;
-                while (vars.hasNext()) {
-                    final IVariable<?> v = vars.next();
-                    conditional &= variables.contains(v);
-                }
-    			if (conditional)
-    				conditionals.add(c);
-    			else
-    				constraints.add(c);
-    		} else {
-    			throw new IllegalArgumentException("illegal operator: " + sop);
     		}
     	}
     	
@@ -317,7 +330,94 @@ public class SOp2BOpUtility {
 	    	}
     	}
     	
+    	/*
+    	 * Gather up all the variables used by predicates in this group
+    	 */
+    	final Set<IVariable<?>> groupVars = new HashSet<IVariable<?>>();
+    	for (IPredicate bop : preds) {
+	        for (BOp arg : bop.args()) {
+	            if (arg instanceof IVariable<?>) {
+	                final IVariable<?> v = (IVariable<?>) arg;
+	                groupVars.add(v);
+	            }
+	        }
+    	}
+
+    	/*
+    	 * Gather up the constraints, segregating into three categories:
+    	 * -constraints: all variables used by predicates in this group
+    	 * -pre-conditionals: all variables already bound by parent group(s)
+    	 * -post-conditionals: some or all variables bound in subqueries
+    	 */
+    	for (SOp sop : group) {
+    		final BOp bop = sop.getBOp();
+    		if (bop instanceof IConstraint) {
+    			final IConstraint c = (IConstraint) bop;
+
+    			{ // find the pre-conditionals
+    				
+	    			final Iterator<IVariable<?>> constraintVars = 
+	                	BOpUtility.getSpannedVariables(c);
+	
+	    			/*
+	    			 * This constraint is a pre-conditional if all of its variables
+	    			 * appear in non-optional parent join groups
+	    			 */
+	                boolean preConditional = true;
+	                while (constraintVars.hasNext()) {
+	                    final IVariable<?> v = constraintVars.next();
+	                    preConditional &= nonOptParentVars.contains(v);
+	                }
+	    			if (preConditional) {
+	    				preConditionals.add(c);
+	    				continue;
+	    			}
+	    			
+    			}
+    			
+    			{ // find the post-conditionals
+    				
+	    			final Iterator<IVariable<?>> constraintVars = 
+	                	BOpUtility.getSpannedVariables(c);
+	
+	    			/*
+	    			 * This constraint is a post-conditional if not all of its 
+	    			 * variables appear in this join group or non-optional parent 
+	    			 * groups (bound by subqueries)
+	    			 */
+	    			boolean postConditional = false;
+	                while (constraintVars.hasNext()) {
+	                    final IVariable<?> v = constraintVars.next();
+	                    if (!nonOptParentVars.contains(v) &&
+	                    		!groupVars.contains(v)) {
+	                    	postConditional = true;
+	                    	break;
+	                    }
+	                }
+	                if (postConditional) {
+	    				postConditionals.add(c);
+	    				continue;
+	                }
+	    			
+    			}
+
+    			/*
+    			 * Neither pre nor post conditional, but a constraint on the
+    			 * predicates in this group. done this roundabout way for the 
+    			 * benefit of the RTO
+    			 */
+				constraints.add(c);
+    		}
+    	}
+    	
     	final IVariable<?>[] required = group.getTree().getRequiredVars();
+    	
+    	if (log.isInfoEnabled()) {
+    		log.info("preds: " + Arrays.toString(preds.toArray()));
+    		log.info("constraints: " + Arrays.toString(constraints.toArray()));
+    		log.info("preConds: " + Arrays.toString(preConditionals.toArray()));
+    		log.info("postConds: " + Arrays.toString(postConditionals.toArray()));
+    	}
     	
 		final IRule rule = new Rule(
 				"dummy rule",
