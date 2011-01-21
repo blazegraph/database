@@ -84,6 +84,11 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo There is relatively little difference between this class and SubqueryOp
+ *       and we should consider converging them into a single concrete subquery
+ *       operator with specializations for UNION and STEPS. The main difference
+ *       is that the SubqueryOp can not run multiple subqueries.
  */
 abstract public class AbstractSubqueryOp extends PipelineOp {
 

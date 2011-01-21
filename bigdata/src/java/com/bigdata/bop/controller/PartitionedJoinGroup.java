@@ -10,11 +10,17 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpEvaluationContext;
+import com.bigdata.bop.BOpIdFactory;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.controller.JoinGraph.NoSolutionsException;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.solutions.SliceOp;
 
 /**
  * Class accepts a join group and partitions it into a join graph and a tail
@@ -53,10 +59,6 @@ import com.bigdata.bop.controller.JoinGraph.NoSolutionsException;
  *       search access path that replaces the actual access path for the
  *       predicate, which is meaningless in an of itself because the P is
  *       magical.]
- * 
- * @todo write a method which returns the set of constraints which should be run
- *       for the last predicate in a given join path (a join path is just an
- *       ordered array of predicates).
  * 
  *       FIXME Add a method to generate a runnable query plan from a collection
  *       of predicates and constraints. This is a bit different for the join
@@ -220,7 +222,54 @@ public class PartitionedJoinGroup {
             path[i] = p;
 
         }
+     
+        return getJoinGraphConstraints(path, joinGraphConstraints
+                .toArray(new IConstraint[joinGraphConstraints.size()]))[pathIds.length - 1];
+        
+    }
 
+    /**
+     * Given a join path, return the set of constraints to be associated with
+     * each join in that join path. Only those constraints whose variables are
+     * known to be bound will be attached.
+     * 
+     * @param path
+     *            The join path.
+     * @param joinGraphConstraints
+     *            The constraints to be applied to the join path (optional).
+     * 
+     * @return The constraints to be paired with each element of the join path.
+     * 
+     * @throws IllegalArgumentException
+     *             if the join path is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the join path is empty.
+     * @throws IllegalArgumentException
+     *             if any element of the join path is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if any element of the join graph constraints is
+     *             <code>null</code>.
+     * 
+     * @todo It should be an error if a variable appear in a constraint is not
+     *       bound by any possible join path. However, it may not be possible to
+     *       determine this by local examination of a join graph since we do not
+     *       know which variables may be presented as already bound when the
+     *       join graph is evaluated (but we can only run the join graph
+     *       currently against static source binding sets and for that case this
+     *       is knowable).
+     */
+    static public IConstraint[][] getJoinGraphConstraints(
+            final IPredicate<?>[] path, final IConstraint[] joinGraphConstraints) {
+
+        if (path == null)
+            throw new IllegalArgumentException();
+        
+        if (path.length == 0)
+            throw new IllegalArgumentException();
+
+        // the set of constraints for each predicate in the join path.
+        final IConstraint[][] ret = new IConstraint[path.length][];
+        
         /*
          * For each predicate in the path in the given order, figure out which
          * constraint(s) would attach to that predicate based on which variables
@@ -234,17 +283,20 @@ public class PartitionedJoinGroup {
         // the set of constraints which have been consumed.
         final Set<IConstraint> used = new LinkedHashSet<IConstraint>();
         
-        // the set of constraints for the last predicate in the join path.
-        final List<IConstraint> ret = new LinkedList<IConstraint>();
-        
-        for(int i = 0; i<path.length; i++) {
+        for (int i = 0; i < path.length; i++) {
 
-            // true iff this is the last join in the path.
-            final boolean lastJoin = i == path.length - 1;
+//            // true iff this is the last join in the path.
+//            final boolean lastJoin = i == path.length - 1;
             
             // a predicate in the path.
             final IPredicate<?> p = path[i];
 
+            if (p == null)
+                throw new IllegalArgumentException();
+            
+            // the constraints for the current predicate in the join path.
+            final List<IConstraint> constraints = new LinkedList<IConstraint>();
+            
             {
                 /*
                  * Visit the variables used by the predicate (and bound by it
@@ -263,80 +315,80 @@ public class PartitionedJoinGroup {
 
                 }
             }
-            
-            // consider each constraint.
-            for(IConstraint c : joinGraphConstraints) {
 
-                if (used.contains(c)) {
+            if (joinGraphConstraints != null) {
+
+                // consider each constraint.
+                for (IConstraint c : joinGraphConstraints) {
+
+                    if (c == null)
+                        throw new IllegalArgumentException();
+
+                    if (used.contains(c)) {
+                        /*
+                         * Skip constraints which were already assigned to
+                         * predicates before this one in the join path.
+                         */
+                        continue;
+                    }
+
                     /*
-                     * Skip constraints which were already assigned to
-                     * predicates before this one in the join path.
+                     * true iff all variables used by this constraint are bound
+                     * at this point in the join path.
                      */
-                    continue;
-                }
+                    boolean allVarsBound = true;
 
-                /*
-                 * true iff all variables used by this constraint are bound at
-                 * this point in the join path.
-                 */
-                boolean allVarsBound = true;
+                    // visit the variables used by this constraint.
+                    final Iterator<IVariable<?>> vitr = BOpUtility
+                            .getSpannedVariables(c);
 
-                // visit the variables used by this constraint.
-                final Iterator<IVariable<?>> vitr = BOpUtility
-                        .getSpannedVariables(c);
+                    while (vitr.hasNext()) {
 
-                while (vitr.hasNext()) {
+                        final IVariable<?> var = vitr.next();
 
-                    final IVariable<?> var = vitr.next();
-                    
-                    if(!boundVars.contains(var)) {
-                        
-                        allVarsBound = false;
+                        if (!boundVars.contains(var)) {
 
-                        break;
+                            allVarsBound = false;
+
+                            break;
+
+                        }
 
                     }
 
-                }
-
-                if (allVarsBound) {
-
-                    /*
-                     * All variables have become bound for this constraint, so
-                     * add it to the set of "used" constraints.
-                     */
-                    
-                    used.add(c);
-
-                    if (log.isDebugEnabled()) {
-                        log.debug("Constraint attached at index " + i + " of "
-                                + path.length + ", bopId=" + p.getId()
-                                + ", constraint=" + c);
-                    }
-                    
-                    if (lastJoin) {
+                    if (allVarsBound) {
 
                         /*
-                         * If we are on the last join in the join path, then
-                         * this constraint is one of the ones that we will
-                         * return.
+                         * All variables have become bound for this constraint,
+                         * so add it to the set of "used" constraints.
                          */
-                        
-                        ret.add(c);
 
-                    }
+                        used.add(c);
 
-                } // if(allVarsBound)
-                    
-            } // next constraint
+                        if (log.isDebugEnabled()) {
+                            log.debug("Constraint attached at index " + i
+                                    + " of " + path.length + ", bopId="
+                                    + p.getId() + ", constraint=" + c);
+                        }
+
+                        constraints.add(c);
+
+                    } // if(allVarsBound)
+
+                } // next constraint
+
+            } // joinGraphConstraints != null;
+
+            // store the constraint[] for that predicate.
+            ret[i] = constraints.toArray(new IConstraint[constraints.size()]);
             
         } // next predicate in the join path.
 
         /*
-         * Return the set of constraints to be applied as of the last predicate
-         * in the join path.
+         * Return the set of constraints associated with each predicate in the
+         * join path.
          */
-        return ret.toArray(new IConstraint[ret.size()]);
+        return ret;
         
     }    
 
@@ -589,4 +641,83 @@ public class PartitionedJoinGroup {
 
     }
     
+    /**
+     * Generate a query plan from an ordered collection of predicates.
+     * 
+     * @param p
+     *            The join path.
+     * 
+     * @return The query plan.
+     * 
+     *         FIXME Select only those variables required by downstream
+     *         processing or explicitly specified by the caller (in the case
+     *         when this is a subquery, the caller has to declare which
+     *         variables are selected and will be returned out of the subquery).
+     * 
+     *         FIXME For scale-out, we need to either mark the join's evaluation
+     *         context based on whether or not the access path is local or
+     *         remote (and whether the index is key-range distributed or hash
+     *         partitioned).
+     */
+    static public PipelineOp getQuery(final BOpIdFactory idFactory,
+            final IPredicate<?>[] preds, final IConstraint[] constraints) {
+
+        // figure out which constraints are attached to which predicates.
+        final IConstraint[][] assignedConstraints = PartitionedJoinGroup
+                .getJoinGraphConstraints(preds, constraints);
+        
+        final PipelineJoin<?>[] joins = new PipelineJoin[preds.length];
+
+        PipelineOp lastOp = null;
+
+        for (int i = 0; i < preds.length; i++) {
+
+            // The next vertex in the selected join order.
+            final IPredicate<?> p = preds[i];
+
+            final List<NV> anns = new LinkedList<NV>();
+
+            anns.add(new NV(PipelineJoin.Annotations.PREDICATE, p));
+
+            anns.add(new NV(PipelineJoin.Annotations.BOP_ID, idFactory
+                    .nextId()));
+
+//          anns.add(new NV(PipelineJoin.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.ANY));
+//
+//          anns.add(new NV(PipelineJoin.Annotations.SELECT, vars.toArray(new IVariable[vars.size()])));
+
+            if (assignedConstraints[i] != null
+                    && assignedConstraints[i].length > 0)
+                anns
+                        .add(new NV(PipelineJoin.Annotations.CONSTRAINTS,
+                                assignedConstraints[i]));
+
+            final PipelineJoin<?> joinOp = new PipelineJoin(
+                    lastOp == null ? new BOp[0] : new BOp[] { lastOp }, anns
+                            .toArray(new NV[anns.size()]));
+
+            joins[i] = joinOp;
+
+            lastOp = joinOp;
+
+        }
+
+//      final PipelineOp queryOp = lastOp;
+
+        /*
+         * FIXME Why does wrapping with this slice appear to be
+         * necessary? (It is causing runtime errors when not wrapped).
+         * Is this a bopId collision which is not being detected?
+         */
+        final PipelineOp queryOp = new SliceOp(new BOp[] { lastOp }, NV
+                .asMap(new NV[] {
+                        new NV(JoinGraph.Annotations.BOP_ID, idFactory.nextId()), //
+                        new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER) }) //
+        );
+
+        return queryOp;
+
+    }
+
 }

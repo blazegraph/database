@@ -57,6 +57,8 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see AbstractSubqueryOp
  */
 public class SubqueryOp extends PipelineOp {
 

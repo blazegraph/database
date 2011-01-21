@@ -211,7 +211,7 @@ public class TestJoinGraphOnBarData extends AbstractJoinGraphTestCase {
 	 * 
 	 * @throws Exception
 	 */
-	public void test_query() throws Exception {
+	public void test_barData_query() throws Exception {
 
         final String namespace = getNamespace();
 

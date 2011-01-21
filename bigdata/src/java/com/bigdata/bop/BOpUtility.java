@@ -34,6 +34,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 
@@ -1053,6 +1054,83 @@ public class BOpUtility {
         return b;
 
     }
-    
-}
 
+    /**
+     * Return the variable references shared by tw operators. All variables
+     * spanned by either {@link BOp} are considered.
+     * 
+     * @param p
+     *            An operator.
+     * @param c
+     *            Another operator.
+     * 
+     * @param p
+     *            A predicate.
+     * 
+     * @param c
+     *            A constraint.
+     * 
+     * @return The variables in common -or- <code>null</code> iff there are no
+     *         variables in common.
+     * 
+     * @throws IllegalArgumentException
+     *             if the two either reference is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the reference are the same.
+     * 
+     * @todo unit tests.
+     */
+    public static Set<IVariable<?>> getSharedVars(final BOp p, final BOp c) {
+
+        if (p == null)
+            throw new IllegalArgumentException();
+
+        if (c == null)
+            throw new IllegalArgumentException();
+
+        if (p == c)
+            throw new IllegalArgumentException();
+
+        // The set of variables which are shared.
+        final Set<IVariable<?>> sharedVars = new LinkedHashSet<IVariable<?>>();
+
+        // Collect the variables appearing anywhere in [p].
+        final Set<IVariable<?>> p1vars = new LinkedHashSet<IVariable<?>>();
+        {
+
+            final Iterator<IVariable<?>> itr = BOpUtility
+                    .getSpannedVariables(p);
+
+            while (itr.hasNext()) {
+
+                p1vars.add(itr.next());
+
+            }
+
+        }
+
+        // Consider the variables appearing anywhere in [c].
+        {
+
+            final Iterator<IVariable<?>> itr = BOpUtility
+                    .getSpannedVariables(c);
+
+            while (itr.hasNext()) {
+
+                final IVariable<?> avar = itr.next();
+
+                if (p1vars.contains(avar)) {
+
+                    sharedVars.add(avar);
+
+                }
+
+            }
+
+        }
+
+        return sharedVars;
+
+    }
+
+}

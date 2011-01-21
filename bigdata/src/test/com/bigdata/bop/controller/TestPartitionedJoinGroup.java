@@ -456,9 +456,6 @@ public class TestPartitionedJoinGroup extends TestCase2 {
     
     /**
      * @todo test with headPlan.
-     * 
-     * @todo test logic to attach constraints to non-optional joins based on a
-     *       given join path (not yet written).
      */
     public void test_something() {
         fail("write tests");

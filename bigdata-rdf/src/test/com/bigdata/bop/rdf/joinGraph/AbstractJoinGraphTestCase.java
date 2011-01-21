@@ -43,7 +43,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.controller.JoinGraph;
+import com.bigdata.bop.controller.PartitionedJoinGroup;
 import com.bigdata.bop.controller.JoinGraph.JGraph;
 import com.bigdata.bop.controller.JoinGraph.Path;
 import com.bigdata.bop.engine.BOpStats;
@@ -217,7 +217,7 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
      *       JVM run using the known solutions produced by the runtime versus
      *       static query optimizers.
      */
-    protected void doTest(final IPredicate[] preds,
+    protected void doTest(final IPredicate<?>[] preds,
             final IConstraint[] constraints) throws Exception {
 
         if (warmUp)
@@ -228,7 +228,7 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
          * Run the runtime query optimizer once (its cost is not counted
          * thereafter).
          */
-        final IPredicate[] runtimePredOrder = runRuntimeQueryOptimizer(
+        final IPredicate<?>[] runtimePredOrder = runRuntimeQueryOptimizer(
                 getQueryEngine(), limit, nedges, preds, constraints);
 
         long totalRuntimeTime = 0;
@@ -296,9 +296,10 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
      * 
      * @throws Exception
      */
-    static protected IPredicate[] runRuntimeQueryOptimizer(
+    static protected IPredicate<?>[] runRuntimeQueryOptimizer(
             final QueryEngine queryEngine, final int limit, final int nedges,
-            final IPredicate[] preds, IConstraint[] constraints) throws Exception {
+            final IPredicate<?>[] preds, IConstraint[] constraints)
+            throws Exception {
 
         final Logger tmp = Logger.getLogger(QueryLog.class);
         final Level oldLevel = tmp.getEffectiveLevel();
@@ -329,8 +330,8 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
      * @return The predicates in order as recommended by the static query
      *         optimizer.
      */
-    static protected IPredicate[] runStaticQueryOptimizer(
-            final QueryEngine queryEngine, final IPredicate[] preds) {
+    static protected IPredicate<?>[] runStaticQueryOptimizer(
+            final QueryEngine queryEngine, final IPredicate<?>[] preds) {
 
         final BOpContextBase context = new BOpContextBase(queryEngine);
 
@@ -351,7 +352,7 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
 
         final int[] ids = new int[order.length];
         
-        final IPredicate[] out = new IPredicate[order.length];
+        final IPredicate<?>[] out = new IPredicate[order.length];
 
         for (int i = 0; i < order.length; i++) {
 
@@ -374,14 +375,8 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
      * @return The elapsed query time (ms).
      */
     private static long runQuery(final String msg,
-            final QueryEngine queryEngine, final IPredicate[] predOrder,
+            final QueryEngine queryEngine, final IPredicate<?>[] predOrder,
             final IConstraint[] constraints) throws Exception {
-
-        if (constraints != null && constraints.length != 0) {
-            // FIXME Constraints must be attached to joins.
-            throw new UnsupportedOperationException(
-                    "Constraints must be attached to joins!");
-        }
 
         if (log.isInfoEnabled())
             log.info("Running " + msg);
@@ -400,37 +395,45 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
 
         }
 
-        final PipelineOp queryOp = JoinGraph.getQuery(idFactory, predOrder,
-                constraints);
+        final PipelineOp queryOp = PartitionedJoinGroup.getQuery(idFactory,
+                predOrder, constraints);
 
         // submit query to runtime optimizer.
         final IRunningQuery q = queryEngine.eval(queryOp);
 
-        // drain the query results.
-        long nout = 0;
-        long nchunks = 0;
-        final IAsynchronousIterator<IBindingSet[]> itr = q.iterator();
         try {
-            while (itr.hasNext()) {
-                final IBindingSet[] chunk = itr.next();
-                nout += chunk.length;
-                nchunks++;
+
+            // drain the query results.
+            long nout = 0;
+            long nchunks = 0;
+            final IAsynchronousIterator<IBindingSet[]> itr = q.iterator();
+            try {
+                while (itr.hasNext()) {
+                    final IBindingSet[] chunk = itr.next();
+                    nout += chunk.length;
+                    nchunks++;
+                }
+            } finally {
+                itr.close();
             }
+
+            // check the Future for the query.
+            q.get();
+
+            // show the results.
+            final BOpStats stats = q.getStats().get(queryOp.getId());
+
+            System.err.println(msg + " : ids=" + Arrays.toString(ids)
+                    + ", elapsed=" + q.getElapsed() + ", nout=" + nout
+                    + ", nchunks=" + nchunks + ", stats=" + stats);
+
+            return q.getElapsed();
+
         } finally {
-            itr.close();
+
+            q.cancel(true/* mayInterruptIfRunning */);
+            
         }
-
-        // check the Future for the query.
-        q.get();
-
-        // show the results.
-        final BOpStats stats = q.getStats().get(queryOp.getId());
-
-        System.err.println(msg + " : ids=" + Arrays.toString(ids)
-                + ", elapsed=" + q.getElapsed() + ", nout=" + nout
-                + ", nchunks=" + nchunks + ", stats=" + stats);
-        
-        return q.getElapsed();
 
     }
 

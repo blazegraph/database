@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -21,44 +21,52 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-/*
- * Created on Jan 18, 2011
- */
-
 package com.bigdata.bop.rdf.joinGraph;
 
-import junit.framework.TestCase2;
 
-import com.bigdata.bop.controller.JoinGraph;
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /**
- * A test suite for the {@link JoinGraph} against RDF data.
- * 
+ * Aggregates test suites into increasing dependency order.
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestJoinGraphWithRDF extends TestCase2 {
+public class TestAll extends TestCase {
 
     /**
      * 
      */
-    public TestJoinGraphWithRDF() {
+    public TestAll() {
+        
     }
 
     /**
-     * @param name
+     * @param arg0
      */
-    public TestJoinGraphWithRDF(String name) {
-        super(name);
+    public TestAll(String arg0) {
+     
+        super(arg0);
+        
     }
 
     /**
-     * Test the ability to dynamically attach a constraint to the first join in
-     * a join path at which all of the variables in that constraint would be
-     * bound (the join graph only considers non-optional joins).
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
      */
-    public void test_constraintAttachment() {
-        fail("write test");
+    public static Test suite()
+    {
+
+        final TestSuite suite = new TestSuite("Runtime query optimizer");
+
+        suite.addTestSuite(TestJoinGraphOnLubm.class);
+        suite.addTestSuite(TestJoinGraphOnBarData.class);
+        suite.addTestSuite(TestJoinGraphOnBSBMData.class);
+
+        return suite;
+        
     }
     
 }
