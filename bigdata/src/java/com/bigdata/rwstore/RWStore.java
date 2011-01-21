@@ -1273,14 +1273,7 @@ public class RWStore implements IStore {
                     	}
                     }
                     
-//					final Allocator na = getBlock((int) addr);
-//					if (! (na instanceof BlobAllocator)) {
-//						throw new IllegalStateException("Invalid Allocator index");
-//					}
-//					final BlobAllocator ba = (BlobAllocator) na;
-//					final int hdraddr = ba.getBlobHdrAddress(getOffset((int) addr));
-//					getData(hdraddr, hdrbuf); // read in header - could itself be a blob!
-                    getData(addr, hdrbuf); // fine but MUST NOT allow header to be a BLOB!
+                    getData(addr, hdrbuf); // will work even if header is also a blob
 					final DataInputStream hdrstr = new DataInputStream(new ByteArrayInputStream(hdrbuf));
 					final int rhdrs = hdrstr.readInt();
                     if (rhdrs != nblocks) {

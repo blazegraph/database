@@ -82,7 +82,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 					if ((m_allocation + m_sectorSize) > m_maxResource) {
 						throw new MemoryManagerResourceError();
 					}
-					SectorAllocator sector = new SectorAllocator(this);//, null);
+					SectorAllocator sector = new SectorAllocator(this, null);
 					sector.setSectorAddress(m_allocation, m_sectorSize);
 					sector.setIndex(m_sectors.size());
 					m_sectors.add(sector);
