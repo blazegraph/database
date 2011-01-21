@@ -173,8 +173,6 @@ public class PartitionedJoinGroup {
      * @throws IllegalArgumentException
      *             if any predicate specified in the join path is optional.
      * 
-     *             FIXME implement and unit tests.
-     * 
      * @todo Implement (or refactor) the logic to decide which variables need to
      *       be propagated and which can be dropped. This decision logic will
      *       need to be available to the runtime query optimizer.
@@ -310,12 +308,11 @@ public class PartitionedJoinGroup {
                     
                     used.add(c);
 
-//                    if (log.isDebugEnabled()) {
-//                        log.debug
-//                    }
-                    System.err.println("Constraint attached at index " + i + " of "
-                            + path.length + ", bopId=" + p.getId()
-                            + ", constraint=" + c);
+                    if (log.isDebugEnabled()) {
+                        log.debug("Constraint attached at index " + i + " of "
+                                + path.length + ", bopId=" + p.getId()
+                                + ", constraint=" + c);
+                    }
                     
                     if (lastJoin) {
 
