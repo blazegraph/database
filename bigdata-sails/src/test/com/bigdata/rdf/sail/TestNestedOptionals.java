@@ -130,14 +130,16 @@ public class TestNestedOptionals extends QuadsTestCase {
 //        final Repository repo = new SailRepository(sail);
 
     	final BigdataSail sail = getSail();
+    	try {
     	sail.initialize();
     	final BigdataSailRepository repo = new BigdataSailRepository(sail);
     	
     	final RepositoryConnection cxn = repo.getConnection();
-        cxn.setAutoCommit(false);
         
         try {
-    
+
+            cxn.setAutoCommit(false);
+
             final ValueFactory vf = sail.getValueFactory();
 
             /*
@@ -261,7 +263,8 @@ public class TestNestedOptionals extends QuadsTestCase {
             
         } finally {
             cxn.close();
-            sail.shutDown();
+        }} finally {
+            sail.__tearDownUnitTest();
         }
 
     }
@@ -273,13 +276,14 @@ public class TestNestedOptionals extends QuadsTestCase {
 	//      final Repository repo = new SailRepository(sail);
 	
 	  	final BigdataSail sail = getSail();
+	  	try {
 	  	sail.initialize();
 	  	final BigdataSailRepository repo = new BigdataSailRepository(sail);
 	  	
 	  	final RepositoryConnection cxn = repo.getConnection();
-	        cxn.setAutoCommit(false);
 	      
 	    try {
+            cxn.setAutoCommit(false);
 	  
 			final ValueFactory vf = sail.getValueFactory();
 
@@ -391,9 +395,11 @@ public class TestNestedOptionals extends QuadsTestCase {
 
 			}
 	          
-		} finally {
-			cxn.close();
-			sail.shutDown();
+	    } finally {
+            cxn.close();
+	    }
+	    } finally {
+			sail.__tearDownUnitTest();
 		}
 	
 	}
@@ -405,13 +411,14 @@ public class TestNestedOptionals extends QuadsTestCase {
 //      final Repository repo = new SailRepository(sail);
 
 		final BigdataSail sail = getSail();
+		try {
 		sail.initialize();
 		final BigdataSailRepository repo = new BigdataSailRepository(sail);
 
 		final RepositoryConnection cxn = repo.getConnection();
-		cxn.setAutoCommit(false);
 
 		try {
+	        cxn.setAutoCommit(false);
 
 			final ValueFactory vf = sail.getValueFactory();
 
@@ -528,8 +535,10 @@ public class TestNestedOptionals extends QuadsTestCase {
 			}
 
 		} finally {
-			cxn.close();
-			sail.shutDown();
+            cxn.close();
+		}
+		} finally {
+			sail.__tearDownUnitTest();
 		}
 
 	}
@@ -537,13 +546,14 @@ public class TestNestedOptionals extends QuadsTestCase {
     private void __testNestedOptionals1() throws Exception {
 
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
             (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
         
         try {
+            cxn.setAutoCommit(false);
     
             final ValueFactory vf = sail.getValueFactory();
 
@@ -634,6 +644,8 @@ public class TestNestedOptionals extends QuadsTestCase {
             
         } finally {
             cxn.close();
+        }
+        } finally {
             sail.__tearDownUnitTest();
         }
 
@@ -642,13 +654,14 @@ public class TestNestedOptionals extends QuadsTestCase {
     private void _testNestedOptionals2() throws Exception {
 
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
             (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
         
         try {
+            cxn.setAutoCommit(false);
     
             final ValueFactory vf = sail.getValueFactory();
 
@@ -811,9 +824,11 @@ public class TestNestedOptionals extends QuadsTestCase {
             
 //            final TupleQueryResult result = tupleQuery.evaluate();
 //            compare(result, answer);
-            
+
         } finally {
             cxn.close();
+        }
+        } finally {
             sail.__tearDownUnitTest();
         }
 

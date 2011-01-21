@@ -130,13 +130,14 @@ public class TestNestedUnions extends QuadsTestCase {
 //        final Repository repo = new SailRepository(sail);
 
     	final BigdataSail sail = getSail();
+    	try {
     	sail.initialize();
     	final BigdataSailRepository repo = new BigdataSailRepository(sail);
     	
     	final RepositoryConnection cxn = repo.getConnection();
-        cxn.setAutoCommit(false);
         
         try {
+            cxn.setAutoCommit(false);
     
             final ValueFactory vf = sail.getValueFactory();
 
@@ -221,7 +222,9 @@ public class TestNestedUnions extends QuadsTestCase {
             
         } finally {
             cxn.close();
-            sail.shutDown();
+        }
+        } finally {
+            sail.__tearDownUnitTest();//shutDown();
         }
 
     }
