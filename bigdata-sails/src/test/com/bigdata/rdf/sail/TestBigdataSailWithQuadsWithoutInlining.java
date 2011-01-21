@@ -81,6 +81,10 @@ public class TestBigdataSailWithQuadsWithoutInlining extends AbstractBigdataSail
         // test suite for optionals handling (left joins).
         suite.addTestSuite(TestOptionals.class);
 
+        suite.addTestSuite(TestNestedOptionals.class);
+        
+        suite.addTestSuite(TestNestedUnions.class);
+        
         // test of the search magic predicate
         suite.addTestSuite(TestSearchQuery.class);
         

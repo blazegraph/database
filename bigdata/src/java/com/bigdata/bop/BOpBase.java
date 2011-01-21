@@ -566,10 +566,14 @@ public class BOpBase implements BOp {
         for (BOp t : args) {
             if (nwritten > 0)
                 sb.append(',');
-            sb.append(t.getClass().getSimpleName());
-            final Integer tid = (Integer) t.getProperty(Annotations.BOP_ID);
-            if (tid != null) {
-                sb.append("[" + tid + "]");
+            if(t instanceof IValueExpression<?>) {
+                sb.append(t.toString());
+            } else {
+                sb.append(t.getClass().getSimpleName());
+                final Integer tid = (Integer) t.getProperty(Annotations.BOP_ID);
+                if (tid != null) {
+                    sb.append("[" + tid + "]");
+                }
             }
             nwritten++;
         }

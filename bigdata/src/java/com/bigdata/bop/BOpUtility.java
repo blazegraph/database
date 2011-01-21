@@ -1022,6 +1022,37 @@ public class BOpUtility {
 		return out;
 
 	}
-	
+
+    /**
+     * Return an ordered array of the bopIds associated with an ordered array of
+     * predicates (aka a join path).
+     * 
+     * @param path
+     *            A join path.
+     * 
+     * @return The ordered array of predicates for that join path.
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if any element of the argument is <code>null</code>.
+     * @throws IllegalStateException
+     *             if any {@link IPredicate} does not have a defined bopId as
+     *             reported by {@link BOp#getId()}.
+     */
+    public static int[] getPredIds(final IPredicate<?>[] path) {
+
+        final int[] b = new int[path.length];
+        
+        for (int i = 0; i < path.length; i++) {
+        
+            b[i] = path[i].getId();
+            
+        }
+        
+        return b;
+
+    }
+    
 }
 

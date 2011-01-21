@@ -69,7 +69,7 @@ import com.bigdata.rdf.vocab.NoVocabulary;
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
-public class TestNestedOptionals extends ProxyBigdataSailTestCase {
+public class TestNestedOptionals extends QuadsTestCase {
 
 	/*
 	 * TODO

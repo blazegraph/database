@@ -68,10 +68,23 @@ import com.bigdata.striterator.Dechunkerator;
 /**
  * Unit tests for the {@link PipelineJoin} operator.
  * <p>
- * Note: The operators to map binding sets over shards are tested independently.
+ * Note: The logic to map binding sets over shards is tested independently.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ *          FIXME This test suite does not fully test the FILTER semantics for
+ *          SPARQL joins. In particular, (a) optional join solutions are counted
+ *          as successful <em>before</em> the FILTER is applied; and (b) if no
+ *          optional join solutions exist (before filtering) for a given source
+ *          binding set, then the FILTER is applied to the source binding set to
+ *          decide whether or not the source solutions should be passed along.
+ *          That is, the behavior is the same in both cases as if the FILTER as
+ *          applied after the optional join. However, in fact, we apply it as
+ *          part of the join operator in order to keep things simpler for the
+ *          runtime query optimizer, which needs to be able to perform cutoff
+ *          joins and which also needs to be able to reorder the predicates,
+ *          creating the appropriate join operators as it does so.
  */
 public class TestPipelineJoin extends TestCase2 {
 
