@@ -33,7 +33,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rwstore.FixedOutputStream;
-//import com.bigdata.rwstore.IWriteCacheManager;
+import com.bigdata.rwstore.IWriteCacheManager;
 
 /**
  * The SectorAllocator is designed as an alternative the the standard RWStore
@@ -126,11 +126,11 @@ public class SectorAllocator {
 	final ISectorManager m_store;
 	boolean m_onFreeList = false;
 	private long m_diskAddr;
-//	private final IWriteCacheManager m_writes;
+	private final IWriteCacheManager m_writes;
 
-	public SectorAllocator(ISectorManager store) {//, IWriteCacheManager writes) {
+	public SectorAllocator(ISectorManager store, IWriteCacheManager writes) {
 		m_store = store;
-//		m_writes = writes;
+		m_writes = writes;
 	}
 
 	/**
@@ -222,8 +222,14 @@ public class SectorAllocator {
 					m_tags[i] = tag;
 					m_free[tag] += 32;
 					m_total[tag]++;
+					
+					if (i < (m_tags.length-1)) {
+						// cache next block offset
+						m_addresses[i+1] = m_addresses[i] + (32 * ALLOC_SIZES[tag]);
+					}
+					
 					if (log.isTraceEnabled())
-						log.trace("addnewTag block for: " + ALLOC_SIZES[tag]);
+						log.trace("addNewTag block for: " + ALLOC_SIZES[tag]);
 					if ((i+1) == m_tags.length) {
 						int trim = m_maxSectorSize - (allocated + block);
 
@@ -232,7 +238,7 @@ public class SectorAllocator {
 					return true;
 				} else {
 					if (log.isDebugEnabled())
-						log.debug("addnewTag FALSE due to Sector SIZE");
+						log.debug("addNewTag FALSE due to Sector SIZE");
 					
 					return false;
 				}
@@ -242,7 +248,7 @@ public class SectorAllocator {
 		}
 		
 		if (log.isDebugEnabled())
-			log.debug("addnewTag FALSE due to Sector BITS");
+			log.debug("addNewTag FALSE due to Sector BITS");
 		return false;
 	}
 
@@ -276,10 +282,10 @@ public class SectorAllocator {
 				m_store.addToFreeList(this);
 			}
 			
-//			if (m_writes != null && m_writes.removeWriteToAddr(getPhysicalAddress(bit))) {
-//				if (log.isTraceEnabled())
-//					log.trace("Removed potential DUPLICATE");
-//			}
+			if (m_writes != null && m_writes.removeWriteToAddr(getPhysicalAddress(bit))) {
+				if (log.isTraceEnabled())
+					log.trace("Removed potential DUPLICATE");
+			}
 		}
 		
 		return false;
@@ -306,11 +312,29 @@ public class SectorAllocator {
 		return 0;
 	}
 	/**
+	 * Uses the m_addresses block offset cache to efficiently determine the
+	 * corresponding resource offset.
 	 * 
 	 * @param bit
 	 * @return the offset in the sector
 	 */
 	int bit2Offset(int bit) {
+		final int entry = bit / 32;
+		final int entryBit = bit % 32;
+		
+		assert entry < m_addresses.length;
+		
+		int offset = m_addresses[entry];
+		offset += entryBit * ALLOC_SIZES[m_tags[entry]];
+		
+		return offset;
+	}
+	/**
+	 * A previous version of bit2Offset that calculated the offset dynamically
+	 * @param bit
+	 * @return the offset in the sector
+	 */
+	int calcBit2Offset(int bit) {
 		int offset = 0;
 		for (int t = 0; t < NUM_ENTRIES; t++) {
 			int tag = m_tags[t];
@@ -387,8 +411,17 @@ public class SectorAllocator {
 			int taglen = str.read(m_tags);
 			assert taglen == m_tags.length;
 			
+			m_addresses[0] = 0;
 			for (int i = 0; i < NUM_ENTRIES; i++) {
 				m_bits[i] = str.readInt();
+				
+				// maintain cached block offset
+				if (i < (NUM_ENTRIES-1)) {
+					final int tag = m_tags[i];
+					if (tag != -1) {
+						m_addresses[i+1] = m_addresses[i] + (32 * ALLOC_SIZES[tag]);
+					}
+				}
 			}
 		} catch (IOException ioe) {
 			throw new RuntimeException(ioe);
@@ -503,10 +536,14 @@ public class SectorAllocator {
 		
 		m_sectorAddress = sectorAddress;
 		m_maxSectorSize = maxsize;
+		m_addresses[0] = 0;
 		for (int i = 0; i < ALLOC_SIZES.length; i++) {
 			m_tags[i] = (byte) i;
 			m_free[i] = 32;
 			m_total[i] = 1;
+			
+			// cache block offset
+			m_addresses[i+1] = m_addresses[i] + (32 * ALLOC_SIZES[i]);			
 		}
 		for (int i = ALLOC_SIZES.length; i < NUM_ENTRIES; i++) {
 			m_tags[i] = (byte) -1;
