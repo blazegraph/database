@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.controller;
 
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
@@ -40,10 +39,8 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
 /**
  * For each binding set presented, this operator executes a subquery. Any
@@ -391,24 +388,27 @@ public class SubqueryOp extends PipelineOp {
                     final QueryEngine queryEngine = parentContext.getRunningQuery()
                             .getQueryEngine();
 
-                    final BOp startOp = BOpUtility.getPipelineStart(subQueryOp);
-
-                    final int startId = startOp.getId();
+//                    final BOp startOp = BOpUtility.getPipelineStart(subQueryOp);
+//
+//                    final int startId = startOp.getId();
+//                    
+//                    final UUID queryId = UUID.randomUUID();
+//
+//                    // execute the subquery, passing in the source binding set.
+//                    runningSubquery = queryEngine
+//                            .eval(
+//                                    queryId,
+//                                    (PipelineOp) subQueryOp,
+//                                    new LocalChunkMessage<IBindingSet>(
+//                                            queryEngine,
+//                                            queryId,
+//                                            startId,
+//                                            -1 /* partitionId */,
+//                                            new ThickAsynchronousIterator<IBindingSet[]>(
+//                                                    new IBindingSet[][] { new IBindingSet[] { bset } })));
                     
-                    final UUID queryId = UUID.randomUUID();
-
-                    // execute the subquery, passing in the source binding set.
-                    runningSubquery = queryEngine
-                            .eval(
-                                    queryId,
-                                    (PipelineOp) subQueryOp,
-                                    new LocalChunkMessage<IBindingSet>(
-                                            queryEngine,
-                                            queryId,
-                                            startId,
-                                            -1 /* partitionId */,
-                                            new ThickAsynchronousIterator<IBindingSet[]>(
-                                                    new IBindingSet[][] { new IBindingSet[] { bset } })));
+                    runningSubquery = queryEngine.eval((PipelineOp) subQueryOp,
+                            bset);
 
 					long ncopied = 0L;
 					try {
@@ -491,9 +491,11 @@ public class SubqueryOp extends PipelineOp {
 						 * Such exceptions are NOT propagated here and WILL NOT
 						 * cause the parent query to terminate.
 						 */
-						throw new RuntimeException(ControllerTask.this.context
-								.getRunningQuery().halt(runningSubquery.getCause()));
-					}
+                        throw new RuntimeException(ControllerTask.this.context
+                                .getRunningQuery().halt(
+                                        runningSubquery == null ? t
+                                                : runningSubquery.getCause()));
+                    }
 					
 					return runningSubquery;
                     

@@ -791,16 +791,57 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     public AbstractRunningQuery eval(final BOp op) throws Exception {
         
+        return eval(op, new ListBindingSet());
+        
+    }
+
+    /**
+     * Evaluate a query. This node will serve as the controller for the query.
+     * 
+     * @param query
+     *            The query to evaluate.
+     * @param bset
+     *            The initial binding set to present.
+     * 
+     * @return The {@link IRunningQuery}.
+     * 
+     * @throws IllegalStateException
+     *             if the {@link QueryEngine} has been {@link #shutdown()}.
+     * @throws Exception
+     */
+    public AbstractRunningQuery eval(final BOp op, final IBindingSet bset)
+            throws Exception {
+
+        return eval(op, newBindingSetIterator(bset));
+
+    }
+
+    /**
+     * Evaluate a query. This node will serve as the controller for the query.
+     * 
+     * @param query
+     *            The query to evaluate.
+     * @param bsets
+     *            The binding sets to be consumed by the query.
+     * 
+     * @return The {@link IRunningQuery}.
+     * 
+     * @throws IllegalStateException
+     *             if the {@link QueryEngine} has been {@link #shutdown()}.
+     * @throws Exception
+     */
+    public AbstractRunningQuery eval(final BOp op,
+            final IAsynchronousIterator<IBindingSet[]> bsets) throws Exception {
+
         final BOp startOp = BOpUtility.getPipelineStart(op);
 
         final int startId = startOp.getId();
-        
+
         final UUID queryId = UUID.randomUUID();
 
         return eval(queryId, (PipelineOp) op,
                 new LocalChunkMessage<IBindingSet>(this/* queryEngine */,
-                        queryId, startId, -1 /* partitionId */,
-                        newBindingSetIterator(new ListBindingSet())));
+                        queryId, startId, -1 /* partitionId */, bsets));
 
     }
 
