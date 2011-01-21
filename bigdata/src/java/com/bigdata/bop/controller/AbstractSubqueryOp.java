@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
 
@@ -45,24 +46,26 @@ import com.bigdata.bop.bset.Tee;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**
  * Executes each of the operands as a subquery. The operands are evaluated in
  * the order given and with the annotated parallelism. Each subquery is run as a
  * separate query but is linked to the parent query in the operator is being
- * evaluated. The subqueries do not receive bindings from the parent and may be
+ * evaluated. The subqueries receive bindings from the pipeline and may be
  * executed independently. By default, the subqueries are run with unlimited
- * parallelism.
+ * parallelism. Since the #of subqueries is generally small (2), this means that
+ * the subqueries run in parallel.
  * <p>
  * Note: This operator must execute on the query controller.
  * <p>
  * The {@link PipelineOp.Annotations#SINK_REF} of each child operand should be
  * overridden to specify the parent of the this operator. If you fail to do
  * this, then the intermediate results of the subqueries will be routed to this
- * operator, which DOES NOT pass them on. This may cause unnecessary network
- * traffic. It may also cause the query to block if the buffer capacity is
- * limited.
+ * operator. This may cause unnecessary network traffic when running against the
+ * {@link IBigdataFederation}. It may also cause the query to block if the
+ * buffer capacity is limited.
  * <p>
  * If you want to route intermediate results from other computations into
  * subqueries, then consider a {@link Tee} pattern instead.
@@ -76,9 +79,9 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * </pre>
  * 
  * Will run the subqueries <i>a</i>, <i>b</i>, and <i>c</i> in parallel. Each
- * subquery will be initialized with a single empty {@link IBindingSet}. The
- * output of those subqueries MUST be explicitly routed to the SLICE operator
- * using {@link PipelineOp.Annotations#SINK_REF} on each of the subqueries.
+ * subquery will be run once for each source {@link IBindingSet}. The output of
+ * those subqueries is explicitly routed to the SLICE operator using
+ * {@link PipelineOp.Annotations#SINK_REF} for efficiency in scale-out.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -168,12 +171,11 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
 
         private final AbstractSubqueryOp controllerOp;
         private final BOpContext<IBindingSet> context;
-        private final List<FutureTask<IRunningQuery>> tasks = new LinkedList<FutureTask<IRunningQuery>>();
-        private final CountDownLatch latch;
         private final int nparallel;
         private final Executor executor;
-        
-        public ControllerTask(final AbstractSubqueryOp controllerOp, final BOpContext<IBindingSet> context) {
+
+        public ControllerTask(final AbstractSubqueryOp controllerOp,
+                final BOpContext<IBindingSet> context) {
 
             if (controllerOp == null)
                 throw new IllegalArgumentException();
@@ -191,37 +193,6 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
             this.executor = new LatchedExecutor(context.getIndexManager()
                     .getExecutorService(), nparallel);
             
-            this.latch = new CountDownLatch(controllerOp.arity());
-
-            /*
-             * Create FutureTasks for each subquery. The futures are not
-             * submitted to the Executor yet. That happens in call(). By
-             * deferring the evaluation until call() we gain the ability to
-             * cancel all subqueries if any subquery fails.
-             */
-            for (BOp op : controllerOp.args()) {
-
-                /*
-                 * Task runs subquery and cancels all subqueries in [tasks] if
-                 * it fails.
-                 */
-                tasks.add(new FutureTask<IRunningQuery>(new SubqueryTask(op,
-                        context)) {
-                    /*
-                     * Hook future to count down the latch when the task is
-                     * done.
-                     */
-                    public void run() {
-                        try {
-                            super.run();
-                        } finally {
-                            latch.countDown();
-                        }
-                    }
-                });
-
-            }
-
         }
 
         /**
@@ -229,7 +200,81 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
          */
         public Void call() throws Exception {
 
+            final IAsynchronousIterator<IBindingSet[]> source = context
+                    .getSource();
+
             try {
+
+                while (source.hasNext()) {
+
+                    final IBindingSet[] chunk = source.next();
+                    
+                    for (IBindingSet bset : chunk) {
+
+                        consumeBindingSet(bset);
+
+                    }
+ 
+                }
+
+                // Now that we know the subqueries ran Ok, flush the sink.
+                context.getSink().flush();
+                
+                // Done.
+                return null;
+
+            } finally {
+
+                // Close the source.
+                source.close();
+
+                context.getSink().close();
+                
+                if (context.getSink2() != null)
+                    context.getSink2().close();
+
+            }
+            
+        }
+
+        private void consumeBindingSet(final IBindingSet bset)
+                throws InterruptedException, ExecutionException {
+
+            final List<FutureTask<IRunningQuery>> tasks = new LinkedList<FutureTask<IRunningQuery>>();
+            
+            try {
+
+                final CountDownLatch latch = new CountDownLatch(controllerOp
+                        .arity());
+
+                /*
+                 * Create FutureTasks for each subquery. The futures are not
+                 * submitted to the Executor yet. That happens in call(). By
+                 * deferring the evaluation until call() we gain the ability to
+                 * cancel all subqueries if any subquery fails.
+                 */
+                for (BOp op : controllerOp.args()) {
+
+                    /*
+                     * Task runs subquery and cancels all subqueries in [tasks]
+                     * if it fails.
+                     */
+                    tasks.add(new FutureTask<IRunningQuery>(new SubqueryTask(
+                            op, context, bset)) {
+                        /*
+                         * Hook future to count down the latch when the task is
+                         * done.
+                         */
+                        public void run() {
+                            try {
+                                super.run();
+                            } finally {
+                                latch.countDown();
+                            }
+                        }
+                    });
+
+                }
 
                 /*
                  * Run subqueries with limited parallelism.
@@ -237,12 +282,6 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
                 for (FutureTask<IRunningQuery> ft : tasks) {
                     executor.execute(ft);
                 }
-
-                /*
-                 * Close the source. Controllers do not accept inputs from the
-                 * pipeline.
-                 */
-                context.getSource().close();
 
                 /*
                  * Wait for all subqueries to complete.
@@ -255,25 +294,14 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
                 for (FutureTask<IRunningQuery> ft : tasks)
                     ft.get();
 
-                // Now that we know the subqueries ran Ok, flush the sink.
-                context.getSink().flush();
-                
-                // Done.
-                return null;
-
             } finally {
 
                 // Cancel any tasks which are still running.
                 for (FutureTask<IRunningQuery> ft : tasks)
                     ft.cancel(true/* mayInterruptIfRunning */);
-                
-                context.getSink().close();
-                
-                if (context.getSink2() != null)
-                    context.getSink2().close();
 
             }
-            
+
         }
 
         /**
@@ -294,12 +322,20 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
              */
             private final BOp subQueryOp;
 
+            /**
+             * The input for this invocation of the subquery.
+             */
+            private final IBindingSet bset;
+            
             public SubqueryTask(final BOp subQuery,
-                    final BOpContext<IBindingSet> parentContext) {
+                    final BOpContext<IBindingSet> parentContext,
+                    final IBindingSet bset) {
 
                 this.subQueryOp = subQuery;
 
                 this.parentContext = parentContext;
+                
+                this.bset = bset;
 
             }
 
@@ -312,7 +348,7 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
                     final QueryEngine queryEngine = parentContext.getRunningQuery()
                             .getQueryEngine();
 
-					runningSubquery = queryEngine.eval(subQueryOp);
+					runningSubquery = queryEngine.eval(subQueryOp, bset);
 
                     // Iterator visiting the subquery solutions.
                     subquerySolutionItr = runningSubquery.iterator();
@@ -343,8 +379,10 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
 						 * Such exceptions are NOT propagated here and WILL NOT
 						 * cause the parent query to terminate.
 						 */
-						throw new RuntimeException(ControllerTask.this.context
-								.getRunningQuery().halt(runningSubquery.getCause()));
+                        throw new RuntimeException(ControllerTask.this.context
+                                .getRunningQuery().halt(
+                                        runningSubquery == null ? t
+                                                : runningSubquery.getCause()));
 					}
 					
 					return runningSubquery;

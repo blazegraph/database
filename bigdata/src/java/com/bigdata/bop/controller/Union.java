@@ -35,15 +35,15 @@ import com.bigdata.bop.PipelineOp;
 
 /**
  * UNION(ops)[maxParallel(default all)]
+ * 
  * <pre>
  * UNION([a,b,c],{})
  * </pre>
  * 
- * Will run the subqueries <i>a</i>, <i>b</i>, and <i>c</i> in parallel. Each
- * subquery will be initialized with a single empty {@link IBindingSet}. The
- * output of those subqueries will be routed to the UNION operator (their
- * parent) unless the subqueries explicitly override this behavior using
- * {@link PipelineOp.Annotations#SINK_REF}.
+ * Will run the subqueries <i>a</i>, <i>b</i>, and <i>c</i> in parallel for each
+ * source {@link IBindingSet}. The output of those subqueries will be routed to
+ * the UNION operator (their parent) unless the subqueries explicitly override
+ * this behavior using {@link PipelineOp.Annotations#SINK_REF}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
