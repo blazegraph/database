@@ -34,10 +34,10 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
 
 /**
- * UNION(ops)[maxParallel(default all)]
+ * UNION()[maxParallel(default all); subqueries=ops]
  * 
  * <pre>
- * UNION([a,b,c],{})
+ * UNION([],{subqueries=[a,b,c]})
  * </pre>
  * 
  * Will run the subqueries <i>a</i>, <i>b</i>, and <i>c</i> in parallel for each
@@ -68,15 +68,14 @@ public class Union extends AbstractSubqueryOp {
      * Shallow copy constructor.
      * 
      * @param args
-     *            Two or more operators whose union is desired.
      * @param annotations
      */
     public Union(final BOp[] args, final Map<String, Object> annotations) {
 
         super(args, annotations);
 
-        if (args.length < 2)
-            throw new IllegalArgumentException();
+//        if (args.length < 2)
+//            throw new IllegalArgumentException();
 
     }
 

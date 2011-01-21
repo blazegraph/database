@@ -1643,17 +1643,24 @@ public class TestQueryEngine extends TestCase2 {
                             new Constant<String>("Leon"),
                             new Constant<String>("Paul") }//
             ),
-            // plus anything we read from the first access path which did not join.
-            new ArrayBindingSet(//
-                    new IVariable[] { Var.var("x"), Var.var("y") },//
-                    new IConstant[] { new Constant<String>("John"),
-                            new Constant<String>("Mary") }//
-            ),
-            new ArrayBindingSet(//
-                    new IVariable[] { Var.var("x"), Var.var("y") },//
-                    new IConstant[] { new Constant<String>("Mary"),
-                            new Constant<String>("Paul") }//
-            )
+            /*
+             * No. The CONSTRAINT on the 2nd join [x == y] filters all
+             * solutions. For solutions where the optional join fails, [y] is
+             * not bound. Since [y] is part of the constraint on that join we DO
+             * NOT observe those solutions which only join on the first access
+             * path.
+             */
+//            // plus anything we read from the first access path which did not join.
+//            new ArrayBindingSet(//
+//                    new IVariable[] { Var.var("x"), Var.var("y") },//
+//                    new IConstant[] { new Constant<String>("John"),
+//                            new Constant<String>("Mary") }//
+//            ),
+//            new ArrayBindingSet(//
+//                    new IVariable[] { Var.var("x"), Var.var("y") },//
+//                    new IConstant[] { new Constant<String>("Mary"),
+//                            new Constant<String>("Paul") }//
+//            )
             };
 
             assertSameSolutionsAnyOrder(expected,
@@ -1714,7 +1721,7 @@ public class TestQueryEngine extends TestCase2 {
             // verify query solution stats details.
 //            assertEquals(1L, stats.chunksIn.get());
             assertEquals(4L, stats.unitsIn.get());
-            assertEquals(4L, stats.unitsOut.get());
+            assertEquals(2L, stats.unitsOut.get());
 //            assertEquals(1L, stats.chunksOut.get());
         }
         
@@ -1727,8 +1734,8 @@ public class TestQueryEngine extends TestCase2 {
 
             // verify query solution stats details.
 //            assertEquals(2L, stats.chunksIn.get());
-            assertEquals(4L, stats.unitsIn.get());
-            assertEquals(4L, stats.unitsOut.get());
+            assertEquals(2L, stats.unitsIn.get());
+            assertEquals(2L, stats.unitsOut.get());
 //            assertEquals(1L, stats.chunksOut.get());
         }
 

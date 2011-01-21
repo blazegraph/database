@@ -45,6 +45,7 @@ import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.EmptyBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
@@ -119,7 +120,7 @@ public class TestUnion extends TestCase2 {
 
         // data to insert (in key order for convenience).
         final E[] a = {//
-        new E("John", "Mary"),// [0]
+                new E("John", "Mary"),// [0]
                 new E("Leon", "Paul"),// [1]
                 new E("Mary", "Paul"),// [2]
                 new E("Paul", "Leon"),// [3]
@@ -176,12 +177,14 @@ public class TestUnion extends TestCase2 {
                         BOpEvaluationContext.CONTROLLER),//
                 }));
 
-        final BOp unionOp = new Union(new BOp[] { startOp1, startOp2 }, NV
+        final BOp unionOp = new Union(new BOp[0], NV
                 .asMap(new NV[] {//
                         new NV(Union.Annotations.BOP_ID, unionId),//
-                        new NV(Union.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.CONTROLLER),//
-                        new NV(Union.Annotations.CONTROLLER, true),//
+                        new NV(Union.Annotations.SUBQUERIES, new BOp[] {
+                                startOp1, startOp2 }),//
+//                        new NV(Union.Annotations.EVALUATION_CONTEXT,
+//                                BOpEvaluationContext.CONTROLLER),//
+//                        new NV(Union.Annotations.CONTROLLER, true),//
                 }));
         
         final BOp query = unionOp;
@@ -193,6 +196,60 @@ public class TestUnion extends TestCase2 {
         };
 
         final IRunningQuery runningQuery = queryEngine.eval(query);
+
+        // verify solutions.
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+                new Dechunkerator<IBindingSet>(runningQuery.iterator()));
+
+        // Wait until the query is done.
+        runningQuery.get();
+
+    }
+
+    public void test_union_consumesSource() throws Exception {
+
+        final int startId1 = 1;
+        final int startId2 = 2;
+        final int unionId = 3;
+
+        final BOp startOp1 = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(StartOp.Annotations.BOP_ID, startId1),//
+                new NV(StartOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                }));
+
+        final BOp startOp2 = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(StartOp.Annotations.BOP_ID, startId2),//
+                new NV(StartOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                }));
+
+        final BOp unionOp = new Union(new BOp[]{}, NV
+                .asMap(new NV[] {//
+                        new NV(Union.Annotations.BOP_ID, unionId),//
+                        new NV(Union.Annotations.SUBQUERIES, new BOp[] {
+                                startOp1, startOp2 }) //
+//                        new NV(Union.Annotations.EVALUATION_CONTEXT,
+//                                BOpEvaluationContext.CONTROLLER),//
+//                        new NV(Union.Annotations.CONTROLLER, true),//
+                }));
+        
+        final BOp query = unionOp;
+
+        /*
+         * Create an initial non-empty binding set.
+         */
+        final IBindingSet bset = new ListBindingSet();
+        bset.set(Var.var("x"), new Constant<String>("John"));
+        bset.set(Var.var("y"), new Constant<String>("Mary"));
+        
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+                bset, // one copy from the left side of the union.
+                bset, // one copy from the right side of the union.
+        };
+
+        final IRunningQuery runningQuery = queryEngine.eval(query, bset);
 
         // verify solutions.
         TestQueryEngine.assertSameSolutionsAnyOrder(expected,
@@ -249,12 +306,14 @@ public class TestUnion extends TestCase2 {
                 new NV(StartOp.Annotations.BINDING_SETS,bindingSets2)
                 }));
 
-        final BOp unionOp = new Union(new BOp[] { startOp1, startOp2 }, NV
+        final BOp unionOp = new Union(new BOp[] {}, NV
                 .asMap(new NV[] {//
                         new NV(Union.Annotations.BOP_ID, unionId),//
-                        new NV(Union.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.CONTROLLER),//
-                        new NV(Union.Annotations.CONTROLLER, true),//
+                        new NV(Union.Annotations.SUBQUERIES, new BOp[] {
+                                startOp1, startOp2 }) //
+//                        new NV(Union.Annotations.EVALUATION_CONTEXT,
+//                                BOpEvaluationContext.CONTROLLER),//
+//                        new NV(Union.Annotations.CONTROLLER, true),//
                 }));
 
         final BOp sliceOp = new SliceOp(new BOp[]{unionOp},NV.asMap(
@@ -336,12 +395,14 @@ public class TestUnion extends TestCase2 {
                 new NV(StartOp.Annotations.BINDING_SETS,bindingSets2)
                 }));
 
-        final BOp unionOp = new Union(new BOp[] { startOp1, startOp2 }, NV
+        final BOp unionOp = new Union(new BOp[] {}, NV
                 .asMap(new NV[] {//
                         new NV(Union.Annotations.BOP_ID, unionId),//
-                        new NV(Union.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.CONTROLLER),//
-                        new NV(Union.Annotations.CONTROLLER, true),//
+                        new NV(Union.Annotations.SUBQUERIES, new BOp[] {
+                                startOp1, startOp2 }) //
+//                        new NV(Union.Annotations.EVALUATION_CONTEXT,
+//                                BOpEvaluationContext.CONTROLLER),//
+//                        new NV(Union.Annotations.CONTROLLER, true),//
                 }));
 
         final BOp sliceOp = new SliceOp(new BOp[]{unionOp},NV.asMap(
