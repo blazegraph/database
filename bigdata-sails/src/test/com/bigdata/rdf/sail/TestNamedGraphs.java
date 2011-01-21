@@ -151,13 +151,14 @@ public class TestNamedGraphs extends QuadsTestCase {
             log.info("testing: 8.2.1 Specifying the Default Graph");
         
         final BigdataSail sail = getSail();
-        sail.initialize();
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-        final BigdataSailRepositoryConnection cxn = 
-            (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
         
         try {
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            final BigdataSailRepositoryConnection cxn = 
+                (BigdataSailRepositoryConnection) repo.getConnection();
+            try {
+            cxn.setAutoCommit(false);
         
             final BNode a = new BNodeImpl("_:a");
             final URI graph = new URIImpl("http://example.org/foaf/aliceFoaf");
@@ -197,8 +198,10 @@ public class TestNamedGraphs extends QuadsTestCase {
             
             compare(result, answer);
             
-        } finally {
+            } finally {
             cxn.close();
+            }
+        } finally {
             sail.__tearDownUnitTest();
         }
 
@@ -260,13 +263,14 @@ public class TestNamedGraphs extends QuadsTestCase {
             log.info("testing: 8.2.3 Combining FROM and FROM NAMED");
         
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
             (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
         
         try {
+        cxn.setAutoCommit(false);
         
             final BNode a = new BNodeImpl("_:a");
             final BNode b = new BNodeImpl("_:b");
@@ -350,6 +354,8 @@ public class TestNamedGraphs extends QuadsTestCase {
             
         } finally {
             cxn.close();
+        }
+        } finally {
             sail.__tearDownUnitTest();
         }
 
@@ -418,14 +424,16 @@ public class TestNamedGraphs extends QuadsTestCase {
             log.info("testing: 8.3.1 Accessing Graph Names");
         
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
             (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
         
         try {
-        
+
+        cxn.setAutoCommit(false);
+                
             final BNode a = new BNodeImpl("_:a");
             final BNode b = new BNodeImpl("_:b");
             final BNode z = new BNodeImpl("_:b");
@@ -536,9 +544,11 @@ public class TestNamedGraphs extends QuadsTestCase {
                     new BindingImpl("bobNick", new LiteralImpl("Robert"))));
             
             compare(result, answer);
-
+            
         } finally {
             cxn.close();
+        }
+        } finally {
             sail.__tearDownUnitTest();
         }
 
@@ -605,13 +615,14 @@ public class TestNamedGraphs extends QuadsTestCase {
             log.info("testing: 8.3.2 Restricting by Graph IRI");
         
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
             (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
-        
         try {
+            
+        cxn.setAutoCommit(false);
         
             final BNode a = new BNodeImpl("_:a");
             final BNode b = new BNodeImpl("_:b");
@@ -719,9 +730,10 @@ public class TestNamedGraphs extends QuadsTestCase {
                     new BindingImpl("nick", new LiteralImpl("Robert"))));
             
             compare(result, answer);
-
         } finally {
             cxn.close();
+        }
+        } finally {
             sail.__tearDownUnitTest();
         }
 
@@ -810,13 +822,14 @@ public class TestNamedGraphs extends QuadsTestCase {
             log.info("testing: 8.3.3 Restricting Possible Graph IRIs");
         
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
             (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
-        
         try {
+            
+        cxn.setAutoCommit(false);
         
             final BNode a = new BNodeImpl("_:a");
             final BNode b = new BNodeImpl("_:b");
@@ -940,6 +953,9 @@ public class TestNamedGraphs extends QuadsTestCase {
 
         } finally {
             cxn.close();
+            
+        }
+        } finally {
             sail.__tearDownUnitTest();
         }
 
@@ -959,14 +975,15 @@ public class TestNamedGraphs extends QuadsTestCase {
             SailException, QueryEvaluationException, MalformedQueryException {
 
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
             (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
-
         try {
             
+        cxn.setAutoCommit(false);
+
             if(!sail.getDatabase().isQuads()) {
                 
                 log.warn("test requires quads.");
@@ -1192,6 +1209,10 @@ public class TestNamedGraphs extends QuadsTestCase {
         } finally {
 
             cxn.close();
+            
+        }
+        } finally {
+
             sail.__tearDownUnitTest();
 
         }
@@ -1212,13 +1233,14 @@ public class TestNamedGraphs extends QuadsTestCase {
             SailException, QueryEvaluationException, MalformedQueryException {
 
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) repo
                 .getConnection();
-        cxn.setAutoCommit(false);
-
         try {
+
+        cxn.setAutoCommit(false);
 
             if (!sail.getDatabase().isQuads()) {
 
@@ -1559,8 +1581,10 @@ public class TestNamedGraphs extends QuadsTestCase {
             }
 
         } finally {
-
             cxn.close();
+        }
+        } finally {
+
             sail.__tearDownUnitTest();
 
         }
@@ -1570,13 +1594,14 @@ public class TestNamedGraphs extends QuadsTestCase {
     public void testSearchQuery() throws Exception {
         
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) repo
                 .getConnection();
-        cxn.setAutoCommit(false);
-
         try {
+
+        cxn.setAutoCommit(false);
 
             if (!sail.getDatabase().isQuads()) {
 
@@ -1669,8 +1694,12 @@ public class TestNamedGraphs extends QuadsTestCase {
             }
             
         } finally {
-
+        
             cxn.close();
+
+        }
+        } finally {
+
             sail.__tearDownUnitTest();
 
         }
