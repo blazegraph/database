@@ -60,8 +60,9 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("RDF data model");
+        final TestSuite suite = new TestSuite("RDF data model");
 
+        // value factory test suite.
         suite.addTestSuite(TestFactory.class);
         
         return suite;
