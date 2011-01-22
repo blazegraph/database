@@ -291,7 +291,12 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     public BigdataLiteralImpl createLiteral(final String label, URI datatype) {
 
-        if (!(datatype instanceof BigdataURIImpl)) {
+        /*
+         * Note: The datatype parameter may be null per the Sesame API.
+         * 
+         * See https://sourceforge.net/apps/trac/bigdata/ticket/226
+         */
+        if (datatype != null && !(datatype instanceof BigdataURIImpl)) {
 
             datatype = createURI(datatype.stringValue());
 
