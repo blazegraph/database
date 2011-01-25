@@ -7,8 +7,11 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -615,6 +618,68 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	final Collection<SOpGroup> groupsToPrune = new LinkedList<SOpGroup>();
     	
     	/*
+    	 * We need to prune Sesame filters that we cannot translate into native
+    	 * constraints (ones that require lexicon joins).  We also need to 
+    	 * prune search metadata tails.
+    	 */
+    	final Collection<SOp> sopsToPrune = new LinkedList<SOp>();
+    	
+        /*
+         * deal with free text search tails first. need to match up search
+         * metadata tails with the searches themselves. ie:
+         * 
+         * select *
+         * where {
+         *   ?s bd:search "foo" .
+         *   ?s bd:relevance ?score .
+         * }
+         */
+        // the statement patterns for metadata about the searches
+        final Map<Var, Set<StatementPattern>> searchMetadata =
+        	new LinkedHashMap<Var, Set<StatementPattern>>();
+        // do a first pass to gather up the actual searches and take them out
+        // of the master list of statement patterns
+    	for (SOp sop : sopTree) {
+    		final QueryModelNode op = sop.getOperator();
+    		if (op instanceof StatementPattern) {
+    			final StatementPattern sp = (StatementPattern) op;
+	        	final Value s = sp.getSubjectVar().getValue();
+	        	final Value p = sp.getPredicateVar().getValue();
+	        	final Value o = sp.getObjectVar().getValue();
+	        	if (s == null && p != null && o != null && 
+	        			BD.SEARCH.equals(p)) {
+        			searchMetadata.put(sp.getSubjectVar(), 
+        					new LinkedHashSet<StatementPattern>());
+	        	}
+    		}
+        }
+        // do a second pass to get the search metadata
+    	for (SOp sop : sopTree) {
+    		final QueryModelNode op = sop.getOperator();
+    		if (op instanceof StatementPattern) {
+    			final StatementPattern sp = (StatementPattern) op;
+	        	final Value s = sp.getSubjectVar().getValue();
+	        	final Value p = sp.getPredicateVar().getValue();
+	        	if (s == null && p != null && 
+	        			(BD.RELEVANCE.equals(p) || BD.MAX_HITS.equals(p) ||
+	        				BD.MIN_RELEVANCE.equals(p))) {
+        			final Var sVar = sp.getSubjectVar();
+        			Set<StatementPattern> metadata = searchMetadata.get(sVar);
+        			if (metadata != null) {
+        				metadata.add(sp);
+        			}
+        			sopsToPrune.add(sop);
+	        	}
+    		}
+        }
+    	
+    	/*
+    	 * Prunes the sop tree of search metadata.
+    	 */
+    	sopTree = stb.pruneSOps(sopTree, sopsToPrune);
+    	sopsToPrune.clear();
+    	
+    	/*
     	 * Iterate through the sop tree and translate statement patterns into
     	 * predicates.
     	 */
@@ -622,8 +687,16 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     		final QueryModelNode op = sop.getOperator();
     		if (op instanceof StatementPattern) {
     			final StatementPattern sp = (StatementPattern) op;
+	        	final Value p = sp.getPredicateVar().getValue();
     			try {
-    				final IPredicate bop = toPredicate((StatementPattern) op);
+    				final IPredicate bop;
+    	        	if (p != null && BD.SEARCH.equals(p)) {
+            			final Set<StatementPattern> metadata = 
+            				searchMetadata.get(sp.getSubjectVar());
+            			bop = toSearchPredicate(sp, metadata);
+    	        	} else {
+    	        		bop = toPredicate((StatementPattern) op);
+    	        	}
     				sop.setBOp(bop);
     			} catch (UnrecognizedValueException ex) {
     				/*
@@ -655,12 +728,6 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	 * query has run natively.
     	 */
     	final Collection<Filter> sesameFilters = new LinkedList<Filter>();
-    	
-    	/*
-    	 * We need to prune Sesame filters that we cannot translate into native
-    	 * constraints (ones that require lexicon joins).
-    	 */
-    	final Collection<SOp> sopsToPrune = new LinkedList<SOp>();
     	
     	/*
     	 * Iterate through the sop tree and translate Sesame ValueExpr operators
@@ -1842,6 +1909,118 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         
     }
 
+    private IPredicate toSearchPredicate(final StatementPattern sp,
+            final Set<StatementPattern> metadata) 
+    		throws QueryEvaluationException {
+        
+        final Value predValue = sp.getPredicateVar().getValue();
+        if (log.isDebugEnabled()) {
+            log.debug(predValue);
+        }
+        if (predValue == null || !BD.SEARCH.equals(predValue)) {
+        	throw new IllegalArgumentException("not a valid magic search: " + sp);
+        }
+        final Value objValue = sp.getObjectVar().getValue();
+        if (log.isDebugEnabled()) {
+            log.debug(objValue);
+        }
+        if (objValue == null || !(objValue instanceof Literal)) {
+        	throw new IllegalArgumentException("not a valid magic search: " + sp);
+        }
+        
+        final Var subjVar = sp.getSubjectVar();
+
+        final IVariableOrConstant<IV> search = 
+        	com.bigdata.bop.Var.var(subjVar.getName());
+        
+        IVariableOrConstant<IV> relevance = new Constant(DummyIV.INSTANCE);
+        Literal maxHits = null;
+        Literal minRelevance = null;
+        
+        for (StatementPattern meta : metadata) {
+        	if (!meta.getSubjectVar().equals(subjVar)) {
+        		throw new IllegalArgumentException("illegal metadata: " + meta);
+        	}
+        	final Value pVal = meta.getPredicateVar().getValue();
+        	final Var oVar = meta.getObjectVar();
+        	final Value oVal = oVar.getValue();
+        	if (pVal == null) {
+        		throw new IllegalArgumentException("illegal metadata: " + meta);
+        	}
+        	if (BD.RELEVANCE.equals(pVal)) {
+        		if (oVar.hasValue()) {
+            		throw new IllegalArgumentException("illegal metadata: " + meta);
+        		}
+        		relevance = com.bigdata.bop.Var.var(oVar.getName());
+        	} else if (BD.MAX_HITS.equals(pVal)) {
+        		if (oVal == null || !(oVal instanceof Literal)) {
+        			throw new IllegalArgumentException("illegal metadata: " + meta);
+        		}
+        		maxHits = (Literal) oVal;
+	    	} else if (BD.MIN_RELEVANCE.equals(pVal)) {
+        		if (oVal == null || !(oVal instanceof Literal)) {
+        			throw new IllegalArgumentException("illegal metadata: " + meta);
+        		}
+        		minRelevance = (Literal) oVal;
+	    	}
+        }
+        
+        final IAccessPathExpander expander = 
+        	new FreeTextSearchExpander(database, (Literal) objValue, 
+        			maxHits, minRelevance);
+
+        // Decide on the correct arity for the predicate.
+        final BOp[] vars = new BOp[] {
+	        search, // s = searchVar
+	        relevance, // p = relevanceVar
+	        new Constant(DummyIV.INSTANCE), // o = reserved
+	        new Constant(DummyIV.INSTANCE), // c = reserved
+        };
+        
+        // The annotations for the predicate.
+        final List<NV> anns = new LinkedList<NV>();
+        
+        anns.add(new NV(IPredicate.Annotations.RELATION_NAME,
+                new String[] { database.getSPORelation().getNamespace() }));//
+        
+        // free text search expander or named graphs expander
+        if (expander != null)
+            anns.add(new NV(IPredicate.Annotations.ACCESS_PATH_EXPANDER, expander));
+
+        // timestamp
+        anns.add(new NV(Annotations.TIMESTAMP, database
+                .getSPORelation().getTimestamp()));
+
+        /*
+         * Explicitly set the access path / iterator flags.
+         * 
+         * Note: High level query generally permits iterator level parallelism.
+         * We set the PARALLEL flag here so it can be used if a global index
+         * view is chosen for the access path.
+         * 
+         * Note: High level query for SPARQL always uses read-only access paths.
+         * If you are working with a SPARQL extension with UPDATE or INSERT INTO
+         * semantics then you will need to remote the READONLY flag for the
+         * mutable access paths.
+         */
+        anns.add(new NV(IPredicate.Annotations.FLAGS, IRangeQuery.DEFAULT
+                | IRangeQuery.PARALLEL | IRangeQuery.READONLY));
+        
+        return new SPOPredicate(vars, anns.toArray(new NV[anns.size()]));
+//        return new SPOPredicate(
+//                new String[] { database.getSPORelation().getNamespace() },
+//                -1, // partitionId
+//                search, // s = searchVar
+//                relevance, // p = relevanceVar
+//                new Constant(DummyIV.INSTANCE), // o = reserved
+//                new Constant(DummyIV.INSTANCE), // c = reserved
+//                false, // optional
+//                null, // filter on elements visited by the access path.
+//                expander // free text search expander or named graphs expander
+//                );
+        
+    }
+    
     /**
      * Takes a ValueExpression from a sesame Filter or LeftJoin and turns it
      * into a bigdata {@link IConstraint}.

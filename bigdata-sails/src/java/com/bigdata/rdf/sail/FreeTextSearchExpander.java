@@ -16,6 +16,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSDDoubleIV;
+import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
@@ -138,14 +139,28 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
             if (hiterator == null) {
                 assert database!=null;
                 assert query != null;
-                if (database.getLexiconRelation().getSearchEngine() == null)
+                
+                final ITextIndexer textNdx = 
+                	database.getLexiconRelation().getSearchEngine();
+                
+                if (textNdx == null)
                     throw new UnsupportedOperationException(
                             "No free text index?");
+                
 //                final long begin = System.nanoTime();
-                hiterator = database.getLexiconRelation()
-                        .getSearchEngine().search(query.getLabel(),
+                
+                String s = query.getLabel();
+                final boolean prefixMatch;
+                if (s.indexOf('*') >= 0) {
+                	prefixMatch = true;
+                	s = s.replaceAll("\\*", "");
+                } else {
+                	prefixMatch = false;
+                }
+                
+                hiterator = textNdx.search(s,
                                 query.getLanguage(), 
-                                false/* prefixMatch */,
+                                prefixMatch,
                                 minRelevance == null ? 0d : minRelevance.doubleValue()/* minCosine */, 
                                 maxHits == null ? 10000 : maxHits.intValue()+1/* maxRank */,
                                 1000L/* timeout */, TimeUnit.MILLISECONDS);
