@@ -929,8 +929,8 @@ abstract public class AbstractTripleStore extends
          * Defaults to the current time zone.
          */
         String DEFAULT_INLINE_DATE_TIMES_TIMEZONE = 
-        	TimeZone.getDefault().getID();
-//        	"GMT";
+//        	TimeZone.getDefault().getID();
+        	"GMT";
         
         /**
          * The name of the {@link IExtensionFactory} class. The implementation 
