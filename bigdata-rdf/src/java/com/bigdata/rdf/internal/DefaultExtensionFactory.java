@@ -3,6 +3,8 @@ package com.bigdata.rdf.internal;
 import java.util.Collection;
 import java.util.LinkedList;
 
+import com.bigdata.rdf.lexicon.LexiconRelation;
+
 /**
  * Empty {@link IExtensionFactory}.
  */
@@ -18,11 +20,12 @@ public class DefaultExtensionFactory implements IExtensionFactory {
             
     }
     
-    public void init(final IDatatypeURIResolver resolver, 
-    		final boolean inlineDateTimes) {
+    public void init(final LexiconRelation lex) {
 
-    	if (inlineDateTimes)
-    		extensions.add(new DateTimeExtension(resolver));
+    	if (lex.isInlineDateTimes())
+    		extensions.add(new DateTimeExtension(
+    				lex, lex.getInlineDateTimesTimeZone()));
+    	
 		extensionsArray = extensions.toArray(new IExtension[extensions.size()]);
         
     }

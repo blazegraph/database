@@ -28,9 +28,11 @@ import java.util.GregorianCalendar;
 import java.util.TimeZone;
 
 import javax.xml.datatype.DatatypeConfigurationException;
+import javax.xml.datatype.DatatypeConstants;
 import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -50,9 +52,13 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
 
     private final BigdataURI dateTime;
     
-    public DateTimeExtension(final IDatatypeURIResolver resolver) {
+    private final TimeZone defaultTZ;
+    
+    public DateTimeExtension(final IDatatypeURIResolver resolver, 
+    		final TimeZone defaultTZ) {
 
         this.dateTime = resolver.resolve(XSD.DATETIME);
+        this.defaultTZ = defaultTZ;
         
     }
         
@@ -84,12 +90,21 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
         final String s = value.stringValue();
         
         final XMLGregorianCalendar c = XMLDatatypeUtil.parseCalendar(s);
+        
+        if (c.getTimezone() == DatatypeConstants.FIELD_UNDEFINED) {
+        	final int offsetInMillis = 
+//        		defaultTZ.getRawOffset();
+        		defaultTZ.getOffset(c.toGregorianCalendar().getTimeInMillis());
+        	final int offsetInMinutes = 
+        		offsetInMillis / 1000 / 60;
+        	c.setTimezone(offsetInMinutes);
+        }
 
         /*
          * Returns the current time as UTC milliseconds from the epoch
          */
         final long l = c.toGregorianCalendar().getTimeInMillis();
-        
+
         final AbstractLiteralIV delegate = new XSDLongIV(l);
 
         return new ExtensionIV(delegate, (TermId) getDatatype().getIV());
@@ -111,6 +126,7 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
     	
     	final GregorianCalendar c = new GregorianCalendar(
 //    			TimeZone.getTimeZone("GMT")
+    			defaultTZ
     			);
     	c.setTimeInMillis(l);
     	
@@ -119,7 +135,13 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
 	    	final XMLGregorianCalendar xmlGC = 
 	    		DatatypeFactory.newInstance().newXMLGregorianCalendar(c);
 	    	
-	        return (V) vf.createLiteral(xmlGC);
+	    	String s = xmlGC.toString();
+	    	final int i = s.lastIndexOf('.');
+	    	if (i >= 0) {
+	    		s = s.substring(0, i);
+	    	}
+	    	
+	        return (V) vf.createLiteral(s, dateTime);
 
     	} catch (DatatypeConfigurationException ex) {
     		
