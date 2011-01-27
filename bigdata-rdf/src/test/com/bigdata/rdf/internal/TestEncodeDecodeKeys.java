@@ -30,6 +30,7 @@ package com.bigdata.rdf.internal;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Random;
+import java.util.TimeZone;
 import java.util.UUID;
 
 import javax.xml.datatype.DatatypeFactory;
@@ -775,12 +776,14 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
         final DateTimeExtension<BigdataValue> ext = 
             new DateTimeExtension<BigdataValue>(new IDatatypeURIResolver() {
-            public BigdataURI resolve(URI uri) {
-                BigdataURI buri = vf.createURI(uri.stringValue());
-                buri.setIV(new TermId(VTE.URI, 1024));
-                return buri;
-            }
-        });
+	            public BigdataURI resolve(URI uri) {
+	                BigdataURI buri = vf.createURI(uri.stringValue());
+	                buri.setIV(new TermId(VTE.URI, 1024));
+	                return buri;
+	            }
+	        },
+	        TimeZone.getDefault()
+            );
         
         final BigdataLiteral[] dt = {
     		vf.createLiteral(

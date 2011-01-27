@@ -24,6 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import com.bigdata.rdf.lexicon.LexiconRelation;
+
 /**
  * IExtensionFactories are responsible for enumerating what extensions are
  * supported for a particular database configuration.  Bigdata comes packaged
@@ -37,16 +39,11 @@ public interface IExtensionFactory {
     /**
      * This will be called very early in the IExtensionFactory lifecycle so that 
      * the {@link TermId}s for the {@link IExtension}'s datatype URIs will be on 
-     * hand when needed.
-     * 
-     * @param resolver
-     *          the datatype URI resolver
-     * @param inlineDateTimes
-     * 			if true, inine the xsd:dateTime datatype using the
-     * 			{@link DateTimeExtension} class.          
+     * hand when needed.  Also gets other relevant configuration information
+     * from the lexicon such as whether or not to inline xsd:datetimes and what
+     * timezone to use to do so.
      */
-    void init(final IDatatypeURIResolver resolver, 
-    		final boolean inlineDateTimes);
+    void init(final LexiconRelation lex);
     
     /**
      * Return the supported extensions.

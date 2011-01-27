@@ -3,6 +3,8 @@ package com.bigdata.rdf.internal;
 import java.util.Collection;
 import java.util.LinkedList;
 
+import com.bigdata.rdf.lexicon.LexiconRelation;
+
 /**
  * Simple {@link IExtensionFactory} implementation that creates two
  * {@link IExtension}s - the {@link EpochExtension} and the 
@@ -20,12 +22,13 @@ public class SampleExtensionFactory implements IExtensionFactory {
             
     }
     
-    public void init(final IDatatypeURIResolver resolver,boolean inlineDateTimes) {
+    public void init(final LexiconRelation lex) {
 
-       	if (inlineDateTimes)
-    		extensions.add(new DateTimeExtension(resolver));
-		extensions.add(new EpochExtension(resolver));
-		extensions.add(new ColorsEnumExtension(resolver));
+       	if (lex.isInlineDateTimes())
+    		extensions.add(new DateTimeExtension(
+    				lex, lex.getInlineDateTimesTimeZone()));
+		extensions.add(new EpochExtension(lex));
+		extensions.add(new ColorsEnumExtension(lex));
 		extensionsArray = extensions.toArray(new IExtension[2]);
         
     }

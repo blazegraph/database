@@ -26,8 +26,10 @@ package com.bigdata.rdf.internal;
 
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Configuration determines which RDF Values are inlined into the statement
@@ -66,11 +68,8 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
     /**
      * Initialize the extensions, which need to resolve their datatype URIs
      * into term ids.
-     * 
-     * @param resolver
-     *          the datatype URI resolver
      */
-    void initExtensions(final IDatatypeURIResolver resolver);
+    void initExtensions(final LexiconRelation lex);
     
     /**
      * <code>true</code> iff the <code>vte</code> and <code>dte</code> 

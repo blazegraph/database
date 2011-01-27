@@ -41,6 +41,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
@@ -69,10 +70,10 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
-import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
+import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
 import com.bigdata.journal.IIndexManager;
@@ -400,6 +401,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     AbstractTripleStore.Options.INLINE_DATE_TIMES,
                     AbstractTripleStore.Options.DEFAULT_INLINE_DATE_TIMES));
             
+            inlineDateTimesTimeZone = TimeZone.getTimeZone(getProperty(
+                    AbstractTripleStore.Options.INLINE_DATE_TIMES_TIMEZONE,
+                    AbstractTripleStore.Options.DEFAULT_INLINE_DATE_TIMES_TIMEZONE));
+            
             try {
                 
                 final Class<IExtensionFactory> xfc = 
@@ -594,6 +599,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      */
     final private boolean inlineDateTimes;
     
+	/**
+	 * The default time zone to be used for decoding inline xsd:datetime
+	 * literals from the statement indices. Will use the current timezeon 
+	 * unless otherwise specified using
+	 * {@link AbstractTripleStore.Options#DEFAULT_INLINE_DATE_TIMES_TIMEZONE}.
+	 */
+    final private TimeZone inlineDateTimesTimeZone;
+    
     /**
      * Return <code>true</code> if datatype literals are being inlined into
      * the statement indices.
@@ -601,6 +614,25 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     final public boolean isInlineLiterals() {
         
         return inlineLiterals;
+        
+    }
+
+    /**
+     * Return <code>true</code> if xsd:datetime literals are being inlined into
+     * the statement indices.
+     */
+    final public boolean isInlineDateTimes() {
+        
+        return inlineDateTimes;
+        
+    }
+
+    /**
+     * Return the default time zone to be used for inlining.
+     */
+    final public TimeZone getInlineDateTimesTimeZone() {
+        
+        return inlineDateTimesTimeZone;
         
     }
 

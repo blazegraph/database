@@ -509,5 +509,72 @@ public class TestInlining extends AbstractTripleStoreTestCase {
         return tmp;
 
     }
+  
+    public void test_inlinedatetimes() {
+
+        final Properties properties = getProperties();
         
+        // test w/o predefined vocab.
+        properties.setProperty(Options.VOCABULARY_CLASS, NoVocabulary.class
+                .getName());
+
+        // test w/o axioms - they imply a predefined vocab.
+        properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        // test w/o the full text index.
+        properties.setProperty(Options.TEXT_INDEX, "false");
+
+        // test w/o the full text index.
+        properties.setProperty(Options.INLINE_DATE_TIMES, "true");
+
+        AbstractTripleStore store = getStore(properties);
+        
+        try {
+
+            final Collection<BigdataValue> terms = new HashSet<BigdataValue>();
+
+            // lookup/add some values.
+            final BigdataValueFactory f = store.getValueFactory();
+
+            terms.add(f.createLiteral("2008-03-22T00:00:00", f
+                    .createURI(XSD.DATETIME.toString())));
+
+            terms.add(f.createLiteral("2007-12-25T00:00:00", f
+                    .createURI(XSD.DATETIME.toString())));
+
+            final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
+
+            if (store.isStable()) {
+                
+                store.commit();
+                
+                store = reopenStore(store);
+
+                // verify same reverse mappings.
+
+                final Map<IV, BigdataValue> ids2 = store.getLexiconRelation()
+                        .getTerms(ids.keySet());
+
+                assertEquals(ids.size(),ids2.size());
+                
+                for (IV id : ids.keySet()) {
+
+                	System.err.println(ids.get(id));
+                	System.err.println(ids2.get(id));
+                	
+                    assertEquals("Id mapped to a different term? : termId="
+                            + id, ids.get(id), ids2.get(id));
+
+                }
+
+            }
+
+        } finally {
+            
+            store.__tearDownUnitTest();
+            
+        }
+
+    }
+    
 }

@@ -267,20 +267,10 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     public BigdataLiteralImpl createLiteral(final XMLGregorianCalendar arg0) {
 
-//        return new BigdataLiteralImpl(this, arg0.toString(),
-//                null/* languageCode */, createURI(arg0.getXMLSchemaType()
-//                        .toString()));
+        return new BigdataLiteralImpl(this, arg0.toString(),
+                null/* languageCode */, createURI(arg0.getXMLSchemaType()
+                        .toString()));
         
-    	String s = arg0.toString();
-    	final int i = s.lastIndexOf('.');
-    	if (i >= 0) {
-    		s = s.substring(0, i);
-    	}
-    	
-        return new BigdataLiteralImpl(this, s,
-                null/* languageCode */, createURI(XMLDatatypeUtil.qnameToURI(
-                        arg0.getXMLSchemaType()).stringValue()));
-
     }
 
     public BigdataLiteralImpl createLiteral(final String label, final String language) {

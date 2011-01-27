@@ -30,12 +30,15 @@ package com.bigdata.rdf.internal;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
+
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -75,9 +78,9 @@ public class LexiconConfiguration<V extends BigdataValue>
         
     }
     
-	public void initExtensions(final IDatatypeURIResolver resolver) {
+	public void initExtensions(final LexiconRelation lex) {
 
-		xFactory.init(resolver, inlineDateTimes);
+		xFactory.init(lex);
 
 		for (IExtension extension : xFactory.getExtensions()) {
 			BigdataURI datatype = extension.getDatatype();

@@ -38,8 +38,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.TimeZone;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -913,6 +915,22 @@ abstract public class AbstractTripleStore extends
                 + ".inlineDateTimes";
 
         String DEFAULT_INLINE_DATE_TIMES = "false";
+        
+        /**
+         * The default timezone to be used to a) encode inline xsd:datetime
+         * literals that do not have a time zone specified and b) decode
+         * xsd:timezone literals from the statement indices where they are
+         * stored as UTC milliseconds since the epoch. 
+         */
+        String INLINE_DATE_TIMES_TIMEZONE = AbstractTripleStore.class.getName()
+                + ".inlineDateTimesTimezone";
+
+        /**
+         * Defaults to the current time zone.
+         */
+        String DEFAULT_INLINE_DATE_TIMES_TIMEZONE = 
+        	TimeZone.getDefault().getID();
+//        	"GMT";
         
         /**
          * The name of the {@link IExtensionFactory} class. The implementation 
