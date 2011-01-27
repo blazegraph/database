@@ -38,10 +38,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
-import java.util.TimeZone;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -99,7 +97,6 @@ import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
@@ -906,27 +903,33 @@ abstract public class AbstractTripleStore extends
         /**
          * Set up database to inline date/times directly into the statement
          * indices rather than using the lexicon to map them to term identifiers
-         * and back. Date times will be converted to UTC, then stored as
-         * milliseconds since the epoch. Thus if you inline date/times you will
-         * lose the canonical representation of the date/time, and you will not
-         * be able to recover the original time zone of the date/time.
+         * and back (default {@value #DEFAULT_INLINE_DATE_TIMES}). Date times
+         * will be converted to UTC, then stored as milliseconds since the
+         * epoch. Thus if you inline date/times you will lose the canonical
+         * representation of the date/time, and you will not be able to recover
+         * the original time zone of the date/time.
+         * 
+         * @see #INLINE_DATE_TIMES_TIMEZONE
          */
         String INLINE_DATE_TIMES = AbstractTripleStore.class.getName()
                 + ".inlineDateTimes";
 
         String DEFAULT_INLINE_DATE_TIMES = "false";
-        
+
         /**
          * The default timezone to be used to a) encode inline xsd:datetime
          * literals that do not have a time zone specified and b) decode
-         * xsd:timezone literals from the statement indices where they are
-         * stored as UTC milliseconds since the epoch. 
+         * xsd:datetime literals from the statement indices where they are
+         * stored as UTC milliseconds since the epoch (default
+         * {@value #DEFAULT_INLINE_DATE_TIMES_TIMEZONE}).
+         * 
+         * @see #INLINE_DATE_TIMES
          */
         String INLINE_DATE_TIMES_TIMEZONE = AbstractTripleStore.class.getName()
                 + ".inlineDateTimesTimezone";
 
         /**
-         * Defaults to the current time zone.
+         * @see #INLINE_DATE_TIMES_TIMEZONE
          */
         String DEFAULT_INLINE_DATE_TIMES_TIMEZONE = 
 //        	TimeZone.getDefault().getID();
