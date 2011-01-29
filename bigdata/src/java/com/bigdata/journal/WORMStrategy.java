@@ -821,7 +821,12 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             final FileMetadata fileMetadata,
             final Quorum<?, ?> quorum) {
 
-        super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
+        super(
+                // @see https://sourceforge.net/apps/trac/bigdata/ticket/236
+                Long.valueOf(fileMetadata.getProperty(Options.INITIAL_EXTENT,
+                        Options.DEFAULT_INITIAL_EXTENT)),
+//                fileMetadata.extent, 
+                maximumExtent, fileMetadata.offsetBits,
                 fileMetadata.nextOffset, fileMetadata.getBufferMode(),
                 fileMetadata.readOnly);
 
