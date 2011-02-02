@@ -1747,6 +1747,9 @@ ${postInstallMessage}</echo>
         <report format="frames" todir="${test.results.dir}/report" />
       </junitreport>
 
+      <!-- Archive the generated HTML report. -->
+      <tar destfile="${test.results.dir}/report.tgz" basedir="${test.results.dir}/report" compression="gzip"/>
+
     </target>
 
 <target name="clean-sparql-test-suite" description="delete the files unpacked by the Sesame SPARQL test suite.">
