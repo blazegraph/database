@@ -1504,11 +1504,14 @@ ${postInstallMessage}</echo>
       </java>
     </target>
 
+	<!-- Note: It appears to be necessary to spawn the script which starts -->
+	<!-- zookeeper under some OS platforms (for example, Centos 5.4) even  -->
+	<!-- though it will start without being spawned under others (OSX).    -->
     <target name="startZookeeper">
     	<echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
         <echo>bin/zkServer.sh start
 </echo>
-    	<exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true">
+    	<exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" spawn="true">
     		<arg value="start"/>
 		</exec>
     </target>
