@@ -113,6 +113,14 @@ public class FileMetadata {
     final long userExtent;
 
     /**
+     * The initialExtent as declared to the constructor. This governs the file
+     * extension policy.
+     * 
+     * @see Options#INITIAL_EXTENT
+     */
+    final long initialExtent;
+    
+    /**
      * The #of bits out of a 64-bit long integer that are used to encode the
      * byte offset as an unsigned integer.  The remaining bits are used to
      * encode the byte count (aka record length) as an unsigned integer.
@@ -340,6 +348,8 @@ public class FileMetadata {
 //        this.readCacheCapacity = readCacheCapacity;
 //        
 //        this.readCacheMaxRecordSize = readCacheMaxRecordSize;
+
+        this.initialExtent = initialExtent;
         
         this.writeCacheEnabled = writeCacheEnabled;
         

@@ -833,7 +833,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     WORMStrategy(final long maximumExtent, final long minimumExtension,
             final FileMetadata fileMetadata) {
 
-        super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
+        // @see https://sourceforge.net/apps/trac/bigdata/ticket/236
+        super(fileMetadata.initialExtent, maximumExtent, fileMetadata.offsetBits,
+//        super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
                 fileMetadata.nextOffset, fileMetadata.bufferMode,
                 fileMetadata.readOnly);
 
