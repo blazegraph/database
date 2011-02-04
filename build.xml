@@ -1420,6 +1420,9 @@ ${postInstallMessage}</echo>
       <!-- around if the JVM is killed. That pid file needs to be cleaned   -->
       <!-- up before we can start a new instance.                           -->
       <antcall target="stopZookeeper" />
+      <antcall target="stopLookup" />
+      <antcall target="stopHttpd" />
+      
       <antcall target="startZookeeper" />
       <antcall target="startHttpd" />
       <antcall target="startLookup" />
