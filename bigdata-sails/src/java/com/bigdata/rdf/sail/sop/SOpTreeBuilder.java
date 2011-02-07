@@ -121,6 +121,8 @@ public class SOpTreeBuilder {
             collectSOps(sops, (LeftJoin) left, rslj, g, pg);
         } else if (left instanceof SingletonSet){
             // do nothing
+        } else if (left instanceof Union){
+            collectSOps(sops, (Union) left, rslj, groupId.incrementAndGet(), g);
         } else {
             throw new UnsupportedOperatorException(left);
         }

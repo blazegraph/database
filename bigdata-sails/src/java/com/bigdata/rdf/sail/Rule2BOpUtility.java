@@ -349,6 +349,10 @@ public class Rule2BOpUtility {
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                 })),queryHints);
+        
+        if (rule.getTailCount() == 0) {
+        	return startOp;
+        }
 
         /*
          * First put the tails in the correct order based on the logic in
@@ -569,12 +573,10 @@ public class Rule2BOpUtility {
         
         for (int i = 0; i < order.length; i++) {
             
-            final int joinId = idFactory.incrementAndGet();
-            
             // assign a bop id to the predicate
             Predicate<?> pred = (Predicate<?>) rule.getTail(order[i]).setBOpId(
                     idFactory.incrementAndGet());
-
+            
             /*
              * Decorate the predicate with the assigned index (this is purely
              * informative).
@@ -585,7 +587,7 @@ public class Rule2BOpUtility {
                         Annotations.ORIGINAL_INDEX, keyOrder[order[i]]);
             }
 
-			// decorate the predicate with the cardinality estimate.
+    		// decorate the predicate with the cardinality estimate.
             if (cardinality != null) {
                 pred = (Predicate<?>) pred.setProperty(
                         Annotations.ESTIMATED_CARDINALITY,
@@ -628,106 +630,8 @@ public class Rule2BOpUtility {
             	}
             }
             
-            // annotations for this join.
-            final List<NV> anns = new LinkedList<NV>();
-            
-            anns.add(new NV(BOp.Annotations.BOP_ID, joinId));
-
-//            anns.add(new NV(PipelineJoin.Annotations.SELECT,
-//                    selectVars[order[i]]));
-            
-            // No. The join just looks at the Predicate's optional annotation.
-//            if (pred.isOptional())
-//                anns.add(new NV(PipelineJoin.Annotations.OPTIONAL, pred
-//                        .isOptional()));
-            
-            /*
-             * Pull off annotations before we clear them from the predicate.
-             */
-            final Scope scope = (Scope) pred.getProperty(Annotations.SCOPE);
-
-            // true iff this is a quads access path.
-            final boolean quads = pred.getProperty(Annotations.QUADS,
-                    Annotations.DEFAULT_QUADS);
-
-            // pull of the Sesame dataset before we strip the annotations.
-            final Dataset dataset = (Dataset) pred
-                    .getProperty(Annotations.DATASET);
-
-            // strip off annotations that we do not want to propagate.
-            pred = pred.clearAnnotations(new String[] { Annotations.SCOPE,
-                    Annotations.QUADS, Annotations.DATASET });
-
-            if (!constraints.isEmpty()) {
-//                // decorate the predicate with any constraints.
-//                pred = (Predicate<?>) pred.setProperty(
-//                        IPredicate.Annotations.CONSTRAINTS, constraints
-//                                .toArray(new IConstraint[constraints.size()]));
-                // add constraints to the join for that predicate.
-                anns.add(new NV(PipelineJoin.Annotations.CONSTRAINTS,
-                        constraints
-                                .toArray(new IConstraint[constraints.size()])));
-
-            }
-
-            if (quads) {
-
-                /*
-                 * Quads mode.
-                 */
-
-                if (enableDecisionTree) {
-                    /*
-                     * Strip off the named graph or default graph expander (in
-                     * the long term it will simply not be generated.)
-                     */
-                    pred = pred
-                            .clearAnnotations(new String[] { IPredicate.Annotations.ACCESS_PATH_EXPANDER });
-
-                    switch (scope) {
-                    case NAMED_CONTEXTS:
-                        left = namedGraphJoin(queryEngine, context, idFactory,
-                                left, anns, pred, dataset, queryHints);
-                        break;
-                    case DEFAULT_CONTEXTS:
-                        left = defaultGraphJoin(queryEngine, context, idFactory,
-                                left, anns, pred, dataset, queryHints);
-                        break;
-                    default:
-                        throw new AssertionError();
-                    }
-                    
-                } else {
-
-                    /*
-                     * This is basically the old way of handling quads query
-                     * using expanders which were attached by
-                     * BigdataEvaluationStrategyImpl.
-                     */
-                    
-                    final boolean scaleOut = queryEngine.isScaleOut();
-                    if (scaleOut)
-                        throw new UnsupportedOperationException();
-                    
-                    anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.ANY));
-
-                    anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
-
-                    left = applyQueryHints(new PipelineJoin(new BOp[] { left },
-                            anns.toArray(new NV[anns.size()])), queryHints);
-
-                }
-
-            } else {
-
-                /*
-                 * Triples or provenance mode.
-                 */
-
-                left = triplesModeJoin(queryEngine, left, anns, pred, queryHints);
-
-            }
+            left = join(queryEngine, left, pred, constraints, context, 
+            		idFactory, queryHints);
 
         }
         
@@ -757,6 +661,129 @@ public class Rule2BOpUtility {
         
         return left;
         
+    }
+    
+    public static PipelineOp join(final QueryEngine queryEngine, 
+			PipelineOp left, Predicate pred, final AtomicInteger idFactory,
+			final Properties queryHints) {
+    	
+		return join(queryEngine, left, pred, null, 
+				new BOpContextBase(queryEngine), idFactory, queryHints);
+    	
+    }
+    
+    public static PipelineOp join(final QueryEngine queryEngine, 
+    		PipelineOp left, Predicate pred, 
+    		final Collection<IConstraint> constraints, 
+    		final BOpContextBase context, final AtomicInteger idFactory, 
+    		final Properties queryHints) {
+    	
+        final int joinId = idFactory.incrementAndGet();
+        
+        // annotations for this join.
+        final List<NV> anns = new LinkedList<NV>();
+        
+        anns.add(new NV(BOp.Annotations.BOP_ID, joinId));
+
+//        anns.add(new NV(PipelineJoin.Annotations.SELECT,
+//                selectVars[order[i]]));
+        
+        // No. The join just looks at the Predicate's optional annotation.
+//        if (pred.isOptional())
+//            anns.add(new NV(PipelineJoin.Annotations.OPTIONAL, pred
+//                    .isOptional()));
+        
+        if (constraints != null && !constraints.isEmpty()) {
+//			// decorate the predicate with any constraints.
+//			pred = (Predicate<?>) pred.setProperty(
+//					IPredicate.Annotations.CONSTRAINTS, constraints
+//							.toArray(new IConstraint[constraints.size()]));
+				
+				// add constraints to the join for that predicate.
+			anns.add(new NV(
+					PipelineJoin.Annotations.CONSTRAINTS,
+					constraints.toArray(new IConstraint[constraints.size()])));
+
+		}
+
+        /*
+         * Pull off annotations before we clear them from the predicate.
+         */
+        final Scope scope = (Scope) pred.getProperty(Annotations.SCOPE);
+
+        // true iff this is a quads access path.
+        final boolean quads = pred.getProperty(Annotations.QUADS,
+                Annotations.DEFAULT_QUADS);
+
+        // pull of the Sesame dataset before we strip the annotations.
+        final Dataset dataset = (Dataset) pred
+                .getProperty(Annotations.DATASET);
+
+        // strip off annotations that we do not want to propagate.
+        pred = pred.clearAnnotations(new String[] { Annotations.SCOPE,
+                Annotations.QUADS, Annotations.DATASET });
+
+        if (quads) {
+
+            /*
+             * Quads mode.
+             */
+
+            if (enableDecisionTree) {
+                /*
+                 * Strip off the named graph or default graph expander (in
+                 * the long term it will simply not be generated.)
+                 */
+                pred = pred
+                        .clearAnnotations(new String[] { IPredicate.Annotations.ACCESS_PATH_EXPANDER });
+
+                switch (scope) {
+                case NAMED_CONTEXTS:
+                    left = namedGraphJoin(queryEngine, context, idFactory,
+                            left, anns, pred, dataset, queryHints);
+                    break;
+                case DEFAULT_CONTEXTS:
+                    left = defaultGraphJoin(queryEngine, context, idFactory,
+                            left, anns, pred, dataset, queryHints);
+                    break;
+                default:
+                    throw new AssertionError();
+                }
+                
+            } else {
+
+                /*
+                 * This is basically the old way of handling quads query
+                 * using expanders which were attached by
+                 * BigdataEvaluationStrategyImpl.
+                 */
+                
+                final boolean scaleOut = queryEngine.isScaleOut();
+                if (scaleOut)
+                    throw new UnsupportedOperationException();
+                
+                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.ANY));
+
+                anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
+
+                left = applyQueryHints(new PipelineJoin(new BOp[] { left },
+                        anns.toArray(new NV[anns.size()])), queryHints);
+
+            }
+
+        } else {
+
+            /*
+             * Triples or provenance mode.
+             */
+
+            left = triplesModeJoin(queryEngine, left, anns, pred, queryHints);
+
+        }
+        
+        return left;
+    	
     }
 
     /**
