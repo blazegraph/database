@@ -28,14 +28,12 @@ package com.bigdata.rdf.sail;
 
 import java.util.Collection;
 import java.util.LinkedList;
-import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
+import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
@@ -48,17 +46,9 @@ import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.sail.SailTupleQuery;
 
-import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.sail.sop.SOp;
-import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree;
-import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
-import com.bigdata.rdf.sail.sop.SOpTree.SOpGroups;
 import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
@@ -220,6 +210,120 @@ public class TestNestedUnions extends QuadsTestCase {
 
             }
             
+        } finally {
+            cxn.close();
+        }
+        } finally {
+            sail.__tearDownUnitTest();//shutDown();
+        }
+
+    }
+
+    public void testNestedUnionWithOptionals() throws Exception {
+    	
+//      final Sail sail = new MemoryStore();
+//      sail.initialize();
+//      final Repository repo = new SailRepository(sail);
+
+	  	final BigdataSail sail = getSail();
+	  	try {
+	  	sail.initialize();
+	  	final BigdataSailRepository repo = new BigdataSailRepository(sail);
+	  	
+	  	final RepositoryConnection cxn = repo.getConnection();
+      
+        try {
+          
+        	cxn.setAutoCommit(false);
+  
+			final ValueFactory vf = sail.getValueFactory();
+
+			/*
+			 * Create some terms.
+			 */
+			final URI john = vf.createURI(BD.NAMESPACE + "john");
+			final URI mary = vf.createURI(BD.NAMESPACE + "mary");
+			final URI leon = vf.createURI(BD.NAMESPACE + "leon");
+			final URI paul = vf.createURI(BD.NAMESPACE + "paul");
+			final URI brad = vf.createURI(BD.NAMESPACE + "brad");
+			final URI fred = vf.createURI(BD.NAMESPACE + "fred");
+			final URI knows = vf.createURI(BD.NAMESPACE + "knows");
+
+			/*
+			 * Create some statements.
+			 */
+			cxn.add(mary, knows, fred);
+			cxn.add(john, knows, leon);
+			cxn.add(john, RDFS.LABEL, vf.createLiteral("John"));
+			cxn.add(mary, RDF.TYPE, RDFS.RESOURCE);
+          
+			/*
+			 * Note: The either flush() or commit() is required to flush the
+			 * statement buffers to the database before executing any
+			 * operations that go around the sail.
+			 */
+			cxn.commit();
+          
+            {
+          	
+	            String query =
+	            	"prefix bd: <"+BD.NAMESPACE+"> " +
+	            	"prefix rdf: <"+RDF.NAMESPACE+"> " +
+	            	"prefix rdfs: <"+RDFS.NAMESPACE+"> " +
+	                "select * " +
+	                "where { " +
+	                "  { " +
+	                "    ?a bd:knows bd:fred . " +
+	                "  } UNION { " +
+	                "    ?a bd:knows bd:leon . " +
+	                "  } " +
+	                "  OPTIONAL { ?a rdf:type ?type } " +
+	                "  OPTIONAL { ?a rdfs:label ?label } " +
+	                "}"; 
+	
+	            final SailTupleQuery tupleQuery = (SailTupleQuery)
+	                cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+	            tupleQuery.setIncludeInferred(false /* includeInferred */);
+	           
+	            if (log.isInfoEnabled()) {
+	            	
+		            final BigdataSailTupleQuery bdTupleQuery =
+		            	(BigdataSailTupleQuery) tupleQuery;
+		            final QueryRoot root = (QueryRoot) bdTupleQuery.getTupleExpr();
+		            final Projection p = (Projection) root.getArg();
+		            final TupleExpr tupleExpr = p.getArg();
+
+	                log.info(tupleExpr);
+
+		            final SOpTreeBuilder stb = new SOpTreeBuilder();
+		            final SOpTree tree = stb.collectSOps(tupleExpr);
+	           
+	                log.info(tree);
+	            	log.info(query);
+
+	            	final TupleQueryResult result = tupleQuery.evaluate();
+	            	log.info("results:");
+	                while (result.hasNext()) {
+	                    log.info(result.next());
+	                }
+	                
+	            }
+	            
+	            final Collection<BindingSet> answer = new LinkedList<BindingSet>();
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", john),
+	            		new BindingImpl("label", vf.createLiteral("John"))
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("a", mary),
+	            		new BindingImpl("type", RDFS.RESOURCE)
+	            		));
+
+	            final TupleQueryResult result = tupleQuery.evaluate();
+	            compare(result, answer);
+
+            }
+          
         } finally {
             cxn.close();
         }
