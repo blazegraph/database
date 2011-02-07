@@ -79,6 +79,9 @@ public class BigdataSailRepository extends SailRepository {
         
     }
     
+    /**
+     * Return a connection backed by a read-write transaction.
+     */
     public BigdataSailRepositoryConnection getReadWriteConnection() 
         throws RepositoryException {
         
@@ -95,6 +98,12 @@ public class BigdataSailRepository extends SailRepository {
         
     }
     
+    /**
+     * Return an unisolated connection to the database.  Only one of these
+     * allowed at a time.
+     * 
+     * @return unisolated connection to the database
+     */
     public BigdataSailRepositoryConnection getUnisolatedConnection() 
         throws RepositoryException {
         
