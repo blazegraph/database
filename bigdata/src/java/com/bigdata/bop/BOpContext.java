@@ -32,12 +32,9 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.btree.ILocalBTreeView;
-import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.service.IBigdataFederation;
 
 /**
  * The evaluation context for the operator (NOT serializable).
@@ -137,56 +134,40 @@ public class BOpContext<E> extends BOpContextBase {
         return sink2;
     }
 
-    /**
-     * 
-     * @param fed
-     *            The {@link IBigdataFederation} IFF the operator is being
-     *            evaluated on an {@link IBigdataFederation}. When evaluating
-     *            operations against an {@link IBigdataFederation}, this
-     *            reference provides access to the scale-out view of the indices
-     *            and to other bigdata services.
-     * @param indexManager
-     *            The <strong>local</strong> {@link IIndexManager}. Query
-     *            evaluation occurs against the local indices. In scale-out,
-     *            query evaluation proceeds shard wise and this
-     *            {@link IIndexManager} MUST be able to read on the
-     *            {@link ILocalBTreeView}.
-     * @param readTimestamp
-     *            The timestamp or transaction identifier against which the
-     *            query is reading.
-     * @param writeTimestamp
-     *            The timestamp or transaction identifier against which the
-     *            query is writing.
-     * @param partitionId
-     *            The index partition identifier -or- <code>-1</code> if the
-     *            index is not sharded.
-     * @param stats
-     *            The object used to collect statistics about the evaluation of
-     *            this operator.
-     * @param source
-     *            Where to read the data to be consumed by the operator.
-     * @param sink
-     *            Where to write the output of the operator.
-     * @param sink2
-     *            Alternative sink for the output of the operator (optional).
-     *            This is used by things like SPARQL optional joins to route
-     *            failed joins outside of the join group.
-     * 
-     * @throws IllegalArgumentException
-     *             if the <i>stats</i> is <code>null</code>
-     * @throws IllegalArgumentException
-     *             if the <i>source</i> is <code>null</code> (use an empty
-     *             source if the source will be ignored).
-     * @throws IllegalArgumentException
-     *             if the <i>sink</i> is <code>null</code>
-     * 
-     * @todo modify to accept {@link IChunkMessage} or an interface available
-     *       from getChunk() on {@link IChunkMessage} which provides us with
-     *       flexible mechanisms for accessing the chunk data.
-     *       <p>
-     *       When doing that, modify to automatically track the {@link BOpStats}
-     *       as the <i>source</i> is consumed.
-     */
+	/**
+	 * 
+	 * @param runningQuery
+	 *            The {@link IRunningQuery}.
+	 * @param partitionId
+	 *            The index partition identifier -or- <code>-1</code> if the
+	 *            index is not sharded.
+	 * @param stats
+	 *            The object used to collect statistics about the evaluation of
+	 *            this operator.
+	 * @param source
+	 *            Where to read the data to be consumed by the operator.
+	 * @param sink
+	 *            Where to write the output of the operator.
+	 * @param sink2
+	 *            Alternative sink for the output of the operator (optional).
+	 *            This is used by things like SPARQL optional joins to route
+	 *            failed joins outside of the join group.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if the <i>stats</i> is <code>null</code>
+	 * @throws IllegalArgumentException
+	 *             if the <i>source</i> is <code>null</code> (use an empty
+	 *             source if the source will be ignored).
+	 * @throws IllegalArgumentException
+	 *             if the <i>sink</i> is <code>null</code>
+	 * 
+	 * @todo modify to accept {@link IChunkMessage} or an interface available
+	 *       from getChunk() on {@link IChunkMessage} which provides us with
+	 *       flexible mechanisms for accessing the chunk data.
+	 *       <p>
+	 *       When doing that, modify to automatically track the {@link BOpStats}
+	 *       as the <i>source</i> is consumed.
+	 */
     public BOpContext(final IRunningQuery runningQuery,final int partitionId,
             final BOpStats stats, final IAsynchronousIterator<E[]> source,
             final IBlockingBuffer<E[]> sink, final IBlockingBuffer<E[]> sink2) {

@@ -661,7 +661,7 @@ public class BOpUtility {
     static public IBindingSet[] toArray(final Iterator<IBindingSet[]> itr,
             final BOpStats stats) {
 
-        final List<IBindingSet[]> list = new LinkedList<IBindingSet[]>();
+    	final List<IBindingSet[]> list = new LinkedList<IBindingSet[]>();
 
         int nchunks = 0, nelements = 0;
         {
@@ -675,8 +675,6 @@ public class BOpUtility {
                 nchunks++;
 
                 nelements += a.length;
-
-                list.add(a);
 
             }
 
@@ -699,18 +697,26 @@ public class BOpUtility {
             
             final IBindingSet[] a = new IBindingSet[nelements];
             
-            final Iterator<IBindingSet[]> itr2 = list.iterator();
-            
-            while (itr2.hasNext()) {
-            
-                final IBindingSet[] t = itr2.next();
-                
-                System.arraycopy(t/* src */, 0/* srcPos */, a/* dest */,
-                        n/* destPos */, t.length/* length */);
-                
-                n += t.length;
-            
-            }
+			final Iterator<IBindingSet[]> itr2 = list.iterator();
+
+			while (itr2.hasNext()) {
+
+				final IBindingSet[] t = itr2.next();
+				try {
+					System.arraycopy(t/* src */, 0/* srcPos */, a/* dest */,
+							n/* destPos */, t.length/* length */);
+				} catch (IndexOutOfBoundsException ex) {
+					// Provide some more detail in the stack trace.
+					final IndexOutOfBoundsException ex2 = new IndexOutOfBoundsException(
+							"t.length=" + t.length + ", a.length=" + a.length
+									+ ", n=" + n);
+					ex2.initCause(ex);
+					throw ex2;
+				}
+
+				n += t.length;
+
+			}
 
             return a;
 

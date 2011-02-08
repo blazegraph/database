@@ -43,9 +43,9 @@ import junit.framework.TestCase2;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.StartOp;
@@ -916,7 +916,7 @@ public class TestRunState extends TestCase2 {
                 .getStartedSet());
 
     }
-    
+
     /*
      * Test helpers
      */

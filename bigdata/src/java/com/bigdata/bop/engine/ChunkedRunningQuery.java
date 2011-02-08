@@ -35,7 +35,6 @@ import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -50,6 +49,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NoSuchBOpException;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.fed.FederatedRunningQuery;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.relation.accesspath.BufferClosedException;
@@ -642,19 +642,42 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
         }
     }
 
-    /**
-     * Examine the input queue for the (bopId,partitionId). If there is work
-     * available and no task is currently running, then drain the work queue and
-     * submit a task to consume that work.
-     * 
-     * @param bundle
-     *            The (bopId,partitionId).
-     *            
-     * @return <code>true</code> if a new task was started.
-     */
+	/**
+	 * Overridden to attempt to consume another chunk each time an operator
+	 * reports that it has halted evaluation. This is necessary because the
+	 * haltOp() message can arrive asynchronously, so we need to test the work
+	 * queues in case there are "at-once" operators awaiting the termination of
+	 * their predecessor(s) in the pipeline.
+	 */
+    @Override
+    protected void haltOp(final HaltOpMessage msg) {
+    	super.haltOp(msg);
+    	consumeChunk();
+    }
+
+	/**
+	 * Examine the input queue for the (bopId,partitionId). If there is work
+	 * available, then drain the work queue and submit a task to consume that
+	 * work. This handles {@link PipelineOp.Annotations#THREAD_SAFE},
+	 * {@link PipelineOp.Annotations#PIPELINED} as special cases.
+	 * 
+	 * 
+	 * @param bundle
+	 *            The (bopId,partitionId).
+	 * 
+	 * @return <code>true</code> if a new task was started.
+	 * 
+	 * @todo Also handle {@link PipelineOp.Annotations#MAX_MEMORY} here by
+	 *       handshaking with the {@link FederatedRunningQuery}.
+	 */
     private boolean scheduleNext(final BSBundle bundle) {
         if (bundle == null)
             throw new IllegalArgumentException();
+        final BOp bop = getBOpIndex().get(bundle.bopId);
+		final boolean threadSafe = bop.getProperty(
+				PipelineOp.Annotations.THREAD_SAFE,
+				PipelineOp.Annotations.DEFAULT_THREAD_SAFE);
+		final boolean pipelined = ((PipelineOp)bop).isPipelined();;
         lock.lock();
         try {
             // Make sure the query is still running.
@@ -664,14 +687,31 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 			ConcurrentHashMap<ChunkFutureTask, ChunkFutureTask> map = operatorFutures
 					.get(bundle);
 			if (map != null) {
-				int nrunning = 0;
+//				// #of instances of the operator already running.
+//				int nrunning = 0;
 				for (ChunkFutureTask cft : map.keySet()) {
-					if (cft.isDone())
+					if (cft.isDone()) {
+						// Remove tasks which have already terminated.
 						map.remove(cft);
-					nrunning++;
+					}
+//					nrunning++;
 				}
-				if (map.isEmpty())
+				if (map.isEmpty()) {
+					// No tasks running for this operator.
 					operatorFutures.remove(bundle);
+				} else {
+					// At least one task is running for this operator.
+					if (!threadSafe) {
+						/*
+						 * This operator is not thread-safe, so reject
+						 * concurrent execution for the same (bopId,shardId).
+						 */
+						if (log.isDebugEnabled())
+							log.debug("Rejecting concurrent execution: "
+									+ bundle + ", #running=" + map.size());
+						return false;
+					}
+				}
                 /*
                  * FIXME If we allow a limit on the concurrency then we need to
                  * manage things in order to guarantee that deadlock can not
@@ -709,26 +749,53 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 //				}
 //			
 //			}
-			// Remove the work queue for that (bopId,partitionId).
+			// Get the work queue for that (bopId,partitionId).
             final BlockingQueue<IChunkMessage<IBindingSet>> queue = operatorQueues
-                    .remove(bundle);
-            if (queue == null || queue.isEmpty()) {
+                    .get(bundle);
+            if (queue == null) {
                 // no work
                 return false;
             }
+			if (!pipelined && !queue.isEmpty() && !isAtOnceReady(bundle.bopId)) {
+				/*
+				 * This operator is not pipelined, so we need to wait until all
+				 * of its input solutions have been materialized (no prior
+				 * operator in the pipeline is running or has inputs available
+				 * which could cause it to run).
+				 * 
+				 * TODO This is where we should examine MAX_MEMORY and the
+				 * buffered data to see whether or not to trigger an evaluation
+				 * pass for the operator based on the data already materialized
+				 * for that operator.
+				 */
+				if (log.isDebugEnabled())
+					log.debug("Waiting on producer(s): bopId=" + bundle.bopId);
+				return false;
+			}
+			// Remove the work queue for that (bopId,partitionId).
+			operatorQueues.remove(bundle);
+			if (queue.isEmpty()) {
+				// no work
+				return false;
+			}
             // Drain the work queue for that (bopId,partitionId).
             final List<IChunkMessage<IBindingSet>> messages = new LinkedList<IChunkMessage<IBindingSet>>();
             queue.drainTo(messages);
             final int nmessages = messages.size();
-            /*
-             * Combine the messages into a single source to be consumed by a
-             * task.
-             */
-            int nchunks = 1;
-            final IMultiSourceAsynchronousIterator<IBindingSet[]> source = new MultiSourceSequentialAsynchronousIterator<IBindingSet[]>(messages.remove(0).getChunkAccessor().iterator());
+			/*
+			 * Combine the messages into a single source to be consumed by a
+			 * task.
+			 * 
+			 * @todo We could limit the #of chunks combined here by leaving the
+			 * rest on the work queue.
+			 */
+//            int nchunks = 1;
+            final IMultiSourceAsynchronousIterator<IBindingSet[]> source = new MultiSourceSequentialAsynchronousIterator<IBindingSet[]>(//
+            		messages.remove(0).getChunkAccessor().iterator()//
+            		);
             for (IChunkMessage<IBindingSet> msg : messages) {
                 source.add(msg.getChunkAccessor().iterator());
-                nchunks++;
+//                nchunks++;
             }
 			/*
 			 * Create task to consume that source.
@@ -748,6 +815,9 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 			/*
 			 * Submit task for execution (asynchronous).
 			 */
+			if (log.isDebugEnabled())
+				log.debug("Running task: bop=" + bundle.bopId + ", nmessages="
+						+ nmessages);
 			getQueryEngine().execute(cft);
 			return true;
         } finally {
@@ -1409,9 +1479,6 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 				 */
 				synchronized (this) {
 
-					if (smallChunks == null)
-						smallChunks = new LinkedList<IBindingSet[]>();
-
 					if (chunkSize + e.length > chunkCapacity) {
 
 						// flush the buffer first.
@@ -1419,6 +1486,9 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
 					}
 					
+					if (smallChunks == null)
+						smallChunks = new LinkedList<IBindingSet[]>();
+
 					smallChunks.add(e);
 
 					chunkSize += e.length;
