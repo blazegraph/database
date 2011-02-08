@@ -38,10 +38,10 @@ import java.util.Map;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo I think that we can avoid quoting operators by using annotations (for
- *       some cases) and through explicit interaction between operators for
- *       others (such as between a join and a predicate). If that proves to be
- *       true then this class will be dropped.
+ * @deprecated I think that we can avoid quoting operators by using annotations
+ *             (for some cases) and through explicit interaction between
+ *             operators for others (such as between a join and a predicate). If
+ *             that proves to be true then this class will be dropped.
  */
 public class QuoteOp extends BOpBase {
 

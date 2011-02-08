@@ -30,6 +30,7 @@ package com.bigdata.bop.engine;
 import java.io.Serializable;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.counters.CAT;
 
 /**
@@ -58,6 +59,13 @@ public class BOpStats implements Serializable {
 	 * The #of instances of a given operator which have been created for a given
 	 * query. This provides interesting information about the #of task instances
 	 * for each operator which were required to execute a query.
+	 * 
+	 * TODO Due to the way this is incremented, this is always ONE (1) if
+	 * {@link PipelineOp.Annotations#SHARED_STATE} is <code>true</code> (it
+	 * reflects the #of times {@link #add(BOpStats)} was invoked plus one for
+	 * the ctor rather than the #of times the operator task was invoked). This
+	 * should be changed to reflect the #of operator task instances created
+	 * instead.
 	 */
     final public CAT opCount = new CAT();
     

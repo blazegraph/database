@@ -301,7 +301,15 @@ public class BOpBase implements BOp {
         return a;
     }
 
-    /** deep copy the arguments. */
+	/**
+	 * Deep copy the arguments.
+	 * 
+	 * @todo As long as we stick to the immutable semantics for bops, we can
+	 *       just make a shallow copy of the arguments in the "copy" constructor
+	 *       and then modify them within the specific operator constructor
+	 *       before returning control to the caller. This would result in less
+	 *       heap churn. 
+	 */
     static protected BOp[] deepCopy(final BOp[] a) {
         if (a == NOARGS) {
             // fast path for zero arity operators.

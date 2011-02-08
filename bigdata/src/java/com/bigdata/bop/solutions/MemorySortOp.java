@@ -20,8 +20,10 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
  *          thompsonbry $
  * 
- * @todo unit tests.
  * @todo do an external merge sort operator.
+ * @todo do a wordsort operator w/ ties broken by the {@link ComparatorOp} after
+ *       the main sort.
+ * @todo do a radix sort operator (for main memory only?)
  */
 public class MemorySortOp extends SortOp {
 
@@ -46,15 +48,20 @@ public class MemorySortOp extends SortOp {
         super(args, annotations);
 
         switch (getEvaluationContext()) {
-        case CONTROLLER:
-            break;
-        default:
-            throw new UnsupportedOperationException(
-                    Annotations.EVALUATION_CONTEXT + "="
-                            + getEvaluationContext());
-        }
+		case CONTROLLER:
+			break;
+		default:
+			throw new UnsupportedOperationException(
+					Annotations.EVALUATION_CONTEXT + "="
+							+ getEvaluationContext());
+		}
 
-    }
+		if (isPipelined()) {
+			throw new UnsupportedOperationException(Annotations.PIPELINED + "="
+					+ isPipelined());
+		}
+
+	}
     
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
@@ -76,7 +83,7 @@ public class MemorySortOp extends SortOp {
 
         SortTask(final MemorySortOp op,
                 final BOpContext<IBindingSet> context) {
-
+        	
             this.context = context;
 
             this.comparator = op.getComparator();
@@ -113,5 +120,5 @@ public class MemorySortOp extends SortOp {
         }
 
     }
-
+    
 }

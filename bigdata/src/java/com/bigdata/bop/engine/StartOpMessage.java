@@ -3,8 +3,6 @@ package com.bigdata.bop.engine;
 import java.io.Serializable;
 import java.util.UUID;
 
-import com.bigdata.bop.PipelineType;
-
 /**
  * A message sent to the {@link IQueryClient} when an operator begins executing
  * for some chunk of inputs (an operator on a node against a shard for some
@@ -39,8 +37,7 @@ public class StartOpMessage implements Serializable {
      * The #of {@link IChunkMessage} accepted as the input for the operator.
      * <p>
      * Note: This should be ONE (1) unless {@link IChunkMessage} are being
-     * combined for the operator. {@link PipelineType#OneShot} operators often
-     * process multiple {@link IChunkMessage}s at once.
+     * combined for the operator.
      */
     final public int nmessages;
 
