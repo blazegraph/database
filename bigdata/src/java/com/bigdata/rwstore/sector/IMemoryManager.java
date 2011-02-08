@@ -26,18 +26,33 @@ package com.bigdata.rwstore.sector;
 
 import java.nio.ByteBuffer;
 
+/**
+ * Abstraction for managing data in {@link ByteBuffer}s. Typically those buffers
+ * will be allocated on the native process heap.
+ * 
+ * @author martyncutcher
+ */
 public interface IMemoryManager {
+
 	/**
 	 * Allocates space on the backing resource and copies the provided data.
 	 * 
-	 * @param data - will be copied to the backing resource
+	 * @param data
+	 *            The data will be copied to the backing resource
+	 * 
 	 * @return the address to be passed to the get method to retrieve the data
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if the argument is <code>null</code>.
+	 *             
+	 *             FIXME Replace with allocate(int nbytes):ByteBuffer[] so the
+	 *             caller can do zero copy NIO.
 	 */
 	public long allocate(ByteBuffer data);
-	
+
 	/**
-	 * The ByteBuffer[] return enables the handling of blobs that span more
-	 * than a single slot, without the need to create an intermediate ByteBuffer.
+	 * The ByteBuffer[] return enables the handling of blobs that span more than
+	 * a single slot, without the need to create an intermediate ByteBuffer.
 	 * 
 	 * This will support transfers directly to other direct ByteBuffers, for
 	 * example for network IO.
@@ -45,13 +60,18 @@ public interface IMemoryManager {
 	 * Using ByteBuffer:put the returned array can be efficiently copied to
 	 * another ByteBuffer:
 	 * 
+	 * <pre>
 	 * ByteBuffer mybb;
 	 * ByteBuffer[] bufs = get(addr);
 	 * for (ByteBuffer b : bufs) {
-	 *   mybb.put(b);
+	 * 	mybb.put(b);
 	 * }
+	 * </pre>
 	 * 
-	 * @param addr previouslt returned by allocate
+	 * @param addr
+	 *            An address previously returned by
+	 *            {@link #allocate(ByteBuffer)}.
+	 *            
 	 * @return array of ByteBuffers
 	 */
 	public ByteBuffer[] get(long addr);
@@ -67,9 +87,11 @@ public interface IMemoryManager {
 	 * Clears all current allocations
 	 */
 	public void clear();
-	
+
 	/**
-	 * Clears all current allocations
+	 * Create a child allocation context within which the caller may make and
+	 * release allocations.
 	 */
-	public AllocationContext createAllocationContext();
+	public IMemoryManager createAllocationContext();
+
 }

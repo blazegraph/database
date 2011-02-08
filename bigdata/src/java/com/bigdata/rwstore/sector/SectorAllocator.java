@@ -31,23 +31,22 @@ import java.util.ArrayList;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rwstore.FixedOutputStream;
 import com.bigdata.rwstore.IWriteCacheManager;
 
 /**
  * The SectorAllocator is designed as an alternative the the standard RWStore
  * FixedAllocators.
- * 
+ * <p>
  * The idea of the SectorAllocator is to efficiently contain within a single
  * region as dense a usage as possible.  Since a SectorAllocator is able to
  * allocate a full range of slot sizes, it should be able to service several
- * thousand allocations and maximise disk locality on write.
- * 
+ * thousand allocations and maximize disk locality on write.
+ * <p>
  * Furthermore, it presents an option to be synced with the backing store -
  * similarly to a MappedFile, in which case a single write for the entire
  * sector could be made for update.
- * 
+ * <p>
  * What we do not want is to run out of bits and to leave significant unused
  * space in the sector.  This could happen if we primarily allocated small
  * slots - say on average 512 bytes.  In this case, the maximum 1636 entries
@@ -63,20 +62,19 @@ import com.bigdata.rwstore.IWriteCacheManager;
  * sectors.  Implying a maximum addressable store file of 64M * 64K,
  * = 4TB of full sectors.  If the average sector only requires 32M, then the
  * total store would be reduced appropriately.
- * 
+ * <p>
  * The maximum theoretical storage is yielded by MAX_INT * AVG_SLOT_SIZE, so
  * 2GB * 2K (avg) would equate to the optimal maximum addressable allocations
  * and file size.  An AVG of > 2K yields fewer allocations and an AVG of < 2K
  * a reduced file size.
  * 
  * TODO: add parameterisation of META_SIZE for exploitation by MemoryManager.
- * TODO: cache block starts in m_addresses to simplify/optimise bit2Offset
  * 
  * @author Martyn Cutcher
- *
  */
 public class SectorAllocator {
-    protected static final Logger log = Logger
+    
+	private static final Logger log = Logger
     .getLogger(SectorAllocator.class);
 
     static final int getBitMask(int bits) {
@@ -86,28 +84,29 @@ public class SectorAllocator {
 		
 		return ret;
 	}
-	static final int SECTOR_INDEX_BITS = 16;
-	static final int SECTOR_OFFSET_BITS = 32-SECTOR_INDEX_BITS;
-	static final int SECTOR_OFFSET_MASK = getBitMask(SECTOR_OFFSET_BITS);
+    
+    private static final int SECTOR_INDEX_BITS = 16;
+	private static final int SECTOR_OFFSET_BITS = 32-SECTOR_INDEX_BITS;
+	private static final int SECTOR_OFFSET_MASK = getBitMask(SECTOR_OFFSET_BITS);
 
-	static final int META_SIZE = 8192; // 8K
+	private static final int META_SIZE = 8192; // 8K
 	
-	final static int SECTOR_SIZE = 64 * 1024 * 1024; // 10M
-	final static int NUM_ENTRIES = (META_SIZE - 12) / (4 + 1); // 8K - index - address / (4 + 1) bits plus tag
-	final int[] BIT_MASKS = {0x1, 0x3, 0x7, 0xF, 0xFF, 0xFFFF, 0xFFFFFFFF};
+//	private final static int SECTOR_SIZE = 64 * 1024 * 1024; // 10M
+	private final static int NUM_ENTRIES = (META_SIZE - 12) / (4 + 1); // 8K - index - address / (4 + 1) bits plus tag
+//	private final int[] BIT_MASKS = {0x1, 0x3, 0x7, 0xF, 0xFF, 0xFFFF, 0xFFFFFFFF};
 	final static int BLOB_SIZE = 4096;
-	final static int BLOB_CHAIN_OFFSET = BLOB_SIZE - 4;
-	final static int[] ALLOC_SIZES = {64, 128, 256, 512, 1024, 2048, BLOB_SIZE};
-	final static int[] ALLOC_BITS = {32, 32, 32, 32, 32, 32, 32};
-	int m_index;
-	long m_sectorAddress;
-	int m_maxSectorSize;
-	byte[] m_tags = new byte[NUM_ENTRIES];
-	int[] m_bits = new int[NUM_ENTRIES]; // 128 - sectorAddress(1) - m_tags(4)
+//	private final static int BLOB_CHAIN_OFFSET = BLOB_SIZE - 4;
+	private final static int[] ALLOC_SIZES = {64, 128, 256, 512, 1024, 2048, BLOB_SIZE};
+	private final static int[] ALLOC_BITS = {32, 32, 32, 32, 32, 32, 32};
+	private int m_index;
+	private long m_sectorAddress;
+	private int m_maxSectorSize;
+	private final byte[] m_tags = new byte[NUM_ENTRIES];
+	private final int[] m_bits = new int[NUM_ENTRIES]; // 128 - sectorAddress(1) - m_tags(4)
 
-	int[] m_transientbits = new int[NUM_ENTRIES];
-	int[] m_commitbits = new int[NUM_ENTRIES];
-	int[] m_addresses = new int[NUM_ENTRIES];
+	private int[] m_transientbits = new int[NUM_ENTRIES];
+	private int[] m_commitbits = new int[NUM_ENTRIES];
+	private final int[] m_addresses = new int[NUM_ENTRIES];
 	
 	// maintain count against each alloc size, this provides ready access to be
 	//	able to check the minimum number of bits for all tag sizes.  No
@@ -118,17 +117,18 @@ public class SectorAllocator {
 	//	only the total number of bits, but the average number of bits for the
 	//	tag, dividing the numebr of free bits by the total (number of blocks)
 	//	for each tag.
-	int[] m_free = new int[ALLOC_SIZES.length];
-	int[] m_total = new int[ALLOC_SIZES.length];
-	int[] m_allocations = new int[ALLOC_SIZES.length];
-	int[] m_recycles = new int[ALLOC_SIZES.length];
+	final private int[] m_free = new int[ALLOC_SIZES.length];
+	final private int[] m_total = new int[ALLOC_SIZES.length];
+	final private int[] m_allocations = new int[ALLOC_SIZES.length];
+	final private int[] m_recycles = new int[ALLOC_SIZES.length];
 	
-	final ISectorManager m_store;
-	boolean m_onFreeList = false;
-	private long m_diskAddr;
+	private final ISectorManager m_store;
 	private final IWriteCacheManager m_writes;
 
-	public SectorAllocator(ISectorManager store, IWriteCacheManager writes) {
+	private boolean m_onFreeList = false;
+	private long m_diskAddr;
+
+	public SectorAllocator(final ISectorManager store, final IWriteCacheManager writes) {
 		m_store = store;
 		m_writes = writes;
 	}
@@ -217,7 +217,7 @@ public class SectorAllocator {
 		int allocated = 0;
 		for (int i = 0; i < m_tags.length; i++) {
 			if (m_tags[i] == -1) {
-				int block = this.ALLOC_SIZES[tag] * 32;
+				int block = SectorAllocator.ALLOC_SIZES[tag] * 32;
 				if ((allocated + block) <= m_maxSectorSize) {
 					m_tags[i] = tag;
 					m_free[tag] += 32;
@@ -553,15 +553,15 @@ public class SectorAllocator {
 		m_store.addToFreeList(this);
 	}
 
-	public static int getSectorIndex(int rwaddr) {
+	public static int getSectorIndex(final int rwaddr) {
 		return (-rwaddr) >> SECTOR_OFFSET_BITS;
 	}
 
-	public static int getSectorOffset(int rwaddr) {
+	public static int getSectorOffset(final int rwaddr) {
 		return (-rwaddr) & SECTOR_OFFSET_MASK;
 	}
 
-	public static int getBlobBlockCount(int size) {
+	public static int getBlobBlockCount(final int size) {
 		final int nblocks = (size + BLOB_SIZE - 1) / BLOB_SIZE;
 		
 		return nblocks;

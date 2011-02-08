@@ -10,7 +10,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.rwstore.sector.MemoryManager.MemoryManagerResourceError;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 import junit.framework.TestCase;
@@ -84,7 +83,7 @@ public class TestMemoryManager extends TestCase {
 	public void testAllocationContexts() {
 		installMemoryManager();
 		
-		AllocationContext context = manager.createAllocationContext();
+		final IMemoryManager context = manager.createAllocationContext();
 		for (int i = 0; i < 500; i++) {
 			doStressAllocations(context, false, 5000, 5 + r.nextInt(3000));			
 			context.clear();

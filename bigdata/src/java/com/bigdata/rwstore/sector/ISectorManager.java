@@ -25,55 +25,60 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rwstore.sector;
 
 /**
- * The SectorManager defines the contract required to manage a set of
- * SectorAllocators.
+ * The {@link ISectorManager} defines the contract required to manage a set of
+ * {@link SectorAllocator}s.
  * 
- * The SectorManager is passed to the SectorAllocator constructors and they
- * will callback to manage their free list availability, and to trim the
- * allocated storage if required.
+ * The {@link ISectorManager} is passed to the {@link SectorAllocator}
+ * constructors and they will callback to manage their free list availability,
+ * and to trim the allocated storage if required.
  * 
  * @author Martyn Cutcher
- *
  */
 public interface ISectorManager {
 
 	/**
-	 * This request is made when the sectorAllocator no longer has a full set
-	 * of block allocations available.
+	 * This request is made when the sectorAllocator no longer has a full set of
+	 * block allocations available.
 	 * 
 	 * The allocator will issue this callback to help the SectorManager manage
 	 * an effective freelist of available allocators.
 	 * 
-	 * @param sectorAllocator to be removed
+	 * @param sectorAllocator
+	 *            to be removed
 	 */
 	void removeFromFreeList(SectorAllocator sectorAllocator);
 
 	/**
-	 * When suficient alocations have been freed for recycling that a threshold
-	 * of availability of reached for all block sizes, then the allocator
-	 * calls back to the SectorManager to signal it is available to be returned
-	 * to the free list.
+	 * When sufficient allocations have been freed for recycling that a
+	 * threshold of availability of reached for all block sizes, then the
+	 * allocator calls back to the SectorManager to signal it is available to be
+	 * returned to the free list.
 	 * 
-	 * @param sectorAllocator to be added
+	 * @param sectorAllocator
+	 *            to be added
 	 */
 	void addToFreeList(SectorAllocator sectorAllocator);
-	
+
 	/**
 	 * When a sector is first created, it will remain at the head of the free
 	 * list until one of two conditions has been reached:
+	 * <ol>
 	 * 
-	 * 1) The allocation has been saturated
-	 * 2) The bit space has been filled
+	 * <li>The allocation has been saturated.</li>
+	 * <li>The bit space has been filled.
+	 * <li>
+	 * </ol>
 	 * 
-	 * In the case of (2), then it is possible that significant allocation
-	 * space cannot be utilised - which will happen if the average allocation
-	 * is less than 1K.  In this situation, the sector can be trimmed and the
-	 * space made available to the next sector.
+	 * In the case of (2), then it is possible that significant allocation space
+	 * cannot be utilized - which will happen if the average allocation is less
+	 * than 1K. In this situation, the sector can be trimmed and the space made
+	 * available to the next sector.
 	 * 
 	 * trimSector will only be called in this condition - on the first occasion
 	 * that the allocator is removed from the freeList.
 	 * 
-	 * @param trim - the amount by which the sector allocation can be reduced
+	 * @param trim
+	 *            - the amount by which the sector allocation can be reduced
 	 */
 	void trimSector(long trim, SectorAllocator sector);
 
