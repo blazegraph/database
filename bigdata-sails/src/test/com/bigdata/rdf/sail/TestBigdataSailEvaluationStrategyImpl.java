@@ -711,7 +711,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                     "where { " +
                     "  ?s <"+RDF.TYPE+"> <"+person+"> . " +   // [160, 8, 164], [156, 8, 164]
                     "  ?s <"+RDFS.LABEL+"> ?label . " +       // [160, 148, 174], [156, 148, 170] 
-                    "  ?label <"+search+"> \"Mi\" . " +     // [174, 0, 0]
+                    "  ?label <"+search+"> \"Mi*\" . " +     // [174, 0, 0]
                     "}";
                 
                 { // evalute it once so i can see it
