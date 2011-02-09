@@ -79,6 +79,9 @@ public class TestAll extends TestCase {
         // pure binding set operators.
         suite.addTest(com.bigdata.bop.bset.TestAll.suite());
 
+        // bind(var,expr)
+        suite.addTestSuite(TestBind.class);
+        
         // index operators.
         suite.addTest(com.bigdata.bop.ndx.TestAll.suite());
 

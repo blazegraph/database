@@ -195,8 +195,8 @@ public class TestMemorySortOp extends TestCase2 {
         {
             int compare = 0 ;
 
-            IConstant<?> lhsv = lhs.get ( sor.getVariable () ) ;
-            IConstant<?> rhsv = rhs.get ( sor.getVariable () ) ;
+            final IConstant<?> lhsv = lhs.get ( sor.getVariable () ) ;
+            final IConstant<?> rhsv = rhs.get ( sor.getVariable () ) ;
 
             if ( null == lhsv && null == rhsv )
                 return 0 ;
