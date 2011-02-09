@@ -36,6 +36,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -178,6 +179,10 @@ public class TestDistinctBindingSets extends TestCase2 {
                 NV.asMap(new NV[]{//
                     new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
                     new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
+                    new NV(MemorySortOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+//                    new NV(MemorySortOp.Annotations.SHARED_STATE,
+//                            true),//
                 }));
         
         // the expected solutions
