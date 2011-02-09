@@ -57,7 +57,6 @@ import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.engine.ChunkedRunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
@@ -1298,14 +1297,20 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                             new Constant<String>("Paul") }//
             ),
             /*
-             * Plus anything we read from the first access path which
-             * did not pass the 2nd join.
+             * No. The CONSTRAINT on the 2nd join [x == y] filters all
+             * solutions. For solutions where the optional join fails, [y] is
+             * not bound. Since [y] is part of the constraint on that join we DO
+             * NOT observe those solutions which only join on the first access
+             * path.
+             * 
+//             * Plus anything we read from the first access path which
+//             * did not pass the 2nd join.
              */
-            new ArrayBindingSet(//
-                    new IVariable[] { Var.var("x"), Var.var("y") },//
-                    new IConstant[] { new Constant<String>("Mary"),
-                            new Constant<String>("Paul") }//
-            ),
+//            new ArrayBindingSet(//
+//                    new IVariable[] { Var.var("x"), Var.var("y") },//
+//                    new IConstant[] { new Constant<String>("Mary"),
+//                            new Constant<String>("Paul") }//
+//            ),
             };
 
             TestQueryEngine.assertSameSolutionsAnyOrder(expected,
@@ -1369,7 +1374,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             // verify query solution stats details.
 //            assertEquals(1L, stats.chunksIn.get());
             assertEquals(5L, stats.unitsIn.get());
-            assertEquals(5L, stats.unitsOut.get());
+            assertEquals(4L, stats.unitsOut.get());
 //            assertEquals(1L, stats.chunksOut.get());
         }
         
@@ -1382,8 +1387,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
             // verify query solution stats details.
 //            assertEquals(2L, stats.chunksIn.get());
-            assertEquals(5L, stats.unitsIn.get());
-            assertEquals(5L, stats.unitsOut.get());
+            assertEquals(4L, stats.unitsIn.get());
+            assertEquals(4L, stats.unitsOut.get());
 //            assertEquals(1L, stats.chunksOut.get());
         }
 
