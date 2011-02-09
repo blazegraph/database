@@ -110,17 +110,17 @@ public class TestAll extends TestCase {
 		 * multiple chunks of solutions.
 		 */
         
-        // stress test for SliceOp.
+        // stress test for SLICE
         suite.addTestSuite(TestQueryEngine_Slice.class);
 
-        // ORDER BY implementations.
+        // stress test for ORDER_BY
         suite.addTestSuite(TestQueryEngine_SortOp.class);
 
-        // @todo DISTINCT implementations.
-//        suite.addTestSuite(TestQueryEngine_SortOp.class);
+        // stress test for DISTINCT.
+        suite.addTestSuite(TestQueryEngine_DistinctOp.class);
 
-        // @todo GROUP BY implementations.
-//        suite.addTestSuite(TestQueryEngine_SortOp.class);
+        // stress test for GROUP_BY.
+    	suite.addTestSuite(TestQueryEngine_GroupByOp.class);
 
         return suite;
         

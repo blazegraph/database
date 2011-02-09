@@ -55,19 +55,17 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
 /**
- * Test suite ORDER BY operators when integrated with the query engine. This
- * test suite is designed to examine cases where the ORDER BY operator will have
- * to buffer multiple chunks of solutions before finally placing the buffered
- * solutions into a total order.
+ * Test suite for DISTINCT solution operators when integrated with the query
+ * engine. This test suite is designed to examine cases where the DISTINCT
+ * operator will have to buffer multiple chunks of solutions before finally
+ * reporting the aggregated solutions.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestQueryEngine2.java 3489 2010-09-01 18:27:35Z thompsonbry $
  * 
- * @todo Test each ORDER BY implementation here (buffered on the Java heap,
- *       buffered on the native heap using the Memory Manager, external memory
- *       sort, radix sort variation, wordsort variation, etc).
+ * @todo Test each DISTINCT implementation here.
  */
-public class TestQueryEngine_SortOp extends TestCase2 {
+public class TestQueryEngine_DistinctOp extends TestCase2 {
 
     public Properties getProperties() {
 
@@ -110,13 +108,13 @@ public class TestQueryEngine_SortOp extends TestCase2 {
     /**
      * 
      */
-    public TestQueryEngine_SortOp() {
+    public TestQueryEngine_DistinctOp() {
     }
 
     /**
      * @param name
      */
-    public TestQueryEngine_SortOp(String name) {
+    public TestQueryEngine_DistinctOp(String name) {
         super(name);
     }
 
@@ -126,7 +124,7 @@ public class TestQueryEngine_SortOp extends TestCase2 {
 			
 			try {
 
-				test_orderBy_threadSafe();
+				test_distinct_threadSafe();
 				
 			} catch (Throwable t) {
 				
@@ -139,9 +137,9 @@ public class TestQueryEngine_SortOp extends TestCase2 {
 	}
 
 	/**
-	 * Unit test for ORDER BY.
+	 * @todo Unit test for DISTINCT. How to judge correctness?
 	 */
-	public void test_orderBy_threadSafe() throws Exception {
+	public void test_distinct_threadSafe() throws Exception {
 
 		final long timeout = 10000; // ms
 
@@ -149,7 +147,7 @@ public class TestQueryEngine_SortOp extends TestCase2 {
 
 		final int poolSize = 10;
 
-		doOrderByTest(50000/* maxInt */, timeout, ntrials, poolSize);
+		doDistinctTest(10000/* maxInt */, timeout, ntrials, poolSize);
 
 	}
 
@@ -166,27 +164,23 @@ public class TestQueryEngine_SortOp extends TestCase2 {
         return new ThickAsynchronousIterator<IBindingSet[]>(bindingSetChunks);
 
     }
+    
+    /**
+     * 
+     * @param timeout
+     * @param ntrials
+     * @param poolSize
+     * 
+     * @return The #of successful trials.
+     * 
+     * @throws Exception
+     */
+    protected void doDistinctTest(final int maxInt,
+            final long timeout, final int ntrials, final int poolSize)
+            throws Exception {
 
-	/**
-	 * Test helper for ORDER_BY tests. We can judge correctness by ensuring that
-	 * (a) all solutions are visited (either by probing to verify that each
-	 * solution defined and visited or using a counter) and by (b) verifying
-	 * that the solutions are visited in an order for which the comparator never
-	 * returns LT ZERO (0) when comparing with the previous solution visited by
-	 * the query iterator.
-	 *
-	 * @param maxInt The maximum value of the variable in the synthetic data.
-	 * @param timeout
-	 * @param ntrials
-	 * @param poolSize
-	 * 
-	 * @return The #of successful trials.
-	 * 
-	 * @throws Exception
-	 */
-	protected void doOrderByTest(final int maxInt, final long timeout,
-			final int ntrials, final int poolSize) throws Exception {
-
+    	fail("write test helper");
+    	
     	int ngiven = 0;
     	final IVariable<?> a = Var.var("a");
         final IBindingSet[][] chunks = new IBindingSet[ntrials][];
@@ -217,12 +211,12 @@ public class TestQueryEngine_SortOp extends TestCase2 {
                         BOpEvaluationContext.CONTROLLER),//
     	}));
 
-		final ComparatorOp compareOp = new IntegerComparatorOp(
-				new ISortOrder[] { new SortOrder(a, true/* ascending */) });
-
     	final PipelineOp query = new MemorySortOp(new BOp[] {startOp}, NV.asMap(new NV[] {//
                 new NV(SliceOp.Annotations.BOP_ID, sortId),//
-				new NV(MemorySortOp.Annotations.COMPARATOR, compareOp),//
+				new NV(MemorySortOp.Annotations.COMPARATOR,
+						new IntegerComparatorOp(
+								new ISortOrder[] { new SortOrder(a,
+										true) })),//
                 new NV(MemorySortOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(MemorySortOp.Annotations.PIPELINED, false),//
@@ -234,33 +228,12 @@ public class TestQueryEngine_SortOp extends TestCase2 {
                         startId, -1/* partitionId */,
                         newBindingSetIterator(chunks)));
 
-		/*
-		 * Consume solutions, verifying the #of solutions and their order.
-		 */
-		int nsolutions = 0;
-		IBindingSet lastSolution = null;
-		final IAsynchronousIterator<IBindingSet[]> itr = q.iterator();
-		try {
-			while (itr.hasNext()) {
-				final IBindingSet[] chunk = itr.next();
-//				nsolutions += chunk.length;
-				for (IBindingSet thisSolution : chunk) {
-					if (lastSolution != null) {
-						if (compareOp.compare(lastSolution, thisSolution) > 0) {
-							fail("Solutions out of order: nvisited="
-									+ (nsolutions + 1) + ", lastSolution:"
-									+ lastSolution + ", thisSolution="
-									+ thisSolution);
-						}
-//						System.err.println(thisSolution.toString());
-					}
-					lastSolution = thisSolution;
-					nsolutions++;
-				}
-			}
-		} finally {
-			itr.close();
-		}
+        // consume solutions.
+        int nsolutions = 0;
+        final IAsynchronousIterator<IBindingSet[]> itr = q.iterator();
+        while (itr.hasNext()) {
+            nsolutions += itr.next().length;
+        }
 
         // wait for the query to terminate.
         q.get();
@@ -312,8 +285,8 @@ public class TestQueryEngine_SortOp extends TestCase2 {
         {
             int compare = 0 ;
 
-            final IConstant<?> lhsv = lhs.get ( sor.getVariable () ) ;
-            final IConstant<?> rhsv = rhs.get ( sor.getVariable () ) ;
+            IConstant<?> lhsv = lhs.get ( sor.getVariable () ) ;
+            IConstant<?> rhsv = rhs.get ( sor.getVariable () ) ;
 
             if ( null == lhsv && null == rhsv )
                 return 0 ;

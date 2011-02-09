@@ -82,21 +82,15 @@ public class TestAll extends TestCase {
         // unit test for the comparator to impose SPARQL sort order semantics.
         suite.addTestSuite(TestSPARQLBindingSetComparatorOp.class);
         
-        /*
-         * test sort operators.
-         * 
-         * @todo unit tests for external N-way merge sort.
-         * 
-         * @todo unit tests for distributed hash partitioned N-way merge sort.
-         */
+        // in-memory sort operator.
         suite.addTestSuite(TestMemorySortOp.class);
 
         /*
          * Aggregation
          */
         
-        // @todo test aggregation (rollup) operators.
-//        suite.addTestSuite(TestXXX.class);
+        // in-memory GROUP_BY
+        suite.addTestSuite(TestMemoryGroupByOp.class);
 
         return suite;
         

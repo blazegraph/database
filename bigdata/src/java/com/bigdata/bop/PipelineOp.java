@@ -109,6 +109,10 @@ abstract public class PipelineOp extends BOpBase {
 		 * @todo Unit tests for {@link ChunkedRunningQuery} to verify that it
 		 *       eventually schedules operator tasks which were deferred to
 		 *       prevent concurrent evaluation.
+		 * 
+		 * @todo This is currently not used. However, it could simplify the
+		 *       logic for operators, such as SLICE, which otherwise depend on
+		 *       {@link #SHARED_STATE} to provide their own synchronization.
 		 */
 		String THREAD_SAFE = PipelineOp.class.getName() + ".threadSafe";
 
@@ -334,7 +338,27 @@ abstract public class PipelineOp extends BOpBase {
 		return getProperty(PipelineOp.Annotations.PIPELINED,
 				PipelineOp.Annotations.DEFAULT_PIPELINED);
 	}
-    
+
+	/**
+	 * Return <code>true</code> iff concurrent invocations of the operator are
+	 * permitted.
+	 * <p>
+	 * Note: Operators which are not thread-safe still permit concurrent
+	 * evaluation for <em>distinct</em> partitions. In order to ensure that all
+	 * invocations of the operator within a query are serialized (no more than
+	 * one concurrent invocation) you must also specify
+	 * {@link BOpEvaluationContext#CONTROLLER}.
+	 * 
+	 * @see Annotations#THREAD_SAFE
+	 * @see BOp.Annotations#EVALUATION_CONTEXT
+	 */
+    public boolean isThreadSafe() {
+
+		return getProperty(Annotations.THREAD_SAFE,
+				Annotations.DEFAULT_THREAD_SAFE);
+        
+    }
+
     /**
      * Return <code>true</code> iff {@link #newStats()} must be shared across
      * all invocations of {@link #eval(BOpContext)} for this operator for a

@@ -14,13 +14,17 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
  * A pipelined DISTINCT operator based on a hash table.
+ * <p>
+ * Note: This implementation is a pipelined operator which inspects each chunk
+ * of solutions as they arrive and those solutions which are distinct for each
+ * chunk processed.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
@@ -58,8 +62,23 @@ public class DistinctBindingSetOp extends PipelineOp {
     public DistinctBindingSetOp(final BOp[] args,
             final Map<String, Object> annotations) {
 
-        super(args, annotations);
+		super(args, annotations);
 
+		switch (getEvaluationContext()) {
+		case CONTROLLER:
+			break;
+		default:
+			throw new UnsupportedOperationException(
+					Annotations.EVALUATION_CONTEXT + "="
+							+ getEvaluationContext());
+		}
+
+		// shared state is used to share the hash table.
+		if (isSharedState()) {
+			throw new UnsupportedOperationException(Annotations.SHARED_STATE
+					+ "=" + isSharedState());
+		}
+	
     }
 
     /**
@@ -99,6 +118,12 @@ public class DistinctBindingSetOp extends PipelineOp {
 
         return (IVariable<?>[]) getRequiredProperty(Annotations.VARIABLES);
         
+    }
+
+    public BOpStats newStats() {
+    	
+    	return new DistinctStats(this);
+    	
     }
 
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
@@ -145,6 +170,37 @@ public class DistinctBindingSetOp extends PipelineOp {
             return true;
         }
     }
+
+	/**
+	 * Extends {@link BOpStats} to provide the shared state for the distinct
+	 * solution groups across multiple invocations of the DISTINCT operator.
+	 */
+    private static class DistinctStats extends BOpStats {
+
+        /**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
+
+		/**
+		 * A concurrent map whose keys are the bindings on the specified
+		 * variables (the keys and the values are the same since the map
+		 * implementation does not allow <code>null</code> values).
+		 * <p>
+		 * Note: The map is shared state and can not be discarded or cleared
+		 * until the last invocation!!!
+		 */
+        private final ConcurrentHashMap<Solution, Solution> map;
+
+    	public DistinctStats(final DistinctBindingSetOp op) {
+    		
+            this.map = new ConcurrentHashMap<Solution, Solution>(
+                    op.getInitialCapacity(), op.getLoadFactor(),
+                    op.getConcurrencyLevel());
+
+    	}
+    	
+    }
     
     /**
      * Task executing on the node.
@@ -153,12 +209,12 @@ public class DistinctBindingSetOp extends PipelineOp {
 
         private final BOpContext<IBindingSet> context;
 
-        /**
-         * A concurrent map whose keys are the bindings on the specified
-         * variables (the keys and the values are the same since the map
-         * implementation does not allow <code>null</code> values).
-         */
-        private /*final*/ ConcurrentHashMap<Solution, Solution> map;
+		/**
+		 * A concurrent map whose keys are the bindings on the specified
+		 * variables (the keys and the values are the same since the map
+		 * implementation does not allow <code>null</code> values).
+		 */
+        private final ConcurrentHashMap<Solution, Solution> map;
 
         /**
          * The variables used to impose a distinct constraint.
@@ -178,9 +234,8 @@ public class DistinctBindingSetOp extends PipelineOp {
             if (vars.length == 0)
                 throw new IllegalArgumentException();
 
-            this.map = new ConcurrentHashMap<Solution, Solution>(
-                    op.getInitialCapacity(), op.getLoadFactor(),
-                    op.getConcurrencyLevel());
+			// The map is shared state across invocations of this operator task.
+			this.map = ((DistinctStats) context.getStats()).map;
 
         }
 
@@ -235,6 +290,7 @@ public class DistinctBindingSetOp extends PipelineOp {
                     stats.chunksIn.increment();
                     stats.unitsIn.add(a.length);
 
+                    // The distinct solutions accepted from this chunk. 
                     final List<IBindingSet> accepted = new LinkedList<IBindingSet>();
 
                     int naccepted = 0;
@@ -243,14 +299,26 @@ public class DistinctBindingSetOp extends PipelineOp {
 
 //                        System.err.println("considering: " + bset);
 
+						/*
+						 * Test to see if this solution is distinct from those
+						 * already seen.
+						 */
                         final IConstant<?>[] vals = accept(bset);
 
                         if (vals != null) {
 
+							/*
+							 * This is a distinct solution. Copy only the
+							 * variables used to select distinct solutions into
+							 * a new binding set and add that to the set of
+							 * [accepted] binding sets which will be emitted by
+							 * this operator.
+							 */
+                        	
 //                            System.err.println("accepted: "
 //                                    + Arrays.toString(vals));
 
-							final HashBindingSet tmp = new HashBindingSet();
+							final ListBindingSet tmp = new ListBindingSet();
                         	
 							for (int i = 0; i < vars.length; i++) {
 
@@ -268,12 +336,19 @@ public class DistinctBindingSetOp extends PipelineOp {
 
                     if (naccepted > 0) {
 
+						/*
+						 * At least one solution was accepted as distinct, so
+						 * copy the selected solutions to the output of the
+						 * operator.
+						 */
+                    	
                         final IBindingSet[] b = accepted
                                 .toArray(new IBindingSet[naccepted]);
                         
 //                        System.err.println("output: "
 //                                + Arrays.toString(b));
 
+                        // copy the distinct solutions to the output.
                         sink.add(b);
 
 //                        stats.unitsOut.add(naccepted);
@@ -285,15 +360,29 @@ public class DistinctBindingSetOp extends PipelineOp {
 
                 sink.flush();
 
+                if(context.isLastInvocation()) {
+
+					/*
+					 * Discard the map.
+					 * 
+					 * Note: The map can not be discarded (or cleared) until the
+					 * last invocation. However, we only get the benefit of the
+					 * lastInvocation signal if the operator is single threaded
+					 * and running on the query controller. That is not a
+					 * requirement for this DISTINCT implementation, so the map
+					 * is not going to be cleared until the query goes out of
+					 * scope and is swept by GC.
+					 */
+                    map.clear();
+
+                }
+                
                 // done.
                 return null;
                 
             } finally {
 
                 sink.close();
-
-                // discard the map.
-                map = null;
 
             }
 

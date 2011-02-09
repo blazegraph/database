@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.bop.rdf;
+package com.bigdata.bop.rdf.aggregate;
 
 
 import junit.framework.Test;
@@ -32,7 +32,7 @@ import junit.framework.TestSuite;
  * Aggregates test suites into increasing dependency order.
  *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestAll.java 3665 2010-09-28 16:53:22Z thompsonbry $
  */
 public class TestAll extends TestCase {
 
@@ -59,16 +59,14 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("RDF operators");
+        final TestSuite suite = new TestSuite("RDF aggregate operators");
 
-        // Aggregate operators (COUNT, SUM, MIN, MAX, etc.)
-        suite.addTest(com.bigdata.bop.rdf.aggregate.TestAll.suite());
-
-        // Specialized RDF filters
-        suite.addTest(com.bigdata.bop.rdf.filter.TestAll.suite());
-
-        // Specialized RDF join operators
-        suite.addTest(com.bigdata.bop.rdf.join.TestAll.suite());
+        suite.addTestSuite(TestCOUNT.class);
+        suite.addTestSuite(TestSUM.class);
+        suite.addTestSuite(TestMIN.class);
+        suite.addTestSuite(TestMAX.class);
+        suite.addTestSuite(TestGROUP_CONCAT.class);
+        suite.addTestSuite(TestSAMPLE.class);
 
         return suite;
         
