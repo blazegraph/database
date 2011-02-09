@@ -1706,29 +1706,27 @@ ${postInstallMessage}</echo>
         <test name="com.bigdata.striterator.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.counters.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rawstore.TestAll" todir="${test.results.dir}" unless="testName" />
-
         <test name="com.bigdata.btree.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.concurrent.TestAll" todir="${test.results.dir}" unless="testName" />
-
       	<test name="com.bigdata.quorum.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.ha.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.io.writecache.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.journal.TestAll" todir="${test.results.dir}" unless="testName" />
-<!-- To run only specific test suites.
-        <test name="com.bigdata.journal.TestWORMStrategy" todir="${test.results.dir}" unless="testName" />
-        <test name="com.bigdata.rwstore.TestRWJournal" todir="${test.results.dir}" unless="testName" />
-        -->
       	<!-- Performance of this test suite has regressed and needs to be investigated.
-      	        <test name="com.bigdata.journal.ha.TestAll" todir="${test.results.dir}" unless="testName" />
+ 	    <test name="com.bigdata.journal.ha.TestAll" todir="${test.results.dir}" unless="testName" />
       	-->
-<!-- end of specific journal test suite runs. -->
-
         <test name="com.bigdata.resources.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.relation.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.bop.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.relation.rule.eval.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.mdi.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.service.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.bop.fed.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.sparse.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.search.TestAll" todir="${test.results.dir}" unless="testName" />
-        <test name="com.bigdata.relation.TestAll" todir="${test.results.dir}" unless="testName" />
+        <!-- not suppported yet.
+        <test name="com.bigdata.bfs.TestAll" todir="${test.results.dir}" unless="testName" />
+        -->
 
         <!-- See https://sourceforge.net/apps/trac/bigdata/ticket/53 -->
         <test name="com.bigdata.jini.TestAll" todir="${test.results.dir}" unless="testName" />

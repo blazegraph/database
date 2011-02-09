@@ -18,7 +18,7 @@ public class Bind<E> extends ImmutableBOp implements IValueExpression<E> {
 	/**
 	 * Required deep copy constructor.
 	 */
-	public Bind(BOpBase op) {
+	public Bind(Bind<E> op) {
 		super(op);
 	}
 
