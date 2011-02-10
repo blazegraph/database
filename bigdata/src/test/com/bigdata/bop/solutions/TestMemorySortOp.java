@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.solutions;
 
+import java.util.concurrent.FutureTask;
+
 import junit.framework.TestCase2;
 
 import com.bigdata.bop.BOp;
@@ -53,6 +55,8 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME This needs to test for computed expressions as well.
  */
 public class TestMemorySortOp extends TestCase2 {
 
@@ -69,7 +73,7 @@ public class TestMemorySortOp extends TestCase2 {
         super ( name ) ;
     }
 
-    public void testEval ()
+    public void testEval () 
     {
     	final IVariable<?> x = Var.var ( "x" ) ;
     	final IVariable<?> y = Var.var ( "y" ) ;
@@ -154,9 +158,29 @@ public class TestMemorySortOp extends TestCase2 {
 				, stats, source, sink, null/* sink2 */
 		);
 
-        query.eval ( context ).run () ;
+		final FutureTask<Void> ft = query.eval(context);
+		// Run the query.
+		{
+			final Thread t = new Thread() {
+				public void run() {
+					ft.run();
+				}
+			};
+			t.setDaemon(true);
+			t.start();
+		}
 
-        TestQueryEngine.assertSameSolutions ( expected, sink.iterator () ) ;
+		try {
+			// Check the solutions.
+			TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+		} finally {
+			/* Always wait for the future afterwards and test it for errors. */
+			try {
+				ft.get();
+			} catch (Throwable ex) {
+				log.error("Evaluation failed: " + ex, ex);
+			}
+		}
 
         assertEquals ( 1, stats.chunksIn.get () ) ;
         assertEquals ( 10, stats.unitsIn.get () ) ;

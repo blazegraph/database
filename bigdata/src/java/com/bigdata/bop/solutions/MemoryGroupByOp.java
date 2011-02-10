@@ -14,12 +14,13 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.ConcurrentHashMapAnnotations;
-import com.bigdata.bop.IAggregate;
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -62,13 +63,12 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  *       GROUP_CONCAT function is specified such that it combines a large #of
  *       input solution bindings into a big string.
  * 
- *       FIXME How should we handle DISTINCT semantics for GROUP_BY? (I think
- *       that we just insert a {@link DistinctBindingSetOp} before the
- *       GROUP_BY).
- * 
- *       FIXME How should we handle nulls (missing values) during aggregation?
- *       (It appears that nulls and type errors are generally handled by the
- *       aggregate operator ignoring the detail record).
+ *       FIXME How should we handle nulls (unbound variables) and type errors
+ *       during aggregation? (LeeF suggests that they cause type errors which
+ *       are propagated such that the aggregated value winds up unbound but I
+ *       can not reconcile this with the language in the W3C draft which would
+ *       appear to suggest that detail records are ignored if they result in
+ *       type errors when computing the aggregate).
  * 
  *       FIXME All of the {@link IAggregate} operators have a side-effect. In
  *       order for them to have isolated side-effects for distinct groups, they
@@ -76,6 +76,57 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  *       group would have to use a distinct instance. If the latter, then
  *       provide for this on the operator, e.g., newInstance(), and document
  *       why.
+ * 
+ *       FIXME Review all syntax/semantic:
+ * 
+ *       <pre>
+ * [17]  	SolutionModifier  ::=  	GroupClause? HavingClause? OrderClause? LimitOffsetClauses?
+ * [18]  	GroupClause	      ::=  	'GROUP' 'BY' GroupCondition+
+ * [19]  	GroupCondition	  ::=  	( BuiltInCall | FunctionCall | '(' Expression ( 'AS' Var )? ')' | Var )
+ * [20]  	HavingClause	  ::=  	'HAVING' HavingCondition+
+ * [21]  	HavingCondition	  ::=  	Constraint
+ * [61]  	FunctionCall	  ::=  	IRIref ArgList
+ * [62]  	ArgList	          ::=  	( NIL | '(' 'DISTINCT'? Expression ( ',' Expression )* ')' )
+ * [106]  	BuiltInCall	      ::=  	'STR' '(' Expression ')' ....
+ * </pre>
+ * 
+ *       FIXME The aggregate functions can have the optional keyword DISTINCT
+ *       which forces the application to the distinct solutions within each
+ *       group. [COUNT(DISTINCT *) appears to have some special semantics as
+ *       well, but I can't figure out what the difference is from the use of
+ *       DISTINCT with other aggregate operators unless it applies to the set of
+ *       variables which are used to impose DISTINCT on the solutions within the
+ *       group.]
+ *       
+ *       I've proven to my satisfaction that MySQL is behaving as per your description of the SPARQL semantics even when there are multiple columns in the aggregated solutions.  It examines the distinct values within each  group for the computed value of the expression within the aggregate function.
+
+mysql> select * from test;
++------+------+------+
+| s    | i    | j    |
++------+------+------+
+| A    |    1 |    1 | 
+| A    |    1 |    2 | 
+| A    |    1 |    3 | 
+| A    |    1 |    4 | 
++------+------+------+
+4 rows in set (0.00 sec)
+
+mysql> select sum(i), sum(j), sum(distinct i), sum(distinct j), sum(i+j), sum(distinct i+j) from test;
++--------+--------+-----------------+-----------------+----------+-------------------+
+| sum(i) | sum(j) | sum(distinct i) | sum(distinct j) | sum(i+j) | sum(distinct i+j) |
++--------+--------+-----------------+-----------------+----------+-------------------+
+|      4 |     10 |               1 |              10 |       14 |                14 | 
++--------+--------+-----------------+-----------------+----------+-------------------+
+1 row in set (0.00 sec)
+
+mysql> select sum(i), sum(j), sum(distinct i), sum(distinct j), sum(i+j), sum(distinct i+j) from test group by s;
++--------+--------+-----------------+-----------------+----------+-------------------+
+| sum(i) | sum(j) | sum(distinct i) | sum(distinct j) | sum(i+j) | sum(distinct i+j) |
++--------+--------+-----------------+-----------------+----------+-------------------+
+|      4 |     10 |               1 |              10 |       14 |                14 | 
++--------+--------+-----------------+-----------------+----------+-------------------+
+1 row in set (0.00 sec)
+
  */
 public class MemoryGroupByOp extends GroupByOp {
 
@@ -251,16 +302,16 @@ public class MemoryGroupByOp extends GroupByOp {
 				final IValueExpression<?>[] compute) {
 
 			/*
-			 * @todo The aggregated variables are all undefined the first time a
-			 * source binding set is presented and need to be initialized to an
-			 * appropriate value.
+			 * FIXME The aggregate functions have side-effects so we need to use
+			 * a distinct instance of each function for each group.
 			 */
 
 			// synchronize for visibility.
 			synchronized(this) {
+				for(IValueExpression<?> expr : compute) {
+					System.err.println(expr.get(bset));
+				}
 			}
-
-			throw new UnsupportedOperationException();
 
         }
         
@@ -318,7 +369,7 @@ public class MemoryGroupByOp extends GroupByOp {
          * The ordered array of variables which define the distinct groups to
          * be aggregated.
          */
-        private final IVariable<?>[] groupBy;
+        private final IValueExpression<?>[] groupBy;
 
 		/**
 		 * The {@link IValueExpression}s used to compute each of the variables
@@ -344,7 +395,7 @@ public class MemoryGroupByOp extends GroupByOp {
             this.context = context;
 
             // must be non-null, and non-empty array w/o dups.
-			this.groupBy = (IVariable[]) op
+			this.groupBy = (IValueExpression<?>[]) op
 					.getRequiredProperty(GroupByOp.Annotations.GROUP_BY);
 
             if (groupBy == null)
@@ -378,7 +429,7 @@ public class MemoryGroupByOp extends GroupByOp {
 
             // may be null or empty[].
             this.having = (IConstraint[]) op
-					.getRequiredProperty(GroupByOp.Annotations.HAVING);
+					.getProperty(GroupByOp.Annotations.HAVING);
 
 			/*
 			 * The variables to project out of the GROUP_BY operator. This may
@@ -418,7 +469,8 @@ public class MemoryGroupByOp extends GroupByOp {
                  * 
                  * @todo write a unit test when some variables are not bound.
                  */
-                r[i] = bset.get(groupBy[i]);
+//                r[i] = bset.get(groupBy[i]);
+                r[i] = new Constant(groupBy[i].get(bset));
 
             }
 

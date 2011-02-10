@@ -30,11 +30,13 @@ import org.openrdf.model.impl.LiteralImpl;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
-import com.bigdata.bop.IAggregate;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.ImmutableBOp;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.aggregate.AggregateBase;
+import com.bigdata.bop.aggregate.IAggregate;
 
 /**
  * Operator combines the string values over the presented binding sets for the
@@ -46,15 +48,30 @@ import com.bigdata.bop.ImmutableBOp;
  *         FIXME This must only operate on variables which are known to be
  *         materialized RDF Values.
  */
-public class GROUP_CONCAT extends ImmutableBOp implements IAggregate<Literal> {
+public class GROUP_CONCAT extends AggregateBase<Literal> implements IAggregate<Literal> {
 
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
 
+	public interface Annotations extends AggregateBase.Annotations {
+
+		/**
+		 * Required string property provides the separator used when combining
+		 * the {@link IValueExpression} computed for each solution within the
+		 * group.
+		 */
+		String SEPARATOR = AggregateBase.class.getName()+".separator";
+
+	}
+	
 	public GROUP_CONCAT(BOpBase op) {
 		super(op);
+	}
+
+	public GROUP_CONCAT(BOp[] args, Map<String, Object> annotations) {
+		super(args, annotations);
 	}
 
 	/**
@@ -64,14 +81,14 @@ public class GROUP_CONCAT extends ImmutableBOp implements IAggregate<Literal> {
 	 * @param sep
 	 *            The separator string.
 	 */
-	public GROUP_CONCAT(IVariable<Literal> var, IConstant<String> sep) {
-		this(new BOp[] { var, sep }, null/* annotations */);
+	public GROUP_CONCAT(final boolean distinct,
+			final IValueExpression<Literal> expr, final IConstant<String> sep) {
+		this(new BOp[] { expr }, NV.asMap(//
+				new NV(Annotations.DISTINCT, distinct),//
+				new NV(Annotations.SEPARATOR, sep)//
+				));
 	}
 	
-	public GROUP_CONCAT(BOp[] args, Map<String, Object> annotations) {
-		super(args, annotations);
-	}
-
 	/**
 	 * The running concatenation of observed bound values.
 	 * <p>

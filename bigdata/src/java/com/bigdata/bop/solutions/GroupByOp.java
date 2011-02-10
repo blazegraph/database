@@ -30,8 +30,10 @@ package com.bigdata.bop.solutions;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.Bind;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 
 /**
@@ -51,14 +53,25 @@ abstract public class GroupByOp extends PipelineOp {
     public interface Annotations extends PipelineOp.Annotations {
 
 		/**
-		 * The ordered set of variables declared by {@link #COMPUTE} which are
-		 * projected out of the group by operator.
+		 * The ordered set of {@link IVariable}s which are projected out of the
+		 * group by operator.
+		 * <p>
+		 * The variables named in {@link #SELECT} must either: (a) appear the
+		 * {@link #GROUP_BY} declaration as simple {@link IVariable} s; or (b)
+		 * be declared by {@link #COMPUTE}.
 		 */
         String SELECT = GroupByOp.class.getName() + ".select";
 
 		/**
 		 * The ordered set of {@link IValueExpression}s which are to be
 		 * computed.
+		 * <p>
+		 * The top-level for each element of {@link #COMPUTE} must be either an
+		 * {@link IVariable} or a {@link Bind}. When present, the {@link Bind}
+		 * has the effect of assigning the result of an {@link IValueExpression}
+		 * to an {@link IVariable}. Only {@link IVariable}s declared in the
+		 * input solutions may be referenced in a {@link #COMPUTE}
+		 * {@link IValueExpression}.
 		 * 
 		 * TODO This really needs to be VAR := EXPR. EXPR can only reference the
 		 * source variables or variables declared earlier in the ordered

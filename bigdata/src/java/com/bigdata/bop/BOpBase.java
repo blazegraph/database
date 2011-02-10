@@ -35,6 +35,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import com.bigdata.bop.constraint.EQ;
 import com.bigdata.btree.Tuple;
@@ -278,8 +279,39 @@ public class BOpBase implements BOp {
     final public List<BOp> args() {
 
         return Collections.unmodifiableList(Arrays.asList(args));
+//        return Arrays.asList(args);
         
     }
+
+    // @todo unit tests.
+    final public Iterator<BOp> argIterator() {
+    	
+    	return new ArgIterator();
+    	
+    }
+
+	/**
+	 * An iterator visiting the arguments which does not support removal.
+	 */
+	private class ArgIterator implements Iterator<BOp> {
+
+		private int i = 0;
+
+		public boolean hasNext() {
+			return i < args.length;
+		}
+
+		public BOp next() {
+			if (!hasNext())
+				throw new NoSuchElementException();
+			return args[i++];
+		}
+
+		public void remove() {
+			throw new UnsupportedOperationException();
+		}
+
+	}
 
     // shallow copy
     public BOp[] toArray() {

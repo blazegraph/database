@@ -29,10 +29,11 @@ import org.openrdf.query.algebra.evaluation.util.ValueComparator;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
-import com.bigdata.bop.IAggregate;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.ImmutableBOp;
+import com.bigdata.bop.aggregate.AggregateBase;
+import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 
@@ -45,10 +46,11 @@ import com.bigdata.rdf.internal.IVUtility;
  * 
  * @todo What is reported if there are no non-null observations?
  * 
- *       FIXME This must handle comparisons when the value is not an IV, e.g.,
- *       using {@link ValueComparator}.
+ *       FIXME MIN (and MAX) are defined in terms of the ORDER_BY semantics for
+ *       SPARQL. Therefore, this must handle comparisons when the value is not
+ *       an IV, e.g., using {@link ValueComparator}.
  */
-public class MIN extends ImmutableBOp implements IAggregate<IV> {
+public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
 
 	/**
 	 * 
@@ -59,14 +61,14 @@ public class MIN extends ImmutableBOp implements IAggregate<IV> {
 		super(op);
 	}
 
-	public MIN(IVariable<IV> var) {
-		this(new BOp[] { var }, null/* annotations */);
-	}
-	
 	public MIN(BOp[] args, Map<String, Object> annotations) {
 		super(args, annotations);
 	}
 
+	public MIN(boolean distinct, IValueExpression<IV> expr) {
+		super(distinct, expr);
+	}
+	
 	/**
 	 * The minimum observed value and initially <code>null</code>.
 	 * <p>
