@@ -29,10 +29,11 @@ import org.openrdf.query.algebra.MathExpr.MathOp;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
-import com.bigdata.bop.IAggregate;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.ImmutableBOp;
+import com.bigdata.bop.aggregate.AggregateBase;
+import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.XSDLongIV;
@@ -49,7 +50,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
  *         the numeric values - perhaps we should just get rid of the option to
  *         not inline and require people to export/import for an upgrade).
  */
-public class SUM extends ImmutableBOp implements IAggregate<IV> {
+public class SUM extends AggregateBase<IV> implements IAggregate<IV> {
 
 	/**
 	 * 
@@ -60,14 +61,14 @@ public class SUM extends ImmutableBOp implements IAggregate<IV> {
 		super(op);
 	}
 
-	public SUM(IVariable<IV> var) {
-		this(new BOp[] { var }, null/* annotations */);
-	}
-	
 	public SUM(BOp[] args, Map<String, Object> annotations) {
 		super(args, annotations);
 	}
 
+	public SUM(boolean distinct, IValueExpression<IV> expr) {
+		super(distinct, expr);
+	}
+	
 	/**
 	 * The running aggregate value.
 	 * <p>

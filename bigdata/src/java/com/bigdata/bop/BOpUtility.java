@@ -44,6 +44,7 @@ import com.bigdata.btree.AbstractNode;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
+import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.SingleValueIterator;
@@ -67,7 +68,7 @@ public class BOpUtility {
     public static Iterator<BOp> preOrderIterator(final BOp op) {
 
         return new Striterator(new SingleValueIterator(op))
-                .append(preOrderIterator2(op));
+                .append(preOrderIterator2(0,op));
 
     }
 
@@ -76,14 +77,18 @@ public class BOpUtility {
      * NOT visit this node.
      */
     @SuppressWarnings("unchecked")
-    static private Iterator<AbstractNode> preOrderIterator2(final BOp op) {
+	static private Iterator<AbstractNode> preOrderIterator2(final int depth, final BOp op) {
 
         /*
          * Iterator visits the direct children, expanding them in turn with a
          * recursive application of the pre-order iterator.
          */
+    	
+		// mild optimization when no children are present.
+		if (op.arity() == 0)
+			return EmptyIterator.DEFAULT;
 
-        return new Striterator(op.args().iterator()).addFilter(new Expander() {
+        return new Striterator(op.argIterator()).addFilter(new Expander() {
 
             private static final long serialVersionUID = 1L;
 
@@ -106,11 +111,13 @@ public class BOpUtility {
                      * Visit the children (recursive pre-order traversal).
                      */
 
+//            		System.err.println("Node["+depth+"]: "+op.getClass().getName());
+
                     final Striterator itr = new Striterator(
                             new SingleValueIterator(child));
 
-                    // append this node in post-order position.
-                    itr.append(preOrderIterator2(child));
+					// append this node in post-order position.
+					itr.append(preOrderIterator2(depth+1,child));
 
                     return itr;
 
@@ -120,10 +127,13 @@ public class BOpUtility {
                      * The child is a leaf.
                      */
 
+//                	System.err.println("Leaf["+depth+"]: "+op.getClass().getName());
+                	
                     // Visit the leaf itself.
                     return new SingleValueIterator(child);
 
                 }
+
             }
         });
 
@@ -153,7 +163,7 @@ public class BOpUtility {
          * recursive application of the post-order iterator.
          */
 
-        return new Striterator(op.args().iterator()).addFilter(new Expander() {
+        return new Striterator(op.argIterator()).addFilter(new Expander() {
 
             private static final long serialVersionUID = 1L;
 
@@ -297,7 +307,7 @@ public class BOpUtility {
                     }
                 });
                 
-                // append the pre-order traveral of each annotation.
+                // append the pre-order traversal of each annotation.
                 itr.append(itr2);
 
                 return itr;
@@ -307,10 +317,11 @@ public class BOpUtility {
         
     }
 
-    /**
-     * Return all variables recursively using a pre-order traversal present
-     * whether in the operator tree or on annotations attached to operators.
-     */
+	/**
+	 * Return the distinct variables recursively using a pre-order traversal
+	 * present whether in the operator tree or on annotations attached to
+	 * operators.
+	 */
     @SuppressWarnings("unchecked")
     public static Iterator<IVariable<?>> getSpannedVariables(final BOp op) {
 
@@ -322,7 +333,7 @@ public class BOpUtility {
                     public boolean isValid(Object arg0) {
                         return arg0 instanceof IVariable<?>;
                     }
-                });
+                }).makeUnique();
 
     }
 
@@ -337,7 +348,7 @@ public class BOpUtility {
     @SuppressWarnings("unchecked")
     static public Iterator<IVariable<?>> getArgumentVariables(final BOp op) {
 
-        return new Striterator(op.args().iterator())
+        return new Striterator(op.argIterator())
                 .addFilter(new Filter() {
 
                     private static final long serialVersionUID = 1L;
@@ -357,7 +368,7 @@ public class BOpUtility {
      */
     static public int getArgumentVariableCount(final BOp op) {
         int nvars = 0;
-        final Iterator<BOp> itr = op.args().iterator();
+        final Iterator<BOp> itr = op.argIterator();
         while(itr.hasNext()) {
             final BOp arg = itr.next();
             if (arg instanceof IVariable<?>)
@@ -504,7 +515,7 @@ public class BOpUtility {
         if (op == null)
             throw new IllegalArgumentException();
 
-        final Iterator<BOp> itr = root.args().iterator();
+        final Iterator<BOp> itr = root.argIterator();
 
         while (itr.hasNext()) {
 
@@ -770,8 +781,12 @@ public class BOpUtility {
         if (bop == null)
             return;
         
-        for (BOp arg : bop.args()) {
+    	final Iterator<BOp> itr = bop.argIterator();
 
+    	while(itr.hasNext()) {
+        
+        	final BOp arg = itr.next();
+        
             if (!(arg instanceof IVariableOrConstant<?>)) {
              
                 toString(arg, sb, indent+1);
@@ -805,7 +820,7 @@ public class BOpUtility {
 
     }
 
-    private static final transient String ws = "                                                                                                                                                                                                                  ";
+    private static final transient String ws = "                                                                                                                                                                                                                                                                                ";
 
 //    /**
 //     * Verify that all bops from the identified <i>startId</i> to the root are

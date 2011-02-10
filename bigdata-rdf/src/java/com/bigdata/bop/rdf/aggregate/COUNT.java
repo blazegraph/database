@@ -27,10 +27,11 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
-import com.bigdata.bop.IAggregate;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.ImmutableBOp;
+import com.bigdata.bop.aggregate.AggregateBase;
+import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSDLongIV;
 
@@ -39,8 +40,11 @@ import com.bigdata.rdf.internal.XSDLongIV;
  * sets for the given variable.
  * 
  * @author thompsonbry
+ * 
+ *         FIXME The application of COUNT(*) must explicitly recognize the
+ *         special variable <code>*</code>
  */
-public class COUNT extends ImmutableBOp implements IAggregate<IV> {
+public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
 
 	/**
 	 * 
@@ -51,21 +55,14 @@ public class COUNT extends ImmutableBOp implements IAggregate<IV> {
 		super(op);
 	}
 
-	/**
-	 * FIXME This must also accept '*' in lieu of a variable. When given a '*'
-	 * (which could be modeled as a special variable name), we count all detail
-	 * records without regard to their bound values.
-	 * 
-	 * @param var
-	 */
-	public COUNT(IVariable<IV> var) {
-		this(new BOp[] { var }, null/* annotations */);
-	}
-	
 	public COUNT(BOp[] args, Map<String, Object> annotations) {
 		super(args, annotations);
 	}
 
+	public COUNT(final boolean distinct, IValueExpression<IV> expr) {
+		super(distinct, expr);
+	}
+	
 	/**
 	 * The running aggregate value.
 	 * <p>
@@ -96,6 +93,16 @@ public class COUNT extends ImmutableBOp implements IAggregate<IV> {
 
 		return new XSDLongIV(aggregated);
 
+	}
+
+	/**
+	 * Overridden to allow <code>COUNT(*)</code>. 
+	 */
+	@Override
+	final public boolean isWildcardAllowed() {
+
+		return true;
+		
 	}
 
 }

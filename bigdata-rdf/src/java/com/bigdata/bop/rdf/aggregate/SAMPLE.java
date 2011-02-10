@@ -27,10 +27,11 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
-import com.bigdata.bop.IAggregate;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.ImmutableBOp;
+import com.bigdata.bop.aggregate.AggregateBase;
+import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.internal.IV;
 
 /**
@@ -40,7 +41,7 @@ import com.bigdata.rdf.internal.IV;
  * 
  * @author thompsonbry
  */
-public class SAMPLE extends ImmutableBOp implements IAggregate<IV> {
+public class SAMPLE extends AggregateBase<IV> implements IAggregate<IV> {
 
 	/**
 	 * 
@@ -51,14 +52,14 @@ public class SAMPLE extends ImmutableBOp implements IAggregate<IV> {
 		super(op);
 	}
 
-	public SAMPLE(IVariable<IV> var) {
-		this(new BOp[] { var }, null/* annotations */);
-	}
-	
 	public SAMPLE(BOp[] args, Map<String, Object> annotations) {
 		super(args, annotations);
 	}
 
+	public SAMPLE(boolean distinct, IValueExpression<IV> expr) {
+		super(distinct, expr);
+	}
+	
 	/**
 	 * The sampled value and initially <code>null</code>.
 	 * <p>

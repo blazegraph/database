@@ -39,12 +39,9 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
-import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.constraint.BOpConstraint;
 import com.bigdata.bop.constraint.OR;
-import com.bigdata.rdf.internal.constraints.SameTermBOp;
 
 /**
  * Unit tests for {@link BOpUtility}.
@@ -64,6 +61,19 @@ public class TestBOpUtility extends TestCase2 {
         super(name);
     }
 
+    private void eatData(/*final int expectedLength, */final Iterator<?> itr) {
+    	int i = 1;
+        while (itr.hasNext()) {
+            final Object t = itr.next();
+//            System.err.print(i+" ");// + " : " + t);
+//            assertTrue("index=" + i + ", expected=" + expected[i] + ", actual="
+//                    + t, expected[i].equals(t));
+            i++;
+        }
+//        System.err.println("");
+//        assertEquals("#visited", expectedLength, i);
+    }
+    
     /**
      * Unit test for {@link BOpUtility#getSpannedVariables(BOp)}.
      */
@@ -73,7 +83,7 @@ public class TestBOpUtility extends TestCase2 {
     	
     	IConstraint bop = null;
     	
-    	final int count = 100;
+    	final int count = 99;
     	
     	for (int i = 0; i < count; i++) {
     		
@@ -93,21 +103,19 @@ public class TestBOpUtility extends TestCase2 {
                 a,//
         };
         
-        int i = 0;
-        final Iterator<IVariable<?>> itr = BOpUtility
-                .getSpannedVariables(bop);
-        while (itr.hasNext()) {
-            final BOp t = itr.next();
-            System.out.println(i + " : " + t);
-//            assertTrue("index=" + i + ", expected=" + expected[i] + ", actual="
-//                    + t, expected[i].equals(t));
-            i++;
-        }
+        System.err.println("preOrderIterator");
+        eatData(BOpUtility.preOrderIterator(bop));
         
-        assertEquals(i, expected.length);
+        System.err.println("preOrderIteratorWithAnnotations");
+        eatData(BOpUtility.preOrderIteratorWithAnnotations(bop));
 
-        assertSameIterator(expected, BOpUtility
-                .getSpannedVariables(bop));
+        System.err.println("getSpannedVariables");
+        eatData(BOpUtility.getSpannedVariables(bop));
+
+        // @todo make the returned set distinct?
+        
+        // @todo verify the actual data visited.
+		assertSameIterator(expected, BOpUtility.getSpannedVariables(bop));
         
     }
     

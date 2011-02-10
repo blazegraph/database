@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop;
 
 import java.io.Serializable;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -71,11 +72,20 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
      * @return The argument.
      */
     BOp get(int index);
+
+	/**
+	 * The operator's arguments as an unmodified list.
+	 * 
+	 * @todo Consider deprecating since this is much less efficient than
+	 *       {@link #argIterator()}.
+	 */
+    List<BOp> args();
     
     /**
-     * The operator's arguments.
+     * An iterator visiting the operator's arguments. The iterator does
+     * not support removal. (This is more efficient than #args()).
      */
-    List<BOp> args();
+    Iterator<BOp> argIterator();
 
     /** A shallow copy of the operator's arguments. */
     BOp[] toArray();

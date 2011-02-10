@@ -535,10 +535,17 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
              * Visit children, but not if this is a CONTROLLER operator since
              * its children belong to a subquery.
              */
-            for (BOp t : op.args()) {
+        	final Iterator<BOp> itr = op.argIterator();
+
+        	while(itr.hasNext()) {
+            
+            	final BOp t = itr.next();
+            
                 // visit children (recursion)
                 populateStatsMap(t);
+                
             }
+        	
         }
 
     }
