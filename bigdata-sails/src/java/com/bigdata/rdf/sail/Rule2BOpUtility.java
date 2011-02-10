@@ -513,8 +513,8 @@ public class Rule2BOpUtility {
         }
         
         // the variables to be retained for each join.
-        final IVariable<?>[][] selectVars = RuleState
-                .computeRequiredVarsForEachTail(rule, order);
+//        final IVariable<?>[][] selectVars = RuleState
+//                .computeRequiredVarsForEachTail(rule, order);
         
         /*
          * Map the constraints from the variables they use.  This way, we can
