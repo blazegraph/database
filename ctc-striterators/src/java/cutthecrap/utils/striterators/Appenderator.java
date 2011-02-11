@@ -52,6 +52,8 @@ public class Appenderator implements Iterator {
   public boolean hasNext() {
   	if (m_current.hasNext()) {
   		return true;
+  	} else if (m_current == m_xtra) { // don't call twice
+  		return false;
   	}
   	
   	m_current = m_xtra;
