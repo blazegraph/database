@@ -1080,7 +1080,7 @@ public class DataLoader {
 
             if (log.isInfoEnabled()) {
 				log.info("file:: " + stats + "; totals:: " + totals
-						+ (baseURL != null ? "; current baseURL=" + baseURL : ""));
+						+ (baseURL != null ? "; baseURL=" + baseURL : ""));
                 if (buffer != null
                         && buffer.getDatabase() instanceof AbstractLocalTripleStore) {
                 	if(log.isDebugEnabled())
