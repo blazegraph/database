@@ -1005,16 +1005,21 @@ public class DataLoader {
         loader.addRioLoaderListener( new RioLoaderListener() {
             
             public void processingNotification( final RioLoaderEvent e ) {
-                /* This reports as statements are parsed. Depending on how things are buffered, the parser can run ahead of the index writes. */
-                if (log.isInfoEnabled()) {
-                    log.info
-                    ( e.getStatementsProcessed() + 
-                      " stmts buffered in " + 
-                      (e.getTimeElapsed() / 1000d) +
-                      " secs, rate= " + 
-                      e.getInsertRate() +
-                      (baseURL != null ? ", baseURL=" + baseURL : "")                      );
-                }
+				/*
+				 * This reports as statements are parsed. Depending on how
+				 * things are buffered, the parser can run ahead of the index
+				 * writes.
+				 */
+				if (log.isInfoEnabled()) {
+					log.info(e.getStatementsProcessed() + " stmts buffered in "
+							+ (e.getTimeElapsed() / 1000d) + " secs, rate= "
+							+ e.getInsertRate()
+							+ (baseURL != null ? ", baseURL=" + baseURL : "") + //
+							(", totalStatementsSoFar="//
+							+ (e.getStatementsProcessed()//
+							+ totals.toldTriples.get()))// 
+					);
+				}
                 
             }
             
