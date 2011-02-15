@@ -730,7 +730,7 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
                     if (rdlen > 0)
                         updateChk(rdlen);
 
-                    if (rdlen == -1)
+                    if (rdlen == -1 || rdlen == 0)
                         break;
 
                     rem -= rdlen;
