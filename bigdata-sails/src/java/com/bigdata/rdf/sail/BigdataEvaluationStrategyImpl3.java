@@ -833,7 +833,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 		 * Begin native bigdata evaluation.
 		 */
 		CloseableIteration<BindingSet, QueryEvaluationException> result = doEvaluateNatively(
-				query, bs, queryEngine);// , sesameFilters);
+				query, bs, queryEngine, required);// , sesameFilters);
 
 		/*
 		 * Use the basic filter iterator for any remaining filters which will be
@@ -868,7 +868,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     
     CloseableIteration<BindingSet, QueryEvaluationException> 
 		doEvaluateNatively(final PipelineOp query, final BindingSet bs,
-			final QueryEngine queryEngine 
+			final QueryEngine queryEngine, final IVariable[] required
 //			, final Collection<Filter> sesameFilters
 			) 
 			throws QueryEvaluationException {
@@ -883,7 +883,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 			 * Wrap up the native bigdata query solution iterator as Sesame
 			 * compatible iteration with materialized RDF Values.
 			 */
-			return wrapQuery(runningQuery);//, sesameFilters);
+			return wrapQuery(runningQuery, required);//, sesameFilters);
 
 		} catch (UnsupportedOperatorException t) {
 			if (runningQuery != null) {
@@ -919,7 +919,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	 * @throws QueryEvaluationException
 	 */
 	CloseableIteration<BindingSet, QueryEvaluationException> wrapQuery(
-			final IRunningQuery runningQuery
+			final IRunningQuery runningQuery, final IVariable[] required
 			) throws QueryEvaluationException {
 
 		// The iterator draining the query solutions.
@@ -938,7 +938,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 			// Convert bigdata binding sets to Sesame binding sets.
 	        new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
         		// Materialize IVs as RDF Values.
-	            new BigdataBindingSetResolverator(database, it2).start(
+	            new BigdataBindingSetResolverator(database, it2, required).start(
 	            		database.getExecutorService())));
 	
 	    return result;
