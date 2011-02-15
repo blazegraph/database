@@ -1,5 +1,6 @@
 package com.bigdata.rdf.store;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -64,6 +65,8 @@ public class BigdataBindingSetResolverator
         
         this.required = required;
         
+//        System.err.println("required: " + (required != null ? Arrays.toString(required) : "null"));
+
     }
 
     /**
@@ -97,6 +100,8 @@ public class BigdataBindingSetResolverator
 
             final IBindingSet bindingSet = solution;
 
+//            System.err.println(solution);
+            
             assert bindingSet != null;
 
             if (required == null) {
@@ -124,8 +129,14 @@ public class BigdataBindingSetResolverator
             } else {
             	
             	for (IVariable v : required) {
+
+            		final IConstant c = bindingSet.get(v);
             		
-            		final IV iv = (IV) bindingSet.get(v).get();
+            		if (c == null) {
+            			continue;
+            		}
+            		
+            		final IV iv = (IV) c.get();
 	            	
 	                if (iv == null) {
 	
@@ -142,6 +153,8 @@ public class BigdataBindingSetResolverator
 
         }
         
+//        System.err.println("resolving: " + Arrays.toString(ids.toArray()));
+
         if (log.isInfoEnabled())
             log.info("Resolving " + ids.size() + " term identifiers");
 
@@ -253,6 +266,8 @@ public class BigdataBindingSetResolverator
             
         }
 	        
+//        System.err.println(bindingSet);
+        
         return bindingSet;
 
     }
