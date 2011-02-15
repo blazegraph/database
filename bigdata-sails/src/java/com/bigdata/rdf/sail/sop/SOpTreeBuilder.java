@@ -33,7 +33,7 @@ public class SOpTreeBuilder {
 			final Collection<SOpGroup> groupsToPrune) {
 		final Collection<SOpGroup> children = new LinkedList<SOpGroup>();
 		for (SOpGroup g : groupsToPrune)
-			collectChildren(tree, g, groupsToPrune);
+			collectChildren(tree, g, children);
 		groupsToPrune.addAll(children);
 		final Collection<SOp> sopsToPrune = new LinkedList<SOp>();
 		for (SOpGroup g : groupsToPrune) {
