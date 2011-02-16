@@ -267,9 +267,15 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     public BigdataLiteralImpl createLiteral(final XMLGregorianCalendar arg0) {
 
+		/*
+		 * Note: QName#toString() does not produce the right representation,
+		 * which is why we need to go through XMLDatatypeUtil.
+		 * 
+		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/117
+		 */
         return new BigdataLiteralImpl(this, arg0.toString(),
-                null/* languageCode */, createURI(arg0.getXMLSchemaType()
-                        .toString()));
+                null/* languageCode */, createURI(XMLDatatypeUtil.qnameToURI(
+                        arg0.getXMLSchemaType()).stringValue()));
         
     }
 
