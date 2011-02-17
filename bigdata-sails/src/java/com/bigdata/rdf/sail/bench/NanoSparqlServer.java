@@ -443,11 +443,11 @@ public class NanoSparqlServer extends AbstractHTTPD {
 							"" + BufferAnnotations.DEFAULT_CHUNK_TIMEOUT)
 					+ "\n");
 
-			sb.append(PipelineJoin.Annotations.MAX_PARALLEL
+			sb.append(PipelineJoin.Annotations.MAX_PARALLEL_CHUNKS
 					+ "="
 					+ tripleStore.getProperties().getProperty(
-							PipelineJoin.Annotations.MAX_PARALLEL,
-							"" + PipelineJoin.Annotations.DEFAULT_MAX_PARALLEL) + "\n");
+							PipelineJoin.Annotations.MAX_PARALLEL_CHUNKS,
+							"" + PipelineJoin.Annotations.DEFAULT_MAX_PARALLEL_CHUNKS) + "\n");
 
 			sb
 					.append(IPredicate.Annotations.FULLY_BUFFERED_READ_THRESHOLD
@@ -1439,10 +1439,15 @@ public class NanoSparqlServer extends AbstractHTTPD {
      */
     private static class Config {
 
+    	/**
+    	 * When true, suppress various things otherwise written on stdout.
+    	 */
+    	public boolean quiet = false;
+    	
 		/**
 		 * The port on which the server will answer requests.
 		 */
-		public int port;
+		public int port = 80;
 		
 		/**
 		 * The default namespace.
@@ -1464,108 +1469,201 @@ public class NanoSparqlServer extends AbstractHTTPD {
     	}
     	
     }
-    
-	private static void usage() {
+
+    /**
+     * Print the optional message on stderr, print the usage information on stderr,
+     * and then force the program to exit with the given status code. 
+     * @param status The status code.
+     * @param msg The optional message
+     */
+	private static void usage(final int status, final String msg) {
 		
-		System.err.println("port (-stop | <i>namespace</i> (propertyFile|configFile) )");
+		if (msg != null) {
+
+			System.err.println(msg);
+			
+		}
+
+		System.err.println("[options] port namespace (propertyFile|configFile)");
+		
+		System.err.println("-OR-");
+		
+		System.err.println("port -stop");
+		
+		System.exit(status);
 		
 	}
 
-    /**
-     * Run an httpd service exposing a SPARQL endpoint. The service will respond
-     * to the following URL paths:
-     * <dl>
-     * <dt>http://localhost:port/</dt>
-     * <dd>The SPARQL end point for the default namespace as specified by the
-     * <code>namespace</code> command line argument.</dd>
-     * <dt>http://localhost:port/namespace/NAMESPACE</dt>
-     * <dd>where <code>NAMESPACE</code> is the namespace of some triple store or
-     * quad store, may be used to address ANY triple or quads store in the
-     * bigdata instance.</dd>
-     * <dt>http://localhost:port/status</dt>
-     * <dd>A status page.</dd>
-     * </dl>
-     * 
-     * @param args
-     *            USAGE: <code>port -stop</code> to stop the server; OR<br/>
-     *            <code>(options) <i>namespace</i> (propertyFile|configFile) )</code>
-     *            where
-     *            <dl>
-     *            <dt>port</dt>
-     *            <dd>The port on which the service will respond.</dd>
-     *            <dt>namespace</dt>
-     *            <dd>The namespace of the default SPARQL endpoint (the
-     *            namespace will be <code>kb</code> if none was specified when
-     *            the triple/quad store was created).</dd>
-     *            <dt>propertyFile</dt>
-     *            <dd>A java properties file for a standalone {@link Journal}.</dd>
-     *            <dt>configFile</dt>
-     *            <dd>A jini configuration file for a bigdata federation.</dd>
-     *            </dl>
-     *            and <i>options</i> are any of:
-     *            <dl>
-     *            <dt>-nthreads</dt>
-     *            <dd>The #of threads which will be used to answer SPARQL
-     *            queries.</dd>
-     *            <dt>-forceOverflow</dt>
-     *            <dd>Force a compacting merge of all shards on all data services in a bigdata federation.</dd>
-     *            </dl>
-     */
+	/**
+	 * Run an httpd service exposing a SPARQL endpoint. The service will respond
+	 * to the following URL paths:
+	 * <dl>
+	 * <dt>http://localhost:port/</dt>
+	 * <dd>The SPARQL end point for the default namespace as specified by the
+	 * <code>namespace</code> command line argument.</dd>
+	 * <dt>http://localhost:port/namespace/NAMESPACE</dt>
+	 * <dd>where <code>NAMESPACE</code> is the namespace of some triple store or
+	 * quad store, may be used to address ANY triple or quads store in the
+	 * bigdata instance.</dd>
+	 * <dt>http://localhost:port/status</dt>
+	 * <dd>A status page.</dd>
+	 * </dl>
+	 * 
+	 * @param args
+	 *            USAGE:<br/>
+	 *            To stop the server:<br/>
+	 *            <code>port -stop</code><br/>
+	 *            To start the server:<br/>
+	 *            <code>(options) <i>namespace</i> (propertyFile|configFile) )</code>
+	 *            <p>
+	 *            <i>Where:</i>
+	 *            <dl>
+	 *            <dt>port</dt>
+	 *            <dd>The port on which the service will respond.</dd>
+	 *            <dt>namespace</dt>
+	 *            <dd>The namespace of the default SPARQL endpoint (the
+	 *            namespace will be <code>kb</code> if none was specified when
+	 *            the triple/quad store was created).</dd>
+	 *            <dt>propertyFile</dt>
+	 *            <dd>A java properties file for a standalone {@link Journal}.</dd>
+	 *            <dt>configFile</dt>
+	 *            <dd>A jini configuration file for a bigdata federation.</dd>
+	 *            </dl>
+	 *            and <i>options</i> are any of:
+	 *            <dl>
+	 *            <dt>-q</dt>
+	 *            <dd>Suppress messages on stdout.</dd>
+	 *            <dt>-nthreads</dt>
+	 *            <dd>The #of threads which will be used to answer SPARQL
+	 *            queries (default 8).</dd>
+	 *            <dt>-forceOverflow</dt>
+	 *            <dd>Force a compacting merge of all shards on all data
+	 *            services in a bigdata federation (this option should only be
+	 *            used for benchmarking purposes).</dd>
+	 *            </dl>
+	 *            </p>
+	 */
 	public static void main(final String[] args) {
 		final Config config = new Config();
-		config.port = 80;
+		boolean forceOverflow = false;
 		Journal jnl = null;
 		JiniClient<?> jiniClient = null;
 		NanoSparqlServer server = null;
 		ITransactionService txs = null;
 		try {
 			/*
-			 * FIXME Modify to handle additional options, which get
-			 * set on [config].  For example, [nthreads] and [forceOverflow].
+			 * First, handle the [port -stop] command, where "port" is the port
+			 * number of the service. This case is a bit different because the
+			 * "-stop" option appears after the "port" argument.
 			 */
 			if (args.length == 2) {
-				final int port = Integer.valueOf(args[0]);
 				if("-stop".equals(args[1])) {
+					final int port;
+					try {
+						port = Integer.valueOf(args[0]);
+					} catch (NumberFormatException ex) {
+						usage(1/* status */, "Could not parse as port# : '"
+								+ args[0] + "'");
+						// keep the compiler happy wrt [port] being bound.
+						throw new AssertionError();
+					}
 					// Send stop to server.
 					sendStop(port);
 					// Normal exit.
 					System.exit(0);
 				} else {
-					usage();
-					System.exit(1);
+					usage(1/* status */, null/* msg */);
 				}
 			}
-			if (args.length != 3) {
-				usage();
-				System.exit(1);
+
+			/*
+			 * Now that we have that case out of the way, handle all arguments
+			 * starting with "-". These should appear before any non-option
+			 * arguments to the program.
+			 */
+			int i = 0;
+			while (i < args.length) {
+				final String arg = args[i];
+				if (arg.startsWith("-")) {
+					if (arg.equals("-q")) {
+						config.quiet = true;
+					} else if (arg.equals("-forceOverflow")) {
+						forceOverflow = true;
+					} else if (arg.equals("-nthreads")) {
+						final String s = args[++i];
+						config.queryThreadPoolSize = Integer.valueOf(s);
+						if (config.queryThreadPoolSize < 0) {
+							usage(1/* status */,
+									"-nthreads must be non-negative, not: " + s);
+						}
+					} else {
+						usage(1/* status */, "Unknown argument: " + arg);
+					}
+				} else {
+					break;
+				}
+				i++;
 			}
-			config.port = Integer.valueOf(args[0]);
-			config.namespace = args[1];
-			final String propertyFile = args[2];
+
+			/*
+			 * Finally, there should be exactly THREE (3) command line arguments
+			 * remaining. These are the [port], the [namespace] and the
+			 * [propertyFile] (journal) or [configFile] (scale-out).
+			 */
+			final int nremaining = args.length - i;
+			if (nremaining != 3) {
+				/*
+				 * There are either too many or too few arguments remaining.
+				 */
+				usage(1/* status */, nremaining < 3 ? "Too few arguments."
+						: "Too many arguments");
+			}
+			/*
+			 * http service port.
+			 */
+			{
+				final String s = args[i++];
+				try {
+					config.port = Integer.valueOf(s);
+				} catch (NumberFormatException ex) {
+					usage(1/* status */, "Could not parse as port# : '" + s
+							+ "'");
+				}
+			}
+			/*
+			 * Namespace.
+			 */
+			config.namespace = args[i++];
+			/*
+			 * Property file.
+			 */
+			final String propertyFile = args[i++];
 			final File file = new File(propertyFile);
 			if (!file.exists()) {
 				throw new RuntimeException("Could not find file: " + file);
 			}
 			boolean isJini = false;
 			if (propertyFile.endsWith(".config")) {
+				// scale-out.
 				isJini = true;
 			} else if (propertyFile.endsWith(".properties")) {
+				// local journal.
 				isJini = false;
 			} else {
-
 				/*
 				 * Note: This is a hack, but we are recognizing the jini
 				 * configuration file with a .config extension and the journal
 				 * properties file with a .properties extension.
 				 */
-				System.err
-						.println("File should have '.config' or '.properties' extension: "
+				usage(1/* status */,
+						"File should have '.config' or '.properties' extension: "
 								+ file);
-				System.exit(1);
 			}
-			System.out.println("port: " + config.port);
-			System.out.println("namespace: " + config.namespace);
-			System.out.println("file: " + file.getAbsoluteFile());
+			if (!config.quiet) {
+				System.out.println("port: " + config.port);
+				System.out.println("namespace: " + config.namespace);
+				System.out.println("file: " + file.getAbsoluteFile());
+			}
 
 			/*
 			 * Connect to the database.
@@ -1620,8 +1718,13 @@ public class NanoSparqlServer extends AbstractHTTPD {
                     : ((IBigdataFederation<?>) indexManager)
                             .getTransactionService());
 
-            config.timestamp = txs.newTx(ITx.READ_COMMITTED);
-            System.out.println("tx: " + config.timestamp);
+			config.timestamp = txs.newTx(ITx.READ_COMMITTED);
+
+			if (!config.quiet) {
+
+				System.out.println("tx: " + config.timestamp);
+
+			}
 
 			// start the server.
 			server = new NanoSparqlServer(config, indexManager);
@@ -1650,25 +1753,36 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
             }
 
-            System.out.println("Service is running.");
+			if (!config.quiet) {
 
-            if (true) { // @todo if(!quiet) or if(verbose)
-                /*
-                 * Log some information about the default kb (#of statements, etc).
-                 */
-                System.out.println(server.getKBInfo(config.namespace,
-                        config.timestamp));
+				System.out.println("Service is running: http://localhost:"
+						+ config.port);
+            	
             }
 
-            final boolean forceOverflow = false;
-            if(forceOverflow&&indexManager instanceof IBigdataFederation<?>) {
-            	
-            	System.out.println("Forcing compacting merge of all data services: "+new Date());
-            	
+			if (log.isInfoEnabled()) {
+				/*
+				 * Log some information about the default kb (#of statements,
+				 * etc).
+				 */
+				log.info("\n"
+						+ server.getKBInfo(config.namespace, config.timestamp));
+			}
+
+			if (forceOverflow && indexManager instanceof IBigdataFederation<?>) {
+
+				if (!config.quiet)
+					System.out
+							.println("Forcing compacting merge of all data services: "
+									+ new Date());
+
 				((AbstractDistributedFederation<?>) indexManager)
 						.forceOverflow(true/* compactingMerge */, false/* truncateJournal */);
 
-            	System.out.println("Did compacting merge of all data services: "+new Date());
+				if (!config.quiet)
+					System.out
+							.println("Did compacting merge of all data services: "
+									+ new Date());
             	
             }
             
@@ -1683,7 +1797,8 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 				}
 
-				System.out.println("Service is down.");
+				if (!config.quiet)
+					System.out.println("Service is down.");
 
 			}
 

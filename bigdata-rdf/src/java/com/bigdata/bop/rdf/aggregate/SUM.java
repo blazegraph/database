@@ -34,6 +34,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
+import com.bigdata.bop.aggregate.AggregateBase.FunctionCode;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.XSDLongIV;
@@ -49,6 +50,10 @@ import com.bigdata.rdf.model.BigdataLiteral;
  *         over them (but the operator can only handle KBs where we are inlining
  *         the numeric values - perhaps we should just get rid of the option to
  *         not inline and require people to export/import for an upgrade).
+ * 
+ * @deprecated I am not convinced that a concrete operator can be implemented in
+ *             this manner rather than by a tight integration with the GROUP_BY
+ *             operator implementation.
  */
 public class SUM extends AggregateBase<IV> implements IAggregate<IV> {
 
@@ -66,7 +71,7 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV> {
 	}
 
 	public SUM(boolean distinct, IValueExpression<IV> expr) {
-		super(distinct, expr);
+		super(FunctionCode.SUM,distinct, expr);
 	}
 	
 	/**
@@ -80,7 +85,6 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV> {
 	 */
 	private transient IV aggregated = new XSDLongIV<BigdataLiteral>(0L);
 	
-	@Override
 	synchronized
 	public IV get(final IBindingSet bindingSet) {
 

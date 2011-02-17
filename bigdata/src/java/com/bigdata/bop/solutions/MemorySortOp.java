@@ -12,6 +12,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.solutions.MemoryGroupByOp.Annotations;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
@@ -73,6 +74,13 @@ public class MemorySortOp extends SortOp {
 							+ getEvaluationContext());
 		}
 
+		// operator may not be broken into multiple tasks.
+		if (getMaxParallel() != 1) {
+			throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
+					+ "=" + getMaxParallel());
+		}
+
+		// operator is "at-once" (not pipelined).
 		if (isPipelined()) {
 			throw new UnsupportedOperationException(Annotations.PIPELINED + "="
 					+ isPipelined());

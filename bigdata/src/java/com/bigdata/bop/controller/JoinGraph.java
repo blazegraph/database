@@ -1080,8 +1080,10 @@ public class JoinGraph extends PipelineOp {
 				new NV(BOp.Annotations.BOP_ID, joinId),//
 				// @todo Why not use a factory which avoids bopIds already in use?
 				new NV(PipelineJoin.Annotations.PREDICATE, vTarget.pred.setBOpId(3)),
-				// disallow parallel evaluation.
-				new NV(PipelineJoin.Annotations.MAX_PARALLEL,0),
+				// disallow parallel evaluation of tasks.
+				new NV(PipelineJoin.Annotations.MAX_PARALLEL,1),
+				// disallow parallel evaluation of chunks.
+				new NV(PipelineJoin.Annotations.MAX_PARALLEL_CHUNKS,0),
 				// disable access path coalescing 
 				new NV(PipelineJoin.Annotations.COALESCE_DUPLICATE_ACCESS_PATHS,false),
 				// cutoff join.

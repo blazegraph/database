@@ -74,4 +74,17 @@ public interface QueryHints {
 	 */
     String OPTIMIZER = QueryHints.class.getName() + ".optimizer";
 
+	/**
+	 * A label which may be used to tag the instances of some SPARQL query
+	 * template in manner which makes sense to the application. The tag is used
+	 * to aggregate performance statistics for tagged queries.
+	 * 
+	 * <pre>
+	 * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sail.QueryHints.tag=Query12&gt;
+	 * </pre>
+	 * 
+	 * @see http://sourceforge.net/apps/trac/bigdata/ticket/207
+	 */
+    String TAG = QueryHints.class.getName() + ".tag";
+
 }

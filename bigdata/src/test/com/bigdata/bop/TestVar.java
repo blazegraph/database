@@ -86,5 +86,13 @@ public class TestVar extends TestCase2 {
         assertTrue(expected == actual);
         
     }
+
+    public void test_isWildcard() {
+    	
+    	assertTrue(Var.var("*").isWildcard());
+
+    	assertFalse(Var.var("a").isWildcard());
+    	
+    }
     
 }

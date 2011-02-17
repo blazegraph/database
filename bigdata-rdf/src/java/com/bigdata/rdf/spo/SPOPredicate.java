@@ -248,7 +248,7 @@ public class SPOPredicate extends Predicate<ISPO> {
 
         final SPOPredicate tmp = this.clone();
 
-        tmp.set(3/*c*/, c);
+        tmp._set(3/*c*/, c);
         
         return tmp;
 

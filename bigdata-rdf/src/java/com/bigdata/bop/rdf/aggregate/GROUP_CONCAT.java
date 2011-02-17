@@ -47,6 +47,10 @@ import com.bigdata.bop.aggregate.IAggregate;
  * 
  *         FIXME This must only operate on variables which are known to be
  *         materialized RDF Values.
+ * 
+ * @deprecated I am not convinced that a concrete operator can be implemented in
+ *             this manner rather than by a tight integration with the GROUP_BY
+ *             operator implementation.
  */
 public class GROUP_CONCAT extends AggregateBase<Literal> implements IAggregate<Literal> {
 
@@ -84,6 +88,7 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements IAggregate<L
 	public GROUP_CONCAT(final boolean distinct,
 			final IValueExpression<Literal> expr, final IConstant<String> sep) {
 		this(new BOp[] { expr }, NV.asMap(//
+				new NV(Annotations.FUNCTION_CODE,FunctionCode.GROUP_CONCAT),//
 				new NV(Annotations.DISTINCT, distinct),//
 				new NV(Annotations.SEPARATOR, sep)//
 				));
@@ -97,7 +102,6 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements IAggregate<L
 	 */
 	private transient Literal aggregated = new LiteralImpl("");
 	
-	@Override
 	synchronized public Literal get(final IBindingSet bindingSet) {
 
 		final IVariable<Literal> var = (IVariable<Literal>) get(0);

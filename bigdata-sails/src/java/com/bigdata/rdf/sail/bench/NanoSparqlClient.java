@@ -36,6 +36,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
@@ -304,7 +307,8 @@ public class NanoSparqlClient {
 					try {
 						String s;
 						while ((s = r.readLine()) != null) {
-							System.out.println(s);
+							if(!opts.hideResults)
+								System.out.println(s);
 						}
 					} finally {
 						r.close();
@@ -343,6 +347,9 @@ public class NanoSparqlClient {
      */
     static private String readFromFile(final File file) throws IOException {
 
+		if (file.isDirectory())
+			throw new IllegalArgumentException();
+    	
         final LineNumberReader r = new LineNumberReader(new FileReader(file));
 
         try {
@@ -406,6 +413,122 @@ public class NanoSparqlClient {
         }
 
     }
+
+	/**
+	 * Populate the list with the plain text files (recursive search of a file
+	 * or directory).
+	 * 
+	 * @param fileOrDir
+	 *            The file or directory.
+	 * @param fileList
+	 *            The list to be populated.
+	 */
+	static private void getFiles(final File fileOrDir,
+			final List<File> fileList) {
+
+		if (fileOrDir.isHidden())
+			return;
+
+		if (fileOrDir.isDirectory()) {
+
+			final File dir = fileOrDir;
+
+			final File[] files = dir.listFiles();
+
+			for (int i = 0; i < files.length; i++) {
+
+				final File f = files[i];
+
+				// recursion.
+				getFiles(f, fileList);
+
+			}
+
+		} else {
+
+			fileList.add(fileOrDir);
+
+		}
+
+    }
+
+	/**
+	 * Read queries from each file in the given list.
+	 * 
+	 * @param fileList
+	 *            The list of files.
+	 * 
+	 * @return An array of the queries read from that list.
+	 * 
+	 * @throws IOException
+	 */
+	static private String[] readQueries(final List<File> fileList)
+			throws IOException {
+
+		final List<String> queries = new LinkedList<String>();
+
+		for (File file : fileList) {
+
+			queries.add(readFromFile(file));
+
+		}
+
+		return queries.toArray(new String[queries.size()]);
+
+	}
+
+	/**
+	 * Helper produces a random sequence of indices in the range [0:n-1]
+	 * suitable for visiting the elements of an array of n elements in a random
+	 * order. This is useful when you want to randomize the presentation of
+	 * elements from two or more arrays. For example, known keys and values can
+	 * be generated and their presentation order randomized by indexing with the
+	 * returned array.
+	 */
+	private static int[] getRandomOrder(final long seed, final int n) {
+
+		final Random rnd = new Random(seed);
+		
+		final class Pair implements Comparable<Pair> {
+			public double r = rnd.nextDouble();
+			public int val;
+
+			public Pair(int val) {
+				this.val = val;
+			}
+
+			public int compareTo(Pair other) {
+				if (this == other)
+					return 0;
+				if (this.r < other.r)
+					return -1;
+				else
+					return 1;
+			}
+
+		}
+
+		final Pair[] pairs = new Pair[n];
+
+		for (int i = 0; i < n; i++) {
+
+			pairs[i] = new Pair(i);
+
+		}
+
+		java.util.Arrays.sort(pairs);
+
+		final int order[] = new int[n];
+
+		for (int i = 0; i < n; i++) {
+
+			order[i] = pairs[i].val;
+
+		}
+
+		return order;
+
+	}
     
     /**
 	 * Options for the query.
@@ -422,7 +545,10 @@ public class NanoSparqlClient {
 		public String defaultGraphUri = null;
 		/** The connection timeout (ms). */
 		public int timeout = DEFAULT_TIMEOUT;
+		/** When <code>true</code>, show the original and parsed query. */
 		public boolean showQuery = false;
+		/** When <code>true</code>, do not show the results of the query. */
+		public boolean hideResults = false;
         public boolean verbose = false;
         public boolean quiet = false;
 
@@ -435,8 +561,8 @@ public class NanoSparqlClient {
 	}
 
 	/**
-	 * Issue a query against a SPARQL endpoint.  By default, the client will
-	 * read from stdin.  It will write on stdout.
+	 * Issue a query against a SPARQL endpoint. By default, the client will read
+	 * from stdin. It will write on stdout.
 	 * 
 	 * @param args
 	 *            <code>(option)* [serviceURL] (query)</code>
@@ -458,20 +584,36 @@ public class NanoSparqlClient {
 	 *            <dt>-timeout</dt>
 	 *            <dd>The connection timeout in milliseconds (default
 	 *            {@value #DEFAULT_TIMEOUT}).</dd>
-     *            <dt>-show</dt>
-     *            <dd>Show the parser query (operator tree).</dd>
-     *            <dt>-verbose</dt>
-     *            <dd>Be verbose.</dd>
-     *            <dt>-quiet</dt>
-     *            <dd>Be quiet.</dd>
-     *            <dt>-f</dt>
-     *            <dd>A file containing the query.</dd>
-     *            <dt>-query</dt>
-     *            <dd>The query follows immediately on the command line (be sure to quote the query).</dd>
-     *            <dt>-t</dt>
-     *            <dd>The http connection timeout in milliseconds -or- ZERO (0) for an infinite timeout.</dd>
+	 *            <dt>-showQuery</dt>
+	 *            <dd>Show the parser query (operator tree).</dd>
+	 *            <dt>-hideResults</dt>
+	 *            <dd>Hide the query results.</dd>
+	 *            <dt>-verbose</dt>
+	 *            <dd>Be verbose.</dd>
+	 *            <dt>-quiet</dt>
+	 *            <dd>Be quiet.</dd>
+	 *            <dt>-f</dt>
+	 *            <dd>A file (or directory) containing the query(s) to be run.
+	 *            Each file may contain a single SPARQL query.</dd>
+	 *            <dt>-query</dt>
+	 *            <dd>The query follows immediately on the command line (be sure
+	 *            to quote the query).</dd>
+	 *            <dt>-repeat #</dt>
+	 *            <dd>The #of times to present each query. A seed of ZERO (0)
+	 *            will disable the randomized presentation of the queries. The
+	 *            default seed is based on the System clock.</dd>
+	 *            <dt>-seed seed</dt>
+	 *            <dd>Randomize the presentation of the queries, optionally
+	 *            using the specified seed for the random number generator.</dd>
+	 *            <dt>-t</dt>
+	 *            <dd>The http connection timeout in milliseconds -or- ZERO (0)
+	 *            for an infinite timeout.</dd>
 	 *            <dt>-defaultGraph</dt>
 	 *            <dd>The URI of the default graph to use for the query.</dd>
+	 *            <dt>-help</dt>
+	 *            <dd>Display help.</dd>
+	 *            <dt>--?</dt>
+	 *            <dd>Display help.</dd>
 	 *            </dl>
 	 * @throws Exception
 	 * 
@@ -487,6 +629,10 @@ public class NanoSparqlClient {
 		/*
          * Parse the command line, overriding various properties.
          */
+		long seed = System.nanoTime(); // Note: 0L means not randomized.
+		int repeat = 1; // repeat count.
+		File file = null; // When non-null, file or directory containing query(s).
+		String queryStr = null; // A query given directly on the command line.
 		final QueryOptions opts = new QueryOptions();
         {
 
@@ -505,12 +651,17 @@ public class NanoSparqlClient {
 
                 } else if (arg.equals("-f")) {
 
-                    final String file = args[++i];
+                    file = new File(args[++i]);
                     
-                    if (opts.verbose)
-                        System.err.println("reading from file: " + file);
+//                    opts.queryStr = readFromFile(new File(file));
 
-                    opts.queryStr = readFromFile(new File(file));
+				} else if (arg.equals("-showQuery")) {
+
+					opts.showQuery = true;
+
+				} else if (arg.equals("-hideResults")) {
+
+					opts.hideResults = true;
 
                 } else if (arg.equals("-verbose")) {
                     
@@ -524,20 +675,20 @@ public class NanoSparqlClient {
                     
                 } else if (arg.equals("-query")) {
 
-                    opts.queryStr = args[++i];
+                    queryStr = args[++i];
 
-				} else if (arg.equals("-defaultGraph")) {
+				} else if (arg.equals("-repeat")) {
 
-					opts.defaultGraphUri = args[++i];
+                    if ((repeat = Integer.valueOf(args[++i])) < 1) {
 
-                    if (opts.verbose)
-                        System.err.println("defaultGraph: "
-                                + opts.defaultGraphUri);
+                        throw new IllegalArgumentException("Bad repeat.");
+                        
+				    }
 
-				} else if (arg.equals("-show")) {
+				} else if (arg.equals("-seed")) {
 
-					opts.showQuery = true;
-					
+                    seed = Long.valueOf(args[++i]);
+                    
 				} else if (arg.equals("-t")) {
 
                     if ((opts.timeout = Integer.valueOf(args[++i])) < 0) {
@@ -550,6 +701,14 @@ public class NanoSparqlClient {
                         System.err.println("timeout: "
                                 + (opts.timeout == 0 ? "infinite" : (""
                                         + opts.timeout + "ms")));
+
+				} else if (arg.equals("-defaultGraph")) {
+
+					opts.defaultGraphUri = args[++i];
+
+                    if (opts.verbose)
+                        System.err.println("defaultGraph: "
+                                + opts.defaultGraphUri);
 
 				} else if (arg.equals("-help") || arg.equals("--?")) {
 
@@ -574,16 +733,6 @@ public class NanoSparqlClient {
 			} else {
 				usage();
 				System.exit(1);
-			}
-
-			if (opts.queryStr == null) {
-
-                if (opts.verbose) {
-                    System.err.println("Reading from stdin...");
-                }
-			    
-			    opts.queryStr = readFromStdin();
-			    
 			}
 
         } // parse command line.
@@ -611,15 +760,162 @@ public class NanoSparqlClient {
 //
 //		}
 
-		// Run the query, writes on stdout.
-        final long elapsed = new Query(/* client, */opts).call();
+        final String[] queries; // The query(s) to run.
+        final String[] sources; // The source for each query (stdin|filename).
+		if (file != null) {
 
-        if (!opts.quiet) {
-            // Show the query run time.
-            System.err.println("elapsed="
-                    + TimeUnit.NANOSECONDS.toMillis(elapsed) + "ms");
-        }
+			/*
+			 * Read the query(s) from the file system.
+			 */
+			
+			if (opts.verbose)
+				System.err.println("Reading query(s) from file: " + file);
+			
+			// Figure out which files will be read.
+			final List<File> fileList = new LinkedList<File>();
+
+			if (!opts.quiet)
+				System.err.println("Read " + fileList.size()
+						+ " queries from: " + file);
+			
+			getFiles(file, fileList);
+
+			// Read the query(s) from the file or directory.
+			queries = readQueries(fileList);
+
+			// Array of source filenames.
+			sources = new String[fileList.size()];
+			
+			int i = 0;
+			
+			for (File t : fileList) {
+
+				sources[i++] = t.toString();
+				
+			}
+
+		} else {
+
+			/*
+			 * Run a single query. Either the query was given as a command line
+			 * argument or we will read it from stdin now.
+			 */
+			
+			if (queryStr == null) {
+
+				if (opts.verbose)
+					System.err.println("Reading query from stdin...");
+
+				queryStr = readFromStdin();
+				
+				sources = new String[] { "stdin" };
+
+			} else {
+
+				sources = new String[] { "command line" };
+
+			}
+
+			// An array with just the one query.
+			queries = new String[] { queryStr };
+			
+		}
+
+		/*
+		 * The order in which those queries will be executed. The elements of
+		 * this array are indices into the query[]. The length of the array is
+		 * the #of queries given times the repeat count.
+		 */
+		final int[] order;
+		{
+			// Total #of trials to execute.
+			final int ntrials = queries.length * repeat;
+
+			// Determine the query presentation order.
+			if (seed == 0) {
+				// Run queries in the given order.
+				order = new int[ntrials];
+				for (int i = 0; i < ntrials; i++) {
+					order[i] = i;
+				}
+			} else {
+				// Run queries in a randomized order.
+				order = getRandomOrder(seed, ntrials);
+			}
+			// Now normalize the query index into [0:nqueries).
+			for (int i = 0; i < ntrials; i++) {
+				order[i] = order[i] % queries.length;
+			}
+		}
+
+		/*
+		 * Run trials.
+		 * 
+		 * @todo option for concurrent clients (must clone opts).
+		 */
+
+		//		System.err.println("order="+Arrays.toString(order));
 		
+		// cumulative elapsed nanos for each presentation of each query
+		final long[] elapsedTimes = new long[queries.length];
+		
+		for (int i = 0; i < order.length; i++) {
+
+			final int queryId = order[i];
+			
+			opts.queryStr = queries[queryId];
+			
+			final String source = sources[queryId];
+
+			// Run the query
+			final long elapsed;
+			{
+				final long begin = System.nanoTime();
+
+				/*
+				 * @todo modify to count results and return that rather than the
+				 * elapsed time, which we can figure out easily enough for
+				 * ourselves.
+				 */
+				new Query(/* client, */opts).call();
+
+				elapsed = System.nanoTime() - begin;
+
+				elapsedTimes[queryId] += elapsed;
+
+			}
+
+			if (!opts.quiet) {
+				// Show the query run time.
+				System.err.println("queryId=" + queryId + ", source=" + source
+						+ ", elapsed=" + TimeUnit.NANOSECONDS.toMillis(elapsed)
+						+ "ms");
+			}
+			
+		}
+
+		if (repeat > 1) {
+			
+			/*
+			 * Report the average running time for each query.
+			 * 
+			 * @todo track the #of results and verify that all runs of each
+			 * query return the same #of results.
+			 */
+			
+			System.out.println("source, average(ms)");
+
+			for (int i = 0; i < queries.length; i++) {
+
+				final long elapsedNanos = elapsedTimes[i] / repeat;
+
+				System.out.println(TimeUnit.NANOSECONDS.toMillis(elapsedNanos)
+						+ ", " + sources[i]);
+
+			}
+
+		}
+
 		// Normal exit.
 		System.exit(0);
 

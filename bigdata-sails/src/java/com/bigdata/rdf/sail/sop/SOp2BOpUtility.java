@@ -300,10 +300,12 @@ public class SOp2BOpUtility {
 			 * incorrect termination under some circumstances.
 			 */
             left = new SliceOp(new BOp[] { left }, NV.asMap(//
-                    new NV(BOp.Annotations.BOP_ID, idFactory
-                            .incrementAndGet()), //
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER)));
+					new NV(BOp.Annotations.BOP_ID, idFactory
+							.incrementAndGet()), //
+					new NV(BOp.Annotations.EVALUATION_CONTEXT,
+							BOpEvaluationContext.CONTROLLER),//
+					new NV(PipelineOp.Annotations.SHARED_STATE, true)//
+			));
         }
     	
     	return left;

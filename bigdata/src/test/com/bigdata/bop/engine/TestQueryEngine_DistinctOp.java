@@ -118,13 +118,13 @@ public class TestQueryEngine_DistinctOp extends TestCase2 {
         super(name);
     }
 
-	public void testStressThreadSafe() throws Exception {
+	public void test_something_StressThreadSafe() throws Exception {
 
 		for (int i = 0; i < 100; i++) {
 			
 			try {
 
-				test_distinct_threadSafe();
+				test_something_distinct_threadSafe();
 				
 			} catch (Throwable t) {
 				
@@ -139,7 +139,7 @@ public class TestQueryEngine_DistinctOp extends TestCase2 {
 	/**
 	 * @todo Unit test for DISTINCT. How to judge correctness?
 	 */
-	public void test_distinct_threadSafe() throws Exception {
+	public void test_something_distinct_threadSafe() throws Exception {
 
 		final long timeout = 10000; // ms
 

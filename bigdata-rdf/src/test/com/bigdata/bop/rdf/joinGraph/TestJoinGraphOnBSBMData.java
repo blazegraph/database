@@ -18,6 +18,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.controller.JoinGraph;
+import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.internal.XSDIntIV;
@@ -90,11 +91,11 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
      * When true, the test uses hardcoded access to an existing Journal already
      * loaded with some BSBM data set.
      */
-	private static final boolean useExistingJournal = false;
+	private static final boolean useExistingJournal = true;
 	
-    private static final long existingPC = 284826; // BSBM 100M
+//    private static final long existingPC = 284826; // BSBM 100M
 
-    // private static final long existingPC = 566496; // BSBM 200M
+     private static final long existingPC = 566496; // BSBM 200M
 
     private static final File existingJournal = new File("/data/bsbm/bsbm_"
             + existingPC + "/bigdata-bsbm.RW.jnl");
@@ -218,6 +219,8 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
      */
 	public void test_bsbm_q5() throws Exception {
 
+//		QueryLog.logTableHeader();
+		
 	    final String namespace = getNamespace();
 	    
 	    final AbstractTripleStore database = getDatabase(namespace);

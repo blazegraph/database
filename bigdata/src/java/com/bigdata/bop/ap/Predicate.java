@@ -349,7 +349,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
                 continue;
             }
 
-            tmp.set(i, val.clone());
+            tmp._set(i, val.clone());
             
 //            modified = true;
 

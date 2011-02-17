@@ -39,6 +39,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.R;
@@ -261,9 +262,7 @@ public class TestUnion extends TestCase2 {
     }
 
     /**
-     * Verifies that the UNION of two operators is computed. The operators do
-     * not route around the UNION, so their solutions are copied to the UNION
-     * and from the UNION to a slice.
+     * Verifies that the UNION of two operators is computed.
      * 
      * @throws Exception 
      */
@@ -319,96 +318,8 @@ public class TestUnion extends TestCase2 {
         final BOp sliceOp = new SliceOp(new BOp[]{unionOp},NV.asMap(
                 new NV(Union.Annotations.BOP_ID, sliceId),//
                 new NV(Union.Annotations.EVALUATION_CONTEXT,
-                        BOpEvaluationContext.CONTROLLER)//
-                ));
-        
-        final BOp query = sliceOp;
-
-        // the expected solutions.
-        final IBindingSet[] expected = new IBindingSet[] {//
-        new ArrayBindingSet(//
-            new IVariable[] { x },//
-            new IConstant[] { new Constant<String>("Leon") }//
-            ), //
-        new ArrayBindingSet(//
-            new IVariable[] { x, y },//
-            new IConstant[] { new Constant<String>("Mary"), 
-                new Constant<String>("John") }//
-        ),//
-        };
-
-        final IRunningQuery runningQuery = queryEngine.eval(query);
-
-        // verify solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected,
-                new Dechunkerator<IBindingSet>(runningQuery.iterator()));
-
-        // Wait until the query is done.
-        runningQuery.get();
-
-    }
-
-    /**
-     * Verifies that the UNION of two operators is computed. The operators route
-     * around the UNION to its parent, which is a SLICE.
-     * 
-     * @throws Exception
-     */
-    public void test_union_routeAround() throws Exception {
-
-        final int startId1 = 1;
-        final int startId2 = 2;
-        final int unionId = 3;
-        final int sliceId = 4;
-
-        final IVariable<?> x = Var.var("x");
-        final IVariable<?> y = Var.var("y");
-        
-        final IBindingSet[] bindingSets1 = new IBindingSet[1];
-        {
-            final IBindingSet tmp = new HashBindingSet();
-            tmp.set(x, new Constant<String>("Leon"));
-            bindingSets1[0] = tmp;
-        }
-        
-        final IBindingSet[] bindingSets2 = new IBindingSet[1];
-        {
-            final IBindingSet tmp = new HashBindingSet();
-            tmp.set(x, new Constant<String>("Mary"));
-            tmp.set(y, new Constant<String>("John"));
-            bindingSets2[0] = tmp;
-        }
-        
-        final BOp startOp1 = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
-                new NV(StartOp.Annotations.BOP_ID, startId1),//
-                new NV(StartOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
-                new NV(StartOp.Annotations.SINK_REF, sliceId),//
-                new NV(StartOp.Annotations.BINDING_SETS,bindingSets1)
-                }));
-
-        final BOp startOp2 = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
-                new NV(StartOp.Annotations.BOP_ID, startId2),//
-                new NV(StartOp.Annotations.EVALUATION_CONTEXT,
-                        BOpEvaluationContext.CONTROLLER),//
-                    new NV(StartOp.Annotations.SINK_REF, sliceId),//
-                new NV(StartOp.Annotations.BINDING_SETS,bindingSets2)
-                }));
-
-        final BOp unionOp = new Union(new BOp[] {}, NV
-                .asMap(new NV[] {//
-                        new NV(Union.Annotations.BOP_ID, unionId),//
-                        new NV(Union.Annotations.SUBQUERIES, new BOp[] {
-                                startOp1, startOp2 }) //
-//                        new NV(Union.Annotations.EVALUATION_CONTEXT,
-//                                BOpEvaluationContext.CONTROLLER),//
-//                        new NV(Union.Annotations.CONTROLLER, true),//
-                }));
-
-        final BOp sliceOp = new SliceOp(new BOp[]{unionOp},NV.asMap(
-                new NV(Union.Annotations.BOP_ID, sliceId),//
-                new NV(Union.Annotations.EVALUATION_CONTEXT,
-                        BOpEvaluationContext.CONTROLLER)//
+                new NV(PipelineOp.Annotations.SHARED_STATE,true)//
                 ));
         
         final BOp query = sliceOp;

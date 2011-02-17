@@ -226,6 +226,7 @@ public class TestQueryEngine_SortOp extends TestCase2 {
                 new NV(MemorySortOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(MemorySortOp.Annotations.PIPELINED, false),//
+                new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
         }));
 
         final UUID queryId = UUID.randomUUID();

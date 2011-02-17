@@ -94,6 +94,7 @@ public class TestMemorySortOp extends TestCase2 {
 				new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
 						BOpEvaluationContext.CONTROLLER),//
 				new NV(MemorySortOp.Annotations.PIPELINED, false),//
+				new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
 		}));
 
         //

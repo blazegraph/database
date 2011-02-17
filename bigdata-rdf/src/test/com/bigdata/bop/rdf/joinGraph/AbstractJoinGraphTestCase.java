@@ -102,7 +102,7 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
      * The #of times to run each query. Use N GT ONE (1) if you want to converge
      * onto the hot query performance.
      */
-    static private final int ntrials = 1;
+    static private final int ntrials = 10;
 
     /**
      * When <code>true</code> evaluates the query using the given join ordering.

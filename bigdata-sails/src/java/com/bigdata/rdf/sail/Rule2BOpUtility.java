@@ -266,7 +266,9 @@ public class Rule2BOpUtility {
                         new NV(BOp.Annotations.BOP_ID, idFactory
                                 .incrementAndGet()), //
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.CONTROLLER)));
+                                BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.SHARED_STATE,true)//
+                        ));
 
             }
 
@@ -1367,7 +1369,7 @@ public class Rule2BOpUtility {
 //        anns.add(new NV(Union.Annotations.CONTROLLER, true));
         
         if (!isParallel)
-            anns.add(new NV(Union.Annotations.MAX_PARALLEL, 1));
+            anns.add(new NV(Union.Annotations.MAX_PARALLEL_SUBQUERIES, 1));
 
         final PipelineOp thisOp;
         if (isParallel) {

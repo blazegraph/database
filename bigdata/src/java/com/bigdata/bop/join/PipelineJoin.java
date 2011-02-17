@@ -150,7 +150,7 @@ public class PipelineJoin<E> extends PipelineOp implements
          * patterns in the variable bindings (optional).
          */
         String CONSTRAINTS = PipelineJoin.class.getName() + ".constraints";
-        
+
 		/**
 		 * The maximum parallelism with which the pipeline will consume the
 		 * source {@link IBindingSet}[] chunk.
@@ -160,12 +160,24 @@ public class PipelineJoin<E> extends PipelineOp implements
 		 * task which is executing concurrently against different source chunks.
 		 * When GT ZERO (0), tasks will run on an {@link ExecutorService} with
 		 * the specified maximum parallelism.
+		 * <p>
+		 * Note: This is NOT the same as
+		 * {@link PipelineOp.Annotations#MAX_PARALLEL}. This option (
+		 * {@link #MAX_PARALLEL_CHUNKS} limits the #of chunks for a single task
+		 * which may be processed concurrently.
+		 * {@link PipelineOp.Annotations#MAX_PARALLEL} limits the #of task
+		 * instances which may run concurrently.
 		 * 
-		 * @see #DEFAULT_MAX_PARALLEL
+		 * @see #DEFAULT_MAX_PARALLEL_CHUNKS
+		 * 
+		 * @todo Chunk level parallelism does not appear to benefit us when
+		 *       using the ChunkedRunningQuery class and the new QueryEngine, so
+		 *       this option might well go away which would allow us to simplify
+		 *       the PipelineJoin implementation.
 		 */
-		String MAX_PARALLEL = PipelineJoin.class.getName() + ".maxParallel";
+		String MAX_PARALLEL_CHUNKS = PipelineJoin.class.getName() + ".maxParallelChunks";
 
-		int DEFAULT_MAX_PARALLEL = 0;
+		int DEFAULT_MAX_PARALLEL_CHUNKS = 0;
 
 		/**
 		 * When <code>true</code>, binding sets observed in the same chunk which
@@ -264,8 +276,8 @@ public class PipelineJoin<E> extends PipelineOp implements
 		 * executed. However, when a cutoff join is used to estimate the join
 		 * hit ratio a measurement error can be introduced into the join hit
 		 * ratio unless {@link Annotations#COALESCE_DUPLICATE_ACCESS_PATHS} is
-		 * <code>false</code> and {@link Annotations#MAX_PARALLEL} is GT ZERO
-		 * (0).
+		 * <code>false</code>, {@link Annotations#MAX_PARALLEL} is GT ONE (1),
+		 * or {@link Annotations#MAX_PARALLEL_CHUNKS} is GT ZERO (0).
 		 * <p>
 		 * When access paths are coalesced because there is an inner loop over
 		 * the input solutions mapped onto the same access path. This inner loop
@@ -286,11 +298,12 @@ public class PipelineJoin<E> extends PipelineOp implements
 		 * of <code>100/2</code> when the actual join hit ratio is
 		 * <code>100/1</code>.
 		 * <p>
-		 * A similar problem can occur if {@link Annotations#MAX_PARALLEL} is GT
-		 * ONE (1) since input count can be incremented by the #of threads
-		 * before any output solutions are generated. Estimation error can also
-		 * occur if multiple join tasks are run in parallel for different chunks
-		 * of input solutions.
+		 * A similar problem can occur if {@link Annotations#MAX_PARALLEL} or
+		 * {@link Annotations#MAX_PARALLEL_CHUNKS} is GT ONE (1) since input
+		 * count can be incremented by the #of threads before any output
+		 * solutions are generated. Estimation error can also occur if multiple
+		 * join tasks are run in parallel for different chunks of input
+		 * solutions.
 		 */
 		public double getJoinHitRatio() {
 			final long in = inputSolutions.get();
@@ -469,13 +482,13 @@ public class PipelineJoin<E> extends PipelineOp implements
     }
     
 	/**
-	 * @see Annotations#MAX_PARALLEL
+	 * @see Annotations#MAX_PARALLEL_CHUNKS
 	 */
-	public int getMaxParallel() {
+	public int getMaxParallelChunks() {
 
 		// return 5;
-		return getProperty(Annotations.MAX_PARALLEL,
-				Annotations.DEFAULT_MAX_PARALLEL);
+		return getProperty(Annotations.MAX_PARALLEL_CHUNKS,
+				Annotations.DEFAULT_MAX_PARALLEL_CHUNKS);
 
 	}
 
@@ -521,14 +534,14 @@ public class PipelineJoin<E> extends PipelineOp implements
 		 * The maximum parallelism with which the {@link JoinTask} will consume
 		 * the source {@link IBindingSet}s.
 		 * 
-		 * @see Annotations#MAX_PARALLEL
+		 * @see Annotations#MAX_PARALLEL_CHUNKS
 		 */
-		final private int maxParallel;
+		final private int maxParallelChunks;
 
 		/**
 		 * The service used for executing subtasks (optional).
 		 * 
-		 * @see #maxParallel
+		 * @see #maxParallelChunks
 		 */
 		final private Executor service;
 
@@ -667,14 +680,14 @@ public class PipelineJoin<E> extends PipelineOp implements
 			this.joinOp = joinOp;
 			this.predicate = joinOp.getPredicate();
 			this.constraints = joinOp.constraints();
-			this.maxParallel = joinOp.getMaxParallel();
-			if (maxParallel < 0)
-				throw new IllegalArgumentException(Annotations.MAX_PARALLEL
-						+ "=" + maxParallel);
-			if (maxParallel > 0) {
+			this.maxParallelChunks = joinOp.getMaxParallelChunks();
+			if (maxParallelChunks < 0)
+				throw new IllegalArgumentException(Annotations.MAX_PARALLEL_CHUNKS
+						+ "=" + maxParallelChunks);
+			if (maxParallelChunks > 0) {
 				// shared service.
 				service = new LatchedExecutor(context.getIndexManager()
-						.getExecutorService(), maxParallel);
+						.getExecutorService(), maxParallelChunks);
 			} else {
 				// run in the caller's thread.
 				service = null;
@@ -1070,15 +1083,15 @@ public class PipelineJoin<E> extends PipelineOp implements
 					return null;
 
 				} catch (Throwable t) {
-
 					// ensure query halts.
 					halt(t);
 					if (getCause() != null) {
 						// abnormal termination.
-						throw new RuntimeException(t);
+						log.error("Halting join (abnormal termination): t="+t+" : cause="+getCause());
+						throw new RuntimeException("Halting join: " + t, t);
 					}
-					// normal terminate - ignore exception.
-					return null;
+					// normal termination - ignore exception.
+					log.warn("Caught and ignored exception: "+t); return null;
 					
 				}
 
@@ -1670,7 +1683,9 @@ public class PipelineJoin<E> extends PipelineOp implements
 						/*
 						 * Note: when NO binding sets were accepted AND the
 						 * predicate is OPTIONAL then we output the _original_
-						 * binding set(s) to the sink join task(s).
+						 * binding set(s) to the sink join task(s), but the
+						 * original binding set still must pass any constraint
+						 * on the join.
 						 */
 
 						// Thread-local buffer iff optional sink is in use.
