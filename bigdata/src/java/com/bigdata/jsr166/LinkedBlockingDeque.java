@@ -125,13 +125,13 @@ public class LinkedBlockingDeque<E>
     private final int capacity;
 
     /** Main lock guarding all access */
-    final ReentrantLock lock = new ReentrantLock();
+    final ReentrantLock lock;// = new ReentrantLock();
 
     /** Condition for waiting takes */
-    private final Condition notEmpty = lock.newCondition();
+    private final Condition notEmpty;// = lock.newCondition();
 
     /** Condition for waiting puts */
-    private final Condition notFull = lock.newCondition();
+    private final Condition notFull;// = lock.newCondition();
 
     /**
      * Creates a {@code LinkedBlockingDeque} with a capacity of
@@ -142,14 +142,52 @@ public class LinkedBlockingDeque<E>
     }
 
     /**
+     * Creates a {@code LinkedBlockingDeque} with a capacity of
+     * {@link Integer#MAX_VALUE} using the caller's lock.
+     */
+    public LinkedBlockingDeque(final ReentrantLock lock) {
+        this(Integer.MAX_VALUE, lock);
+    }
+
+    /**
      * Creates a {@code LinkedBlockingDeque} with the given (fixed) capacity.
      *
      * @param capacity the capacity of this deque
      * @throws IllegalArgumentException if {@code capacity} is less than 1
      */
     public LinkedBlockingDeque(int capacity) {
+        this(capacity, new ReentrantLock());
+//        if (capacity <= 0) throw new IllegalArgumentException();
+//        this.capacity = capacity;
+    }
+
+    /**
+     * Creates a {@code LinkedBlockingDeque} with the given (fixed) capacity and
+     * the caller's {@link ReentrantLock} object.
+     * <p>
+     * <strong>Caution:</strong> By using the caller's lock, this constructor
+     * allows the caller to break the encapsulation of the synchronization and
+     * lock-based notification (signals). This can be used advantageously to
+     * create designs where an outer lock is shared by the collection which
+     * avoid deadlock arising from blocking operations on an inner lock while
+     * holding a distinct outer lock. However, the caller's decisions about its
+     * lock are no longer independent of the design decisions within this class
+     * since they share the same lock.
+     * 
+     * @param capacity
+     *            the capacity of this deque
+     * @param lock
+     *            the lock object.
+     * @throws IllegalArgumentException
+     *             if {@code capacity} is less than 1
+     */
+    public LinkedBlockingDeque(final int capacity, final ReentrantLock lock) {
         if (capacity <= 0) throw new IllegalArgumentException();
+        if (lock == null) throw new NullPointerException();
         this.capacity = capacity;
+        this.lock = lock;
+        this.notEmpty = lock.newCondition();
+        this.notFull = lock.newCondition();
     }
 
     /**
