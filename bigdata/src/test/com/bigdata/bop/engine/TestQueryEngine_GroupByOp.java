@@ -118,13 +118,13 @@ public class TestQueryEngine_GroupByOp extends TestCase2 {
         super(name);
     }
 
-	public void testStressThreadSafe() throws Exception {
+	public void test_something_StressThreadSafe() throws Exception {
 
 		for (int i = 0; i < 100; i++) {
 			
 			try {
 
-				test_groupBy_threadSafe();
+				test_something_groupBy_threadSafe();
 				
 			} catch (Throwable t) {
 				
@@ -139,7 +139,7 @@ public class TestQueryEngine_GroupByOp extends TestCase2 {
 	/**
 	 * @todo Unit test for GROUP BY. How to judge correctness?
 	 */
-	public void test_groupBy_threadSafe() throws Exception {
+	public void test_something_groupBy_threadSafe() throws Exception {
 
 		final long timeout = 10000; // ms
 

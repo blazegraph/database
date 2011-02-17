@@ -32,6 +32,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
+import com.bigdata.bop.aggregate.AggregateBase.FunctionCode;
 import com.bigdata.rdf.internal.IV;
 
 /**
@@ -40,6 +41,10 @@ import com.bigdata.rdf.internal.IV;
  * available.
  * 
  * @author thompsonbry
+ * 
+ * @deprecated I am not convinced that a concrete operator can be implemented in
+ *             this manner rather than by a tight integration with the GROUP_BY
+ *             operator implementation.
  */
 public class SAMPLE extends AggregateBase<IV> implements IAggregate<IV> {
 
@@ -57,7 +62,7 @@ public class SAMPLE extends AggregateBase<IV> implements IAggregate<IV> {
 	}
 
 	public SAMPLE(boolean distinct, IValueExpression<IV> expr) {
-		super(distinct, expr);
+		super(FunctionCode.SAMPLE,distinct, expr);
 	}
 	
 	/**
@@ -67,7 +72,6 @@ public class SAMPLE extends AggregateBase<IV> implements IAggregate<IV> {
 	 */
 	private transient IV sample = null;
 	
-	@Override
 	synchronized
 	public IV get(final IBindingSet bindingSet) {
 

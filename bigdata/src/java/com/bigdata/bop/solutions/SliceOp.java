@@ -141,6 +141,10 @@ public class SliceOp extends PipelineOp {
                             + getEvaluationContext());
         }
 
+		if (!isSharedState())
+			throw new UnsupportedOperationException(Annotations.SHARED_STATE
+					+ "=" + isSharedState());
+                
     }
 
     /**
@@ -161,19 +165,19 @@ public class SliceOp extends PipelineOp {
         
     }
 
-    /**
-     * Overridden to return <code>true</code> since the correct decision
-     * semantics for the slice depend on concurrent invocations for the same
-     * query having the same {@link SliceStats} object.
-     * <p>
-     * {@inheritDoc}
-     */
-    @Override
-    final public boolean isSharedState() {
-        
-        return true;
-        
-    }
+//    /**
+//     * Overridden to return <code>true</code> since the correct decision
+//     * semantics for the slice depend on concurrent invocations for the same
+//     * query having the same {@link SliceStats} object.
+//     * <p>
+//     * {@inheritDoc}
+//     */
+//    @Override
+//    final public boolean isSharedState() {
+//        
+//        return true;
+//        
+//    }
     
     /**
      * Extends {@link BOpStats} to capture the state of the {@link SliceOp}.

@@ -191,6 +191,7 @@ public class TestQueryEngine_Slice extends TestCase2 {
 
         final SliceOp query = new SliceOp(new BOp[] {startOp}, NV.asMap(new NV[] {//
                 new NV(SliceOp.Annotations.BOP_ID, sliceId),//
+            	new NV(SliceOp.Annotations.SHARED_STATE,true),//
                         new NV(SliceOp.Annotations.OFFSET, offset),//
                         new NV(SliceOp.Annotations.LIMIT, limit),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,

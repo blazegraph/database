@@ -246,6 +246,36 @@ public class BOpBase implements BOp {
         return args[index];
         
     }
+
+//	/**
+//	 * Return a new {@link BOp} where the specified argument has been replaced
+//	 * by the given value. This is a copy-on-write operation. The original
+//	 * {@link BOp} is NOT modified by this method.
+//	 * 
+//	 * @param index
+//	 *            The index of the argument whose value will be changed.
+//	 * @param arg
+//	 *            The new value for that argument.
+//	 * 
+//	 * @return A new operator in which the given argument has been replaced.
+//	 * 
+//	 * @throws IndexOutOfBoundsException
+//	 *             unless <i>index</i> is in (0:{@link #arity()}].
+//	 * @throws IllegalArgumentException
+//	 *             if <i>arg</i> is <code>null</code>.
+//	 */
+//    public BOp setArg(final int index,final BOp arg) {
+//    	
+//    	if(arg == null)
+//    		throw new IllegalArgumentException();
+//    	
+//    	final BOpBase tmp = this.clone();
+//    	
+//    	tmp._set(index, arg);
+//    	
+//    	return tmp;
+//    	
+//    }
     
     /**
      * Set the value of an operand.
@@ -264,7 +294,7 @@ public class BOpBase implements BOp {
      * 
      * @todo thread safety and visibility....
      */
-    final protected void set(final int index, final BOp op) {
+    final protected void _set(final int index, final BOp op) {
         
         this.args[index] = op;
         

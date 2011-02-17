@@ -43,6 +43,10 @@ import com.bigdata.rdf.internal.XSDLongIV;
  * 
  *         FIXME The application of COUNT(*) must explicitly recognize the
  *         special variable <code>*</code>
+ * 
+ * @deprecated I am not convinced that a concrete operator can be implemented in
+ *             this manner rather than by a tight integration with the GROUP_BY
+ *             operator implementation.
  */
 public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
 
@@ -60,7 +64,7 @@ public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
 	}
 
 	public COUNT(final boolean distinct, IValueExpression<IV> expr) {
-		super(distinct, expr);
+		super(FunctionCode.COUNT,distinct, expr);
 	}
 	
 	/**
@@ -76,7 +80,6 @@ public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
 	 * Note: COUNT() returns ZERO if there are no non-error solutions presented.
 	 * This assumes that the ZERO will be an xsd:long.
 	 */
-	@Override
 	synchronized
 	public IV get(final IBindingSet bindingSet) {
 
@@ -95,14 +98,14 @@ public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
 
 	}
 
-	/**
-	 * Overridden to allow <code>COUNT(*)</code>. 
-	 */
-	@Override
-	final public boolean isWildcardAllowed() {
-
-		return true;
-		
-	}
+//	/**
+//	 * Overridden to allow <code>COUNT(*)</code>. 
+//	 */
+//	@Override
+//	final public boolean isWildcardAllowed() {
+//
+//		return true;
+//		
+//	}
 
 }

@@ -79,7 +79,8 @@ public class BOpContext<E> extends BOpContextBase {
 	 * <ol>
 	 * <li>{@link BOp.Annotations#EVALUATION_CONTEXT} is
 	 * {@link BOpEvaluationContext#CONTROLLER}</li>
-	 * <li>{@link PipelineOp.Annotations#THREAD_SAFE} is <code>false</code></li>
+	 * <li>{@link PipelineOp.Annotations#MAX_PARALLEL} is <code>1</code></li>
+	 * <li>{@link PipelineOp.Annotations#PIPELINED} is <code>true</code></li>
 	 * </ol>
 	 * Under these circumstances, it is possible for the {@link IQueryClient} to
 	 * atomically decide that a specific invocation of the operator task for the
@@ -90,7 +91,8 @@ public class BOpContext<E> extends BOpContextBase {
 	 * controller. In addition, the operator must declare that it is NOT thread
 	 * safe in order for the query engine to serialize its evaluation tasks.
 	 * 
-	 * @return
+	 * @todo This should be a ctor parameter.  We just have to update the test
+	 * suites for the changed method signature.
 	 */
     public boolean isLastInvocation() {
     	return lastInvocation.get();

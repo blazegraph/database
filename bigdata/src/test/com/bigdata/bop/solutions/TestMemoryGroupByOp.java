@@ -91,6 +91,12 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
  * 
  * @todo Is it possible to test these aggregation operators without testing at
  *       the SPARQL level?
+ * 
+ * @todo Benchmark against the Barton library data set and queries per <a
+ *       href="http://cs-www.cs.yale.edu/homes/dna/abadirdf.pdf">the original
+ *       vertical partitioning for RDF paper</a>, <a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.140.6138&rep=rep1&type=pdf"
+ *       >the not all swans are black</a> paper, and <a
+ *       href="http://simile.mit.edu/rdf-test-data/barton/">the data set</a>.
  */
 public class TestMemoryGroupByOp extends TestCase2 {
 
@@ -161,7 +167,7 @@ public class TestMemoryGroupByOp extends TestCase2 {
 	 * @throws ExecutionException
 	 * @throws InterruptedException
 	 */
-	public void test_simpleGroupBy() {
+	public void test_something_simpleGroupBy() {
 
 		final IVariable<?> org = Var.var("org");
 		final IVariable<?> auth = Var.var("auth");
@@ -191,15 +197,17 @@ public class TestMemoryGroupByOp extends TestCase2 {
 						new NV(BOp.Annotations.EVALUATION_CONTEXT,
 								BOpEvaluationContext.CONTROLLER),//
 						new NV(PipelineOp.Annotations.PIPELINED, true),//
-						new NV(PipelineOp.Annotations.THREAD_SAFE, false),//
-						new NV(GroupByOp.Annotations.SELECT, //
-								new IVariable[] { org, lprice }), //
-						new NV(GroupByOp.Annotations.COMPUTE,//
-								new IValueExpression[] { new SUMInt(
-										false/* distinct */,
-										(IValueExpression) lprice) }), //
-						new NV(GroupByOp.Annotations.GROUP_BY,//
-								new IValueExpression[] { org }) //
+						new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+//						new NV(GroupByOp.Annotations.SELECT, //
+//								new IValueExpression[] { org, new SUMInt(
+//										false/* distinct */,
+//										(IValueExpression) lprice)}), //
+//						new NV(GroupByOp.Annotations.GROUP_BY,//
+//								new IValueExpression[] { org }) //
+//						new NV(GroupByOp.Annotations.COMPUTE,//
+//								new IValueExpression[] { new SUMInt(
+//										false/* distinct */,
+//										(IValueExpression) lprice) }), //
 				}));
 
         /* the test data:
@@ -277,55 +285,61 @@ public class TestMemoryGroupByOp extends TestCase2 {
 
 	}
 
-	private static class SUMInt extends AggregateBase<Integer> implements IAggregate<Integer> {
-
-		/**
-		 * 
-		 */
-		private static final long serialVersionUID = 1L;
-
-		public SUMInt(BOpBase op) {
-			super(op);
-		}
-
-		public SUMInt(BOp[] args, Map<String, Object> annotations) {
-			super(args, annotations);
-		}
-
-		public SUMInt(boolean distinct, IValueExpression<Integer> expr) {
-			super(distinct, expr);
-		}
-
-		/**
-		 * The running aggregate value.
-		 * <p>
-		 * Note: SUM() returns ZERO if there are no non-error solutions
-		 * presented.
-		 * <p>
-		 * Note: This field is guarded by the monitor on the {@link SUMInt}
-		 * instance.
-		 */
-		private transient int aggregated = 0;
-		
-		@Override
-		synchronized
-		public Integer get(final IBindingSet bindingSet) {
-
-			final IValueExpression<Integer> var = (IValueExpression<Integer>) get(0);
-
-			final Integer val = (Integer) var.get(bindingSet);
-
-			if (val != null) {
-
-				// aggregate non-null values.
-				aggregated += val;
-
-			}
-
-			return Integer.valueOf(aggregated);
-
-		}
-
-	}
+//	/**
+//	 * 
+//	 * @deprecated I am not convinced that a concrete operator can be
+//	 *             implemented in this manner rather than by a tight integration
+//	 *             with the GROUP_BY operator implementation.
+//	 */
+//	private static class SUMInt extends AggregateBase<Integer> implements IAggregate<Integer> {
+//
+//		/**
+//		 * 
+//		 */
+//		private static final long serialVersionUID = 1L;
+//
+//		public SUMInt(BOpBase op) {
+//			super(op);
+//		}
+//
+//		public SUMInt(BOp[] args, Map<String, Object> annotations) {
+//			super(args, annotations);
+//		}
+//
+//		public SUMInt(boolean distinct, IValueExpression<Integer> expr) {
+//			super(distinct, expr);
+//		}
+//
+//		/**
+//		 * The running aggregate value.
+//		 * <p>
+//		 * Note: SUM() returns ZERO if there are no non-error solutions
+//		 * presented.
+//		 * <p>
+//		 * Note: This field is guarded by the monitor on the {@link SUMInt}
+//		 * instance.
+//		 */
+//		private transient int aggregated = 0;
+//		
+//		@Override
+//		synchronized
+//		public Integer get(final IBindingSet bindingSet) {
+//
+//			final IValueExpression<Integer> var = (IValueExpression<Integer>) get(0);
+//
+//			final Integer val = (Integer) var.get(bindingSet);
+//
+//			if (val != null) {
+//
+//				// aggregate non-null values.
+//				aggregated += val;
+//
+//			}
+//
+//			return Integer.valueOf(aggregated);
+//
+//		}
+//
+//	}
 
 }

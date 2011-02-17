@@ -1,6 +1,30 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.bop.solutions;
 
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +39,7 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.ConcurrentHashMapAnnotations;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
@@ -90,43 +115,34 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * [106]  	BuiltInCall	      ::=  	'STR' '(' Expression ')' ....
  * </pre>
  * 
- *       FIXME The aggregate functions can have the optional keyword DISTINCT
- *       which forces the application to the distinct solutions within each
- *       group. [COUNT(DISTINCT *) appears to have some special semantics as
- *       well, but I can't figure out what the difference is from the use of
- *       DISTINCT with other aggregate operators unless it applies to the set of
- *       variables which are used to impose DISTINCT on the solutions within the
- *       group.]
- *       
- *       I've proven to my satisfaction that MySQL is behaving as per your description of the SPARQL semantics even when there are multiple columns in the aggregated solutions.  It examines the distinct values within each  group for the computed value of the expression within the aggregate function.
-
-mysql> select * from test;
-+------+------+------+
-| s    | i    | j    |
-+------+------+------+
-| A    |    1 |    1 | 
-| A    |    1 |    2 | 
-| A    |    1 |    3 | 
-| A    |    1 |    4 | 
-+------+------+------+
-4 rows in set (0.00 sec)
-
-mysql> select sum(i), sum(j), sum(distinct i), sum(distinct j), sum(i+j), sum(distinct i+j) from test;
-+--------+--------+-----------------+-----------------+----------+-------------------+
-| sum(i) | sum(j) | sum(distinct i) | sum(distinct j) | sum(i+j) | sum(distinct i+j) |
-+--------+--------+-----------------+-----------------+----------+-------------------+
-|      4 |     10 |               1 |              10 |       14 |                14 | 
-+--------+--------+-----------------+-----------------+----------+-------------------+
-1 row in set (0.00 sec)
-
-mysql> select sum(i), sum(j), sum(distinct i), sum(distinct j), sum(i+j), sum(distinct i+j) from test group by s;
-+--------+--------+-----------------+-----------------+----------+-------------------+
-| sum(i) | sum(j) | sum(distinct i) | sum(distinct j) | sum(i+j) | sum(distinct i+j) |
-+--------+--------+-----------------+-----------------+----------+-------------------+
-|      4 |     10 |               1 |              10 |       14 |                14 | 
-+--------+--------+-----------------+-----------------+----------+-------------------+
-1 row in set (0.00 sec)
-
+ *       FIXME The aggregate functions can have the optional keyword DISTINCT.
+ *       When present, the aggregation function needs to operate over the
+ *       distinct computed values for its value expression within each solution
+ *       group. Thus, the DISTINCT keyword within the aggregate function makes
+ *       it impossible to undertake certain optimizations where the aggregate
+ *       can be computed without first materializing the computed values for its
+ *       value expressions.
+ *       <p>
+ *       The other exception is COUNT(DISTINCT *), where the DISTINCT is applied
+ *       to the solutions in the group rather than to the column (this is not
+ *       supported by MySQL and might not be valid SQL).
+ *       <p>
+ *       So, if we always materialize the grouped value expressions, we can then
+ *       run the aggregate functions afterwards. In fact, the approach could be
+ *       broken down into distinct stages which: (a) compute value expressions;
+ *       (b) group solutions; (c) compute aggregates. This staging also works
+ *       when the GROUPs are themselves computed expressions. (This might even
+ *       be inherently more parallelizable, e.g., on a GPU. Also, a column
+ *       projection would be a natural fit when computing the aggregates.)
+ *       <p>
+ *       It is possible to roll all of these stages together and do less work.
+ *       The savings from computing all stages at once would be one pass over
+ *       the solutions, directly generating the aggregated grouped solutions
+ *       versus three passes. We can still do this if the keyword DISTINCT is
+ *       used by any of the aggregate functions if we use a pipelined hash table
+ *       as a distinct filter on the computed value expressions. So, this
+ *       suggests two implementations: a three-stage operator and a single stage
+ *       operator which optionally uses embedded pipelined DISTINCT filters.
  */
 public class MemoryGroupByOp extends GroupByOp {
 
@@ -174,9 +190,9 @@ public class MemoryGroupByOp extends GroupByOp {
 		}
 
 		// single threaded required for pipelining w/ isLastInvocation() hook.
-		if (isThreadSafe()) {
-			throw new UnsupportedOperationException(Annotations.THREAD_SAFE
-					+ "=" + isThreadSafe());
+		if (getMaxParallel() != 1) {
+			throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
+					+ "=" + getMaxParallel());
 		}
 
 		// operator is pipelined, but relies on isLastEvaluation() hook.
@@ -327,15 +343,19 @@ public class MemoryGroupByOp extends GroupByOp {
 		 * 
 		 */
 		private static final long serialVersionUID = 1L;
-		
+
 		/**
-         * A concurrent map whose keys are the bindings on the specified
-         * variables (the keys and the values are the same since the map
-         * implementation does not allow <code>null</code> values).
+		 * A concurrent map whose keys are the bindings on the specified
+		 * variables (the keys and the values are the same since the map
+		 * implementation does not allow <code>null</code> values).
 		 * <p>
 		 * Note: The map is shared state and can not be discarded or cleared
 		 * until the last invocation!!!
-         */
+		 * 
+		 * @todo The operator is single threaded so use a {@link LinkedHashMap}
+		 *       and the {@link HashMapAnnotations} rather than the
+		 *       {@link ConcurrentHashMapAnnotations}
+		 */
         private /*final*/ ConcurrentHashMap<SolutionGroup, SolutionGroup> map;
 
     	public GroupByStats(final MemoryGroupByOp op) {
@@ -371,11 +391,11 @@ public class MemoryGroupByOp extends GroupByOp {
          */
         private final IValueExpression<?>[] groupBy;
 
-		/**
-		 * The {@link IValueExpression}s used to compute each of the variables
-		 * in the aggregated solutions.
-		 */
-        private final IValueExpression<?>[] compute;
+//		/**
+//		 * The {@link IValueExpression}s used to compute each of the variables
+//		 * in the aggregated solutions.
+//		 */
+//        private final IValueExpression<?>[] compute;
         
         /**
          * Optional constraints applied to the aggregated solutions.
@@ -404,28 +424,28 @@ public class MemoryGroupByOp extends GroupByOp {
             if (groupBy.length == 0)
                 throw new IllegalArgumentException();
 
-			/*
-			 * Must be non-null, and non-empty array. Any variables in the
-			 * source solutions may only appear within aggregation operators
-			 * such as SUM, COUNT, etc. Variables declared in [compute] may be
-			 * referenced inside the value expressions as long as they do not
-			 * appear within an aggregation function, but they they must be
-			 * defined earlier in the ordered compute[]. The value expressions
-			 * must include an assignment to the appropriate aggregate variable.
-			 * 
-			 * FIXME This must include a LET or BIND to assign the computed
-			 * value to the appropriate variable.
-			 * 
-			 * FIXME verify references to unaggregated and aggregated variables.
-			 */
-			this.compute = (IValueExpression<?>[]) op
-					.getRequiredProperty(GroupByOp.Annotations.COMPUTE);
-
-            if (compute == null)
-                throw new IllegalArgumentException();
-
-            if (compute.length == 0)
-                throw new IllegalArgumentException();
+//			/*
+//			 * Must be non-null, and non-empty array. Any variables in the
+//			 * source solutions may only appear within aggregation operators
+//			 * such as SUM, COUNT, etc. Variables declared in [compute] may be
+//			 * referenced inside the value expressions as long as they do not
+//			 * appear within an aggregation function, but they they must be
+//			 * defined earlier in the ordered compute[]. The value expressions
+//			 * must include an assignment to the appropriate aggregate variable.
+//			 * 
+//			 * FIXME This must include a LET or BIND to assign the computed
+//			 * value to the appropriate variable.
+//			 * 
+//			 * FIXME verify references to unaggregated and aggregated variables.
+//			 */
+//			this.compute = (IValueExpression<?>[]) op
+//					.getRequiredProperty(GroupByOp.Annotations.COMPUTE);
+//
+//            if (compute == null)
+//                throw new IllegalArgumentException();
+//
+//            if (compute.length == 0)
+//                throw new IllegalArgumentException();
 
             // may be null or empty[].
             this.having = (IConstraint[]) op
@@ -513,7 +533,7 @@ public class MemoryGroupByOp extends GroupByOp {
 						final SolutionGroup solutionGroup = accept(bset);
 
 						// aggregate the bindings
-						solutionGroup.aggregate(bset, compute);
+						solutionGroup.aggregate(bset, null/*FIXME compute*/);
 
 					}
 

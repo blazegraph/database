@@ -405,6 +405,33 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     }
 
+	/**
+	 * Return the {@link BOp} having the specified id.
+	 * 
+	 * @param bopId
+	 *            The {@link BOp} identifier.
+	 * 
+	 * @return The {@link BOp}.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if there is no {@link BOp} with that identifier declared in
+	 *             this query.
+	 */
+	final public BOp getBOp(final int bopId) {
+
+		final BOp bop = getBOpIndex().get(bopId);
+
+		if (bop == null) {
+
+			throw new IllegalArgumentException("Not found: id=" + bopId
+					+ ", query=" + query);
+
+		}
+
+		return bop;
+    	
+    }
+
     /**
      * @param queryEngine
      *            The {@link QueryEngine} on which the query is running. In
@@ -620,6 +647,9 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
         try {
 
+    		if(log.isInfoEnabled())//FIXME TRACE
+    			log.info(msg.toString());
+    		
             if (runState.startOp(msg)) {
 
 				/*
@@ -673,9 +703,12 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         if (!queryId.equals(msg.queryId))
             throw new IllegalArgumentException();
 
-        lock.lock();
+		lock.lock();
 
         try {
+
+    		if(log.isInfoEnabled())//FIXME TRACE
+    			log.info(msg.toString());
 
             // update per-operator statistics.
             final BOpStats tmp = statsMap.putIfAbsent(msg.bopId, msg.taskStats);
@@ -1129,6 +1162,21 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     }
 
+	/**
+	 * Return the textual representation of the {@link RunState} of this query.
+	 * <p>
+	 * Note: Exposed for log messages in derived classes since {@link #runState}
+	 * is private.
+	 */
+	protected String runStateString() {
+		lock.lock();
+		try {
+			return runState.toString();
+		} finally {
+			lock.unlock();
+		}
+	}
+    
     public String toString() {
         final StringBuilder sb = new StringBuilder(getClass().getName());
 		sb.append("{queryId=" + queryId);

@@ -361,6 +361,7 @@ public class TestSubqueryOp extends TestCase2 {
                         new NV(BOp.Annotations.BOP_ID, sliceId),//
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         }));
 
         final PipelineOp query = sliceOp;
@@ -626,6 +627,7 @@ public class TestSubqueryOp extends TestCase2 {
                         new NV(BOp.Annotations.BOP_ID, sliceId),//
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         }));
 
         final PipelineOp query = sliceOp;
@@ -887,6 +889,7 @@ public class TestSubqueryOp extends TestCase2 {
                         new NV(BOp.Annotations.BOP_ID, sliceId),//
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         }));
 
         final PipelineOp query = sliceOp;

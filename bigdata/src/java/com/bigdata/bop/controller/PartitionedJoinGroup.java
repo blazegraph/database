@@ -713,7 +713,9 @@ public class PartitionedJoinGroup {
                 .asMap(new NV[] {
                         new NV(JoinGraph.Annotations.BOP_ID, idFactory.nextId()), //
                         new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.CONTROLLER) }) //
+                                BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        }) //
         );
 
         return queryOp;

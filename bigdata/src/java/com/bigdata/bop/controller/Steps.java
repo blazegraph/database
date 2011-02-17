@@ -74,8 +74,8 @@ public class Steps extends AbstractSubqueryOp {
 
         super(args, annotations);
 
-        if (getMaxParallel() != 1)
-            throw new IllegalArgumentException(Annotations.MAX_PARALLEL + "="
+        if (getMaxParallelSubqueries() != 1)
+            throw new IllegalArgumentException(Annotations.MAX_PARALLEL_SUBQUERIES + "="
                     + getMaxParallel());
 
     }

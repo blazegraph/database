@@ -35,7 +35,7 @@ import java.util.concurrent.FutureTask;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.bop.engine.ChunkedRunningQuery;
+import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -101,24 +101,65 @@ abstract public class PipelineOp extends BOpBase {
 		boolean DEFAULT_SHARED_STATE = false;
 
 		/**
-		 * Annotation may be used to indicate operators which are not thread
-		 * safe (default {@value #DEFAULT_THREAD_SAFE}). Concurrent invocations
-		 * of the evaluation task will not be scheduled for a given shard for an
-		 * operator which is not thread safe.
-		 * 
-		 * @todo Unit tests for {@link ChunkedRunningQuery} to verify that it
-		 *       eventually schedules operator tasks which were deferred to
-		 *       prevent concurrent evaluation.
-		 * 
-		 * @todo This is currently not used. However, it could simplify the
-		 *       logic for operators, such as SLICE, which otherwise depend on
-		 *       {@link #SHARED_STATE} to provide their own synchronization.
+		 * This option may be used to place an optional limit on the #of
+		 * concurrent tasks which may run for the same (bopId,shardId) for a
+		 * given query (default {@value #DEFAULT_MAX_PARALLEL}). The query is
+		 * guaranteed to make progress as long as this is some positive integer.
+		 * While limiting this value can limit the concurrency with which
+		 * certain operators are evaluated and that can have a negative effect
+		 * on the throughput, it controls both the demand on the JVM heap and
+		 * the #of threads consumed.
+		 * <p>
+		 * Note: {@link #MAX_PARALLEL} is the annotation for pipelined joins
+		 * which has the strongest effect on performance. Changes to both
+		 * {@link #MAX_MESSAGES_PER_TASK} and {@link #PIPELINE_QUEUE_CAPACITY}
+		 * have less effect and performance tends to be best around a modest
+		 * value (10) for those annotations.
 		 */
-		String THREAD_SAFE = PipelineOp.class.getName() + ".threadSafe";
-
-		boolean DEFAULT_THREAD_SAFE = true;
+		String MAX_PARALLEL = PipelineOp.class.getName() + ".maxParallel";
 
 		/**
+		 * @see #MAX_PARALLEL
+		 */
+		int DEFAULT_MAX_PARALLEL = 5; 
+
+		/**
+		 * For a pipelined operator, this is the maximum number of messages that
+		 * will be assigned to a single invocation of the evaluation task for
+		 * that operator (default {@value #DEFAULT_MAX_MESSAGES_PER_TASK}). By
+		 * default the {@link QueryEngine} MAY (and generally does) combine
+		 * multiple {@link IChunkMessage}s from the work queue of an operator
+		 * for each evaluation pass made for that operator. When ONE (1), each
+		 * {@link IChunkMessage} will be assigned to a new evaluation task for
+		 * the operator. The value of this annotation must be a positive
+		 * integer. If the operator is not-pipelined, then the maximum amount of
+		 * data to be assigned to an evaluation task is governed by
+		 * {@link #MAX_MEMORY} instead.
+		 */
+	    String MAX_MESSAGES_PER_TASK = PipelineOp.class.getName()
+	            + ".maxMessagesPerTask";
+
+		/**
+		 * @see #MAX_MESSAGES_PER_TASK
+		 */
+	    int DEFAULT_MAX_MESSAGES_PER_TASK = 10;
+
+		/**
+		 * For pipelined operators, this is the capacity of the input queue for
+		 * that operator. Producers will block if the input queue for the target
+		 * operator is at its capacity. This provides an important limit on the
+		 * amount of data which can be buffered on the JVM heap during pipelined
+		 * query evaluation.
+		 */
+		String PIPELINE_QUEUE_CAPACITY = PipelineOp.class.getName()
+				+ ".pipelineQueueCapacity";
+
+		/**
+		 * @see #PIPELINE_QUEUE_CAPACITY
+		 */
+		int DEFAULT_PIPELINE_QUEUE_CAPACITY = 10;
+
+	    /**
 		 * Annotation used to mark pipelined (aka vectored) operators. When
 		 * <code>false</code> the operator will use either "at-once" or
 		 * "blocked" evaluation depending on how it buffers its data for
@@ -126,6 +167,9 @@ abstract public class PipelineOp extends BOpBase {
 		 */
 		String PIPELINED = PipelineOp.class.getName() + ".pipelined";
 
+		/**
+		 * @see #PIPELINED
+		 */
 		boolean DEFAULT_PIPELINED = true;
 
 		/**
@@ -159,87 +203,11 @@ abstract public class PipelineOp extends BOpBase {
 		 */
 		String MAX_MEMORY = PipelineOp.class.getName() + ".maxMemory";
 
+		/**
+		 * @see #MAX_MEMORY
+		 */
 		int DEFAULT_MAX_MEMORY = 0;
 		
-//        /**
-//         * Annotation used to mark a set of (non-optional) joins which may be
-//         * freely reordered by the query optimizer in order to minimize the
-//         * amount of work required to compute the solutions.
-//         * <p>
-//         * Note: Optional joins MAY NOT appear within a join graph. Optional
-//         * joins SHOULD be evaluated as part of the "tail plan" following the
-//         * join graph, but before operations such as SORT, DISTINCT, etc. When
-//         * the query plan includes {@link #CONDITIONAL_GROUP}s, those groups
-//         * include a leading {@link #JOIN_GRAPH} (required joins) followed by
-//         * zero or more optional joins.
-//         */
-//		String JOIN_GRAPH = PipelineOp.class.getName() + ".joinGraph";
-
-//        /**
-//         * Annotation used to mark a set of operators belonging to a conditional
-//         * binding group. Bindings within with the group will be discarded if
-//         * any required operator in the group fails. For example, if a binding
-//         * set exits via the alternative sink for a required join then any
-//         * conditional bindings within the group will be discarded.
-//         * <p>
-//         * Together with {@link #ALT_SINK_GROUP}, the {@link #CONDITIONAL_GROUP}
-//         * annotation provides the information necessary in order to decide the
-//         * re-entry point in the query plan when a join within an conditional
-//         * binding group fails.
-//         * <p>
-//         * The {@link #CONDITIONAL_GROUP} annotation controls the
-//         * {@link IBindingSet#push()} and {@link IBindingSet#pop(boolean)} of
-//         * individual solutions as they propagate through the pipeline. When a
-//         * pipeline starts, the {@link IBindingSet} stack contains only the top
-//         * level symbol table (i.e., name/value bindings). When an intermediate
-//         * solution enters a {@link PipelineOp} marked as belonging to a
-//         * {@link #CONDITIONAL_GROUP}, a new symbol table is
-//         * {@link IBindingSet#push() pushed} onto the stack for that solution.
-//         * If the solution leaves the optional join group via the default sink,
-//         * then the symbol table is "saved" when it is
-//         * {@link IBindingSet#pop(boolean) popped} off of the stack. If the
-//         * solution leaves the join group via the alternative sink, then the
-//         * symbol table is discarded when it is {@link IBindingSet#pop(boolean)
-//         * popped} off of the stack. This provides for conditional binding of
-//         * variables within the operators of the group.
-//         * <p>
-//         * The value of the {@link #CONDITIONAL_GROUP} is an {@link Integer}
-//         * which uniquely identifies the group within the query.
-//         * 
-//         * @deprecated The binding set stack push/pop mechanisms are not
-//         *             sufficient to support optional join groups. This
-//         *             annotation will be removed unless it proves valuable for
-//         *             marking the elements of a join group, in which case the
-//         *             javadoc needs to be updated.
-//         */
-//		String CONDITIONAL_GROUP = PipelineOp.class.getName() + ".conditionalGroup";
-
-//        /**
-//         * Annotation used to designate the target when a required operator
-//         * within an {@link #CONDITIONAL_GROUP} fails. The value of this
-//         * annotation must be the {@link #CONDITIONAL_GROUP} identifier
-//         * corresponding to the next conditional binding group in the query
-//         * plan. If there is no such group, then the {@link #ALT_SINK_REF}
-//         * should be used instead to specify the target operator in the
-//         * pipeline, e.g., a {@link SliceOp}.
-//         * <p>
-//         * The target {@link #CONDITIONAL_GROUP} is specified (rather than the
-//         * bopId of the target join) since the non-optional joins in the target
-//         * {@link #CONDITIONAL_GROUP} be reordered by the query optimizer. The
-//         * entry point for solutions redirected to the {@link #ALT_SINK_GROUP}
-//         * is therefore the first operator in the target
-//         * {@link #CONDITIONAL_GROUP}. This decouples the routing decisions from
-//         * the join ordering decisions.
-//         * 
-//         * @see #CONDITIONAL_GROUP
-//         * @see #ALT_SINK_REF
-//         * 
-//         * @deprecated The binding set stack push/pop mechanisms are not
-//         *             sufficient to support optional join groups. This
-//         *             annotation will be removed.
-//         */
-//		String ALT_SINK_GROUP = PipelineOp.class.getName() + ".altSinkGroup";
-
     }
 
     /**
@@ -261,13 +229,19 @@ abstract public class PipelineOp extends BOpBase {
             final Map<String, Object> annotations) {
 
         super(args, annotations);
-
+        
+		if (getMaxParallel() < 1)
+			throw new IllegalArgumentException(Annotations.MAX_PARALLEL + "="
+					+ getMaxParallel());
+        
+		// @todo range check the rest of the annotations.
+		
     }
 
     /**
      * @see BufferAnnotations#CHUNK_CAPACITY
      */
-    public int getChunkCapacity() {
+    final public int getChunkCapacity() {
         
         return getProperty(Annotations.CHUNK_CAPACITY,
                 Annotations.DEFAULT_CHUNK_CAPACITY);
@@ -277,7 +251,7 @@ abstract public class PipelineOp extends BOpBase {
     /**
      * @see BufferAnnotations#CHUNK_OF_CHUNKS_CAPACITY
      */
-    public int getChunkOfChunksCapacity() {
+    final public int getChunkOfChunksCapacity() {
 
         return getProperty(Annotations.CHUNK_OF_CHUNKS_CAPACITY,
                 Annotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
@@ -287,7 +261,7 @@ abstract public class PipelineOp extends BOpBase {
     /**
      * @see BufferAnnotations#CHUNK_TIMEOUT
      */
-    public long getChunkTimeout() {
+    final public long getChunkTimeout() {
         
         return getProperty(Annotations.CHUNK_TIMEOUT,
                 Annotations.DEFAULT_CHUNK_TIMEOUT);
@@ -334,30 +308,48 @@ abstract public class PipelineOp extends BOpBase {
 	 * @see Annotations#PIPELINED
 	 * @see Annotations#MAX_MEMORY
 	 */
-	public boolean isPipelined() {
-		return getProperty(PipelineOp.Annotations.PIPELINED,
+    final public boolean isPipelined() {
+		
+    	return getProperty(PipelineOp.Annotations.PIPELINED,
 				PipelineOp.Annotations.DEFAULT_PIPELINED);
+    	
 	}
 
-	/**
-	 * Return <code>true</code> iff concurrent invocations of the operator are
-	 * permitted.
-	 * <p>
-	 * Note: Operators which are not thread-safe still permit concurrent
-	 * evaluation for <em>distinct</em> partitions. In order to ensure that all
-	 * invocations of the operator within a query are serialized (no more than
-	 * one concurrent invocation) you must also specify
-	 * {@link BOpEvaluationContext#CONTROLLER}.
-	 * 
-	 * @see Annotations#THREAD_SAFE
-	 * @see BOp.Annotations#EVALUATION_CONTEXT
-	 */
-    public boolean isThreadSafe() {
+//	/**
+//	 * Return <code>true</code> iff concurrent invocations of the operator are
+//	 * permitted.
+//	 * <p>
+//	 * Note: Operators which are not thread-safe still permit concurrent
+//	 * evaluation for <em>distinct</em> partitions. In order to ensure that all
+//	 * invocations of the operator within a query are serialized (no more than
+//	 * one concurrent invocation) you must also specify
+//	 * {@link BOpEvaluationContext#CONTROLLER}.
+//	 * 
+//	 * @see Annotations#THREAD_SAFE
+//	 * @see BOp.Annotations#EVALUATION_CONTEXT
+//	 */
+//    public boolean isThreadSafe() {
+//
+//		return getProperty(Annotations.THREAD_SAFE,
+//				Annotations.DEFAULT_THREAD_SAFE);
+//        
+//    }
 
-		return getProperty(Annotations.THREAD_SAFE,
-				Annotations.DEFAULT_THREAD_SAFE);
-        
-    }
+	/**
+	 * The maximum parallelism with which tasks may be evaluated for this
+	 * operator (this is a per-shard limit in scale-out). A value of ONE (1)
+	 * indicates that at most ONE (1) instance of this task may be executing in
+	 * parallel for a given shard and may be used to indicate that the operator
+	 * evaluation task is not thread-safe.
+	 * 
+	 * @see Annotations#MAX_PARALLEL
+	 */
+	final public int getMaxParallel() {
+
+		return getProperty(PipelineOp.Annotations.MAX_PARALLEL,
+				PipelineOp.Annotations.DEFAULT_MAX_PARALLEL);
+
+	}
 
     /**
      * Return <code>true</code> iff {@link #newStats()} must be shared across
@@ -366,7 +358,7 @@ abstract public class PipelineOp extends BOpBase {
      * 
      * @see Annotations#SHARED_STATE
      */
-    public boolean isSharedState() {
+    final public boolean isSharedState() {
 
 		return getProperty(Annotations.SHARED_STATE,
 				Annotations.DEFAULT_SHARED_STATE);

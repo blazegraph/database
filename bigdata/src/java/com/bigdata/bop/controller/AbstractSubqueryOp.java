@@ -59,13 +59,6 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * <p>
  * Note: This operator must execute on the query controller.
  * <p>
- * The {@link PipelineOp.Annotations#SINK_REF} of each child operand should be
- * overridden to specify the parent of the this operator. If you fail to do
- * this, then the intermediate results of the subqueries will be routed to this
- * operator. This may cause unnecessary network traffic when running against the
- * {@link IBigdataFederation}. It may also cause the query to block if the
- * buffer capacity is limited.
- * <p>
  * If you want to route intermediate results from other computations into
  * subqueries, then consider a {@link Tee} pattern instead.
  * <p>
@@ -73,14 +66,12 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * 
  * <pre>
  * SLICE[1](
- *   UNION[2]([...],{subqueries=[a{sinkRef=1},b{sinkRef=1},c{sinkRef=1}]})
+ *   UNION[2]([...],{subqueries=[a,b,c]})
  *   )
  * </pre>
  * 
  * Will run the subqueries <i>a</i>, <i>b</i>, and <i>c</i> in parallel. Each
- * subquery will be run once for each source {@link IBindingSet}. The output of
- * those subqueries is explicitly routed to the SLICE operator using
- * {@link PipelineOp.Annotations#SINK_REF} for efficiency in scale-out.
+ * subquery will be run once for each source {@link IBindingSet}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -109,19 +100,19 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
          * The maximum parallelism with which the subqueries will be evaluated
          * (default is unlimited).
          */
-        String MAX_PARALLEL = AbstractSubqueryOp.class.getName()
-                + ".maxParallel";
+        String MAX_PARALLEL_SUBQUERIES = AbstractSubqueryOp.class.getName()
+                + ".maxParallelSubqueries";
 
-        int DEFAULT_MAX_PARALLEL = Integer.MAX_VALUE;
+        int DEFAULT_MAX_PARALLEL_SUBQUERIES = Integer.MAX_VALUE;
 
     }
 
     /**
-     * @see Annotations#MAX_PARALLEL
+     * @see Annotations#MAX_PARALLEL_SUBQUERIES
      */
-    public int getMaxParallel() {
-        return getProperty(Annotations.MAX_PARALLEL,
-                Annotations.DEFAULT_MAX_PARALLEL);
+    public int getMaxParallelSubqueries() {
+        return getProperty(Annotations.MAX_PARALLEL_SUBQUERIES,
+                Annotations.DEFAULT_MAX_PARALLEL_SUBQUERIES);
     }
     
     /**
@@ -207,8 +198,8 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
             this.subqueries = (BOp[]) controllerOp
                     .getRequiredProperty(Annotations.SUBQUERIES);
 
-            this.nparallel = controllerOp.getProperty(Annotations.MAX_PARALLEL,
-                    Annotations.DEFAULT_MAX_PARALLEL);
+            this.nparallel = controllerOp.getProperty(Annotations.MAX_PARALLEL_SUBQUERIES,
+                    Annotations.DEFAULT_MAX_PARALLEL_SUBQUERIES);
 
             this.executor = new LatchedExecutor(context.getIndexManager()
                     .getExecutorService(), nparallel);

@@ -124,6 +124,12 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
 
     }
 
+	public boolean isWildcard() {
+
+		return name.length() == 1 && name.charAt(0) == '*';
+    	
+    }
+    
     //        public int compareTo(IVariableOrConstant arg0) {
     //
     //            // order vars before ids
