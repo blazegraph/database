@@ -7,6 +7,8 @@ package com.bigdata.jsr166;
 import junit.framework.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.locks.ReentrantLock;
+
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import java.io.*;
 
@@ -326,7 +328,7 @@ public class LinkedBlockingDequeTest extends JSR166TestCase {
      */
     public void testConstructor3() {
         try {
-            LinkedBlockingDeque q = new LinkedBlockingDeque(null);
+            LinkedBlockingDeque q = new LinkedBlockingDeque((Collection)null);
             shouldThrow();
         } catch (NullPointerException success) {}
     }
@@ -365,6 +367,27 @@ public class LinkedBlockingDequeTest extends JSR166TestCase {
         LinkedBlockingDeque q = new LinkedBlockingDeque(Arrays.asList(ints));
         for (int i = 0; i < SIZE; ++i)
             assertEquals(ints[i], q.poll());
+    }
+
+    /**
+     * Deque constructor with <code>null</code> {@link ReentrantLock} argument
+     * throws NPE.
+     */
+    public void testConstructor7() {
+        try {
+            LinkedBlockingDeque q = new LinkedBlockingDeque(20,null/*lock*/);
+            shouldThrow();
+        } catch (NullPointerException success) {}
+    }
+    
+    /**
+     * Initializing from null Lock throws NPE
+     */
+    public void testConstructor8() {
+        try {
+            LinkedBlockingDeque q = new LinkedBlockingDeque((ReentrantLock)null);
+            shouldThrow();
+        } catch (NullPointerException success) {}
     }
 
     /**
