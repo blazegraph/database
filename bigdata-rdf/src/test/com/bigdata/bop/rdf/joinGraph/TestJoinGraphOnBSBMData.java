@@ -91,7 +91,7 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
      * When true, the test uses hardcoded access to an existing Journal already
      * loaded with some BSBM data set.
      */
-	private static final boolean useExistingJournal = true;
+	private static final boolean useExistingJournal = false;
 	
 //    private static final long existingPC = 284826; // BSBM 100M
 
@@ -219,7 +219,7 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
      */
 	public void test_bsbm_q5() throws Exception {
 
-//		QueryLog.logTableHeader();
+		QueryLog.logTableHeader();
 		
 	    final String namespace = getNamespace();
 	    

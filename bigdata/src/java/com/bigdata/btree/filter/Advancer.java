@@ -63,6 +63,18 @@ abstract public class Advancer<E> extends FilterBase implements ITupleFilter<E> 
 
     }
 
+	/**
+	 * Hook for one-time initialization invoked before the advancer visits the
+	 * first tuple. The default implementation simply returns <code>true</code>.
+	 * 
+	 * @return <code>false</code> if nothing should be visited.
+	 */
+    protected boolean init() {
+    	
+    	return true;
+    	
+    }
+    
     /**
      * Offers an opportunity to advance the source {@link ITupleCursor} to a
      * new key using {@link ITupleCursor#seek(byte[]).
@@ -86,6 +98,11 @@ abstract public class Advancer<E> extends FilterBase implements ITupleFilter<E> 
 
         final private Advancer<E> filter;
 
+        /**
+         * Used to invoke {@link Advancer#init()}.
+         */
+        private boolean firstTime = true;
+        
         /**
          * Set true iff we exceed the bounds on the {@link ITupleCursor}. For
          * example, if we run off the end of an index partition. This is used to
@@ -116,6 +133,20 @@ abstract public class Advancer<E> extends FilterBase implements ITupleFilter<E> 
 
         public boolean hasNext() {
 
+        	if(firstTime) {
+    			
+				if (!filter.init()) {
+					
+					exhausted = true;
+					
+					return false;
+					
+        		}
+        		
+        		firstTime =false;
+        		
+        	}
+        	
             if(exhausted) return false;
             
             return src.hasNext();

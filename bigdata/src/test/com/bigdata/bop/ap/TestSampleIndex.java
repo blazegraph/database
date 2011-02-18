@@ -41,6 +41,10 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.IPredicate.Annotations;
+import com.bigdata.bop.ap.SampleIndex.AcceptanceSetOffsetSampler;
+import com.bigdata.bop.ap.SampleIndex.IOffsetSampler;
+import com.bigdata.bop.ap.SampleIndex.SampleType;
+import com.bigdata.bop.ap.SampleIndex.SmartOffsetSampler;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -175,8 +179,124 @@ public class TestSampleIndex extends TestCase2 {
     }
 
 	/**
+	 * Stress test for {@link IOffsetSampler}s.
+	 * 
+	 * TODO Look at the distributions of the different {@link IOffsetSampler}s.
+	 * They should be uniform.
+	 */
+	public void test_offsetSamplers() {
+
+		// Note: Only handles a special case!
+//		new GetOffsetsEntireRange(),
+		
+		final IOffsetSampler[] samplers = new IOffsetSampler[] {
+				new SmartOffsetSampler(), //
+//				new BitVectorOffsetSampler(),//
+				new AcceptanceSetOffsetSampler(),//
+//				new RejectionSetOffsetSampler(), //
+				};
+
+		final Random r = new Random();
+		
+		final int ntrials = 1000;
+		
+		for (int trial = 0; trial < ntrials; trial++) {
+
+			// 10% seed is 0L (which gets turned into random anyway)
+			final long seed = r.nextDouble() < .1 ? 0 : r.nextLong();
+
+			final int entryCount = r.nextInt(100000);
+			
+			// 10% fromIndex is zero.
+			final int fromIndex = r.nextDouble() < .1 ? 0 : r
+					.nextInt(entryCount);
+
+			final int remaining = entryCount - fromIndex;
+
+			final int toIndex = r.nextDouble() < .1 ? entryCount : (fromIndex
+					+ r.nextInt(remaining) + 1);
+
+			final int rangeCount = toIndex - fromIndex;
+			
+			final int limit = r.nextDouble() < .1 ? r.nextInt(100) + 1 : r
+					.nextDouble() < .5 ? r.nextInt(entryCount) + 1 : r
+					.nextInt(10000) + 1;
+			
+			for (IOffsetSampler sampler : samplers) {
+
+				try {
+
+					final long begin = System.currentTimeMillis(); 
+					
+					final int[] offsets = sampler.getOffsets(seed, limit, fromIndex, toIndex);
+					
+					final long elapsed = System.currentTimeMillis() - begin;
+					
+					if (elapsed > 1000) {
+						log.warn("Slow: elapsed=" + elapsed + ", class="
+								+ sampler.getClass() + ", seed=" + seed
+								+ ", limit=" + limit + ", fromIndex="
+								+ fromIndex + ",toIndex=" + toIndex);
+					}
+
+					// check the #of offsets returned.
+					final int noffsets = offsets.length;
+					assertTrue(noffsets <= limit);
+					if (limit > rangeCount)
+						assertTrue(noffsets <= rangeCount);
+					else 
+						assertTrue(noffsets == limit);
+
+					// check offsets ordered, within range, and w/o dups.
+					int lastOffset = -1;
+					for (int j = 0; j < offsets.length; j++) {
+
+						final int offset = offsets[j];
+
+						if (offset < fromIndex)
+							fail("index=" + j
+									+ ", offset LT fromIndex: offset=" + offset
+									+ ", fromIndex=" + fromIndex);
+
+						if (offset >= toIndex)
+							fail("index=" + j + ", offset GTE toIndex: offset="
+									+ offset + ", toIndex=" + toIndex);
+
+						if (offset <= lastOffset) {
+							fail("index=" + j + ", lastOffset=" + lastOffset
+									+ ", but offset=" + offset);
+						}
+						
+						lastOffset = offset;
+
+					}
+					
+				} catch (Throwable t) {
+
+					fail("sampler=" + sampler.getClass() + ", seed=" + seed
+							+ ", limit=" + limit + ", fromIndex=" + fromIndex
+							+ ",toIndex=" + toIndex + ", rangeCount="
+							+ rangeCount, t);
+
+				}
+
+			}
+
+		}
+
+	}
+
+    /**
 	 * Unit test verifies some aspects of a sample taken from a local index
 	 * (primarily that the sample respects the limit).
+	 * 
+	 * @todo test when the range count is zero.
+	 * 
+	 * @todo test when the inclusive lower bound of a key range is an insertion
+	 *       point (no tuple for that key).
+	 * 
+	 * @todo test when the exclusive upper bound of a key range is an insertion
+	 *       point (no tuple for that key).
 	 */
     public void test_something() {
 
@@ -194,42 +314,59 @@ public class TestSampleIndex extends TestCase2 {
 				new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED)//
 		);
 
-		final BOpContextBase context = new BOpContextBase(null/* fed */, jnl/* indexManager */);
-
 		final int[] limits = new int[] { //
 		1, 9, 19, 100, 217, 900,// 
 		nrecords, 
 		nrecords + 1
 		};
 
-		for (int limit : limits) {
+		for (SampleType sampleType : SampleType.values()) {
 
-			final SampleIndex<E> sampleOp = new SampleIndex<E>(
-					new BOp[0],
-					NV
-							.asMap(
-									//
-									new NV(SampleIndex.Annotations.PREDICATE,
-											predicate),//
-									new NV(SampleIndex.Annotations.LIMIT, limit)//
-							));
+			if (log.isInfoEnabled())
+				log.info("Testing: SampleType=" + sampleType);
 
-			final E[] a = sampleOp.eval(context);
+			for (int limit : limits) {
 
-//			System.err.println("limit=" + limit + ", nrecords=" + nrecords
-//					+ ", nsamples=" + a.length);
-//			
-//			for (int i = 0; i < a.length && i < 10; i++) {
-//				System.err.println("a[" + i + "]=" + a[i]);
-//			}
+				doTest(nrecords, limit, sampleType, predicate);
 
-			final int nexpected = Math.min(nrecords, limit);
-
-			assertEquals("#samples (limit=" + limit + ", nrecords=" + nrecords
-					+ ", nexpected=" + nexpected + ")", nexpected, a.length);
+			}
 
 		}
 
 	}
+    
+	private void doTest(final int nrecords, final int limit,
+			final SampleType sampleType, final IPredicate<E> predicate) {
+
+		final BOpContextBase context = new BOpContextBase(null/* fed */, jnl/* indexManager */);
+
+		final SampleIndex<E> sampleOp = new SampleIndex<E>( new BOp[0], //
+				NV.asMap(//
+					new NV(SampleIndex.Annotations.PREDICATE, predicate),//
+					new NV(SampleIndex.Annotations.LIMIT, limit),//
+					new NV(SampleIndex.Annotations.SAMPLE_TYPE, sampleType
+							.name())//
+				));
+
+		final E[] a = sampleOp.eval(context);
+
+		if (log.isInfoEnabled()) {
+
+			System.err.println("limit=" + limit + ", nrecords=" + nrecords
+					+ ", nsamples=" + a.length + ", sampleType=" + sampleType);
+
+			for (int i = 0; i < a.length && i < 10; i++) {
+			
+				System.err.println("a[" + i + "]=" + a[i]);
+				
+			}
+			
+		}
+
+		final int nexpected = Math.min(nrecords, limit);
+
+		assertEquals("#samples (limit=" + limit + ", nrecords=" + nrecords
+				+ ", nexpected=" + nexpected + ")", nexpected, a.length);
+    }
 
 }
