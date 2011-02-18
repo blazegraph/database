@@ -60,6 +60,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.SampleIndex;
+import com.bigdata.bop.ap.SampleIndex.SampleType;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
@@ -534,11 +535,16 @@ public class JoinGraph extends PipelineOp {
 				 * Materialize a random sample from the access path.
 				 */
 
-				final SampleIndex sampleOp = new SampleIndex(
+//				final SampleType sampleType = SampleType.EVEN;
+				final SampleType sampleType = SampleType.RANDOM;
+				
+				final SampleIndex<?> sampleOp = new SampleIndex(
 						new BOp[] {}, //
 						NV.asMap(//
 							new NV(SampleIndex.Annotations.PREDICATE, pred),//
-							new NV(SampleIndex.Annotations.LIMIT, limit)));
+							new NV(SampleIndex.Annotations.LIMIT, limit),//
+							new NV(SampleIndex.Annotations.SAMPLE_TYPE, sampleType.name())//
+							));
 
 				sample = new VertexSample(rangeCount, limit, false/* exact */,
 						sampleOp.eval(context));
@@ -1081,7 +1087,7 @@ public class JoinGraph extends PipelineOp {
 				// @todo Why not use a factory which avoids bopIds already in use?
 				new NV(PipelineJoin.Annotations.PREDICATE, vTarget.pred.setBOpId(3)),
 				// disallow parallel evaluation of tasks.
-				new NV(PipelineJoin.Annotations.MAX_PARALLEL,1),
+				new NV(PipelineOp.Annotations.MAX_PARALLEL,1),
 				// disallow parallel evaluation of chunks.
 				new NV(PipelineJoin.Annotations.MAX_PARALLEL_CHUNKS,0),
 				// disable access path coalescing 
@@ -1172,6 +1178,11 @@ public class JoinGraph extends PipelineOp {
 				 * cardinality at 1600L (lower bound). In fact, the cardinality
 				 * is 16*175000. This falsely low estimate can cause solutions
 				 * which are really better to be dropped.
+				 * 
+				 * @todo we should mark [nout] when we do this show that it
+				 * shows up in the trace!  Also, the rangeCount is sometimes
+				 * falsely high. However, that should be corrected by random
+				 * resampling of the vertices and paths.
 				 */
 				nout = sumRangeCount;
 
@@ -1226,11 +1237,14 @@ public class JoinGraph extends PipelineOp {
 		/**
 		 * The cumulative estimated cardinality of the path. This is zero for an
 		 * empty path. For a path consisting of a single edge, this is the
-		 * estimated cardinality of that edge. When creating a new path adding
-		 * an edge to an existing path, the cumulative cardinality of the new
-		 * path is the cumulative cardinality of the existing path plus the
+		 * estimated cardinality of that edge. When creating a new path by
+		 * adding an edge to an existing path, the cumulative cardinality of the
+		 * new path is the cumulative cardinality of the existing path plus the
 		 * estimated cardinality of the cutoff join of the new edge given the
 		 * input sample of the existing path.
+		 * 
+		 * @todo track this per vertex as well as the total for more interesting
+		 * traces in showPath(Path).
 		 */
 		final public long cumulativeEstimatedCardinality;
 
@@ -1672,7 +1686,7 @@ public class JoinGraph extends PipelineOp {
 	static public String showTable(final Path[] a,final Path[] pruned) {
 		final StringBuilder sb = new StringBuilder();
 		final Formatter f = new Formatter(sb);
-		f.format("%5s %10s%1s * %7s (%3s/%3s) = %10s%1s : %10s %10s",
+		f.format("%5s %10s%1s * %10s (%6s/%6s) = %10s%1s : %10s %10s",
 				"path",//
 				"rangeCount",//
 				"",// sourceSampleExact
@@ -1698,9 +1712,9 @@ public class JoinGraph extends PipelineOp {
 				}
 			}
 			if (x.sample == null) {
-				f.format("p[%2d] %10d%1s * %7s (%3s/%3s) = %10s%1s : %10s", i, "N/A", "", "N/A", "N/A", "N/A", "N/A", "", "N/A");
+				f.format("p[%2d] %10d%1s * %10s (%6s/%6s) = %10s%1s : %10s", i, "N/A", "", "N/A", "N/A", "N/A", "N/A", "", "N/A");
 			} else {
-				f.format("p[%2d] %10d%1s * % 7.2f (%3d/%3d) = % 10d%1s : % 10d", i,
+				f.format("p[%2d] %10d%1s * % 10.2f (%6d/%6d) = % 10d%1s : % 10d", i,
 						x.sample.rangeCount,//
 						x.sample.sourceSampleExact?"E":"",//
 						x.sample.f,//
@@ -1729,6 +1743,66 @@ public class JoinGraph extends PipelineOp {
 		return sb.toString();
 	}
 
+	/**
+	 * Show the details of a join path, including the estimated cardinality and
+	 * join hit ratio for each step in the path.
+	 * 
+	 * @param p
+	 *            The join path.
+	 */
+	public static String showPath(final Path x) {
+		if(x == null)
+			throw new IllegalArgumentException();
+		final StringBuilder sb = new StringBuilder();
+		final Formatter f = new Formatter(sb);
+		{
+			/*
+			 * @todo show sumEstCard for each step of the path. Only the
+			 * estimate for the current path length is currently preserved. We
+			 * would need to preserve the estimate for each step in the path to
+			 * show it here.
+			 * 
+			 * @todo show limit on EdgeSample?
+			 */
+			f.format("%6s %10s%1s * %10s (%6s/%6s) = %10s%1s",// : %10s",//
+					"edge",
+					"rangeCount",//
+					"",// sourceSampleExact
+					"f",//
+					"out",//
+					"in",//
+					"estCard",//
+					""// estimateIs(Exact|LowerBound|UpperBound)
+//					"sumEstCard",//
+					);
+			int i = 0;
+			for (Edge e : x.edges) {
+				sb.append("\n");
+				if (e.sample == null) {
+					f.format("%6s %10d%1s * %10s (%6s/%6s) = %10s%1s",//
+							e.getLabel(),//
+							"N/A", "", "N/A", "N/A", "N/A", "N/A", "", "N/A");
+				} else {
+					f.format("%6s %10d%1s * % 10.2f (%6d/%6d) = % 10d%1s",//
+							e.getLabel(),//
+							e.sample.rangeCount,//
+							e.sample.sourceSampleExact ? "E" : "",//
+							e.sample.f,//
+							e.sample.outputCount,//
+							e.sample.inputCount,//
+							e.sample.estimatedCardinality,//
+							e.sample.estimateEnum.getCode()//
+//							e.cumulativeEstimatedCardinality//
+							);
+				}
+//				sb.append("\nv[" + vertexIds[i] + "] " + e.toString());
+				i++;
+			}
+		}
+		sb.append("\n");
+		return sb.toString();
+	}
+	
 	/**
 	 * A runtime optimizer for a join graph. The {@link JoinGraph} bears some
 	 * similarity to ROX (Runtime Optimizer for XQuery), but has several
@@ -2148,6 +2222,18 @@ public class JoinGraph extends PipelineOp {
 			// Should be one winner.
 			assert paths.length == 1;
 
+			if (log.isInfoEnabled()) {
+
+				/*
+				 * @todo It would be nice to show the plan with the filters
+				 * attached, but that might be something that the caller does.
+				 */
+				log.info("\n*** Selected join path: "
+						+ Arrays.toString(paths[0].getVertexIds()) + "\n"
+						+ showPath(paths[0]));
+
+			}
+			
 			return paths[0];
 
 		}
