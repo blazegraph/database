@@ -89,7 +89,9 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
 
     /**
      * When true, the test uses hardcoded access to an existing Journal already
-     * loaded with some BSBM data set.
+     * loaded with some a larger data set (you need to run against a moderately
+     * large data set to assess the relative performance of the static and
+     * runtime query optimizers).
      */
 	private static final boolean useExistingJournal = false;
 	
