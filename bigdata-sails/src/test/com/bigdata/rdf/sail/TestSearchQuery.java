@@ -40,6 +40,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
@@ -99,6 +100,8 @@ import com.bigdata.search.IHit;
  */
 public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
+	protected static final Logger log = Logger.getLogger(TestSearchQuery.class);
+	
     public TestSearchQuery() {
         
     }
@@ -708,6 +711,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
         	final URI s5 = vf.createURI(BD.NAMESPACE+"s5");
         	final URI s6 = vf.createURI(BD.NAMESPACE+"s6");
         	final URI s7 = vf.createURI(BD.NAMESPACE+"s7");
+        	final URI s8 = vf.createURI(BD.NAMESPACE+"s8");
         	final Literal l1 = vf.createLiteral("how");
         	final Literal l2 = vf.createLiteral("now");
         	final Literal l3 = vf.createLiteral("brown");
@@ -715,6 +719,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
         	final Literal l5 = vf.createLiteral("how now");
         	final Literal l6 = vf.createLiteral("brown cow");
         	final Literal l7 = vf.createLiteral("how now brown cow");
+        	final Literal l8 = vf.createLiteral("toilet");
         	
             cxn.add(s1, RDFS.LABEL, l1);
             cxn.add(s2, RDFS.LABEL, l2);
@@ -723,6 +728,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             cxn.add(s5, RDFS.LABEL, l5);
             cxn.add(s6, RDFS.LABEL, l6);
             cxn.add(s7, RDFS.LABEL, l7);
+            cxn.add(s8, RDFS.LABEL, l8);
             
             /*
              * Note: The either flush() or commit() is required to flush the
@@ -739,6 +745,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             literals.put(((BigdataValue)l5).getIV(), l5);
             literals.put(((BigdataValue)l6).getIV(), l6);
             literals.put(((BigdataValue)l7).getIV(), l7);
+            literals.put(((BigdataValue)l8).getIV(), l8);
             
             final Map<IV, URI> uris = new LinkedHashMap<IV, URI>();
             uris.put(((BigdataValue)l1).getIV(), s1);
@@ -748,6 +755,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             uris.put(((BigdataValue)l5).getIV(), s5);
             uris.put(((BigdataValue)l6).getIV(), s6);
             uris.put(((BigdataValue)l7).getIV(), s7);
+            uris.put(((BigdataValue)l8).getIV(), s8);
             
 /**/            
             if (log.isInfoEnabled()) {
@@ -1031,6 +1039,71 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 	log.info(i++ + ": " + result.next().toString());
                 }
                 assertTrue("wrong # of results: " + i, i == 3);
+                
+                result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            true, // prefixMatch
+                            minRelevance, // minCosine
+                            10000, // maxRank (=maxResults + 1)
+                            1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = new TermId(VTE.LITERAL, hit.getDocId());
+                	final Literal score = vf.createLiteral(hit.getCosine());
+                	final URI s = uris.get(id);
+                	final Literal o = literals.get(id);
+                    final BindingSet bs = createBindingSet(
+                    		new BindingImpl("s", s),
+                    		new BindingImpl("o", o),
+                    		new BindingImpl("score", score));
+                    log.info(bs);
+                    answer.add(bs);
+                }
+                
+                compare(result, answer);
+
+            }
+
+            { // prefix match using a stopword
+            	
+            	final String searchQuery = "to*";
+            	final double minRelevance = 0.0d;
+            	
+                final String query = 
+                    "select ?s ?o ?score " + 
+                    "where " +
+                    "{ " +
+                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
+//                    "    ?o <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
+//                    "    ?o <"+BD.MAX_HITS+"> \"5\" . " +
+//                    "    filter regex(?o, \""+searchQuery+"\") " +
+                    "} " +
+                    "order by desc(?score)";
+                
+                log.info("\n"+query);
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                int i = 0;
+                while (result.hasNext()) {
+                	log.info(i++ + ": " + result.next().toString());
+                }
+                assertTrue("wrong # of results: " + i, i == 1);
                 
                 result = tupleQuery.evaluate();
 
