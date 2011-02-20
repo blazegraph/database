@@ -51,7 +51,10 @@ import org.apache.log4j.Logger;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.LowerCaseFilter;
 import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.standard.StandardFilter;
+import org.apache.lucene.analysis.standard.StandardTokenizer;
 import org.apache.lucene.analysis.tokenattributes.TermAttribute;
+import org.apache.lucene.util.Version;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
@@ -661,6 +664,19 @@ public class FullTextIndex extends AbstractRelation {
     }
 
     /**
+     * See {@link #index(TokenBuffer, long, int, String, Reader, boolean)}.
+     * <p>
+     * Uses a default filterStopwords value of true.
+     * 
+     */
+    public void index(final TokenBuffer buffer, final long docId, final int fieldId,
+            final String languageCode, final Reader r) {
+    	
+    	index(buffer, docId, fieldId, languageCode, r, true/* filterStopwords */);
+    	
+    }
+    
+    /**
      * Index a field in a document.
      * <p>
      * Note: This method does NOT force a write on the indices. If the <i>buffer</i>
@@ -684,11 +700,13 @@ public class FullTextIndex extends AbstractRelation {
      *            {@link Locale}.
      * @param r
      *            A reader on the text to be indexed.
+     * @param filterStopwords
+     * 			  if true, filter stopwords from the token stream            
      * 
      * @see TokenBuffer#flush()
      */
     public void index(final TokenBuffer buffer, final long docId, final int fieldId,
-            final String languageCode, final Reader r) {
+            final String languageCode, final Reader r, final boolean filterStopwords) {
 
         /*
          * Note: You can invoke this on a read-only index. It is only overflow
@@ -701,7 +719,7 @@ public class FullTextIndex extends AbstractRelation {
         int n = 0;
         
         // tokenize (note: docId,fieldId are not on the tokenStream, but the field could be).
-        final TokenStream tokenStream = getTokenStream(languageCode, r);
+        final TokenStream tokenStream = getTokenStream(languageCode, r, filterStopwords);
         try {
         while (tokenStream.incrementToken()) {
             TermAttribute term=tokenStream.getAttribute(TermAttribute.class);
@@ -729,10 +747,14 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @param r
      *            A reader on the text to be indexed.
+     *            
+     * @param filterStopwords
+     * 			  if true, filter stopwords from the token stream            
      * 
      * @return The extracted token stream.
      */
-    protected TokenStream getTokenStream(final String languageCode, final Reader r) {
+    protected TokenStream getTokenStream(final String languageCode, 
+    		final Reader r, final boolean filterStopwords) {
 
         /*
          * Note: This stripping out stopwords by default.
@@ -741,9 +763,22 @@ public class FullTextIndex extends AbstractRelation {
          */
         final Analyzer a = getAnalyzer(languageCode);
         
-        TokenStream tokenStream = a.tokenStream(null/* @todo field? */, r);
+        TokenStream tokenStream;
+        if (filterStopwords) {
+        	tokenStream = a.tokenStream(null/* @todo field? */, r);
+        } else {
+        	/*
+        	 * To eliminiate stopword filtering, we simulate the tokenStream()
+        	 * operation above per the javadoc for that method, which says:
+        	 * "Constructs a StandardTokenizer filtered by a StandardFilter, 
+        	 * a LowerCaseFilter and a StopFilter", eliminating the StopFilter.
+        	 */
+        	tokenStream = new StandardTokenizer(Version.LUCENE_CURRENT, r);
+        	tokenStream = new StandardFilter(tokenStream);
+        }
         
         // force to lower case.
+        // might be able to move this inside the else {} block above?
         tokenStream = new LowerCaseFilter(tokenStream);
         
         return tokenStream;
@@ -1037,9 +1072,15 @@ public class FullTextIndex extends AbstractRelation {
             
             final TokenBuffer buffer = new TokenBuffer(1, this);
             
+            /*
+             * If we are using prefix match (* operator) then we don't want
+             * to filter stopwords from the search query.
+             */
+            final boolean filterStopwords = !prefixMatch;
+            
             index(buffer, Long.MIN_VALUE/* docId */,
                     Integer.MIN_VALUE/* fieldId */, languageCode,
-                    new StringReader(query));
+                    new StringReader(query), filterStopwords);
 
             if (buffer.size() == 0) {
 
