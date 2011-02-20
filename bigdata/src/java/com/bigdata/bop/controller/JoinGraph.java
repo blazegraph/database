@@ -1950,36 +1950,42 @@ public class JoinGraph extends PipelineOp {
 			}
 
             /*
-             * Identify the edges by looking for shared variables among the
-             * predicates.
+             * Create edges to represent possible joins between predicates based
+             * on directly shared variables.
              * 
-             * Note: Variables appear in predicates or in constraints. Edges are
-             * created to represent possible joins between predicates based on
-             * those shared variables. There are two cases:
+             * Note: There are really three classes of joins to be considered.
              * 
-             * (1) When the target predicate shares a variable with the source
-             * predicate, then we always create an edge between those predicates
-             * to represent a possible join.
+             * (1) The target predicate directly shares a variable with the
+             * source predicate. These joins are always constrained since the
+             * source predicate will have bound that variable.
              * 
              * (2) When the source predicate shares a variable with a constraint
-             * which also shares a variable with the target predicate, then we
-             * will also create an edge to represent a possible join.
+             * which also shares a variable with the target predicate. While the
+             * predicates do not directly share a variable, these joins are
+             * constrained by the shared variable in the constraint on the
+             * target predicate. BSBM Q5 is an example of this case. We do not
+             * create edges for such joins here. Instead, we dynamically
+             * determine when a constrained join is possible when extending the
+             * join path in each round.
              * 
-             * The second case handles the case where variables are transitively
-             * shared through a constraint, but not directly shared between the
-             * predicates. BSBM Q5 is an example of this case.
+             * (3) Any two predicates may always be joined. However, joins which
+             * do not share variables either directly or indirectly will be full
+             * cross products. Therefore such joins are run last and we do not
+             * create edges for them here.
              * 
-             * Note: If applying these two rules fails to create any edges for
-             * some vertex, then it does not share ANY variables and can be
-             * paired with ANY of the other vertices. However, we always run
-             * such vertices last as they can not restrict the cumulative
-             * cardinality of the solutions. Such vertices are therefore
-             * inserted into a separate set and appended to the join path once
-             * all edges having shared variables have been exhausted.
+             * FIXME VERTICES WHICH SHARE VARS THROUGH A CONSTRAINT : handle
+             * dynamically rather than enumerating since the joins are path
+             * dependent.
              * 
-             * FIXME VERTICES WHICH SHARE VARS THROUGH A CONSTRAINT.
-             * 
-             * FIXME VERTICES WITH NO SHARED VARS.
+             * FIXME VERTICES WITH NO SHARED VARS : handle once all other joins
+             * have been exhausted.  [These do not need to be collected, we just
+             * need to run them after all the constrained joins have been run.
+             * Also, these joins should not be sampled by the query optimizer
+             * since there is no reason to choose one ordering of these vertices
+             * over another.  [The only reason to sample these joins would be
+             * to estimate the total cumulative cardinality of the join graph,
+             * which might be useful when estimating the run time or resource
+             * demand.]]
              */
 			{
 
@@ -3158,7 +3164,7 @@ public class JoinGraph extends PipelineOp {
 	 * we are not yet handling anything except standard joins in the runtime
 	 * optimizer.
 	 */
-
+	
     /**
      * Execute the selected join path.
      * <p>
