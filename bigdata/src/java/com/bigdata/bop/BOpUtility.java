@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -39,6 +40,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp.Annotations;
+import com.bigdata.bop.controller.PartitionedJoinGroup;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.AbstractNode;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -1010,40 +1012,40 @@ public class BOpUtility {
 
     }
 
-	/**
-	 * Inject (or replace) an {@link Integer} "rowId" column. This does not have
-	 * a side-effect on the source {@link IBindingSet}s.
-	 * 
-	 * @param var
-	 *            The name of the column.
-	 * @param start
-	 *            The starting value for the identifier.
-	 * @param in
-	 *            The source {@link IBindingSet}s.
-	 * 
-	 * @return The modified {@link IBindingSet}s.
-	 */
-	public static IBindingSet[] injectRowIdColumn(final IVariable var,
-			final int start, final IBindingSet[] in) {
-
-		if (in == null)
-			throw new IllegalArgumentException();
-		
-		final IBindingSet[] out = new IBindingSet[in.length];
-		
-		for (int i = 0; i < out.length; i++) {
-		
-			final IBindingSet bset = in[i].clone();
-
-			bset.set(var, new Constant<Integer>(Integer.valueOf(start + i)));
-
-			out[i] = bset;
-			
-		}
-		
-		return out;
-
-	}
+//	/**
+//	 * Inject (or replace) an {@link Integer} "rowId" column. This does not have
+//	 * a side-effect on the source {@link IBindingSet}s.
+//	 * 
+//	 * @param var
+//	 *            The name of the column.
+//	 * @param start
+//	 *            The starting value for the identifier.
+//	 * @param in
+//	 *            The source {@link IBindingSet}s.
+//	 * 
+//	 * @return The modified {@link IBindingSet}s.
+//	 */
+//	public static IBindingSet[] injectRowIdColumn(final IVariable<?> var,
+//			final int start, final IBindingSet[] in) {
+//
+//		if (in == null)
+//			throw new IllegalArgumentException();
+//		
+//		final IBindingSet[] out = new IBindingSet[in.length];
+//		
+//		for (int i = 0; i < out.length; i++) {
+//		
+//			final IBindingSet bset = in[i].clone();
+//
+//			bset.set(var, new Constant<Integer>(Integer.valueOf(start + i)));
+//
+//			out[i] = bset;
+//			
+//		}
+//		
+//		return out;
+//
+//	}
 
     /**
      * Return an ordered array of the bopIds associated with an ordered array of
@@ -1077,29 +1079,20 @@ public class BOpUtility {
     }
 
     /**
-     * Return the variable references shared by tw operators. All variables
-     * spanned by either {@link BOp} are considered.
+     * Return the variable references shared by two operators. All variables
+     * spanned by either {@link BOp} are considered, regardless of whether they
+     * appear as operands or within annotations.
      * 
      * @param p
      *            An operator.
      * @param c
      *            Another operator.
      * 
-     * @param p
-     *            A predicate.
-     * 
-     * @param c
-     *            A constraint.
-     * 
-     * @return The variables in common -or- <code>null</code> iff there are no
-     *         variables in common.
+     * @return The variable(s) in common. This may be an empty set, but it is
+     *         never <code>null</code>.
      * 
      * @throws IllegalArgumentException
      *             if the two either reference is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if the reference are the same.
-     * 
-     * @todo unit tests.
      */
     public static Set<IVariable<?>> getSharedVars(final BOp p, final BOp c) {
 
@@ -1109,8 +1102,12 @@ public class BOpUtility {
         if (c == null)
             throw new IllegalArgumentException();
 
-        if (p == c)
-            throw new IllegalArgumentException();
+        /*
+         * Note: This is allowed since both arguments might be the same variable
+         * or constant.
+         */
+//        if (p == c)
+//            throw new IllegalArgumentException();
 
         // The set of variables which are shared.
         final Set<IVariable<?>> sharedVars = new LinkedHashSet<IVariable<?>>();
@@ -1151,6 +1148,287 @@ public class BOpUtility {
         }
 
         return sharedVars;
+
+    }
+
+    /**
+     * Return <code>true</code> iff two predicates can join on the basis of at
+     * least one variable which is shared directly by those predicates. Only the
+     * operands of the predicates are considered.
+     * <p>
+     * Note: This method will only identify joins where the predicates directly
+     * share at least one variable. However, joins are also possible when the
+     * predicates share variables via one or more constraint(s). Use
+     * {@link #canJoinUsingConstraints(IPredicate[], IPredicate, IConstraint[])}
+     * to identify such joins.
+     * <p>
+     * Note: Any two predicates may join regardless of the presence of shared
+     * variables. However, such joins will produce the full cross product of the
+     * binding sets selected by each predicate. As such, they should be run last
+     * and this method will not return <code>true</code> for such predicates.
+     * <p>
+     * Note: This method is more efficient than {@link #getSharedVars(BOp, BOp)}
+     * because it does not materialize the sets of shared variables. However, it
+     * only considers the operands of the {@link IPredicate}s and is thus more
+     * restricted than {@link #getSharedVars(BOp, BOp)} as well.
+     * 
+     * @param p1
+     *            A predicate.
+     * @param p2
+     *            Another predicate.
+     * 
+     * @return <code>true</code> iff the predicates share at least one variable
+     *         as an operand.
+     * 
+     * @throws IllegalArgumentException
+     *             if the two either reference is <code>null</code>.
+     */
+//  * @throws IllegalArgumentException
+//  *             if the reference are the same.
+    static public boolean canJoin(final IPredicate<?> p1, final IPredicate<?> p2) {
+
+        if (p1 == null)
+            throw new IllegalArgumentException();
+
+        if (p2 == null)
+            throw new IllegalArgumentException();
+
+//        if (p1 == p2)
+//            throw new IllegalArgumentException();
+
+        // iterator scanning the operands of p1.
+        final Iterator<IVariable<?>> itr1 = BOpUtility.getArgumentVariables(p1);
+
+        while (itr1.hasNext()) {
+
+            final IVariable<?> v1 = itr1.next();
+
+            // iterator scanning the operands of p2.
+            final Iterator<IVariable<?>> itr2 = BOpUtility
+                    .getArgumentVariables(p2);
+
+            while (itr2.hasNext()) {
+
+                final IVariable<?> v2 = itr2.next();
+
+                if (v1 == v2) {
+
+                    if (log.isDebugEnabled())
+                        log.debug("Can join: sharedVar=" + v1 + ", p1=" + p1
+                                + ", p2=" + p2);
+
+                    return true;
+
+                }
+
+            }
+
+        }
+
+        if (log.isDebugEnabled())
+            log.debug("No directly shared variable: p1=" + p1 + ", p2=" + p2);
+
+        return false;
+
+    }
+
+    /**
+     * Return <code>true</code> iff a predicate may be used to extend a join
+     * path on the basis of at least one variable which is shared either
+     * directly or via one or more constraints which may be attached to the
+     * predicate when it is added to the join path. The join path is used to
+     * decide which variables are known to be bound, which in turn decides which
+     * constraints may be run. Unlike the case when the variable is directly
+     * shared between the two predicates, a join involving a constraint requires
+     * us to know which variables are already bound so we can know when the
+     * constraint may be attached.
+     * <p>
+     * Note: Use {@link #canJoin(IPredicate, IPredicate)} instead to identify
+     * joins based on a variable which is directly shared.
+     * <p>
+     * Note: Any two predicates may join regardless of the presence of shared
+     * variables. However, such joins will produce the full cross product of the
+     * binding sets selected by each predicate. As such, they should be run last
+     * and this method will not return <code>true</code> for such predicates.
+     * 
+     * @param path
+     *            A join path containing at least one predicate.
+     * @param vertex
+     *            A predicate which is being considered as an extension of that
+     *            join path.
+     * @param constraints
+     *            A set of zero or more constraints (optional). Constraints are
+     *            attached dynamically once the variables which they use are
+     *            bound. Hence, a constraint will always share a variable with
+     *            any predicate to which it is attached. If any constraints are
+     *            attached to the given vertex and they share a variable which
+     *            has already been bound by the join path, then the vertex may
+     *            join with the join path even if it does not directly bind that
+     *            variable.
+     * 
+     * @return <code>true</code> iff the vertex can join with the join path via
+     *         a shared variable.
+     * 
+     * @throws IllegalArgumentException
+     *             if the join path is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the join path is empty.
+     * @throws IllegalArgumentException
+     *             if any element in the join path is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the vertex is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the vertex is already part of the join path.
+     * @throws IllegalArgumentException
+     *             if any element in the optional constraints array is
+     *             <code>null</code>.
+     */
+    static public boolean canJoinUsingConstraints(final IPredicate<?>[] path,
+            final IPredicate<?> vertex, final IConstraint[] constraints) {
+
+        /*
+         * Check arguments.
+         */
+        if (path == null)
+            throw new IllegalArgumentException();
+        if (vertex == null)
+            throw new IllegalArgumentException();
+        // constraints MAY be null.
+        if (path.length == 0)
+            throw new IllegalArgumentException();
+        {
+            for (IPredicate<?> p : path) {
+                if (p == null)
+                    throw new IllegalArgumentException();
+                if (vertex == p)
+                    throw new IllegalArgumentException();
+            }
+        }
+
+        /*
+         * Find the set of variables which are known to be bound because they
+         * are referenced as operands of the predicates in the join path.
+         */
+        final Set<IVariable<?>> knownBound = new LinkedHashSet<IVariable<?>>();
+
+        for (IPredicate<?> p : path) {
+        
+            final Iterator<IVariable<?>> vitr = BOpUtility
+                    .getArgumentVariables(p);
+
+            while (vitr.hasNext()) {
+
+                knownBound.add(vitr.next());
+
+            }
+
+        }
+
+        /*
+         * 
+         * If the given predicate directly shares a variable with any of the
+         * predicates in the join path, then we can return immediately.
+         */
+        {
+
+            final Iterator<IVariable<?>> vitr = BOpUtility
+                    .getArgumentVariables(vertex);
+
+            while (vitr.hasNext()) {
+
+                final IVariable<?> var = vitr.next();
+                
+                if(knownBound.contains(var)) {
+
+                    if (log.isDebugEnabled())
+                        log.debug("Can join: sharedVar=" + var + ", path="
+                                + Arrays.toString(path) + ", vertex=" + vertex);
+
+                    return true;
+                    
+                }
+
+            }
+
+        }
+
+        if(constraints == null) {
+            
+            // No opportunity for a constraint based join.
+
+            if (log.isDebugEnabled())
+                log.debug("No directly shared variable: path="
+                        + Arrays.toString(path) + ", vertex=" + vertex);
+
+            return false;
+            
+        }
+        
+        /*
+         * Find the set of constraints which can run with the vertex given the
+         * join path.
+         */
+        {
+
+            // Extend the new join path.
+            final IPredicate<?>[] newPath = new IPredicate[path.length + 1];
+
+            System.arraycopy(path/* src */, 0/* srcPos */, newPath/* dest */,
+                    0/* destPos */, path.length);
+
+            newPath[path.length] = vertex;
+
+            /*
+             * Find the constraints that will run with each vertex of the new
+             * join path.
+             */
+            final IConstraint[][] constraintRunArray = PartitionedJoinGroup
+                    .getJoinGraphConstraints(newPath, constraints);
+
+            /*
+             * Consider only the constraints attached to the last vertex in the
+             * new join path. All of their variables will be bound since (by
+             * definition) a constraint may not run until its variables are
+             * bound. If any of the constraints attached to that last share any
+             * variables which were already known to be bound in the caller's
+             * join path, then the vertex can join (without of necessity being
+             * a full cross product join).
+             */
+            final IConstraint[] vertexConstraints = constraintRunArray[path.length];
+
+            for (IConstraint c : vertexConstraints) {
+
+                // consider all variables spanned by the constraint.
+                final Iterator<IVariable<?>> vitr = BOpUtility
+                        .getSpannedVariables(c);
+
+                while (vitr.hasNext()) {
+
+                    final IVariable<?> var = vitr.next();
+
+                    if (knownBound.contains(var)) {
+
+                        if (log.isDebugEnabled())
+                            log.debug("Can join: sharedVar=" + var + ", path="
+                                    + Arrays.toString(path) + ", vertex="
+                                    + vertex + ", constraint=" + c);
+
+                        return true;
+
+                    }
+
+                }                
+                
+            }
+            
+        }
+
+        if (log.isDebugEnabled())
+            log.debug("No shared variable: path=" + Arrays.toString(path)
+                    + ", vertex=" + vertex + ", constraints="
+                    + Arrays.toString(constraints));
+
+        return false;
 
     }
 
