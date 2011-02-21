@@ -45,9 +45,11 @@ public interface IAnalyzerFactory {
      * @param languageCode
      *            The language code or <code>null</code> to use the default
      *            {@link Locale}.
+     * @param filterStopwords
+     * 			  if false, return an analyzer with no stopwords            
      * 
      * @return The token analyzer best suited to the indicated language family.
      */
-    Analyzer getAnalyzer(final String languageCode);
+    Analyzer getAnalyzer(final String languageCode, final boolean filterStopwords);
 
 }
