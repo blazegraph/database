@@ -39,12 +39,18 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQueryResult;
+import org.openrdf.query.algebra.Distinct;
 import org.openrdf.query.algebra.Projection;
 import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.impl.BindingImpl;
+import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
+import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.repository.sail.SailTupleQuery;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.sail.Sail;
+import org.openrdf.sail.memory.MemoryStore;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.sop.SOpTree;
@@ -331,6 +337,110 @@ public class TestNestedUnions extends QuadsTestCase {
             sail.__tearDownUnitTest();//shutDown();
         }
 
+    }
+    
+    public void testForumBug() throws Exception {
+    	
+//        final Sail sail = new MemoryStore();
+	  	final Sail sail = getSail();
+	  	
+	  	try {
+	  	
+  		sail.initialize();
+	  	final Repository repo = sail instanceof BigdataSail ?
+	  			new BigdataSailRepository((BigdataSail)sail) :
+	  			new SailRepository(sail);
+	  	final RepositoryConnection cxn = repo.getConnection();
+      
+        try {
+        	
+        	final ValueFactory vf = sail.getValueFactory();
+          
+        	cxn.setAutoCommit(false);
+  
+			/*
+			 * load the data
+			 */
+			cxn.add(getClass().getResourceAsStream("union.ttl"),"",RDFFormat.TURTLE);
+          
+			/*
+			 * Note: The either flush() or commit() is required to flush the
+			 * statement buffers to the database before executing any
+			 * operations that go around the sail.
+			 */
+			cxn.commit();
+          
+            {
+          	
+	            String query =
+	            	"prefix bd: <"+BD.NAMESPACE+"> " +
+	            	"prefix rdf: <"+RDF.NAMESPACE+"> " +
+	            	"prefix rdfs: <"+RDFS.NAMESPACE+"> " +
+	                "SELECT DISTINCT ?neType ?majorType ?minorType " +
+	                "WHERE { " +
+	                "  { " +
+	                "    ?neType <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://example/class/NamedEntity> . " +
+	                "    FILTER(?neType != <http://example/class/NamedEntity>) " +
+	                "  } " +
+	                "  UNION " +
+	                "  { ?lookup <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://example/class/Lookup> . " +
+	                "    ?lookup <http://example/prop/lookup/majorType> ?majorType . " +
+	                "    OPTIONAL { ?lookup <http://example/prop/lookup/minorType> ?minorType } " +
+	                "  } " +
+	                "}";
+ 	
+	            final SailTupleQuery tupleQuery = (SailTupleQuery)
+	                cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+	            tupleQuery.setIncludeInferred(false /* includeInferred */);
+	           
+	            if (sail instanceof BigdataSail && log.isInfoEnabled()) {
+	            	
+		            final BigdataSailTupleQuery bdTupleQuery =
+		            	(BigdataSailTupleQuery) tupleQuery;
+		            final QueryRoot root = (QueryRoot) bdTupleQuery.getTupleExpr();
+		            final Distinct d = (Distinct) root.getArg();
+		            final Projection p = (Projection) d.getArg();
+		            final TupleExpr tupleExpr = p.getArg();
+
+	                log.info(tupleExpr);
+
+		            final SOpTreeBuilder stb = new SOpTreeBuilder();
+		            final SOpTree tree = stb.collectSOps(tupleExpr);
+	           
+	                log.info(tree);
+	            	log.info(query);
+
+	            }
+	            
+	            if (log.isInfoEnabled()) {
+	            	final TupleQueryResult result = tupleQuery.evaluate();
+	            	log.info("results:");
+	                while (result.hasNext()) {
+	                    log.info(result.next());
+	                }
+	            }
+                
+	            final Collection<BindingSet> answer = new LinkedList<BindingSet>();
+	            answer.add(createBindingSet(
+	            		new BindingImpl("neType", vf.createURI("http://example/class/Location"))
+	            		));
+	            answer.add(createBindingSet(
+	            		new BindingImpl("neType", vf.createURI("http://example/class/Person"))
+	            		));
+
+	            final TupleQueryResult result = tupleQuery.evaluate();
+	            compare(result, answer);
+
+            }
+          
+        } finally {
+            cxn.close();
+        }
+        } finally {
+            if (sail instanceof BigdataSail)
+            	((BigdataSail)sail).__tearDownUnitTest();//shutDown();
+        }
+    	
     }
 
 }

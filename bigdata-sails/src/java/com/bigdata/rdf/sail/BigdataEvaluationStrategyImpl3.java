@@ -703,13 +703,14 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     				 * If we encounter a value not in the lexicon, we can
     				 * still continue with the query if the value is in
     				 * either an optional tail or an optional join group (i.e.
-    				 * if it appears on the right side of a LeftJoin).
+    				 * if it appears on the right side of a LeftJoin).  We can
+    				 * also continue if the value is in a UNION.
     				 * Otherwise we can stop evaluating right now. 
     				 */
-    				if (sop.isRightSideLeftJoin()) {
-    					groupsToPrune.add(sopTree.getGroup(sop.getGroup()));
-    				} else {
+    				if (sop.getGroup() == SOpTreeBuilder.ROOT_GROUP_ID) {
     					throw new UnrecognizedValueException(ex);
+    				} else {
+    					groupsToPrune.add(sopTree.getGroup(sop.getGroup()));
     				}
     			}
     		}
@@ -720,6 +721,15 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	 * not in the lexicon.
     	 */
     	sopTree = stb.pruneGroups(sopTree, groupsToPrune);
+
+    	/*
+    	 * If after pruning groups with unrecognized values we end up with a
+    	 * UNION with no subqueries, we can safely just return an empty
+    	 * iteration.
+    	 */
+    	if (SOp2BOpUtility.isEmptyUnion(sopTree.getRoot())) {
+    		return new EmptyIteration<BindingSet, QueryEvaluationException>();
+    	}
     	
     	/*
     	 * If we have a filter in the root group (one that can be safely applied
@@ -2047,9 +2057,33 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     }
 
     private IConstraint toConstraint(Or or) {
-        final IConstraint right = toConstraint(or.getRightArg());
-        final IConstraint left = toConstraint(or.getLeftArg());
-        return new OR(left, right);
+        IConstraint left = null, right = null;
+        UnrecognizedValueException uve = null;
+    	try {
+            left = toConstraint(or.getLeftArg());
+    	} catch (UnrecognizedValueException ex) {
+            uve = ex;
+    	}
+    	try {
+            right = toConstraint(or.getRightArg());
+    	} catch (UnrecognizedValueException ex) {
+            uve = ex;
+    	}
+    	
+    	/*
+    	 * if both sides contain unrecognized values, then we need to throw
+    	 * the exception up.  but if only one does, then we can still handle it
+    	 * since we are doing an OR.
+    	 */
+    	if (left == null && right == null) {
+    		throw uve;
+    	}
+    	
+    	if (left != null && right != null) {
+    		return new OR(left, right);
+    	} else {
+    		return left != null ? left : right;
+    	}
     }
 
     private IConstraint toConstraint(And and) {

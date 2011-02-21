@@ -105,6 +105,18 @@ public class SOp2BOpUtility {
     	
 	}
     
+    public static boolean isEmptyUnion(final SOpGroup sopGroup) {
+    	
+    	if (isUnion(sopGroup)) {
+    		final SOpGroups children = sopGroup.getChildren();
+    		if (children == null || children.size() == 0) {
+    			return true;
+    		}
+    	}
+    	return false;
+    	
+    }
+    
     /**
      * Because of the way we parse the Sesame operator tree, the single
      * optional tails get placed in their own singleton subgroup without any
@@ -214,10 +226,10 @@ public class SOp2BOpUtility {
         	 * First do the non-optional subqueries (UNIONs) 
         	 */
 	    	for (SOpGroup child : children) {
-	    		if (!isUnion(child))
+	    		if (!isUnion(child) || isEmptyUnion(child))
 	    			continue;
 	    		
-	    		final PipelineOp subquery = convert(
+	    		final PipelineOp subquery = union(
 	    				child, idFactory, db, queryEngine, queryHints);
 	    		final boolean optional = isOptional(child);
 	    		final int subqueryId = idFactory.incrementAndGet();
