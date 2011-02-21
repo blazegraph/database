@@ -118,7 +118,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                     "         ?p = <"+property1+">) " +
                     "}";
                 
-                { // evalute it once so i can see it
+                { // evaluate it once so i can see it
                     
                     final StringWriter sw = new StringWriter();
                     final SPARQLResultsXMLWriter handler = new SPARQLResultsXMLWriter(
@@ -881,6 +881,29 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
             "SELECT ?x ?y ?z " +
             "{  " +
             "    GRAPH ?g { ?x ?p 1 } { ?x :p ?y } UNION { ?p a ?z } " +
+            "}";
+        
+        // define the correct answer
+        Collection<BindingSet> answer = new LinkedList<BindingSet>();
+        
+        // run the test
+        runQuery(graph, query, answer);
+        
+    }
+    
+    public void test_join_combo_3() throws Exception {
+
+        // define the vocabulary
+        
+        // define the graph
+        Graph graph = new GraphImpl();
+        
+        // define the query
+        String query = 
+            "PREFIX :    <http://example/> " +
+            "SELECT * " +
+            "{  " +
+            "    { ?x :p ?y } UNION { ?p a ?z } " +
             "}";
         
         // define the correct answer
