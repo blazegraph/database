@@ -43,21 +43,21 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.controller.PartitionedJoinGroup;
-import com.bigdata.bop.controller.JoinGraph.JGraph;
-import com.bigdata.bop.controller.JoinGraph.Path;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.bop.joinGraph.IRangeCountFactory;
+import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
+import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
+import com.bigdata.bop.joinGraph.rto.JoinGraph.JGraph;
+import com.bigdata.bop.joinGraph.rto.JoinGraph.Path;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Rule;
-import com.bigdata.relation.rule.eval.DefaultEvaluationPlan2;
-import com.bigdata.relation.rule.eval.IRangeCountFactory;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

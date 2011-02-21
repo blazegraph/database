@@ -1,4 +1,4 @@
-package com.bigdata.bop.controller;
+package com.bigdata.bop.joinGraph;
 
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -14,12 +14,14 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpIdFactory;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.Bind;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.bop.solutions.SliceOp;
 
 /**
@@ -38,19 +40,10 @@ import com.bigdata.bop.solutions.SliceOp;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
- * @todo The order of the {@link IPredicate}s in the tail plan is currently
- *       unchanged from their given order (optional joins without constraints
- *       can not reduce the selectivity of the query). However, it could be
- *       worthwhile to run optionals with constraints before those without
- *       constraints since the constraints can reduce the selectivity of the
- *       query. If we do this, then we need to reorder the optionals based on
- *       the partial order imposed what variables they MIGHT bind (which are not
- *       bound by the join graph).
- * 
  * @todo Things like LET can also bind variables. So can a subquery. Analysis of
  *       those will tell us whether the variable will definitely or
  *       conditionally become bound (I am assuming that a LET can conditionally
- *       leave a variable unbound).
+ *       leave a variable unbound). See {@link Bind}.
  * 
  * @todo runFirst flag on the expander (for free text search). this should be an
  *       annotation. this can be a [headPlan]. [There can be constraints which
@@ -59,13 +52,6 @@ import com.bigdata.bop.solutions.SliceOp;
  *       search access path that replaces the actual access path for the
  *       predicate, which is meaningless in an of itself because the P is
  *       magical.]
- * 
- *       FIXME Add a method to generate a runnable query plan from a collection
- *       of predicates and constraints. This is a bit different for the join
- *       graph and the optionals in the tail plan. The join graph itself should
- *       either be a {@link JoinGraph} operator which gets evaluated at run time
- *       or reordered by whichever optimizer is selected for the query (query
- *       hints).
  */
 public class PartitionedJoinGroup {
 
@@ -257,6 +243,8 @@ public class PartitionedJoinGroup {
      *       join graph is evaluated (but we can only run the join graph
      *       currently against static source binding sets and for that case this
      *       is knowable).
+     * 
+     *       FIXME Unit tests.
      */
     static public IConstraint[][] getJoinGraphConstraints(
             final IPredicate<?>[] path, final IConstraint[] joinGraphConstraints) {
@@ -452,11 +440,15 @@ public class PartitionedJoinGroup {
         return constraints.toArray(new IConstraint[constraints.size()]);
         
     }
-    
+
     /**
-     * Analyze a set of {@link IPredicate}s representing optional and
-     * non-optional joins and a collection of {@link IConstraint}s, partitioning
-     * them into a join graph and a tail plan.
+     * Analyze a set of {@link IPredicate}s representing "runFirst", optional
+     * joins, and non-optional joins which may be freely reordered together with
+     * a collection of {@link IConstraint}s and partition them into a join graph
+     * and a tail plan. The resulting data structure can efficiently answer a
+     * variety of queries regarding joins, join paths, and constraints and can
+     * be used to formulate a complete query when combined with a desired join
+     * ordering.
      * 
      * @param sourcePreds
      *            The predicates.
@@ -640,7 +632,7 @@ public class PartitionedJoinGroup {
         }
 
     }
-    
+
     /**
      * Generate a query plan from an ordered collection of predicates.
      * 
@@ -658,6 +650,31 @@ public class PartitionedJoinGroup {
      *         context based on whether or not the access path is local or
      *         remote (and whether the index is key-range distributed or hash
      *         partitioned).
+     * 
+     *         FIXME Add a method to generate a runnable query plan from the
+     *         collection of predicates and constraints on the
+     *         {@link PartitionedJoinGroup} together with an ordering over the
+     *         join graph. This is a bit different for the join graph and the
+     *         optionals in the tail plan. The join graph itself should either
+     *         be a {@link JoinGraph} operator which gets evaluated at run time
+     *         or reordered by whichever optimizer is selected for the query
+     *         (query hints).
+     * 
+     * @todo The order of the {@link IPredicate}s in the tail plan is currently
+     *       unchanged from their given order (optional joins without
+     *       constraints can not reduce the selectivity of the query). However,
+     *       it could be worthwhile to run optionals with constraints before
+     *       those without constraints since the constraints can reduce the
+     *       selectivity of the query. If we do this, then we need to reorder
+     *       the optionals based on the partial order imposed what variables
+     *       they MIGHT bind (which are not bound by the join graph).
+     * 
+     * @todo multiple runFirst predicates can be evaluated in parallel unless
+     *       they have shared variables. When there are no shared variables,
+     *       construct a TEE pattern such that evaluation proceeds in parallel.
+     *       When there are shared variables, the runFirst predicates must be
+     *       ordered based on those shared variables (at which point, it is
+     *       probably an error to flag them as runFirst).
      */
     static public PipelineOp getQuery(final BOpIdFactory idFactory,
             final IPredicate<?>[] preds, final IConstraint[] constraints) {
@@ -708,6 +725,8 @@ public class PartitionedJoinGroup {
          * FIXME Why does wrapping with this slice appear to be
          * necessary? (It is causing runtime errors when not wrapped).
          * Is this a bopId collision which is not being detected?
+         * 
+         * [This should perhaps be moved into the caller.]
          */
         final PipelineOp queryOp = new SliceOp(new BOp[] { lastOp }, NV
                 .asMap(new NV[] {

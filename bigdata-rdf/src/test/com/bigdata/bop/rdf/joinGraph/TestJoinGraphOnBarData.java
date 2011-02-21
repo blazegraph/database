@@ -13,7 +13,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.IPredicate.Annotations;
-import com.bigdata.bop.controller.JoinGraph;
+import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.model.BigdataLiteral;

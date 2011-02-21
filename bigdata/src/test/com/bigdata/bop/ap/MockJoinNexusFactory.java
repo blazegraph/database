@@ -29,11 +29,11 @@ package com.bigdata.bop.ap;
 
 import java.util.Properties;
 
+import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.eval.AbstractJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ActionEnum;
-import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IRuleTaskFactory;
 

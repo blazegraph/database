@@ -1,4 +1,4 @@
-package com.bigdata.bop.controller;
+package com.bigdata.bop.joinGraph;
 
 /**
  * Exception thrown when the join graph does not have any solutions in the

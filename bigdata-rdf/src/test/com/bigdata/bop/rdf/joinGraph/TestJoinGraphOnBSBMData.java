@@ -17,8 +17,8 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.constraint.NEConstant;
-import com.bigdata.bop.controller.JoinGraph;
 import com.bigdata.bop.engine.QueryLog;
+import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.internal.XSDIntIV;
@@ -216,6 +216,16 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
      * query. This means that running the predicates without shared variables
      * and applying the constraints before the tail of the plan can in fact lead
      * to a more efficient join path.
+     * 
+     * @todo Here are the join orderings for the static and runtime query
+     *       optimizers right now. Neither one pays any mind to the constraints
+     *       at this point. The RTO plan is somewhat better, but I think that we
+     *       are missing the "right" plan by a mile.
+     * 
+     *       <pre>
+     * test_bsbm_q5 : static [0] : : ids=[1, 2, 4, 6, 0, 3, 5]
+     * test_bsbm_q5 : runtime[0] : : ids=[1, 2, 0, 4, 6, 3, 5]
+     * </pre>
      * 
      * @throws Exception
      */

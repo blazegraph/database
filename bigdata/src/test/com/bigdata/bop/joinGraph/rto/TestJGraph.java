@@ -25,9 +25,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 18, 2011
  */
 
-package com.bigdata.bop.controller;
+package com.bigdata.bop.joinGraph.rto;
 
-import com.bigdata.bop.controller.JoinGraph.JGraph;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.joinGraph.rto.JoinGraph.JGraph;
 
 import junit.framework.TestCase2;
 
@@ -64,8 +65,9 @@ public class TestJGraph extends TestCase2 {
     }
 
 //    /**
-//     * Test ability to identify shared variables appearing either as predicate
-//     * operands or as part of CONSTRAINTS or FILTERS.
+    // * Test ability to identify shared variables appearing either as predicate
+    // * operands or as part of CONSTRAINTS or FILTERS. @todo Move to
+    // TestBOpUtility
 //     */
 //    public void test_getSharedVariables() {
 //        fail("write test");
@@ -78,7 +80,9 @@ public class TestJGraph extends TestCase2 {
 //    public void test_noSharedVariables() {
 //        fail("write test");
 //    }
-//
+
+
+    
 //    public void test_getMinimumCardinalityEdge() {
 //        fail("write test");
 //    }

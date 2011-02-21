@@ -21,15 +21,11 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.bop.ap.filter;
-
+package com.bigdata.bop.util;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
-
-import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
-import com.bigdata.relation.rule.IRule;
 
 /**
  * Aggregates test suites into increasing dependency order.
@@ -62,23 +58,22 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("access path filters");
+        final TestSuite suite = new TestSuite("bop utils");
 
-        // test filter operator.
-        suite.addTestSuite(TestFilter.class);
+        // counting variables, etc.
+        suite.addTestSuite(TestBOpUtility.class);
 
-        // test resolver operator.
-        suite.addTestSuite(TestResolver.class);
+        // unit tests for shared variables.
+        suite.addTestSuite(TestBOpUtility_sharedVariables.class);
 
-        // test distinct operator.
-        suite.addTestSuite(TestDistinctFilter.class);
+        // unit tests for allowing joins based on shared variables in preds.
+        suite.addTestSuite(TestBOpUtility_canJoin.class);
 
-        suite.addTestSuite(TestSameVariableConstraint.class);
-        
-        // @todo operators and test suites for the remaining striterator patterns.
-        
+        // more complex logic for join paths.
+        suite.addTestSuite(TestBOpUtility_canJoinUsingConstraints.class);
+
         return suite;
-
+        
     }
-
+    
 }

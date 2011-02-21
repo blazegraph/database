@@ -30,13 +30,13 @@ package com.bigdata.rdf.rules;
 
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
+import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlanFactory2;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.ActionEnum;
-import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
-import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.striterator.IChunkedOrderedIterator;

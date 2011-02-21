@@ -21,15 +21,11 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.bop.ap.filter;
-
+package com.bigdata.bop.joinGraph.rto;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
-
-import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
-import com.bigdata.relation.rule.IRule;
 
 /**
  * Aggregates test suites into increasing dependency order.
@@ -62,23 +58,16 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("access path filters");
+        final TestSuite suite = new TestSuite("runtime query optimizer");
 
-        // test filter operator.
-        suite.addTestSuite(TestFilter.class);
+        // runtime query optimizer operator.
+        suite.addTestSuite(TestJoinGraph.class);
 
-        // test resolver operator.
-        suite.addTestSuite(TestResolver.class);
+        // runtime query optimizer behavior.
+        suite.addTestSuite(TestJGraph.class);
 
-        // test distinct operator.
-        suite.addTestSuite(TestDistinctFilter.class);
-
-        suite.addTestSuite(TestSameVariableConstraint.class);
-        
-        // @todo operators and test suites for the remaining striterator patterns.
-        
         return suite;
-
+        
     }
-
+    
 }

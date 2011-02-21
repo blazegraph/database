@@ -27,6 +27,8 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
+import com.bigdata.bop.util.TestBOpUtility;
+
 /**
  * Aggregates test suites into increasing dependency order.
  *
@@ -73,11 +75,8 @@ public class TestAll extends TestCase {
         // counting variables, etc.
         suite.addTestSuite(TestBOpUtility.class);
 
-        // unit tests for allowing joins based on shared variables in preds.
-        suite.addTestSuite(TestBOpUtility_canJoin.class);
-
-        // more complex logic for join paths.
-        suite.addTestSuite(TestBOpUtility_canJoinUsingConstraints.class);
+        // bop utils.
+        suite.addTest(com.bigdata.bop.util.TestAll.suite());
 
         // constraint operators (EQ, NE, etc).
         suite.addTest(com.bigdata.bop.constraint.TestAll.suite());

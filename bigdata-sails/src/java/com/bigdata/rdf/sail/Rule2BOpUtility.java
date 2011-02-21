@@ -72,6 +72,8 @@ import com.bigdata.bop.cost.ScanCostReport;
 import com.bigdata.bop.cost.SubqueryCostReport;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.joinGraph.IRangeCountFactory;
+import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
 import com.bigdata.bop.rdf.filter.StripContextFilter;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.solutions.SliceOp;
@@ -91,8 +93,6 @@ import com.bigdata.relation.rule.EmptyAccessPathExpander;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
-import com.bigdata.relation.rule.eval.DefaultEvaluationPlan2;
-import com.bigdata.relation.rule.eval.IRangeCountFactory;
 import com.bigdata.relation.rule.eval.RuleState;
 import com.bigdata.striterator.IKeyOrder;
 

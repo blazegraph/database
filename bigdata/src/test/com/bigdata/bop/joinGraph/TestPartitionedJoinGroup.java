@@ -25,10 +25,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 19, 2011
  */
 
-package com.bigdata.bop.controller;
+package com.bigdata.bop.joinGraph;
 
 import java.util.Arrays;
 import java.util.Iterator;
+
+import org.openrdf.query.algebra.Compare.CompareOp;
+import org.openrdf.query.algebra.MathExpr.MathOp;
 
 import junit.framework.TestCase2;
 
@@ -42,6 +45,15 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.constraint.NEConstant;
+import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
+import com.bigdata.rdf.internal.XSDIntIV;
+import com.bigdata.rdf.internal.constraints.CompareBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.spo.SPOPredicate;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Unit tests for {@link PartitionedJoinGroup}.
@@ -466,6 +478,8 @@ public class TestPartitionedJoinGroup extends TestCase2 {
      * ordering and that the iterator is exhausted once all expected objects
      * have been visited. The implementation uses a selection without
      * replacement "pattern".
+     * 
+     * @todo raise into the AbstractTestCase (e.g, TestCase2/3).
      */
     @SuppressWarnings("unchecked")
     static public void assertSameIteratorAnyOrder(final Object[] expected,
@@ -528,4 +542,5 @@ public class TestPartitionedJoinGroup extends TestCase2 {
         }
 
     }
+
 }
