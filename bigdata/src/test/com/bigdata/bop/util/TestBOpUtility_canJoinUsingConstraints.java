@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 20, 2011
  */
 
-package com.bigdata.bop;
+package com.bigdata.bop.util;
 
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -34,10 +34,23 @@ import java.util.Set;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.ImmutableBOp;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.Var;
+import com.bigdata.bop.BOp.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.constraint.AND;
 import com.bigdata.bop.constraint.BOpConstraint;
-import com.bigdata.bop.controller.JoinGraph.JGraph;
+import com.bigdata.bop.joinGraph.rto.JoinGraph.JGraph;
 
 /**
  * 

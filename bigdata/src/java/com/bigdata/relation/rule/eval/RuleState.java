@@ -14,6 +14,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.joinGraph.IEvaluationPlan;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStarJoin;

@@ -23,11 +23,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 
-package com.bigdata.relation.rule.eval;
+package com.bigdata.bop.joinGraph;
 
 import com.bigdata.bop.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IAccessPathExpander;
+import com.bigdata.relation.rule.eval.IJoinNexus;
 
 /**
  * Useful for testing - will not reorder the join predicates.

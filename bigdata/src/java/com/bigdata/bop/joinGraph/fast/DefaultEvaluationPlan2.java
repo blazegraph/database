@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 26, 2008
  */
 
-package com.bigdata.relation.rule.eval;
+package com.bigdata.bop.joinGraph.fast;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -34,10 +34,13 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.joinGraph.IEvaluationPlan;
+import com.bigdata.bop.joinGraph.IRangeCountFactory;
 import com.bigdata.journal.ITx;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IStarJoin;
+import com.bigdata.relation.rule.eval.IJoinNexus;
 
 /**
  * The evaluation order is determined by analysis of the propagation of
@@ -291,7 +294,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
     /**
      * Start by looking at every possible initial join. Take every tail and
      * match it with every other tail to find the lowest possible cardinality.
-     * See {@link #computeJoinCardinality(com.bigdata.relation.rule.eval.DefaultEvaluationPlan2.IJoinDimension, com.bigdata.relation.rule.eval.DefaultEvaluationPlan2.IJoinDimension)}
+     * See {@link #computeJoinCardinality(com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2.IJoinDimension, com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2.IJoinDimension)}
      * for more on this. 
      */
     private Join getFirstJoin() {

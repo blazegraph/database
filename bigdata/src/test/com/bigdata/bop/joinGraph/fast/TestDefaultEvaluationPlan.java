@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 19, 2008
  */
 
-package com.bigdata.relation.rule.eval;
+package com.bigdata.bop.joinGraph.fast;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -45,6 +45,10 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.joinGraph.IEvaluationPlan;
+import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
+import com.bigdata.bop.joinGraph.IRangeCountFactory;
+import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
 import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.config.IValidator;
 import com.bigdata.io.IStreamSerializer;
@@ -60,11 +64,17 @@ import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.Rule;
+import com.bigdata.relation.rule.eval.ActionEnum;
+import com.bigdata.relation.rule.eval.IJoinNexus;
+import com.bigdata.relation.rule.eval.IJoinNexusFactory;
+import com.bigdata.relation.rule.eval.IRuleStatisticsFactory;
+import com.bigdata.relation.rule.eval.IRuleTaskFactory;
+import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
- * Test harness for {@link DefaultEvaluationPlan}.
+ * Test harness for {@link DefaultEvaluationPlan2}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

@@ -33,6 +33,8 @@ import java.util.Vector;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.joinGraph.IEvaluationPlan;
+import com.bigdata.bop.joinGraph.IRangeCountFactory;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IProgram;

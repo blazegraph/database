@@ -25,8 +25,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 20, 2011
  */
 
-package com.bigdata.bop;
+package com.bigdata.bop.util;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 
 import junit.framework.TestCase2;

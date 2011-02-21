@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 26, 2008
  */
 
-package com.bigdata.relation.rule.eval;
+package com.bigdata.bop.joinGraph;
 
 import com.bigdata.relation.rule.IRule;
 

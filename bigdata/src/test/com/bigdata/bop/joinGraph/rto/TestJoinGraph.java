@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 18, 2010
  */
 
-package com.bigdata.bop.controller;
+package com.bigdata.bop.joinGraph.rto;
 
 import junit.framework.TestCase2;
 
@@ -41,12 +41,13 @@ import com.bigdata.bop.constraint.NEConstant;
 
 /**
  * Unit tests for the {@link JoinGraph} operator.
+ * <p>
+ * Note: A lot of the guts the {@link JoinGraph} operator evaluation are tested
+ * by {@link TestJGraph}. There is also an RDF specific test suite which runs
+ * against various RDF data sets.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Test evaluation of the operator as well. A lot of the guts of that are
- *       tested by {@link TestJGraph}.
  */
 public class TestJoinGraph extends TestCase2 {
 

@@ -40,8 +40,8 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp.Annotations;
-import com.bigdata.bop.controller.PartitionedJoinGroup;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.btree.AbstractNode;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -1381,6 +1381,9 @@ public class BOpUtility {
             /*
              * Find the constraints that will run with each vertex of the new
              * join path.
+             * 
+             * TODO This is a forward reference to a different package, so maybe
+             * move the canJoinWithConstraints() method to that package?
              */
             final IConstraint[][] constraintRunArray = PartitionedJoinGroup
                     .getJoinGraphConstraints(newPath, constraints);

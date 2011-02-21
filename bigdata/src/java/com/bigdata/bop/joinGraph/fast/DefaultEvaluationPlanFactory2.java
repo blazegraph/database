@@ -1,6 +1,9 @@
-package com.bigdata.relation.rule.eval;
+package com.bigdata.bop.joinGraph.fast;
 
+import com.bigdata.bop.joinGraph.IEvaluationPlan;
+import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.eval.IJoinNexus;
 
 /**
  * Factory for {@link DefaultEvaluationPlan2}s.

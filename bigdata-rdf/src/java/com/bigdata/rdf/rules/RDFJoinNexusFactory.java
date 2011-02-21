@@ -32,6 +32,7 @@ import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.spo.SPORelation;
@@ -39,7 +40,6 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.eval.AbstractJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ActionEnum;
-import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IRuleTaskFactory;
 

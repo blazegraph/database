@@ -26,9 +26,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 18, 2008
  */
 
-package com.bigdata.relation.rule.eval;
+package com.bigdata.bop.joinGraph;
 
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.eval.IJoinNexus;
 
 /**
  * A factory for {@link IEvaluationPlan}s that do not reorder the predicates in
