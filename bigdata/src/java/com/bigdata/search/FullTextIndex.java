@@ -599,9 +599,9 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @return The token analyzer best suited to the indicated language family.
      */
-    protected Analyzer getAnalyzer(final String languageCode) {
+    protected Analyzer getAnalyzer(final String languageCode, final boolean filterStopwords) {
 
-        return analyzerFactory.getAnalyzer(languageCode);
+        return analyzerFactory.getAnalyzer(languageCode, filterStopwords);
         
     }
     
@@ -761,24 +761,11 @@ public class FullTextIndex extends AbstractRelation {
          * 
          * @todo is it using a language family specific stopword list?
          */
-        final Analyzer a = getAnalyzer(languageCode);
+        final Analyzer a = getAnalyzer(languageCode, filterStopwords);
         
-        TokenStream tokenStream;
-        if (filterStopwords) {
-        	tokenStream = a.tokenStream(null/* @todo field? */, r);
-        } else {
-        	/*
-        	 * To eliminiate stopword filtering, we simulate the tokenStream()
-        	 * operation above per the javadoc for that method, which says:
-        	 * "Constructs a StandardTokenizer filtered by a StandardFilter, 
-        	 * a LowerCaseFilter and a StopFilter", eliminating the StopFilter.
-        	 */
-        	tokenStream = new StandardTokenizer(Version.LUCENE_CURRENT, r);
-        	tokenStream = new StandardFilter(tokenStream);
-        }
+        TokenStream tokenStream = a.tokenStream(null/* @todo field? */, r);
         
         // force to lower case.
-        // might be able to move this inside the else {} block above?
         tokenStream = new LowerCaseFilter(tokenStream);
         
         return tokenStream;
