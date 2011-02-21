@@ -52,6 +52,8 @@ import com.bigdata.rdf.vocab.RDFSVocabulary;
 import com.bigdata.striterator.ChunkedArrayIterator;
 
 /**
+ * Test change sets. This is meant to be run in triples with SIDs mode.
+ * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
@@ -59,38 +61,15 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
 
     protected static final Logger log = Logger.getLogger(TestChangeSets.class);
     
-    public Properties getTriplesNoInference() {
+    public Properties getNoInferenceProps() {
         
         Properties props = super.getProperties();
-        
-        // triples with sids
-        props.setProperty(BigdataSail.Options.QUADS, "false");
-        props.setProperty(BigdataSail.Options.STATEMENT_IDENTIFIERS, "false");
         
         // no inference
         props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
         props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
         props.setProperty(BigdataSail.Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
         props.setProperty(BigdataSail.Options.JUSTIFY, "false");
-        props.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
-        
-        return props;
-        
-    }
-
-    public Properties getTriplesWithInference() {
-        
-        Properties props = super.getProperties();
-        
-        // triples with sids
-        props.setProperty(BigdataSail.Options.QUADS, "false");
-        props.setProperty(BigdataSail.Options.STATEMENT_IDENTIFIERS, "false");
-        
-        // no inference
-        props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "true");
-        props.setProperty(BigdataSail.Options.AXIOMS_CLASS, OwlAxioms.class.getName());
-        props.setProperty(BigdataSail.Options.VOCABULARY_CLASS, RDFSVocabulary.class.getName());
-        props.setProperty(BigdataSail.Options.JUSTIFY, "true");
         props.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
         
         return props;
@@ -112,7 +91,9 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
 
     public void testSimpleAdd() throws Exception {
 
-        final BigdataSail sail = getSail(getTriplesNoInference());
+        final BigdataSail sail = getSail(getNoInferenceProps());
+        try {
+        	
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
@@ -204,6 +185,9 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             
         } finally {
             cxn.close();
+        } 
+        
+        } finally {
             sail.__tearDownUnitTest();
         }
 
@@ -211,8 +195,10 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
     
     public void testSimpleRemove() throws Exception {
 
-        final BigdataSail sail = getSail(getTriplesNoInference());
-        sail.initialize();
+        final BigdataSail sail = getSail(getNoInferenceProps());
+        try {
+        
+    	sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
             (BigdataSailRepositoryConnection) repo.getConnection();
@@ -288,6 +274,9 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             
         } finally {
             cxn.close();
+        }
+        
+        } finally {
             sail.__tearDownUnitTest();
         }
 
@@ -295,15 +284,10 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
     
     public void testSids() throws Exception {
 
-        Properties props = getTriplesNoInference();
+        final BigdataSail sail = getSail(getNoInferenceProps());
+        try {
         
-        if (!Boolean.valueOf(props.getProperty(BigdataSail.Options.STATEMENT_IDENTIFIERS)).booleanValue()) {
-            log.warn("cannot run this test without sids enabled");
-            return;
-        }
-        
-        final BigdataSail sail = getSail(getTriplesNoInference());
-        sail.initialize();
+    	sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
             (BigdataSailRepositoryConnection) repo.getConnection();
@@ -402,6 +386,9 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             
         } finally {
             cxn.close();
+        }
+        
+        } finally {
             sail.__tearDownUnitTest();
         }
 
@@ -409,7 +396,9 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
     
     public void testTMAdd() throws Exception {
 
-        final BigdataSail sail = getSail(getTriplesWithInference());
+        final BigdataSail sail = getSail();
+        try {
+        	
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
@@ -499,6 +488,9 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             
         } finally {
             cxn.close();
+        }
+        
+        } finally {
             sail.__tearDownUnitTest();
         }
 
@@ -506,7 +498,9 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
     
     public void testTMRetract() throws Exception {
 
-        final BigdataSail sail = getSail(getTriplesWithInference());
+        final BigdataSail sail = getSail();
+        try {
+        	
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
@@ -606,6 +600,9 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             
         } finally {
             cxn.close();
+        }
+        
+        } finally {
             sail.__tearDownUnitTest();
         }
 
@@ -613,7 +610,9 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
     
     public void testTMUpdate() throws Exception {
 
-        final BigdataSail sail = getSail(getTriplesWithInference());
+        final BigdataSail sail = getSail();
+        try {
+        	
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
@@ -717,6 +716,9 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             
         } finally {
             cxn.close();
+        }
+        
+        } finally {
             sail.__tearDownUnitTest();
         }
 
