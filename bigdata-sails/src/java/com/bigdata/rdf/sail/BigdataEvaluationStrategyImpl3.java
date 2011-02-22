@@ -84,9 +84,15 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.internal.DummyIV;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.AndBOp;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
+import com.bigdata.rdf.internal.constraints.EBVBOp;
+import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.constraints.NotBOp;
+import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
+import com.bigdata.rdf.internal.constraints.ValueExpressionConstraint;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
@@ -1705,7 +1711,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         // @todo why is [s] handled differently?
         // because [s] is the variable in free text searches, no need to test
         // to see if the free text search expander is in place
-        final IVariableOrConstant<IV> s = toVariableOrConstant(
+        final IVariableOrConstant<IV> s = toVE(
                 stmtPattern.getSubjectVar());
         if (s == null) {
             return null;
@@ -1713,7 +1719,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         
         final IVariableOrConstant<IV> p;
         if (expander == null) {
-            p = toVariableOrConstant(stmtPattern.getPredicateVar());
+            p = toVE(stmtPattern.getPredicateVar());
         } else {
             p = new Constant(DummyIV.INSTANCE);
         }
@@ -1723,7 +1729,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         
         final IVariableOrConstant<IV> o;
         if (expander == null) {
-            o = toVariableOrConstant(stmtPattern.getObjectVar());
+            o = toVE(stmtPattern.getObjectVar());
         } else {
             o = new Constant(DummyIV.INSTANCE);
         }
@@ -1806,7 +1812,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
                          * "SELECT * WHERE {graph ?g {?g :p :o } }"
                          */
                         expander = new NamedGraphSolutionExpander(null/* ALL */);
-                        c = toVariableOrConstant(cvar);
+                        c = toVE(cvar);
                     }
                 } else { // dataset != null
                     // attach the DataSet.
@@ -1828,7 +1834,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
                         if (cvar == null)
                             c = null;
                         else
-                            c = toVariableOrConstant(cvar);
+                            c = toVE(cvar);
                         break;
                     }
                     case NAMED_CONTEXTS: {
@@ -1840,7 +1846,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
                         if (cvar == null) {// || !cvar.hasValue()) {
                             c = null;
                         } else {
-                            c = toVariableOrConstant(cvar);
+                            c = toVE(cvar);
                         }
                         break;
                     }
@@ -2039,33 +2045,57 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	 * value does not exist in the lexicon.
      */
     private IConstraint toConstraint(final ValueExpr ve) {
-        if (ve instanceof Or) {
-            return toConstraint((Or) ve);
+
+    	final IValueExpression<IV> veBOp = toVE(ve);
+    	return ValueExpressionConstraint.wrap(veBOp);
+    	
+    }
+
+    /**
+     * Generate a bigdata {@link IValueExpression} for a given Sesame
+     * <code>ValueExpr</code> object.  We can currently handle variables,
+     * value constants, and math expressions. Is there anything else we need
+     * to handle?
+     */
+    private IValueExpression<IV> toVE(final ValueExpr ve) 
+    		throws UnsupportedOperatorException {
+    	if (ve instanceof Var) {
+        	return toVE((Var) ve);
+        } else if (ve instanceof ValueConstant) {
+        	return toVE((ValueConstant) ve);
+        } else if (ve instanceof MathExpr) {
+        	return toVE((MathExpr) ve);
+        } else if (ve instanceof Or) {
+            return toVE((Or) ve);
         } else if (ve instanceof And) {
-            return toConstraint((And) ve);
+            return toVE((And) ve);
         } else if (ve instanceof Not) {
-            return toConstraint((Not) ve);
+            return toVE((Not) ve);
         } else if (ve instanceof SameTerm) {
-            return toConstraint((SameTerm) ve);
+            return toVE((SameTerm) ve);
         } else if (ve instanceof Compare) {
-            return toConstraint((Compare) ve);
+            return toVE((Compare) ve);
         } else if (ve instanceof Bound) {
-            return toConstraint((Bound) ve);
+            return toVE((Bound) ve);
         }
         
         throw new UnsupportedOperatorException(ve);
     }
 
-    private IConstraint toConstraint(Or or) {
-        IConstraint left = null, right = null;
+    private IValueExpression<IV> toVE(Or or) {
+    	IValueExpression<IV> left = null, right = null;
         UnrecognizedValueException uve = null;
     	try {
-            left = toConstraint(or.getLeftArg());
+            left = toVE(or.getLeftArg());
+            if (left instanceof IVariableOrConstant)
+            	left = new EBVBOp(left);
     	} catch (UnrecognizedValueException ex) {
             uve = ex;
     	}
     	try {
-            right = toConstraint(or.getRightArg());
+            right = toVE(or.getRightArg());
+            if (right instanceof IVariableOrConstant)
+            	right = new EBVBOp(right);
     	} catch (UnrecognizedValueException ex) {
             uve = ex;
     	}
@@ -2080,65 +2110,52 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	}
     	
     	if (left != null && right != null) {
-    		return new OR(left, right);
+    		return new OrBOp(left, right);
     	} else {
     		return left != null ? left : right;
     	}
     }
 
-    private IConstraint toConstraint(And and) {
-        final IConstraint right = toConstraint(and.getRightArg());
-        final IConstraint left = toConstraint(and.getLeftArg());
-        return new AND(left, right);
+    private IValueExpression<IV> toVE(And and) {
+        IValueExpression<IV> left = toVE(and.getLeftArg());
+        if (left instanceof IVariableOrConstant)
+        	left = new EBVBOp(left);
+        IValueExpression<IV> right = toVE(and.getRightArg());
+        if (right instanceof IVariableOrConstant)
+        	right = new EBVBOp(right);
+        return new AndBOp(left, right);
     }
 
-    private IConstraint toConstraint(Not not) {
-        final IConstraint c = toConstraint(not.getArg());
-        return new NOT(c);
+    private IValueExpression<IV> toVE(Not not) {
+        IValueExpression<IV> ve = toVE(not.getArg());
+        if (ve instanceof IVariableOrConstant)
+        	ve = new EBVBOp(ve);
+    	return new NotBOp(ve);
     }
 
-    private IConstraint toConstraint(SameTerm sameTerm) {
+    private IValueExpression<IV> toVE(SameTerm sameTerm) {
     	final IValueExpression<IV> iv1 = 
-    		toValueExpression(sameTerm.getLeftArg());
+    		toVE(sameTerm.getLeftArg());
     	final IValueExpression<IV> iv2 = 
-    		toValueExpression(sameTerm.getRightArg());
+    		toVE(sameTerm.getRightArg());
         return new SameTermBOp(iv1, iv2);
     }
 
-    private IConstraint toConstraint(final Compare compare) {
+    private IValueExpression<IV> toVE(final Compare compare) {
     	if (!database.isInlineLiterals()) {
     		throw new UnsupportedOperatorException(compare);
     	}
     	final IValueExpression<IV> iv1 = 
-    		toValueExpression(compare.getLeftArg());
+    		toVE(compare.getLeftArg());
     	final IValueExpression<IV> iv2 = 
-    		toValueExpression(compare.getRightArg());
+    		toVE(compare.getRightArg());
         return new CompareBOp(iv1, iv2, compare.getOperator());
     }
 
-    private IConstraint toConstraint(Bound bound) {
+    private IValueExpression<IV> toVE(final Bound bound) {
     	final IVariable<IV> var = 
     		com.bigdata.bop.Var.var(bound.getArg().getName());
-    	return new BOUND(var);
-    }
-
-    /**
-     * Generate a bigdata {@link IValueExpression} for a given Sesame
-     * <code>ValueExpr</code> object.  We can currently handle variables,
-     * value constants, and math expressions. Is there anything else we need
-     * to handle?
-     */
-    private IValueExpression<IV> toValueExpression(final ValueExpr ve) 
-    		throws UnsupportedOperatorException {
-    	if (ve instanceof Var) {
-        	return toVariableOrConstant((Var) ve);
-        } else if (ve instanceof ValueConstant) {
-        	return toConstant((ValueConstant) ve);
-        } else if (ve instanceof MathExpr) {
-        	return toValueExpression((MathExpr) ve);
-        } 
-        
-        throw new UnsupportedOperatorException(ve);
+    	return new IsBoundBOp(var);
     }
 
 	/**
@@ -2147,7 +2164,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	 * This method will throw an exception if the Sesame term is bound and the
 	 * value does not exist in the lexicon.
 	 */
-    private IVariableOrConstant<IV> toVariableOrConstant(final Var var) 
+    private IVariableOrConstant<IV> toVE(final Var var) 
     		throws UnsupportedOperatorException {
         final String name = var.getName();
         final BigdataValue val = (BigdataValue) var.getValue();
@@ -2171,7 +2188,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	 * This method will throw an exception if the Sesame term is bound and the
 	 * value does not exist in the lexicon.
 	 */
-    private IConstant<IV> toConstant(final ValueConstant vc) {
+    private IConstant<IV> toVE(final ValueConstant vc) {
         final IV iv = ((BigdataValue) vc.getValue()).getIV();
         if (iv == null)
         	throw new UnrecognizedValueException(vc.getValue());
@@ -2183,12 +2200,12 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
      * have two {@link IValueExpression} operands, each of which will be
      * either a variable, constant, or another math expression.
      */
-    private MathBOp toValueExpression(final MathExpr mathExpr) {
+    private MathBOp toVE(final MathExpr mathExpr) {
     	final ValueExpr left = mathExpr.getLeftArg();
     	final ValueExpr right = mathExpr.getRightArg();
     	final MathOp op = mathExpr.getOperator();
-    	final IValueExpression<IV> iv1 = toValueExpression(left);
-    	final IValueExpression<IV> iv2 = toValueExpression(right);
+    	final IValueExpression<IV> iv1 = toVE(left);
+    	final IValueExpression<IV> iv2 = toVE(right);
         return new MathBOp(iv1, iv2, op);
     }
     

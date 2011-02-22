@@ -28,23 +28,39 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.internal.constraints;
 
 import java.util.GregorianCalendar;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.xml.datatype.XMLGregorianCalendar;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.MathExpr.MathOp;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.IPredicate.Annotations;
+import com.bigdata.bop.engine.IRunningQuery;
+import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.joinGraph.IEvaluationPlan;
 import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlanFactory2;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -53,15 +69,23 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.RuleContextEnum;
+import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.Rule2BOpUtility;
+import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
+import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ProxyTestCase;
+import com.bigdata.relation.accesspath.ElementFilter;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.striterator.ChunkedWrappedIterator;
+import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.sun.org.apache.xerces.internal.jaxp.datatype.XMLGregorianCalendarImpl;
 
@@ -71,6 +95,8 @@ import com.sun.org.apache.xerces.internal.jaxp.datatype.XMLGregorianCalendarImpl
  */
 public class TestInlineConstraints extends ProxyTestCase {
 
+	protected static final Logger log = Logger.getLogger(TestInlineConstraints.class);
+	
     /**
      * 
      */
@@ -83,6 +109,13 @@ public class TestInlineConstraints extends ProxyTestCase {
      */
     public TestInlineConstraints(String name) {
         super(name);
+    }
+    
+    @Override
+    public Properties getProperties() {
+    	final Properties props = super.getProperties();
+    	props.setProperty(BigdataSail.Options.INLINE_DATE_TIMES, "true");
+    	return props;
     }
     
     public void testGT() {
@@ -142,25 +175,27 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IRule rule =
                         new Rule("test_greater_than", null, // head
                                 new IPredicate[] {
-                                    new SPOPredicate(SPO, s, type, x),
-                                    new SPOPredicate(SPO, s, age, a) 
+                                    toPredicate(db, s, type, x),
+                                    toPredicate(db, s, age, a) 
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                                    new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GT)
-                                });
+                        			ValueExpressionConstraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GT))
+                                }
+                        );
                 
                 try {
                 
                     int numSolutions = 0;
                     
-                    IChunkedOrderedIterator<ISolution> solutions = runQuery(db, rule);
+                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
                     
                     while (solutions.hasNext()) {
                         
-                        ISolution solution = solutions.next();
+                        final IBindingSet bs = solutions.next();
                         
-                        IBindingSet bs = solution.getBindingSet();
+                        if (log.isInfoEnabled())
+                        	log.info(bs);
                         
                         assertEquals(bs.get(s).get(), B.getIV());
                         assertEquals(bs.get(a).get(), _45.getIV());
@@ -168,6 +203,8 @@ public class TestInlineConstraints extends ProxyTestCase {
                         numSolutions++;
                         
                     }
+
+                    solutions.close();
                     
                     assertEquals("wrong # of solutions", 1, numSolutions);
                     
@@ -244,25 +281,26 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IRule rule =
                         new Rule("test_greater_than", null, // head
                                 new IPredicate[] {
-                                    new SPOPredicate(SPO, s, type, x),
-                                    new SPOPredicate(SPO, s, age, a) 
+                                    toPredicate(db, s, type, x),
+                                    toPredicate(db, s, age, a) 
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                                    new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GE)
+                        			ValueExpressionConstraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GE))
                                 });
                 
                 try {
                 
                     int numSolutions = 0;
                     
-                    IChunkedOrderedIterator<ISolution> solutions = runQuery(db, rule);
+                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
                     
                     while (solutions.hasNext()) {
                         
-                        ISolution solution = solutions.next();
+                        final IBindingSet bs = solutions.next();
                         
-                        IBindingSet bs = solution.getBindingSet();
+                        if (log.isInfoEnabled())
+                        	log.info(bs);
                         
                         final IV _s = (IV) bs.get(s).get();
                         final IV _a = (IV) bs.get(a).get();
@@ -272,6 +310,8 @@ public class TestInlineConstraints extends ProxyTestCase {
                         numSolutions++;
                         
                     }
+                    
+                    solutions.close();
                     
                     assertEquals("wrong # of solutions", 2, numSolutions);
                     
@@ -348,12 +388,12 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IRule rule =
                         new Rule("test_less_than", null, // head
                                 new IPredicate[] {
-                                    new SPOPredicate(SPO, s, type, x),
-                                    new SPOPredicate(SPO, s, age, a) 
+                                    toPredicate(db, s, type, x),
+                                    toPredicate(db, s, age, a) 
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                        			new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LT)
+                        			ValueExpressionConstraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LT))
                                 });
                 
                 if (log.isInfoEnabled())
@@ -363,16 +403,14 @@ public class TestInlineConstraints extends ProxyTestCase {
                 
                     int numSolutions = 0;
                     
-                    IChunkedOrderedIterator<ISolution> solutions = runQuery(db, rule);
+                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
                     
                     while (solutions.hasNext()) {
                         
-                        ISolution solution = solutions.next();
-                        
-                        IBindingSet bs = solution.getBindingSet();
+                        final IBindingSet bs = solutions.next();
                         
                         if (log.isInfoEnabled())
-                            log.info("solution: " + bs);
+                        	log.info(bs);
                         
                         assertEquals(bs.get(s).get(), A.getIV());
                         assertEquals(bs.get(a).get(), _25.getIV());
@@ -380,6 +418,8 @@ public class TestInlineConstraints extends ProxyTestCase {
                         numSolutions++;
                         
                     }
+                    
+                    solutions.close();
                     
                     assertEquals("wrong # of solutions", 1, numSolutions);
                     
@@ -456,12 +496,12 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IRule rule =
                         new Rule("test_less_than", null, // head
                                 new IPredicate[] {
-                                    new SPOPredicate(SPO, s, type, x),
-                                    new SPOPredicate(SPO, s, age, a) 
+                                    toPredicate(db, s, type, x),
+                                    toPredicate(db, s, age, a) 
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                                	new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LE)
+                        			ValueExpressionConstraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LE))
                                 });
                 
                 if (log.isInfoEnabled())
@@ -471,16 +511,14 @@ public class TestInlineConstraints extends ProxyTestCase {
                 
                     int numSolutions = 0;
                     
-                    IChunkedOrderedIterator<ISolution> solutions = runQuery(db, rule);
+                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
                     
                     while (solutions.hasNext()) {
                         
-                        ISolution solution = solutions.next();
-                        
-                        IBindingSet bs = solution.getBindingSet();
+                        final IBindingSet bs = solutions.next();
                         
                         if (log.isInfoEnabled())
-                            log.info("solution: " + bs);
+                        	log.info(bs);
                         
                         final IV _s = (IV) bs.get(s).get();
                         final IV _a = (IV) bs.get(a).get();
@@ -490,6 +528,8 @@ public class TestInlineConstraints extends ProxyTestCase {
                         numSolutions++;
                         
                     }
+                    
+                    solutions.close();
                     
                     assertEquals("wrong # of solutions", 2, numSolutions);
                     
@@ -572,28 +612,27 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IRule rule =
                         new Rule("test_math", null, // head
                                 new IPredicate[] {
-                        			new SPOPredicate(SPO, d, age, dAge),
-                                    new SPOPredicate(SPO, s, type, x),
-                                    new SPOPredicate(SPO, s, age, a) 
+                        			toPredicate(db, d, age, dAge),
+                                    toPredicate(db, s, type, x),
+                                    toPredicate(db, s, age, a) 
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                                    new CompareBOp(a, new MathBOp(dAge, new Constant<IV>(_5.getIV()), MathOp.PLUS), CompareOp.GT)
+                        			ValueExpressionConstraint.wrap(new CompareBOp(a, new MathBOp(dAge, new Constant<IV>(_5.getIV()), MathOp.PLUS), CompareOp.GT))
                                 });
                 
                 try {
                 
                     int numSolutions = 0;
                     
-                    IChunkedOrderedIterator<ISolution> solutions = runQuery(db, rule);
+                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
                     
                     while (solutions.hasNext()) {
                         
-                        ISolution solution = solutions.next();
+                        final IBindingSet bs = solutions.next();
                         
-                        IBindingSet bs = solution.getBindingSet();
-                        
-                        System.err.println(bs);
+                        if (log.isInfoEnabled())
+                        	log.info(bs);
                         
                         assertEquals(bs.get(s).get(), B.getIV());
                         assertEquals(bs.get(a).get(), _45.getIV());
@@ -601,6 +640,8 @@ public class TestInlineConstraints extends ProxyTestCase {
                         numSolutions++;
                         
                     }
+                    
+                    solutions.close();
                     
                     assertEquals("wrong # of solutions", 1, numSolutions);
                     
@@ -685,12 +726,12 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IRule rule =
                         new Rule("test_greater_than", null, // head
                                 new IPredicate[] {
-                                    new SPOPredicate(SPO, s, type, x),
-                                    new SPOPredicate(SPO, s, birthday, a) 
+                                    toPredicate(db, s, type, x),
+                                    toPredicate(db, s, birthday, a) 
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                                    new CompareBOp(a, new Constant<IV>(l2.getIV()), CompareOp.GT)
+                                    ValueExpressionConstraint.wrap(new CompareBOp(a, new Constant<IV>(l2.getIV()), CompareOp.GT))
                                 });
                 
                 try {
@@ -698,33 +739,36 @@ public class TestInlineConstraints extends ProxyTestCase {
                 	final IV left = l3.getIV();
                 	final IV right = l2.getIV();
                 	
-                	System.err.println(left + ": " + left.isInline() + ", " + left.isLiteral() + ", " + left.isNumeric());
-                	System.err.println(right + ": " + right.isInline() + ", " + right.isLiteral() + ", " + right.isNumeric());
+                	if (log.isInfoEnabled()) {
                 	
-                	if (IVUtility.canNumericalCompare(left) &&
-                			IVUtility.canNumericalCompare(right)) {
-                		
-                		final int compare = IVUtility.numericalCompare(left, right);
-                		
-                		System.err.println("can numerical compare: " + compare);
-            	        
-                	} else {
-                		
-                		final int compare = (left.compareTo(right));
-                		
-                		System.err.println("cannot numerical compare: " + compare);
-            	        
+                		log.info(left + ": " + left.isInline() + ", " + left.isLiteral() + ", " + left.isNumeric());
+	                	log.info(right + ": " + right.isInline() + ", " + right.isLiteral() + ", " + right.isNumeric());
+	                	
+	                	if (IVUtility.canNumericalCompare(left) &&
+	                			IVUtility.canNumericalCompare(right)) {
+	                		
+	                		final int compare = IVUtility.numericalCompare(left, right);
+	                		log.info("can numerical compare: " + compare);
+	            	        
+	                	} else {
+	                		
+	                		final int compare = (left.compareTo(right));
+	                		log.info("cannot numerical compare: " + compare);
+	            	        
+	                	}
+	                	
                 	}
 
                     int numSolutions = 0;
                     
-                    IChunkedOrderedIterator<ISolution> solutions = runQuery(db, rule);
+                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
                     
                     while (solutions.hasNext()) {
                         
-                        ISolution solution = solutions.next();
+                        final IBindingSet bs = solutions.next();
                         
-                        IBindingSet bs = solution.getBindingSet();
+                        if (log.isInfoEnabled())
+                        	log.info(bs);
                         
                         assertEquals(bs.get(s).get(), C.getIV());
                         assertEquals(bs.get(a).get(), l3.getIV());
@@ -732,6 +776,8 @@ public class TestInlineConstraints extends ProxyTestCase {
                         numSolutions++;
                         
                     }
+                    
+                    solutions.close();
                     
                     assertEquals("wrong # of solutions", 1, numSolutions);
                     
@@ -751,31 +797,124 @@ public class TestInlineConstraints extends ProxyTestCase {
         
     }
 
-    private IChunkedOrderedIterator<ISolution> runQuery(AbstractTripleStore db, IRule rule)
-        throws Exception {
-        // run the query as a native rule.
-        final IEvaluationPlanFactory planFactory =
-                DefaultEvaluationPlanFactory2.INSTANCE;
-        final IJoinNexusFactory joinNexusFactory =
-                db.newJoinNexusFactory(RuleContextEnum.HighLevelQuery,
-                        ActionEnum.Query, IJoinNexus.BINDINGS, null, // filter
-                        false, // justify 
-                        false, // backchain
-                        planFactory);
-        final IJoinNexus joinNexus =
-                joinNexusFactory.newInstance(db.getIndexManager());
-        final IEvaluationPlan plan = planFactory.newPlan(joinNexus, rule);
-        StringBuilder sb = new StringBuilder();
-        int order[] = plan.getOrder();
-        for (int i = 0; i < order.length; i++) {
-            sb.append(order[i]);
-            if (i < order.length-1) {
-                sb.append(",");
-            }
-        }
-        if(log.isInfoEnabled())log.info("order: [" + sb.toString() + "]");
-        IChunkedOrderedIterator<ISolution> solutions = joinNexus.runQuery(rule);
-        return solutions;
+//    private IChunkedOrderedIterator<ISolution> runQuery(AbstractTripleStore db, IRule rule)
+//        throws Exception {
+//        // run the query as a native rule.
+//        final IEvaluationPlanFactory planFactory =
+//                DefaultEvaluationPlanFactory2.INSTANCE;
+//        final IJoinNexusFactory joinNexusFactory =
+//                db.newJoinNexusFactory(RuleContextEnum.HighLevelQuery,
+//                        ActionEnum.Query, IJoinNexus.BINDINGS, null, // filter
+//                        false, // justify 
+//                        false, // backchain
+//                        planFactory);
+//        final IJoinNexus joinNexus =
+//                joinNexusFactory.newInstance(db.getIndexManager());
+//        final IEvaluationPlan plan = planFactory.newPlan(joinNexus, rule);
+//        StringBuilder sb = new StringBuilder();
+//        int order[] = plan.getOrder();
+//        for (int i = 0; i < order.length; i++) {
+//            sb.append(order[i]);
+//            if (i < order.length-1) {
+//                sb.append(",");
+//            }
+//        }
+//        if(log.isInfoEnabled())log.info("order: [" + sb.toString() + "]");
+//        IChunkedOrderedIterator<ISolution> solutions = joinNexus.runQuery(rule);
+//        return solutions;
+//    }
+    
+    private IPredicate toPredicate(final AbstractTripleStore database,
+    		final IVariableOrConstant<IV> s,
+    		final IVariableOrConstant<IV> p,
+    		final IVariableOrConstant<IV> o) {
+    	
+        // The annotations for the predicate.
+        final List<NV> anns = new LinkedList<NV>();
+
+        // Decide on the correct arity for the predicate.
+        final BOp[] vars = new BOp[] { s, p, o };
+
+        anns.add(new NV(IPredicate.Annotations.RELATION_NAME,
+                new String[] { database.getSPORelation().getNamespace() }));//
+        
+
+        // timestamp
+        anns.add(new NV(Annotations.TIMESTAMP, database
+                .getSPORelation().getTimestamp()));
+
+        /*
+         * Explicitly set the access path / iterator flags.
+         * 
+         * Note: High level query generally permits iterator level parallelism.
+         * We set the PARALLEL flag here so it can be used if a global index
+         * view is chosen for the access path.
+         * 
+         * Note: High level query for SPARQL always uses read-only access paths.
+         * If you are working with a SPARQL extension with UPDATE or INSERT INTO
+         * semantics then you will need to remote the READONLY flag for the
+         * mutable access paths.
+         */
+        anns.add(new NV(IPredicate.Annotations.FLAGS, IRangeQuery.DEFAULT
+                | IRangeQuery.PARALLEL | IRangeQuery.READONLY));
+        
+        return new SPOPredicate(vars, anns.toArray(new NV[anns.size()]));
+    	
+    }
+    		
+    		
+    
+    private IChunkedOrderedIterator<IBindingSet> runQuery(
+    		final AbstractTripleStore db, final IRule rule)
+    		throws Exception {
+    
+	    final QueryEngine queryEngine = 
+	    	QueryEngineFactory.getQueryController(db.getIndexManager());
+	
+		final PipelineOp query;
+		{
+			/*
+			 * Note: The ids are assigned using incrementAndGet() so ONE (1) is
+			 * the first id that will be assigned when we pass in ZERO (0) as
+			 * the initial state of the AtomicInteger.
+			 */
+			final AtomicInteger idFactory = new AtomicInteger(0);
+	
+			// Convert the step to a bigdata operator tree.
+			query = Rule2BOpUtility.convert(rule, idFactory, db,
+					queryEngine, new Properties());
+	
+			if (log.isInfoEnabled())
+				log.info("\n"+BOpUtility.toString2(query));
+	
+		}
+		
+	    IRunningQuery runningQuery = null;
+    	try {
+    		
+    		// Submit query for evaluation.
+    		runningQuery = queryEngine.eval(query);
+
+    		// The iterator draining the query solutions.
+    		final IAsynchronousIterator<IBindingSet[]> it1 = runningQuery
+    				.iterator();
+
+    	    // De-chunk the IBindingSet[] visited by that iterator.
+    	    final IChunkedOrderedIterator<IBindingSet> it2 = 
+    	    	new ChunkedWrappedIterator<IBindingSet>(
+    	            new Dechunkerator<IBindingSet>(it1));
+    	    
+    	    return it2;
+
+		} catch (Throwable t) {
+			if (runningQuery != null) {
+				// ensure query is halted.
+				runningQuery.cancel(true/* mayInterruptIfRunning */);
+			}
+//			log.error("Remove log stmt"+t,t);// FIXME remove this - I am just looking for the root cause of something in the SAIL.
+			throw new QueryEvaluationException(t);
+		}
+		
     }
 
 }

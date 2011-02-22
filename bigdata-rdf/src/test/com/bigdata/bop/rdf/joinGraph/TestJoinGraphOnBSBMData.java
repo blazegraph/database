@@ -12,18 +12,22 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.IPredicate.Annotations;
-import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSDIntIV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.constraints.NotBOp;
+import com.bigdata.rdf.internal.constraints.SameTermBOp;
+import com.bigdata.rdf.internal.constraints.ValueExpressionConstraint;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -380,15 +384,14 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
             // the vertices of the join graph (the predicates).
             preds = new IPredicate[] { p0, p1, p2, p3, p4, p5, p6 };
 
-            // the constraints on the join graph.
-            constraints = new IConstraint[] {
+            final IValueExpression[] ves = new IValueExpression[] {
 
                     /*
                      * FILTER
                      * (<http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances
                      * /dataFromProducer1092/Product53999> != ?product)
                      */
-                    new NEConstant(product, new Constant(product53999.getIV())), //
+                    new NotBOp(new SameTermBOp(product, new Constant(product53999.getIV()))), //
 
                     /*
                      * FILTER (?simProperty1 < (?origProperty1 + 120) &&
@@ -431,6 +434,12 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
                                     CompareOp.GT) })),//
 
             };
+            
+            // the constraints on the join graph.
+            constraints = new IConstraint[ves.length];
+            for (int i = 0; i < ves.length; i++) {
+            	constraints[i] = ValueExpressionConstraint.wrap(ves[i]);
+            }
 
         }
 

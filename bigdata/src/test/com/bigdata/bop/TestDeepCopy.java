@@ -45,10 +45,16 @@ import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.constraint.OR;
+import com.bigdata.rdf.internal.constraints.AndBOp;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
-import com.bigdata.rdf.internal.constraints.IsInline;
-import com.bigdata.rdf.internal.constraints.IsLiteral;
+import com.bigdata.rdf.internal.constraints.EBVBOp;
+import com.bigdata.rdf.internal.constraints.IsBoundBOp;
+import com.bigdata.rdf.internal.constraints.IsInlineBOp;
+import com.bigdata.rdf.internal.constraints.IsLiteralBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.constraints.NotBOp;
+import com.bigdata.rdf.internal.constraints.OrBOp;
+import com.bigdata.rdf.internal.constraints.SameTermBOp;
 import com.bigdata.rdf.rules.RejectAnythingSameAsItself;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.spo.SPOStarJoin;
@@ -99,9 +105,15 @@ public class TestDeepCopy extends TestCase2 {
             com.bigdata.rdf.magic.MagicPredicate.class,//
             // com.bigdata.rdf.internal.constraint
             CompareBOp.class,//
-            IsInline.class,//
-            IsLiteral.class,//
+            IsInlineBOp.class,//
+            IsLiteralBOp.class,//
             MathBOp.class,//
+            AndBOp.class,
+            EBVBOp.class,
+            IsBoundBOp.class,
+            NotBOp.class,
+            OrBOp.class,
+            SameTermBOp.class,
             // com.bigdata.rdf.inf
             RejectAnythingSameAsItself.class,
 

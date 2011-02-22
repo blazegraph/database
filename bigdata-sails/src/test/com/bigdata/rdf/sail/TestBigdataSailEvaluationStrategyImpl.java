@@ -903,7 +903,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
             "PREFIX :    <http://example/> " +
             "SELECT * " +
             "{  " +
-            "    { ?x :p ?y } UNION { ?p a ?z } " +
+            "    { ?x :p ?y } UNION { ?p :a ?z } " +
             "}";
         
         // define the correct answer
