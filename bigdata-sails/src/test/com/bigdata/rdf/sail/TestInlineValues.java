@@ -29,6 +29,8 @@ package com.bigdata.rdf.sail;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Properties;
+
+import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
@@ -48,6 +50,8 @@ import com.bigdata.rdf.vocab.NoVocabulary;
  */
 public class TestInlineValues extends ProxyBigdataSailTestCase {
 
+	protected static final Logger log = Logger.getLogger(TestInlineValues.class);
+	
     @Override
     public Properties getProperties() {
         
@@ -194,6 +198,129 @@ public class TestInlineValues extends ProxyBigdataSailTestCase {
                 TupleQueryResult result = tupleQuery.evaluate();
  
                 Collection<BindingSet> solution = new LinkedList<BindingSet>();
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("s", B),
+                    new BindingImpl("age", _45)
+                }));
+                
+                compare(result, solution);
+                
+            }
+            
+        } finally {
+            cxn.close();
+            sail.__tearDownUnitTest();
+        }
+
+    }
+    
+    public void testIsLiteral() throws Exception {
+
+        final BigdataSail sail = getSail();
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        final BigdataSailRepositoryConnection cxn = 
+            (BigdataSailRepositoryConnection) repo.getConnection();
+        cxn.setAutoCommit(false);
+        
+        try {
+    
+            final ValueFactory vf = sail.getValueFactory();
+            
+            URI A = vf.createURI("_:A");
+            URI B = vf.createURI("_:B");
+            URI X = vf.createURI("_:X");
+            URI AGE = vf.createURI("_:AGE");
+            Literal _25 = vf.createLiteral(25);
+            Literal _45 = vf.createLiteral(45);
+
+            cxn.add(A, RDF.TYPE, X);
+            cxn.add(B, RDF.TYPE, X);
+            cxn.add(A, AGE, _25);
+            cxn.add(B, AGE, _45);
+
+            /*
+             * Note: The either flush() or commit() is required to flush the
+             * statement buffers to the database before executing any operations
+             * that go around the sail.
+             */
+            cxn.flush();//commit();
+            
+            if (log.isInfoEnabled()) {
+                log.info("\n" + sail.getDatabase().dumpStore());
+            }
+
+            {
+                
+                String query = 
+                    "select ?s ?age " +
+                    "WHERE { " +
+                    "  ?s <"+RDF.TYPE+"> <"+X+"> . " +
+                    "  ?s <"+AGE+"> ?age . " +
+                    "  FILTER( isLiteral(?age) ) . " +
+                    "}";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                
+                if (log.isInfoEnabled()) {
+                	final TupleQueryResult result = tupleQuery.evaluate();
+                	log.info("results:");
+                	if (!result.hasNext()) {
+                		log.info("no results.");
+                	}
+                	while (result.hasNext()) {
+                		log.info(result.next());
+                	}
+                }
+                
+                final TupleQueryResult result = tupleQuery.evaluate();
+ 
+                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("s", A),
+                    new BindingImpl("age", _25)
+                }));
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("s", B),
+                    new BindingImpl("age", _45)
+                }));
+                
+                compare(result, solution);
+                
+            }
+            
+            {
+                
+                String query = 
+                    "select ?s ?age " +
+                    "WHERE { " +
+                    "  ?s <"+RDF.TYPE+"> <"+X+"> . " +
+                    "  ?s <"+AGE+"> ?age . " +
+                    "  FILTER( isLiteral("+_25.toString()+") ) . " +
+                    "}";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                
+                if (log.isInfoEnabled()) {
+                	final TupleQueryResult result = tupleQuery.evaluate();
+                	log.info("results:");
+                	if (!result.hasNext()) {
+                		log.info("no results.");
+                	}
+                	while (result.hasNext()) {
+                		log.info(result.next());
+                	}
+                }
+                
+                final TupleQueryResult result = tupleQuery.evaluate();
+ 
+                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("s", A),
+                    new BindingImpl("age", _25)
+                }));
                 solution.add(createBindingSet(new Binding[] {
                     new BindingImpl("s", B),
                     new BindingImpl("age", _45)

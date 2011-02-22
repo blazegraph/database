@@ -21,6 +21,7 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.impl.BooleanLiteralImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
@@ -29,6 +30,7 @@ import org.openrdf.query.algebra.Bound;
 import org.openrdf.query.algebra.Compare;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Group;
+import org.openrdf.query.algebra.IsLiteral;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.LeftJoin;
 import org.openrdf.query.algebra.MathExpr;
@@ -84,10 +86,12 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.internal.DummyIV;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.XSDBooleanIV;
 import com.bigdata.rdf.internal.constraints.AndBOp;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.EBVBOp;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
+import com.bigdata.rdf.internal.constraints.IsLiteralBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.OrBOp;
@@ -2059,6 +2063,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
      */
     private IValueExpression<IV> toVE(final ValueExpr ve) 
     		throws UnsupportedOperatorException {
+    	
     	if (ve instanceof Var) {
         	return toVE((Var) ve);
         } else if (ve instanceof ValueConstant) {
@@ -2077,6 +2082,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
             return toVE((Compare) ve);
         } else if (ve instanceof Bound) {
             return toVE((Bound) ve);
+        } else if (ve instanceof IsLiteral) {
+        	return toVE((IsLiteral) ve);
         }
         
         throw new UnsupportedOperatorException(ve);
@@ -2158,6 +2165,11 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	return new IsBoundBOp(var);
     }
 
+    private IValueExpression<IV> toVE(final IsLiteral isLiteral) {
+    	final IVariable<IV> var = (IVariable<IV>) toVE(isLiteral.getArg());
+    	return new IsLiteralBOp(var);
+    }
+
 	/**
 	 * Generate a bigdata term from a Sesame term.
 	 * <p>
@@ -2189,7 +2201,14 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	 * value does not exist in the lexicon.
 	 */
     private IConstant<IV> toVE(final ValueConstant vc) {
-        final IV iv = ((BigdataValue) vc.getValue()).getIV();
+    	final IV iv;
+    	final Value v = vc.getValue();
+    	if (v instanceof BooleanLiteralImpl) {
+    		final BooleanLiteralImpl bl = (BooleanLiteralImpl) v;
+    		iv = XSDBooleanIV.valueOf(bl.booleanValue());
+    	} else {
+    		iv = ((BigdataValue) vc.getValue()).getIV();
+    	}
         if (iv == null)
         	throw new UnrecognizedValueException(vc.getValue());
     	return new Constant<IV>(iv);
