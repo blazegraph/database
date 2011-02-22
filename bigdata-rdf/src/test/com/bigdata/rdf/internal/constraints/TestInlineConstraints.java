@@ -48,12 +48,14 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.IPredicate.Annotations;
+import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -61,8 +63,10 @@ import com.bigdata.bop.joinGraph.IEvaluationPlan;
 import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlanFactory2;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -795,6 +799,164 @@ public class TestInlineConstraints extends ProxyTestCase {
             
         }
         
+    }
+    
+    public void testAnd() {
+    	
+    	final IValueExpression<IV> T = new ValueExpressionBOp(new BOp[] { }, null/*anns*/) {
+			public IV get(IBindingSet bindingSet) {
+				return XSDBooleanIV.TRUE;
+			}
+		};
+    	
+    	final IValueExpression<IV> F = new ValueExpressionBOp(new BOp[] { }, null/*anns*/) {
+			public IV get(IBindingSet bindingSet) {
+				return XSDBooleanIV.FALSE;
+			}
+		};
+    	
+    	final IValueExpression<IV> E = new ValueExpressionBOp(new BOp[] { }, null/*anns*/) {
+			public IV get(IBindingSet bindingSet) {
+				throw new SparqlTypeErrorException();
+			}
+		};
+		
+		final IBindingSet bs = new HashBindingSet();
+		
+		{
+			final AndBOp and = new AndBOp(T, T);
+			final XSDBooleanIV iv = and.get(bs);
+			assertTrue(iv.booleanValue());
+		}
+		{
+			final AndBOp and = new AndBOp(T, F);
+			final XSDBooleanIV iv = and.get(bs);
+			assertFalse(iv.booleanValue());
+		}
+		{
+			final AndBOp and = new AndBOp(F, T);
+			final XSDBooleanIV iv = and.get(bs);
+			assertFalse(iv.booleanValue());
+		}
+		{
+			final AndBOp and = new AndBOp(F, F);
+			final XSDBooleanIV iv = and.get(bs);
+			assertFalse(iv.booleanValue());
+		}
+		{
+			final AndBOp and = new AndBOp(T, E);
+			try {
+				and.get(bs);
+				//should produce a type error
+				assertTrue(false);
+			} catch (SparqlTypeErrorException ex) { }
+		}
+		{
+			final AndBOp and = new AndBOp(E, T);
+			try {
+				and.get(bs);
+				//should produce a type error
+				assertTrue(false);
+			} catch (SparqlTypeErrorException ex) { }
+		}
+		{
+			final AndBOp and = new AndBOp(E, F);
+			final XSDBooleanIV iv = and.get(bs);
+			assertFalse(iv.booleanValue());
+		}
+		{
+			final AndBOp and = new AndBOp(F, E);
+			final XSDBooleanIV iv = and.get(bs);
+			assertFalse(iv.booleanValue());
+		}
+		{
+			final AndBOp and = new AndBOp(E, E);
+			try {
+				and.get(bs);
+				//should produce a type error
+				assertTrue(false);
+			} catch (SparqlTypeErrorException ex) { }
+		}
+    	
+    }
+    
+    public void testOr() {
+    	
+    	final IValueExpression<IV> T = new ValueExpressionBOp(new BOp[] { }, null/*anns*/) {
+			public IV get(IBindingSet bindingSet) {
+				return XSDBooleanIV.TRUE;
+			}
+		};
+    	
+    	final IValueExpression<IV> F = new ValueExpressionBOp(new BOp[] { }, null/*anns*/) {
+			public IV get(IBindingSet bindingSet) {
+				return XSDBooleanIV.FALSE;
+			}
+		};
+    	
+    	final IValueExpression<IV> E = new ValueExpressionBOp(new BOp[] { }, null/*anns*/) {
+			public IV get(IBindingSet bindingSet) {
+				throw new SparqlTypeErrorException();
+			}
+		};
+		
+		final IBindingSet bs = new HashBindingSet();
+		
+		{
+			final OrBOp or = new OrBOp(T, T);
+			final XSDBooleanIV iv = or.get(bs);
+			assertTrue(iv.booleanValue());
+		}
+		{
+			final OrBOp or = new OrBOp(T, F);
+			final XSDBooleanIV iv = or.get(bs);
+			assertTrue(iv.booleanValue());
+		}
+		{
+			final OrBOp or = new OrBOp(F, T);
+			final XSDBooleanIV iv = or.get(bs);
+			assertTrue(iv.booleanValue());
+		}
+		{
+			final OrBOp or = new OrBOp(F, F);
+			final XSDBooleanIV iv = or.get(bs);
+			assertFalse(iv.booleanValue());
+		}
+		{
+			final OrBOp or = new OrBOp(E, T);
+			final XSDBooleanIV iv = or.get(bs);
+			assertTrue(iv.booleanValue());
+		}
+		{
+			final OrBOp or = new OrBOp(T, E);
+			final XSDBooleanIV iv = or.get(bs);
+			assertTrue(iv.booleanValue());
+		}
+		{
+			final OrBOp or = new OrBOp(F, E);
+			try {
+				or.get(bs);
+				//should produce a type error
+				assertTrue(false);
+			} catch (SparqlTypeErrorException ex) { }
+		}
+		{
+			final OrBOp or = new OrBOp(E, F);
+			try {
+				or.get(bs);
+				//should produce a type error
+				assertTrue(false);
+			} catch (SparqlTypeErrorException ex) { }
+		}
+		{
+			final OrBOp or = new OrBOp(E, E);
+			try {
+				or.get(bs);
+				//should produce a type error
+				assertTrue(false);
+			} catch (SparqlTypeErrorException ex) { }
+		}
+		
     }
 
 //    private IChunkedOrderedIterator<ISolution> runQuery(AbstractTripleStore db, IRule rule)

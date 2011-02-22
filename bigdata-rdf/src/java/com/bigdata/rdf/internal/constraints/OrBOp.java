@@ -105,7 +105,7 @@ public class OrBOp extends ValueExpressionBOp
 
     }
     
-    public IV get(final IBindingSet bs) {
+    public XSDBooleanIV get(final IBindingSet bs) {
     	
     	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
     	
