@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -28,58 +28,57 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.NV;
-import com.bigdata.bop.constraint.BOpConstraint;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.XSDBooleanIV;
 
 /**
- * Imposes the constraint <code>isLiteral(x)</code>.
+ * Imposes the constraint <code>bound(x)</code> for the variable x.
  */
-public class IsLiteral extends BOpConstraint {
+public class IsBoundBOp extends ValueExpressionBOp 
+		implements IValueExpression<IV> {
 
-    /**
+	/**
 	 * 
 	 */
-	private static final long serialVersionUID = 3125106876006900339L;
+	private static final long serialVersionUID = -7408654639183330874L;
+
+    public IsBoundBOp(final IVariable<IV> x) {
+
+        this(new BOp[] { x }, null/*annocations*/);
+
+    }
 
     /**
      * Required shallow copy constructor.
      */
-    public IsLiteral(final BOp[] values,
-            final Map<String, Object> annotations) {
-        super(values, annotations);
+    public IsBoundBOp(final BOp[] args, final Map<String, Object> anns) {
+    	
+        super(args, anns);
+        
+        if (args.length != 1 || args[0] == null)
+            throw new IllegalArgumentException();
+
     }
 
     /**
      * Required deep copy constructor.
      */
-    public IsLiteral(final IsLiteral op) {
+    public IsBoundBOp(final IsBoundBOp op) {
         super(op);
     }
 
-    public IsLiteral(final IVariable<IV> x) {
-        
-        super(new BOp[] { x }, null/*annocations*/);
-        
-        if (x == null)
-            throw new IllegalArgumentException();
+    public boolean accept(final IBindingSet s) {
+
+        return get(0).get(s) != null;
 
     }
     
-    public boolean accept(IBindingSet s) {
-        
-        // get binding for "x".
-        final IConstant<IV> x = s.get((IVariable<IV>) get(0)/*x*/);
-       
-        if (x == null)
-            return true; // not yet bound.
-
-        final IV iv = x.get();
-
-    	return iv.isLiteral(); 
-
-   }
-
+    public IV get(final IBindingSet bs) {
+    	
+    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
+    	
+    }
+    
 }

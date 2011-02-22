@@ -28,17 +28,19 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.constraint.BOpConstraint;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.XSDBooleanIV;
 
 /**
  * Imposes the constraint <code>isInline(x)</code>.
  */
-public class IsInline extends BOpConstraint {
+public class IsInlineBOp extends ValueExpressionBOp 
+		implements IValueExpression<IV> {
 
     /**
 	 * 
@@ -54,49 +56,54 @@ public class IsInline extends BOpConstraint {
     	 * <p>
     	 * @see IV#isInline()
     	 */
-    	String INLINE = IsInline.class.getName() + ".inline";
+    	String INLINE = IsInlineBOp.class.getName() + ".inline";
     	
     }
 
+    public IsInlineBOp(final IVariable<IV> x, final boolean inline) {
+        
+        this(new BOp[] { x }, NV.asMap(new NV(Annotations.INLINE, inline)));
+        
+    }
+    
     /**
      * Required shallow copy constructor.
      */
-    public IsInline(final BOp[] values,
-            final Map<String, Object> annotations) {
-        super(values, annotations);
+    public IsInlineBOp(final BOp[] args, final Map<String, Object> anns) {
+
+    	super(args, anns);
+    	
+        if (args.length != 1 || args[0] == null)
+            throw new IllegalArgumentException();
+
     }
 
     /**
      * Required deep copy constructor.
      */
-    public IsInline(final IsInline op) {
+    public IsInlineBOp(final IsInlineBOp op) {
         super(op);
     }
 
-    public IsInline(final IVariable<IV> x, final boolean inline) {
-        
-        super(new BOp[] { x }, NV.asMap(new NV(Annotations.INLINE, inline)));
-        
-        if (x == null)
-            throw new IllegalArgumentException();
-
-    }
-    
-    public boolean accept(IBindingSet s) {
-        
-        // get binding for "x".
-        final IConstant<IV> x = s.get((IVariable<IV>) get(0)/*x*/);
-       
-        if (x == null)
-            return true; // not yet bound.
-
-        final IV iv = x.get();
+    public boolean accept(final IBindingSet bs) {
         
         final boolean inline = 
         	(Boolean) getRequiredProperty(Annotations.INLINE); 
         
+        final IV iv = get(0).get(bs);
+       
+        // not yet bound
+        if (iv == null)
+        	throw new SparqlTypeErrorException();
+
 		return iv.isInline() == inline;
 
+    }
+    
+    public IV get(final IBindingSet bs) {
+    	
+    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
+    	
     }
 
 }

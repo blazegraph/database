@@ -39,11 +39,11 @@ public class XSDBooleanIV<V extends BigdataLiteral> extends
      */
     private static final long serialVersionUID = 1L;
 
-    static public transient final XSDBooleanIV<BigdataLiteral> TRUE = new XSDBooleanIV<BigdataLiteral>(
-            true);
+    static public transient final XSDBooleanIV<BigdataLiteral> TRUE = 
+    	new XSDBooleanIV<BigdataLiteral>(true);
 
-    static public transient final XSDBooleanIV<BigdataLiteral> FALSE = new XSDBooleanIV<BigdataLiteral>(
-            false);
+    static public transient final XSDBooleanIV<BigdataLiteral> FALSE = 
+    	new XSDBooleanIV<BigdataLiteral>(false);
     
     private final boolean value;
 

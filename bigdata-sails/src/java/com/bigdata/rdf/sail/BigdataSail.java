@@ -3289,24 +3289,11 @@ public class BigdataSail extends SailBase implements Sail {
             final BigdataTripleSource tripleSource = 
             	new BigdataTripleSource(this, includeInferred);
 
-            final boolean newEvalStrategy = 
-            	Boolean.parseBoolean(properties.getProperty(
-                    BigdataSail.Options.NEW_EVAL_STRATEGY,
-                    BigdataSail.Options.DEFAULT_NEW_EVAL_STRATEGY));
-            
-            final BigdataEvaluationStrategy strategy;
-            
-            if (newEvalStrategy) {
-            	strategy = new BigdataEvaluationStrategyImpl3(
+            final BigdataEvaluationStrategy strategy = 
+            	new BigdataEvaluationStrategyImpl3(
             			tripleSource, dataset, nativeJoins, 
             			allowSesameQueryEvaluation
             			);
-            } else {
-            	strategy = new BigdataEvaluationStrategyImpl(
-            			tripleSource, dataset, nativeJoins 
-            			,starJoins, database.isInlineLiterals()
-            			);
-            }
 
             final QueryOptimizerList optimizerList = new QueryOptimizerList();
             optimizerList.add(new BindingAssigner());
@@ -3385,24 +3372,11 @@ public class BigdataSail extends SailBase implements Sail {
                 final BigdataTripleSource tripleSource = 
                 	new BigdataTripleSource(this, includeInferred);
 
-                final boolean newEvalStrategy = 
-                	Boolean.parseBoolean(properties.getProperty(
-                        BigdataSail.Options.NEW_EVAL_STRATEGY,
-                        BigdataSail.Options.DEFAULT_NEW_EVAL_STRATEGY));
-                
-                final BigdataEvaluationStrategy strategy;
-                
-                if (newEvalStrategy) {
-                	strategy = new BigdataEvaluationStrategyImpl3(
+                final BigdataEvaluationStrategy strategy = 
+                	new BigdataEvaluationStrategyImpl3(
                 			tripleSource, dataset, nativeJoins, 
-                			allowSesameQueryEvaluation 
+                			allowSesameQueryEvaluation
                 			);
-                } else {
-                	strategy = new BigdataEvaluationStrategyImpl(
-                			tripleSource, dataset, nativeJoins 
-                			,starJoins, database.isInlineLiterals()
-                			);
-                }
 
                 final QueryOptimizerList optimizerList = new QueryOptimizerList();
                 optimizerList.add(new BindingAssigner());

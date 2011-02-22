@@ -26,33 +26,41 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
-import org.openrdf.query.algebra.Compare.CompareOp;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.NV;
-import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.constraint.BOpConstraint;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.XSDBooleanIV;
 
 /**
  * Compare two terms for exact equality. 
  */
-public class SameTermBOp extends BOpConstraint {
+public class SameTermBOp extends ValueExpressionBOp 
+		implements IValueExpression<IV> {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
     
+    public SameTermBOp(final IValueExpression<IV> left, 
+    		final IValueExpression<IV> right) {
+    	
+        this(new BOp[] { left, right }, null);
+        
+    }
+    
     /**
      * Required shallow copy constructor.
      */
-    public SameTermBOp(final BOp[] values,
-            final Map<String, Object> annotations) {
-        super(values, annotations);
+    public SameTermBOp(final BOp[] args, final Map<String, Object> anns) {
+
+    	super(args, anns);
+    	
+        if (args.length != 2 || args[0] == null || args[1] == null)
+			throw new IllegalArgumentException();
+
     }
 
     /**
@@ -62,26 +70,23 @@ public class SameTermBOp extends BOpConstraint {
         super(op);
     }
 
-    public SameTermBOp(final IValueExpression<IV> left, 
-    		final IValueExpression<IV> right) {
-    	
-        super(new BOp[] { left, right }, null);
+    public boolean accept(final IBindingSet bs) {
         
-        if (left == null || right == null)
-            throw new IllegalArgumentException();
+    	final IV left = get(0).get(bs);
+    	final IV right = get(1).get(bs);
 
-    }
-    
-    public boolean accept(final IBindingSet s) {
-        
-    	final IV left = ((IValueExpression<IV>) get(0)).get(s);
-    	final IV right = ((IValueExpression<IV>) get(1)).get(s);
-
+    	// not yet bound
     	if (left == null || right == null)
-            return true; // not yet bound.
+            throw new SparqlTypeErrorException(); 
 
 		return left.equals(right);
 		
+    }
+    
+    public IV get(final IBindingSet bs) {
+    	
+    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
+    	
     }
     
 }

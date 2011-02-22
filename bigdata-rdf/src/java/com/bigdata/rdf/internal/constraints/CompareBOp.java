@@ -26,6 +26,7 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.Compare.CompareOp;
 
 import com.bigdata.bop.BOp;
@@ -33,21 +34,26 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.constraint.BOpConstraint;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.XSDBooleanIV;
 
 /**
  * Use inline terms to perform numerical comparison operations.
  * 
  * @see IVUtility#numericalCompare(IV, IV) 
  */
-public class CompareBOp extends BOpConstraint {
+public class CompareBOp extends ValueExpressionBOp 
+		implements IValueExpression<IV> {
 
-    /**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 5661497748051783499L;
+	
+	protected static final Logger log = Logger.getLogger(CompareBOp.class);
+	
     
     public interface Annotations extends PipelineOp.Annotations {
 
@@ -58,12 +64,27 @@ public class CompareBOp extends BOpConstraint {
 
     }
 
+    public CompareBOp(final IValueExpression<IV> left, 
+    		final IValueExpression<IV> right, final CompareOp op) {
+    	
+        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op)));
+        
+    }
+    
     /**
      * Required shallow copy constructor.
      */
-    public CompareBOp(final BOp[] values,
-            final Map<String, Object> annotations) {
-        super(values, annotations);
+    public CompareBOp(final BOp[] args, final Map<String, Object> anns) {
+
+    	super(args, anns);
+    	
+        if (args.length != 2 || args[0] == null || args[1] == null
+        		|| getProperty(Annotations.OP) == null) {
+
+			throw new IllegalArgumentException();
+		
+		}
+
     }
 
     /**
@@ -73,32 +94,32 @@ public class CompareBOp extends BOpConstraint {
         super(op);
     }
 
-    public CompareBOp(final IValueExpression<IV> left, 
-    		final IValueExpression<IV> right, final CompareOp op) {
-    	
-        super(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op)));
-        
-        if (left == null || right == null || op == null)
-            throw new IllegalArgumentException();
-
-    }
-    
     public boolean accept(final IBindingSet s) {
         
-    	final IV left = ((IValueExpression<IV>) get(0)).get(s);
-    	final IV right = ((IValueExpression<IV>) get(1)).get(s);
-
+    	final IV left = get(0).get(s);
+    	final IV right = get(1).get(s);
+    	
+        // not yet bound
     	if (left == null || right == null)
-//            return true; // not yet bound.
-    		return false; // no longer allow unbound values
+        	throw new SparqlTypeErrorException();
 
     	final CompareOp op = (CompareOp) getProperty(Annotations.OP);
     	
-    	if (left.isTermId() && right.isTermId() &&
-    			(op == CompareOp.EQ || op == CompareOp.NE)) {
-    		return _accept(left.compareTo(right));
+    	if (left.isTermId() && right.isTermId()) {
+    		if (op == CompareOp.EQ || op == CompareOp.NE) {
+    			return _accept(left.compareTo(right));
+    		} else {
+    			if (log.isInfoEnabled())
+    				log.info("cannot compare: " 
+    					+ left + " " + op + " " + right);
+    			
+    			throw new SparqlTypeErrorException();
+    		}
     	}
     	
+    	/*
+    	 * This code is bad.
+    	 */
     	if (!IVUtility.canNumericalCompare(left) ||
     			!IVUtility.canNumericalCompare(right)) {
     		if (op == CompareOp.EQ) {
@@ -106,8 +127,11 @@ public class CompareBOp extends BOpConstraint {
     		} else if (op == CompareOp.NE) {
     			return true;
     		} else {
-    			throw new NotNumericalException("cannot numerical compare: " 
+    			if (log.isInfoEnabled())
+    				log.info("cannot numerical compare: " 
     					+ left + " " + op + " " + right);
+    			
+    			throw new SparqlTypeErrorException();
     		}
     	}
     	
@@ -121,7 +145,7 @@ public class CompareBOp extends BOpConstraint {
     	
     	switch(op) {
     	case EQ:
-    		return compare == 0;
+    		return compare == 0; 
     	case NE:
     		return compare != 0;
     	case GT:
@@ -137,7 +161,13 @@ public class CompareBOp extends BOpConstraint {
     	}
     	
     }
-    
+
+    public IV get(final IBindingSet bs) {
+    	
+    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
+    	
+    }
+
     public static class NotNumericalException extends RuntimeException {
 
 		/**
