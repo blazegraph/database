@@ -16,7 +16,7 @@ public class UnsupportedOperatorException extends RuntimeException {
 	 */
 	private static final long serialVersionUID = 1493443291958364334L;
 	
-    private QueryModelNode operator;
+    final private QueryModelNode operator;
 
 	/**
 	 * Wrap with another instance of this class.
