@@ -29,7 +29,6 @@ package com.bigdata.bop.util;
 
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.FutureTask;
 
 import junit.framework.TestCase2;
@@ -48,9 +47,6 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.BOp.Annotations;
-import com.bigdata.bop.ap.Predicate;
-import com.bigdata.bop.constraint.BOpConstraint;
 
 /**
  * Unit tests for {@link BOpUtility}.

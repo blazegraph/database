@@ -37,6 +37,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NEConstant;
 
 /**
@@ -94,7 +95,7 @@ public class TestJoinGraph extends TestCase2 {
                     new Predicate(new BOp[]{Var.var("y"),Var.var("z")}),//
             };
             final IConstraint[] constraints = new IConstraint[] { //
-            new NEConstant(Var.var("x"), new Constant<Long>(12L)) //
+            		Constraint.wrap(new NEConstant(Var.var("x"), new Constant<Long>(12L))) //
             };
             final JoinGraph joinGraph = new JoinGraph(new BOp[0],//
                     new NV(JoinGraph.Annotations.VERTICES, vertices),//
@@ -118,7 +119,7 @@ public class TestJoinGraph extends TestCase2 {
                     new Predicate(new BOp[]{Var.var("y"),Var.var("z")}),//
             };
             final IConstraint[] constraints = new IConstraint[] { //
-            new NEConstant(Var.var("x"), new Constant<Long>(12L)) //
+            		Constraint.wrap(new NEConstant(Var.var("x"), new Constant<Long>(12L))) //
             };
             final int limit = 50;
             final int nedges = 1;
@@ -234,7 +235,7 @@ public class TestJoinGraph extends TestCase2 {
                         new Predicate(new BOp[] { Var.var("y"), Var.var("z") }),//
                 };
                 final IConstraint[] constraints = new IConstraint[] { //
-                new NEConstant(Var.var("x"), new Constant<Long>(12L)) //
+                		Constraint.wrap(new NEConstant(Var.var("x"), new Constant<Long>(12L))) //
                 };
                 final int limit = 0;
                 final int nedges = 1;
@@ -262,7 +263,7 @@ public class TestJoinGraph extends TestCase2 {
                         new Predicate(new BOp[] { Var.var("y"), Var.var("z") }),//
                 };
                 final IConstraint[] constraints = new IConstraint[] { //
-                new NEConstant(Var.var("x"), new Constant<Long>(12L)) //
+                		Constraint.wrap(new NEConstant(Var.var("x"), new Constant<Long>(12L))) //
                 };
                 final int limit = 10;
                 final int nedges = 0;

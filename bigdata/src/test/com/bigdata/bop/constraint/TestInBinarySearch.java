@@ -79,10 +79,10 @@ public class TestInBinarySearch extends TestINConstraint {
 
         INConstraint op = new INBinarySearch ( x, vals ) ;
 
-        assertTrue ( op.accept ( new ArrayBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<Integer> ( 21 ) } ) ) ) ;
-        assertTrue ( op.accept ( new ArrayBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<Integer> ( 37 ) } ) ) ) ;
-        assertTrue ( op.accept ( new ArrayBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<Integer> ( 75 ) } ) ) ) ;
-        assertFalse ( op.accept ( new ArrayBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<Integer> ( 101 ) } ) ) ) ;
+        assertTrue ( op.get ( new ArrayBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<Integer> ( 21 ) } ) ) ) ;
+        assertTrue ( op.get ( new ArrayBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<Integer> ( 37 ) } ) ) ) ;
+        assertTrue ( op.get ( new ArrayBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<Integer> ( 75 ) } ) ) ) ;
+        assertFalse ( op.get ( new ArrayBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<Integer> ( 101 ) } ) ) ) ;
     }
 
     @Override protected INConstraint newINConstraint ( IVariable<?> var, IConstant<?> vals [] )

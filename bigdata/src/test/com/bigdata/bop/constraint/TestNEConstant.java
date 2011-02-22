@@ -72,7 +72,7 @@ public class TestNEConstant extends TestCase2 {
     }
 
     /**
-     * Unit test for {@link NEConstant#accept(IBindingSet)}
+     * Unit test for {@link NEConstant#get(IBindingSet)}
      */
     public void testAccept ()
     {
@@ -88,9 +88,9 @@ public class TestNEConstant extends TestCase2 {
         IBindingSet ne2 = new ArrayBindingSet ( new IVariable<?> [] { var }, new IConstant [] { val3 } ) ;
         IBindingSet nb = new ArrayBindingSet ( new IVariable<?> [] {}, new IConstant [] {} ) ;
 
-        assertFalse ( op.accept ( eq ) ) ;
-        assertTrue ( op.accept ( ne1 ) ) ;
-        assertTrue ( op.accept ( ne2 ) ) ;
-        assertTrue ( op.accept ( nb ) ) ;
+        assertFalse ( op.get ( eq ) ) ;
+        assertTrue ( op.get ( ne1 ) ) ;
+        assertTrue ( op.get ( ne2 ) ) ;
+        assertTrue ( op.get ( nb ) ) ;
     }    
 }

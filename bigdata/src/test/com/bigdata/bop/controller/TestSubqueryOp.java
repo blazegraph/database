@@ -56,6 +56,7 @@ import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
@@ -598,7 +599,7 @@ public class TestSubqueryOp extends TestCase2 {
 				new NV(PipelineJoin.Annotations.PREDICATE, pred3Op),//
 				// constraint d != Leon
 				new NV(PipelineJoin.Annotations.CONSTRAINTS,
-						new IConstraint[] { new NEConstant(d, new Constant<String>("Leon")) })
+						new IConstraint[] { Constraint.wrap(new NEConstant(d, new Constant<String>("Leon"))) })
 //				// join is optional.
 //				new NV(PipelineJoin.Annotations.OPTIONAL, true),//
 //				// optional target is the same as the default target.
@@ -834,7 +835,7 @@ public class TestSubqueryOp extends TestCase2 {
                         new NV(Predicate.Annotations.BOP_ID, joinId1),//
                         new NV(PipelineJoin.Annotations.PREDICATE,pred1Op));
 
-        final IConstraint condition = new NEConstant(a, new Constant<String>("Paul"));
+        final IConstraint condition = Constraint.wrap(new NEConstant(a, new Constant<String>("Paul")));
         
         final ConditionalRoutingOp condOp = new ConditionalRoutingOp(new BOp[]{join1Op},
                 NV.asMap(new NV[]{//

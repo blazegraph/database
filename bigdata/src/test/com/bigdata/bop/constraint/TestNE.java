@@ -75,9 +75,9 @@ public class TestNE extends TestCase2 {
     }
 
     /**
-     * Unit test for {@link NE#accept(IBindingSet)}
+     * Unit test for {@link NE#get(IBindingSet)}
      */
-    public void testAccept ()
+    public void testGet ()
     {
         Var<?> x = Var.var ( "x" ) ;
         Var<?> y = Var.var ( "y" ) ;
@@ -89,8 +89,8 @@ public class TestNE extends TestCase2 {
         IBindingSet ne = new ArrayBindingSet ( vars, new IConstant [] { new Constant<String> ( "1" ), new Constant<String> ( "2" ) } ) ;
         IBindingSet nb = new ArrayBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<String> ( "1" ) } ) ;
 
-        assertTrue ( op.accept ( ne ) ) ;
-        assertFalse ( op.accept ( eq ) ) ;
-        assertTrue ( op.accept ( nb ) ) ;
+        assertTrue ( op.get ( ne ) ) ;
+        assertFalse ( op.get ( eq ) ) ;
+        assertTrue ( op.get ( nb ) ) ;
     }
 }
