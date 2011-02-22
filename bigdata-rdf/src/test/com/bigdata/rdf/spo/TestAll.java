@@ -93,7 +93,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestDefaultGraphAccessPath.class);
 
         // star joins
-        suite.addTestSuite(TestSPOStarJoin.class);
+//        suite.addTestSuite(TestSPOStarJoin.class);
 
         // test for shard split handler for the xxxC indices.
         suite.addTestSuite(TestXXXCShardSplitHandler.class);

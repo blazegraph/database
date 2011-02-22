@@ -68,7 +68,7 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
         
     }
     
-    public void testStarJoin1() throws Exception {
+    private void _testStarJoin1() throws Exception {
         
         final AbstractTripleStore store = getStore(getProperties());
         
@@ -206,7 +206,7 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
         
     }
 
-    public void testStarJoin2() throws Exception {
+    private void _testStarJoin2() throws Exception {
         
         final AbstractTripleStore store = getStore(getProperties());
         
