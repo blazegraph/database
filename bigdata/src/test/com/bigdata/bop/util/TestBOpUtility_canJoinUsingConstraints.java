@@ -46,10 +46,10 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.BOp.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.constraint.AND;
-import com.bigdata.bop.constraint.BOpConstraint;
+import com.bigdata.bop.constraint.BooleanValueExpression;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.joinGraph.rto.JoinGraph.JGraph;
 
 /**
@@ -214,7 +214,7 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
                     new IPredicate[] { p2 }, // path
                     p1,// vertex
                     new IConstraint[] { //
-                    new NEConstant(x, new Constant<Integer>(12)), //
+                    Constraint.wrap(new NEConstant(x, new Constant<Integer>(12))), //
                     null //
                     }// constraints
                     );
@@ -240,7 +240,7 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
      * used to test the logic which decides when two predicates can join based
      * on variable(s) shared via a constraint.
      */
-    static private final class MyCompareOp extends BOpConstraint {
+    static private final class MyCompareOp extends BooleanValueExpression {
 
         private static final long serialVersionUID = 1L;
 
@@ -261,7 +261,7 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
             super(args, annotations);
         }
 
-        public boolean accept(IBindingSet bindingSet) {
+        public Boolean get(IBindingSet bindingSet) {
             throw new UnsupportedOperationException();
         }
 
@@ -272,7 +272,7 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
      * used to test the logic which decides when two predicates can join based
      * on variable(s) shared via a constraint.
      */
-    static private final class NEConstant extends BOpConstraint {
+    static private final class NEConstant extends BooleanValueExpression {
 
         private static final long serialVersionUID = 1L;
 
@@ -297,7 +297,7 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
             this(new BOp[] { var, value }, null/* annotations */);
         }
 
-        public boolean accept(IBindingSet bindingSet) {
+        public Boolean get(IBindingSet bindingSet) {
             throw new UnsupportedOperationException();
         }
 
@@ -449,8 +449,8 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
     /**
      * FILTER (productInstance != ?product)
      */
-    final IConstraint c0 = new NEConstant(product, new Constant<String>(
-            productInstance));
+    final IConstraint c0 = Constraint.wrap(new NEConstant(product, new Constant<String>(
+            productInstance)));
 
     /**
      * FILTER (?simProperty1 < (?origProperty1 + 120) && ?simProperty1 >
@@ -460,7 +460,7 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
      * that each of these is represented as its own IConstraint, but I have
      * combined them for the purposes of these unit tests.
      */
-    final IConstraint c1 = new AND(//
+    final IConstraint c1 = Constraint.wrap(new AND(//
             new MyCompareOp(
                     new BOp[] {
                             simProperty1,
@@ -471,7 +471,7 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
                     simProperty1,
                     new MathBOp(origProperty1, new Constant<Integer>(120),
                             MINUS) }, NV.asMap(new NV[] { new NV(OP, GT) }))//
-    );
+    ));
 
     /**
      * FILTER (?simProperty2 < (?origProperty2 + 170) && ?simProperty2 >
@@ -481,7 +481,7 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
      * that each of these is represented as its own IConstraint, but I have
      * combined them for the purposes of these unit tests.
      */
-    final IConstraint c2 = new AND(//
+    final IConstraint c2 = Constraint.wrap(new AND(//
             new MyCompareOp(
                     new BOp[] {
                             simProperty2,
@@ -492,7 +492,7 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
                     simProperty2,
                     new MathBOp(origProperty2, new Constant<Integer>(170),
                             MINUS) }, NV.asMap(new NV[] { new NV(OP, GT) }))//
-    );
+    ));
 
     /** The constraints on the join graph. */
     final IConstraint[] constraints = new IConstraint[] { c0, c1, c2 };

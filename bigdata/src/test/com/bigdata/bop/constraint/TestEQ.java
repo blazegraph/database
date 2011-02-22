@@ -94,7 +94,7 @@ public class TestEQ extends TestCase2 {
                 new IConstant[] { new Constant<String>("1"),
                         new Constant<String>("1") });
 
-        assertTrue(op.accept(bs1));
+        assertTrue(op.get(bs1));
         
     }
 
@@ -110,7 +110,7 @@ public class TestEQ extends TestCase2 {
                 new IConstant[] { new Constant<String>("1"),
                         new Constant<String>("2") });
 
-        assertFalse(op.accept(bs1));
+        assertFalse(op.get(bs1));
         
     }
 
@@ -122,7 +122,7 @@ public class TestEQ extends TestCase2 {
                 new IVariable[] { Var.var("x") }, //
                 new IConstant[] { new Constant<String>("1") });
 
-        assertTrue(op.accept(bs1));
+        assertTrue(op.get(bs1));
         
     }
 }

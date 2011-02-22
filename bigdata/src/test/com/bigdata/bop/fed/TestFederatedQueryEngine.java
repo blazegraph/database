@@ -38,18 +38,19 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.engine.BOpStats;
@@ -719,8 +720,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 						BOpEvaluationContext.SHARDED),//
 				// impose constraint on the join.
 				new NV(PipelineJoin.Annotations.CONSTRAINTS,
-						new IConstraint[] { new EQConstant(y,
-								new Constant<String>("Paul")) }));
+						new IConstraint[] { Constraint.wrap(new EQConstant(y,
+								new Constant<String>("Paul"))) }));
         
         final PipelineOp query = new SliceOp(new BOp[] { joinOp },
         // slice annotations
@@ -1240,7 +1241,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 						BOpEvaluationContext.SHARDED),//
 				// constraint x == z
 				new NV(PipelineJoin.Annotations.CONSTRAINTS,
-						new IConstraint[] { new EQ(x, z) }),
+						new IConstraint[] { Constraint.wrap(new EQ(x,z)) }),
 				// optional target is the same as the default target.
 				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
 

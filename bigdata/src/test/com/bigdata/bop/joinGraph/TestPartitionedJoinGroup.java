@@ -30,30 +30,19 @@ package com.bigdata.bop.joinGraph;
 import java.util.Arrays;
 import java.util.Iterator;
 
-import org.openrdf.query.algebra.Compare.CompareOp;
-import org.openrdf.query.algebra.MathExpr.MathOp;
-
 import junit.framework.TestCase2;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NEConstant;
-import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
-import com.bigdata.rdf.internal.XSDIntIV;
-import com.bigdata.rdf.internal.constraints.CompareBOp;
-import com.bigdata.rdf.internal.constraints.MathBOp;
-import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.spo.SPOPredicate;
-import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Unit tests for {@link PartitionedJoinGroup}.
@@ -220,11 +209,11 @@ public class TestPartitionedJoinGroup extends TestCase2 {
         // Test w/ constraint(s) on the join graph.
         {
 
-            final IConstraint c1 = new NEConstant(x,
-                    new Constant<String>("Bob"));
+            final IConstraint c1 = Constraint.wrap(new NEConstant(x,
+                    new Constant<String>("Bob")));
             
-            final IConstraint c2 = new NEConstant(y,
-                    new Constant<String>("UNCG"));
+            final IConstraint c2 = Constraint.wrap(new NEConstant(y,
+                    new Constant<String>("UNCG")));
 
             final IConstraint[] constraints = new IConstraint[] { c1, c2 };
 
@@ -417,14 +406,14 @@ public class TestPartitionedJoinGroup extends TestCase2 {
         // Test w/ constraint(s) on the join graph.
         {
 
-            final IConstraint c1 = new NEConstant(x,
-                    new Constant<String>("Bob"));
+            final IConstraint c1 = Constraint.wrap(new NEConstant(x,
+                    new Constant<String>("Bob")));
             
-            final IConstraint c2 = new NEConstant(y,
-                    new Constant<String>("UNCG"));
+            final IConstraint c2 = Constraint.wrap(new NEConstant(y,
+                    new Constant<String>("UNCG")));
 
-            final IConstraint c3 = new NEConstant(z,
-                    new Constant<String>("Physics"));
+            final IConstraint c3 = Constraint.wrap(new NEConstant(z,
+                    new Constant<String>("Physics")));
 
             final IConstraint[] constraints = new IConstraint[] { c1, c2, c3 };
 

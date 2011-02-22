@@ -63,8 +63,8 @@ public class TestOR extends TestCase2 {
      */
     public void testConstructor ()
     {
-        IConstraint eq = new EQ ( Var.var ( "x" ), Var.var ( "y" ) ) ;
-        IConstraint ne = new EQ ( Var.var ( "x" ), Var.var ( "y" ) ) ;
+        BooleanValueExpression eq = new EQ ( Var.var ( "x" ), Var.var ( "y" ) ) ;
+        BooleanValueExpression ne = new EQ ( Var.var ( "x" ), Var.var ( "y" ) ) ;
 
         try { assertTrue ( null != new OR ( null, eq ) ) ; fail ( "IllegalArgumentException expected, lhs was null" ) ; }
         catch ( IllegalArgumentException e ) {}
@@ -76,7 +76,7 @@ public class TestOR extends TestCase2 {
     }
 
     /**
-     * Unit test for {@link OR#accept(IBindingSet)}
+     * Unit test for {@link OR#get(IBindingSet)}
      */
     public void testAccept ()
     {
@@ -85,8 +85,8 @@ public class TestOR extends TestCase2 {
         Constant<Integer> val1 = new Constant<Integer> ( 1 ) ;
         Constant<Integer> val2 = new Constant<Integer> ( 2 ) ;
 
-        IConstraint eq = new EQ ( x, y ) ;
-        IConstraint eqc = new EQConstant ( y, val2 ) ;
+        BooleanValueExpression eq = new EQ ( x, y ) ;
+        BooleanValueExpression eqc = new EQConstant ( y, val2 ) ;
 
         OR op = new OR ( eq, eqc ) ;
 
@@ -94,8 +94,8 @@ public class TestOR extends TestCase2 {
         IBindingSet eqrhs = new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { val1, val2 } ) ;
         IBindingSet ne = new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { val2, val1 } ) ;
 
-        assertTrue ( op.accept ( eqlhs ) ) ;
-        assertTrue ( op.accept ( eqrhs ) ) ;
-        assertFalse ( op.accept ( ne ) ) ;
+        assertTrue ( op.get ( eqlhs ) ) ;
+        assertTrue ( op.get ( eqrhs ) ) ;
+        assertFalse ( op.get ( ne ) ) ;
     }    
 }

@@ -88,9 +88,9 @@ public class TestEQConstant extends TestCase2 {
         IBindingSet ne2 = new ArrayBindingSet ( new IVariable<?> [] { var }, new IConstant [] { val3 } ) ;
         IBindingSet nb = new ArrayBindingSet ( new IVariable<?> [] {}, new IConstant [] {} ) ;
 
-        assertTrue ( op.accept ( eq ) ) ;
-        assertFalse ( op.accept ( ne1 ) ) ;
-        assertFalse ( op.accept ( ne2 ) ) ;
-        assertTrue ( op.accept ( nb ) ) ;
+        assertTrue ( op.get ( eq ) ) ;
+        assertFalse ( op.get ( ne1 ) ) ;
+        assertFalse ( op.get ( ne2 ) ) ;
+        assertTrue ( op.get ( nb ) ) ;
     }    
 }

@@ -51,6 +51,7 @@ import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.CopyOp;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.MockRunningQuery;
@@ -393,7 +394,7 @@ public class TestPipelineJoin extends TestCase2 {
 				new NV(BOpBase.Annotations.BOP_ID, joinId),//
 				new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
 				new NV(PipelineJoin.Annotations.CONSTRAINTS,
-						new IConstraint[] { new INBinarySearch<String>(y, set) }));
+						new IConstraint[] { Constraint.wrap(new INBinarySearch<String>(y, set)) }));
 
         // the expected solution (just one).
         final IBindingSet[] expected = new IBindingSet[] {//
