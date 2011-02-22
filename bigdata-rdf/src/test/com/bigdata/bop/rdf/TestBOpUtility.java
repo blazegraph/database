@@ -32,16 +32,30 @@ import java.util.Map;
 
 import junit.framework.TestCase2;
 
+import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
+import org.openrdf.model.ValueFactory;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQuery;
+import org.openrdf.query.TupleQueryResult;
+import org.openrdf.repository.Repository;
+import org.openrdf.repository.RepositoryConnection;
+import org.openrdf.repository.sail.SailRepository;
+import org.openrdf.sail.Sail;
+import org.openrdf.sail.memory.MemoryStore;
+
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.constraint.BOpConstraint;
-import com.bigdata.bop.constraint.OR;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.OrBOp;
+import com.bigdata.rdf.internal.constraints.ValueExpressionBOp;
+import com.bigdata.rdf.store.BD;
 
 /**
  * Unit tests for {@link BOpUtility}.
@@ -76,18 +90,18 @@ public class TestBOpUtility extends TestCase2 {
 
     private BOp generateBOp(final int count,final IValueExpression<?> a) {
     	
-    	IConstraint bop = null;
+    	IValueExpression bop = null;
     	
     	for (int i = 0; i < count; i++) {
     		
-        	final IConstraint c = new DummyConstraint(
+        	final IValueExpression c = new DummyVE(
         			new BOp[] { a, new Constant<Integer>(i) }, 
         			null/*annotations*/); 
         	
     		if (bop == null) {
     			bop = c;
     		} else {
-    			bop = new OR(c, bop);
+    			bop = new OrBOp(c, bop);
     		}
     		
     	}
@@ -132,24 +146,66 @@ public class TestBOpUtility extends TestCase2 {
         
     }
     
-    private static class DummyConstraint extends BOpConstraint {
+    private static class DummyVE extends ValueExpressionBOp {
     	
     	/**
 		 * 
 		 */
 		private static final long serialVersionUID = 1942393209821562541L;
 
-		public DummyConstraint(BOp[] args, Map<String, Object> annotations) {
+		public DummyVE(BOp[] args, Map<String, Object> annotations) {
 			super(args, annotations);
 		}
 
-		public DummyConstraint(BOpBase op) {
+		public DummyVE(ValueExpressionBOp op) {
 			super(op);
 		}
 
-		public boolean accept(IBindingSet bindingSet) {
+		public IV get(IBindingSet bindingSet) {
     		throw new RuntimeException();
     	}
+    }
+    
+    public void testOpenWorldEq() throws Exception {
+    	
+    	final Sail sail = new MemoryStore();
+    	final Repository repo = new SailRepository(sail);
+    	repo.initialize();
+    	final RepositoryConnection cxn = repo.getConnection();
+    	
+    	try {
+    		
+    		final ValueFactory vf = sail.getValueFactory();
+    		
+    		final URI mike = vf.createURI(BD.NAMESPACE + "mike");
+    		final URI age = vf.createURI(BD.NAMESPACE + "age");
+    		final Literal mikeAge = vf.createLiteral(34);
+    		
+    		cxn.add(vf.createStatement(mike, RDF.TYPE, RDFS.RESOURCE));
+    		cxn.add(vf.createStatement(mike, age, mikeAge));
+    		
+    		final String query =
+    			"select * " +
+    			"where { " +
+    			"  ?s ?p ?o . " +
+    			"  filter (?o < 40) " +
+    			"}";
+    		
+    		final TupleQuery tupleQuery = 
+    			cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+    		
+    		final TupleQueryResult result = tupleQuery.evaluate();
+    		while (result.hasNext()) {
+    			System.err.println(result.next());
+    		}
+    		
+    		
+    	} finally {
+    		cxn.close();
+    		repo.shutDown();
+    	}
+    	
+    	
     }
 
 }

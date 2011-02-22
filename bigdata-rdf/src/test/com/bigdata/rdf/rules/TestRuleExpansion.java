@@ -42,6 +42,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.joinGraph.IEvaluationPlan;
 import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
@@ -322,7 +323,7 @@ public class TestRuleExpansion extends AbstractInferenceEngineTestCase {
                                 },
                                 // true, // distinct
                                 new IConstraint[] {
-                                        new NEConstant(_p, sameAs)
+                        			Constraint.wrap(new NEConstant(_p, sameAs))
                                     }
                                 );
                 

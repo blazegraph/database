@@ -39,6 +39,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.bop.joinGraph.IEvaluationPlan;
 import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
@@ -149,7 +150,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                             new P(relation, var("v"), rdfType, var("u")) //
                     },//
                     new IConstraint[] {
-                            new NE(var("u"),var("x"))
+            			Constraint.wrap(new NE(var("u"),var("x")))
                         }
             );
             

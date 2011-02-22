@@ -27,7 +27,7 @@ import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
-import com.bigdata.rdf.internal.constraints.ValueExpressionConstraint;
+import com.bigdata.rdf.internal.constraints.Constraint;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -438,7 +438,7 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
             // the constraints on the join graph.
             constraints = new IConstraint[ves.length];
             for (int i = 0; i < ves.length; i++) {
-            	constraints[i] = ValueExpressionConstraint.wrap(ves[i]);
+            	constraints[i] = Constraint.wrap(ves[i]);
             }
 
         }
