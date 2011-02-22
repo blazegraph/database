@@ -120,7 +120,7 @@ public class EBVBOp extends ValueExpressionBOp
      * purpose is to evaluate the effective boolean value of a wrapped
      * expression.
      */
-    @Override
+//    @Override
     public XSDBooleanIV get(final IBindingSet bs) {
     	
     	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
