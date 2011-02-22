@@ -45,6 +45,10 @@ public class XSDBooleanIV<V extends BigdataLiteral> extends
     static public transient final XSDBooleanIV<BigdataLiteral> FALSE = 
     	new XSDBooleanIV<BigdataLiteral>(false);
     
+    static public final XSDBooleanIV valueOf(final boolean b) {
+    	return b ? TRUE : FALSE;
+    }
+    
     private final boolean value;
 
     public XSDBooleanIV(final boolean value) {
