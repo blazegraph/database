@@ -29,6 +29,7 @@ public class UnsupportedOperatorException extends RuntimeException {
     }
 
     public UnsupportedOperatorException(final QueryModelNode operator) {
+    	super(""+operator);
         this.operator = operator;
     }
 
