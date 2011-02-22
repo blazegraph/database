@@ -72,13 +72,6 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.bop.constraint.AND;
-import com.bigdata.bop.constraint.BOUND;
-import com.bigdata.bop.constraint.EQ;
-import com.bigdata.bop.constraint.INBinarySearch;
-import com.bigdata.bop.constraint.NE;
-import com.bigdata.bop.constraint.NOT;
-import com.bigdata.bop.constraint.OR;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.solutions.ISortOrder;
@@ -96,7 +89,7 @@ import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
-import com.bigdata.rdf.internal.constraints.ValueExpressionConstraint;
+import com.bigdata.rdf.internal.constraints.Constraint;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
@@ -206,18 +199,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * either as JOINs (generating an additional {@link IPredicate} in the
  * {@link IRule}) or as an {@link INBinarySearch} constraint, where the inclusion set is
  * pre-populated by some operation on the {@link LexiconRelation}.
- * <dl>
- * <dt>EQ</dt>
- * <dd>Translated into an {@link EQ} constraint on an {@link IPredicate}.</dd>
- * <dt>NE</dt>
- * <dd>Translated into an {@link NE} constraint on an {@link IPredicate}.</dd>
- * <dt>IN</dt>
- * <dd>Translated into an {@link INBinarySearch} constraint on an {@link IPredicate}.</dd>
- * <dt>OR</dt>
- * <dd>Translated into an {@link OR} constraint on an {@link IPredicate}.</dd>
- * <dt></dt>
- * <dd></dd>
- * </dl>
+ * <p>
  * <h2>Magic predicates</h2>
  * <p>
  * {@link BD#SEARCH} is the only magic predicate at this time. When the object
@@ -2051,7 +2033,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     private IConstraint toConstraint(final ValueExpr ve) {
 
     	final IValueExpression<IV> veBOp = toVE(ve);
-    	return ValueExpressionConstraint.wrap(veBOp);
+    	return Constraint.wrap(veBOp);
     	
     }
 

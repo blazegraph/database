@@ -180,7 +180,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                        			ValueExpressionConstraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GT))
+                        			Constraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GT))
                                 }
                         );
                 
@@ -286,7 +286,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                        			ValueExpressionConstraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GE))
+                        			Constraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GE))
                                 });
                 
                 try {
@@ -393,7 +393,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                        			ValueExpressionConstraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LT))
+                        			Constraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LT))
                                 });
                 
                 if (log.isInfoEnabled())
@@ -501,7 +501,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                        			ValueExpressionConstraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LE))
+                        			Constraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LE))
                                 });
                 
                 if (log.isInfoEnabled())
@@ -618,7 +618,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                        			ValueExpressionConstraint.wrap(new CompareBOp(a, new MathBOp(dAge, new Constant<IV>(_5.getIV()), MathOp.PLUS), CompareOp.GT))
+                        			Constraint.wrap(new CompareBOp(a, new MathBOp(dAge, new Constant<IV>(_5.getIV()), MathOp.PLUS), CompareOp.GT))
                                 });
                 
                 try {
@@ -731,7 +731,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                                    ValueExpressionConstraint.wrap(new CompareBOp(a, new Constant<IV>(l2.getIV()), CompareOp.GT))
+                                    Constraint.wrap(new CompareBOp(a, new Constant<IV>(l2.getIV()), CompareOp.GT))
                                 });
                 
                 try {
