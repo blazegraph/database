@@ -30,22 +30,19 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.constraint.BOpConstraint;
+import com.bigdata.bop.constraint.BooleanValueExpression;
 
 /**
  * Rejects (x y z) iff x==z and y==owl:sameAs, where x, y, and z are variables.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class RejectAnythingSameAsItself extends BOpConstraint {
+public class RejectAnythingSameAsItself extends BooleanValueExpression {
 
     /**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
+	 * 
+	 */
+	private static final long serialVersionUID = -44020295153412258L;
 
-    /**
+	/**
      * Required shallow copy constructor.
      */
     public RejectAnythingSameAsItself(final BOp[] values,
@@ -79,7 +76,7 @@ public class RejectAnythingSameAsItself extends BOpConstraint {
     }
     
     @SuppressWarnings("unchecked")
-    public boolean accept(final IBindingSet bindingSet) {
+    public Boolean get(final IBindingSet bindingSet) {
 
         // get binding for "x".
         final IConstant<Long> s = bindingSet.get((IVariable<?>) get(0)/* s */);

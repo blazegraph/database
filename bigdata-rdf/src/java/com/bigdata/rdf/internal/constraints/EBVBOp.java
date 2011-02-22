@@ -37,8 +37,7 @@ import com.bigdata.rdf.internal.XSDBooleanIV;
  * Calculates the "effective boolean value" of an IValueExpression.  See the
  * SPARQL spec for details.
  */
-public class EBVBOp extends ValueExpressionBOp 
-		implements IValueExpression<IV> {
+public class EBVBOp extends ValueExpressionBOp {
 
 	/**
 	 * 

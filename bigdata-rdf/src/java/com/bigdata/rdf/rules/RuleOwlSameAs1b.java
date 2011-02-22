@@ -30,6 +30,7 @@ package com.bigdata.rdf.rules;
 import org.openrdf.model.vocabulary.OWL;
 
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.vocab.Vocabulary;
@@ -64,9 +65,9 @@ public class RuleOwlSameAs1b extends Rule
                     new SPOPredicate(relationName,var("x"), vocab.getConstant(OWL.SAMEAS), var("y")),//
                     new SPOPredicate(relationName,var("y"), vocab.getConstant(OWL.SAMEAS), var("z"))//
                 }, new IConstraint[] {
-                    new NE(var("x"),var("y")),
-                    new NE(var("y"),var("z")),
-                    new NE(var("x"),var("z")),
+        			Constraint.wrap(new NE(var("x"),var("y"))),
+        			Constraint.wrap(new NE(var("y"),var("z"))),
+					Constraint.wrap(new NE(var("x"),var("z"))),
                     }
                 );
         

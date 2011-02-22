@@ -32,7 +32,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.constraint.BOpConstraint;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 
@@ -40,46 +39,44 @@ import com.bigdata.rdf.internal.IV;
  * BOpConstraint that wraps a {@link EBVBOp}, which itself computes the 
  * effective boolean value of an IValueExpression.
  */
-public class ValueExpressionConstraint extends BOpConstraint {
+public class Constraint extends com.bigdata.bop.constraint.Constraint {
 
 	/**
 	 * 
 	 */
-	private static final long serialVersionUID = -7068219781217676085L;
+	private static final long serialVersionUID = -5796492538735372727L;
 	
-	protected static final Logger log = Logger.getLogger(ValueExpressionConstraint.class);
+	protected static final Logger log = Logger.getLogger(Constraint.class);
 	
 	/**
 	 * Convenience method to generate a constraint from a value expression.
 	 */
 	public static IConstraint wrap(final IValueExpression<IV> ve) {
-		return new ValueExpressionConstraint(new EBVBOp(ve));
+		if (ve instanceof EBVBOp)
+			return new Constraint((EBVBOp) ve);
+		else
+			return new Constraint(new EBVBOp(ve));
 	}
 	
 	
-	public ValueExpressionConstraint(final EBVBOp x) {
-		
-        this(new BOp[] { x }, null/*annocations*/);
+	public Constraint(final EBVBOp x) {
 
+		this(new BOp[] { x }, null/*annocations*/);
+		
     }
 
     /**
      * Required shallow copy constructor.
      */
-    public ValueExpressionConstraint(final BOp[] args, 
+    public Constraint(final BOp[] args, 
     		final Map<String, Object> anns) {
-    	
         super(args, anns);
-        
-        if (args.length != 1 || args[0] == null)
-            throw new IllegalArgumentException();
-
     }
 
     /**
      * Required deep copy constructor.
      */
-    public ValueExpressionConstraint(final ValueExpressionConstraint op) {
+    public Constraint(final Constraint op) {
         super(op);
     }
 
