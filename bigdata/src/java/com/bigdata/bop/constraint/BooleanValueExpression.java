@@ -26,48 +26,39 @@ package com.bigdata.bop.constraint;
 
 import java.util.Map;
 
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.ImmutableBOp;
 
 /**
- * Imposes the constraint <code>!x</code>.
+ * Base class for boolean value expression BOps.  Value expressions perform some
+ * evaluation on one or more value expressions as input and produce one
+ * boolean as output.
  */
-public class NOT extends BOpConstraint {
+public abstract class BooleanValueExpression extends ImmutableBOp 
+		implements IValueExpression<Boolean> {
 
 	/**
 	 * 
 	 */
-	private static final long serialVersionUID = -5701967329003122236L;
+	private static final long serialVersionUID = 1140290634566864478L;
 
 	/**
-     * Required deep copy constructor.
+     * Required shallow copy constructor.
      */
-    public NOT(final BOp[] args, final Map<String, Object> annotations) {
-        super(args, annotations);
+    public BooleanValueExpression(final BOp[] args, 
+    		final Map<String, Object> anns) {
+        super(args, anns);
     }
 
     /**
      * Required deep copy constructor.
      */
-    public NOT(final NOT op) {
+    public BooleanValueExpression(final BooleanValueExpression op) {
         super(op);
     }
 
-    public NOT(final IConstraint x) {
-
-        super(new BOp[] { x }, null/*Annotations*/);
-
-        if (x == null)
-            throw new IllegalArgumentException();
-
-    }
-
-    public boolean accept(final IBindingSet s) {
-
-        return !((IConstraint) get(0)).accept(s);
-
-    }
+    public abstract Boolean get(final IBindingSet bs);
     
 }

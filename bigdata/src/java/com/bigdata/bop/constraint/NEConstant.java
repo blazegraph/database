@@ -33,22 +33,29 @@ import com.bigdata.bop.IVariable;
 
 /**
  * Imposes the constraint <code>var != constant</code>.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class NEConstant extends BOpConstraint {
-    
-    /**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
+public class NEConstant extends BooleanValueExpression {
 
     /**
-     * Required deep copy constructor.
+	 * 
+	 */
+	private static final long serialVersionUID = 7260967777291997075L;
+
+	public NEConstant(final IVariable<?> x, final IConstant<?> y) {
+
+        this(new BOp[] { x, y }, null/* annotations */);
+
+    }
+    
+    /**
+     * Required shallow copy constructor.
      */
     public NEConstant(final BOp[] args, final Map<String, Object> annotations) {
         super(args, annotations);
+
+        if (args.length != 2 || args[0] == null || args[1] == null)
+            throw new IllegalArgumentException();
+
     }
 
     /**
@@ -58,19 +65,7 @@ public class NEConstant extends BOpConstraint {
         super(op);
     }
     
-    public NEConstant(final IVariable<?> var, final IConstant<?> val) {
-
-        super(new BOp[] { var, val }, null/*annotations*/);
-        
-        if (var == null)
-            throw new IllegalArgumentException();
-        
-        if (val == null)
-            throw new IllegalArgumentException();
-        
-    }
-    
-    public boolean accept(final IBindingSet s) {
+    public Boolean get(final IBindingSet s) {
         
         // get binding for the variable.
         final IConstant<?> tmp = s.get((IVariable<?>) get(0)/* var */);

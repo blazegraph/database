@@ -47,14 +47,14 @@ import com.bigdata.rdf.spo.InGraphHashSetFilter;
  *          {@link InGraphHashSetFilter} and also with the use of an in-memory
  *          join against the incoming binding sets to handle SPARQL data sets.
  */
-abstract public class INConstraint<T> extends BOpConstraint {
+abstract public class INConstraint<T> extends BooleanValueExpression {
 
     /**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
+	 * 
+	 */
+	private static final long serialVersionUID = -774833617971700165L;
 
-    public interface Annotations extends BOpConstraint.Annotations {
+	public interface Annotations extends BOpBase.Annotations {
 
         /**
          * The variable against which the constraint is applied.
@@ -74,7 +74,7 @@ abstract public class INConstraint<T> extends BOpConstraint {
     /**
      * @param op
      */
-    public INConstraint(BOpBase op) {
+    public INConstraint(final INConstraint<T> op) {
         super(op);
     }
 

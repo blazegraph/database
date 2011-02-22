@@ -33,22 +33,32 @@ import com.bigdata.bop.IVariable;
 
 /**
  * Imposes the constraint <code>x != y</code>.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class NE extends BOpConstraint {
+public class NE extends BooleanValueExpression {
 
-    /**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = -2511708022205706034L;
 
+	public NE(final IVariable<?> x, final IVariable<?> y) {
+
+        this(new BOp[] { x, y }, null/* annotations */);
+
+    }
+    
     /**
-     * Required deep copy constructor.
+     * Required shallow copy constructor.
      */
     public NE(final BOp[] args, final Map<String, Object> annotations) {
         super(args, annotations);
+
+        if (args.length != 2 || args[0] == null || args[1] == null)
+            throw new IllegalArgumentException();
+
+        if (args[0] == args[1])
+            throw new IllegalArgumentException();
+        
     }
 
     /**
@@ -58,19 +68,7 @@ public class NE extends BOpConstraint {
         super(op);
     }
     
-    public NE(final IVariable<?> x, final IVariable<?> y) {
-
-        super(new BOp[] { x, y }, null/*annotations*/);
-        
-        if (x == null || y == null)
-            throw new IllegalArgumentException();
-
-        if (x == y)
-            throw new IllegalArgumentException();
-        
-    }
-    
-    public boolean accept(final IBindingSet s) {
+    public Boolean get(final IBindingSet s) {
         
         // get binding for "x".
         final IConstant<?> x = s.get((IVariable<?>) get(0)/* x */);
