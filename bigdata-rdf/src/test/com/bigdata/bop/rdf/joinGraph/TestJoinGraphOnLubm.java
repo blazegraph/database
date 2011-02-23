@@ -14,6 +14,7 @@ import java.util.UUID;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
@@ -434,7 +435,21 @@ public class TestJoinGraphOnLubm extends AbstractJoinGraphTestCase {
 			preds = new IPredicate[] { p0, p1, p2, p3, p4, p5 };
 		}
 
-        doTest(preds, null/* constraints */);
+        final IPredicate<?>[] runtimeOrder = doTest(preds, null/* constraints */);
+
+        if(!useExistingJournal) {
+            /*
+             * Verify that the runtime optimizer produced the expected join
+             * path.
+             * 
+             * Note: There are no solutions for this query against U1. The
+             * optimizer is only providing the fastest path to prove that. We
+             * have to use a larger data set if we want to verify the optimizers
+             * join path for a query which produces solutions in the data.
+             */
+            assertEquals("runtimeOrder", new int[] { 4, 5, 0, 3, 1, 2 },
+                    BOpUtility.getPredIds(runtimeOrder));
+		}
 
 	} // LUBM_Q2
 
@@ -564,7 +579,16 @@ public class TestJoinGraphOnLubm extends AbstractJoinGraphTestCase {
 			preds = new IPredicate[] { p0, p1, p2, p3, p4 };
 		}
 
-        doTest(preds, null/* constraints */);
+        final IPredicate<?>[] runtimeOrder = doTest(preds, null/* constraints */);
+
+        if (!useExistingJournal) {
+            /*
+             * Verify that the runtime optimizer produced the expected join
+             * path.
+             */
+            assertEquals("runtimeOrder", new int[] { 3, 0, 2, 1, 4 },
+                    BOpUtility.getPredIds(runtimeOrder));
+        }
         
 	} // LUBM Q8
 
@@ -703,8 +727,23 @@ public class TestJoinGraphOnLubm extends AbstractJoinGraphTestCase {
 			preds = new IPredicate[] { p0, p1, p2, p3, p4, p5 };
 		}
 
-        doTest(preds, null/* constraints */);
-        
+        final IPredicate<?>[] runtimeOrder = doTest(preds, null/* constraints */);
+
+        if (!useExistingJournal) {
+            /*
+             * Verify that the runtime optimizer produced the expected join
+             * path.
+             * 
+             * Note: When random sampling is used, several join plans are
+             * possible including: {4, 2, 3, 5, 0, 1}, {3, 0, 5, 4, 1, 2}, and {
+             * 1, 4, 3, 5, 0, 2 }. These all appear to be good join plans even
+             * though { 1, 4, 3, 5, 0, 2 } is definitely better. In all cases
+             * the static query optimizer does significantly worse.
+             */
+            assertEquals("runtimeOrder", new int[] {4, 2, 3, 5, 0, 1},
+                    BOpUtility.getPredIds(runtimeOrder));
+        }
+
 	} // LUBM_Q9
 
 }

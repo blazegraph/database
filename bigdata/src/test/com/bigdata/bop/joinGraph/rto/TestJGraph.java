@@ -27,9 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.joinGraph.rto;
 
-import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.joinGraph.rto.JoinGraph.JGraph;
-
 import junit.framework.TestCase2;
 
 /**
@@ -42,6 +39,15 @@ import junit.framework.TestCase2;
  * @todo There are some operations which depend on equality or hash code
  *       behavior for vertices and perhaps edges so those things should also be
  *       tested.
+ * 
+ * @todo Test (re-)sampling for a vertex.
+ * 
+ * @todo Test sampling of the initial edge(s), including when there are
+ *       constraints which can be applied to those edges and when one of the
+ *       edges does not have any solutions (true zero).
+ * 
+ * @todo Test sampling of an edge when extending a path and resampling of the
+ *       path.
  */
 public class TestJGraph extends TestCase2 {
 
@@ -64,15 +70,6 @@ public class TestJGraph extends TestCase2 {
         
     }
 
-//    /**
-    // * Test ability to identify shared variables appearing either as predicate
-    // * operands or as part of CONSTRAINTS or FILTERS. @todo Move to
-    // TestBOpUtility
-//     */
-//    public void test_getSharedVariables() {
-//        fail("write test");
-//    }
-//
 //    /**
 //     * Test ability to recognize when there is a predicate without any shared
 //     * variables.
