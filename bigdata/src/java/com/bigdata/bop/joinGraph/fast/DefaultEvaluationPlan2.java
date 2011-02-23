@@ -30,10 +30,15 @@ package com.bigdata.bop.joinGraph.fast;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
 import org.apache.log4j.Logger;
+
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.Var;
 import com.bigdata.bop.joinGraph.IEvaluationPlan;
 import com.bigdata.bop.joinGraph.IRangeCountFactory;
 import com.bigdata.journal.ITx;
@@ -195,7 +200,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
     /**
      * Compute the evaluation order.
      */
-    private void calc(IRule rule) {
+    private void calc(final IRule rule) {
 
         if (order != null)
             return;
@@ -224,14 +229,26 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         }
         */
         
+        final Set<IVariable<?>> runFirstVars = new HashSet<IVariable<?>>();
+        
         int startIndex = 0;
         for (int i = 0; i < tailCount; i++) {
-            IAccessPathExpander expander = rule.getTail(i).getAccessPathExpander();
+            final IPredicate pred = rule.getTail(i);
+        	final IAccessPathExpander expander = pred.getAccessPathExpander();
             if (expander != null && expander.runFirst()) {
                 if (DEBUG) log.debug("found a run first, tail " + i);
+                final Iterator<IVariable<?>> it = BOpUtility.getArgumentVariables(pred);
+                while (it.hasNext()) {
+                	runFirstVars.add(it.next());
+                }
                 order[startIndex++] = i;
                 used[i] = true;
             }
+        }
+        
+        // if there are no more tails left after the expanders, we're done
+        if (startIndex == tailCount) {
+        	return;
         }
         
         // if there is only one tail left after the expanders
@@ -247,6 +264,25 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
                 return;
             }            
         }
+        
+        int preferredFirstTail = -1;
+        // give preferential treatment to a tail that shares variables with the
+        // runFirst expanders
+        for (int i = 0; i < tailCount; i++) {
+            // only check unused tails
+            if (used[i]) {
+                continue;
+            }
+            final IPredicate pred = rule.getTail(i);
+            final Iterator<IVariable<?>> it = BOpUtility.getArgumentVariables(pred);
+            while (it.hasNext()) {
+            	if (runFirstVars.contains(it.next())) {
+            		preferredFirstTail = i;
+            	}
+            }
+            if (preferredFirstTail != -1)
+            	break;
+        }            
         
         // if there are only two tails left after the expanders
         if (startIndex == tailCount-2) {
@@ -267,8 +303,13 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
                 }
             }
             if (DEBUG) log.debug(t1 + ", " + t2);
-            order[tailCount-2] = cardinality(t1) <= cardinality(t2) ? t1 : t2;
-            order[tailCount-1] = cardinality(t1) <= cardinality(t2) ? t2 : t1;
+            if (preferredFirstTail != -1) {
+            	order[tailCount-2] = preferredFirstTail;
+            	order[tailCount-1] = preferredFirstTail == t1 ? t2 : t1;
+            } else {
+	            order[tailCount-2] = cardinality(t1) <= cardinality(t2) ? t1 : t2;
+	            order[tailCount-1] = cardinality(t1) <= cardinality(t2) ? t2 : t1;
+            }
             return;
         }
         
@@ -276,11 +317,16 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
          * There will be (tails-1) joins, we just need to figure out what
          * they should be.
          */
-        Join join = getFirstJoin();
+        Join join = preferredFirstTail == -1 ? getFirstJoin() : getFirstJoin(preferredFirstTail);
         int t1 = ((Tail) join.getD1()).getTail();
         int t2 = ((Tail) join.getD2()).getTail();
-        order[startIndex] = cardinality(t1) <= cardinality(t2) ? t1 : t2;
-        order[startIndex+1] = cardinality(t1) <= cardinality(t2) ? t2 : t1;
+        if (preferredFirstTail == -1) {
+	        order[startIndex] = cardinality(t1) <= cardinality(t2) ? t1 : t2;
+	        order[startIndex+1] = cardinality(t1) <= cardinality(t2) ? t2 : t1;
+        } else {
+        	order[startIndex] = t1;
+        	order[startIndex+1] = t2;
+        }
         used[order[startIndex]] = true;
         used[order[startIndex+1]] = true;
         for (int i = startIndex+2; i < tailCount; i++) {
@@ -357,6 +403,48 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         vars.addAll(minT1.getVars());
         vars.addAll(minT2.getVars());
         return new Join(minT1, minT2, minJoinCardinality, vars);
+    }
+    
+    private Join getFirstJoin(final int preferredFirstTail) {
+        if (DEBUG) {
+            log.debug("evaluating first join");
+        }
+        
+        
+        long minJoinCardinality = Long.MAX_VALUE;
+        long minOtherTailCardinality = Long.MAX_VALUE;
+        Tail minT2 = null;
+        final int i = preferredFirstTail;
+        final Tail t1 = new Tail(i, rangeCount(i), getVars(i));
+        for (int j = 0; j < tailCount; j++) {
+            // check only non-same and unused tails
+            if (i == j || used[j]) {
+                continue;
+            }
+            Tail t2 = new Tail(j, rangeCount(j), getVars(j));
+            long t2Cardinality = cardinality(j);
+            long joinCardinality = computeJoinCardinality(t1, t2);
+            if(DEBUG) log.debug("evaluating " + i + " X " + j + ": cardinality= " + joinCardinality);
+            if (joinCardinality < minJoinCardinality) {
+                if(DEBUG) log.debug("found a new min: " + joinCardinality);
+                minJoinCardinality = joinCardinality;
+                minOtherTailCardinality = t2Cardinality;
+                minT2 = t2;
+            } else if (joinCardinality == minJoinCardinality) {
+                if (t2Cardinality < minOtherTailCardinality) {
+                    if(DEBUG) log.debug("found a new min: " + joinCardinality);
+                    minJoinCardinality = joinCardinality;
+                    minOtherTailCardinality = t2Cardinality;
+                    minT2 = t2;
+                }
+            }
+        }
+
+        // the join variables is the union of the join dimensions' variables
+        Set<String> vars = new HashSet<String>();
+        vars.addAll(t1.getVars());
+        vars.addAll(minT2.getVars());
+        return new Join(t1, minT2, minJoinCardinality, vars);
     }
     
     /**
