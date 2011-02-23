@@ -50,7 +50,7 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.constraint.AND;
 import com.bigdata.bop.constraint.BooleanValueExpression;
 import com.bigdata.bop.constraint.Constraint;
-import com.bigdata.bop.joinGraph.rto.JoinGraph.JGraph;
+import com.bigdata.bop.joinGraph.rto.JGraph;
 
 /**
  * 
