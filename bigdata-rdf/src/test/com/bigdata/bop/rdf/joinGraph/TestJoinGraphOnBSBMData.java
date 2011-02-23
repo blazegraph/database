@@ -9,6 +9,7 @@ import org.openrdf.query.algebra.MathExpr.MathOp;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
@@ -21,7 +22,6 @@ import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSDIntIV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
@@ -221,19 +221,20 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
      * and applying the constraints before the tail of the plan can in fact lead
      * to a more efficient join path.
      * 
-     * @todo Here are the join orderings for the static and runtime query
-     *       optimizers right now. Neither one pays any mind to the constraints
-     *       at this point. The RTO plan is somewhat better, but I think that we
-     *       are missing the "right" plan by a mile.
+     * FIXME Here are the join orderings for the static and runtime query
+     * optimizers right now. Neither one pays any mind to the constraints at
+     * this point. The RTO plan is somewhat better, but I think that we are
+     * missing the "right" plan by a mile.
      * 
-     *       <pre>
+     * <pre>
      * test_bsbm_q5 : static [0] : : ids=[1, 2, 4, 6, 0, 3, 5]
      * test_bsbm_q5 : runtime[0] : : ids=[1, 2, 0, 4, 6, 3, 5]
      * </pre>
      * 
      * @throws Exception
      */
-	public void test_bsbm_q5() throws Exception {
+	@SuppressWarnings("unchecked")
+    public void test_bsbm_q5() throws Exception {
 
 		QueryLog.logTableHeader();
 		
@@ -443,8 +444,37 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
 
         }
 
-        doTest(preds, constraints);
-
+		final IPredicate<?>[] runtimeOrder = doTest(preds, constraints);
+		
+        {
+            /*
+             * Verify that the runtime optimizer produced the expected join
+             * path.
+             * 
+             * Note: There are no solutions for this query against BSBM 100. The
+             * optimizer is only providing the fastest path to prove that. We
+             * have to use a larger data set if we want to verify the optimizers
+             * join path for a query which produces solutions in the data.
+             * 
+             * Note: The optimizer finds the same join path for the BSBM 100,
+             * 100M, and 200M data sets.
+             * 
+             * FIXME These join paths represent the behavior of the optimizer
+             * when it ignores the [constraints]. This needs to be modified once
+             * the optimizer correctly incorporates and attaches constraints
+             * during cutoff join evaluation to reflect the new target join 
+             * path for the query optimizer.
+             * 
+             * BSBM 100 : 1,2,0,4,6,3,5 w/o constraints in use!
+             * 
+             * BSBM 100M : 1,2,0,4,6,3,5 w/o constraints in use!
+             * 
+             * BSBM 200M : 1,2,0,4,6,3,5 w/o constraints in use!
+             */
+            assertEquals("runtimeOrder", new int[] { 1, 2, 0, 4, 6, 3, 5 },
+                    BOpUtility.getPredIds(runtimeOrder));
+        }
+        
     }
 
 }

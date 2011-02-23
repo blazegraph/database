@@ -96,9 +96,12 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 	 *       sampling join paths.
 	 */
 	public static enum SampleType {
-		/**
-		 * Samples are taken at even space offsets.
-		 */
+        /**
+         * Samples are taken at even space offsets. This produces a sample
+         * without any random effects. Re-sampling an index having the same data
+         * with the same key-range and the limit will always return the same
+         * results. This is useful to make unit test repeatable.
+         */
 		EVEN,
 		/**
 		 * Sample offsets are computed randomly.
@@ -153,19 +156,28 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 		super(args, annotations);
 
     }
-    
+
+    /**
+     * @see Annotations#LIMIT
+     */
 	public int limit() {
 
 		return getProperty(Annotations.LIMIT, Annotations.DEFAULT_LIMIT);
         
     }
 	
+    /**
+     * @see Annotations#SEED
+     */
 	public long seed() {
 
 		return getProperty(Annotations.SEED, Annotations.DEFAULT_SEED);
         
     }
-	
+
+	/**
+	 * @see Annotations#SAMPLE_TYPE
+	 */
 	public SampleType getSampleType() {
 
 		return SampleType.valueOf(getProperty(Annotations.SAMPLE_TYPE,
