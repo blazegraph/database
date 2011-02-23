@@ -40,15 +40,14 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.joinGraph.IEvaluationPlan;
 import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
 import com.bigdata.bop.joinGraph.IRangeCountFactory;
-import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
 import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.config.IValidator;
 import com.bigdata.io.IStreamSerializer;
@@ -61,6 +60,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.Rule;
@@ -252,7 +252,120 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
 //        fail("write test");
 //        
 //    }
+       
+    
+    public void testRunFirstExpanders() {
+
+        final String relation = "spo";
+        final long timestamp = ITx.READ_COMMITTED;
         
+        /*
+         * ?l search Mike
+         * ?s ?p ?l
+         * ?s type Person
+         * ?p type Property
+         */
+        
+        final Constant<?> search = new Constant<String>("search");
+        final Constant<?> Mike = new Constant<String>("Mike");
+        final Constant<?> type = new Constant<String>("type");
+        final Constant<?> Person = new Constant<String>("Person");
+        final Constant<?> Property = new Constant<String>("Property");
+
+        final IAccessPathExpander expander = new IAccessPathExpander() {
+
+			@Override
+			public IAccessPath getAccessPath(IAccessPath accessPath) {
+				throw new UnsupportedOperationException();
+			}
+
+			@Override
+			public boolean backchain() {
+				return false;
+			}
+
+			@Override
+			public boolean runFirst() {
+				return true;
+			}
+        	
+        };
+        
+        final IPredicate<?> pred0 = new Predicate(//
+                new IVariableOrConstant[] {//
+                Var.var("l"), search, Mike },//
+                new NV(Predicate.Annotations.RELATION_NAME,
+                        new String[] { relation }),//
+                new NV(Annotations.TIMESTAMP,timestamp),//
+                new NV(Predicate.Annotations.ACCESS_PATH_EXPANDER, expander)
+                );
+
+        final IPredicate<?> pred1 = new Predicate(//
+                new IVariableOrConstant[] {//
+                Var.var("s"), Var.var("p"), Var.var("l") },//
+                new NV(Predicate.Annotations.RELATION_NAME,
+                        new String[] { relation }),//
+                new NV(Annotations.TIMESTAMP,timestamp)//
+                );
+        
+        final IPredicate<?> pred2 = new Predicate( //
+                new IVariableOrConstant[] {//
+                Var.var("s"), type, Person },//
+                new NV(Predicate.Annotations.RELATION_NAME,
+                        new String[] { relation }),//
+                new NV(Annotations.TIMESTAMP,timestamp)//
+                );
+        
+        final IPredicate<?> pred3 = new Predicate( //
+                new IVariableOrConstant[] {//
+                Var.var("p"), type, Property },//
+                new NV(Predicate.Annotations.RELATION_NAME,
+                        new String[] { relation }),//
+                new NV(Annotations.TIMESTAMP,timestamp)//
+                );
+        
+        final IRule rule = new Rule(getName(), null/* head */,
+                new IPredicate[] { pred0, pred1, pred2, pred3 }, //
+                null// constraints
+        );
+        
+        final Map<IPredicate,Long> rangeCount = new HashMap<IPredicate,Long>();
+        {
+            rangeCount.put(pred0, 0L);
+            rangeCount.put(pred1, 1000000L);
+            rangeCount.put(pred2, 10000L);
+            rangeCount.put(pred3, 100L);
+        }
+        
+        final IEvaluationPlan plan = newPlan(new MockJoinNexus(
+                new MockRangeCountFactory(rangeCount)), rule);
+        
+        assertFalse(plan.isEmpty());
+        
+        final int[] expected = new int[] { 0, 1, 3, 2 };
+        
+        final int[] actual = plan.getOrder();
+        
+        if (!Arrays.equals(expected, actual))
+            fail("evaluation order: expected=" + Arrays.toString(expected)
+                    + ", actual=" + Arrays.toString(actual));
+        
+//        assertFalse("isFullyBound(0)", plan.isFullyBound(0));
+//        assertTrue( "isFullyBound(1)", plan.isFullyBound(1));
+//        assertFalse("isFullyBound(2)", plan.isFullyBound(2));
+//        assertTrue( "isFullyBound(3)", plan.isFullyBound(3));
+//        assertFalse("isFullyBound(4)", plan.isFullyBound(4));
+//
+//        assertEquals("getVarCount(0)", 1, plan.getVariableCount(0));
+//        assertEquals("getVarCount(1)", 0, plan.getVariableCount(1));
+//        assertEquals("getVarCount(2)", 1, plan.getVariableCount(2));
+//        assertEquals("getVarCount(3)", 0, plan.getVariableCount(3));
+//        assertEquals("getVarCount(4)", 1, plan.getVariableCount(4));
+        
+    }
+
+
+    
     /**
      * Mock object.
      * 
