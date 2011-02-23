@@ -101,8 +101,6 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
      *            Per {@link IEvaluationPlanFactory}
      * @param rule
      *            {@link IEvaluationPlanFactory}
-     * @param rangeCount
-     *            The range count data for each predicate in the <i>rule</i>.
      */
     final IEvaluationPlan newPlan(IJoinNexus joinNexus, final IRule rule) {
             
@@ -274,17 +272,17 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
 
         final IAccessPathExpander expander = new IAccessPathExpander() {
 
-			@Override
+//			@Override
 			public IAccessPath getAccessPath(IAccessPath accessPath) {
 				throw new UnsupportedOperationException();
 			}
 
-			@Override
+//			@Override
 			public boolean backchain() {
 				return false;
 			}
 
-			@Override
+//			@Override
 			public boolean runFirst() {
 				return true;
 			}
