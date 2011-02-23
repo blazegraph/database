@@ -447,9 +447,16 @@ public class TestJoinGraphOnLubm extends AbstractJoinGraphTestCase {
              * have to use a larger data set if we want to verify the optimizers
              * join path for a query which produces solutions in the data.
              */
-            assertEquals("runtimeOrder", new int[] { 4, 5, 0, 3, 1, 2 },
-                    BOpUtility.getPredIds(runtimeOrder));
-		}
+
+            // order produced after refactor
+            final int[] expected = new int[] { 4, 5, 0, 1, 2, 3 };
+
+            // order produced before refactor.
+//            final int[] expected = new int[] { 4, 5, 0, 3, 1, 2 };
+
+            assertEquals("runtimeOrder", expected, BOpUtility
+                    .getPredIds(runtimeOrder));
+        }
 
 	} // LUBM_Q2
 

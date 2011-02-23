@@ -61,6 +61,10 @@ public class Vertex implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    /**
+     * The {@link IPredicate} associated with the {@link Vertex}. This basically
+     * provides the information necessary to select an appropriate access path.
+     */
     public final IPredicate<?> pred;
 
     /**
@@ -203,7 +207,7 @@ public class Vertex implements Serializable {
         }
 
         if (log.isTraceEnabled())
-            log.trace("Sampled: " + sample);
+            log.trace("Sampled: id=" + pred.getId() + ", sample=" + sample);
 
         return;
 

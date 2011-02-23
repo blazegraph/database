@@ -1,17 +1,32 @@
 package com.bigdata.bop.joinGraph.rto;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
+import java.util.UUID;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpEvaluationContext;
+import com.bigdata.bop.BOpIdFactory;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.engine.IRunningQuery;
+import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
+import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
+import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
+import com.bigdata.striterator.Dechunkerator;
 
 /**
  * A join path is an ordered sequence of N {@link Vertex vertices} and
@@ -64,15 +79,15 @@ import com.bigdata.bop.engine.QueryEngine;
  */
 public class Path {
 
-//    private static final transient Logger log = Logger.getLogger(Path.class);
+    private static final transient Logger log = Logger.getLogger(Path.class);
 
-    /**
-     * An immutable ordered list of the edges in the (aka the sequence of
-     * joins represented by this path).
-     * 
-     * @deprecated by with {@link #vertices}.
-     */
-    final List<Edge> edges;
+//    /**
+//     * An immutable ordered list of the edges in the (aka the sequence of
+//     * joins represented by this path).
+//     * 
+//     * @deprecated by with {@link #vertices}.
+//     */
+//    final List<Edge> edges;
 
     /**
      * An ordered list of the vertices in the {@link Path}.
@@ -98,21 +113,50 @@ public class Path {
      * approach does allow us to limit the amount of work to be done to
      * satisfy the cutoff).
      */
-    public EdgeSample sample;
+    EdgeSample edgeSample;
 
     /**
      * The cumulative estimated cardinality of the path. This is zero for an
-     * empty path. For a path consisting of a single edge, this is the
-     * estimated cardinality of that edge. When creating a new path by
-     * adding an edge to an existing path, the cumulative cardinality of the
-     * new path is the cumulative cardinality of the existing path plus the
-     * estimated cardinality of the cutoff join of the new edge given the
-     * input sample of the existing path.
+     * empty path. For a path consisting of a single edge, this is the estimated
+     * cardinality of that edge. When creating a new path by adding an edge to
+     * an existing path, the cumulative cardinality of the new path is the
+     * cumulative cardinality of the existing path plus the estimated
+     * cardinality of the cutoff join of the new edge given the input sample of
+     * the existing path.
      * 
-     * @todo track this per vertex as well as the total for more interesting
-     * traces in showPath(Path).
+     * @todo Track this per vertex as well as the total for more interesting
+     *       traces in showPath(Path). In fact, that is just the VertexSample
+     *       for the initial vertex and the EdgeSample for each subsequent
+     *       vertex in path order. The EdgeSamples are maintained in a map
+     *       managed by JGraph during optimization.
      */
     final public long cumulativeEstimatedCardinality;
+
+    /**
+     * Combine the cumulative estimated cost of the source path with the cost of
+     * the edge sample and return the cumulative estimated cost of the new path.
+     * 
+     * @param cumulativeEstimatedCardinality
+     *            The cumulative estimated cost of the source path.
+     * @param edgeSample
+     *            The cost estimate for the cutoff join required to extend the
+     *            source path to the new path.
+     * @return The cumulative estimated cost of the new path.
+     * 
+     *         FIXME Figure out how to properly combine/weight the #of tuples
+     *         read and the #of solutions produced!
+     */
+    static private long add(final long cumulativeEstimatedCardinality,
+            final EdgeSample edgeSample) {
+
+        final long total = cumulativeEstimatedCardinality + //
+                edgeSample.estimatedCardinality + //
+                edgeSample.tuplesRead// this is part of the cost too.
+        ;
+
+        return total;
+        
+    }
 
     public String toString() {
         final StringBuilder sb = new StringBuilder();
@@ -131,79 +175,119 @@ public class Path {
 //            first = false;
 //        }
         sb.append("],cumEstCard=" + cumulativeEstimatedCardinality
-                + ",sample=" + sample + "}");
+                + ",sample=" + edgeSample + "}");
         return sb.toString();
     }
 
-    /**
-     * Create an empty path.
-     */
-    public Path() {
-        this.edges = Collections.emptyList();
-        this.vertices = getVertices(edges);
-        this.preds = getPredicates(vertices);
-        this.cumulativeEstimatedCardinality = 0;
-        this.sample = null;
-    }
+//    /**
+//     * Create an empty path.
+//     */
+//    public Path() {
+////        this.edges = Collections.emptyList();
+//        this.vertices = new Vertex[0];
+//        this.preds = new IPredicate[0];
+//        this.cumulativeEstimatedCardinality = 0;
+//        this.sample = null;
+//    }
 
     /**
      * Create a path from a single edge.
      * 
-     * @param e
-     *            The edge.
+     * @param v0
+     *            The initial vertex in the path.
+     * @param v1
+     *            The 2nd vertex in the path.
+     * @param edgeSample
+     *            The sample obtained from the cutoff join of (v0,v1).
      */
-    public Path(final Edge e) {
+    public Path(final Vertex v0, final Vertex v1, final EdgeSample edgeSample) {
 
-        if (e == null)
+        if (v0 == null)
             throw new IllegalArgumentException();
 
-        if (e.sample == null)
-            throw new IllegalArgumentException("Not sampled: " + e);
+        if (v1 == null)
+            throw new IllegalArgumentException();
 
-        this.edges = Collections.singletonList(e);
+        if (v0.sample == null)
+            throw new IllegalArgumentException();
 
-        this.vertices = getVertices(edges);
+        if (edgeSample == null)
+            throw new IllegalArgumentException();
+
+        if (edgeSample.sample == null)
+            throw new IllegalArgumentException();
+
+//        this.edges = Collections.singletonList(e);
+
+        this.vertices = new Vertex[]{v0,v1};//getVertices(edges);
 
         this.preds = getPredicates(vertices);
         
-        this.sample = e.sample;
+        this.edgeSample = edgeSample;
 
-        this.cumulativeEstimatedCardinality = e.sample.estimatedCardinality;
+        this.cumulativeEstimatedCardinality = add(0L/*cumulativeEstimatedCardinality*/,edgeSample);
+//            edgeSample.estimatedCardinality +//
+//            edgeSample.tuplesRead// this is part of the cost too.
+//            ;
+
+//        this.cumulativeEstimatedCardinality = //
+//            edgeSample.estimatedCardinality +//
+//            edgeSample.tuplesRead// this is part of the cost too.
+//            ;
 
     }
 
     /**
-     * Constructor used by {@link #addEdge(QueryEngine, int, Edge)}
+     * Private constructor used when we extend a path.
      * 
-     * @param edges
-     *            The edges in the new path.
+     * @param vertices
+     *            The ordered array of vertices in the new path. The last entry
+     *            in this array is the vertex which was used to extend the path.
+     * @param preds
+     *            The ordered array of predicates in the new path (correlated
+     *            with the vertices and passed in since it is already computed
+     *            by the caller).
      * @param cumulativeEstimatedCardinality
      *            The cumulative estimated cardinality of the new path.
-     * @param sample
-     *            The sample from the last
+     * @param edgeSample
+     *            The sample from the cutoff join of the last vertex added to
+     *            this path.
      */
-    private Path(final List<Edge> edges,
-            final long cumulativeEstimatedCardinality,
-            final EdgeSample sample) {
+    private Path(//
+            final Vertex[] vertices,//
+            final IPredicate<?>[] preds,//
+//            final List<Edge> edges,//
+            final long cumulativeEstimatedCardinality,//
+            final EdgeSample edgeSample//
+            ) {
 
-        if (edges == null)
+        if (vertices == null)
+            throw new IllegalArgumentException();
+
+        if (preds == null)
+            throw new IllegalArgumentException();
+
+        if (vertices.length != preds.length)
             throw new IllegalArgumentException();
 
         if (cumulativeEstimatedCardinality < 0)
             throw new IllegalArgumentException();
 
-        if (sample == null)
+        if (edgeSample == null)
             throw new IllegalArgumentException();
 
-        this.edges = Collections.unmodifiableList(edges);
+        if (edgeSample.sample == null)
+            throw new IllegalArgumentException();
 
-        this.vertices = getVertices(edges);
+//        this.edges = Collections.unmodifiableList(edges);
+
+        this.vertices = vertices;
         
-        this.preds = getPredicates(vertices);
+        this.preds = preds;
         
         this.cumulativeEstimatedCardinality = cumulativeEstimatedCardinality;
 
-        this.sample = sample;
+        this.edgeSample = edgeSample;
         
     }
 
@@ -215,10 +299,10 @@ public class Path {
         return vertices.length;
         
     }
-    
+
     /**
-     * Return <code>true</code> iff the {@link Path} contains at least one
-     * {@link Edge} for that {@link Vertex}.
+     * Return <code>true</code> iff the {@link Path} contains that
+     * {@link Vertex}.
      * 
      * @param v
      *            The vertex
@@ -347,45 +431,43 @@ public class Path {
         
     }
     
-    /**
-     * Return the vertices in this path (in path order). For the first edge,
-     * the minimum cardinality vertex is always reported first (this is
-     * critical for producing the correct join plan). For the remaining
-     * edges in the path, the unvisited is reported.
-     * 
-     * @return The vertices (in path order).
-     * 
-     * TODO Drop this when we drop {@link Path#edges}.
-     */
-    static private Vertex[] getVertices(final List<Edge> edges) {
-        
-        final Set<Vertex> tmp = new LinkedHashSet<Vertex>();
-
-        for (Edge e : edges) {
-
-            if (tmp.isEmpty()) {
-                /*
-                 * The first edge is handled specially in order to report
-                 * the minimum cardinality vertex first.
-                 */
-                tmp.add(e.getMinimumCardinalityVertex());
-                tmp.add(e.getMaximumCardinalityVertex());
-
-            } else {
-
-                tmp.add(e.v1);
-
-                tmp.add(e.v2);
-
-            }
-            
-        }
-        
-        final Vertex[] a = tmp.toArray(new Vertex[tmp.size()]);
-        
-        return a;
-        
-    }
+//    /**
+//     * Return the vertices in this path (in path order). For the first edge,
+//     * the minimum cardinality vertex is always reported first (this is
+//     * critical for producing the correct join plan). For the remaining
+//     * edges in the path, the unvisited is reported.
+//     * 
+//     * @return The vertices (in path order).
+//     */
+//    static private Vertex[] getVertices(final List<Edge> edges) {
+//        
+//        final Set<Vertex> tmp = new LinkedHashSet<Vertex>();
+//
+//        for (Edge e : edges) {
+//
+//            if (tmp.isEmpty()) {
+//                /*
+//                 * The first edge is handled specially in order to report
+//                 * the minimum cardinality vertex first.
+//                 */
+//                tmp.add(e.getMinimumCardinalityVertex());
+//                tmp.add(e.getMaximumCardinalityVertex());
+//
+//            } else {
+//
+//                tmp.add(e.v1);
+//
+//                tmp.add(e.v2);
+//
+//            }
+//            
+//        }
+//        
+//        final Vertex[] a = tmp.toArray(new Vertex[tmp.size()]);
+//        
+//        return a;
+//        
+//    }
 
     /**
      * Return the predicates associated with the vertices.
@@ -410,37 +492,35 @@ public class Path {
 
     }
 
-    /**
-     * Return the {@link BOp} identifiers of the predicates associated with
-     * each vertex in path order.
-     * 
-     * TODO Drop when we drop {@link #edges}.
-     */
-    static int[] getVertexIds(final List<Edge> edges) {
-
-        final Set<Vertex> tmp = new LinkedHashSet<Vertex>();
-        
-        for (Edge e : edges) {
-        
-            tmp.add(e.v1);
-            
-            tmp.add(e.v2);
-            
-        }
-        
-        final Vertex[] a = tmp.toArray(new Vertex[tmp.size()]);
-
-        final int[] b = new int[a.length];
-        
-        for (int i = 0; i < a.length; i++) {
-        
-            b[i] = a[i].pred.getId();
-            
-        }
-        
-        return b;
-        
-    }
+//    /**
+//     * Return the {@link BOp} identifiers of the predicates associated with
+//     * each vertex in path order.
+//     */
+//    static int[] getVertexIds(final List<Edge> edges) {
+//
+//        final Set<Vertex> tmp = new LinkedHashSet<Vertex>();
+//        
+//        for (Edge e : edges) {
+//        
+//            tmp.add(e.v1);
+//            
+//            tmp.add(e.v2);
+//            
+//        }
+//        
+//        final Vertex[] a = tmp.toArray(new Vertex[tmp.size()]);
+//
+//        final int[] b = new int[a.length];
+//        
+//        for (int i = 0; i < a.length; i++) {
+//        
+//            b[i] = a[i].pred.getId();
+//            
+//        }
+//        
+//        return b;
+//        
+//    }
 
     /**
      * Return <code>true</code> if this path begins with the given path.
@@ -477,15 +557,39 @@ public class Path {
     }
 
     /**
+     * Return the first N {@link IPredicate}s in this {@link Path}.
+     * 
+     * @param length
+     *            The length of the path segment.
+     * 
+     * @return The path segment.
+     */
+    public IPredicate<?>[] getPathSegment(final int length) {
+
+        if (length > preds.length)
+            throw new IllegalArgumentException();
+
+        final IPredicate<?>[] preds2 = new IPredicate[length];
+        
+        System.arraycopy(preds/* src */, 0/* srcPos */, preds2/* dest */,
+                0/* destPos */, length);
+        
+        return preds2;
+
+    }
+
+    /**
      * Add an edge to a path, computing the estimated cardinality of the new
-     * path, and returning the new path. The cutoff join is performed using
-     * the {@link #sample} of <i>this</i> join path and the actual access
-     * path for the target vertex.
+     * path, and returning the new path. The cutoff join is performed using the
+     * {@link #edgeSample} of <i>this</i> join path and the actual access path
+     * for the target vertex.
      * 
      * @param queryEngine
      * @param limit
-     * @param e
-     *            The edge.
+     * @param vnew
+     *            The new vertex.
+     * @param constraints
+     *            The join graph constraints (if any).
      * 
      * @return The new path. The materialized sample for the new path is the
      *         sample obtained by the cutoff join for the edge added to the
@@ -494,30 +598,39 @@ public class Path {
      * @throws Exception
      */
     public Path addEdge(final QueryEngine queryEngine, final int limit,
-            final Edge e) throws Exception {
+            final Vertex vnew, final IConstraint[] constraints)
+            throws Exception {
 
-        if (e == null)
+        if (vnew == null)
             throw new IllegalArgumentException();
 
-        // Figure out which vertices are already part of this path.
-        final boolean v1Found = contains(e.v1);
-        final boolean v2Found = contains(e.v2);
+//        // Figure out which vertices are already part of this path.
+//        final boolean v1Found = contains(e.v1);
+//        final boolean v2Found = contains(e.v2);
+//
+//        if (!v1Found && !v2Found)
+//            throw new IllegalArgumentException(
+//                    "Edge does not extend path: edge=" + e + ", path="
+//                            + this);
+//
+//        if (v1Found && v2Found)
+//            throw new IllegalArgumentException(
+//                    "Edge already present in path: edge=" + e + ", path="
+//                            + this);
 
-        if (!v1Found && !v2Found)
+        if(contains(vnew))
             throw new IllegalArgumentException(
-                    "Edge does not extend path: edge=" + e + ", path="
-                            + this);
+                "Vertex already present in path: vnew=" + vnew + ", path="
+                        + this);
 
-        if (v1Found && v2Found)
-            throw new IllegalArgumentException(
-                    "Edge already present in path: edge=" + e + ", path="
-                            + this);
+        if (this.edgeSample == null)
+            throw new IllegalStateException();
 
-        // The vertex which is already part of this path.
-        final Vertex sourceVertex = v1Found ? e.v1 : e.v2;
+//        // The vertex which is already part of this path.
+//        final Vertex sourceVertex = v1Found ? e.v1 : e.v2;
 
         // The new vertex, which is not part of this path.
-        final Vertex targetVertex = v1Found ? e.v2 : e.v1;
+        final Vertex targetVertex = vnew;//v1Found ? e.v2 : e.v1;
 
         /*
          * Chain sample the edge.
@@ -529,23 +642,48 @@ public class Path {
          * path we have to do a one step cutoff evaluation of the new Edge,
          * given the sample available on the current Path.
          * 
-         * FIXME It is possible for the path sample to be empty. Unless the
-         * sample also happens to be exact, this is an indication that the
-         * estimated cardinality has underflowed. We track the estimated
-         * cumulative cardinality, so this does not make the join path an
-         * immediate winner, but it does mean that we can not probe further on
-         * that join path as we lack any intermediate solutions to feed into the
-         * downstream joins. To resolve that, we have to increase the sample
-         * limit (unless the path is the winner, in which case we can fully
-         * execute the join path segment and materialize the results and use
-         * those to probe further, but this will require the use of the memory
-         * manager to keep the materialized intermediate results off of the Java
-         * heap).
+         * FIXME It is possible for the resulting edge sample to be empty (no
+         * solutions). Unless the sample also happens to be exact, this is an
+         * indication that the estimated cardinality has underflowed. We track
+         * the estimated cumulative cardinality, so this does not make the join
+         * path an immediate winner, but it does mean that we can not probe
+         * further on that join path as we lack any intermediate solutions to
+         * feed into the downstream joins. To resolve that, we have to increase
+         * the sample limit (unless the path is the winner, in which case we can
+         * fully execute the join path segment and materialize the results and
+         * use those to probe further, but this will require the use of the
+         * memory manager to keep the materialized intermediate results off of
+         * the Java heap).
          */
 
-        final EdgeSample edgeSample = e.estimateCardinality(queryEngine,
-                limit, sourceVertex, targetVertex,
-                this.sample // the source sample.
+        // Ordered array of all predicates including the target vertex.
+        final IPredicate<?>[] preds2;
+        final Vertex[] vertices2;
+        {
+            preds2 = new IPredicate[preds.length + 1];
+
+            vertices2 = new Vertex[preds.length + 1];
+
+            System.arraycopy(preds/* src */, 0/* srcPos */, preds2/* dest */,
+                    0/* destPos */, preds.length);
+            
+            System.arraycopy(vertices/* src */, 0/* srcPos */, vertices2/* dest */,
+                    0/* destPos */, preds.length);
+
+            preds2[preds.length] = targetVertex.pred;
+            
+            vertices2[preds.length] = targetVertex;
+            
+        }
+
+        final EdgeSample edgeSample2 = cutoffJoin(//
+                queryEngine,//
+                limit, //
+//                sourceVertex, // 
+//                targetVertex,//
+                preds2,//
+                constraints,//
+                this.edgeSample // the source sample.
 //                this.sample.estimatedCardinality,
 //                this.sample.estimateEnum == EstimateEnum.Exact,
 //                this.sample.limit,//
@@ -554,23 +692,312 @@ public class Path {
 
         {
 
-            final List<Edge> edges = new ArrayList<Edge>(
-                    this.edges.size() + 1);
+//            final List<Edge> edges = new ArrayList<Edge>(
+//                    this.edges.size() + 1);
+//
+//            edges.addAll(this.edges);
+//
+//            edges.add(e);
 
-            edges.addAll(this.edges);
-
-            edges.add(e);
-
-            final long cumulativeEstimatedCardinality = this.cumulativeEstimatedCardinality
-                    + edgeSample.estimatedCardinality;
+            final long cumulativeEstimatedCardinality = add(
+                    this.cumulativeEstimatedCardinality, edgeSample2);
+//                this.cumulativeEstimatedCardinality
+//                    + edgeSample2.estimatedCardinality//
+//                    + edgeSample2.tuplesRead// this is part of the cost too.
+//                    ;
 
             // Extend the path.
-            final Path tmp = new Path(edges,
-                    cumulativeEstimatedCardinality, edgeSample);
+            final Path tmp = new Path(vertices2, preds2,
+                    cumulativeEstimatedCardinality, edgeSample2);
 
             return tmp;
 
         }
+
+    }
+
+    /**
+     * Cutoff join of the last vertex in the join path.
+     * <p>
+     * <strong>The caller is responsible for protecting against needless
+     * re-sampling.</strong> This includes cases where a sample already exists
+     * at the desired sample limit and cases where the sample is already exact.
+     * 
+     * @param queryEngine
+     *            The query engine.
+     * @param limit
+     *            The limit for the cutoff join.
+     * @param path
+     *            The path segment, which must include the target vertex as the
+     *            last component of the path segment.
+     * @param constraints
+     *            The constraints declared for the join graph (if any). The
+     *            appropriate constraints will be applied based on the variables
+     *            which are known to be bound as of the cutoff join for the last
+     *            vertex in the path segment.
+     * @param sourceSample
+     *            The input sample for the cutoff join. When this is a one-step
+     *            estimation of the cardinality of the edge, then this sample is
+     *            taken from the {@link VertexSample}. When the edge (vSource,
+     *            vTarget) extends some {@link Path}, then this is taken from
+     *            the {@link EdgeSample} for that {@link Path}.
+     * 
+     * @return The result of sampling that edge.
+     * 
+     * @throws Exception
+     */
+//    * @param vSource
+//    *            The source vertex.
+//    * @param vTarget
+//    *            The target vertex
+    static public EdgeSample cutoffJoin(//
+            final QueryEngine queryEngine,//
+            final int limit,//
+            final IPredicate<?>[] path,//
+            final IConstraint[] constraints,//
+//            final Vertex vSource,// 
+//            final Vertex vTarget,//
+            final SampleBase sourceSample//
+//            final long sourceEstimatedCardinality,//
+//            final boolean sourceSampleExact,//
+//            final int sourceSampleLimit,//
+//            final IBindingSet[] sourceSample//
+    ) throws Exception {
+
+        if (path == null)
+            throw new IllegalArgumentException();
+
+        if (limit <= 0)
+            throw new IllegalArgumentException();
+
+        // The access path on which the cutoff join will read.
+        final IPredicate<?> pred = path[path.length - 1];
+
+        if (pred == null)
+            throw new IllegalArgumentException();
+
+        if (sourceSample == null)
+            throw new IllegalArgumentException();
+        
+        if (sourceSample.sample == null)
+            throw new IllegalArgumentException();
+        
+        // Figure out which constraints attach to each predicate.
+        final IConstraint[][] constraintAttachmentArray = PartitionedJoinGroup
+                .getJoinGraphConstraints(path, constraints);
+
+        // The constraint(s) (if any) for this join.
+        final IConstraint[] c = constraintAttachmentArray[path.length - 1];
+        
+        /*
+         * Setup factory for bopIds with reservations for ones already in use.
+         */
+        final BOpIdFactory idFactory = new BOpIdFactory();
+
+        // Reservation for the bopId used by the predicate.
+        idFactory.reserve(pred.getId());
+        
+        // Reservations for the bopIds used by the constraints.
+        if (c != null) {
+            for (IConstraint x : c) {
+                if (log.isDebugEnabled())
+                    log.debug("Attaching constraint: " + x);
+                final Iterator<BOp> itr = BOpUtility
+                        .preOrderIteratorWithAnnotations(x);
+                while (itr.hasNext()) {
+                    final BOp y = itr.next();
+                    final Integer anId = (Integer) y
+                            .getProperty(BOp.Annotations.BOP_ID);
+                    if (anId != null)
+                        idFactory.reserve(anId.intValue());
+                }
+            }
+        }
+
+        /*
+         * Set up a cutoff pipeline join operator which makes an accurate
+         * estimate of the #of input solutions consumed and the #of output
+         * solutions generated. From that, we can directly compute the join hit
+         * ratio.
+         * 
+         * Note: This approach is preferred to injecting a "RowId" column as the
+         * estimates are taken based on internal counters in the join operator
+         * and the join operator knows how to cutoff evaluation as soon as the
+         * limit is satisfied, thus avoiding unnecessary effort.
+         */
+
+        //        final int joinId = 1;
+        final int joinId = idFactory.nextId();
+        final Map<String, Object> anns = NV.asMap(
+            //
+            new NV(BOp.Annotations.BOP_ID, joinId),//
+            new NV(PipelineJoin.Annotations.PREDICATE, pred),
+            // Note: does not matter since not executed by the query
+            // controller.
+            // // disallow parallel evaluation of tasks
+            // new NV(PipelineOp.Annotations.MAX_PARALLEL,1),
+            // disallow parallel evaluation of chunks.
+            new NV(PipelineJoin.Annotations.MAX_PARALLEL_CHUNKS, 0),
+            // disable access path coalescing
+            new NV( PipelineJoin.Annotations.COALESCE_DUPLICATE_ACCESS_PATHS, false), //
+            // pass in constraints on this join.
+            new NV(PipelineJoin.Annotations.CONSTRAINTS, c),//
+            // cutoff join.
+            new NV(PipelineJoin.Annotations.LIMIT, (long) limit),
+            /*
+             * Note: In order to have an accurate estimate of the
+             * join hit ratio we need to make sure that the join
+             * operator runs using a single PipelineJoinStats
+             * instance which will be visible to us when the query
+             * is cutoff. In turn, this implies that the join must
+             * be evaluated on the query controller.
+             * 
+             * @todo This implies that sampling of scale-out joins
+             * must be done using remote access paths.
+             */
+            new NV(PipelineJoin.Annotations.SHARED_STATE, true),//
+            new NV(PipelineJoin.Annotations.EVALUATION_CONTEXT,
+                    BOpEvaluationContext.CONTROLLER)//
+            );
+
+        @SuppressWarnings("unchecked")
+        final PipelineJoin<?> joinOp = new PipelineJoin(new BOp[] {}, anns);
+
+        final PipelineOp queryOp = joinOp;
+
+        // run the cutoff sampling of the edge.
+        final UUID queryId = UUID.randomUUID();
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, queryOp,
+                new LocalChunkMessage<IBindingSet>(queryEngine, queryId, joinOp
+                        .getId()/* startId */, -1 /* partitionId */,
+                        new ThickAsynchronousIterator<IBindingSet[]>(
+                                new IBindingSet[][] { sourceSample.sample })));
+
+        final List<IBindingSet> result = new LinkedList<IBindingSet>();
+        try {
+            try {
+                IBindingSet bset = null;
+                // Figure out the #of source samples consumed.
+                final Iterator<IBindingSet> itr = new Dechunkerator<IBindingSet>(
+                        runningQuery.iterator());
+                while (itr.hasNext()) {
+                    bset = itr.next();
+                    result.add(bset);
+                }
+            } finally {
+                // verify no problems.
+                runningQuery.get();
+            }
+        } finally {
+            runningQuery.cancel(true/* mayInterruptIfRunning */);
+        }
+
+        // The join hit ratio can be computed directly from these stats.
+        final PipelineJoinStats joinStats = (PipelineJoinStats) runningQuery
+                .getStats().get(joinId);
+
+        if (log.isTraceEnabled())
+            log.trace(joinStats.toString());
+
+        // #of solutions in.
+        final int inputCount = (int) joinStats.inputSolutions.get();
+
+        // #of solutions out.
+        long outputCount = joinStats.outputSolutions.get();
+
+        // cumulative range count of the sampled access paths.
+        final long sumRangeCount = joinStats.accessPathRangeCount.get();
+
+        final EstimateEnum estimateEnum;
+        if (sourceSample.estimateEnum == EstimateEnum.Exact
+                && outputCount < limit) {
+            /*
+             * Note: If the entire source vertex is being fed into the cutoff
+             * join and the cutoff join outputCount is LT the limit, then the
+             * sample is the actual result of the join. That is, feeding all
+             * source solutions into the join gives fewer than the desired
+             * number of output solutions.
+             */
+            estimateEnum = EstimateEnum.Exact;
+        } else if (inputCount == 1 && outputCount == limit) {
+            /*
+             * If the inputCount is ONE (1) and the outputCount is the limit,
+             * then the estimated cardinality is a lower bound as more than
+             * outputCount solutions might be produced by the join when
+             * presented with a single input solution.
+             * 
+             * However, this condition suggests that the sum of the sampled
+             * range counts is a much better estimate of the cardinality of this
+             * join.
+             * 
+             * For example, consider a join feeding a rangeCount of 16 into a
+             * rangeCount of 175000. With a limit of 100, we estimated the
+             * cardinality at 1600L (lower bound). In fact, the cardinality is
+             * 16*175000. This falsely low estimate can cause solutions which
+             * are really better to be dropped.
+             */
+            // replace outputCount with the sum of the sampled range counts.
+            outputCount = sumRangeCount;
+            estimateEnum = EstimateEnum.LowerBound;
+        } else if ((sourceSample.estimateEnum != EstimateEnum.Exact)
+                && inputCount == Math.min(sourceSample.limit,
+                        sourceSample.estimatedCardinality) && outputCount == 0) {
+            /*
+             * When the source sample was not exact, the inputCount is EQ to the
+             * lesser of the source range count and the source sample limit, and
+             * the outputCount is ZERO (0), then feeding in all source solutions
+             * is not sufficient to generate any output solutions. In this case,
+             * the estimated join hit ratio appears to be zero. However, the
+             * estimation of the join hit ratio actually underflowed and the
+             * real join hit ratio might be a small non-negative value. A real
+             * zero can only be identified by executing the full join.
+             * 
+             * Note: An apparent join hit ratio of zero does NOT imply that the
+             * join will be empty (unless the source vertex sample is actually
+             * the fully materialized access path - this case is covered above).
+             */
+            estimateEnum = EstimateEnum.Underflow;
+        } else {
+            estimateEnum = EstimateEnum.Normal;
+        }
+
+        /*
+         * The #of tuples read from the sampled access paths. This is part of
+         * the cost of the join path, even though it is not part of the expected
+         * cardinality of the cutoff join.
+         * 
+         * Note: While IOs is a better predictor of latency, it is possible to
+         * choose a pipelined join versus a hash join once the query plan has
+         * been decided. Their IO provides are both correlated to the #of tuples
+         * read.
+         */
+        final long tuplesRead = joinStats.accessPathUnitsIn.get();
+        
+        final double f = outputCount == 0 ? 0
+                : (outputCount / (double) inputCount);
+
+        final long estimatedCardinality = (long) (sourceSample.estimatedCardinality * f);
+
+        final EdgeSample edgeSample = new EdgeSample(//
+//                sourceSample.estimatedCardinality, //
+//                sourceSample.estimateEnum, // 
+//                sourceSample.limit, //
+                sourceSample,//
+                inputCount,//
+                outputCount, //
+                tuplesRead,//
+                f, //
+                // args to SampleBase
+                estimatedCardinality, //
+                limit, //
+                estimateEnum,//
+                result.toArray(new IBindingSet[result.size()]));
+
+        if (log.isDebugEnabled())
+            log.debug(Arrays.toString(BOpUtility.getPredIds(path))
+                    + " : newSample=" + edgeSample);
+
+        return edgeSample;
 
     }
 
