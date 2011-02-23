@@ -30,7 +30,6 @@ package com.bigdata.bop.joinGraph.rto;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Formatter;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -44,11 +43,9 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.ap.SampleIndex.SampleType;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.joinGraph.NoSolutionsException;
-import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 
 /**
@@ -236,50 +233,50 @@ public class JGraph {
      */
     private final SampleType sampleType;
     
-    /**
-     * The edges of the join graph as determined by static analysis. Each
-     * edge is basically a possible join. This array is comprised of just
-     * those edges which are determined by static analysis. Additional edges
-     * MAY be identified dynamically. Altogether there are three categories
-     * of edges:
-     * <ol>
-     * <li>The vertices directly share variables (join with shared
-     * variable(s)). These edges are identified by static analysis in the
-     * constructor are are represented in {@link #E}.</li>
-     * <li>The vertices indirectly share variables via a constraint (join
-     * with indirectly shared variable(s)). These edges are identified by
-     * dynamic analysis. Each time we expand the set of join paths under
-     * consideration, we examine {@link #unshared} vertices. Given the join
-     * path under consideration and the set of constraints, it may be that
-     * the vertex will indirectly share a variable via a constraint and can
-     * therefore participate in a constrained join.</li>
-     * <li>The vertices do not share variables, either directly or
-     * indirectly (unconstrained join). All vertices can join. However, if
-     * there are no shared variables then the join is unconstrained (full
-     * cross product). These edges are identified dynamically. In each round
-     * for which a constrained edge could not be identified, we consider all
-     * vertices in {@link #unshared} and choose an unconstrained edge.</li>
-     * </ol>
-     * 
-     * @see BOpUtility#canJoinUsingConstraints(IPredicate[], IPredicate, IConstraint[])
-     */
-    private final Edge[] E;
+//    /**
+//     * The edges of the join graph as determined by static analysis. Each
+//     * edge is basically a possible join. This array is comprised of just
+//     * those edges which are determined by static analysis. Additional edges
+//     * MAY be identified dynamically. Altogether there are three categories
+//     * of edges:
+//     * <ol>
+//     * <li>The vertices directly share variables (join with shared
+//     * variable(s)). These edges are identified by static analysis in the
+//     * constructor are are represented in {@link #E}.</li>
+//     * <li>The vertices indirectly share variables via a constraint (join
+//     * with indirectly shared variable(s)). These edges are identified by
+//     * dynamic analysis. Each time we expand the set of join paths under
+//     * consideration, we examine {@link #unshared} vertices. Given the join
+//     * path under consideration and the set of constraints, it may be that
+//     * the vertex will indirectly share a variable via a constraint and can
+//     * therefore participate in a constrained join.</li>
+//     * <li>The vertices do not share variables, either directly or
+//     * indirectly (unconstrained join). All vertices can join. However, if
+//     * there are no shared variables then the join is unconstrained (full
+//     * cross product). These edges are identified dynamically. In each round
+//     * for which a constrained edge could not be identified, we consider all
+//     * vertices in {@link #unshared} and choose an unconstrained edge.</li>
+//     * </ol>
+//     * 
+//     * @see BOpUtility#canJoinUsingConstraints(IPredicate[], IPredicate, IConstraint[])
+//     */
+//    private final Edge[] E;
 
-    /**
-     * An unordered collection of vertices which do not share any variables
-     * with the other vertices in the join graph. These vertices will
-     * produce full cross product joins unless a constraint causes indirect
-     * sharing of variables with a join path.
-     */
-    private final Vertex[] unshared;
+//    /**
+//     * An unordered collection of vertices which do not share any variables
+//     * with the other vertices in the join graph. These vertices will
+//     * produce full cross product joins unless a constraint causes indirect
+//     * sharing of variables with a join path.
+//     */
+//    private final Vertex[] unshared;
 
     public List<Vertex> getVertices() {
         return Collections.unmodifiableList(Arrays.asList(V));
     }
 
-    public List<Edge> getEdges() {
-        return Collections.unmodifiableList(Arrays.asList(E));
-    }
+//    public List<Edge> getEdges() {
+//        return Collections.unmodifiableList(Arrays.asList(E));
+//    }
 
     public String toString() {
         final StringBuilder sb = new StringBuilder();
@@ -292,14 +289,14 @@ public class JGraph {
         for (IConstraint c : C) {
             sb.append("\nC[" + c.getId() + "]=" + c);
         }
-        sb.append("\n],unshared=[");
-        for (Vertex v : unshared) {
-            sb.append("\n" + v);
-        }
-        sb.append("],E=[");
-        for (Edge e : E) {
-            sb.append("\n" + e);
-        }
+//        sb.append("\n],unshared=[");
+//        for (Vertex v : unshared) {
+//            sb.append("\n" + v);
+//        }
+//        sb.append("],E=[");
+//        for (Edge e : E) {
+//            sb.append("\n" + e);
+//        }
         sb.append("\n]}");
         return sb.toString();
     }
@@ -367,185 +364,160 @@ public class JGraph {
         
         this.sampleType = sampleType;
 
-        /*
-         * Create edges to represent possible joins between predicates based
-         * on directly shared variables - these joins can be identified by a
-         * static analysis of the join graph.
-         * 
-         * Note: There are really three classes of joins to be considered.
-         * 
-         * (1) The target predicate directly shares a variable with the
-         * source predicate. These joins are always constrained since the
-         * source predicate will have bound that variable. This is the
-         * static analysis of the join graph.
-         * 
-         * (2) When the source predicate shares a variable with a constraint
-         * which also shares a variable with the target predicate. While the
-         * predicates do not directly share a variable, these joins are
-         * constrained by the shared variable in the constraint on the
-         * target predicate. BSBM Q5 is an example of this case. We do not
-         * create edges for such joins here. Instead, we dynamically
-         * determine when a constrained join is possible when extending the
-         * join path in each round. Hence, this is part of the dynamic
-         * analysis of the join graph.
-         * 
-         * (3) Any two predicates may always be joined. However, joins which
-         * do not share variables either directly or indirectly will be full
-         * cross products. Therefore such joins are run last and we do not
-         * create edges for them here. Again, this is part of the dynamic
-         * analysis of the join graph.
-         */
-        {
-
-            // The set of identified edges for vertices which share vars.
-            final List<Edge> tmp = new LinkedList<Edge>();
-
-            // The set of vertices which share variables.
-            final Set<Vertex> sharedEdgeVertices = new LinkedHashSet<Vertex>();
-
-            // The set of vertices which do not share variables.
-            final List<Vertex> unsharedEdgeVertices = new LinkedList<Vertex>();
-
-            for (int i = 0; i < v.length; i++) {
-
-                // consider a source vertex.
-                final IPredicate<?> p1 = v[i];
-
-                // #of vertices which share a variable with source vertex.
-                int nmatched = 0;
-                
-                for (int j = i + 1; j < v.length; j++) {
-
-                    // consider a possible target vertex.
-                    final IPredicate<?> p2 = v[j];
-
-//                    final Set<IVariable<?>> shared = BOpUtility
-//                            .getSharedVars(p1, p2);
-
-                    if(BOpUtility.canJoin(p1, p2)) {
-//                  if (!shared.isEmpty()) {
-
-                        /*
-                         * The source and target vertices can join based on
-                         * one or more shared variable(s).
-                         */
-                        
-                        if (log.isDebugEnabled())
-                            log.debug("vertices shared variable(s): vars="
-                                    + BOpUtility.getSharedVars(p1, p2)
-                                    + ", v1=" + p1 + ", v2=" + p2);
-                        
-                        tmp.add(new Edge(V[i], V[j]));//, shared));
-                        
-                        sharedEdgeVertices.add(V[i]);
-                        
-                        sharedEdgeVertices.add(V[j]);
-                        
-                        nmatched++;
-
-                    } else if (constraints != null) {
-
-                        /*
-                         * The source and target vertices do not directly
-                         * share any variable(s). However, there may be a
-                         * constraint which shares a variable with both the
-                         * source and target vertex. If such a constraint is
-                         * found, then we add an edge now as that join is
-                         * potentially constrained (less than the full
-                         * Cartesian cross product).
-                         * 
-                         * Note: While this identifies possible joins via a
-                         * constraint, such joins are only legal when all
-                         * variables used by the constraint are known to be
-                         * bound.
-                         * 
-                         * FIXME Edges should be identified dynamically, not
-                         * statically. Probably all edges (aka possible
-                         * joins) should be identified dynamically given the
-                         * history represented by a given join path and the
-                         * set of constraints declared for the join graph.
-                         */
-
-                        for(IConstraint c : constraints) {
-                    
-                            if(BOpUtility.getSharedVars(p1, c).isEmpty())
-                                continue;
-                            
-                            if(BOpUtility.getSharedVars(p2, c).isEmpty())
-                                continue;
-                            
-                            if (log.isDebugEnabled())
-                                log
-                                        .debug("vertices shared variable(s) via constraint: v1="
-                                                + p1
-                                                + ", v2="
-                                                + p2
-                                                + ", c=" + c);
-                            
-                            tmp.add(new Edge(V[i], V[j]));//, shared));
-                            
-                            sharedEdgeVertices.add(V[i]);
-                            
-                            sharedEdgeVertices.add(V[j]);
-                            
-                            nmatched++;
-
-                        }
-
-                    }
-
-                }
-
-                if (nmatched == 0 && !sharedEdgeVertices.contains(V[i])) {
-
-                    /*
-                     * The source vertex does not share any variables.
-                     */
-
-                    log
-                            .warn("Vertex does not share any variables: "
-                                    + V[i]);
-                    
-                    unsharedEdgeVertices.add(V[i]);
-
-                }
-                
-            } // create edges
-
-            E = tmp.toArray(new Edge[0]);
-            
-            this.unshared = unsharedEdgeVertices.toArray(new Vertex[0]); 
-
-//          if(!unsharedEdgeVertices.isEmpty()) {
+//        /*
+//         * Create edges to represent possible joins between predicates based on
+//         * directly shared variables - these joins can be identified by a static
+//         * analysis of the join graph.
+//         */
+//        {
 //
-//                /*
-//                 * FIXME NO SHARED VARS : RUN LAST. This needs to be
-//                 * supported. When vertices that do not share variables
-//                 * either directly or via a constraint then they should run
-//                 * last as they can not constrain the query. In this case,
-//                 * they are not considered by the runtime optimizer when
-//                 * building up the join path until all vertices which share
-//                 * variables have been exhausted. At that point, the
-//                 * remaining vertices are just appended to whatever join
-//                 * path was selected as having the lowest cumulative
-//                 * estimated cardinality.
-//                 * 
-//                 * However, if there exists for a vertex which otherwise
-//                 * does not share variables a constraint which should be
-//                 * evaluated against that vertex, then that constraint
-//                 * provides the basis for a edge (aka join). In this case,
-//                 * an edge must be created for the vertex based on the
-//                 * shared variable in the constraint and its position in the
-//                 * join path will be decided by the runtime optimizer.
-//                 */
+//            // The set of identified edges for vertices which share vars.
+//            final List<Edge> tmp = new LinkedList<Edge>();
 //
-//                throw new UnsupportedOperationException(
-//                        "Some predicates do not share any variables with other predicates: unshared="
-//                                + unsharedEdgeVertices);
-//              
-//          }
-            
-        }
+//            // The set of vertices which share variables.
+//            final Set<Vertex> sharedEdgeVertices = new LinkedHashSet<Vertex>();
+//
+////            // The set of vertices which do not share variables.
+////            final List<Vertex> unsharedEdgeVertices = new LinkedList<Vertex>();
+//
+//            for (int i = 0; i < v.length; i++) {
+//
+//                // consider a source vertex.
+//                final IPredicate<?> p1 = v[i];
+//
+//                // #of vertices which share a variable with source vertex.
+//                int nmatched = 0;
+//                
+//                for (int j = i + 1; j < v.length; j++) {
+//
+//                    // consider a possible target vertex.
+//                    final IPredicate<?> p2 = v[j];
+//
+////                    final Set<IVariable<?>> shared = BOpUtility
+////                            .getSharedVars(p1, p2);
+//
+//                    if(BOpUtility.canJoin(p1, p2)) {
+////                  if (!shared.isEmpty()) {
+//
+//                        /*
+//                         * The source and target vertices can join based on
+//                         * one or more shared variable(s).
+//                         */
+//                        
+//                        if (log.isDebugEnabled())
+//                            log.debug("vertices shared variable(s): vars="
+//                                    + BOpUtility.getSharedVars(p1, p2)
+//                                    + ", v1=" + p1 + ", v2=" + p2);
+//                        
+//                        tmp.add(new Edge(V[i], V[j]));//, shared));
+//                        
+//                        sharedEdgeVertices.add(V[i]);
+//                        
+//                        sharedEdgeVertices.add(V[j]);
+//                        
+//                        nmatched++;
+//
+//                    } else if (constraints != null) {
+//
+//                        /*
+//                         * The source and target vertices do not directly
+//                         * share any variable(s). However, there may be a
+//                         * constraint which shares a variable with both the
+//                         * source and target vertex. If such a constraint is
+//                         * found, then we add an edge now as that join is
+//                         * potentially constrained (less than the full
+//                         * Cartesian cross product).
+//                         * 
+//                         * Note: While this identifies possible joins via a
+//                         * constraint, such joins are only legal when all
+//                         * variables used by the constraint are known to be
+//                         * bound.
+//                         * 
+//                         * FIXME Edges should be identified dynamically, not
+//                         * statically. Probably all edges (aka possible
+//                         * joins) should be identified dynamically given the
+//                         * history represented by a given join path and the
+//                         * set of constraints declared for the join graph.
+//                         */
+//
+//                        for(IConstraint c : constraints) {
+//                    
+//                            if(BOpUtility.getSharedVars(p1, c).isEmpty())
+//                                continue;
+//                            
+//                            if(BOpUtility.getSharedVars(p2, c).isEmpty())
+//                                continue;
+//                            
+//                            if (log.isDebugEnabled())
+//                                log
+//                                        .debug("vertices shared variable(s) via constraint: v1="
+//                                                + p1
+//                                                + ", v2="
+//                                                + p2
+//                                                + ", c=" + c);
+//                            
+//                            tmp.add(new Edge(V[i], V[j]));//, shared));
+//                            
+//                            sharedEdgeVertices.add(V[i]);
+//                            
+//                            sharedEdgeVertices.add(V[j]);
+//                            
+//                            nmatched++;
+//
+//                        }
+//
+//                    }
+//
+//                }
+//
+//                if (nmatched == 0 && !sharedEdgeVertices.contains(V[i])) {
+//
+//                    /*
+//                     * The source vertex does not share any variables.
+//                     */
+//
+//                    log.warn("Vertex does not share any variables: " + V[i]);
+//                  
+////                    unsharedEdgeVertices.add(V[i]);
+//
+//                }
+//                
+//            } // next vertex
+//
+//            E = tmp.toArray(new Edge[0]);
+//            
+////            this.unshared = unsharedEdgeVertices.toArray(new Vertex[0]); 
+//
+////          if(!unsharedEdgeVertices.isEmpty()) {
+////
+////                /*
+////                 * FIXME NO SHARED VARS : RUN LAST. This needs to be
+////                 * supported. When vertices that do not share variables
+////                 * either directly or via a constraint then they should run
+////                 * last as they can not constrain the query. In this case,
+////                 * they are not considered by the runtime optimizer when
+////                 * building up the join path until all vertices which share
+////                 * variables have been exhausted. At that point, the
+////                 * remaining vertices are just appended to whatever join
+////                 * path was selected as having the lowest cumulative
+////                 * estimated cardinality.
+////                 * 
+////                 * However, if there exists for a vertex which otherwise
+////                 * does not share variables a constraint which should be
+////                 * evaluated against that vertex, then that constraint
+////                 * provides the basis for a edge (aka join). In this case,
+////                 * an edge must be created for the vertex based on the
+////                 * shared variable in the constraint and its position in the
+////                 * join path will be decided by the runtime optimizer.
+////                 */
+////
+////                throw new UnsupportedOperationException(
+////                        "Some predicates do not share any variables with other predicates: unshared="
+////                                + unsharedEdgeVertices);
+////              
+////          }
+//            
+//        } // create edges.
 
     }
 
@@ -626,9 +598,27 @@ public class JGraph {
 
         int round = 1;
 
+        /*
+         * This map is used to associate join path segments (expressed as an
+         * ordered array of bopIds) with edge sample to avoid redundant effort.
+         * 
+         * FIXME HEAP MANAGMENT : This map holds references to the cutoff join
+         * samples. To ensure that the map has the minimum heap footprint, it
+         * must be scanned each time we prune the set of active paths and any
+         * entry which is not a prefix of an active path should be removed.
+         * 
+         * TODO MEMORY MANAGER : When an entry is cleared from this map, the
+         * corresponding allocation in the memory manager (if any) must be
+         * released. The life cycle of the map needs to be bracketed by a
+         * try/finally in order to ensure that all allocations associated with
+         * the map are released no later than when we leave the lexicon scope of
+         * that clause.
+         */
+        final Map<PathIds, EdgeSample> edgeSamples = new LinkedHashMap<PathIds, EdgeSample>();
+        
         while (paths.length > 0 && round < nvertices - 1) {
 
-            paths = expand(queryEngine, limit, round++, paths);
+            paths = expand(queryEngine, limit, round++, paths, edgeSamples);
 
         }
 
@@ -644,13 +634,9 @@ public class JGraph {
 
         if (log.isInfoEnabled()) {
 
-            /*
-             * @todo It would be nice to show the plan with the filters
-             * attached, but that might be something that the caller does.
-             */
             log.info("\n*** Selected join path: "
                     + Arrays.toString(paths[0].getVertexIds()) + "\n"
-                    + showPath(paths[0]));
+                    + showPath(paths[0], edgeSamples));
 
         }
         
@@ -674,7 +660,7 @@ public class JGraph {
         if(p == null)
             throw new IllegalArgumentException();
         
-        final IPredicate[] path = p.getPredicates();
+        final IPredicate<?>[] path = p.getPredicates();
 
         if (path.length != V.length) {
             throw new IllegalArgumentException(
@@ -712,46 +698,45 @@ public class JGraph {
      * 
      * @param nedges
      *            The maximum #of edges to choose.
+     * @param paths
+     *            The set of possible initial paths to choose from.
+     * 
+     * @return Up to <i>nedges</i> minimum cardinality paths.
      */
-    public Path[] chooseStartingPaths(final int nedges) {
+    public Path[] chooseStartingPaths(final int nedges, final Path[] paths) {
 
         final List<Path> tmp = new LinkedList<Path>();
 
-        // All edges in the graph.
-        final Edge[] edges = getEdges().toArray(new Edge[0]);
-
         // Sort them by ascending expected cardinality.
-        Arrays.sort(edges, 0, edges.length,
-                EstimatedEdgeCardinalityComparator.INSTANCE);
+        Arrays.sort(paths, 0, paths.length,
+                EstimatedCardinalityComparator.INSTANCE);
 
         // Choose the top-N edges (those with the least cardinality).
-        for (int i = 0; i < edges.length && i < nedges; i++) {
+        for (int i = 0; i < paths.length && i < nedges; i++) {
 
-            tmp.add(new Path(edges[i]));
+            tmp.add(paths[i]);
 
         }
 
-        final Path[] a = tmp.toArray(new Path[tmp.size()]);
-
-        return a;
+        return tmp.toArray(new Path[tmp.size()]);
 
     }
 
     /**
-     * Choose up to <i>nedges</i> edges to be the starting point. For each
-     * of the <i>nedges</i> lowest cardinality edges, the starting vertex
-     * will be the vertex with the lowest cardinality for that edge.
+     * Choose up to <i>nedges</i> edges to be the starting point. For each of
+     * the <i>nedges</i> lowest cardinality edges, the starting vertex will be
+     * the vertex with the lowest cardinality for that edge.
      * <p>
      * Note: An edge can not serve as a starting point for exploration if it
      * uses variables (for example, in a CONSTRAINT) which are not bound by
-     * either vertex (since the variable(s) are not bound, the constraint
-     * would always fail).
+     * either vertex (since the variable(s) are not bound, the constraint would
+     * always fail).
      * 
      * @param queryEngine
      *            The query engine.
      * @param limit
-     *            The cutoff used when sampling the vertices and when
-     *            sampling the edges.
+     *            The cutoff used when sampling the vertices and when sampling
+     *            the edges.
      * @param nedges
      *            The maximum #of edges to choose. Those having the smallest
      *            expected cardinality will be chosen.
@@ -759,6 +744,12 @@ public class JGraph {
      * @return An initial set of paths starting from at most <i>nedges</i>.
      * 
      * @throws Exception
+     * 
+     * @todo UNIT TEST : with runFirst predicates in the join graph. [If we
+     *       allow "runFirst" predicates into the join graph, then an initial
+     *       non-empty join path needs to be constructed from those vertices.
+     *       The operators for those APs would also have to be modified to
+     *       support cutoff evaluation or to be fully materialized.]
      */
     public Path[] round0(final QueryEngine queryEngine, final int limit,
             final int nedges) throws Exception {
@@ -780,24 +771,14 @@ public class JGraph {
 
         /*
          * Estimate the cardinality for each edge.
-         * 
-         * TODO It would be very interesting to see the variety and/or
-         * distribution of the values bound when the edge is sampled. This
-         * can be easily done using a hash map with a counter. That could
-         * tell us a lot about the cardinality of the next join path
-         * (sampling the join path also tells us a lot, but it does not
-         * explain it as much as seeing the histogram of the bound values).
-         * I believe that there are some interesting online algorithms for
-         * computing the N most frequent observations and the like which
-         * could be used here.
          */
-        estimateInitialEdgeWeights(queryEngine, limit);
+        final Path[] a = estimateInitialEdgeWeights(queryEngine, limit);
 
         if (log.isDebugEnabled()) {
             final StringBuilder sb = new StringBuilder();
-            sb.append("Edges:\n");
-            for (Edge e : E) {
-                sb.append(e.toString());
+            sb.append("All possible initial paths:\n");
+            for (Path x : a) {
+                sb.append(x.toString());
                 sb.append("\n");
             }
             log.debug(sb.toString());
@@ -806,78 +787,98 @@ public class JGraph {
         /*
          * Choose the initial set of paths.
          */
-        final Path[] paths_t0 = chooseStartingPaths(nedges);
+        final Path[] paths_t0 = chooseStartingPaths(nedges, a);
 
         if (log.isInfoEnabled())
             log.info("\n*** Paths @ t0\n" + JGraph.showTable(paths_t0));
 
         /*
-         * FIXME Discard samples which will not be reused? If yes, then do in
-         * each round since with more than one starting vertex we have have
-         * starting vertices which will not be re-sampled at any round (assuming
-         * that all paths beginning with a given starting vertex get pruned).
+         * Discard samples which will not be reused.
          * 
-         * See Edge#estimateCardinality(...) which actually requires both the
-         * initial vertex and the 2nd vertex to decide which is the left hand
-         * side and which is the right hand side of the join.  If we get rid of
-         * Edge, then this problem will be resolved at the same time.
+         * @todo Do this in each round since with more than one starting vertex
+         * we have have starting vertices which will not be re-sampled at any
+         * round (assuming that all paths beginning with a given starting vertex
+         * get pruned). See runtimeOptimizer() for some more notes on this.
          */
-//        /*
-//         * Discard samples for vertices which were not chosen as starting points
-//         * for join paths.
-//         * 
-//         * Note: We do not need the samples of the other vertices once we decide
-//         * on the initial vertices from which the join paths will be grown so
-//         * they could even be discarded at this point.
-//         */
-//        {
-//            
-//            final Set<Vertex> initialVertexSet = new LinkedHashSet<Vertex>();
-//         
-//            for (Path x : paths_t0) {
-//
-//                initialVertexSet.add(x.vertices[0]);
-//                
-//            }
-//            
-//            for(Vertex v : V) {
-//                
-//                if(!initialVertexSet.contains(v)) {
-//                    
-//                    // Discard sample.
-//                    v.sample = null;
-//                    
-//                }
-//                
-//            }
-//            
-//        }
+        /*
+         * Discard samples for vertices which were not chosen as starting points
+         * for join paths.
+         * 
+         * Note: We do not need the samples of the other vertices once we decide
+         * on the initial vertices from which the join paths will be grown so
+         * they could even be discarded at this point.
+         */
+        {
+
+            final Set<Vertex> initialVertexSet = new LinkedHashSet<Vertex>();
+
+            for (Path x : paths_t0) {
+
+                initialVertexSet.add(x.vertices[0]);
+
+            }
+
+            for (Vertex v : V) {
+
+                if (!initialVertexSet.contains(v)) {
+
+                    // Discard sample.
+                    v.sample = null;
+
+                }
+
+            }
+
+        }
         
         return paths_t0;
 
     }
 
     /**
-     * Do one breadth first expansion.
+     * Do one breadth first expansion. In each breadth first expansion we extend
+     * each of the active join paths by one vertex for each remaining vertex
+     * which enjoys a constrained join with that join path. In the event that
+     * there are no remaining constrained joins, we will extend the join path
+     * using an unconstrained join if one exists. In all, there are three
+     * classes of joins to be considered:
+     * <ol>
+     * <li>The target predicate directly shares a variable with the source join
+     * path. Such joins are always constrained since the source predicate will
+     * have bound that variable.</li>
+     * <li>The target predicate indirectly shares a variable with the source
+     * join path via a constraint can run for the target predicate and which
+     * shares a variable with the source join path. These joins are indirectly
+     * constrained by the shared variable in the constraint. BSBM Q5 is an
+     * example of this case.</li>
+     * <li>Any predicates may always be join to an existing join path. However,
+     * joins which do not share variables either directly or indirectly will be
+     * full cross products. Therefore such joins are added to the join path only
+     * after all constrained joins have been consumed.</li>
+     * </ol>
      * 
      * @param queryEngine
      *            The query engine.
      * @param limitIn
-     *            The limit (this is automatically multiplied by the round
-     *            to increase the sample size in each round).
+     *            The limit (this is automatically multiplied by the round to
+     *            increase the sample size in each round).
      * @param round
      *            The round number in [1:n].
      * @param a
-     *            The set of paths from the previous round. For the first
-     *            round, this is formed from the initial set of edges to
-     *            consider.
+     *            The set of paths from the previous round. For the first round,
+     *            this is formed from the initial set of edges to consider.
+     * @param edgeSamples
+     *            A map used to associate join path segments (expressed as an
+     *            ordered array of bopIds) with {@link EdgeSample}s to avoid
+     *            redundant effort.
      * 
      * @return The set of paths which survived pruning in this round.
      * 
      * @throws Exception
      */
     public Path[] expand(final QueryEngine queryEngine, int limitIn,
-            final int round, final Path[] a) throws Exception {
+            final int round, final Path[] a,
+            final Map<PathIds, EdgeSample> edgeSamples) throws Exception {
 
         if (queryEngine == null)
             throw new IllegalArgumentException();
@@ -943,35 +944,27 @@ public class JGraph {
         if (log.isDebugEnabled())
             log.debug("Re-sampling in-use path segments: limit=" + limit);
 
-        // This map is used to associate join path segments (expressed as an
-        // ordered array of bopIds) with edge sample to avoid redundant effort.
-        final Map<int[], EdgeSample> edgePaths = new LinkedHashMap<int[], EdgeSample>();
-        
         for (Path x : a) {
 
-            // The edges which we have visited in this path.
-            final List<Edge> edges = new LinkedList<Edge>();
+//            // The edges which we have visited in this path.
+//            final List<Edge> edges = new LinkedList<Edge>();
 
-            /*
-             * The vertices which we have visited in this path.
-             * 
-             * TODO This happens to be the ordered list of vertices as well
-             * since it is a linked hash map. We may be able to exploit that to
-             * drop the [edges] list, but [edges] is being built up first while
-             * [vertices] is being built up at a different point within each
-             * iteration of this loop.
-             */
-            final Set<Vertex> vertices = new LinkedHashSet<Vertex>();
-            
+            // The vertices which we have visited in this path.
+//            final Set<Vertex> vertices = new LinkedHashSet<Vertex>();
+
+            // The cutoff join sample of the one step shorter path segment.
             EdgeSample priorEdgeSample = null;
-            
-            for(Edge e : x.edges) {
+
+            for (int segmentLength = 2; segmentLength <= x.vertices.length; segmentLength++) {
+//            for(Edge ex : x.edges) {
                 
-                // Add edge to the visited set for this join path.
-                edges.add(e);
+//                // Add edge to the visited set for this join path.
+//                edges.add(e);
 
                 // Generate unique key for this join path segment.
-                final int[] ids = Path.getVertexIds(edges);
+//                final int[] ids = Path.getVertexIds(edges);
+                final PathIds ids = new PathIds(BOpUtility.getPredIds(x
+                        .getPathSegment(segmentLength)));
 
                 if (priorEdgeSample == null) {
 
@@ -982,81 +975,101 @@ public class JGraph {
                      * to see if we have already re-sampled that edge. If
                      * not, then re-sample it now.
                      */
+                    
+                    assert segmentLength == 2;
 
                     // Test sample cache.
-                    EdgeSample edgeSample = edgePaths.get(ids);
+                    EdgeSample edgeSample = edgeSamples.get(ids);
 
                     if (edgeSample == null) {
-                        if (e.sample != null && e.sample.limit >= limit) {
-
-                            // The existing sample for that edge is fine.
-                            edgeSample = e.sample;
-                            
-                        } else {
+                        
+//                        if (e.sample != null && e.sample.limit >= limit) {
+//
+//                            // The existing sample for that edge is fine.
+//                            edgeSample = e.sample;
+//                            
+//                        } else {
 
                             /*
-                             * Re-sample the edge, updating the sample on
-                             * the edge as a side-effect. The cutoff sample
-                             * is based on the vertex sample for the minimum
-                             * cardinality vertex.
-                             * 
-                             * FIXME This is actually using the source vertex
-                             * as the source sample which is WRONG.
+                             * Re-sample the 1st edge in the join path, updating
+                             * the sample on the edge as a side-effect. The
+                             * cutoff sample is based on the vertex sample for
+                             * the minimum cardinality vertex.
                              */
 
-                            edgeSample = e.estimateCardinality(queryEngine,
-                                    limit);
+                            edgeSample = Path.cutoffJoin(//
+                                    queryEngine,
+                                    limit,//
+                                    x.getPathSegment(2),// 1st edge.
+                                    C,// constraints
+                                    x.vertices[0].sample// source sample.
+                                    );
 
-                        }
+//                        }
 
                         // Cache the sample.
-                        if (edgePaths.put(ids, edgeSample) != null)
+                        if (edgeSamples.put(ids, edgeSample) != null)
                             throw new AssertionError();
 
                     }
 
-                    // Add both vertices to the visited set.
-                    vertices.add(e.v1);
-                    vertices.add(e.v2);
+//                    // Add both vertices to the visited set.
+//                    vertices.add(x.vertices[0]);
+//                    vertices.add(x.vertices[1]);
+//                    vertices.add(e.v1);
+//                    vertices.add(e.v2);
 
                     // Save sample. It will be used to re-sample the next edge.
                     priorEdgeSample = edgeSample;
-
-                    continue;
                     
-                }
+                } else {
 
-                final boolean v1Found = vertices.contains(e.v1);
+                    /*
+                     * The path segment is at least 3 vertices long.
+                     */
+                    assert ids.length() >= 3;
+                    
+//                final boolean v1Found = vertices.contains(e.v1);
 
-                // The source vertex for the new edge.
-                final Vertex sVertex = v1Found ? e.v1 : e.v2;
+//                // The source vertex for the new edge.
+//                final Vertex sVertex = v1Found ? e.v1 : e.v2;
 
-                // The target vertex for the new edge.
-                final Vertex tVertex = v1Found ? e.v2 : e.v1;
+////                // The target vertex for the new edge.
+//                final Vertex tVertex = x.vertices[segmentLength - 1];
+//                final Vertex tVertex = v1Found ? e.v2 : e.v1;
 
                 // Look for sample for this path in our cache.
-                EdgeSample edgeSample = edgePaths.get(ids);
+                EdgeSample edgeSample = edgeSamples.get(ids);
 
+                    if (edgeSample != null && edgeSample.limit < limit
+                            && !edgeSample.isExact()) {
+                        if (log.isDebugEnabled())
+                            log.debug("Will resample at higher limit: " + ids);
+                        // Time to resample this edge.
+                        edgeSamples.remove(ids);
+                        edgeSample = null;
+                }
+                
                 if (edgeSample == null) {
-                    
+
                     /*
-                     * This is some N-step edge in the path, where N is
-                     * greater than ONE (1). The source vertex is the vertex
-                     * which already appears in the prior edges of this join
-                     * path. The target vertex is the next vertex which is
-                     * visited by the join path. The sample pass in is the
-                     * prior edge sample - that is, the sample from the path
-                     * segment less the target vertex. This is the sample
-                     * that we just updated when we visited the prior edge
-                     * of the path.
+                     * This is some N-step edge in the path, where N is greater
+                     * than ONE (1). The source vertex is the vertex which
+                     * already appears in the prior edges of this join path. The
+                     * target vertex is the next vertex which is visited by the
+                     * join path. The sample passed in is the prior edge sample
+                     * -- that is, the sample from the path segment without the
+                     * target vertex. This is the sample that we just updated
+                     * when we visited the prior edge of the path.
                      */
 
-                    edgeSample = e
-                            .estimateCardinality(
+                    edgeSample = Path.cutoffJoin(
                                     queryEngine,//
                                     limit,//
-                                    sVertex,//
-                                    tVertex,//
+//                                    sVertex,// 
+//                                    tVertex,// 
+                                    x.getPathSegment(ids.length()),//
+                                    C, // constraints
                                     priorEdgeSample//
 //                                    priorEdgeSample.estimatedCardinality,//
 //                                    priorEdgeSample.estimateEnum == EstimateEnum.Exact,
@@ -1065,10 +1078,10 @@ public class JGraph {
                             );
 
                     if (log.isDebugEnabled())
-                        log.debug("Resampled: " + Arrays.toString(ids)
+                        log.debug("Resampled: " + ids
                                 + " : " + edgeSample);
                     
-                    if (edgePaths.put(ids, edgeSample) != null)
+                    if (edgeSamples.put(ids, edgeSample) != null)
                         throw new AssertionError();
 
                 }
@@ -1076,43 +1089,24 @@ public class JGraph {
                 // Save sample. It will be used to re-sample the next edge.
                 priorEdgeSample = edgeSample;
 
-                // Add target vertex to the visited set.
-                vertices.add(tVertex);
+//                // Add target vertex to the visited set.
+//                vertices.add(tVertex);
+                
+                }
+ 
+            } // next path prefix in Path [x]
 
-            } // next Edge [e] in Path [x]
-
+            if (priorEdgeSample == null)
+                throw new AssertionError();
+            
             // Save the result on the path.
-            x.sample = priorEdgeSample;
+            x.edgeSample = priorEdgeSample;
             
         } // next Path [x].
 
         /*
          * Expand each path one step from each vertex which branches to an
          * unused vertex.
-         * 
-         * FIXME If we allow "runFirst" predicates into the join graph, then
-         * an initial non-empty join path needs to be constructed from those
-         * vertices. The operators for those APs would also have to be
-         * modified to support cutoff evaluation or to be fully
-         * materialized. This change should be introduced into round0() of
-         * the algorithm.
-         * 
-         * FIXME VERTICES WHICH SHARE VARS THROUGH A CONSTRAINT : Some
-         * vertices can participate in constrained joins even though they do
-         * not directly share variables because a constraint may be
-         * evaluated which shares variables with both the existing join path
-         * and the new vertex. Such extensions can only be determined
-         * dynamically using canJoinWithConstraints() or perhaps
-         * PartitionedJoinGraph. The termination conditions here need to be
-         * revised to permit such dynamic extensions, e.g., by terminating
-         * the expansion loop only after no _unconstrained_ extension can be
-         * made to the join path. At that point, we simply append in all of
-         * the vertices which had not yet been incorporated (those are the
-         * remaining vertices w/o shared variables). However, this should
-         * also be done incrementally within the same iteration as it is
-         * possible that there are two (or more) partitions to the join
-         * graph (partitions which do not have shared variables) while
-         * within each partition there may be shared variables.
          */
 
         if (log.isDebugEnabled())
@@ -1123,110 +1117,92 @@ public class JGraph {
         
         for (Path x : a) {
 
-//          final int nedges = x.edges.size();
-//
-//          if (nedges < round) {
-//
-//              // Path is from a previous round.
-//              continue;
-//              
-//          }
-
             /*
              * The set of vertices used to expand this path in this round.
              */
             final Set<Vertex> used = new LinkedHashSet<Vertex>();
 
-            /*
-             * First, consider the edges identified by static analysis. This
-             * will create zero or more paths from the current join path.
-             * 
-             * FIXME Change this to use canJoin() and get rid of E[] and
-             * of Edges in general.
-             */
-            // Check all edges in the graph.
-            for (Edge edgeInGraph : E) {
+//            /*
+//             * First, consider the edges identified by static analysis. This
+//             * will create zero or more paths from the current join path.
+//             * 
+//             * FIXME Change this to use canJoin() and get rid of E[] and of
+//             * Edges in general.
+//             */
+//            // Check all edges in the graph.
+//            for (Edge edgeInGraph : E) {
+//
+//                // Figure out which vertices are already part of this path.
+//                final boolean v1Found = x.contains(edgeInGraph.v1);
+//                final boolean v2Found = x.contains(edgeInGraph.v2);
+//
+//                if (log.isTraceEnabled())
+//                    log.trace("Edge: " + edgeInGraph + ", v1Found="
+//                            + v1Found + ", v2Found=" + v2Found);
+//                
+//                if (!v1Found && !v2Found) {
+//                    // Edge is not connected to this path.
+//                    continue;
+//                }
+//
+//                if (v1Found && v2Found) {
+//                    // Edge is already present in this path.
+//                    continue;
+//                }
+//
+//                // the target vertex for the new edge.
+//                final Vertex tVertex = v1Found ? edgeInGraph.v2
+//                        : edgeInGraph.v1;
+//
+////              // the source vertex for the new edge.
+////              final Vertex sVertex = v1Found ? edgeInGraph.v1
+////                      : edgeInGraph.v2;
+//
+//                if (used.contains(tVertex)) {
+//                    // Vertex already used to extend this path.
+//                    if (log.isTraceEnabled())
+//                        log.trace("Edge: " + edgeInGraph
+//                                + " - already used to extend this path.");
+//                    continue;
+//                }
+//
+//                // add the new vertex to the set of used vertices.
+//                used.add(tVertex);
+//
+//                // (Re-)sample vertex before we sample a new edge
+//                tVertex.sample(queryEngine, limit, sampleType);
+//                
+//                // Extend the path to the new vertex.
+//                final Path p = x.addEdge(queryEngine, limit, tVertex, /*edgeInGraph,*/ C);
+//
+//                // Add to the set of paths for this round.
+//                tmp.add(p);
+//
+//                if (log.isTraceEnabled())
+//                    log.trace("Extended path with static edge: "
+//                            + edgeInGraph + ", new path=" + p);
+//
+//            }
 
-                // Figure out which vertices are already part of this path.
-                final boolean v1Found = x.contains(edgeInGraph.v1);
-                final boolean v2Found = x.contains(edgeInGraph.v2);
-
-                if (log.isTraceEnabled())
-                    log.trace("Edge: " + edgeInGraph + ", v1Found="
-                            + v1Found + ", v2Found=" + v2Found);
-                
-                if (!v1Found && !v2Found) {
-                    // Edge is not connected to this path.
-                    continue;
-                }
-
-                if (v1Found && v2Found) {
-                    // Edge is already present in this path.
-                    continue;
-                }
-
-                // the target vertex for the new edge.
-                final Vertex tVertex = v1Found ? edgeInGraph.v2
-                        : edgeInGraph.v1;
-
-//              // the source vertex for the new edge.
-//              final Vertex sVertex = v1Found ? edgeInGraph.v1
-//                      : edgeInGraph.v2;
-
-                if (used.contains(tVertex)) {
-                    // Vertex already used to extend this path.
-                    if (log.isTraceEnabled())
-                        log.trace("Edge: " + edgeInGraph
-                                + " - already used to extend this path.");
-                    continue;
-                }
-
-                // add the new vertex to the set of used vertices.
-                used.add(tVertex);
-
-                // (Re-)sample vertex before we sample a new edge
-                tVertex.sample(queryEngine, limit, sampleType);
-                
-                // Extend the path to the new vertex.
-                final Path p = x.addEdge(queryEngine, limit, edgeInGraph);
-
-                // Add to the set of paths for this round.
-                tmp.add(p);
-
-                if (log.isTraceEnabled())
-                    log.trace("Extended path with static edge: "
-                            + edgeInGraph + ", new path=" + p);
-
-            }
-
-            /*
-             * Next, consider the edges which are identified by dynamic
-             * analysis. We only consider target vertices which do not share
-             * any variables and we ignore any target vertex which is
-             * already part of the path.
-             */
-
-            if (unshared.length > 0) {
+            {
 
                 /*
                  * Any vertex which (a) does not appear in the path to be
-                 * extended; (b) has not already been used to extend the
-                 * path; and (c) does not share any variables indirectly via
+                 * extended; (b) has not already been used to extend the path;
+                 * and (c) does not share any variables indirectly via
                  * constraints is added to this collection.
                  * 
-                 * If we are not able to extend the path at least once by an
-                 * edge identified by static analysis OR dynamic analysis,
-                 * then we will use this collection as the source of
-                 * unconnected edges which need to be used to extend the
-                 * path.
+                 * If we are not able to extend the path at least once using a
+                 * constrained join then we will use this collection as the
+                 * source of unconnected edges which need to be used to extend
+                 * the path.
                  */
                 final Set<Vertex> nothingShared = new LinkedHashSet<Vertex>();
                 
-                // Consider all vertices not sharing any variables.
-                for (Vertex tVertex : unshared) {
+                // Consider all vertices.
+                for (Vertex tVertex : V) {
 
-                    // Figure out which vertices are already part of this
-                    // path.
+                    // Figure out which vertices are already part of this path.
                     final boolean vFound = x.contains(tVertex);
 
                     if (vFound) {
@@ -1260,128 +1236,132 @@ public class JGraph {
                             log
                                     .trace("Vertex: "
                                             + tVertex
-                                            + " - does not share variables indirectly with this path.");
+                                            + " - unconstrained join for this path.");
+                        nothingShared.add(tVertex);
                         continue;
                     }
 
                     // add the new vertex to the set of used vertices.
                     used.add(tVertex);
 
-                    // (Re-)sample vertex before we sample a new edge
-                    tVertex.sample(queryEngine, limit, sampleType);
+//                    // (Re-)sample vertex before we sample a new edge
+//                    tVertex.sample(queryEngine, limit, sampleType);
 
-                    // Analyze the join path and constraints for the
-                    // proposed path.
-                    final PartitionedJoinGroup g;
-                    {
-                        // extract ordered preds from path to be extended
-                        final List<IPredicate<?>> preds = new LinkedList<IPredicate<?>>(
-                                Arrays.asList(x.getPredicates()));
-                        // append the target vertex.
-                        preds.add(tVertex.pred);
-                        // convert to an array.
-                        final IPredicate<?>[] newPath = preds
-                                .toArray(new IPredicate[preds.size()]);
-                        g = new PartitionedJoinGroup(newPath, C);
-                    }
-                    
-                    // The set of constraints which will run for this
-                    // vertex.
-                    final IConstraint[] c = g
-                            .getTailPlanConstraints(tVertex.pred.getId());
+//                    // Analyze join path and constraints for new path.
+//                    final PartitionedJoinGroup g;
+//                    {
+//                        // extract ordered preds from path to be extended
+//                        final List<IPredicate<?>> preds = new LinkedList<IPredicate<?>>(
+//                                Arrays.asList(x.getPredicates()));
+//                        // append the target vertex.
+//                        preds.add(tVertex.pred);
+//                        // convert to an array.
+//                        final IPredicate<?>[] newPath = preds
+//                                .toArray(new IPredicate[preds.size()]);
+//                        g = new PartitionedJoinGroup(newPath, C);
+//                    }
+//                    
+//                    // The set of constraints which will run for this vertex.
+//                    final IConstraint[] c = g
+//                            .getJoinGraphConstraints(tVertex.pred.getId());
+//
+//                    if (c == null || c.length == 0) {
+//                        /*
+//                         * Must not be null since the constraint(s) are what
+//                         * license this as a constrained join.
+//                         */
+//                        throw new AssertionError();
+//                    }
 
-                    if (c == null || c.length == 0) {
-                        /*
-                         * Must not be null since the constraint(s) are what
-                         * license this as a constrained join.
-                         */
-                        throw new AssertionError();
-                    }
+//                    /*
+//                     * Find any vertex in the path which we are extending
+//                     * which shares at least one variable with one of the
+//                     * constraints which will run with this edge. That will
+//                     * be the "source" vertex for the purposes of this path
+//                     * extension.
+//                     */
+//                    Vertex vSource = null;
+//                    {
+//
+//                        // The set of variables used by the constraints.
+//                        final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
+//
+//                        for (IConstraint aConstraint : c) {
+//
+//                            final Iterator<IVariable<?>> vitr = BOpUtility
+//                                    .getSpannedVariables(aConstraint);
+//
+//                            while (vitr.hasNext()) {
+//
+//                                vars.add(vitr.next());
+//
+//                            }
+//
+//                        }
+//                        
+//                        // Find a vertex using any of those variables.
+//                        for (Vertex aVertex : x.vertices) {
+//
+//                            if (vSource != null) {
+//                                // Done.
+//                                break;
+//                            }
+//                            
+//                            final IPredicate<?> aPred = aVertex.pred;
+//
+//                            final Iterator<IVariable<?>> vitr = BOpUtility
+//                                    .getArgumentVariables(aPred);
+//
+//                            while (vSource == null && vitr.hasNext()) {
+//
+//                                final IVariable<?> aVar = vitr.next();
+//
+//                                if (vars.contains(aVar)) {
+//
+//                                    // Done.
+//                                    vSource = aVertex;
+//
+//                                }
+//
+//                            } // while
+//
+//                        } // for
+//
+//                        if (vSource == null)
+//                            throw new AssertionError("No shared variables?");
+//
+//                    } // end block
 
-                    /*
-                     * Find any vertex in the path which we are extending
-                     * which shares at least one variable with one of the
-                     * constraints which will run with this edge. That will
-                     * be the "source" vertex for the purposes of this path
-                     * extension.
-                     */
-                    Vertex vSource = null;
-                    {
-
-                        // The set of variables used by the constraints.
-                        final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
-
-                        for (IConstraint aConstraint : c) {
-
-                            final Iterator<IVariable<?>> vitr = BOpUtility
-                                    .getSpannedVariables(aConstraint);
-
-                            while (vitr.hasNext()) {
-
-                                vars.add(vitr.next());
-
-                            }
-
-                        }
-                        
-                        // Find a vertex using any of those variables.
-                        for (Vertex aVertex : x.vertices) {
-
-                            if (vSource != null) {
-                                // Done.
-                                break;
-                            }
-                            
-                            final IPredicate<?> aPred = aVertex.pred;
-
-                            final Iterator<IVariable<?>> vitr = BOpUtility
-                                    .getArgumentVariables(aPred);
-
-                            while (vSource == null && vitr.hasNext()) {
-
-                                final IVariable<?> aVar = vitr.next();
-
-                                if (vars.contains(aVar)) {
-
-                                    // Done.
-                                    vSource = aVertex;
-
-                                }
-
-                            } // while
-
-                        } // for
-
-                        if (vSource == null)
-                            throw new AssertionError("No shared variables?");
-
-                    } // end block
-
-                    final Edge dynamicEdge = new Edge(/* x, */vSource,
-                            tVertex);
+//                    final Edge dynamicEdge = new Edge(/* x, */vSource,
+//                            tVertex);
 
                     // Extend the path to the new vertex.
                     final Path p = x.addEdge(queryEngine, limit,
-                            dynamicEdge);
+                            tVertex, /*dynamicEdge,*/ C);
 
                     // Add to the set of paths for this round.
                     tmp.add(p);
 
-                    if (log.isTraceEnabled())
-                        log.trace("Extended path with dynamic edge: "
-                                + dynamicEdge + ", new path=" + p);
+                    // Record the sample for the new path.
+                    if (edgeSamples.put(new PathIds(p.getVertexIds()),
+                            p.edgeSample) != null)
+                        throw new AssertionError();
 
-                } // next [unshared] vertex.
+                    if (log.isTraceEnabled())
+                        log.trace("Extended path with dynamic edge: vnew="
+                                + tVertex.pred.getId() + ", new path=" + p);
+
+                } // next vertex.
 
                 if (tmp.isEmpty()) {
 
                     /*
-                     * NO edges were identified by static and dynamic
-                     * analysis so we must consider edges which represent fully
+                     * NO edges were identified by static and dynamic analysis
+                     * so we must consider edges which represent fully
                      * unconstrained joins.
                      */
                     
-                    assert unshared.length != 0;
+//                    assert unshared.length != 0;
 
                     assert !nothingShared.isEmpty();
 
@@ -1395,25 +1375,25 @@ public class JGraph {
                      */
                     final Vertex tVertex = nothingShared.iterator().next();
                     
-                    /*
-                     * Since there are no shared variables, any vertex already
-                     * in the path may be used as the source for this edge.
-                     */
-                    final Vertex vSource = x.vertices[0];
+//                    /*
+//                     * Since there are no shared variables, any vertex already
+//                     * in the path may be used as the source for this edge.
+//                     */
+//                    final Vertex vSource = x.vertices[0];
                     
-                    final Edge dynamicEdge = new Edge(vSource, tVertex);
+//                    final Edge dynamicEdge = new Edge(vSource, tVertex);
 
                     // Extend the path to the new vertex.
                     final Path p = x.addEdge(queryEngine, limit,
-                            dynamicEdge);
+                            tVertex,/*dynamicEdge*/ C);
 
                     // Add to the set of paths for this round.
                     tmp.add(p);
 
                     if (log.isTraceEnabled())
-                        log.trace("Extended path with dynamic edge: "
-                                + dynamicEdge + ", new path=" + p);
-                    
+                        log.trace("Extended path with dynamic edge: vnew="
+                                + tVertex.pred.getId() + ", new path=" + p);
+
                 }
 
             } 
@@ -1448,7 +1428,7 @@ public class JGraph {
      * @return The {@link Vertex} -or- <code>null</code> if there is no such
      *         vertex in the join graph.
      */
-    public Vertex getVertex(int bopId) {
+    public Vertex getVertex(final int bopId) {
         for (Vertex v : V) {
             if (v.pred.getId() == bopId)
                 return v;
@@ -1456,27 +1436,27 @@ public class JGraph {
         return null;
     }
 
-    /**
-     * Return the {@link Edge} associated with the given vertices. The
-     * vertices may appear in any order.
-     * 
-     * @param v1
-     *            One vertex.
-     * @param v2
-     *            Another vertex.
-     * 
-     * @return The edge -or- <code>null</code> if there is no such edge in
-     *         the join graph.
-     */
-    public Edge getEdge(Vertex v1, Vertex v2) {
-        for (Edge e : E) {
-            if (e.v1 == v1 && e.v2 == v2)
-                return e;
-            if (e.v1 == v2 && e.v2 == v1)
-                return e;
-        }
-        return null;
-    }
+//    /**
+//     * Return the {@link Edge} associated with the given vertices. The
+//     * vertices may appear in any order.
+//     * 
+//     * @param v1
+//     *            One vertex.
+//     * @param v2
+//     *            Another vertex.
+//     * 
+//     * @return The edge -or- <code>null</code> if there is no such edge in
+//     *         the join graph.
+//     */
+//    public Edge getEdge(Vertex v1, Vertex v2) {
+//        for (Edge e : E) {
+//            if (e.v1 == v1 && e.v2 == v2)
+//                return e;
+//            if (e.v1 == v2 && e.v2 == v1)
+//                return e;
+//        }
+//        return null;
+//    }
 
     /**
      * Obtain a sample and estimated cardinality (fast range count) for each
@@ -1509,76 +1489,226 @@ public class JGraph {
      *            The sample size.
      * 
      * @throws Exception
+     * 
+     *             TODO It would be very interesting to see the variety and/or
+     *             distribution of the values bound when the edge is sampled.
+     *             This can be easily done using a hash map with a counter. That
+     *             could tell us a lot about the cardinality of the next join
+     *             path (sampling the join path also tells us a lot, but it does
+     *             not explain it as much as seeing the histogram of the bound
+     *             values). I believe that there are some interesting online
+     *             algorithms for computing the N most frequent observations and
+     *             the like which could be used here.
      */
-    private void estimateInitialEdgeWeights(final QueryEngine queryEngine,
+    private Path[] estimateInitialEdgeWeights(final QueryEngine queryEngine,
             final int limit) throws Exception {
 
-        for (Edge e : E) {
+        final List<Path> paths = new LinkedList<Path>();
 
-            if (e.v1.sample == null || e.v2.sample == null) {
+        /*
+         * Examine all unordered vertex pairs (v1,v2) once. If any vertex has
+         * not been sampled, then it is ignored. For each unordered vertex pair,
+         * determine which vertex has the minimum cardinality and create an
+         * ordered vertex pair (v,vp) such that [v] is the vertex with the
+         * lesser cardinality. Finally, perform a cutoff join of (v,vp) and
+         * create a join path with a single edge (v,vp) using the sample
+         * obtained from the cutoff join.
+         */
+ 
+        for (int i = 0; i < V.length; i++) {
 
+            final Vertex v1 = V[i];
+            
+            if (v1.sample == null) {
+                
                 /*
                  * We can only estimate the cardinality of edges connecting
                  * vertices for which samples were obtained.
                  */
+            
                 continue;
+            
+            }
+ 
+            for (int j = i + 1; j < V.length; j++) {
+            
+                final Vertex v2 = V[j];
+                
+                if (v2.sample == null) {
+                
+                    /*
+                     * We can only estimate the cardinality of edges connecting
+                     * vertices for which samples were obtained.
+                     */
+                    
+                    continue;
+                    
+                }
+
+                /*
+                 * Figure out which vertex has the smaller cardinality. The sample
+                 * of that vertex is used since it is more representative than the
+                 * sample of the other vertex.
+                 */
+                
+                final Vertex v, vp;
+                if (v1.sample.estimatedCardinality < v2.sample.estimatedCardinality) {
+                    v = v1;
+                    vp = v2;
+                } else {
+                    v = v2;
+                    vp = v1;
+                }
+                
+                if (!BOpUtility.canJoinUsingConstraints(
+                        new IPredicate[] { v.pred }, vp.pred, C)) {
+
+                    /*
+                     * If there are no shared variables, either directly or
+                     * indirectly via the constraints, then we can not use this
+                     * as an initial edge.
+                     * 
+                     * @todo UNIT TEST : correct rejection of initial paths for
+                     * vertices which are unconstrained joins.
+                     * 
+                     * @todo UNIT TEST : correct acceptance of initial paths for
+                     * vertices which are unconstrained joins IFF there are no
+                     * constrained joins in the join graph.
+                     */
+                    
+                    continue;
+                    
+                }
+                        
+                // The path segment
+                final IPredicate<?>[] preds = new IPredicate[] { v.pred, vp.pred };
+
+                // cutoff join of the edge (v,vp)
+                final EdgeSample edgeSample = Path.cutoffJoin(
+                        queryEngine,// 
+                        limit, // sample limit
+                        preds, // ordered path segment.
+                        C, // constraints
+                        v.sample // sourceSample
+                        );
+
+                final Path p = new Path(v, vp, edgeSample);
+
+                paths.add(p);
 
             }
-
-            e.estimateCardinality(queryEngine, limit);
-
+        
         }
+        
+//        for (Edge e : E) {
+//
+//            if (e.v1.sample == null || e.v2.sample == null) {
+//
+//                /*
+//                 * We can only estimate the cardinality of edges connecting
+//                 * vertices for which samples were obtained.
+//                 */
+//
+//                continue;
+//
+//            }
+//
+//            /*
+//             * Figure out which vertex has the smaller cardinality. The sample
+//             * of that vertex is used since it is more representative than the
+//             * sample of the other vertex.
+//             */
+//            // vertex v, vprime
+//            final Vertex v, vp;
+////            if (e.v1.sample == null) // vertex not sampled.
+////                throw new IllegalStateException();
+////            if (e.v2.sample == null) // vertex not sampled.
+////                throw new IllegalStateException();
+//            if (e.v1.sample.estimatedCardinality < e.v2.sample.estimatedCardinality) {
+//                v = e.v1;
+//                vp = e.v2;
+//            } else {
+//                v = e.v2;
+//                vp = e.v1;
+//            }
+//            
+//            // The path segment
+//            final IPredicate<?>[] preds = new IPredicate[] { v.pred, vp.pred };
+//
+//            /*
+//             * TODO If we get rid of the static analysis to identify edges with
+//             * shared variables then make sure that however we sample the
+//             * initial edges we protect against sampling the same edge more than
+//             * once.
+//             */
+//            
+//            // cutoff join of the edge (v,vp)
+//            final EdgeSample edgeSample = e.sample = Edge.estimateCardinality(
+//                    queryEngine,// 
+//                    limit, // sample limit
+//                    preds, // ordered path segment.
+//                    C, // constraints
+//                    v.sample // sourceSample
+//                    );
+//
+//            final Path p = new Path(v, vp, edgeSample);
+//
+//            paths.add(p);
+//            
+//        }
+        
+        return paths.toArray(new Path[paths.size()]);
 
     }
 
-    /**
-     * Return the {@link Edge} having the minimum estimated cardinality out of
-     * those edges whose cardinality has been estimated.
-     * 
-     * @param visited
-     *            A set of vertices to be excluded from consideration
-     *            (optional).
-     * 
-     * @return The minimum cardinality edge -or- <code>null</code> if there are
-     *         no {@link Edge}s having an estimated cardinality.
-     */
-    public Edge getMinimumCardinalityEdge(final Set<Vertex> visited) {
-
-        long minCard = Long.MIN_VALUE;
-        Edge minEdge = null;
-
-        for (Edge e : E) {
-
-            if (e.sample == null) {
-
-                // Edge has not been sampled.
-                continue;
-
-            }
-
-            if (visited != null
-                    && (visited.contains(e.v1) || visited.contains(e.v2))) {
-
-                // A vertex of that edge has already been consumed.
-                continue;
-
-            }
-
-            final long estimatedCardinality = e.sample.estimatedCardinality;
-
-            if (minEdge == null || estimatedCardinality < minCard) {
-
-                minEdge = e;
-
-                minCard = estimatedCardinality;
-
-            }
-
-        }
-
-        return minEdge;
-
-    }
+//    /**
+//     * Return the {@link Edge} having the minimum estimated cardinality out of
+//     * those edges whose cardinality has been estimated.
+//     * 
+//     * @param visited
+//     *            A set of vertices to be excluded from consideration
+//     *            (optional).
+//     * 
+//     * @return The minimum cardinality edge -or- <code>null</code> if there are
+//     *         no {@link Edge}s having an estimated cardinality.
+//     */
+//    public Edge getMinimumCardinalityEdge(final Set<Vertex> visited) {
+//
+//        long minCard = Long.MIN_VALUE;
+//        Edge minEdge = null;
+//
+//        for (Edge e : E) {
+//
+//            if (e.sample == null) {
+//
+//                // Edge has not been sampled.
+//                continue;
+//
+//            }
+//
+//            if (visited != null
+//                    && (visited.contains(e.v1) || visited.contains(e.v2))) {
+//
+//                // A vertex of that edge has already been consumed.
+//                continue;
+//
+//            }
+//
+//            final long estimatedCardinality = e.sample.estimatedCardinality;
+//
+//            if (minEdge == null || estimatedCardinality < minCard) {
+//
+//                minEdge = e;
+//
+//                minCard = estimatedCardinality;
+//
+//            }
+//
+//        }
+//
+//        return minEdge;
+//
+//    }
 
     // /**
     // * Return the {@link Edge} having the minimum estimated cardinality
@@ -1595,69 +1725,69 @@ public class JGraph {
     //          
     // }
 
-    /**
-     * Return the #of edges in which the given vertex appears where the
-     * other vertex of the edge does not appear in the set of visited
-     * vertices.
-     * 
-     * @param v
-     *            The vertex.
-     * @param visited
-     *            A set of vertices to be excluded from consideration.
-     * 
-     * @return The #of such edges.
-     */
-    public int getEdgeCount(final Vertex v, final Set<Vertex> visited) {
-
-        return getEdges(v, visited).size();
-
-    }
-
-    /**
-     * Return the edges in which the given vertex appears where the other
-     * vertex of the edge does not appear in the set of visited vertices.
-     * 
-     * @param v
-     *            The vertex.
-     * @param visited
-     *            A set of vertices to be excluded from consideration
-     *            (optional).
-     * 
-     * @return Those edges.
-     */
-    public List<Edge> getEdges(final Vertex v, final Set<Vertex> visited) {
-
-        if (v == null)
-            throw new IllegalArgumentException();
-
-        if (visited != null && visited.contains(v))
-            return Collections.emptyList();
-
-        final List<Edge> tmp = new LinkedList<Edge>();
-
-        for (Edge e : E) {
-
-            if (v.equals(e.v1) || v.equals(e.v2)) {
-
-                if (visited != null) {
-
-                    if (visited.contains(e.v1))
-                        continue;
-
-                    if (visited.contains(e.v2))
-                        continue;
-
-                }
-
-                tmp.add(e);
-
-            }
-
-        }
-
-        return tmp;
-
-    }
+//    /**
+//     * Return the #of edges in which the given vertex appears where the
+//     * other vertex of the edge does not appear in the set of visited
+//     * vertices.
+//     * 
+//     * @param v
+//     *            The vertex.
+//     * @param visited
+//     *            A set of vertices to be excluded from consideration.
+//     * 
+//     * @return The #of such edges.
+//     */
+//    public int getEdgeCount(final Vertex v, final Set<Vertex> visited) {
+//
+//        return getEdges(v, visited).size();
+//
+//    }
+//
+//    /**
+//     * Return the edges in which the given vertex appears where the other
+//     * vertex of the edge does not appear in the set of visited vertices.
+//     * 
+//     * @param v
+//     *            The vertex.
+//     * @param visited
+//     *            A set of vertices to be excluded from consideration
+//     *            (optional).
+//     * 
+//     * @return Those edges.
+//     */
+//    public List<Edge> getEdges(final Vertex v, final Set<Vertex> visited) {
+//
+//        if (v == null)
+//            throw new IllegalArgumentException();
+//
+//        if (visited != null && visited.contains(v))
+//            return Collections.emptyList();
+//
+//        final List<Edge> tmp = new LinkedList<Edge>();
+//
+//        for (Edge e : E) {
+//
+//            if (v.equals(e.v1) || v.equals(e.v2)) {
+//
+//                if (visited != null) {
+//
+//                    if (visited.contains(e.v1))
+//                        continue;
+//
+//                    if (visited.contains(e.v2))
+//                        continue;
+//
+//                }
+//
+//                tmp.add(e);
+//
+//            }
+//
+//        }
+//
+//        return tmp;
+//
+//    }
 
     /**
      * Prune paths which are dominated by other paths. Paths are extended in
@@ -1696,7 +1826,7 @@ public class JGraph {
         final Set<Path> pruned = new LinkedHashSet<Path>();
         for (int i = 0; i < a.length; i++) {
             final Path Pi = a[i];
-            if (Pi.sample == null)
+            if (Pi.edgeSample == null)
                 throw new RuntimeException("Not sampled: " + Pi);
 //          if (Pi.edges.size() < maxPathLen) {
             if (Pi.vertices.length < maxPathLen) {
@@ -1713,7 +1843,7 @@ public class JGraph {
                 if (i == j)
                     continue;
                 final Path Pj = a[j];
-                if (Pj.sample == null)
+                if (Pj.edgeSample == null)
                     throw new RuntimeException("Not sampled: " + Pj);
                 if (pruned.contains(Pj))
                     continue;
@@ -1814,13 +1944,14 @@ public class JGraph {
     static public String showTable(final Path[] a,final Path[] pruned) {
         final StringBuilder sb = new StringBuilder();
         final Formatter f = new Formatter(sb);
-        f.format("%5s %10s%1s * %10s (%6s/%6s) = %10s%1s : %10s %10s",
+        f.format("%-6s %10s%1s * %10s (%6s/%6s/%6s) = %10s%1s : %10s %10s",
                 "path",//
-                "rangeCount",//
+                "sourceCard",//
                 "",// sourceSampleExact
                 "f",//
                 "out",//
                 "in",//
+                "read",//
                 "estCard",//
                 "",// estimateIs(Exact|LowerBound|UpperBound)
                 "sumEstCard",//
@@ -1839,17 +1970,22 @@ public class JGraph {
                     }
                 }
             }
-            if (x.sample == null) {
-                f.format("p[%2d] %10s%1s * %10s (%6s/%6s) = %10s%1s : %10s", i, "N/A", "", "N/A", "N/A", "N/A", "N/A", "", "N/A");
+            final EdgeSample edgeSample = x.edgeSample;
+            if (edgeSample == null) {
+                f.format("%6d %10s%1s * %10s (%6s/%6s/%6s) = %10s%1s : %10s",//
+                            i, "N/A", "", "N/A", "N/A", "N/A", "N/A", "N/A", "",
+                                "N/A");
             } else {
-                f.format("p[%2d] %10d%1s * % 10.2f (%6d/%6d) = % 10d%1s : % 10d", i,
-                        x.sample.sourceSample.estimatedCardinality,//
-                        x.sample.sourceSample.isExact()?"E":"",//
-                        x.sample.f,//
-                        x.sample.outputCount,//
-                        x.sample.inputCount,//
-                        x.sample.estimatedCardinality,//
-                        x.sample.estimateEnum.getCode(),//
+                f.format("%6d %10d%1s * % 10.2f (%6d/%6d/%6d) = % 10d%1s : % 10d", //
+                        i,//
+                        edgeSample.sourceSample.estimatedCardinality,//
+                        edgeSample.sourceSample.estimateEnum.getCode(),//
+                        edgeSample.f,//
+                        edgeSample.outputCount,//
+                        edgeSample.inputCount,//
+                        edgeSample.tuplesRead,//
+                        edgeSample.estimatedCardinality,//
+                        edgeSample.estimateEnum.getCode(),//
                         x.cumulativeEstimatedCardinality//
                         );
             }
@@ -1876,59 +2012,87 @@ public class JGraph {
      * 
      * @param p
      *            The join path.
+     * @param edgeSamples
+     *            A map containing the samples utilized by the {@link Path}.
      */
-    public static String showPath(final Path x) {
-        if(x == null)
+    static String showPath(final Path x, final Map<PathIds, EdgeSample> edgeSamples) {
+        if (x == null)
             throw new IllegalArgumentException();
         final StringBuilder sb = new StringBuilder();
         final Formatter f = new Formatter(sb);
-        {
+    {
             /*
-             * @todo show sumEstCard for each step of the path. Only the
-             * estimate for the current path length is currently preserved. We
-             * would need to preserve the estimate for each step in the path to
-             * show it here.
-             * 
-             * @todo show limit on EdgeSample?
+             * @todo show limit on samples?
              */
-            f.format("%5s %10s%1s * %10s (%6s/%6s) = %10s%1s",// : %10s",//
-                    "edge",
-                    "rangeCount",//
+            f.format("%6s %10s%1s * %10s (%6s/%6s/%6s) = %10s%1s : %10s",//
+                    "vertex",
+                    "sourceCard",//
                     "",// sourceSampleExact
                     "f",//
                     "out",//
                     "in",//
+                    "read",//
                     "estCard",//
-                    ""// estimateIs(Exact|LowerBound|UpperBound)
-//                  "sumEstCard",//
+                    "",// estimateIs(Exact|LowerBound|UpperBound)
+                    "sumEstCard"//
                     );
-            int i = 0;
-            /*
-             * TODO Modify to access the per "edge" sample for the join path,
-             * and to show the vertex sample for the initial edge as well.
-             */
-            for (Edge e : x.edges) {
-                sb.append("\n");
-                if (e.sample == null) {
-                    f.format("%5s %10s%1s * %10s (%6s/%6s) = %10s%1s",//
-                            e.getLabel(),//
-                            "N/A", "", "N/A", "N/A", "N/A", "N/A", "");//, "N/A");
+            long sumEstCard = 0;
+            for (int i = 0; i < x.vertices.length; i++) {
+                final int[] ids = BOpUtility
+                        .getPredIds(x.getPathSegment(i + 1));
+                final int predId = x.vertices[i].pred.getId();
+                final SampleBase sample;
+                if(i==0) {
+                    sample = x.vertices[i].sample;
                 } else {
-                    f.format("%5s %10d%1s * % 10.2f (%6d/%6d) = % 10d%1s",//
-                            e.getLabel(),//
-                            e.sample.sourceSample.estimatedCardinality,//
-                            e.sample.sourceSample.isExact() ? "E" : "",//
-                            e.sample.f,//
-                            e.sample.outputCount,//
-                            e.sample.inputCount,//
-                            e.sample.estimatedCardinality,//
-                            e.sample.estimateEnum.getCode()//
+                    // edge sample from the caller's map.
+                    sample = edgeSamples.get(new PathIds(ids));
+                }
+                if (sample != null) {
+                    sumEstCard += sample.estimatedCardinality;
+                    if (sample instanceof EdgeSample)
+                        sumEstCard += ((EdgeSample) sample).tuplesRead;
+                }
+                sb.append("\n");
+                if (sample == null) {
+                    f.format("% 6d %10s%1s * %10s (%6s/%6s/%6s) = %10s%1s : %10s",//
+                            predId,//
+                            "N/A", "", "N/A", "N/A", "N/A", "N/A", "N/A", "", "N/A");
+                } else if(sample instanceof VertexSample) {
+                    // Show the vertex sample for the initial vertex.
+                    f.format("% 6d %10s%1s * %10s (%6s/%6s/%6s) = % 10d%1s : %10d",//
+                            predId,//
+                            "NA",//sample.sourceSample.estimatedCardinality,//
+                            " ",//sample.sourceSample.isExact() ? "E" : "",//
+                            " ",//sample.f,//
+                            "N/A",//sample.outputCount,//
+                            "N/A",//sample.inputCount,//
+                            "N/A",//sample.tuplesRead,//
+                            sample.estimatedCardinality,//
+                            sample.estimateEnum.getCode(),//
+                            sumEstCard//
+//                          e.cumulativeEstimatedCardinality//
+                            );
+                } else {
+                    // Show the sample for a cutoff join with the 2nd+ vertex.
+                    final EdgeSample edgeSample = (EdgeSample)sample;
+                    f.format("% 6d %10d%1s * % 10.2f (%6d/%6d/%6d) = % 10d%1s : %10d",//
+                            predId,//
+                            edgeSample.sourceSample.estimatedCardinality,//
+                            edgeSample.sourceSample.estimateEnum.getCode(),//
+                            edgeSample.f,//
+                            edgeSample.outputCount,//
+                            edgeSample.inputCount,//
+                            edgeSample.tuplesRead,//
+                            edgeSample.estimatedCardinality,//
+                            edgeSample.estimateEnum.getCode(),//
+                            sumEstCard//
 //                          e.cumulativeEstimatedCardinality//
                             );
                 }
 //              sb.append("\nv[" + vertexIds[i] + "] " + e.toString());
-                i++;
             }
+            /**/
         }
         sb.append("\n");
         return sb.toString();

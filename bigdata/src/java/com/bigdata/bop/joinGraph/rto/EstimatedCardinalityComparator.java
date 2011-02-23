@@ -32,26 +32,26 @@ import java.util.Comparator;
  * 
  * TODO unit tests, including with unweighted edges.
  */
-class EstimatedEdgeCardinalityComparator implements Comparator<Edge> {
+class EstimatedCardinalityComparator implements Comparator<Path> {
 
-    public static final transient Comparator<Edge> INSTANCE = new EstimatedEdgeCardinalityComparator();
+    public static final transient Comparator<Path> INSTANCE = new EstimatedCardinalityComparator();
 
     // @Override
-    public int compare(final Edge o1, final Edge o2) {
-        if (o1.sample == null && o2.sample == null) {
+    public int compare(final Path o1, final Path o2) {
+        if (o1.edgeSample == null && o2.edgeSample == null) {
             // Neither edge is weighted.
             return 0;
         }
-        if (o1.sample == null) {
+        if (o1.edgeSample == null) {
             // o1 is not weighted, but o2 is. sort o1 to the end.
             return 1;
         }
-        if (o2.sample == null) {
+        if (o2.edgeSample == null) {
             // o2 is not weighted. sort o2 to the end.
             return -1;
         }
-        final long id1 = o1.sample.estimatedCardinality;
-        final long id2 = o2.sample.estimatedCardinality;
+        final long id1 = o1.edgeSample.estimatedCardinality;
+        final long id2 = o2.edgeSample.estimatedCardinality;
         if (id1 < id2)
             return -1;
         if (id1 > id2)

@@ -26,59 +26,17 @@ package com.bigdata.bop.joinGraph.rto;
 import com.bigdata.bop.IBindingSet;
 
 /**
- * A sample of an {@link Edge} (a join).
+ * A sample produced by a cutoff join.
  */
 public class EdgeSample extends SampleBase {
 
-//    private static final transient Logger log = Logger
-//            .getLogger(EdgeSample.class);
-
-//    /**
-//     * The estimated cardinality of the cutoff join.
-//     */
-//    public final long estimatedCardinality;
-//
-//    /**
-//     * The limit used to sample the cutoff join.
-//     */
-//    public final int limit;
-//
-//    /**
-//     * Indicates whether the estimate is exact, an upper bound, or a lower
-//     * bound.
-//     */
-//    public final EstimateEnum estimateEnum;
-//
-//    /**
-//     * The sample of the solutions for the join path.
-//     */
-//    final IBindingSet[] sample;
+    // private static final transient Logger log = Logger
+    // .getLogger(EdgeSample.class);
 
     /**
      * The source sample used to compute the cutoff join.
      */
     public final SampleBase sourceSample;
-    
-//    /**
-//     * The estimated cardinality of the source sample.
-//     */
-//    public final long sourceEstimatedCardinality;
-//
-//    /**
-//     * The sample type for the source sample.
-//     */
-//    public final EstimateEnum sourceEstimateEnum;
-//
-//    /**
-//     * Return <code>true</code> iff the source sample is exact (because the
-//     * source is either a fully materialized vertex or an edge whose solutions
-//     * have been fully materialized).
-//     */
-//    public boolean isSourceSampleExact() {
-//
-//        return sourceEstimateEnum == EstimateEnum.Exact;
-//
-//    }
 
     /**
      * The #of binding sets out of the source sample vertex sample which were
@@ -94,6 +52,11 @@ public class EdgeSample extends SampleBase {
      * This is not 100%, merely indicative.
      */
     public final long outputCount;
+
+    /**
+     * The #of tuples read from the access path when processing the cutoff join.
+     */
+    public final long tuplesRead;
 
     /**
      * The ratio of the #of input samples consumed to the #of output samples
@@ -115,60 +78,47 @@ public class EdgeSample extends SampleBase {
      *            which were consumed.
      * @param outputCount
      *            The #of binding sets generated before the join was cutoff.
+     * @param tuplesRead
+     *            The #of tuples read from the access path when processing the
+     *            cutoff join.
      */
-//    * @param sourceVertexSample
-//    *            The sample for source vertex of the edge (whichever vertex has
-//    *            the lower cardinality).
-    EdgeSample(
-            // final VertexSample sourceVertexSample,
-            final SampleBase sourceSample,//
-//            final long sourceEstimatedCardinality,//
-//            final EstimateEnum sourceEstimateEnum, // 
-//            final int sourceSampleLimit,//
+    EdgeSample(final SampleBase sourceSample,//
             final int inputCount, //
             final long outputCount,//
+            final long tuplesRead,//
             final double f, //
             // args to SampleBase
             final long estimatedCardinality,//
             final int limit,//
             final EstimateEnum estimateEnum,//
             final IBindingSet[] sample//
-            ) {
+    ) {
 
         super(estimatedCardinality, limit, estimateEnum, sample);
 
-        if(sourceSample == null)
+        if (sourceSample == null)
             throw new IllegalArgumentException();
 
         this.sourceSample = sourceSample;
-
-//        this.sourceEstimatedCardinality = sourceSample.estimatedCardinality;
-//
-//        this.sourceEstimateEnum = sourceSample.estimateEnum;
 
         this.inputCount = inputCount;
 
         this.outputCount = outputCount;
 
+        this.tuplesRead = tuplesRead;
+        
         this.f = f;
 
     }
 
     @Override
     protected void toString(final StringBuilder sb) {
-//        return getClass().getName() //
-//                + "{ estimatedCardinality=" + estimatedCardinality//
-//                + ", limit=" + limit //
-//                + ", estimateEnum=" + estimateEnum//
-        sb.append(", sourceEstimatedCardinality=" + sourceSample.estimatedCardinality);
+        sb.append(", sourceEstimatedCardinality="
+                + sourceSample.estimatedCardinality);
         sb.append(", sourceEstimateEnum=" + sourceSample.estimateEnum);
         sb.append(", inputCount=" + inputCount);
         sb.append(", outputCount=" + outputCount);
         sb.append(", f=" + f);
-                // + ", estimateIsLowerBound=" + estimateIsLowerBound//
-                // + ", estimateIsUpperBound=" + estimateIsUpperBound//
-                // + ", sampleIsExactSolution=" + estimateIsExact //
-//                + "}";
     }
 
 }
