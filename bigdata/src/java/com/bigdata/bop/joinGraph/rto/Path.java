@@ -202,7 +202,7 @@ public class Path {
         if (edgeSample == null)
             throw new IllegalArgumentException();
 
-        if (edgeSample.sample == null)
+        if (edgeSample.getSample() == null)
             throw new IllegalArgumentException();
 
 //        this.edges = Collections.singletonList(e);
@@ -264,7 +264,7 @@ public class Path {
         if (edgeSample == null)
             throw new IllegalArgumentException();
 
-        if (edgeSample.sample == null)
+        if (edgeSample.getSample() == null)
             throw new IllegalArgumentException();
 
 //        this.edges = Collections.unmodifiableList(edges);
@@ -457,9 +457,11 @@ public class Path {
         if (p == null)
             throw new IllegalArgumentException();
 
-        if (vertices.length > p.vertices.length) {
+        if (vertices.length < p.vertices.length) {
+
             // Proven false since the caller's path is longer.
             return false;
+            
         }
 
         for (int i = 0; i < p.vertices.length; i++) {
@@ -469,6 +471,43 @@ public class Path {
             final Vertex vOther = p.vertices[i];
             
             if (vSelf != vOther) {
+            
+                return false;
+                
+            }
+            
+        }
+
+        return true;
+    }
+
+    /**
+     * Return <code>true</code> if this path begins with the given path.
+     * 
+     * @param p
+     *            The given path.
+     * 
+     * @return <code>true</code> if this path begins with the given path.
+     * 
+     * @todo unit tests.
+     */
+    public boolean beginsWith(final int[] ids) {
+
+        if (ids == null)
+            throw new IllegalArgumentException();
+
+        if (vertices.length < ids.length) {
+            // Proven false since the caller's path is longer.
+            return false;
+        }
+
+        for (int i = 0; i < ids.length; i++) {
+
+            final int idSelf = vertices[i].pred.getId();
+            
+            final int idOther = ids[i];
+            
+            if (idSelf != idOther) {
             
                 return false;
                 
@@ -658,7 +697,7 @@ public class Path {
         if (sourceSample == null)
             throw new IllegalArgumentException();
         
-        if (sourceSample.sample == null)
+        if (sourceSample.getSample() == null)
             throw new IllegalArgumentException();
         
         // Figure out which constraints attach to each predicate.
@@ -749,7 +788,7 @@ public class Path {
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId, joinOp
                         .getId()/* startId */, -1 /* partitionId */,
                         new ThickAsynchronousIterator<IBindingSet[]>(
-                                new IBindingSet[][] { sourceSample.sample })));
+                                new IBindingSet[][] { sourceSample.getSample() })));
 
         final List<IBindingSet> result = new LinkedList<IBindingSet>();
         try {
