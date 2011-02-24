@@ -23,10 +23,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
  * Implementation for any kind of RDF Value when the values is not being
@@ -42,6 +44,8 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
      */
     private static final long serialVersionUID = 4309045651680610931L;
     
+    protected static final Logger log = Logger.getLogger(TermId.class);
+    
     /**
      * Value used for a "NULL" term identifier.
      */
@@ -49,7 +53,7 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
 
     /** The term identifier. */
     private final long termId;
-
+    
     /**
      * Constructor for a term identifier when you are decoding and already have
      * the flags.
@@ -101,19 +105,24 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
 
     /**
      * {@inheritDoc}
-     * <p>
-     * {@link TermId}s are never inline so this method always throws an
-     * exception.
-     * 
-     * @throws UnsupportedOperationException
-     *             always since {@link TermId}s are never inline.
      */
-    final public V asValue(final BigdataValueFactory f, 
-            final ILexiconConfiguration config)
-            throws UnsupportedOperationException {
-        throw new UnsupportedOperationException();
+    final public V asValue(final LexiconRelation lex) 
+    		throws UnsupportedOperationException {
+    	throw new UnsupportedOperationException();
+//		/*
+//		 * Delegates to {@link LexiconRelation#getTerm(IV)}, which is an
+//		 * extremely inefficient method for materializing terms. Caches the
+//		 * BigdataValue once it has been materialized.
+//		 */
+//    	if (value == null) {
+//    		if (log.isInfoEnabled())
+//    			log.info("performing inefficient materialization");
+//    		value = (V) lex.getTerm(this);
+//    	}
+//    	return value;
     }
-
+//    volatile private V value;
+    
     final public Void getInlineValue() {
         throw new UnsupportedOperationException();
     }

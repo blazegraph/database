@@ -27,8 +27,8 @@ package com.bigdata.rdf.internal;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataValueFactory;
 
 /** Implementation for inline <code>xsd:boolean</code>. */
 public class XSDBooleanIV<V extends BigdataLiteral> extends
@@ -66,9 +66,8 @@ public class XSDBooleanIV<V extends BigdataLiteral> extends
     }
 
     @SuppressWarnings("unchecked")
-    public V asValue(final BigdataValueFactory f, 
-            final ILexiconConfiguration config) {
-        final V v = (V) f.createLiteral(value);
+    public V asValue(final LexiconRelation lex) {
+        final V v = (V) lex.getValueFactory().createLiteral(value);
         v.setIV(this);
         return v;
     }

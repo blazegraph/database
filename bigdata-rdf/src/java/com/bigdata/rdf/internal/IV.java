@@ -33,8 +33,8 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 
 /**
@@ -202,17 +202,12 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      * factory. However, implementations are encouraged to cache the inflated
      * {@link BigdataValue} on a transient field.
      * 
-     * @param vf
-     *            The value factory.
-     * @param config
-     *            The lexicon configuration.
+     * @param lex
+     *            the lexicon relation
      * 
      * @return The corresponding {@link BigdataValue}.
-     * 
-     * @throws UnsupportedOperationException
-     *             unless the RDF value is inline.
      */
-    V asValue(final BigdataValueFactory vf, final ILexiconConfiguration config) 
+    V asValue(final LexiconRelation lex) 
         throws UnsupportedOperationException;
 
 }

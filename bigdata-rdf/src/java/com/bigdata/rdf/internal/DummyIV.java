@@ -31,8 +31,8 @@ import java.io.ObjectStreamException;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.Var;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
  * A dummy {@link IV} class used in cases where we want a dummy {@link Constant}
@@ -55,8 +55,7 @@ public class DummyIV extends AbstractIV {
         return "DummyIV";
     }
     
-    public BigdataValue asValue(final BigdataValueFactory f, 
-            final ILexiconConfiguration config)
+    public BigdataValue asValue(final LexiconRelation lex)
             throws UnsupportedOperationException {
         throw new UnsupportedOperationException();
     }
