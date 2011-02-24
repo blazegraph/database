@@ -295,10 +295,9 @@ public class JoinGraph extends PipelineOp {
      *       query is long running. Samples must be held until we have
      *       identified the final join path since each vertex will be used by
      *       each maximum length join path and we use the samples from the
-     *       vertices to re-sample the surviving join paths in each round.
-     * 
-     * @todo If there is a slice on the outer query, then the query result may
-     *       well be materialized by now.
+     *       vertices to re-sample the surviving join paths in each round. [In
+     *       fact, the samples are not being provided to this evaluation context
+     *       right now.]
      * 
      * @todo If there are source binding sets then they need to be applied above
      *       (when we are sampling) and below (when we evaluate the selected
@@ -336,12 +335,12 @@ public class JoinGraph extends PipelineOp {
                     parentContext.getSink(), null/* sink2 */,
                     null/* constraints */, null/* stats */);
 
-            System.out.println("nout=" + nout);
+//            System.out.println("nout=" + nout);
 
             // verify no problems.
             runningQuery.get();
 
-            System.out.println("Future Ok");
+//            System.out.println("Future Ok");
 
         } catch (Throwable t) {
 

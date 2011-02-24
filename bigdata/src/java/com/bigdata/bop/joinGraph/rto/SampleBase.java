@@ -59,7 +59,9 @@ public abstract class SampleBase {
      * the sample as an inline access path.
      * 
      * TODO This field should be used to avoid needless re-computation of a join
-     * whose exact solution is already known.
+     * whose exact solution is already known. We already do this within the
+     * runtime optimizer. To go further than that we need to do the partial
+     * evaluation of the join graph.
      */
     public final EstimateEnum estimateEnum;
 

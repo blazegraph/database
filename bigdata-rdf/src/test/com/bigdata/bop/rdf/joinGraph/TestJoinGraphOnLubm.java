@@ -162,6 +162,8 @@ public class TestJoinGraphOnLubm extends AbstractJoinGraphTestCase {
             final File testDir = new File(tmpDir, "bigdata-tests");
             testDir.mkdirs();
             file = new File(testDir, resourceId + ".jnl");
+            // uncomment to force a reload of the dataset.
+//            if(file.exists()) file.delete();
             namespace = "LUBM_U1";
         }
         
