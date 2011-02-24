@@ -341,31 +341,44 @@ public class PartitionedJoinGroup {
                         continue;
                     }
 
-                    /*
-                     * true iff all variables used by this constraint are bound
-                     * at this point in the join path.
-                     */
-                    boolean allVarsBound = true;
-
-                    // visit the variables used by this constraint.
-                    final Iterator<IVariable<?>> vitr = BOpUtility
-                            .getSpannedVariables(c);
-
-                    while (vitr.hasNext()) {
-
-                        final IVariable<?> var = vitr.next();
-
-                        if (!boundVars.contains(var)) {
-
-                            allVarsBound = false;
-
-                            break;
-
-                        }
-
+                    boolean attach = false;
+                    
+                    if (i == path.length-1) {
+                    	
+                    	// attach all unused constraints to last predicate
+                    	attach = true;
+                    	
+                    } else {
+                    
+	                    /*
+	                     * true iff all variables used by this constraint are bound
+	                     * at this point in the join path.
+	                     */
+	                    boolean allVarsBound = true;
+	
+	                    // visit the variables used by this constraint.
+	                    final Iterator<IVariable<?>> vitr = BOpUtility
+	                            .getSpannedVariables(c);
+	
+	                    while (vitr.hasNext()) {
+	
+	                        final IVariable<?> var = vitr.next();
+	
+	                        if (!boundVars.contains(var)) {
+	
+	                            allVarsBound = false;
+	
+	                            break;
+	
+	                        }
+	
+	                    }
+	                 
+	                    attach = allVarsBound;
+	                    
                     }
 
-                    if (allVarsBound) {
+                    if (attach) {
 
                         /*
                          * All variables have become bound for this constraint,
