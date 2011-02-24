@@ -1,82 +1,55 @@
-/*
-Striterator - transformation and mapping patterns over java Iterators
-
-Copyright (C) SYSTAP, LLC 2010.  All rights reserved.
-
-Contact:
-     SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
-
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; version 2 of the License.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
-
 package cutthecrap.utils.striterators;
 
-import java.util.*;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 
-/**
- * Expanderator
- *
- * Flattens out a two-level iteration.  By combining Expanderators recursively a general tree
- *	iteration is provided.
- *
- * Provides resolution for both the child object and also the nested iterator.
- *	The actual expansion is via an Expander object that is passed in at construction.
- */
+import cutthecrap.utils.striterators.IStriterator.ITailOp;
 
-public class Expanderator implements Iterator {
+public class Expanderator extends Prefetch implements ITailOp {
 
 	private final Iterator m_src;
 	private Iterator m_child = null;
 	protected final Object m_context;
 	private final Expander m_expander;
-	
-  public Expanderator(Iterator src, Object context, Expander expander) {
-    m_src = src;
-    m_context = context;
-    m_expander = expander;
-  }
 
-  //-------------------------------------------------------------
-  
-  public boolean hasNext() {
-  	if (m_child != null && m_child.hasNext()) {
-  		return true;
-  	} else if (m_src.hasNext()) {
-  		m_child = m_expander.expand(m_src.next());
-  		
-  		return hasNext();
-  	} else {
-  		return false;
-  	}
-  }
-  
-  //-------------------------------------------------------------
-  // must call hasNext() to ensure m_child is setup
-  public Object next() {
-  	if (hasNext()) {
-  		return m_child.next();
-  	}
-  	
-  	throw new NoSuchElementException("Expanderator");
-  }
-  
-  //-------------------------------------------------------------
-  
-  public void remove() {
-  	m_child.remove();
-  }
+	public Expanderator(Iterator src, Object context, Expander expander) {
+		m_src = src;
+		m_context = context;
+		m_expander = expander;
+	}
+
+	// -------------------------------------------------------------
+
+	protected Object getNext() {
+		if (m_child != null && m_child.hasNext()) {
+			final Object ret = m_child.next();
+			
+			// experimental tail optimisation
+			if (m_child instanceof ITailOp) {
+				m_child = ((ITailOp) m_child).availableTailOp();
+			}
+
+			return ret;
+		} else if (m_src.hasNext()) {
+			m_child = m_expander.expand(m_src.next());
+
+			return getNext();
+		} else {
+			return null;
+		}
+	}
+
+	// -------------------------------------------------------------
+
+	public void remove() {
+		m_child.remove();
+	}
+
+	public Iterator availableTailOp() {
+		if ((!ready()) && !m_src.hasNext()) {
+			return m_child;
+		} else {
+			return this;
+		}
+	}
 }

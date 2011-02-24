@@ -32,6 +32,8 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import cutthecrap.utils.striterators.IStriterator.ITailOp;
+
 /**
  * Striterator
  *
@@ -40,7 +42,7 @@ import java.util.List;
  * The IFilter objects passed to addFilter allow selection criteria for the iterated objects.
  *	The <code>addTypeFilter</code> method allows easy specification of a class type restriction.
  */
-public class Striterator implements IStriterator {
+public class Striterator implements IStriterator, ITailOp {
 	volatile List<IFilter> filters = null; // Note: NOT serializable.
     private volatile Iterator realSource;
 	private volatile Iterator m_src = null;
@@ -82,7 +84,13 @@ public class Striterator implements IStriterator {
     public Object next() {
         if (m_src == null)
             compile(realSource);
-        return m_src.next();
+        final Object ret =  m_src.next();
+        // experimental tail optimisation
+		if (m_src instanceof ITailOp) {
+			Object old = m_src;
+			m_src = ((ITailOp) m_src).availableTailOp();
+		}
+		return ret;
 	}
 
 	/** Enumeration version of hasNext() **/
@@ -120,7 +128,7 @@ public class Striterator implements IStriterator {
 
         return this;
 	}
-
+	
     public void compile(final Iterator src) {
         compile(src, null/* context */);
     }
@@ -190,4 +198,27 @@ public class Striterator implements IStriterator {
         return sb.toString();
     }
 
+    /**
+     * If this Striterator has not been overriden then return the
+     * source iterator, or even better, try and recurse to the nested tailOp
+     * if available.
+     * 
+     * This has been disabled since it appears to have a negative effect.
+     * 
+     * To reactivate, uncomment the ITailOp implementation declaration.
+     * 
+     * TODO: Investigate apparent performance degradation with activation
+     * 
+     * @return
+     */
+    boolean doneone = false;
+	public Iterator availableTailOp() {
+		final boolean avail =  Striterator.class == this.getClass();
+		
+		if (avail) {
+			return (m_src instanceof ITailOp) ? ((ITailOp) m_src).availableTailOp() : m_src;
+		} else {
+			return this;
+		}
+	}
 }
