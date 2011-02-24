@@ -10,6 +10,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.io.DirectBufferPool;
+import com.bigdata.rwstore.sector.MemoryManagerResourceError;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 import junit.framework.TestCase;
@@ -47,12 +49,10 @@ public class TestMemoryManager extends TestCase {
 		String retstr = getString(saddr);
 		
 		assertTrue(helloWorld.equals(retstr));
-		
-		System.out.println(helloWorld + " allocated address: " + saddr + " returned: " + retstr);
 	}
 	
 	private void installMemoryManager() {
-		manager =  new MemoryManager(5 * sectorSize, sectorSize);
+		manager =  new MemoryManager(DirectBufferPool.INSTANCE, 10);
 	}
 
 	/**
@@ -64,7 +64,7 @@ public class TestMemoryManager extends TestCase {
 		while (--i > 0) {
 			// final int sector = r.nextInt(12);
 			final int sector = r.nextInt(32 * 1024);
-			final int bit = r.nextInt(64 * 1024);
+			final int bit = r.nextInt(32 * 1024);
 			final int rwaddr = SectorAllocator.makeAddr(sector, bit);
 			final int rsector = SectorAllocator.getSectorIndex(rwaddr);
 			final int rbit = SectorAllocator.getSectorOffset(rwaddr);
@@ -76,14 +76,26 @@ public class TestMemoryManager extends TestCase {
 		installMemoryManager();
 		
 		for (int i = 0; i < 20; i++) {
-			doStressAllocations(manager, true, 80000, 5 + r.nextInt(200));	
+			doStressAllocations(manager, true, 50000, 5 + r.nextInt(5000));	
 		}
+	}
+	
+	public void testSimpleBlob() {
+		installMemoryManager();
+		
+		String blob =  new String(c_testData, 0, 11000);
+
+		final long saddr = allocate(manager, blob);
+		
+		String retstr = getString(saddr);
+		
+		assertTrue(blob.equals(retstr));
 	}
 	
 	public void testAllocationContexts() {
 		installMemoryManager();
 		
-		final IMemoryManager context = manager.createAllocationContext();
+		IMemoryManager context = manager.createAllocationContext();
 		for (int i = 0; i < 500; i++) {
 			doStressAllocations(context, false, 5000, 5 + r.nextInt(3000));			
 			context.clear();
@@ -133,30 +145,34 @@ public class TestMemoryManager extends TestCase {
 					int f = r.nextInt(addrs.size());
 					long faddr = ((Long) addrs.remove(f)).longValue();
 					mm.free(faddr);
-					// System.out.println("freeing: " + faddr);
 					frees++;
 				}
 			}
 		} catch (MemoryManagerResourceError err) {
 			// all okay
 		}
-		
-		System.out.println("Committed " + allocs + " allocations, and " + frees + " frees");
 	}
 	
 	private String getString(long saddr) {
-		final ByteBuffer ret = manager.get(saddr)[0];
-		final byte[] data;
-		if (ret.isDirect()) {
-			ByteBuffer indbuf = ByteBuffer.allocate(ret.remaining());
-			data = indbuf.array();
-			indbuf.put(ret);
-			indbuf.flip();
-		} else {
-			data = ret.array();
+		StringBuffer sb = new StringBuffer();
+		
+		final ByteBuffer[] bufs = manager.get(saddr);
+		
+		for (int i = 0; i < bufs.length; i++) {
+			final byte[] data;
+			if (bufs[i].isDirect()) {
+				ByteBuffer indbuf = ByteBuffer.allocate(bufs[i].remaining());
+				data = indbuf.array();
+				indbuf.put(bufs[i]);
+				indbuf.flip();
+			} else {
+				data = bufs[i].array();
+			}
+			
+			sb.append(new String(data));
 		}
 		
-		return new String(data);
+		return sb.toString();
 	}
 	
 	private long allocate(final IMemoryManager mm, String val) {

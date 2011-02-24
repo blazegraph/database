@@ -35,7 +35,6 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rwstore.FixedOutputStream;
 import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.IWriteCacheManager;
-import com.bigdata.rwstore.RWSectorStore;
 import com.bigdata.rwstore.RWWriteCacheService;
 
 /**
@@ -666,7 +665,7 @@ public class SectorAllocator implements Comparable {
 		
 	}
 
-	public int alloc(RWSectorStore sectorStore, int size, IAllocationContext context) {
+	public int alloc(int size, IAllocationContext context) {
 
 		return alloc(size);
 	}
