@@ -30,6 +30,7 @@ package com.bigdata.bop.joinGraph.rto;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Formatter;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -968,9 +969,15 @@ public class JGraph {
 
         } // next path
 
+        /*
+         * Now examine the set of generated and sampled join paths. If any paths
+         * span the same vertices then they are alternatives and we can pick the
+         * best alternative now and prune the other alternatives for those
+         * vertices.
+         */
         final Path[] paths_tp1 = tmp.toArray(new Path[tmp.size()]);
 
-        final Path[] paths_tp1_pruned = pruneJoinPaths(paths_tp1);
+        final Path[] paths_tp1_pruned = pruneJoinPaths(paths_tp1, edgeSamples);
 
         if (log.isDebugEnabled())
             log.debug("\n*** round=" + round + ", limit=" + limit
@@ -1153,22 +1160,26 @@ public class JGraph {
     /**
      * Prune paths which are dominated by other paths. Paths are extended in
      * each round. Paths from previous rounds are always pruned. Of the new
-     * paths in each round, the following rule is applied to prune the
-     * search to just those paths which are known to dominate the other
-     * paths covering the same set of vertices:
+     * paths in each round, the following rule is applied to prune the search to
+     * just those paths which are known to dominate the other paths covering the
+     * same set of vertices:
      * <p>
      * If there is a path, [p] != [p1], where [p] is an unordered variant of
-     * [p1] (that is the vertices of p are the same as the vertices of p1),
-     * and the cumulative cost of [p] is LTE the cumulative cost of [p1],
-     * then [p] dominates (or is equivalent to) [p1] and p1 should be
-     * pruned.
+     * [p1] (that is the vertices of p are the same as the vertices of p1), and
+     * the cumulative cost of [p] is LTE the cumulative cost of [p1], then [p]
+     * dominates (or is equivalent to) [p1] and p1 should be pruned.
      * 
      * @param a
      *            A set of paths.
+     * @param edgeSamples
+     *            The set of samples for path segments. Samples which are no
+     *            longer in use after pruning will be cleared from the map and
+     *            their materialized solution sets will be discarded.
      * 
      * @return The set of paths with all dominated paths removed.
      */
-    public Path[] pruneJoinPaths(final Path[] a) {
+    public Path[] pruneJoinPaths(final Path[] a,
+            final Map<PathIds, EdgeSample> edgeSamples) {
         /*
          * Find the length of the longest path(s). All shorter paths are
          * dropped in each round.
@@ -1237,13 +1248,84 @@ public class JGraph {
                 }
             } // Pj
         } // Pi
-        final Set<Path> keep = new LinkedHashSet<Path>();
-        for (Path p : a) {
-            if (pruned.contains(p))
-                continue;
-            keep.add(p);
+        /*
+         * Generate a set of paths which will be retained.
+         */
+        final Path[] b;
+        {
+            final Set<Path> keep = new LinkedHashSet<Path>();
+            for (Path p : a) {
+                if (pruned.contains(p))
+                    continue;
+                keep.add(p);
+            }
+            // convert the retained paths to an array.
+            b = keep.toArray(new Path[keep.size()]);
         }
-        final Path[] b = keep.toArray(new Path[keep.size()]);
+        /*
+         * Clear any entries from the edgeSamples map which are not prefixes of
+         * the retained join paths.
+         */
+        {
+            
+            final Iterator<Map.Entry<PathIds, EdgeSample>> itr = edgeSamples
+                    .entrySet().iterator();
+            
+            int ncleared = 0;
+            while (itr.hasNext()) {
+                
+                final Map.Entry<PathIds, EdgeSample> e = itr.next();
+
+                final PathIds ids = e.getKey();
+
+                // Consider the retained paths.
+                boolean found = false;
+
+                for (Path p : b) {
+
+                    if (p.beginsWith(ids.ids)) {
+
+                        // This sample is still in use.
+                        found = true;
+                        
+                        break;
+                        
+                    }
+
+                }
+
+                if (!found) {
+
+                    /*
+                     * Clear sample no longer in use.
+                     * 
+                     * Note: In fact, holding onto the sample metadata is
+                     * relatively cheap if there was a reason to do so (it only
+                     * effects the size of the [edgeSamples] map). It is holding
+                     * onto the materialized solution set which puts pressure on
+                     * the heap.
+                     */
+                    if (log.isTraceEnabled())
+                        log.trace("Clearing sample: " + ids);
+
+                    // release the sampled solution set.
+                    e.getValue().releaseSample();
+
+                    // clear the entry from the array.
+                    itr.remove();
+
+                    ncleared++;
+                    
+                }
+
+            }
+            
+            if (ncleared > 0 && log.isDebugEnabled())
+                log.debug("Cleared " + ncleared + " samples");
+
+        }
+        
+        // Return the set of retained paths.
         return b;
     }
 

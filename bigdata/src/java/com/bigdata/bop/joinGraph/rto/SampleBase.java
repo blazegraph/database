@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.joinGraph.rto;
 
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rwstore.sector.IMemoryManager;
 
@@ -36,8 +40,21 @@ import com.bigdata.rwstore.sector.IMemoryManager;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ *          TODO Large samples should be buffered on the {@link IMemoryManager}
+ *          so they do not pose a burden on the heap. This will require us to
+ *          manage the allocation contexts so we can release samples in a timely
+ *          manner once they are no longer used and always release samples by
+ *          the time the RTO is finished. [There is an additional twist if we
+ *          have fully materialized some part of the join since we no longer
+ *          need to evaluate that path segment. If the RTO can interleave query
+ *          evaluation with exploration then we can take advantage of these
+ *          materialized solutions.]
  */
 public abstract class SampleBase {
+
+    private static final transient Logger log = Logger
+            .getLogger(SampleBase.class);
 
     /**
      * The estimated cardinality of the underlying access path (for a vertex) or
@@ -46,7 +63,7 @@ public abstract class SampleBase {
     public final long estimatedCardinality;
 
     /**
-     * The limit used to produce the {@link #sample}.
+     * The limit used to produce the {@link #getSample() sample}.
      */
     public final int limit;
 
@@ -77,17 +94,36 @@ public abstract class SampleBase {
 
     /**
      * Sample.
-     * 
-     * TODO Large samples should be buffered on the {@link IMemoryManager} so
-     * they do not pose a burden on the heap. This will require us to manage the
-     * allocation contexts so we can release samples in a timely manner once
-     * they are no longer used and always release samples by the time the RTO is
-     * finished. [There is an additional twist if we have fully materialized
-     * some part of the join since we no longer need to evaluate that path
-     * segment.  If the RTO can interleave query evaluation with exploration
-     * then we can take advantage of these materialized solutions.]
      */
-    final IBindingSet[] sample;
+    private final AtomicReference<IBindingSet[]> sampleRef = new AtomicReference<IBindingSet[]>();
+
+    /**
+     * The sampled solution set.
+     * 
+     * @return The sampled solution set -or- <code>null</code> if it has been
+     *         released.
+     */
+    IBindingSet[] getSample() {
+        
+        return sampleRef.get();
+        
+    }
+
+    /**
+     * Release the sampled solution set.
+     * 
+     * TODO MEMORY MANAGER : release.
+     */
+    void releaseSample() {
+
+        if (sampleRef.getAndSet(null) != null) {
+
+            if (log.isTraceEnabled())
+                log.trace("Released sample: " + this);
+            
+        }
+        
+    }
 
     /**
      * 
@@ -126,7 +162,7 @@ public abstract class SampleBase {
 
         this.estimateEnum = estimateEnum;
 
-        this.sample = sample;
+        this.sampleRef.set(sample);
 
     }
 
@@ -147,7 +183,10 @@ public abstract class SampleBase {
         sb.append("{estimatedCardinality=" + estimatedCardinality);
         sb.append(",limit=" + limit);
         sb.append(",estimateEnum=" + estimateEnum);
-        sb.append(",sampleSize=" + sample.length);
+        {
+            final IBindingSet[] tmp = sampleRef.get();
+            sb.append(",sampleSize=" + (tmp != null ? tmp.length : "N/A"));
+        }
         toString(sb); // allow extension
         sb.append("}");
         return sb.toString();

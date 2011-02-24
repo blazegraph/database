@@ -24,10 +24,12 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.internal.XSDIntIV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
+import com.bigdata.rdf.internal.constraints.Constraint;
+import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
-import com.bigdata.rdf.internal.constraints.Constraint;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -432,19 +434,19 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
 
         }
 
-		/*
-		 * Run w/o constraints.
-		 * 
-		 * Note: There are no solutions for this query against BSBM 100. The
-		 * optimizer is only providing the fastest path to prove that. We have
-		 * to use a larger data set if we want to verify the optimizers join
-		 * path for a query which produces solutions in the data.
+        /*
+         * Run w/o constraints.
+         * 
+         * Note: There are no solutions for this query against BSBM 100. The
+         * optimizer is only providing the fastest path to prove that. We have
+         * to use a larger data set if we want to verify the optimizers join
+         * path for a query which produces solutions in the data.
 		 * 
 		 * Note: The optimizer finds the same join path for the BSBM 100, 100M,
 		 * and 200M data sets
-		 */
+         */
         if (true) {
-        	/*
+            /*
 100M: static: ids=[1, 2, 4, 6, 0, 3, 5]
 
 *** round=5, limit=600: paths{in=1,considered=1,out=1}
@@ -470,14 +472,15 @@ path   sourceCard  *          f (   out/    in/  read) =    estCard  : sumEstCar
      0     166410  *       1.00 (   600/   600/   600) =     166410  :     998460  [ 1  2  0  4  6  3  5 ]
 
 test_bsbm_q5 : Total times: static=8871, runtime=8107, delta(static-runtime)=764
-        	 */
+             */
             final IPredicate<?>[] runtimeOrder = doTest(preds, null/* constraints */);
-//            assertEquals("runtimeOrder", new int[] { 1, 2, 0, 4, 6, 3, 5 }, BOpUtility.getPredIds(runtimeOrder));
+            assertEquals("runtimeOrder", new int[] { 1, 2, 0, 4, 6, 3, 5 },
+                    BOpUtility.getPredIds(runtimeOrder));
         }
 
         // Run w/ constraints.
         if(true){
-        	/*
+        /*
 100M: static: ids=[1, 2, 4, 6, 0, 3, 5]
  
 *** round=5, limit=600: paths{in=4,considered=4,out=1}
@@ -503,12 +506,233 @@ path   sourceCard  *          f (   out/    in/  read) =    estCard  : sumEstCar
      0       1941  *       1.00 (     7/     7/     7) =       1941  :     344799  [ 1  2  4  3  6  5  0 ]
 
 test_bsbm_q5 : Total times: static=7312, runtime=3305, delta(static-runtime)=4007
-
-        	 */
+            
+             */
             final IPredicate<?>[] runtimeOrder = doTest(preds, constraints);
-//            assertEquals("runtimeOrder", new int[] { 1, 2, 0, 4, 6, 3, 5 }, BOpUtility.getPredIds(runtimeOrder));
+            assertEquals("runtimeOrder", new int[] { 1, 2, 4, 3, 6, 5, 0 },
+                    BOpUtility.getPredIds(runtimeOrder));
         }
         
+    }
+
+    /**
+     * BSBM Q3
+     * 
+     * <pre>
+     * PREFIX bsbm-inst: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/>
+     * PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * 
+     * SELECT ?product ?label
+     * WHERE {
+     *     ?product rdfs:label ?label .
+     *     ?product a %ProductType% .
+     *     ?product bsbm:productFeature %ProductFeature1% .
+     *     ?product bsbm:productPropertyNumeric1 ?p1 .
+     *     FILTER ( ?p1 > %x% ) 
+     *     ?product bsbm:productPropertyNumeric3 ?p3 .
+     *     FILTER (?p3 < %y% )
+     *     OPTIONAL { 
+     *         ?product bsbm:productFeature %ProductFeature2% .
+     *         ?product rdfs:label ?testVar }
+     *     FILTER (!bound(?testVar)) 
+     * }
+     * ORDER BY ?label
+     * LIMIT 10
+     * </pre>
+     */
+    public void test_bsbm_q3() throws Exception {
+
+        fail("This test needs instance data for BSBM 100 and 100M");
+        
+        QueryLog.logTableHeader();
+        
+        final String namespace = getNamespace();
+        
+        final AbstractTripleStore database = getDatabase(namespace);
+        
+        /*
+         * Resolve terms against the lexicon.
+         */
+        final BigdataValueFactory valueFactory = database.getLexiconRelation()
+                .getValueFactory();
+
+        final String rdfs = "http://www.w3.org/2000/01/rdf-schema#";
+        final String rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+        final String bsbm = "http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/";
+        final String bsbmInst ="http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/";
+
+        final BigdataURI rdfType = valueFactory.createURI(rdf + "type");
+
+        final BigdataURI rdfsLabel = valueFactory.createURI(rdfs + "label");
+
+        final BigdataURI productFeature = valueFactory.createURI(bsbm
+                + "productFeature");
+
+        final BigdataURI productPropertyNumeric1 = valueFactory.createURI(bsbm
+                + "productPropertyNumeric1");
+
+        final BigdataURI productPropertyNumeric3 = valueFactory.createURI(bsbm
+                + "productPropertyNumeric3");
+
+        // FIXME parameters
+        final BigdataURI productType = valueFactory.createURI(productInstance);
+        final BigdataURI productFeature1 = valueFactory.createURI(productInstance);
+        final BigdataURI productFeature2 = valueFactory.createURI(productInstance);
+        final BigdataLiteral x = valueFactory.createLiteral(productInstance);
+        final BigdataLiteral y = valueFactory.createLiteral(productInstance);
+        
+        final BigdataValue[] terms = new BigdataValue[] { rdfType, rdfsLabel,
+                productFeature, productPropertyNumeric1,
+                productPropertyNumeric3, productType, productFeature1,
+                productFeature2, x, y };
+
+        // resolve terms.
+        database.getLexiconRelation()
+                .addTerms(terms, terms.length, true/* readOnly */);
+
+        {
+            for (BigdataValue tmp : terms) {
+                System.out.println(tmp + " : " + tmp.getIV());
+                if (tmp.getIV() == null)
+                    throw new RuntimeException("Not defined: " + tmp);
+            }
+        }
+
+        final IConstraint[] constraints;
+        final IPredicate[] preds;
+        final IPredicate p0, p1, p2, p3, p4, p5, p6;
+        final IConstraint c0, c1, c2;
+        {
+            final IVariable product = Var.var("product");
+            final IVariable label = Var.var("label");
+            final IVariable p1Var = Var.var("p1");
+            final IVariable p3Var = Var.var("p3");
+            final IVariable testVar = Var.var("testVar");
+
+            // The name space for the SPO relation.
+            final String[] spoRelation = new String[] { namespace + ".spo" };
+
+//          // The name space for the Lexicon relation.
+//          final String[] lexRelation = new String[] { namespace + ".lex" };
+
+            final long timestamp = database.getIndexManager().getLastCommitTime();
+
+            int nextId = 0;
+
+//          ?product rdfs:label ?label .
+            p0 = new SPOPredicate(new BOp[] {//
+                    product,
+                    new Constant(rdfsLabel.getIV()),
+                    label//
+                    },//
+                    new NV(BOp.Annotations.BOP_ID, nextId++),//
+                    new NV(Annotations.TIMESTAMP, timestamp),//
+                    new NV(IPredicate.Annotations.RELATION_NAME, spoRelation)//
+            );
+
+            // ?product a %ProductType% .
+            p1 = new SPOPredicate(new BOp[] {//
+                    product,
+                    new Constant(rdfType.getIV()),
+                    new Constant(productType.getIV())//
+                    },//
+                    new NV(BOp.Annotations.BOP_ID, nextId++),//
+                    new NV(Annotations.TIMESTAMP, timestamp),//
+                    new NV(IPredicate.Annotations.RELATION_NAME, spoRelation)//
+            );
+
+            // ?product bsbm:productFeature %ProductFeature1% .
+            p2 = new SPOPredicate(new BOp[] {//
+                    product,
+                    new Constant(productFeature.getIV()),
+                    new Constant(productFeature1.getIV())//
+                    },//
+                    new NV(BOp.Annotations.BOP_ID, nextId++),//
+                    new NV(Annotations.TIMESTAMP, timestamp),//
+                    new NV(IPredicate.Annotations.RELATION_NAME, spoRelation)//
+            );
+
+            // ?product bsbm:productPropertyNumeric1 ?p1 .
+            p3 = new SPOPredicate(new BOp[] {//
+                    product,
+                    new Constant(productPropertyNumeric1.getIV()),
+                    p1Var//
+                    },//
+                    new NV(BOp.Annotations.BOP_ID, nextId++),//
+                    new NV(Annotations.TIMESTAMP, timestamp),//
+                    new NV(IPredicate.Annotations.RELATION_NAME, spoRelation)//
+            );
+
+            // ?product bsbm:productPropertyNumeric3 ?p3 .
+            p4 = new SPOPredicate(new BOp[] {//
+                    product,
+                    new Constant(productPropertyNumeric3.getIV()),
+                    p3Var//
+                    },//
+                    new NV(BOp.Annotations.BOP_ID, nextId++),//
+                    new NV(Annotations.TIMESTAMP, timestamp),//
+                    new NV(IPredicate.Annotations.RELATION_NAME, spoRelation)//
+            );
+
+            /*
+             * FIXME (p5,p6) below in an optional join group!
+             */
+            
+            // ?product bsbm:productFeature %ProductFeature2% .
+            p5 = new SPOPredicate(new BOp[] {//
+                    product,
+                    new Constant(productFeature.getIV()),
+                    new Constant(productFeature2.getIV()),
+                    },//
+                    new NV(BOp.Annotations.BOP_ID, nextId++),//
+                    new NV(Annotations.TIMESTAMP, timestamp),//
+                    new NV(IPredicate.Annotations.RELATION_NAME, spoRelation)//
+            );
+
+            // ?product rdfs:label ?testVar }
+            p6 = new SPOPredicate(new BOp[] {//
+                    product,
+                    new Constant(rdfsLabel.getIV()),
+                    testVar,
+                    },//
+                    new NV(BOp.Annotations.BOP_ID, nextId++),//
+                    new NV(Annotations.TIMESTAMP, timestamp),//
+                    new NV(IPredicate.Annotations.RELATION_NAME, spoRelation)//
+            );
+
+            // the vertices of the join graph (the predicates).
+            preds = new IPredicate[] { p0, p1, p2, p3, p4, p5, p6 };
+
+            // FILTER ( ?p1 > %x% )
+            c0 = Constraint.wrap(new CompareBOp(new BOp[] { p1Var,
+                    new Constant(x.getIV()) }, NV.asMap(new NV[] { new NV(
+                    CompareBOp.Annotations.OP, CompareOp.GT) })));
+
+            // FILTER (?p3 < %y% )
+            c1 = Constraint.wrap(new CompareBOp(new BOp[] { p3Var,
+                    new Constant(y.getIV()) }, NV.asMap(new NV[] { new NV(
+                    CompareBOp.Annotations.OP, CompareOp.LT) })));
+
+            // FILTER (!bound(?testVar))
+            c2 = Constraint.wrap(new NotBOp(new IsBoundBOp(testVar)));
+            
+            // the constraints on the join graph.
+            constraints = new IConstraint[] { c0, c1, c2 };
+
+        }
+
+        /*
+         * Run the join graph w/ its constraints (?p1>%x% and ?p3<%y%), but not
+         * the optional join group nor its constraint (!bound(?testVar)).
+         * 
+         * FIXME The optional join group is part of the tail plan and can not be
+         * fed into the RTO right now.
+         */
+        final IPredicate<?>[] runtimeOrder = doTest(preds, new IConstraint[] {
+                c0, c1 });
+
     }
 
 }
