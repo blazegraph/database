@@ -189,10 +189,11 @@ public class SOp2BOpUtility {
     	final Collection<IConstraint> postConditionals = 
     		new LinkedList<IConstraint>();
     	
-    	final IRule rule = rule(join, preConditionals, postConditionals);
+    	PipelineOp left = rule2BOp(join, preConditionals, postConditionals, 
+    			idFactory, db, queryEngine, queryHints);
     	
-    	PipelineOp left = Rule2BOpUtility.convert(
-    			rule, preConditionals, idFactory, db, queryEngine, queryHints);
+//    	PipelineOp left = Rule2BOpUtility.convert(
+//    			rule, preConditionals, idFactory, db, queryEngine, queryHints);
     	
     	/*
     	 * Start with left=<this join group> and add a SubqueryOp for each
@@ -229,14 +230,14 @@ public class SOp2BOpUtility {
 	    		if (!isUnion(child) || isEmptyUnion(child))
 	    			continue;
 	    		
+	    		final boolean optional = isOptional(child);
 	    		final PipelineOp subquery = union(
 	    				child, idFactory, db, queryEngine, queryHints);
-	    		final boolean optional = isOptional(child);
 	    		final int subqueryId = idFactory.incrementAndGet();
 	    		left = new SubqueryOp(new BOp[]{left}, 
 	                    new NV(Predicate.Annotations.BOP_ID, subqueryId),//
 	                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
-	                    new NV(SubqueryOp.Annotations.OPTIONAL,optional)//
+	                    new NV(SubqueryOp.Annotations.OPTIONAL, optional)//
 	            );
 	    		if (log.isInfoEnabled()) {
 	    			log.info("adding a subquery: " + subqueryId + "\n" + left);
@@ -358,9 +359,11 @@ public class SOp2BOpUtility {
 
     }
 
-    protected static IRule rule(final SOpGroup group,
+    protected static PipelineOp rule2BOp(final SOpGroup group,
     		final Collection<IConstraint> preConditionals,
-    		final Collection<IConstraint> postConditionals) {
+    		final Collection<IConstraint> postConditionals,
+            final AtomicInteger idFactory, final AbstractTripleStore db,
+            final QueryEngine queryEngine, final Properties queryHints) {
     	
     	final Collection<IPredicate> preds = new LinkedList<IPredicate>();
     	final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
@@ -504,7 +507,11 @@ public class SOp2BOpUtility {
 				null/* constants */, null/* taskFactory */, 
 				required);    	
     	
-		return rule;
+		final PipelineOp left = Rule2BOpUtility.convert(
+				rule, preConditionals, nonOptParentVars, 
+				idFactory, db, queryEngine, queryHints);
+
+		return left;
 		
     }
     
