@@ -49,6 +49,11 @@ import com.bigdata.bop.constraint.NEConstant;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME Add test to ensure that constraints are run regardless as of the last
+ * join even if their variables are not known to be bound.  Also, modify the
+ * constructor to accept a set of variables which are known to be bound on 
+ * entry into the join group.
  */
 public class TestPartitionedJoinGroup extends TestCase2 {
 
@@ -493,7 +498,7 @@ public class TestPartitionedJoinGroup extends TestCase2 {
 
         final int nrange = expected.length;
 
-        java.util.Map range = new java.util.HashMap();
+        final java.util.Map range = new java.util.HashMap();
 
         for (int j = 0; j < nrange; j++) {
 
@@ -513,7 +518,7 @@ public class TestPartitionedJoinGroup extends TestCase2 {
 
             }
 
-            Object actualObject = actual.next();
+            final Object actualObject = actual.next();
 
             if (range.remove(actualObject) == null) {
 

@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 20, 2011
  */
 
-package com.bigdata.bop.util;
+package com.bigdata.bop.joinGraph;
 
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -35,7 +35,6 @@ import java.util.Set;
 import junit.framework.TestCase2;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -50,6 +49,7 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.constraint.AND;
 import com.bigdata.bop.constraint.BooleanValueExpression;
 import com.bigdata.bop.constraint.Constraint;
+import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.bop.joinGraph.rto.JGraph;
 
 /**
@@ -92,8 +92,8 @@ import com.bigdata.bop.joinGraph.rto.JGraph;
  * which a join path can be extended corresponding to both static and dynamic
  * analysis of the query.
  * 
- * @see BOpUtility#canJoin(IPredicate, IPredicate)
- * @see BOpUtility#canJoinUsingConstraints(IPredicate[], IPredicate,
+ * @see PartitionedJoinGroup#canJoin(IPredicate, IPredicate)
+ * @see PartitionedJoinGroup#canJoinUsingConstraints(IPredicate[], IPredicate,
  *      IConstraint[])
  * @see JGraph
  * 
@@ -113,25 +113,25 @@ import com.bigdata.bop.joinGraph.rto.JGraph;
  * </pre>
  */
 //@SuppressWarnings("unchecked")
-public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
+public class TestPartitionedJoinGroup_canJoinUsingConstraints extends TestCase2 {
 
     /**
      * 
      */
-    public TestBOpUtility_canJoinUsingConstraints() {
+    public TestPartitionedJoinGroup_canJoinUsingConstraints() {
     }
 
     /**
      * @param name
      */
-    public TestBOpUtility_canJoinUsingConstraints(String name) {
+    public TestPartitionedJoinGroup_canJoinUsingConstraints(String name) {
         super(name);
     }
 
     /**
      * Unit tests to verify that arguments are validated.
      * 
-     * @see BOpUtility#canJoinUsingConstraints(IPredicate[], IPredicate,
+     * @see PartitionedJoinGroup#canJoinUsingConstraints(IPredicate[], IPredicate,
      *      IConstraint[])
      */
     public void test_canJoinUsingConstraints_illegalArgument() {
@@ -145,7 +145,7 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
 
         // path must not be null.
         try {
-            BOpUtility.canJoinUsingConstraints(//
+            PartitionedJoinGroup.canJoinUsingConstraints(//
                     null, // path
                     p1,// vertex
                     new IConstraint[0]// constraints
@@ -158,7 +158,7 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
 
         // vertex must not be null.
         try {
-            BOpUtility.canJoinUsingConstraints(//
+            PartitionedJoinGroup.canJoinUsingConstraints(//
                     new IPredicate[]{p1}, // path
                     null,// vertex
                     new IConstraint[0]// constraints
@@ -171,7 +171,7 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
 
         // path may not be empty.
         try {
-            BOpUtility.canJoinUsingConstraints(//
+            PartitionedJoinGroup.canJoinUsingConstraints(//
                     new IPredicate[] {}, // path
                     p1,// vertex
                     new IConstraint[0]// constraints
@@ -184,7 +184,7 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
 
         // path elements may not be null.
         try {
-            BOpUtility.canJoinUsingConstraints(//
+            PartitionedJoinGroup.canJoinUsingConstraints(//
                     new IPredicate[] { p2, null }, // path
                     p1,// vertex
                     new IConstraint[0]// constraints
@@ -197,7 +197,7 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
 
         // vertex must not appear in the path.
         try {
-            BOpUtility.canJoinUsingConstraints(//
+            PartitionedJoinGroup.canJoinUsingConstraints(//
                     new IPredicate[] { p2, p1 }, // path
                     p1,// vertex
                     new IConstraint[0]// constraints
@@ -210,7 +210,7 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
 
         // constraint array may not contain null elements.
         try {
-            BOpUtility.canJoinUsingConstraints(//
+            PartitionedJoinGroup.canJoinUsingConstraints(//
                     new IPredicate[] { p2 }, // path
                     p1,// vertex
                     new IConstraint[] { //
@@ -508,19 +508,19 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
             for (int j = i; j < a.length; j++) {
                 final IPredicate<?> t0 = a[i];
                 final IPredicate<?> t1 = a[j];
-                assertTrue(BOpUtility.canJoin(t0, t1));
-                assertTrue(BOpUtility.canJoin(t1, t0));
+                assertTrue(PartitionedJoinGroup.canJoin(t0, t1));
+                assertTrue(PartitionedJoinGroup.canJoin(t1, t0));
                 if (t0 != t1) {
                     /*
                      * Test join path extension, but not when the vertex used to
                      * extend the path is already present in the join path.
                      */
-                    assertTrue(BOpUtility.canJoinUsingConstraints(//
+                    assertTrue(PartitionedJoinGroup.canJoinUsingConstraints(//
                             new IPredicate[] { t0 }, // path
                             t1,// vertex
                             new IConstraint[0]// constraints
                             ));
-                    assertTrue(BOpUtility.canJoinUsingConstraints(//
+                    assertTrue(PartitionedJoinGroup.canJoinUsingConstraints(//
                             new IPredicate[] { t1 }, // path
                             t0,// vertex
                             new IConstraint[0]// constraints
@@ -582,11 +582,11 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
 
         // Verify all joins in the path are legal.
         for (int i = 0; i < path.length - 1; i++) {
-            assertTrue(BOpUtility.canJoin(path[i], path[i + 1]));
+            assertTrue(PartitionedJoinGroup.canJoin(path[i], path[i + 1]));
         }
         
         // Verify the extension of the path is legal.
-        assertTrue(BOpUtility.canJoinUsingConstraints(//
+        assertTrue(PartitionedJoinGroup.canJoinUsingConstraints(//
                 path,//
                 vertex,//
                 new IConstraint[0]// constraints
@@ -610,14 +610,14 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
          * constraints (i.e., the join would be an unconstrained cross product
          * if it were executed).
          */
-        assertFalse(BOpUtility.canJoin(p3, p4));
-        assertFalse(BOpUtility.canJoin(p4, p3));
-        assertFalse(BOpUtility.canJoinUsingConstraints(//
+        assertFalse(PartitionedJoinGroup.canJoin(p3, p4));
+        assertFalse(PartitionedJoinGroup.canJoin(p4, p3));
+        assertFalse(PartitionedJoinGroup.canJoinUsingConstraints(//
                 new IPredicate[] { p3 }, // path
                 p4,// vertex
                 new IConstraint[0]// constraints
                 ));
-        assertFalse(BOpUtility.canJoinUsingConstraints(//
+        assertFalse(PartitionedJoinGroup.canJoinUsingConstraints(//
                 new IPredicate[] { p4 }, // path
                 p3,// vertex
                 new IConstraint[0]// constraints
@@ -627,12 +627,12 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
          * Verify (p3,p4) join is not permitted if we do not consider the
          * constraint which provides the shared variables.
          */
-        assertFalse(BOpUtility.canJoinUsingConstraints(//
+        assertFalse(PartitionedJoinGroup.canJoinUsingConstraints(//
                 new IPredicate[] { p3 }, // path
                 p4,// vertex
                 new IConstraint[] { c2 }// constraints
                 ));
-        assertFalse(BOpUtility.canJoinUsingConstraints(//
+        assertFalse(PartitionedJoinGroup.canJoinUsingConstraints(//
                 new IPredicate[] { p4 }, // path
                 p3,// vertex
                 new IConstraint[] { c2 }// constraints
@@ -642,12 +642,12 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
          * Verify (p3,p4) join is permitted if we consider the constraint which
          * provides the shared variables.
          */
-        assertTrue(BOpUtility.canJoinUsingConstraints(//
+        assertTrue(PartitionedJoinGroup.canJoinUsingConstraints(//
                 new IPredicate[] { p3 }, // path
                 p4,// vertex
                 new IConstraint[] { c1 }// constraints
                 ));
-        assertTrue(BOpUtility.canJoinUsingConstraints(//
+        assertTrue(PartitionedJoinGroup.canJoinUsingConstraints(//
                 new IPredicate[] { p4 }, // path
                 p3,// vertex
                 new IConstraint[] { c1 }// constraints
@@ -671,14 +671,14 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
          * constraints (i.e., the join would be an unconstrained cross product
          * if it were executed).
          */
-        assertFalse(BOpUtility.canJoin(p5, p6));
-        assertFalse(BOpUtility.canJoin(p6, p5));
-        assertFalse(BOpUtility.canJoinUsingConstraints(//
+        assertFalse(PartitionedJoinGroup.canJoin(p5, p6));
+        assertFalse(PartitionedJoinGroup.canJoin(p6, p5));
+        assertFalse(PartitionedJoinGroup.canJoinUsingConstraints(//
                 new IPredicate[] { p5 }, // path
                 p6,// vertex
                 new IConstraint[0]// constraints
                 ));
-        assertFalse(BOpUtility.canJoinUsingConstraints(//
+        assertFalse(PartitionedJoinGroup.canJoinUsingConstraints(//
                 new IPredicate[] { p6 }, // path
                 p5,// vertex
                 new IConstraint[0]// constraints
@@ -688,12 +688,12 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
          * Verify (p5,p6) join is not permitted if we do not consider the
          * constraint which provides the shared variables.
          */
-        assertFalse(BOpUtility.canJoinUsingConstraints(//
+        assertFalse(PartitionedJoinGroup.canJoinUsingConstraints(//
                 new IPredicate[] { p5 }, // path
                 p6,// vertex
                 new IConstraint[] { c1 }// constraints
                 ));
-        assertFalse(BOpUtility.canJoinUsingConstraints(//
+        assertFalse(PartitionedJoinGroup.canJoinUsingConstraints(//
                 new IPredicate[] { p6 }, // path
                 p5,// vertex
                 new IConstraint[] { c1 }// constraints
@@ -703,12 +703,12 @@ public class TestBOpUtility_canJoinUsingConstraints extends TestCase2 {
          * Verify (p5,p6) join is permitted if we consider the constraint which
          * provides the shared variables.
          */
-        assertTrue(BOpUtility.canJoinUsingConstraints(//
+        assertTrue(PartitionedJoinGroup.canJoinUsingConstraints(//
                 new IPredicate[] { p5 }, // path
                 p6,// vertex
                 new IConstraint[] { c2 }// constraints
                 ));
-        assertTrue(BOpUtility.canJoinUsingConstraints(//
+        assertTrue(PartitionedJoinGroup.canJoinUsingConstraints(//
                 new IPredicate[] { p6 }, // path
                 p5,// vertex
                 new IConstraint[] { c2 }// constraints

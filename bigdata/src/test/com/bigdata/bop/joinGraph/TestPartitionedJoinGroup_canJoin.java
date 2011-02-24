@@ -25,36 +25,36 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 20, 2011
  */
 
-package com.bigdata.bop.util;
+package com.bigdata.bop.joinGraph;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 
 import junit.framework.TestCase2;
 
 /**
- * Unit tests for {@link BOpUtility#canJoin(IPredicate, IPredicate)}
+ * Unit tests for {@link PartitionedJoinGroup#canJoin(IPredicate, IPredicate)}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestBOpUtility_canJoin extends TestCase2 {
+public class TestPartitionedJoinGroup_canJoin extends TestCase2 {
 
     /**
      * 
      */
-    public TestBOpUtility_canJoin() {
+    public TestPartitionedJoinGroup_canJoin() {
     }
 
     /**
      * @param name
      */
-    public TestBOpUtility_canJoin(String name) {
+    public TestPartitionedJoinGroup_canJoin(String name) {
         super(name);
     }
 
@@ -76,7 +76,7 @@ public class TestBOpUtility_canJoin extends TestCase2 {
         
         // correct rejection w/ null arg.
         try {
-            BOpUtility.canJoin(null,p2);
+            PartitionedJoinGroup.canJoin(null,p2);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             if (log.isInfoEnabled())
@@ -85,7 +85,7 @@ public class TestBOpUtility_canJoin extends TestCase2 {
         
         // correct rejection w/ null arg.
         try {
-            BOpUtility.canJoin(p1,null);
+            PartitionedJoinGroup.canJoin(p1,null);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             if (log.isInfoEnabled())
@@ -97,7 +97,7 @@ public class TestBOpUtility_canJoin extends TestCase2 {
     /**
      * Semantics tests focused on shared variables in the operands.
      * 
-     * @see BOpUtility#canJoin(IPredicate, IPredicate)
+     * @see PartitionedJoinGroup#canJoin(IPredicate, IPredicate)
      */
     @SuppressWarnings("unchecked")
     public void test_canJoin() {
@@ -112,16 +112,16 @@ public class TestBOpUtility_canJoin extends TestCase2 {
         final IPredicate<?> p3 = new Predicate(new BOp[] { u, z });
 
         // share y
-        assertTrue(BOpUtility.canJoin(p1, p2));
+        assertTrue(PartitionedJoinGroup.canJoin(p1, p2));
         
         // share z
-        assertTrue(BOpUtility.canJoin(p2, p3));
+        assertTrue(PartitionedJoinGroup.canJoin(p2, p3));
         
         // share z
-        assertFalse(BOpUtility.canJoin(p1, p3));
+        assertFalse(PartitionedJoinGroup.canJoin(p1, p3));
 
         // shares (x,y) with self.
-        assertTrue(BOpUtility.canJoin(p1, p1));
+        assertTrue(PartitionedJoinGroup.canJoin(p1, p1));
 
     }
 
@@ -129,7 +129,7 @@ public class TestBOpUtility_canJoin extends TestCase2 {
      * Verify that joins are not permitted when the variables are
      * only shared via an annotation.
      * 
-     * @see BOpUtility#canJoin(IPredicate, IPredicate)
+     * @see PartitionedJoinGroup#canJoin(IPredicate, IPredicate)
      */
     @SuppressWarnings("unchecked")
     public void test_canJoin_annotationsAreIngored() {
@@ -146,7 +146,7 @@ public class TestBOpUtility_canJoin extends TestCase2 {
                 );
 
         // verify that the variables in the annotations are ignored.
-        assertFalse(BOpUtility.canJoin(p1, p2));
+        assertFalse(PartitionedJoinGroup.canJoin(p1, p2));
 
     }
 
