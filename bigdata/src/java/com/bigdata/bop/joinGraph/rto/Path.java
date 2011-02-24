@@ -679,8 +679,9 @@ public class Path {
         // Reservations for the bopIds used by the constraints.
         if (c != null) {
             for (IConstraint x : c) {
-                if (log.isDebugEnabled())
-                    log.debug("Attaching constraint: " + x);
+                if (log.isTraceEnabled())
+                    log.trace(Arrays.toString(BOpUtility.getPredIds(path))
+                            + ": constraint: " + x);
                 final Iterator<BOp> itr = BOpUtility
                         .preOrderIteratorWithAnnotations(x);
                 while (itr.hasNext()) {
@@ -774,7 +775,8 @@ public class Path {
                 .getStats().get(joinId);
 
         if (log.isTraceEnabled())
-            log.trace(joinStats.toString());
+            log.trace(Arrays.toString(BOpUtility.getPredIds(path)) + ": "
+                    + joinStats.toString());
 
         // #of solutions in.
         final int inputCount = (int) joinStats.inputSolutions.get();
@@ -869,7 +871,7 @@ public class Path {
 
         if (log.isDebugEnabled())
             log.debug(Arrays.toString(BOpUtility.getPredIds(path))
-                    + " : newSample=" + edgeSample);
+                    + ": newSample=" + edgeSample);
 
         return edgeSample;
 
