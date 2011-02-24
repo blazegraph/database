@@ -47,6 +47,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.ap.SampleIndex.SampleType;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.joinGraph.NoSolutionsException;
+import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 
 /**
@@ -894,7 +895,7 @@ public class JGraph {
                         continue;
                     }
 
-                    if (!BOpUtility.canJoinUsingConstraints(//
+                    if (!PartitionedJoinGroup.canJoinUsingConstraints(//
                             x.getPredicates(),// path
                             tVertex.pred,// vertex
                             C// constraints
@@ -1113,7 +1114,7 @@ public class JGraph {
                     vp = v1;
                 }
                 
-                if (!BOpUtility.canJoinUsingConstraints(
+                if (!PartitionedJoinGroup.canJoinUsingConstraints(
                         new IPredicate[] { v.pred }, vp.pred, C)) {
 
                     /*

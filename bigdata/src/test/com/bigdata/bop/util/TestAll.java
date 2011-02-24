@@ -23,6 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop.util;
 
+import com.bigdata.bop.joinGraph.TestPartitionedJoinGroup_canJoin;
+import com.bigdata.bop.joinGraph.TestPartitionedJoinGroup_canJoinUsingConstraints;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -65,12 +68,6 @@ public class TestAll extends TestCase {
 
         // unit tests for shared variables.
         suite.addTestSuite(TestBOpUtility_sharedVariables.class);
-
-        // unit tests for allowing joins based on shared variables in preds.
-        suite.addTestSuite(TestBOpUtility_canJoin.class);
-
-        // more complex logic for join paths.
-        suite.addTestSuite(TestBOpUtility_canJoinUsingConstraints.class);
 
         return suite;
         

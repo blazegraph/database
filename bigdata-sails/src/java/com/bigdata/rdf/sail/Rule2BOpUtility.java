@@ -31,12 +31,9 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -93,7 +90,6 @@ import com.bigdata.relation.rule.EmptyAccessPathExpander;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
-import com.bigdata.relation.rule.eval.RuleState;
 import com.bigdata.striterator.IKeyOrder;
 
 
@@ -524,36 +520,36 @@ public class Rule2BOpUtility {
          * variable appears.  This way we only run the appropriate constraint
          * once, instead of for every tail. 
          */
-        final Map<IVariable<?>, Collection<IConstraint>> constraintsByVar = 
-            new HashMap<IVariable<?>, Collection<IConstraint>>();
-        for (int i = 0; i < rule.getConstraintCount(); i++) {
-            final IConstraint c = rule.getConstraint(i);
-            
-            if (log.isDebugEnabled()) {
-                log.debug(c);
-            }
-            
-            final Set<IVariable<?>> uniqueVars = new HashSet<IVariable<?>>();
-            final Iterator<IVariable<?>> vars = BOpUtility.getSpannedVariables(c);
-            while (vars.hasNext()) {
-                final IVariable<?> v = vars.next();
-                uniqueVars.add(v);
-            }
-            
-            for (IVariable<?> v : uniqueVars) {
-
-                if (log.isDebugEnabled()) {
-                    log.debug(v);
-                }
-                
-                Collection<IConstraint> constraints = constraintsByVar.get(v);
-                if (constraints == null) {
-                    constraints = new LinkedList<IConstraint>();
-                    constraintsByVar.put(v, constraints);
-                }
-                constraints.add(c);
-            }
-        }
+//        final Map<IVariable<?>, Collection<IConstraint>> constraintsByVar = 
+//            new HashMap<IVariable<?>, Collection<IConstraint>>();
+//        for (int i = 0; i < rule.getConstraintCount(); i++) {
+//            final IConstraint c = rule.getConstraint(i);
+//            
+//            if (log.isDebugEnabled()) {
+//                log.debug(c);
+//            }
+//            
+//            final Set<IVariable<?>> uniqueVars = new HashSet<IVariable<?>>();
+//            final Iterator<IVariable<?>> vars = BOpUtility.getSpannedVariables(c);
+//            while (vars.hasNext()) {
+//                final IVariable<?> v = vars.next();
+//                uniqueVars.add(v);
+//            }
+//            
+//            for (IVariable<?> v : uniqueVars) {
+//
+//                if (log.isDebugEnabled()) {
+//                    log.debug(v);
+//                }
+//                
+//                Collection<IConstraint> constraints = constraintsByVar.get(v);
+//                if (constraints == null) {
+//                    constraints = new LinkedList<IConstraint>();
+//                    constraintsByVar.put(v, constraints);
+//                }
+//                constraints.add(c);
+//            }
+//        }
         
         PipelineOp left = startOp;
         
@@ -572,7 +568,12 @@ public class Rule2BOpUtility {
                 }
         	}
         }
-        
+
+        /*
+         * Create an array of predicates in the decided evaluation with various
+         * annotations providing details from the query optimizer.
+         */
+        final Predicate<?>[] preds = new Predicate[rule.getTailCount()];
         for (int i = 0; i < order.length; i++) {
             
             // assign a bop id to the predicate
@@ -596,6 +597,48 @@ public class Rule2BOpUtility {
                         cardinality[order[i]]);
             }
             
+            // save reference into array in evaluation order.
+            preds[i] = pred;
+            
+        }
+
+//        /*
+//         * Analyze the predicates and constraints to decide which constraints
+//         * will run with which predicates.  @todo does not accept known bound
+//         * variables yet and does not report on the constraint attachment for
+//         * optional joins using the same assignedConstraint[] (which makes the
+//         * integration a bit more complicated).
+//         */
+//        final IConstraint[][] assignedConstraints;
+////        final PartitionedJoinGroup g;
+//        {
+//            // Extract IConstraint[] from the rule.
+//            final IConstraint[] constraints = new IConstraint[rule.getConstraintCount()];
+//            for(int i=0; i<constraints.length; i++) {
+//                constraints[i] = rule.getConstraint(i);
+//            }
+//            
+////            // Analyze the join graph.
+////            g = new PartitionedJoinGroup(preds, constraints);
+//
+//            // figure out which constraints are attached to which predicates.
+//            assignedConstraints = PartitionedJoinGroup.getJoinGraphConstraints(
+//                    preds, constraints);
+//        }
+
+        /*
+         * 
+         */
+        for (int i = 0; i < order.length; i++) {
+            
+            // assign a bop id to the predicate
+            final Predicate<?> pred = (Predicate<?>) preds[i];
+
+            // @todo Life will be simple once assignedConstraints is ready.
+//            left = join(queryEngine, left, pred,//
+//                    Arrays.asList(assignedConstraints[i]), //
+//                    context, idFactory, queryHints);
+
             /*
              * Collect all the constraints for this predicate based on which
              * variables make their first appearance in this tail

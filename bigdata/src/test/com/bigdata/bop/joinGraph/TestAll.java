@@ -62,6 +62,12 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestPartitionedJoinGroup.class);
         
+        // unit tests for allowing joins based on shared variables in preds.
+        suite.addTestSuite(TestPartitionedJoinGroup_canJoin.class);
+
+        // more complex logic for join paths.
+        suite.addTestSuite(TestPartitionedJoinGroup_canJoinUsingConstraints.class);
+
         // static query optimizer test suite.
         suite.addTest(com.bigdata.bop.joinGraph.fast.TestAll.suite());
 
