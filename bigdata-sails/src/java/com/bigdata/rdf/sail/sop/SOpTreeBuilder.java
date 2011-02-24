@@ -172,6 +172,8 @@ public class SOpTreeBuilder {
             collectSOps(sops, (Join) left, rslj, g, pg);
         } else if (left instanceof LeftJoin) {
             collectSOps(sops, (LeftJoin) left, rslj, groupId.incrementAndGet(), g);
+        } else if (left instanceof Union) {
+            collectSOps(sops, (Union) left, rslj, groupId.incrementAndGet(), g);
         } else {
             throw new UnsupportedOperatorException(left);
         }

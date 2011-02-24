@@ -70,6 +70,7 @@ import com.bigdata.bop.cost.SubqueryCostReport;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.joinGraph.IRangeCountFactory;
+import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
 import com.bigdata.bop.rdf.filter.StripContextFilter;
 import com.bigdata.bop.rdf.join.DataSetJoin;
@@ -327,13 +328,16 @@ public class Rule2BOpUtility {
             final AtomicInteger idFactory, final AbstractTripleStore db,
             final QueryEngine queryEngine, final Properties queryHints) {
 
-    	return convert(rule, null/* conditionals */, idFactory, db, queryEngine, 
-    			queryHints);
+    	return convert(rule, 
+    			null/* conditionals */, 
+    			null/* known bound variables */, 
+    			idFactory, db, queryEngine, queryHints);
     	
     }
     
     public static PipelineOp convert(final IRule<?> rule,
     		final Collection<IConstraint> conditionals,
+    		final Set<IVariable<?>> knownBound,
             final AtomicInteger idFactory, final AbstractTripleStore db,
             final QueryEngine queryEngine, final Properties queryHints) {
 
@@ -514,43 +518,6 @@ public class Rule2BOpUtility {
 //        final IVariable<?>[][] selectVars = RuleState
 //                .computeRequiredVarsForEachTail(rule, order);
         
-        /*
-         * Map the constraints from the variables they use.  This way, we can
-         * properly attach constraints to only the first tail in which the
-         * variable appears.  This way we only run the appropriate constraint
-         * once, instead of for every tail. 
-         */
-//        final Map<IVariable<?>, Collection<IConstraint>> constraintsByVar = 
-//            new HashMap<IVariable<?>, Collection<IConstraint>>();
-//        for (int i = 0; i < rule.getConstraintCount(); i++) {
-//            final IConstraint c = rule.getConstraint(i);
-//            
-//            if (log.isDebugEnabled()) {
-//                log.debug(c);
-//            }
-//            
-//            final Set<IVariable<?>> uniqueVars = new HashSet<IVariable<?>>();
-//            final Iterator<IVariable<?>> vars = BOpUtility.getSpannedVariables(c);
-//            while (vars.hasNext()) {
-//                final IVariable<?> v = vars.next();
-//                uniqueVars.add(v);
-//            }
-//            
-//            for (IVariable<?> v : uniqueVars) {
-//
-//                if (log.isDebugEnabled()) {
-//                    log.debug(v);
-//                }
-//                
-//                Collection<IConstraint> constraints = constraintsByVar.get(v);
-//                if (constraints == null) {
-//                    constraints = new LinkedList<IConstraint>();
-//                    constraintsByVar.put(v, constraints);
-//                }
-//                constraints.add(c);
-//            }
-//        }
-        
         PipelineOp left = startOp;
         
         if (conditionals != null) { // @todo lift into CONDITION on SubqueryOp
@@ -602,101 +569,39 @@ public class Rule2BOpUtility {
             
         }
 
-//        /*
-//         * Analyze the predicates and constraints to decide which constraints
-//         * will run with which predicates.  @todo does not accept known bound
-//         * variables yet and does not report on the constraint attachment for
-//         * optional joins using the same assignedConstraint[] (which makes the
-//         * integration a bit more complicated).
-//         */
-//        final IConstraint[][] assignedConstraints;
-////        final PartitionedJoinGroup g;
-//        {
-//            // Extract IConstraint[] from the rule.
-//            final IConstraint[] constraints = new IConstraint[rule.getConstraintCount()];
-//            for(int i=0; i<constraints.length; i++) {
-//                constraints[i] = rule.getConstraint(i);
-//            }
-//            
-////            // Analyze the join graph.
-////            g = new PartitionedJoinGroup(preds, constraints);
-//
-//            // figure out which constraints are attached to which predicates.
-//            assignedConstraints = PartitionedJoinGroup.getJoinGraphConstraints(
-//                    preds, constraints);
-//        }
+        /*
+         * Analyze the predicates and constraints to decide which constraints
+         * will run with which predicates.  @todo does not handle optionals
+         * correctly, but we do not pass optionals in to Rule2BOpUtility
+         * from SOp2BOpUtility anymore so ok for now
+         */
+        final IConstraint[][] assignedConstraints;
+        {
+            // Extract IConstraint[] from the rule.
+            final IConstraint[] constraints = new IConstraint[rule.getConstraintCount()];
+            for(int i=0; i<constraints.length; i++) {
+                constraints[i] = rule.getConstraint(i);
+            }
+            
+            // figure out which constraints are attached to which predicates.
+            assignedConstraints = PartitionedJoinGroup.getJoinGraphConstraints(
+                    preds, constraints, 
+                    knownBound.toArray(new IVariable<?>[knownBound.size()]));
+        }
 
         /*
          * 
          */
-        for (int i = 0; i < order.length; i++) {
+        for (int i = 0; i < preds.length; i++) {
             
             // assign a bop id to the predicate
             final Predicate<?> pred = (Predicate<?>) preds[i];
 
-            // @todo Life will be simple once assignedConstraints is ready.
-//            left = join(queryEngine, left, pred,//
-//                    Arrays.asList(assignedConstraints[i]), //
-//                    context, idFactory, queryHints);
-
-            /*
-             * Collect all the constraints for this predicate based on which
-             * variables make their first appearance in this tail
-             */
-            final Collection<IConstraint> constraints = 
-                new LinkedList<IConstraint>();
-            
-//            /*
-//             * Peek through the predicate's args to find its variables. Use
-//             * these to attach constraints to the join based on the variables
-//             * that make their first appearance in this tail.
-//             */
-//            for (BOp arg : pred.args()) {
-//                if (arg instanceof IVariable<?>) {
-//                    final IVariable<?> v = (IVariable<?>) arg;
-//                    /*
-//                     * We do a remove because we don't ever need to run these
-//                     * constraints again during subsequent joins once they have
-//                     * been run once at the initial appearance of the variable.
-//                     * 
-//                     * @todo revisit this when we dynamically re-order running
-//                     * joins
-//                     */ 
-//                    if (constraintsByVar.containsKey(v))
-//                        constraints.addAll(constraintsByVar.remove(v));
-//                }
-//            }
-
-            // just add all the constraints to the very last tail for now
-            if (i == (order.length-1) && rule.getConstraintCount() > 0) {
-            	final Iterator<IConstraint> it = rule.getConstraints();
-            	while (it.hasNext()) {
-            		constraints.add(it.next());
-            	}
-            }
-            
-            left = join(queryEngine, left, pred, constraints, context, 
-            		idFactory, queryHints);
+            left = join(queryEngine, left, pred,//
+                    Arrays.asList(assignedConstraints[i]), //
+                    context, idFactory, queryHints);
 
         }
-        
-//        if (rule.getConstraintCount() > 0) {
-//        	final Iterator<IConstraint> it = rule.getConstraints();
-//        	while (it.hasNext()) {
-//        		final IConstraint c = it.next();
-//        		final int condId = idFactory.incrementAndGet();
-//                final PipelineOp condOp = applyQueryHints(
-//                	new ConditionalRoutingOp(new BOp[]{left},
-//                        NV.asMap(new NV[]{//
-//                            new NV(BOp.Annotations.BOP_ID,condId),
-//                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
-//                        })), queryHints);
-//                left = condOp;
-//                if (log.isDebugEnabled()) {
-//                	log.debug("adding conditional routing op: " + condOp);
-//                }
-//        	}
-//        }
         
         if (log.isInfoEnabled()) {
             // just for now while i'm debugging

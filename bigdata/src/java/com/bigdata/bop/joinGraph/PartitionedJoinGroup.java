@@ -217,6 +217,13 @@ public class PartitionedJoinGroup {
         
     }
 
+    static public IConstraint[][] getJoinGraphConstraints(
+            final IPredicate<?>[] path, final IConstraint[] joinGraphConstraints) {
+
+    	return getJoinGraphConstraints(path, joinGraphConstraints, null);
+    	
+    }
+    	
     /**
      * Given a join path, return the set of constraints to be associated with
      * each join in that join path. Only those constraints whose variables are
@@ -226,6 +233,9 @@ public class PartitionedJoinGroup {
      *            The join path.
      * @param joinGraphConstraints
      *            The constraints to be applied to the join path (optional).
+     * @param knownBoundVars
+     * 			  Variables that are known to be bound as inputs to this
+     *            join graph (parent queries).
      * 
      * @return The constraints to be paired with each element of the join path.
      * 
@@ -250,7 +260,9 @@ public class PartitionedJoinGroup {
      *       FIXME Unit tests.
      */
     static public IConstraint[][] getJoinGraphConstraints(
-            final IPredicate<?>[] path, final IConstraint[] joinGraphConstraints) {
+            final IPredicate<?>[] path,
+            final IConstraint[] joinGraphConstraints,
+            final IVariable<?>[] knownBoundVars) {
 
         if (path == null)
             throw new IllegalArgumentException();
@@ -260,7 +272,16 @@ public class PartitionedJoinGroup {
 
         // the set of constraints for each predicate in the join path.
         final IConstraint[][] ret = new IConstraint[path.length][];
+
+        // the set of variables which are bound.
+        final Set<IVariable<?>> boundVars = new LinkedHashSet<IVariable<?>>();
         
+        // add the already known bound vars
+        if (knownBoundVars != null) {
+        	for (IVariable<?> v : knownBoundVars)
+        		boundVars.add(v);
+        }
+
         /*
          * For each predicate in the path in the given order, figure out which
          * constraint(s) would attach to that predicate based on which variables
@@ -268,9 +289,6 @@ public class PartitionedJoinGroup {
          * given join path, we return that set of constraints.
          */
 
-        // the set of variables which are bound.
-        final Set<IVariable<?>> boundVars = new LinkedHashSet<IVariable<?>>(); 
-        
         // the set of constraints which have been consumed.
         final Set<IConstraint> used = new LinkedHashSet<IConstraint>();
         
