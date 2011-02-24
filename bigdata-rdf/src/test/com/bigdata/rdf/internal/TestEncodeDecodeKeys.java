@@ -42,6 +42,7 @@ import org.openrdf.model.impl.LiteralImpl;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -232,8 +233,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                         throw new UnsupportedOperationException();
                     }
 
-                    public BigdataValue asValue(final BigdataValueFactory f, 
-                            final ILexiconConfiguration config)
+                    public BigdataValue asValue(final LexiconRelation lex)
                             throws UnsupportedOperationException {
                         return null;
                     }

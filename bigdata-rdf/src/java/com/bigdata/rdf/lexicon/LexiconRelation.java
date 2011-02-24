@@ -1661,7 +1661,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             if (iv.isInline()) {
                 
                 // translate it into a value directly
-                ret.put(iv, iv.asValue(valueFactory, getLexiconConfiguration()));
+                ret.put(iv, iv.asValue(this));
                 
             } else {
                 
@@ -2291,7 +2291,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     final public BigdataValue getTerm(final IV iv) {
         
         if (iv.isInline())
-            return iv.asValue(valueFactory, getLexiconConfiguration());
+            return iv.asValue(this);
         
         TermId tid = (TermId) iv;
         
