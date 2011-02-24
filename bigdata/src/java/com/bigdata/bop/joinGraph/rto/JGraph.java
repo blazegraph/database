@@ -555,14 +555,14 @@ public class JGraph {
          */
         sampleAllVertices(queryEngine, limit);
 
-        if (log.isInfoEnabled()) {
+        if (log.isDebugEnabled()) {
             final StringBuilder sb = new StringBuilder();
             sb.append("Vertices:\n");
             for (Vertex v : V) {
                 sb.append(v.toString());
                 sb.append("\n");
             }
-            log.info(sb.toString());
+            log.debug(sb.toString());
         }
 
         /*
@@ -1280,14 +1280,14 @@ public class JGraph {
     static public String showTable(final Path[] a,final Path[] pruned) {
         final StringBuilder sb = new StringBuilder();
         final Formatter f = new Formatter(sb);
-        f.format("%-6s %10s%1s * %10s (%6s/%6s/%6s) = %10s%1s : %10s %10s",
+        f.format("%-6s %10s%1s * %10s (%6s %6s %6s) = %10s%1s : %10s %10s",
                 "path",//
                 "sourceCard",//
                 "",// sourceSampleExact
                 "f",//
-                "out",//
                 "in",//
                 "read",//
+                "out",//
                 "estCard",//
                 "",// estimateIs(Exact|LowerBound|UpperBound)
                 "sumEstCard",//
@@ -1308,18 +1308,18 @@ public class JGraph {
             }
             final EdgeSample edgeSample = x.edgeSample;
             if (edgeSample == null) {
-                f.format("%6d %10s%1s * %10s (%6s/%6s/%6s) = %10s%1s : %10s",//
+                f.format("%6d %10s%1s * %10s (%6s %6s %6s) = %10s%1s : %10s",//
                             i, "N/A", "", "N/A", "N/A", "N/A", "N/A", "N/A", "",
                                 "N/A");
             } else {
-                f.format("%6d %10d%1s * % 10.2f (%6d/%6d/%6d) = % 10d%1s : % 10d", //
+                f.format("%6d %10d%1s * % 10.2f (%6d %6d %6d) = % 10d%1s : % 10d", //
                         i,//
                         edgeSample.sourceSample.estimatedCardinality,//
                         edgeSample.sourceSample.estimateEnum.getCode(),//
                         edgeSample.f,//
-                        edgeSample.outputCount,//
                         edgeSample.inputCount,//
                         edgeSample.tuplesRead,//
+                        edgeSample.outputCount,//
                         edgeSample.estimatedCardinality,//
                         edgeSample.estimateEnum.getCode(),//
                         x.cumulativeEstimatedCardinality//
@@ -1360,14 +1360,14 @@ public class JGraph {
             /*
              * @todo show limit on samples?
              */
-            f.format("%6s %10s%1s * %10s (%6s/%6s/%6s) = %10s%1s : %10s",//
+            f.format("%6s %10s%1s * %10s (%6s %6s %6s) = %10s%1s : %10s",//
                     "vertex",
                     "sourceCard",//
                     "",// sourceSampleExact
                     "f",//
-                    "out",//
                     "in",//
                     "read",//
+                    "out",//
                     "estCard",//
                     "",// estimateIs(Exact|LowerBound|UpperBound)
                     "sumEstCard"//
@@ -1391,19 +1391,19 @@ public class JGraph {
                 }
                 sb.append("\n");
                 if (sample == null) {
-                    f.format("% 6d %10s%1s * %10s (%6s/%6s/%6s) = %10s%1s : %10s",//
+                    f.format("% 6d %10s%1s * %10s (%6s %6s %6s) = %10s%1s : %10s",//
                             predId,//
                             "N/A", "", "N/A", "N/A", "N/A", "N/A", "N/A", "", "N/A");
                 } else if(sample instanceof VertexSample) {
                     // Show the vertex sample for the initial vertex.
-                    f.format("% 6d %10s%1s * %10s (%6s/%6s/%6s) = % 10d%1s : %10d",//
+                    f.format("% 6d %10s%1s * %10s (%6s %6s %6s) = % 10d%1s : %10d",//
                             predId,//
-                            "NA",//sample.sourceSample.estimatedCardinality,//
+                            "N/A",//sample.sourceSample.estimatedCardinality,//
                             " ",//sample.sourceSample.isExact() ? "E" : "",//
                             " ",//sample.f,//
-                            "N/A",//sample.outputCount,//
                             "N/A",//sample.inputCount,//
                             "N/A",//sample.tuplesRead,//
+                            "N/A",//sample.outputCount,//
                             sample.estimatedCardinality,//
                             sample.estimateEnum.getCode(),//
                             sumEstCard//
@@ -1412,14 +1412,14 @@ public class JGraph {
                 } else {
                     // Show the sample for a cutoff join with the 2nd+ vertex.
                     final EdgeSample edgeSample = (EdgeSample)sample;
-                    f.format("% 6d %10d%1s * % 10.2f (%6d/%6d/%6d) = % 10d%1s : %10d",//
+                    f.format("% 6d %10d%1s * % 10.2f (%6d %6d %6d) = % 10d%1s : %10d",//
                             predId,//
                             edgeSample.sourceSample.estimatedCardinality,//
                             edgeSample.sourceSample.estimateEnum.getCode(),//
                             edgeSample.f,//
-                            edgeSample.outputCount,//
                             edgeSample.inputCount,//
                             edgeSample.tuplesRead,//
+                            edgeSample.outputCount,//
                             edgeSample.estimatedCardinality,//
                             edgeSample.estimateEnum.getCode(),//
                             sumEstCard//
