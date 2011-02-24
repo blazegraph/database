@@ -35,9 +35,9 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSDBooleanIV;
 
 /**
- * Imposes the constraint <code>isLiteral(x)</code>.
+ * Imposes the constraint <code>isURI(x)</code>.
  */
-public class IsLiteralBOp extends ValueExpressionBOp 
+public class IsURIBOp extends ValueExpressionBOp 
 		implements IValueExpression<IV> {
 
     /**
@@ -45,7 +45,7 @@ public class IsLiteralBOp extends ValueExpressionBOp
 	 */
 	private static final long serialVersionUID = 3125106876006900339L;
 
-    public IsLiteralBOp(final IVariable<IV> x) {
+    public IsURIBOp(final IVariable<IV> x) {
         
         this(new BOp[] { x }, null/*annocations*/);
         
@@ -54,7 +54,7 @@ public class IsLiteralBOp extends ValueExpressionBOp
     /**
      * Required shallow copy constructor.
      */
-    public IsLiteralBOp(final BOp[] args, final Map<String, Object> anns) {
+    public IsURIBOp(final BOp[] args, final Map<String, Object> anns) {
 
     	super(args, anns);
     	
@@ -66,7 +66,7 @@ public class IsLiteralBOp extends ValueExpressionBOp
     /**
      * Required deep copy constructor.
      */
-    public IsLiteralBOp(final IsLiteralBOp op) {
+    public IsURIBOp(final IsURIBOp op) {
         super(op);
     }
 
@@ -78,7 +78,7 @@ public class IsLiteralBOp extends ValueExpressionBOp
         if (iv == null)
         	throw new SparqlTypeErrorException();
 
-    	return iv.isLiteral(); 
+    	return iv.isURI(); 
 
     }
     

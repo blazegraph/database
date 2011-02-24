@@ -26,18 +26,24 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.openrdf.model.URI;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSDBooleanIV;
+import com.bigdata.rdf.internal.StrIV;
+import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Imposes the constraint <code>isLiteral(x)</code>.
+ * Imposes the constraint <code>isURI(x)</code>.
  */
-public class IsLiteralBOp extends ValueExpressionBOp 
+public class StrBOp extends ValueExpressionBOp 
 		implements IValueExpression<IV> {
 
     /**
@@ -45,7 +51,7 @@ public class IsLiteralBOp extends ValueExpressionBOp
 	 */
 	private static final long serialVersionUID = 3125106876006900339L;
 
-    public IsLiteralBOp(final IVariable<IV> x) {
+    public StrBOp(final IVariable<IV> x) {
         
         this(new BOp[] { x }, null/*annocations*/);
         
@@ -54,7 +60,7 @@ public class IsLiteralBOp extends ValueExpressionBOp
     /**
      * Required shallow copy constructor.
      */
-    public IsLiteralBOp(final BOp[] args, final Map<String, Object> anns) {
+    public StrBOp(final BOp[] args, final Map<String, Object> anns) {
 
     	super(args, anns);
     	
@@ -66,11 +72,11 @@ public class IsLiteralBOp extends ValueExpressionBOp
     /**
      * Required deep copy constructor.
      */
-    public IsLiteralBOp(final IsLiteralBOp op) {
+    public StrBOp(final StrBOp op) {
         super(op);
     }
 
-    public boolean accept(final IBindingSet bs) {
+    public IV get(final IBindingSet bs) {
         
         final IV iv = get(0).get(bs);
         
@@ -78,14 +84,35 @@ public class IsLiteralBOp extends ValueExpressionBOp
         if (iv == null)
         	throw new SparqlTypeErrorException();
 
-    	return iv.isLiteral(); 
-
+        // uh oh how the heck do I get my hands on this? big change
+        final AbstractTripleStore db = null;
+        
+        // use to materialize my terms
+        final LexiconRelation lex = db.getLexiconRelation();
+        
+        // use to create my simple literals
+        final BigdataValueFactory vf = db.getValueFactory();
+        
+        if (iv.isURI()) {
+        	// return new simple literal using URI label
+        	final URI uri = (URI) iv.asValue(lex);
+        	final BigdataLiteral str = vf.createLiteral(uri.toString());
+        	return new StrIV(iv, str);
+        } else if (iv.isLiteral()) {
+        	final BigdataLiteral lit = (BigdataLiteral) iv.asValue(lex);
+        	if (lit.getDatatype() == null && lit.getLanguage() == null) {
+            	// if simple literal return it
+        		return iv;
+        	}
+        	else {
+            	// else return new simple literal using Literal.getLabel
+            	final BigdataLiteral str = vf.createLiteral(lit.getLabel());
+            	return new StrIV(iv, str);
+        	}
+        } else {
+        	throw new SparqlTypeErrorException();
+        }
+        
     }
     
-    public IV get(final IBindingSet bs) {
-    	
-    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
-    	
-    }
-
 }
