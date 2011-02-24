@@ -10,6 +10,8 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Properties;
 import java.util.Set;
+
+import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -46,6 +48,8 @@ import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 public class BigdataSailGraphQuery extends SailGraphQuery 
         implements BigdataSailQuery {
     
+	protected static Logger log = Logger.getLogger(BigdataSailGraphQuery.class);
+	
     /**
      * Query hints are embedded in query strings as namespaces.  
      * See {@link QueryHints#NAMESPACE} for more information.
@@ -74,8 +78,10 @@ public class BigdataSailGraphQuery extends SailGraphQuery
     
     protected void optimizeDescribe() {
         try {
-            ParsedQuery parsedQuery = getParsedQuery(); 
+            ParsedQuery parsedQuery = getParsedQuery();
             TupleExpr node = parsedQuery.getTupleExpr();
+            if (log.isInfoEnabled())
+            	log.info(node);
             node = ((Reduced) node).getArg();
             node = ((Projection) node).getArg();
             ValueExpr ve = ((Filter) node).getCondition();
@@ -90,7 +96,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery
                         vars.add(var);
                     }
                 });
-                Collection<Join> joins = new LinkedList<Join>();
+                Collection<StatementPattern> sps = new LinkedList<StatementPattern>();
                 Collection<ProjectionElemList> projElemLists = 
                     new LinkedList<ProjectionElemList>();
                 for (Var v : vars) {
@@ -98,7 +104,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery
                         Var p = createAnonVar("-p" + v.getName() + "-1");
                         Var o = createAnonVar("-o" + v.getName());
                         StatementPattern sp = new StatementPattern(v, p, o);
-                        joins.add(new Join(node, sp));
+                        sps.add(sp);
                         ProjectionElemList projElemList = new ProjectionElemList();
                         projElemList.addElement(new ProjectionElem(v.getName(), "subject"));
                         projElemList.addElement(new ProjectionElem(p.getName(), "predicate"));
@@ -109,7 +115,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery
                         Var s = createAnonVar("-s" + v.getName());
                         Var p = createAnonVar("-p" + v.getName() + "-2");
                         StatementPattern sp = new StatementPattern(s, p, v);
-                        joins.add(new Join(node, sp));
+                        sps.add(sp);
                         ProjectionElemList projElemList = new ProjectionElemList();
                         projElemList.addElement(new ProjectionElem(s.getName(), "subject"));
                         projElemList.addElement(new ProjectionElem(p.getName(), "predicate"));
@@ -117,12 +123,12 @@ public class BigdataSailGraphQuery extends SailGraphQuery
                         projElemLists.add(projElemList);
                     }
                 }
-                Iterator<Join> it = joins.iterator();
-                node = it.next();
+                Iterator<StatementPattern> it = sps.iterator();
+                Union union = new Union(it.next(), it.next());
                 while (it.hasNext()) {
-                    Join j = it.next();
-                    node = new Union(j, node);
+                    union = new Union(union, it.next());
                 }
+                node = new Join(node, union);
                 node = new MultiProjection(node, projElemLists);
                 node = new Reduced(node);
                 parsedQuery.setTupleExpr(node);
