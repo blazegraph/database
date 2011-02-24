@@ -80,6 +80,17 @@ public class AllocationContext implements IMemoryManager {
 	}
 
 	synchronized
+	public long allocate(final int nbytes) {
+
+		final long addr = m_parent.allocate(nbytes);
+		
+		// getSectorAllocation(addr).allocate(addr);		
+		m_addresses.add(Long.valueOf(addr));
+		
+		return addr;
+	}
+
+	synchronized
 	public void clear() {
 		for (Long addr : m_addresses) {
 			m_parent.free(addr);
@@ -103,6 +114,10 @@ public class AllocationContext implements IMemoryManager {
 
 	public IMemoryManager createAllocationContext() {
 		return new AllocationContext(this);
+	}
+
+	public int allocationSize(final long addr) {
+		return m_parent.allocationSize(addr);
 	}
 
 //	private SectorAllocation m_head = null;
