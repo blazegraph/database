@@ -440,7 +440,7 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
          * to use a larger data set if we want to verify the optimizers join
          * path for a query which produces solutions in the data.
          */
-        if (true) {
+        if (false) {
             final IPredicate<?>[] runtimeOrder = doTest(preds, null/* constraints */);
             /*
              * Verify that the runtime optimizer produced the expected join
@@ -456,7 +456,7 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
         /*
          * Run w/ constraints.
          */
-        if(false){
+        if(true){
 
             final IPredicate<?>[] runtimeOrder = doTest(preds, constraints);
             
