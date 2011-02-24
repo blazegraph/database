@@ -81,20 +81,8 @@ public class Path {
 
     private static final transient Logger log = Logger.getLogger(Path.class);
 
-//    /**
-//     * An immutable ordered list of the edges in the (aka the sequence of
-//     * joins represented by this path).
-//     * 
-//     * @deprecated by with {@link #vertices}.
-//     */
-//    final List<Edge> edges;
-
     /**
      * An ordered list of the vertices in the {@link Path}.
-     * 
-     * TODO Replace {@link #edges} with {@link #vertices} and declare a
-     * second array with the {@link VertexSample} for the initial vertex
-     * followed by the {@link EdgeSample} for each cutoff join in the path.
      */
     final Vertex[] vertices;
 
@@ -150,8 +138,8 @@ public class Path {
             final EdgeSample edgeSample) {
 
         final long total = cumulativeEstimatedCardinality + //
-                edgeSample.estimatedCardinality + //
-                edgeSample.tuplesRead// this is part of the cost too.
+                edgeSample.estimatedCardinality //
+//                + edgeSample.tuplesRead //
         ;
 
         return total;
@@ -431,44 +419,6 @@ public class Path {
         
     }
     
-//    /**
-//     * Return the vertices in this path (in path order). For the first edge,
-//     * the minimum cardinality vertex is always reported first (this is
-//     * critical for producing the correct join plan). For the remaining
-//     * edges in the path, the unvisited is reported.
-//     * 
-//     * @return The vertices (in path order).
-//     */
-//    static private Vertex[] getVertices(final List<Edge> edges) {
-//        
-//        final Set<Vertex> tmp = new LinkedHashSet<Vertex>();
-//
-//        for (Edge e : edges) {
-//
-//            if (tmp.isEmpty()) {
-//                /*
-//                 * The first edge is handled specially in order to report
-//                 * the minimum cardinality vertex first.
-//                 */
-//                tmp.add(e.getMinimumCardinalityVertex());
-//                tmp.add(e.getMaximumCardinalityVertex());
-//
-//            } else {
-//
-//                tmp.add(e.v1);
-//
-//                tmp.add(e.v2);
-//
-//            }
-//            
-//        }
-//        
-//        final Vertex[] a = tmp.toArray(new Vertex[tmp.size()]);
-//        
-//        return a;
-//        
-//    }
-
     /**
      * Return the predicates associated with the vertices.
      * 
@@ -492,36 +442,6 @@ public class Path {
 
     }
 
-//    /**
-//     * Return the {@link BOp} identifiers of the predicates associated with
-//     * each vertex in path order.
-//     */
-//    static int[] getVertexIds(final List<Edge> edges) {
-//
-//        final Set<Vertex> tmp = new LinkedHashSet<Vertex>();
-//        
-//        for (Edge e : edges) {
-//        
-//            tmp.add(e.v1);
-//            
-//            tmp.add(e.v2);
-//            
-//        }
-//        
-//        final Vertex[] a = tmp.toArray(new Vertex[tmp.size()]);
-//
-//        final int[] b = new int[a.length];
-//        
-//        for (int i = 0; i < a.length; i++) {
-//        
-//            b[i] = a[i].pred.getId();
-//            
-//        }
-//        
-//        return b;
-//        
-//    }
-
     /**
      * Return <code>true</code> if this path begins with the given path.
      * 
@@ -543,14 +463,17 @@ public class Path {
         }
 
         for (int i = 0; i < p.vertices.length; i++) {
+
             final Vertex vSelf = vertices[i];
+            
             final Vertex vOther = p.vertices[i];
-//            final Edge eSelf = edges.get(i);
-//            final Edge eOther = p.edges.get(i);
-//            if (eSelf != eOther) {
+            
             if (vSelf != vOther) {
+            
                 return false;
+                
             }
+            
         }
 
         return true;
@@ -604,20 +527,6 @@ public class Path {
         if (vnew == null)
             throw new IllegalArgumentException();
 
-//        // Figure out which vertices are already part of this path.
-//        final boolean v1Found = contains(e.v1);
-//        final boolean v2Found = contains(e.v2);
-//
-//        if (!v1Found && !v2Found)
-//            throw new IllegalArgumentException(
-//                    "Edge does not extend path: edge=" + e + ", path="
-//                            + this);
-//
-//        if (v1Found && v2Found)
-//            throw new IllegalArgumentException(
-//                    "Edge already present in path: edge=" + e + ", path="
-//                            + this);
-
         if(contains(vnew))
             throw new IllegalArgumentException(
                 "Vertex already present in path: vnew=" + vnew + ", path="
@@ -626,11 +535,8 @@ public class Path {
         if (this.edgeSample == null)
             throw new IllegalStateException();
 
-//        // The vertex which is already part of this path.
-//        final Vertex sourceVertex = v1Found ? e.v1 : e.v2;
-
-        // The new vertex, which is not part of this path.
-        final Vertex targetVertex = vnew;//v1Found ? e.v2 : e.v1;
+        // The new vertex.
+        final Vertex targetVertex = vnew;
 
         /*
          * Chain sample the edge.
@@ -679,32 +585,15 @@ public class Path {
         final EdgeSample edgeSample2 = cutoffJoin(//
                 queryEngine,//
                 limit, //
-//                sourceVertex, // 
-//                targetVertex,//
                 preds2,//
                 constraints,//
                 this.edgeSample // the source sample.
-//                this.sample.estimatedCardinality,
-//                this.sample.estimateEnum == EstimateEnum.Exact,
-//                this.sample.limit,//
-//                this.sample.sample// the sample fed into the cutoff join.
                 );
 
         {
 
-//            final List<Edge> edges = new ArrayList<Edge>(
-//                    this.edges.size() + 1);
-//
-//            edges.addAll(this.edges);
-//
-//            edges.add(e);
-
             final long cumulativeEstimatedCardinality = add(
                     this.cumulativeEstimatedCardinality, edgeSample2);
-//                this.cumulativeEstimatedCardinality
-//                    + edgeSample2.estimatedCardinality//
-//                    + edgeSample2.tuplesRead// this is part of the cost too.
-//                    ;
 
             // Extend the path.
             final Path tmp = new Path(vertices2, preds2,
@@ -746,22 +635,12 @@ public class Path {
      * 
      * @throws Exception
      */
-//    * @param vSource
-//    *            The source vertex.
-//    * @param vTarget
-//    *            The target vertex
     static public EdgeSample cutoffJoin(//
             final QueryEngine queryEngine,//
             final int limit,//
             final IPredicate<?>[] path,//
             final IConstraint[] constraints,//
-//            final Vertex vSource,// 
-//            final Vertex vTarget,//
             final SampleBase sourceSample//
-//            final long sourceEstimatedCardinality,//
-//            final boolean sourceSampleExact,//
-//            final int sourceSampleLimit,//
-//            final IBindingSet[] sourceSample//
     ) throws Exception {
 
         if (path == null)
@@ -826,12 +705,10 @@ public class Path {
          * limit is satisfied, thus avoiding unnecessary effort.
          */
 
-        //        final int joinId = 1;
         final int joinId = idFactory.nextId();
-        final Map<String, Object> anns = NV.asMap(
-            //
+        final Map<String, Object> anns = NV.asMap(//
             new NV(BOp.Annotations.BOP_ID, joinId),//
-            new NV(PipelineJoin.Annotations.PREDICATE, pred),
+            new NV(PipelineJoin.Annotations.PREDICATE, pred),//
             // Note: does not matter since not executed by the query
             // controller.
             // // disallow parallel evaluation of tasks
@@ -979,9 +856,6 @@ public class Path {
         final long estimatedCardinality = (long) (sourceSample.estimatedCardinality * f);
 
         final EdgeSample edgeSample = new EdgeSample(//
-//                sourceSample.estimatedCardinality, //
-//                sourceSample.estimateEnum, // 
-//                sourceSample.limit, //
                 sourceSample,//
                 inputCount,//
                 outputCount, //
