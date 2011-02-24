@@ -51,6 +51,15 @@ public interface IMemoryManager {
 	public long allocate(ByteBuffer data);
 
 	/**
+	 * To give more control to the caller by reserving the allocations without
+	 * the requirement to supply a source ByteBuffer.
+	 * 
+	 * @param nbytes
+	 * @return an address that will return a ByteBuffer[] using get
+	 */
+	public long allocate(int nbytes);
+
+	/**
 	 * The ByteBuffer[] return enables the handling of blobs that span more than
 	 * a single slot, without the need to create an intermediate ByteBuffer.
 	 * 
@@ -68,9 +77,13 @@ public interface IMemoryManager {
 	 * }
 	 * </pre>
 	 * 
+	 * Furthermore, since the ByteBuffers are not read-only, they can be updated
+	 * directly.  In this way the {@link #allocate(int)} can be used
+	 * in conjunction with get to provide more flexibility when storing data.
+	 * 
 	 * @param addr
 	 *            An address previously returned by
-	 *            {@link #allocate(ByteBuffer)}.
+	 *            {@link #allocate(ByteBuffer)} or {@link #allocate(int)}.
 	 *            
 	 * @return array of ByteBuffers
 	 */
@@ -94,4 +107,10 @@ public interface IMemoryManager {
 	 */
 	public IMemoryManager createAllocationContext();
 
+	/**
+	 * @param addr
+	 * @return the number of bytes allocated at the address
+	 */
+	public int allocationSize(long addr);
+	
 }
