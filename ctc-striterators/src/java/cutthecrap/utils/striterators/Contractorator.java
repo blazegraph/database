@@ -42,12 +42,10 @@ import java.util.NoSuchElementException;
  * 
  * @author Martyn Cutcher
  */
-public class Contractorator implements Iterator {
+public class Contractorator extends Prefetch {
 	private final Iterator m_src;
 	protected final Object   m_ctx;
 	private final Contractor m_contractor;
-	private Object m_next;
-	private boolean m_init = false;
 
 	public Contractorator(Iterator src, final Object ctx, Contractor contractor) {
 		m_src = src;
@@ -55,28 +53,12 @@ public class Contractorator implements Iterator {
 		m_contractor = contractor;
 	}
 	
-	private void init() {
-		if (!m_init) {
-			m_next = m_contractor.contract(m_src);
-			m_init = true;
+	protected Object getNext() {
+		if (m_src.hasNext()) {
+			return m_contractor.contract(m_src);
+		} else {
+			return null;
 		}
-	}
-
-	public boolean hasNext() {
-		init();
-		
-		return m_next != null;
-	}
-
-	public Object next() {
-		if (!hasNext()) {
-			throw new NoSuchElementException();
-		}
-
-		Object ret = m_next;
-		m_next = m_contractor.contract(m_src);
-
-		return ret;
 	}
 
 	public void remove() {
