@@ -30,7 +30,10 @@ import org.openrdf.query.algebra.Bound;
 import org.openrdf.query.algebra.Compare;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Group;
+import org.openrdf.query.algebra.IsBNode;
 import org.openrdf.query.algebra.IsLiteral;
+import org.openrdf.query.algebra.IsResource;
+import org.openrdf.query.algebra.IsURI;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.LeftJoin;
 import org.openrdf.query.algebra.MathExpr;
@@ -48,6 +51,7 @@ import org.openrdf.query.algebra.Regex;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.StatementPattern.Scope;
+import org.openrdf.query.algebra.Str;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
 import org.openrdf.query.algebra.Union;
@@ -72,6 +76,7 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.solutions.ISortOrder;
@@ -82,14 +87,16 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSDBooleanIV;
 import com.bigdata.rdf.internal.constraints.AndBOp;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
+import com.bigdata.rdf.internal.constraints.Constraint;
 import com.bigdata.rdf.internal.constraints.EBVBOp;
+import com.bigdata.rdf.internal.constraints.IsBNodeBOp;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.IsLiteralBOp;
+import com.bigdata.rdf.internal.constraints.IsURIBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
-import com.bigdata.rdf.internal.constraints.Constraint;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
@@ -2066,6 +2073,12 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
             return toVE((Bound) ve);
         } else if (ve instanceof IsLiteral) {
         	return toVE((IsLiteral) ve);
+        }  else if (ve instanceof IsBNode) {
+        	return toVE((IsBNode) ve);
+        } else if (ve instanceof IsResource) {
+        	return toVE((IsResource) ve);
+        } else if (ve instanceof IsURI) {
+        	return toVE((IsURI) ve);
         }
         
         throw new UnsupportedOperatorException(ve);
@@ -2150,6 +2163,22 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     private IValueExpression<IV> toVE(final IsLiteral isLiteral) {
     	final IVariable<IV> var = (IVariable<IV>) toVE(isLiteral.getArg());
     	return new IsLiteralBOp(var);
+    }
+
+    private IValueExpression<IV> toVE(final IsBNode isBNode) {
+    	final IVariable<IV> var = (IVariable<IV>) toVE(isBNode.getArg());
+    	return new IsBNodeBOp(var);
+    }
+
+    private IValueExpression<IV> toVE(final IsResource isResource) {
+    	final IVariable<IV> var = (IVariable<IV>) toVE(isResource.getArg());
+    	// isResource == isURI || isBNode == !isLiteral
+    	return new NotBOp(new IsLiteralBOp(var));
+    }
+
+    private IValueExpression<IV> toVE(final IsURI isURI) {
+    	final IVariable<IV> var = (IVariable<IV>) toVE(isURI.getArg());
+    	return new IsURIBOp(var);
     }
 
 	/**
