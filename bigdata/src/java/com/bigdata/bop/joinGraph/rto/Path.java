@@ -702,7 +702,8 @@ public class Path {
         
         // Figure out which constraints attach to each predicate.
         final IConstraint[][] constraintAttachmentArray = PartitionedJoinGroup
-                .getJoinGraphConstraints(path, constraints);
+                .getJoinGraphConstraints(path, constraints,null/*knownVariables*/,
+                        false/*FIXME pathIsComplete*/);
 
         // The constraint(s) (if any) for this join.
         final IConstraint[] c = constraintAttachmentArray[path.length - 1];
