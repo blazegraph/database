@@ -586,7 +586,9 @@ public class Rule2BOpUtility {
             // figure out which constraints are attached to which predicates.
             assignedConstraints = PartitionedJoinGroup.getJoinGraphConstraints(
                     preds, constraints, 
-                    knownBound.toArray(new IVariable<?>[knownBound.size()]));
+                    knownBound.toArray(new IVariable<?>[knownBound.size()]),
+                    true// pathIsComplete
+                    );
         }
 
         /*

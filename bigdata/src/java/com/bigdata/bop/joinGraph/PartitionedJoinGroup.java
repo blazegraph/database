@@ -134,46 +134,52 @@ public class PartitionedJoinGroup {
                 .toArray(new IConstraint[joinGraphConstraints.size()]);
     }
 
-    /**
-     * Return the set of constraints which should be attached to the last join
-     * in the given the join path. All joins in the join path must be
-     * non-optional joins (that is, part of either the head plan or the join
-     * graph).
-     * <p>
-     * The rule followed by this method is that each constraint will be attached
-     * to the first non-optional join at which all of its variables are known to
-     * be bound. It is assumed that constraints are attached to each join in the
-     * join path by a consistent logic, e.g., as dictated by this method.
-     * 
-     * @param joinPath
-     *            An ordered array of predicate identifiers representing a
-     *            specific sequence of non-optional joins.
-     * 
-     * @return The constraints which should be attached to the last join in the
-     *         join path.
-     * 
-     * @throws IllegalArgumentException
-     *             if the join path is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if the join path is empty.
-     * @throws IllegalArgumentException
-     *             if any element of the join path is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if any predicate specified in the join path is not known to
-     *             this class.
-     * @throws IllegalArgumentException
-     *             if any predicate specified in the join path is optional.
-     * 
-     * @todo Implement (or refactor) the logic to decide which variables need to
-     *       be propagated and which can be dropped. This decision logic will
-     *       need to be available to the runtime query optimizer.
-     * 
-     * @todo This does not pay attention to the head plan. If there can be
-     *       constraints on the head plan then either this should be modified
-     *       such that it can decide where they attach or we need to have a
-     *       method which does the same thing for the head plan.
-     */
-    public IConstraint[] getJoinGraphConstraints(final int[] pathIds) {
+	/**
+	 * Return the set of constraints which should be attached to the last join
+	 * in the given the join path. All joins in the join path must be
+	 * non-optional joins (that is, part of either the head plan or the join
+	 * graph).
+	 * <p>
+	 * The rule followed by this method is that each constraint will be attached
+	 * to the first non-optional join at which all of its variables are known to
+	 * be bound. It is assumed that constraints are attached to each join in the
+	 * join path by a consistent logic, e.g., as dictated by this method.
+	 * 
+	 * @param joinPath
+	 *            An ordered array of predicate identifiers representing a
+	 *            specific sequence of non-optional joins.
+	 * @param pathIsComplete
+	 *            <code>true</code> iff the <i>path</i> represents a complete
+	 *            join path. When <code>true</code>, any constraints which have
+	 *            not already been attached will be attached to the last
+	 *            predicate in the join path.
+	 * 
+	 * @return The constraints which should be attached to the last join in the
+	 *         join path.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if the join path is <code>null</code>.
+	 * @throws IllegalArgumentException
+	 *             if the join path is empty.
+	 * @throws IllegalArgumentException
+	 *             if any element of the join path is <code>null</code>.
+	 * @throws IllegalArgumentException
+	 *             if any predicate specified in the join path is not known to
+	 *             this class.
+	 * @throws IllegalArgumentException
+	 *             if any predicate specified in the join path is optional.
+	 * 
+	 * @todo Implement (or refactor) the logic to decide which variables need to
+	 *       be propagated and which can be dropped. This decision logic will
+	 *       need to be available to the runtime query optimizer.
+	 * 
+	 * @todo This does not pay attention to the head plan. If there can be
+	 *       constraints on the head plan then either this should be modified
+	 *       such that it can decide where they attach or we need to have a
+	 *       method which does the same thing for the head plan.
+	 */
+    public IConstraint[] getJoinGraphConstraints(final int[] pathIds,
+    		final boolean pathIsComplete) {
 
         /*
          * Verify arguments and resolve bopIds to predicates.
@@ -212,57 +218,59 @@ public class PartitionedJoinGroup {
 
         }
      
-        return getJoinGraphConstraints(path, joinGraphConstraints
-                .toArray(new IConstraint[joinGraphConstraints.size()]))[pathIds.length - 1];
+		final IConstraint[] constraints = joinGraphConstraints
+				.toArray(new IConstraint[joinGraphConstraints.size()]);
+
+		final IConstraint[][] attachedConstraints = getJoinGraphConstraints(
+				path, constraints, null/* knownBound */, pathIsComplete);
+        
+        return attachedConstraints[pathIds.length - 1];
         
     }
 
-    static public IConstraint[][] getJoinGraphConstraints(
-            final IPredicate<?>[] path, final IConstraint[] joinGraphConstraints) {
+//    static public IConstraint[][] getJoinGraphConstraints(
+//            final IPredicate<?>[] path, final IConstraint[] joinGraphConstraints) {
+//
+//    	return getJoinGraphConstraints(path, joinGraphConstraints, null/*knownBound*/);
+//    	
+//    }
 
-    	return getJoinGraphConstraints(path, joinGraphConstraints, null);
-    	
-    }
-    	
-    /**
-     * Given a join path, return the set of constraints to be associated with
-     * each join in that join path. Only those constraints whose variables are
-     * known to be bound will be attached.
-     * 
-     * @param path
-     *            The join path.
-     * @param joinGraphConstraints
-     *            The constraints to be applied to the join path (optional).
-     * @param knownBoundVars
-     * 			  Variables that are known to be bound as inputs to this
-     *            join graph (parent queries).
-     * 
-     * @return The constraints to be paired with each element of the join path.
-     * 
-     * @throws IllegalArgumentException
-     *             if the join path is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if the join path is empty.
-     * @throws IllegalArgumentException
-     *             if any element of the join path is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if any element of the join graph constraints is
-     *             <code>null</code>.
-     * 
-     * @todo It should be an error if a variable appear in a constraint is not
-     *       bound by any possible join path. However, it may not be possible to
-     *       determine this by local examination of a join graph since we do not
-     *       know which variables may be presented as already bound when the
-     *       join graph is evaluated (but we can only run the join graph
-     *       currently against static source binding sets and for that case this
-     *       is knowable).
-     * 
-     *       FIXME Unit tests.
-     */
+	/**
+	 * Given a join path, return the set of constraints to be associated with
+	 * each join in that join path. Only those constraints whose variables are
+	 * known to be bound will be attached.
+	 * 
+	 * @param path
+	 *            The join path.
+	 * @param joinGraphConstraints
+	 *            The constraints to be applied to the join path (optional).
+	 * @param knownBoundVars
+	 *            Variables that are known to be bound as inputs to this join
+	 *            graph (parent queries).
+	 * @param pathIsComplete
+	 *            <code>true</code> iff the <i>path</i> represents a complete
+	 *            join path. When <code>true</code>, any constraints which have
+	 *            not already been attached will be attached to the last predicate
+	 *            in the join path.
+	 * 
+	 * @return The constraints to be paired with each element of the join path.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if the join path is <code>null</code>.
+	 * @throws IllegalArgumentException
+	 *             if the join path is empty.
+	 * @throws IllegalArgumentException
+	 *             if any element of the join path is <code>null</code>.
+	 * @throws IllegalArgumentException
+	 *             if any element of the join graph constraints is
+	 *             <code>null</code>.
+	 */
     static public IConstraint[][] getJoinGraphConstraints(
-            final IPredicate<?>[] path,
-            final IConstraint[] joinGraphConstraints,
-            final IVariable<?>[] knownBoundVars) {
+            final IPredicate<?>[] path,//
+            final IConstraint[] joinGraphConstraints,//
+            final IVariable<?>[] knownBoundVars,//
+            final boolean pathIsComplete//
+            ) {
 
         if (path == null)
             throw new IllegalArgumentException();
@@ -343,7 +351,7 @@ public class PartitionedJoinGroup {
 
                     boolean attach = false;
                     
-                    if (i == path.length-1) {
+					if (pathIsComplete && i == path.length - 1) {
                     	
                     	// attach all unused constraints to last predicate
                     	attach = true;
@@ -700,12 +708,11 @@ public class PartitionedJoinGroup {
             /*
              * Find the constraints that will run with each vertex of the new
              * join path.
-             * 
-             * TODO This is a forward reference to a different package, so maybe
-             * move the canJoinWithConstraints() method to that package?
              */
             final IConstraint[][] constraintRunArray = getJoinGraphConstraints(
-                    newPath, constraints);
+                    newPath, constraints, null/*knownBound*/,
+                    true/*pathIsComplete*/
+                    );
 
             /*
              * Consider only the constraints attached to the last vertex in the
@@ -997,7 +1004,8 @@ public class PartitionedJoinGroup {
 
         // figure out which constraints are attached to which predicates.
         final IConstraint[][] assignedConstraints = PartitionedJoinGroup
-                .getJoinGraphConstraints(preds, constraints);
+                .getJoinGraphConstraints(preds, constraints, null/*knownBound*/,
+                		true/*pathIsComplete*/);
         
         final PipelineJoin<?>[] joins = new PipelineJoin[preds.length];
 
