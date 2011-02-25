@@ -205,7 +205,7 @@ public class Haltable<V> implements IHaltable<V> {
                  * running (since it invoked halted() it must be running). Since
                  * it is running,
                  */
-                throw new RuntimeException();
+                throw new RuntimeException("Halted");
                 
             }
             throw new RuntimeException(firstCause);
