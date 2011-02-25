@@ -592,6 +592,9 @@ public class PipelineJoin<E> extends PipelineOp implements
 		/**
 		 * An optional limit on the #of solutions to be produced. The limit is
 		 * ignored if it is {@link Long#MAX_VALUE}.
+		 * <p>
+		 * Note: Invoking {@link #halt(Object)} is necessary to enforce the
+		 * limit.
 		 * 
 		 * @see Annotations#LIMIT
 		 */
@@ -1094,8 +1097,10 @@ public class PipelineJoin<E> extends PipelineOp implements
 						throw new RuntimeException("Halting join: " + t, t);
 					}
 					// normal termination - ignore exception.
-					log.warn("Caught and ignored exception: "+t); return null;
-					
+					if (log.isDebugEnabled())
+						log.debug("Caught and ignored exception: " + t);
+					return null;
+
 				}
 
 			}
@@ -1632,7 +1637,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 						log.info("Breaking query @ limit: limit=" + limit
 								+ ", exactOutputCount="
 								+ exactOutputCount.get());
-//					halt((Void) null);
+					halt((Void) null);
 					return null;
 				}
 
@@ -1677,10 +1682,14 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 					while (itr.hasNext()) {
 
+						halted();
+						
 						final Object[] chunk = itr.nextChunk();
 
-						 stats.accessPathChunksIn.increment();
+						stats.accessPathChunksIn.increment();
 
+//						System.err.println("#chunks="+stats.accessPathChunksIn+", chunkSize="+chunk.length);
+						
 						// process the chunk in the caller's thread.
 						new ChunkTask(bindingSets, naccepted, unsyncBuffer,
 								chunk).call();
@@ -1727,7 +1736,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 									log.info("Breaking query @ limit: limit=" + limit
 											+ ", exactOutputCount="
 											+ exactOutputCount.get());
-//								halt((Void) null);
+								halt((Void) null);
 								break;
 							}
 
@@ -1947,7 +1956,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 										log.info("Breaking query @ limit: limit=" + limit
 												+ ", exactOutputCount="
 												+ exactOutputCount.get());
-//									halt((Void) null);
+									halt((Void) null);
 									break;
 								}
 
@@ -2145,7 +2154,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 										log.info("Breaking query @ limit: limit=" + limit
 												+ ", exactOutputCount="
 												+ exactOutputCount.get());
-//									halt((Void) null);
+									halt((Void) null);
 									break;
 								}
 
