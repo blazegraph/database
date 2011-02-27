@@ -56,11 +56,17 @@ public abstract class SampleBase {
     private static final transient Logger log = Logger
             .getLogger(SampleBase.class);
 
-    /**
-     * The estimated cardinality of the underlying access path (for a vertex) or
-     * the join (for a cutoff join).
-     */
-    public final long estimatedCardinality;
+	/**
+	 * The total estimated cardinality of the underlying access path (for a
+	 * vertex) or the join path segment (for a cutoff join).
+	 * 
+	 * TODO When using a non-perfect index, the estimated cardinality is only
+	 * part of the cost. The #of tuples scanned is also important. Even when
+	 * scanning and filtering in key order this could trigger random IOs unless
+	 * the file has index order (an IndexSegment file has index order but a
+	 * BTree on a journal does not).
+	 */
+    public final long estCard;
 
     /**
      * The limit used to produce the {@link #getSample() sample}.
@@ -156,7 +162,7 @@ public abstract class SampleBase {
         if (sample == null)
             throw new IllegalArgumentException();
 
-        this.estimatedCardinality = estimatedCardinality;
+        this.estCard = estimatedCardinality;
 
         this.limit = limit;
 
@@ -180,7 +186,7 @@ public abstract class SampleBase {
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append(getClass().getSimpleName());
-        sb.append("{estimatedCardinality=" + estimatedCardinality);
+        sb.append("{estCard=" + estCard);
         sb.append(",limit=" + limit);
         sb.append(",estimateEnum=" + estimateEnum);
         {

@@ -99,7 +99,7 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
      * large data set to assess the relative performance of the static and
      * runtime query optimizers).
      */
-	private static final boolean useExistingJournal = false;
+	private static final boolean useExistingJournal = true;
 	
     private static final long existingPC = 284826; // BSBM 100M
 
@@ -445,7 +445,7 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
 		 * Note: The optimizer finds the same join path for the BSBM 100, 100M,
 		 * and 200M data sets
          */
-        if (true) {
+        if (false) {
             /*
 100M: static: ids=[1, 2, 4, 6, 0, 3, 5]
 

@@ -50,8 +50,8 @@ class EstimatedCardinalityComparator implements Comparator<Path> {
             // o2 is not weighted. sort o2 to the end.
             return -1;
         }
-        final long id1 = o1.edgeSample.estimatedCardinality;
-        final long id2 = o2.edgeSample.estimatedCardinality;
+        final long id1 = o1.edgeSample.estCard;
+        final long id2 = o2.edgeSample.estCard;
         if (id1 < id2)
             return -1;
         if (id1 > id2)

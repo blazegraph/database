@@ -153,7 +153,7 @@ public class Vertex implements Serializable {
         final IAccessPath ap = context.getAccessPath(r, pred);
 
         final long rangeCount = oldSample == null ? ap
-                .rangeCount(false/* exact */) : oldSample.estimatedCardinality;
+                .rangeCount(false/* exact */) : oldSample.estCard;
 
         if (rangeCount <= limit) {
 

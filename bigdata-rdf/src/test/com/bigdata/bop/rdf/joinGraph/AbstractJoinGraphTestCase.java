@@ -39,6 +39,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpIdFactory;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
@@ -89,8 +90,17 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
 
     /** The initial sampling limit. */
     static private final int limit = 100;
-    
-    /** The #of edges considered for the initial paths. */
+
+	/**
+	 * The #of edges considered for the initial paths.
+	 * 
+	 * FIXME We need to consider all of the low cardinality vertices, e.g., BSBM
+	 * Q5 has 3 such vertices. Also, we should not consider vertices when
+	 * looking for the initial edges which are relatively unconstrained (e.g.,
+	 * 1-bound). This could be handled by sampling the top-N vertices in reverse
+	 * rank order of their cardinality and any with a cardinality LT 10x the
+	 * initial sample limit.
+	 */
     static private final int nedges = 2;
 
     static private final SampleType sampleType = SampleType.EVEN;
@@ -240,9 +250,14 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
         final IPredicate<?>[] runtimePredOrder = runRuntimeQueryOptimizer(
                 getQueryEngine(), limit, nedges, sampleType, preds, constraints);
 
+        long totalGivenTime = 0;
         long totalRuntimeTime = 0;
         long totalStaticTime = 0;
         
+		long givenSolutions = 0;
+		long runtimeSolutions = 0;
+		long staticSolutions = 0;
+		
         for (int i = 0; i < ntrials; i++) {
 
             final String RUNTIME = getName() + " : runtime["+i+"] :";
@@ -253,31 +268,59 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
 
             if (runGivenOrder) {
 
-                runQuery(GIVEN, queryEngine, preds, constraints);
-                
+            	final long begin = System.currentTimeMillis();
+				final BOpStats stats = runQuery(GIVEN, queryEngine, preds,
+						constraints);
+				final long nout = stats.unitsOut.get();
+				if (i == 0)
+					givenSolutions = nout;
+				else if (givenSolutions != nout) {
+					fail("#solutions inconsistent for given plan: "
+							+ givenSolutions + " versus " + nout);
+				}
+                totalGivenTime += System.currentTimeMillis() - begin;
+
             }
 
-            if (runStaticQueryOptimizer) {
+			if (runStaticQueryOptimizer) {
 
-                totalStaticTime += runQuery(STATIC, queryEngine,
-                        runStaticQueryOptimizer(getQueryEngine(), preds),
-                        constraints);
+				final long begin = System.currentTimeMillis();
+				final BOpStats stats = runQuery(STATIC, queryEngine,
+						runStaticQueryOptimizer(getQueryEngine(), preds),
+						constraints);
+				final long nout = stats.unitsOut.get();
+				if (i == 0)
+					staticSolutions = nout;
+				else if (staticSolutions != nout) {
+					fail("#solutions inconsistent for static plan: "
+							+ staticSolutions + " versus " + nout);
+				}
+				totalStaticTime += System.currentTimeMillis() - begin;
+			}
 
-            }
+			if (runRuntimeQueryOptimizer) {
 
-            if (runRuntimeQueryOptimizer) {
+				/*
+				 * Run the runtime query optimizer each time (its overhead is
+				 * factored into the running comparison of the two query
+				 * optimizers).
+				 */
+				// final IPredicate[] runtimePredOrder =
+				// runRuntimeQueryOptimizer(new JGraph(
+				// preds));
 
-                /*
-                 * Run the runtime query optimizer each time (its overhead is
-                 * factored into the running comparison of the two query
-                 * optimizers).
-                 */
-//              final IPredicate[] runtimePredOrder = runRuntimeQueryOptimizer(new JGraph(
-//                      preds));
-
-                // Evaluate the query using the selected join order.
-                totalRuntimeTime += runQuery(RUNTIME, queryEngine,
-                        runtimePredOrder, constraints);
+				// Evaluate the query using the selected join order.
+				final long begin = System.currentTimeMillis();
+				final BOpStats stats = runQuery(RUNTIME, queryEngine,
+						runtimePredOrder, constraints);
+				final long nout = stats.unitsOut.get();
+				if (i == 0)
+					runtimeSolutions = nout;
+				else if (runtimeSolutions != nout) {
+					fail("#solutions inconsistent for runtime plan: "
+							+ runtimeSolutions + " versus " + nout);
+				}
+                totalRuntimeTime += System.currentTimeMillis() - begin;
 
             }
 
@@ -289,6 +332,10 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
                     ", runtime=" + totalRuntimeTime + //
                     ", delta(static-runtime)=" + (totalStaticTime - totalRuntimeTime));
         }
+		if (staticSolutions != runtimeSolutions) {
+			fail("#solutions inconsistent: static=" + staticSolutions
+					+ ", runtime=" + runtimeSolutions);
+		}
 
         return runtimePredOrder;
         
@@ -384,9 +431,9 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
     /**
      * Run a query joining a set of {@link IPredicate}s in the given join order.
      * 
-     * @return The elapsed query time (ms).
+     * @return The stats for the last operator in the pipeline.
      */
-    private static long runQuery(final String msg,
+    private static BOpStats runQuery(final String msg,
             final QueryEngine queryEngine, final IPredicate<?>[] predOrder,
             final IConstraint[] constraints) throws Exception {
 
@@ -410,6 +457,8 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
         final PipelineOp queryOp = PartitionedJoinGroup.getQuery(idFactory,
                 predOrder, constraints);
 
+        System.out.println(BOpUtility.toString(queryOp));
+        
         // submit query to runtime optimizer.
         final IRunningQuery q = queryEngine.eval(queryOp);
 
@@ -439,7 +488,7 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
                     + ", elapsed=" + q.getElapsed() + ", nout=" + nout
                     + ", nchunks=" + nchunks + ", stats=" + stats);
 
-            return q.getElapsed();
+            return stats;
 
         } finally {
 

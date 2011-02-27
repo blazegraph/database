@@ -100,7 +100,7 @@ public class TestJoinGraphOnBarData extends AbstractJoinGraphTestCase {
      * large data set to assess the relative performance of the static and
      * runtime query optimizers).
      */
-    private final static boolean useExistingJournal = false;
+    private final static boolean useExistingJournal = true;
     
     protected Journal getJournal(final Properties properties) throws Exception {
 
