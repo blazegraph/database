@@ -1061,6 +1061,8 @@ public class PartitionedJoinGroup {
                         }) //
         );
 
+//        final PipelineOp queryOp = lastOp;
+        
         return queryOp;
 
     }

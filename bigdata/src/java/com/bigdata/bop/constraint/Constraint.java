@@ -81,19 +81,27 @@ public class Constraint extends ImmutableBOp implements IConstraint {
 
     public boolean accept(final IBindingSet bs) {
     	
-    	try {
+//    	try {
     		
     		// evaluate the BVE operator
     		return ((BooleanValueExpression) get(0)).get(bs);
-    		
-    	} catch (Exception ex) {
-    		
-    		// trap the type error and filter out the solution
-    		if (log.isInfoEnabled())
-    			log.info("discarding solution due to error: " + bs);
-    		return false;
-    		
-    	}
+
+//		} catch (Throwable t) {
+//
+//			if (InnerCause.isInnerCause(t, SparqlTypeErrorException.class)) {
+//
+//				// trap the type error and filter out the solution
+//				if (log.isInfoEnabled())
+//					log.info("discarding solution due to type error: " + bs
+//							+ " : " + t);
+//				
+//				return false;
+//
+//			}
+//
+//			throw new RuntimeException(t);
+//
+//    	}
     	
     }
     
