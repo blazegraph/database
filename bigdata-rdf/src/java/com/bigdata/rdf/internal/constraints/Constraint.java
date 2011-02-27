@@ -34,6 +34,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.util.InnerCause;
 
 /**
  * BOpConstraint that wraps a {@link EBVBOp}, which itself computes the 
@@ -85,22 +86,30 @@ public class Constraint extends com.bigdata.bop.constraint.Constraint {
     	return (EBVBOp) super.get(i);
     }
     
-    public boolean accept(final IBindingSet bs) {
-    	
-    	try {
-    		
-    		// evaluate the EBV operator
-    		return get(0).get(bs).booleanValue();
-    		
-    	} catch (SparqlTypeErrorException ex) {
-    		
-    		// trap the type error and filter out the solution
-    		if (log.isInfoEnabled())
-    			log.info("discarding solution due to type error: " + bs);
-    		return false;
-    		
-    	}
-    	
-    }
-    
+	public boolean accept(final IBindingSet bs) {
+
+		try {
+
+			// evaluate the EBV operator
+			return get(0).get(bs).booleanValue();
+
+		} catch (Throwable t) {
+
+			if (InnerCause.isInnerCause(t, SparqlTypeErrorException.class)) {
+
+				// trap the type error and filter out the solution
+				if (log.isInfoEnabled())
+					log.info("discarding solution due to type error: " + bs
+							+ " : " + t);
+
+				return false;
+
+			}
+
+			throw new RuntimeException(t);
+
+		}
+
+	}
+
 }
