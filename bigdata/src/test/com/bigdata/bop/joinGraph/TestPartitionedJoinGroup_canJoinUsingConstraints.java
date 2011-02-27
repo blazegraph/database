@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.joinGraph;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Random;
@@ -49,7 +51,6 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.constraint.AND;
 import com.bigdata.bop.constraint.BooleanValueExpression;
 import com.bigdata.bop.constraint.Constraint;
-import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.bop.joinGraph.rto.JGraph;
 
 /**
@@ -715,5 +716,145 @@ public class TestPartitionedJoinGroup_canJoinUsingConstraints extends TestCase2 
                 ));
 
     }
+
+	/*
+	 * Unit tests for attaching constraints using a specific join path.
+	 */
+
+    private final Set<IConstraint> asSet(IConstraint[] a) {
+    	
+		return new LinkedHashSet<IConstraint>(Arrays.asList(a));
+		
+    }
+    
+	/** no constraints. */
+	final Set<IConstraint> NA = Collections.emptySet();
+
+	/** {@link #c0} attaches when any of [p0,p2,p4,p6] runs for the 1st time. */
+	final Set<IConstraint> C0 = asSet(new IConstraint[]{c0});
+
+	/** {@link #c1} attaches when 2nd of (p3,p4) runs (in any order). */
+	final Set<IConstraint> C1 = asSet(new IConstraint[] { c1 });
+
+	/** {@link #c2} attaches when 2nd of (p5,p6) runs (in any order). */
+	final Set<IConstraint> C2 = asSet(new IConstraint[] { c2 });
+
+	/** <code>path = [1, 2, 4, 6, 0, 3, 5]</code> */
+	public void test_attachConstraints_BSBM_Q5_path01() {
+
+		final IPredicate<?>[] path = { p1, p2, p4, p6, p0, p3, p5 };
+
+		final IConstraint[][] actual = PartitionedJoinGroup
+				.getJoinGraphConstraints(path, constraints,
+						null/* knownBoundVars */, true/* pathIsComplete */);
+
+		final Set<IConstraint>[] expected = new Set[] { //
+				NA, // p1
+				C0, // p2
+				NA, // p4
+				NA, // p6
+				NA, // p0
+				C1, // p3
+				C2, // p5
+		};
+
+		assertSameConstraints(expected, actual);
+
+	}
+
+	/** <code>[5, 3, 1, 0, 2, 4, 6]</code>. */
+	public void test_attachConstraints_BSBM_Q5_path02() {
+
+		final IPredicate<?>[] path = { p5, p3, p1, p0, p2, p4, p6 };
+
+		final IConstraint[][] actual = PartitionedJoinGroup
+				.getJoinGraphConstraints(path, constraints,
+						null/* knownBoundVars */, true/* pathIsComplete */);
+
+		final Set<IConstraint>[] expected = new Set[] { //
+				NA, // p5
+				NA, // p3
+				NA, // p1
+				C0, // p0
+				NA, // p2
+				C1, // p4
+				C2, // p6
+		};
+
+		assertSameConstraints(expected, actual);
+
+	}
+
+	/** <code>[3, 4, 5, 6, 1, 2, 0]</code> (key-range constraint variant). */
+	public void test_attachConstraints_BSBM_Q5_path03() {
+
+		final IPredicate<?>[] path = { p3, p4, p5, p6, p1, p2, p0 };
+
+		final IConstraint[][] actual = PartitionedJoinGroup
+				.getJoinGraphConstraints(path, constraints,
+						null/* knownBoundVars */, true/* pathIsComplete */);
+
+		final Set<IConstraint>[] expected = new Set[] { //
+				NA, // p3
+				asSet(new IConstraint[]{c0,c1}), // p4
+				NA, // p5
+				C2, // p6
+				NA, // p1
+				NA, // p2
+				NA, // p0
+		};
+
+		assertSameConstraints(expected, actual);
+
+	}
+
+	/**
+	 * Verifies that the right set of constraints is attached at each of the
+	 * vertices of a join path. Comparison of {@link IConstraint} instances is
+	 * by reference.
+	 * 
+	 * @param expected
+	 * @param actual
+	 */
+	static void assertSameConstraints(final Set<IConstraint>[] expected,
+			final IConstraint[][] actual) {
+
+		assertEquals("length", expected.length, actual.length);
+
+		for (int i = 0; i < expected.length; i++) {
+
+			final Set<IConstraint> e = expected[i];
+			final IConstraint[] a = actual[i];
+
+			if (e.size() != a.length) {
+				fail("Differs at expected[" + i + "] : expecting " + e.size()
+						+ ", not " + a.length + " elements: "
+						+ Arrays.toString(a));
+			}
+
+			for (int j = 0; j < a.length; j++) {
+
+				boolean foundRef = false;
+				for (IConstraint t : e) {
+
+					if (t == a[j]) {
+						foundRef = true;
+						break;
+					}
+
+				}
+
+				if (!foundRef) {
+
+					fail("Differs at expected[" + i + "][" + j + "] : actual="
+							+ a[j]);
+
+				}
+
+			}
+
+		}
+
+	}
 
 }
