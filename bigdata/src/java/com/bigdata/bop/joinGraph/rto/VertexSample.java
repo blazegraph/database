@@ -37,7 +37,7 @@ public class VertexSample extends SampleBase {
      * historical view or even a time scale of query which is significantly
      * faster than update).
      * 
-     * @param estimatedCardinality
+     * @param estCard
      *            The estimated cardinality.
      * @param limit
      *            The cutoff limit used to make that cardinality estimate.
@@ -49,10 +49,10 @@ public class VertexSample extends SampleBase {
      * @param sample
      *            The sample.
      */
-    public VertexSample(final long estimatedCardinality, final int limit,
+    public VertexSample(final long estCard, final int limit,
             final EstimateEnum estimateEnum, final IBindingSet[] sample) {
 
-        super(estimatedCardinality, limit, estimateEnum, sample);
+        super(estCard, limit, estimateEnum, sample);
 
         switch (estimateEnum) {
         case Normal:

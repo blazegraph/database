@@ -83,23 +83,15 @@ import com.bigdata.bop.rdf.join.DataSetJoin;
  * dominated paths.
  * 
  * TODO Compare the cumulative expected cardinality of a join path with the
- * expected cost of a join path. The latter allows us to also explore
- * alternative join strategies, such as the parallel subquery versus scan and
- * filter decision for named graph and default graph SPARQL queries.
+ * tuples read of a join path. The latter allows us to also explore alternative
+ * join strategies, such as the parallel subquery versus scan and filter
+ * decision for named graph and default graph SPARQL queries.
  * 
  * TODO Coalescing duplicate access paths can dramatically reduce the work
  * performed by a pipelined nested index subquery. (A hash join eliminates all
  * duplicate access paths using a scan and filter approach.) If we will run a
  * pipeline nested index subquery join, then should the runtime query optimizer
  * prefer paths with duplicate access paths?
- * 
- * TODO How can we handle things like lexicon joins. A lexicon join is is only
- * evaluated when the dynamic type of a variable binding indicates that the RDF
- * Value must be materialized by a join against the ID2T index. Binding sets
- * having inlined values can simply be routed around the join against the ID2T
- * index. Routing around saves network IO in scale-out where otherwise we would
- * route binding sets having identifiers which do not need to be materialized to
- * the ID2T shards.
  * 
  * @todo Examine the overhead of the runtime optimizer. Look at ways to prune
  *       its costs. For example, by pruning the search, by recognizing when the
@@ -217,7 +209,9 @@ import com.bigdata.bop.rdf.join.DataSetJoin;
  */
 public class JGraph {
 
-    private static final transient Logger log = Logger.getLogger(JGraph.class);
+    private static final String NA = "N/A";
+
+	private static final transient Logger log = Logger.getLogger(JGraph.class);
 
     /**
      * Vertices of the join graph.
@@ -254,32 +248,37 @@ public class JGraph {
         return sb.toString();
     }
 
-    /**
-     * 
-     * @param v
-     *            The vertices of the join graph. These are
-     *            {@link IPredicate}s associated with required joins.
-     * @param constraints
-     *            The constraints of the join graph (optional). Since all
-     *            joins in the join graph are required, constraints are
-     *            dynamically attached to the first join in which all of
-     *            their variables are bound.
-     * 
-     * @throws IllegalArgumentException
-     *             if the vertices is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if the vertices is an empty array.
-     * @throws IllegalArgumentException
-     *             if any element of the vertices is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if any constraint uses a variable which is never bound by
-     *             the given predicates.
-     * @throws IllegalArgumentException
-     *             if <i>sampleType</i> is <code>null</code>.
-     * 
-     * @todo unit test for a constraint using a variable which is never
-     *       bound.
-     */
+	/**
+	 * 
+	 * @param v
+	 *            The vertices of the join graph. These are {@link IPredicate}s
+	 *            associated with required joins.
+	 * @param constraints
+	 *            The constraints of the join graph (optional). Since all joins
+	 *            in the join graph are required, constraints are dynamically
+	 *            attached to the first join in which all of their variables are
+	 *            bound.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if the vertices is <code>null</code>.
+	 * @throws IllegalArgumentException
+	 *             if the vertices is an empty array.
+	 * @throws IllegalArgumentException
+	 *             if any element of the vertices is <code>null</code>.
+	 * @throws IllegalArgumentException
+	 *             if any constraint uses a variable which is never bound by the
+	 *             given predicates.
+	 * @throws IllegalArgumentException
+	 *             if <i>sampleType</i> is <code>null</code>.
+	 * 
+	 * @todo unit test for a constraint using a variable which is never bound.
+	 *       the constraint should be attached at the last vertex in the join
+	 *       path. this will cause the query to fail unless the variable was
+	 *       already bound, e.g., by a parent query or in the solutions pumped
+	 *       into the {@link JoinGraph} operator.
+	 * 
+	 * @todo unit test when the join graph has a single vertex.
+	 */
     public JGraph(final IPredicate<?>[] v, final IConstraint[] constraints,
             final SampleType sampleType) {
 
@@ -557,30 +556,35 @@ public class JGraph {
          */
         sampleAllVertices(queryEngine, limit);
 
-        if (log.isDebugEnabled()) {
-            final StringBuilder sb = new StringBuilder();
-            sb.append("Vertices:\n");
-            for (Vertex v : V) {
-                sb.append(v.toString());
-                sb.append("\n");
-            }
-            log.debug(sb.toString());
-        }
+		if (log.isInfoEnabled()) {
+			final StringBuilder sb = new StringBuilder();
+			sb.append("Sampled vertices:\n");
+			for (Vertex v : V) {
+				if (v.sample != null) {
+					sb.append("id="+v.pred.getId()+" : ");
+					sb.append(v.sample.toString());
+					sb.append("\n");
+				}
+			}
+			log.info(sb.toString());
+		}
 
         /*
          * Estimate the cardinality for each edge.
          */
         final Path[] a = estimateInitialEdgeWeights(queryEngine, limit);
 
-        if (log.isDebugEnabled()) {
-            final StringBuilder sb = new StringBuilder();
-            sb.append("All possible initial paths:\n");
-            for (Path x : a) {
-                sb.append(x.toString());
-                sb.append("\n");
-            }
-            log.debug(sb.toString());
-        }
+//        if (log.isDebugEnabled()) {
+//            final StringBuilder sb = new StringBuilder();
+//            sb.append("All possible initial paths:\n");
+//            for (Path x : a) {
+//                sb.append(x.toString());
+//                sb.append("\n");
+//            }
+//            log.debug(sb.toString());
+//        }
+        if (log.isInfoEnabled())
+            log.info("\n*** Initial Paths\n" + JGraph.showTable(a));
 
         /*
          * Choose the initial set of paths.
@@ -681,12 +685,11 @@ public class JGraph {
         if (a.length == 0)
             throw new IllegalArgumentException();
         
-        // increment the limit by itself in each round.
-        final int limit = (round + 1) * limitIn;
+//        // increment the limit by itself in each round.
+//        final int limit = (round + 1) * limitIn;
 
         if (log.isDebugEnabled())
-            log.debug("round=" + round + ", limit=" + limit
-                    + ", #paths(in)=" + a.length);
+			log.debug("round=" + round + ", #paths(in)=" + a.length);
 
         /*
          * Re-sample the vertices which are the initial vertex of any of the
@@ -703,9 +706,11 @@ public class JGraph {
          * a NOP if the vertex has been fully materialized.
          */
         if (log.isDebugEnabled())
-            log.debug("Re-sampling in-use vertices: limit=" + limit);
+            log.debug("Re-sampling in-use vertices.");
 
         for (Path x : a) {
+
+			final int limit = x.getNewLimit(limitIn);
 
             x.vertices[0].sample(queryEngine, limit, sampleType);
 
@@ -725,11 +730,22 @@ public class JGraph {
          * a given path prefix more than once per round. 
          */
         if (log.isDebugEnabled())
-            log.debug("Re-sampling in-use path segments: limit=" + limit);
+            log.debug("Re-sampling in-use path segments.");
 
         for (Path x : a) {
 
-            // The cutoff join sample of the one step shorter path segment.
+			/*
+			 * Get the new sample limit for the path.
+			 * 
+			 * TODO We only need to increase the sample limit starting at the
+			 * vertex where we have a cardinality underflow or variability in
+			 * the cardinality estimate. This is increasing the limit in each
+			 * round of expansion, which means that we are reading more data
+			 * than we really need to read.
+			 */
+			final int limit = x.getNewLimit(limitIn);
+
+			// The cutoff join sample of the one step shorter path segment.
             EdgeSample priorEdgeSample = null;
 
             for (int segmentLength = 2; segmentLength <= x.vertices.length; segmentLength++) {
@@ -775,6 +791,7 @@ public class JGraph {
                                 queryEngine, limit,//
                                 x.getPathSegment(2),// 1st edge.
                                 C,// constraints
+								V.length == 2,// pathIsComplete
                                 x.vertices[0].sample// source sample.
                                 );
 
@@ -812,6 +829,7 @@ public class JGraph {
                                 limit,//
                                 x.getPathSegment(ids.length()),//
                                 C, // constraints
+                                V.length == ids.length(), // pathIsComplete
                                 priorEdgeSample//
                                 );
 
@@ -844,14 +862,19 @@ public class JGraph {
          */
 
         if (log.isDebugEnabled())
-            log.debug("Expanding paths: limit=" + limit + ", #paths(in)="
-                    + a.length);
+			log.debug("Expanding paths: #paths(in)=" + a.length);
 
         final List<Path> tmp = new LinkedList<Path>();
 
         for (Path x : a) {
 
-            /*
+			/*
+			 * We already increased the sample limit for the path in the loop
+			 * above.
+			 */
+			final int limit = x.edgeSample.limit;
+
+			/*
              * The set of vertices used to expand this path in this round.
              */
             final Set<Vertex> used = new LinkedHashSet<Vertex>();
@@ -916,9 +939,10 @@ public class JGraph {
                     // add the new vertex to the set of used vertices.
                     used.add(tVertex);
 
-                    // Extend the path to the new vertex.
-                    final Path p = x.addEdge(queryEngine, limit,
-                            tVertex, /*dynamicEdge,*/ C);
+					// Extend the path to the new vertex.
+					final Path p = x
+							.addEdge(queryEngine, limit, tVertex, /* dynamicEdge, */
+									C, x.getVertexCount() + 1 == V.length/* pathIsComplete */);
 
                     // Add to the set of paths for this round.
                     tmp.add(p);
@@ -954,8 +978,9 @@ public class JGraph {
                     final Vertex tVertex = nothingShared.iterator().next();
                     
                     // Extend the path to the new vertex.
-                    final Path p = x.addEdge(queryEngine, limit,
-                            tVertex,/*dynamicEdge*/ C);
+					final Path p = x
+							.addEdge(queryEngine, limit, tVertex,/* dynamicEdge */
+									C, x.getVertexCount() + 1 == V.length/* pathIsComplete */);
 
                     // Add to the set of paths for this round.
                     tmp.add(p);
@@ -981,12 +1006,12 @@ public class JGraph {
         final Path[] paths_tp1_pruned = pruneJoinPaths(paths_tp1, edgeSamples);
 
         if (log.isDebugEnabled())
-            log.debug("\n*** round=" + round + ", limit=" + limit
+            log.debug("\n*** round=" + round 
                     + " : generated paths\n"
                     + JGraph.showTable(paths_tp1, paths_tp1_pruned));
 
         if (log.isInfoEnabled())
-            log.info("\n*** round=" + round + ", limit=" + limit
+            log.info("\n*** round=" + round 
                     + ": paths{in=" + a.length + ",considered="
                     + paths_tp1.length + ",out=" + paths_tp1_pruned.length
                     + "}\n" + JGraph.showTable(paths_tp1_pruned));
@@ -1012,15 +1037,31 @@ public class JGraph {
         return null;
     }
 
-    /**
-     * Obtain a sample and estimated cardinality (fast range count) for each
-     * vertex.
-     * 
-     * @param queryEngine
-     *            The query engine.
-     * @param limit
-     *            The sample size.
-     */
+	/**
+	 * Obtain a sample and estimated cardinality (fast range count) for each
+	 * vertex.
+	 * 
+	 * @param queryEngine
+	 *            The query engine.
+	 * @param limit
+	 *            The sample size.
+	 * 
+	 *            TODO Only sample vertices with an index.
+	 * 
+	 *            TODO Consider other cases where we can avoid sampling a vertex
+	 *            or an initial edge.
+	 *            <p>
+	 *            Be careful about rejecting high cardinality vertices here as
+	 *            they can lead to good solutions (see the "bar" data set
+	 *            example).
+	 *            <p>
+	 *            BSBM Q5 provides a counter example where (unless we translate
+	 *            it into a key-range constraint on an index) some vertices do
+	 *            not share a variable directly and hence will materialize the
+	 *            full cross product before filtering which is *really*
+	 *            expensive.
+	 * 
+	 */
     public void sampleAllVertices(final QueryEngine queryEngine, final int limit) {
 
         for (Vertex v : V) {
@@ -1068,7 +1109,9 @@ public class JGraph {
          * create a join path with a single edge (v,vp) using the sample
          * obtained from the cutoff join.
          */
- 
+
+        final boolean pathIsComplete = 2 == V.length;
+        
         for (int i = 0; i < V.length; i++) {
 
             final Vertex v1 = V[i];
@@ -1106,7 +1149,7 @@ public class JGraph {
                  */
                 
                 final Vertex v, vp;
-                if (v1.sample.estimatedCardinality < v2.sample.estimatedCardinality) {
+                if (v1.sample.estCard < v2.sample.estCard) {
                     v = v1;
                     vp = v2;
                 } else {
@@ -1143,6 +1186,7 @@ public class JGraph {
                         limit, // sample limit
                         preds, // ordered path segment.
                         C, // constraints
+                        pathIsComplete,//
                         v.sample // sourceSample
                         );
 
@@ -1181,6 +1225,7 @@ public class JGraph {
      */
     public Path[] pruneJoinPaths(final Path[] a,
             final Map<PathIds, EdgeSample> edgeSamples) {
+    	final boolean neverPruneUnderflow = true;
         /*
          * Find the length of the longest path(s). All shorter paths are
          * dropped in each round.
@@ -1198,7 +1243,12 @@ public class JGraph {
             final Path Pi = a[i];
             if (Pi.edgeSample == null)
                 throw new RuntimeException("Not sampled: " + Pi);
-            if (Pi.vertices.length < maxPathLen) {
+			if (neverPruneUnderflow
+					&& Pi.edgeSample.estimateEnum == EstimateEnum.Underflow) {
+				// Do not prune if path has cardinality underflow.
+				continue;
+			}
+			if (Pi.vertices.length < maxPathLen) {
                 /*
                  * Only the most recently generated set of paths survive to
                  * the next round.
@@ -1214,16 +1264,21 @@ public class JGraph {
                 final Path Pj = a[j];
                 if (Pj.edgeSample == null)
                     throw new RuntimeException("Not sampled: " + Pj);
-                if (pruned.contains(Pj))
+				if (neverPruneUnderflow
+						&& Pj.edgeSample.estimateEnum == EstimateEnum.Underflow) {
+					// Do not prune if path has cardinality underflow.
+					continue;
+    			}
+    			if (pruned.contains(Pj))
                     continue;
                 final boolean isPiSuperSet = Pi.isUnorderedVariant(Pj);
                 if (!isPiSuperSet) {
                     // Can not directly compare these join paths.
                     continue;
                 }
-                final long costPi = Pi.cumulativeEstimatedCardinality;
-                final long costPj = Pj.cumulativeEstimatedCardinality;
-                final boolean lte = costPi <= costPj;
+                final long costPi = Pi.sumEstCard;
+                final long costPj = Pj.sumEstCard;
+				final boolean lte = costPi <= costPj;
                 List<Integer> prunedByThisPath = null;
                 if (lte) {
                     prunedByThisPath = new LinkedList<Integer>();
@@ -1363,17 +1418,24 @@ public class JGraph {
     static public String showTable(final Path[] a,final Path[] pruned) {
         final StringBuilder sb = new StringBuilder();
         final Formatter f = new Formatter(sb);
-        f.format("%-6s %10s%1s * %10s (%6s %6s %6s) = %10s%1s : %10s %10s",
+        f.format("%-4s %10s%1s * %10s (%8s %8s %8s %8s %8s %8s) = %10s %10s%1s : %10s %10s %10s",
                 "path",//
-                "sourceCard",//
+                "srcCard",//
                 "",// sourceSampleExact
                 "f",//
+                // (
                 "in",//
-                "read",//
+                "sumRgCt",//sumRangeCount
+                "tplsRead",//
                 "out",//
+                "limit",//
+                "adjCard",//
+                // ) =
+                "estRead",//
                 "estCard",//
                 "",// estimateIs(Exact|LowerBound|UpperBound)
-                "sumEstCard",//
+                "sumEstRead",// sumEstimatedTuplesRead
+                "sumEstCard",// sumEstimatedCardinality
                 "joinPath\n"
                 );
         for (int i = 0; i < a.length; i++) {
@@ -1391,21 +1453,27 @@ public class JGraph {
             }
             final EdgeSample edgeSample = x.edgeSample;
             if (edgeSample == null) {
-                f.format("%6d %10s%1s * %10s (%6s %6s %6s) = %10s%1s : %10s",//
-                            i, "N/A", "", "N/A", "N/A", "N/A", "N/A", "N/A", "",
-                                "N/A");
+                f.format("%4d %10s%1s * %10s (%8s %8s %8s %8s %8s %8s) = %10s %10s%1s : %10s %10s",//
+                            i, NA, "", NA, NA, NA, NA, NA, NA, NA, NA, NA, "", NA,
+                                NA);
             } else {
-                f.format("%6d %10d%1s * % 10.2f (%6d %6d %6d) = % 10d%1s : % 10d", //
+                f.format("%4d %10d%1s * % 10.2f (%8d %8d %8d %8d %8d %8d) = %10d % 10d%1s : % 10d % 10d", //
                         i,//
-                        edgeSample.sourceSample.estimatedCardinality,//
+                        edgeSample.sourceSample.estCard,//
                         edgeSample.sourceSample.estimateEnum.getCode(),//
                         edgeSample.f,//
                         edgeSample.inputCount,//
+                        edgeSample.sumRangeCount,//
                         edgeSample.tuplesRead,//
                         edgeSample.outputCount,//
-                        edgeSample.estimatedCardinality,//
+                        edgeSample.limit,//
+                        edgeSample.adjCard,//
+                        // =
+                        edgeSample.estRead,//
+                        edgeSample.estCard,//
                         edgeSample.estimateEnum.getCode(),//
-                        x.cumulativeEstimatedCardinality//
+                        x.sumEstRead,//
+                        x.sumEstCard//
                         );
             }
             sb.append("  [");
@@ -1443,70 +1511,103 @@ public class JGraph {
             /*
              * @todo show limit on samples?
              */
-            f.format("%6s %10s%1s * %10s (%6s %6s %6s) = %10s%1s : %10s",//
-                    "vertex",
-                    "sourceCard",//
+            f.format("%4s %10s%1s * %10s (%8s %8s %8s %8s %8s %8s) = %10s %10s%1s : %10s %10s",// %10s %10s",//
+                    "vert",
+                    "srcCard",//
                     "",// sourceSampleExact
                     "f",//
+                    // (
                     "in",//
-                    "read",//
+                    "sumRgCt",// sumRangeCount
+                    "tplsRead",// tuplesRead
                     "out",//
+                    "limit",//
+                    "adjCard",//
+                    // ) =
+                    "estRead",//
                     "estCard",//
                     "",// estimateIs(Exact|LowerBound|UpperBound)
+                    "sumEstRead",//
                     "sumEstCard"//
                     );
-            long sumEstCard = 0;
+            long sumEstRead = 0; // sum(estRead), where estRead := tuplesRead*f
+            long sumEstCard = 0; // sum(estCard)
+//            double sumEstCost = 0; // sum(f(estCard,estRead))
             for (int i = 0; i < x.vertices.length; i++) {
                 final int[] ids = BOpUtility
                         .getPredIds(x.getPathSegment(i + 1));
                 final int predId = x.vertices[i].pred.getId();
                 final SampleBase sample;
-                if(i==0) {
-                    sample = x.vertices[i].sample;
-                } else {
-                    // edge sample from the caller's map.
-                    sample = edgeSamples.get(new PathIds(ids));
-                }
-                if (sample != null) {
-                    sumEstCard += sample.estimatedCardinality;
-                    if (sample instanceof EdgeSample)
-                        sumEstCard += ((EdgeSample) sample).tuplesRead;
-                }
+				if (i == 0) {
+					sample = x.vertices[i].sample;
+					if (sample != null) {
+						sumEstRead = sample.estCard; // dbls as estRead for vtx
+						sumEstCard = sample.estCard;
+					}
+				} else {
+					// edge sample from the caller's map.
+					sample = edgeSamples.get(new PathIds(ids));
+	                if (sample != null) {
+                        sumEstRead+= ((EdgeSample) sample).estRead;
+                        sumEstCard += ((EdgeSample) sample).estCard;
+	                }
+				}
                 sb.append("\n");
                 if (sample == null) {
-                    f.format("% 6d %10s%1s * %10s (%6s %6s %6s) = %10s%1s : %10s",//
+                    f.format("% 4d %10s%1s * %10s (%8s %8s %8s %8s %8s %8s) = %10s %10s%1s : %10s %10s",// %10s %10s",//
                             predId,//
-                            "N/A", "", "N/A", "N/A", "N/A", "N/A", "N/A", "", "N/A");
+                            NA, "", NA, NA, NA, NA, NA, NA, NA, NA, NA, "", NA, NA);//,NA,NA);
                 } else if(sample instanceof VertexSample) {
-                    // Show the vertex sample for the initial vertex.
-                    f.format("% 6d %10s%1s * %10s (%6s %6s %6s) = % 10d%1s : %10d",//
+					/*
+					 * Show the vertex sample for the initial vertex.
+					 * 
+					 * Note: we do not store all fields for a vertex sample
+					 * which are stored for an edge sample because so many of
+					 * the values are redundant for a vertex sample. Therefore,
+					 * this sets up local variables which are equivalent to the
+					 * various edge sample columns that we will display.
+					 */
+                	final long sumRangeCount = sample.estCard;
+                	final long estRead = sample.estCard;
+					final long tuplesRead = Math.min(sample.estCard, sample.limit);
+					final long outputCount = Math.min(sample.estCard, sample.limit);
+					final long adjCard = Math.min(sample.estCard, sample.limit);
+                    f.format("% 4d %10s%1s * %10s (%8s %8s %8s %8s %8s %8s) = % 10d % 10d%1s : %10d %10d",// %10d %10s",//
                             predId,//
-                            "N/A",//sample.sourceSample.estimatedCardinality,//
-                            " ",//sample.sourceSample.isExact() ? "E" : "",//
+                            " ",//srcSample.estCard
+                            " ",//srcSample.estimateEnum
                             " ",//sample.f,//
-                            "N/A",//sample.inputCount,//
-                            "N/A",//sample.tuplesRead,//
-                            "N/A",//sample.outputCount,//
-                            sample.estimatedCardinality,//
+                            " ",//sample.inputCount,
+                            sumRangeCount,//
+                            tuplesRead,//
+                            outputCount,//
+                            sample.limit,// limit
+                            adjCard,// adjustedCard
+                            estRead,// estRead
+                            sample.estCard,// estCard
                             sample.estimateEnum.getCode(),//
+                            sumEstRead,//
                             sumEstCard//
-//                          e.cumulativeEstimatedCardinality//
                             );
                 } else {
                     // Show the sample for a cutoff join with the 2nd+ vertex.
                     final EdgeSample edgeSample = (EdgeSample)sample;
-                    f.format("% 6d %10d%1s * % 10.2f (%6d %6d %6d) = % 10d%1s : %10d",//
+                    f.format("% 4d %10d%1s * % 10.2f (%8d %8d %8d %8d %8d %8d) = % 10d % 10d%1s : %10d %10d",// %10d %10",//
                             predId,//
-                            edgeSample.sourceSample.estimatedCardinality,//
+                            edgeSample.sourceSample.estCard,//
                             edgeSample.sourceSample.estimateEnum.getCode(),//
                             edgeSample.f,//
                             edgeSample.inputCount,//
+                            edgeSample.sumRangeCount,//
                             edgeSample.tuplesRead,//
                             edgeSample.outputCount,//
-                            edgeSample.estimatedCardinality,//
+                            edgeSample.limit,//
+                            edgeSample.adjCard,//
+                            edgeSample.estRead,//
+                            edgeSample.estCard,//
                             edgeSample.estimateEnum.getCode(),//
+                            sumEstRead,//
                             sumEstCard//
-//                          e.cumulativeEstimatedCardinality//
                             );
                 }
             }
