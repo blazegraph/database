@@ -467,12 +467,13 @@ public class TestPartitionedJoinGroup extends TestCase2 {
 
     }
     
-    /**
-     * @todo test with headPlan.
-     */
-    public void test_something() {
-        fail("write tests");
-    }
+//    /**
+//     * @todo test with headPlan (actually, I think that we will remove
+//     * the head plan from the PartitionedJoinGraph).
+//     */
+//    public void test_something_headPlan() {
+//        fail("write tests");
+//    }
 
     /**
      * Verifies that the iterator visits the specified objects in some arbitrary
