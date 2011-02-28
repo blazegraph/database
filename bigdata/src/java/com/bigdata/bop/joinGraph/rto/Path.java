@@ -158,20 +158,25 @@ public class Path {
 	 * reflects the #of tuples read from the disk. These two measures are
 	 * tracked separately and then combined into the {@link #sumEstCost}.
 	 */
-    final public double sumEstCost;
-    
-    /**
-     * Combine the cumulative expected cardinality and the cumulative expected
-     * tuples read to produce an overall measure of the expected cost of the
-     * join path if it were to be fully executed.
-     * 
-     * @return The cumulative estimated cost of the join path.
-     */
-    private static double getTotalCost(final Path p) {
+    final public long sumEstCost;
 
-		final long total = p.sumEstCard + //
-				p.sumEstRead//
-		;
+	/**
+	 * Combine the cumulative expected cardinality and the cumulative expected
+	 * tuples read to produce an overall measure of the expected cost of the
+	 * join path if it were to be fully executed.
+	 * 
+	 * @return The cumulative estimated cost of the join path.
+	 * 
+	 *         TODO Compute this incrementally as estCost using estRead and
+	 *         estCard and then take the running sum as sumEstCost and update
+	 *         the JGraph trace appropriately.
+	 */
+	private static long getCost(final long sumEstRead, final long sumEstCard) {
+
+		final long total;
+//		total = sumEstCard + sumEstRead; // intermediate results + IO.
+//		total = sumEstRead; // just IO
+		total = sumEstCard; // just intermediate results.
 
         return total;
         
@@ -193,8 +198,12 @@ public class Path {
 //            sb.append(e.getLabel());
 //            first = false;
 //        }
-        sb.append("],cumEstCard=" + sumEstCard
-                + ",sample=" + edgeSample + "}");
+		sb.append("]");
+		sb.append(",sumEstRead=" + sumEstRead);
+		sb.append(",sumEstCard=" + sumEstCard);
+		sb.append(",sumEstCost=" + sumEstCost);
+		sb.append(",sample=" + edgeSample);
+		sb.append("}");
         return sb.toString();
     }
 
@@ -243,18 +252,18 @@ public class Path {
         this.edgeSample = edgeSample;
 
 		/*
-		 * The estimated cardinality of the cutoff join of (v0,v1).
-		 */
-		this.sumEstCard = edgeSample.estCard;
-
-		/*
 		 * The expected #of tuples read for the full join of (v0,v1). This is
 		 * everything which could be visited for [v0] plus the #of tuples read
 		 * from [v1] during the cutoff join times the (adjusted) join hit ratio.
 		 */
 		this.sumEstRead = v0.sample.estCard + edgeSample.estRead;
 
-		this.sumEstCost = getTotalCost(this);
+		/*
+		 * The estimated cardinality of the cutoff join of (v0,v1).
+		 */
+		this.sumEstCard = edgeSample.estCard;
+
+		this.sumEstCost = getCost(this.sumEstRead, this.sumEstCard);
 		
     }
 
@@ -312,7 +321,7 @@ public class Path {
 
 		this.sumEstRead = sumEstRead;
 
-		this.sumEstCost = getTotalCost(this);
+		this.sumEstCost = getCost(this.sumEstRead, this.sumEstCard);
         
     }
 
@@ -618,29 +627,27 @@ public class Path {
         // The new vertex.
         final Vertex targetVertex = vnew;
 
-        /*
-         * Chain sample the edge.
-         * 
-         * Note: ROX uses the intermediate result I(p) for the existing path as
-         * the input when sampling the edge. The corresponding concept for us is
-         * the sample for this Path, which will have all variable bindings
-         * produced so far. In order to estimate the cardinality of the new join
-         * path we have to do a one step cutoff evaluation of the new Edge,
-         * given the sample available on the current Path.
-         * 
-         * FIXME It is possible for the resulting edge sample to be empty (no
-         * solutions). Unless the sample also happens to be exact, this is an
-         * indication that the estimated cardinality has underflowed. We track
-         * the estimated cumulative cardinality, so this does not make the join
-         * path an immediate winner, but it does mean that we can not probe
-         * further on that join path as we lack any intermediate solutions to
-         * feed into the downstream joins. To resolve that, we have to increase
-         * the sample limit (unless the path is the winner, in which case we can
-         * fully execute the join path segment and materialize the results and
-         * use those to probe further, but this will require the use of the
-         * memory manager to keep the materialized intermediate results off of
-         * the Java heap).
-         */
+		/*
+		 * Chain sample the edge.
+		 * 
+		 * Note: ROX uses the intermediate result I(p) for the existing path as
+		 * the input when sampling the edge. The corresponding concept for us is
+		 * the sample for this Path, which will have all variable bindings
+		 * produced so far. In order to estimate the cardinality of the new join
+		 * path we have to do a one step cutoff evaluation of the new Edge,
+		 * given the sample available on the current Path.
+		 * 
+		 * Note: It is possible for the resulting edge sample to be empty (no
+		 * solutions). Unless the sample also happens to be exact, this is an
+		 * indication that the estimated cardinality has underflowed. We track
+		 * the estimated cumulative cardinality, so this does not make the join
+		 * path an immediate winner, but it does mean that we can not probe
+		 * further on that join path as we lack any intermediate solutions to
+		 * feed into the downstream joins. To resolve that, we have to increase
+		 * the sample limit (unless the path is the winner, in which case we can
+		 * fully execute the join path segment and materialize the results and
+		 * use those to probe further).
+		 */
 
         // Ordered array of all predicates including the target vertex.
         final IPredicate<?>[] preds2;
@@ -846,15 +853,22 @@ public class Path {
                         runningQuery.iterator());
                 while (itr.hasNext()) {
                     bset = itr.next();
-                    result.add(bset);
-                    nresults++; // TODO break out if cutoff join over produces!
+					result.add(bset);
+					if (nresults++ >= limit) {
+						// Break out if cutoff join over produces!
+						break;
+                    }
                 }
             } finally {
-                // verify no problems.
-                runningQuery.get(); // TODO CANCEL query once limit is satisfied THEN check the future for errors.
+            	// ensure terminated regardless.
+                runningQuery.cancel(true/* mayInterruptIfRunning */);
             }
-        } finally {
-            runningQuery.cancel(true/* mayInterruptIfRunning */);
+		} finally {
+			// verify no problems.
+			if (runningQuery.getCause() != null) {
+				// wrap throwable from abnormal termination.
+				throw new RuntimeException(runningQuery.getCause());
+            }
         }
 
         // The join hit ratio can be computed directly from these stats.

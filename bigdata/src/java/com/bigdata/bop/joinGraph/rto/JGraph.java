@@ -37,6 +37,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 
@@ -415,6 +416,27 @@ public class JGraph {
         
         while (paths.length > 0 && round < nvertices - 1) {
 
+			/*
+			 * Resample the paths.
+			 * 
+			 * Note: Since the vertex samples are random, it is possible for the
+			 * #of paths with cardinality estimate underflow to jump up and down
+			 * due to the sample which is making its way through each path in
+			 * each round.
+			 */
+			int nunderflow;
+
+			while ((nunderflow = resamplePaths(queryEngine, limit, round,
+					paths, edgeSamples)) > 0) {
+			
+				log.warn("resampling in round=" + round + " : " + nunderflow
+						+ " paths have cardinality estimate underflow.");
+				
+			}
+
+            /*
+             * Extend the paths by one vertex.
+             */
             paths = expand(queryEngine, limit, round++, paths, edgeSamples);
 
         }
@@ -426,8 +448,11 @@ public class JGraph {
             
         }
         
-        // Should be one winner.
-        assert paths.length == 1;
+		// Should be one winner.
+		if (paths.length != 1) {
+			throw new AssertionError("Expected one path but have "
+					+ paths.length + " paths.");
+        }
 
         if (log.isInfoEnabled()) {
 
@@ -629,48 +654,30 @@ public class JGraph {
 
     }
 
-    /**
-     * Do one breadth first expansion. In each breadth first expansion we extend
-     * each of the active join paths by one vertex for each remaining vertex
-     * which enjoys a constrained join with that join path. In the event that
-     * there are no remaining constrained joins, we will extend the join path
-     * using an unconstrained join if one exists. In all, there are three
-     * classes of joins to be considered:
-     * <ol>
-     * <li>The target predicate directly shares a variable with the source join
-     * path. Such joins are always constrained since the source predicate will
-     * have bound that variable.</li>
-     * <li>The target predicate indirectly shares a variable with the source
-     * join path via a constraint can run for the target predicate and which
-     * shares a variable with the source join path. These joins are indirectly
-     * constrained by the shared variable in the constraint. BSBM Q5 is an
-     * example of this case.</li>
-     * <li>Any predicates may always be join to an existing join path. However,
-     * joins which do not share variables either directly or indirectly will be
-     * full cross products. Therefore such joins are added to the join path only
-     * after all constrained joins have been consumed.</li>
-     * </ol>
-     * 
-     * @param queryEngine
-     *            The query engine.
-     * @param limitIn
-     *            The limit (this is automatically multiplied by the round to
-     *            increase the sample size in each round).
-     * @param round
-     *            The round number in [1:n].
-     * @param a
-     *            The set of paths from the previous round. For the first round,
-     *            this is formed from the initial set of edges to consider.
-     * @param edgeSamples
-     *            A map used to associate join path segments (expressed as an
-     *            ordered array of bopIds) with {@link EdgeSample}s to avoid
-     *            redundant effort.
-     * 
-     * @return The set of paths which survived pruning in this round.
-     * 
-     * @throws Exception
-     */
-    public Path[] expand(final QueryEngine queryEngine, int limitIn,
+	/**
+	 * Resample the initial vertices for the specified join paths and then
+	 * resample the cutoff join for each given join path in path order.
+	 * 
+	 * @param queryEngine
+	 *            The query engine.
+	 * @param limitIn
+	 *            The original limit.
+	 * @param round
+	 *            The round number in [1:n].
+	 * @param a
+	 *            The set of paths from the previous round. For the first round,
+	 *            this is formed from the initial set of edges to consider.
+	 * @param edgeSamples
+	 *            A map used to associate join path segments (expressed as an
+	 *            ordered array of bopIds) with {@link EdgeSample}s to avoid
+	 *            redundant effort.
+	 * 
+	 * @return The number of join paths which are experiencing cardinality
+	 *         estimate underflow.
+	 * 
+	 * @throws Exception
+	 */
+    public int resamplePaths(final QueryEngine queryEngine, int limitIn,
             final int round, final Path[] a,
             final Map<PathIds, EdgeSample> edgeSamples) throws Exception {
 
@@ -684,37 +691,59 @@ public class JGraph {
             throw new IllegalArgumentException();
         if (a.length == 0)
             throw new IllegalArgumentException();
-        
-//        // increment the limit by itself in each round.
-//        final int limit = (round + 1) * limitIn;
+    	
+		/*
+		 * Re-sample the vertices which are the initial vertex of any of the
+		 * existing paths.
+		 * 
+		 * Note: We do not need to resample vertices unless they are the first
+		 * vertex in some path. E.g., the initial vertices from which we start.
+		 * The inputs to an EdgeSample are always either the sample of an
+		 * initial vertex or the sample of a prior cutoff join in the join
+		 * path's own history.
+		 * 
+		 * Note: A request to re-sample a vertex is a NOP unless the limit has
+		 * been increased since the last time the vertex was sampled. It is also
+		 * a NOP if the vertex has been fully materialized.
+		 * 
+		 * Note: Before resampling the vertices, decide what the maximum limit
+		 * will be for each vertex by examining the paths using that vertex,
+		 * their current sample limit (TODO there should be a distinct limit for
+		 * the vertex and for each cutoff join), and whether or not each path
+		 * experiences a cardinality estimate underflow.
+		 */
+		{
 
-        if (log.isDebugEnabled())
-			log.debug("round=" + round + ", #paths(in)=" + a.length);
+			if (log.isDebugEnabled())
+				log.debug("Re-sampling in-use vertices.");
 
-        /*
-         * Re-sample the vertices which are the initial vertex of any of the
-         * existing paths.
-         * 
-         * Note: We do not need to resample vertices unless they are the first
-         * vertex in some path. E.g., the initial vertices from which we start.
-         * The inputs to an EdgeSample are always either the sample of an
-         * initial vertex or the sample of a prior cutoff join in the join
-         * path's own history.
-         * 
-         * Note: A request to re-sample a vertex is a NOP unless the limit has
-         * been increased since the last time the vertex was sampled. It is also
-         * a NOP if the vertex has been fully materialized.
-         */
-        if (log.isDebugEnabled())
-            log.debug("Re-sampling in-use vertices.");
+			final Map<Vertex, AtomicInteger/* limit */> vertexLimit = new LinkedHashMap<Vertex, AtomicInteger>();
 
-        for (Path x : a) {
+			for (Path x : a) {
 
-			final int limit = x.getNewLimit(limitIn);
+				final int limit = x.getNewLimit(limitIn);
 
-            x.vertices[0].sample(queryEngine, limit, sampleType);
+				final Vertex v = x.vertices[0];
 
-        }
+				AtomicInteger theLimit = vertexLimit.get(v);
+				if (theLimit == null) {
+					vertexLimit.put(v, theLimit = new AtomicInteger());
+				}
+				theLimit.set(limit);
+
+			}
+
+			for (Path x : a) {
+
+				final Vertex v = x.vertices[0];
+
+				final int limit = vertexLimit.get(v).intValue();
+
+				v.sample(queryEngine, limit, sampleType);
+
+			}
+
+		}
 
         /*
          * Re-sample the cutoff join for each edge in each of the existing
@@ -732,6 +761,7 @@ public class JGraph {
         if (log.isDebugEnabled())
             log.debug("Re-sampling in-use path segments.");
 
+        int nunderflow = 0;
         for (Path x : a) {
 
 			/*
@@ -759,8 +789,8 @@ public class JGraph {
 
                 if (edgeSample != null && edgeSample.limit < limit
                         && !edgeSample.isExact()) {
-                    if (log.isDebugEnabled())
-                        log.debug("Will resample at higher limit: " + ids);
+                    if (log.isTraceEnabled())
+                        log.trace("Will resample at higher limit: " + ids);
                     // Time to resample this edge.
                     edgeSamples.remove(ids);
                     edgeSample = null;
@@ -833,8 +863,8 @@ public class JGraph {
                                 priorEdgeSample//
                                 );
 
-                        if (log.isDebugEnabled())
-                            log.debug("Resampled: " + ids + " : " + edgeSample);
+                        if (log.isTraceEnabled())
+                            log.trace("Resampled: " + ids + " : " + edgeSample);
 
                         if (edgeSamples.put(ids, edgeSample) != null)
                             throw new AssertionError();
@@ -853,8 +883,79 @@ public class JGraph {
 
             // Save the result on the path.
             x.edgeSample = priorEdgeSample;
+            
+			if (x.edgeSample.estimateEnum == EstimateEnum.Underflow) {
+				if (log.isDebugEnabled())
+					log.debug("Cardinality underflow: " + x);
+				nunderflow++;
+            }
 
         } // next Path [x].
+
+        return nunderflow;
+
+    }
+
+    /**
+     * Do one breadth first expansion. In each breadth first expansion we extend
+     * each of the active join paths by one vertex for each remaining vertex
+     * which enjoys a constrained join with that join path. In the event that
+     * there are no remaining constrained joins, we will extend the join path
+     * using an unconstrained join if one exists. In all, there are three
+     * classes of joins to be considered:
+     * <ol>
+     * <li>The target predicate directly shares a variable with the source join
+     * path. Such joins are always constrained since the source predicate will
+     * have bound that variable.</li>
+     * <li>The target predicate indirectly shares a variable with the source
+     * join path via a constraint can run for the target predicate and which
+     * shares a variable with the source join path. These joins are indirectly
+     * constrained by the shared variable in the constraint. BSBM Q5 is an
+     * example of this case.</li>
+     * <li>Any predicates may always be join to an existing join path. However,
+     * joins which do not share variables either directly or indirectly will be
+     * full cross products. Therefore such joins are added to the join path only
+     * after all constrained joins have been consumed.</li>
+     * </ol>
+     * 
+     * @param queryEngine
+     *            The query engine.
+     * @param limitIn
+     *            The original limit.
+     * @param round
+     *            The round number in [1:n].
+     * @param a
+     *            The set of paths from the previous round. For the first round,
+     *            this is formed from the initial set of edges to consider.
+     * @param edgeSamples
+     *            A map used to associate join path segments (expressed as an
+     *            ordered array of bopIds) with {@link EdgeSample}s to avoid
+     *            redundant effort.
+     * 
+     * @return The set of paths which survived pruning in this round.
+     * 
+     * @throws Exception
+     */
+    public Path[] expand(final QueryEngine queryEngine, int limitIn,
+            final int round, final Path[] a,
+            final Map<PathIds, EdgeSample> edgeSamples) throws Exception {
+
+        if (queryEngine == null)
+            throw new IllegalArgumentException();
+        if (limitIn <= 0)
+            throw new IllegalArgumentException();
+        if (round <= 0)
+            throw new IllegalArgumentException();
+        if (a == null)
+            throw new IllegalArgumentException();
+        if (a.length == 0)
+            throw new IllegalArgumentException();
+        
+//        // increment the limit by itself in each round.
+//        final int limit = (round + 1) * limitIn;
+
+        if (log.isDebugEnabled())
+			log.debug("round=" + round + ", #paths(in)=" + a.length);
 
         /*
          * Expand each path one step from each vertex which branches to an
@@ -1005,12 +1106,13 @@ public class JGraph {
 
         final Path[] paths_tp1_pruned = pruneJoinPaths(paths_tp1, edgeSamples);
 
-        if (log.isDebugEnabled())
-            log.debug("\n*** round=" + round 
-                    + " : generated paths\n"
-                    + JGraph.showTable(paths_tp1, paths_tp1_pruned));
+        if (log.isDebugEnabled()) // shows which paths were pruned.
+			log.info("\n*** round=" + round + ": paths{in=" + a.length
+					+ ",considered=" + paths_tp1.length + ",out="
+					+ paths_tp1_pruned.length + "}\n"
+					+ JGraph.showTable(paths_tp1, paths_tp1_pruned));
 
-        if (log.isInfoEnabled())
+        if (log.isInfoEnabled()) // only shows the surviving paths.
             log.info("\n*** round=" + round 
                     + ": paths{in=" + a.length + ",considered="
                     + paths_tp1.length + ",out=" + paths_tp1_pruned.length
@@ -1243,11 +1345,6 @@ public class JGraph {
             final Path Pi = a[i];
             if (Pi.edgeSample == null)
                 throw new RuntimeException("Not sampled: " + Pi);
-			if (neverPruneUnderflow
-					&& Pi.edgeSample.estimateEnum == EstimateEnum.Underflow) {
-				// Do not prune if path has cardinality underflow.
-				continue;
-			}
 			if (Pi.vertices.length < maxPathLen) {
                 /*
                  * Only the most recently generated set of paths survive to
@@ -1256,28 +1353,32 @@ public class JGraph {
                 pruned.add(Pi);
                 continue;
             }
-            if (pruned.contains(Pi))
+            if (pruned.contains(Pi)) {
+            	// already pruned.
                 continue;
+            }
+			if (neverPruneUnderflow
+					&& Pi.edgeSample.estimateEnum == EstimateEnum.Underflow) {
+				// Do not use path to prune if path has cardinality underflow.
+				continue;
+			}
             for (int j = 0; j < a.length; j++) {
                 if (i == j)
                     continue;
                 final Path Pj = a[j];
                 if (Pj.edgeSample == null)
                     throw new RuntimeException("Not sampled: " + Pj);
-				if (neverPruneUnderflow
-						&& Pj.edgeSample.estimateEnum == EstimateEnum.Underflow) {
-					// Do not prune if path has cardinality underflow.
-					continue;
-    			}
-    			if (pruned.contains(Pj))
+    			if (pruned.contains(Pj)) {
+    				// already pruned.
                     continue;
+    			}
                 final boolean isPiSuperSet = Pi.isUnorderedVariant(Pj);
                 if (!isPiSuperSet) {
                     // Can not directly compare these join paths.
                     continue;
                 }
-                final long costPi = Pi.sumEstCard;
-                final long costPj = Pj.sumEstCard;
+                final long costPi = Pi.sumEstCost;
+                final long costPj = Pj.sumEstCost;
 				final boolean lte = costPi <= costPj;
                 List<Integer> prunedByThisPath = null;
                 if (lte) {
@@ -1418,7 +1519,7 @@ public class JGraph {
     static public String showTable(final Path[] a,final Path[] pruned) {
         final StringBuilder sb = new StringBuilder();
         final Formatter f = new Formatter(sb);
-        f.format("%-4s %10s%1s * %10s (%8s %8s %8s %8s %8s %8s) = %10s %10s%1s : %10s %10s %10s",
+        f.format("%-4s %10s%1s * %10s (%8s %8s %8s %8s %8s %8s) = %10s %10s%1s : %10s %10s %10s %10s",
                 "path",//
                 "srcCard",//
                 "",// sourceSampleExact
@@ -1434,8 +1535,9 @@ public class JGraph {
                 "estRead",//
                 "estCard",//
                 "",// estimateIs(Exact|LowerBound|UpperBound)
-                "sumEstRead",// sumEstimatedTuplesRead
-                "sumEstCard",// sumEstimatedCardinality
+                "sumEstRead",//
+                "sumEstCard",//
+                "sumEstCost",//
                 "joinPath\n"
                 );
         for (int i = 0; i < a.length; i++) {
@@ -1453,11 +1555,11 @@ public class JGraph {
             }
             final EdgeSample edgeSample = x.edgeSample;
             if (edgeSample == null) {
-                f.format("%4d %10s%1s * %10s (%8s %8s %8s %8s %8s %8s) = %10s %10s%1s : %10s %10s",//
-                            i, NA, "", NA, NA, NA, NA, NA, NA, NA, NA, NA, "", NA,
+                f.format("%4d %10s%1s * %10s (%8s %8s %8s %8s %8s %8s) = %10s %10s%1s : %10s %10s %10s",//
+                            i, NA, "", NA, NA, NA, NA, NA, NA, NA, NA, NA, "", NA, NA,
                                 NA);
             } else {
-                f.format("%4d %10d%1s * % 10.2f (%8d %8d %8d %8d %8d %8d) = %10d % 10d%1s : % 10d % 10d", //
+                f.format("%4d %10d%1s * % 10.2f (%8d %8d %8d %8d %8d %8d) = %10d % 10d%1s : % 10d % 10d % 10d", //
                         i,//
                         edgeSample.sourceSample.estCard,//
                         edgeSample.sourceSample.estimateEnum.getCode(),//
@@ -1473,7 +1575,8 @@ public class JGraph {
                         edgeSample.estCard,//
                         edgeSample.estimateEnum.getCode(),//
                         x.sumEstRead,//
-                        x.sumEstCard//
+                        x.sumEstCard,//
+                        x.sumEstCost
                         );
             }
             sb.append("  [");

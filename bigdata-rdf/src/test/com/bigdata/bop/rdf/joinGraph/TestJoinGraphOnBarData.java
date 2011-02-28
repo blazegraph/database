@@ -265,15 +265,16 @@ public class TestJoinGraphOnBarData extends AbstractJoinGraphTestCase {
 			}
 		}
 
-		final IPredicate[] preds;
-		final IPredicate p0, p1, p2, p3, p4, p5;
+		final IVariable<?>[] selected;
+		final IPredicate<?>[] preds;
+		final IPredicate<?> p0, p1, p2, p3, p4, p5;
 		{
 //			a, value, d, b, f
-			final IVariable<?> a = Var.var("a");
-			final IVariable<?> value = Var.var("value");
-			final IVariable<?> d = Var.var("d");
-			final IVariable<?> b = Var.var("b");
-			final IVariable<?> f = Var.var("f");
+			final IVariable<?> a = Var.var("a"); // ?item
+			final IVariable<?> value = Var.var("value"); // ?value
+			final IVariable<?> d = Var.var("d"); // ?type
+			final IVariable<?> b = Var.var("b"); // ?order
+			final IVariable<?> f = Var.var("f"); // ?employeeNum
 			
 			final IVariable<?> g0 = Var.var("g0");
 			final IVariable<?> g1 = Var.var("g1");
@@ -281,13 +282,14 @@ public class TestJoinGraphOnBarData extends AbstractJoinGraphTestCase {
 			final IVariable<?> g3 = Var.var("g3");
 			final IVariable<?> g4 = Var.var("g4");
 			final IVariable<?> g5 = Var.var("g5");
-			
+
+			selected = new IVariable[]{f,d};
 
 			// The name space for the SPO relation.
 			final String[] spoRelation = new String[] { namespace + ".spo" };
 
-			// The name space for the Lexicon relation.
-			final String[] lexRelation = new String[] { namespace + ".lex" };
+//			// The name space for the Lexicon relation.
+//			final String[] lexRelation = new String[] { namespace + ".lex" };
 
 			final long timestamp = database.getIndexManager().getLastCommitTime();
 
@@ -348,7 +350,10 @@ public class TestJoinGraphOnBarData extends AbstractJoinGraphTestCase {
 
 		}
 
-        final IPredicate<?>[] runtimeOrder = doTest(preds, null/* constraints */);
+		// TODO Should use GROUP BY with SELECT expression rather than DISTINCT.
+		final boolean distinct = true;
+		final IPredicate<?>[] runtimeOrder = doTest(distinct, selected, preds,
+				null/* constraints */);
 
         {
             /*
@@ -360,8 +365,10 @@ public class TestJoinGraphOnBarData extends AbstractJoinGraphTestCase {
              */
             
             // after the refactor.
-            final int[] expected = new int[]{0, 1, 2, 3, 4, 5};
-            
+            final int[] expected;
+			expected = new int[] { 0, 1, 2, 3, 4, 5 }; // estCard
+//			expected = new int[] { 0, 1, 2, 3, 4, 5 }; // estRead
+
             // before the refactor.
 //            final int[] expected = new int[] { 0, 1, 3, 2, 4, 5 };
             
