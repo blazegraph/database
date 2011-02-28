@@ -42,6 +42,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
@@ -160,6 +161,65 @@ public class TestDistinctBindingSets extends TestCase2 {
         data = null;
 
     }
+    
+    public void test_ctor_correctRejection() {
+    	
+        final Var<?> x = Var.var("x");
+
+        final int distinctId = 1;
+
+        // w/o variables.
+        try {
+        new DistinctBindingSetOp(new BOp[]{},
+                NV.asMap(new NV[]{//
+                    new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
+//                    new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
+                    new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.SHARED_STATE,
+                            true),//
+                }));
+        fail("Expecting: "+IllegalArgumentException.class);
+        } catch(IllegalArgumentException ex) {
+        	if(log.isInfoEnabled())
+        		log.info("Ignoring expected exception: "+ex);
+        }
+
+        // w/o evaluation on the query controller.
+        try {
+        new DistinctBindingSetOp(new BOp[]{},
+                NV.asMap(new NV[]{//
+                    new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
+                    new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
+//                    new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
+//                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.SHARED_STATE,
+                            true),//
+                }));
+        fail("Expecting: "+UnsupportedOperationException.class);
+        } catch(UnsupportedOperationException ex) {
+        	if(log.isInfoEnabled())
+        		log.info("Ignoring expected exception: "+ex);
+        }
+
+        // w/o shared state.
+        try {
+        new DistinctBindingSetOp(new BOp[]{},
+                NV.asMap(new NV[]{//
+                    new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
+                    new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
+                    new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+//                    new NV(PipelineOp.Annotations.SHARED_STATE,
+//                            true),//
+                }));
+        fail("Expecting: "+UnsupportedOperationException.class);
+        } catch(UnsupportedOperationException ex) {
+        	if(log.isInfoEnabled())
+        		log.info("Ignoring expected exception: "+ex);
+        }
+
+    }
 
     /**
      * Unit test for distinct.
@@ -179,10 +239,10 @@ public class TestDistinctBindingSets extends TestCase2 {
                 NV.asMap(new NV[]{//
                     new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
                     new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
-                    new NV(MemorySortOp.Annotations.EVALUATION_CONTEXT,
+                    new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
-//                    new NV(MemorySortOp.Annotations.SHARED_STATE,
-//                            true),//
+                    new NV(PipelineOp.Annotations.SHARED_STATE,
+                            true),//
                 }));
         
         // the expected solutions

@@ -1,11 +1,14 @@
 package com.bigdata.bop.solutions;
 
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.FutureTask;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
@@ -32,6 +35,9 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  */
 public class DistinctBindingSetOp extends PipelineOp {
 
+	private final static transient Logger log = Logger
+			.getLogger(DistinctBindingSetOp.class);
+	
     /**
      * 
      */
@@ -74,11 +80,16 @@ public class DistinctBindingSetOp extends PipelineOp {
 		}
 
 		// shared state is used to share the hash table.
-		if (isSharedState()) {
+		if (!isSharedState()) {
 			throw new UnsupportedOperationException(Annotations.SHARED_STATE
 					+ "=" + isSharedState());
 		}
-	
+
+		final IVariable<?>[] vars = (IVariable[]) getProperty(Annotations.VARIABLES);
+
+		if (vars == null || vars.length == 0)
+			throw new IllegalArgumentException();
+
     }
 
     /**
@@ -266,7 +277,13 @@ public class DistinctBindingSetOp extends PipelineOp {
 
             final Solution s = new Solution(r);
             
+			if (log.isTraceEnabled())
+				log.trace("considering: " + Arrays.toString(r));
+
             final boolean distinct = map.putIfAbsent(s, s) == null;
+
+			if (distinct && log.isDebugEnabled())
+				log.debug("accepted: " + Arrays.toString(r));
 
             return distinct ? r : null;
 
@@ -297,8 +314,6 @@ public class DistinctBindingSetOp extends PipelineOp {
 
                     for (IBindingSet bset : a) {
 
-//                        System.err.println("considering: " + bset);
-
 						/*
 						 * Test to see if this solution is distinct from those
 						 * already seen.
@@ -315,9 +330,6 @@ public class DistinctBindingSetOp extends PipelineOp {
 							 * this operator.
 							 */
                         	
-//                            System.err.println("accepted: "
-//                                    + Arrays.toString(vals));
-
 							final ListBindingSet tmp = new ListBindingSet();
                         	
 							for (int i = 0; i < vars.length; i++) {
