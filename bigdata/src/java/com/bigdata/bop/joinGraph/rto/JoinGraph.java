@@ -38,6 +38,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.SampleIndex;
@@ -79,6 +80,11 @@ public class JoinGraph extends PipelineOp {
 	 */
 	public interface Annotations extends PipelineOp.Annotations {
 
+		/**
+		 * The variables which are projected out of the join graph.
+		 */
+		String SELECTED = JoinGraph.class.getName() + ".selected";
+		
         /**
          * The vertices of the join graph, expressed an an {@link IPredicate}[]
          * (required).
@@ -117,6 +123,15 @@ public class JoinGraph extends PipelineOp {
         
         String DEFAULT_SAMPLE_TYPE = SampleType.RANDOM.name();
 	
+	}
+
+	/**
+	 * @see Annotations#SELECTED
+	 */
+	public IVariable<?>[] getSelected() {
+
+		return (IVariable[]) getRequiredProperty(Annotations.SELECTED);
+
 	}
 
 	/**
@@ -174,6 +189,15 @@ public class JoinGraph extends PipelineOp {
     public JoinGraph(final BOp[] args, final Map<String, Object> anns) {
 
         super(args, anns);
+
+        // required property.
+        final IVariable<?>[] selected = (IVariable[]) getProperty(Annotations.SELECTED);
+
+        if (selected == null)
+            throw new IllegalArgumentException(Annotations.SELECTED);
+
+        if (selected.length == 0)
+            throw new IllegalArgumentException(Annotations.SELECTED);
 
         // required property.
         final IPredicate<?>[] vertices = (IPredicate[]) getProperty(Annotations.VERTICES);
@@ -253,6 +277,12 @@ public class JoinGraph extends PipelineOp {
 
 	    }
 
+		/**
+		 * {@inheritDoc}
+		 * 
+		 * 
+		 * TODO where to handle DISTINCT, ORDER BY, GROUP BY for join graph?
+		 */
 	    public Void call() throws Exception {
 
 	        // Create the join graph.
@@ -266,9 +296,10 @@ public class JoinGraph extends PipelineOp {
 	        // Factory avoids reuse of bopIds assigned to the predicates.
 	        final BOpIdFactory idFactory = new BOpIdFactory();
 
-	        // Generate the query from the join path.
-	        final PipelineOp queryOp = PartitionedJoinGroup.getQuery(idFactory,
-	                p.getPredicates(), getConstraints());
+			// Generate the query from the join path.
+			final PipelineOp queryOp = PartitionedJoinGroup.getQuery(idFactory,
+					false/* distinct */, getSelected(), p.getPredicates(),
+					getConstraints());
 
 	        // Run the query, blocking until it is done.
 	        JoinGraph.runSubquery(context, queryOp);

@@ -368,13 +368,17 @@ public class TestJoinGraphOnLubm extends AbstractJoinGraphTestCase {
 			}
 		}
 
-		final IPredicate[] preds;
-		final IPredicate p0, p1, p2, p3, p4, p5;
+		final boolean distinct = false;
+		final IVariable<?>[] selected;
+		final IPredicate<?>[] preds;
+		final IPredicate<?> p0, p1, p2, p3, p4, p5;
 		{
 			final IVariable<?> x = Var.var("x");
 			final IVariable<?> y = Var.var("y");
 			final IVariable<?> z = Var.var("z");
 
+			selected = new IVariable[] { x, y, z };
+			
 			// The name space for the SPO relation.
 			final String[] relation = new String[] { namespace + ".spo" };
 
@@ -437,28 +441,33 @@ public class TestJoinGraphOnLubm extends AbstractJoinGraphTestCase {
 			preds = new IPredicate[] { p0, p1, p2, p3, p4, p5 };
 		}
 
-        final IPredicate<?>[] runtimeOrder = doTest(preds, null/* constraints */);
+		final IPredicate<?>[] runtimeOrder = doTest(distinct, selected, preds,
+				null/* constraints */);
 
-        if(!useExistingJournal) {
-            /*
-             * Verify that the runtime optimizer produced the expected join
-             * path.
-             * 
-             * Note: There are no solutions for this query against U1. The
-             * optimizer is only providing the fastest path to prove that. We
-             * have to use a larger data set if we want to verify the optimizers
-             * join path for a query which produces solutions in the data.
-             */
-
+		final int[] expected;
+		if(useExistingJournal) {
+			// after refactor on U50 
+            expected = new int[] {2, 4, 5, 3, 0, 1}; // based on estCard
+//            expected = new int[] {1, 4, 5, 3, 0, 2}; // based on estRead
+		} else {
             // order produced after refactor
-            final int[] expected = new int[] { 4, 5, 0, 1, 2, 3 };
+            expected = new int[] { 4, 5, 0, 1, 2, 3 };
 
             // order produced before refactor.
-//            final int[] expected = new int[] { 4, 5, 0, 3, 1, 2 };
+//          expected = new int[] { 4, 5, 0, 3, 1, 2 };
+		}
 
-            assertEquals("runtimeOrder", expected, BOpUtility
-                    .getPredIds(runtimeOrder));
-        }
+		/*
+		 * Verify that the runtime optimizer produced the expected join path.
+		 * 
+		 * Note: There are no solutions for this query against U1. The optimizer
+		 * is only providing the fastest path to prove that. We have to use a
+		 * larger data set if we want to verify the optimizers join path for a
+		 * query which produces solutions in the data.
+		 */
+
+		assertEquals("runtimeOrder", expected, BOpUtility
+				.getPredIds(runtimeOrder));
 
 	} // LUBM_Q2
 
@@ -527,13 +536,17 @@ public class TestJoinGraphOnLubm extends AbstractJoinGraphTestCase {
 			}
 		}
 
-		final IPredicate[] preds;
-		final IPredicate p0, p1, p2, p3, p4;
+		final boolean distinct = false;
+		final IVariable<?>[] selected;
+		final IPredicate<?>[] preds;
+		final IPredicate<?> p0, p1, p2, p3, p4;
 		{
 			final IVariable<?> x = Var.var("x");
 			final IVariable<?> y = Var.var("y");
 			final IVariable<?> z = Var.var("z");
 
+			selected = new IVariable[]{x,y,z};
+			
 			// The name space for the SPO relation.
 			final String[] relation = new String[] { namespace + ".spo" };
 
@@ -588,17 +601,18 @@ public class TestJoinGraphOnLubm extends AbstractJoinGraphTestCase {
 			preds = new IPredicate[] { p0, p1, p2, p3, p4 };
 		}
 
-        final IPredicate<?>[] runtimeOrder = doTest(preds, null/* constraints */);
+		final IPredicate<?>[] runtimeOrder = doTest(distinct, selected, preds,
+				null/* constraints */);
 
-        if (!useExistingJournal) {
-            /*
-             * Verify that the runtime optimizer produced the expected join
-             * path.
-             */
-            assertEquals("runtimeOrder", new int[] { 3, 0, 2, 1, 4 },
-                    BOpUtility.getPredIds(runtimeOrder));
-        }
-        
+		/*
+		 * Verify that the runtime optimizer produced the expected join path.
+		 */
+		final int[] expected;
+		expected = new int[] { 3, 0, 2, 1, 4 };// estCard
+//		expected = new int[] { 3, 0, 2, 1, 4 };// estRead
+		assertEquals("runtimeOrder", expected, BOpUtility
+				.getPredIds(runtimeOrder));
+
 	} // LUBM Q8
 
 	/**
@@ -667,13 +681,17 @@ public class TestJoinGraphOnLubm extends AbstractJoinGraphTestCase {
 			}
 		}
 
-		final IPredicate[] preds;
-		final IPredicate p0, p1, p2, p3, p4, p5;
+		final boolean distinct = false;
+		final IVariable<?>[] selected;
+		final IPredicate<?>[] preds;
+		final IPredicate<?> p0, p1, p2, p3, p4, p5;
 		{
 			final IVariable<?> x = Var.var("x");
 			final IVariable<?> y = Var.var("y");
 			final IVariable<?> z = Var.var("z");
 
+			selected = new IVariable[] { x, y, z };
+			
 			// The name space for the SPO relation.
 			final String[] relation = new String[] { namespace + ".spo" };
 
@@ -736,22 +754,25 @@ public class TestJoinGraphOnLubm extends AbstractJoinGraphTestCase {
 			preds = new IPredicate[] { p0, p1, p2, p3, p4, p5 };
 		}
 
-        final IPredicate<?>[] runtimeOrder = doTest(preds, null/* constraints */);
+		final IPredicate<?>[] runtimeOrder = doTest(distinct, selected, preds,
+				null/* constraints */);
 
-        if (!useExistingJournal) {
-            /*
-             * Verify that the runtime optimizer produced the expected join
-             * path.
-             * 
-             * Note: When random sampling is used, several join plans are
-             * possible including: {4, 2, 3, 5, 0, 1}, {3, 0, 5, 4, 1, 2}, and {
-             * 1, 4, 3, 5, 0, 2 }. These all appear to be good join plans even
-             * though { 1, 4, 3, 5, 0, 2 } is definitely better. In all cases
-             * the static query optimizer does significantly worse.
-             */
-            assertEquals("runtimeOrder", new int[] {4, 2, 3, 5, 0, 1},
-                    BOpUtility.getPredIds(runtimeOrder));
-        }
+		/*
+		 * Verify that the runtime optimizer produced the expected join path.
+		 * 
+		 * Note: When random sampling is used, several join plans are possible
+		 * including: {4, 2, 3, 5, 0, 1}, {3, 0, 5, 4, 1, 2}, and { 1, 4, 3, 5,
+		 * 0, 2 }. These all appear to be good join plans even though { 1, 4, 3,
+		 * 5, 0, 2 } is definitely better. In all cases the static query
+		 * optimizer does significantly worse.
+		 */
+
+		final int[] expected;
+		expected = new int[] { 4, 2, 3, 5, 0, 1 }; // estCard
+//		expected = new int[] { 1, 4, 3, 5, 0, 2 }; // estRead
+
+		assertEquals("runtimeOrder", expected, BOpUtility
+				.getPredIds(runtimeOrder));
 
 	} // LUBM_Q9
 

@@ -18,6 +18,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.IPredicate.Annotations;
+import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.journal.ITx;
@@ -273,6 +274,8 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
 			}
 		}
 
+		final boolean distinct = true;
+		final IVariable<?>[] selected;
 		final IConstraint[] constraints;
 		final IPredicate[] preds;
 		final IPredicate p0, p1, p2, p3, p4, p5, p6;
@@ -285,6 +288,8 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
 		    final IVariable origProperty1 = Var.var("origProperty1"); 
 		    final IVariable origProperty2 = Var.var("origProperty2"); 
 
+			selected = new IVariable[] { product, productLabel };
+		    
 			// The name space for the SPO relation.
 			final String[] spoRelation = new String[] { namespace + ".spo" };
 
@@ -473,9 +478,10 @@ path   sourceCard  *          f (   out/    in/  read) =    estCard  : sumEstCar
 
 test_bsbm_q5 : Total times: static=8871, runtime=8107, delta(static-runtime)=764
              */
-            final IPredicate<?>[] runtimeOrder = doTest(preds, null/* constraints */);
-            assertEquals("runtimeOrder", new int[] { 1, 2, 0, 4, 6, 3, 5 },
-                    BOpUtility.getPredIds(runtimeOrder));
+			final IPredicate<?>[] runtimeOrder = doTest(distinct, selected,
+					preds, null/* constraints */);
+			assertEquals("runtimeOrder", new int[] { 1, 2, 0, 4, 6, 3, 5 },
+					BOpUtility.getPredIds(runtimeOrder));
         }
 
         // Run w/ constraints.
@@ -508,10 +514,31 @@ path   sourceCard  *          f (   out/    in/  read) =    estCard  : sumEstCar
 test_bsbm_q5 : Total times: static=7312, runtime=3305, delta(static-runtime)=4007
             
              */
-            final IPredicate<?>[] runtimeOrder = doTest(preds, constraints);
-            assertEquals("runtimeOrder", new int[] { 1, 2, 4, 3, 6, 5, 0 },
-                    BOpUtility.getPredIds(runtimeOrder));
+			final IPredicate<?>[] runtimeOrder = doTest(distinct, selected,
+					preds, constraints);
+			/*
+			 * FIXME The RTO produces join paths on some runs which appear to
+			 * have no solutions. I've written a unit test for constraint
+			 * attachment for the case below, but the constraints appear to be
+			 * attached correctly. I've also run the "bad" join path directly
+			 * (see below) and it finds the correct #of solutions. This is
+			 * pretty weird.
+			 */
+			// [5, 3, 1, 2, 4, 6, 0] - Ok and faster.
+			// [5, 3, 1, 2, 4, 6, 0] - Ok and faster (8828 vs 3621)
+			// [5, 6, 0, 2, 1, 4, 3] - no results!!!
+			// [5, 6, 0, 2, 1, 4, 3] - again, no results.
+			assertEquals("runtimeOrder", new int[] { 1, 2, 4, 3, 6, 5, 0 },
+					BOpUtility.getPredIds(runtimeOrder));
         }
+        
+        if(false){
+			// Run some fixed order.
+//			final IPredicate<?>[] path = { p5, p6, p0, p2, p1, p4, p3 }; 
+			final IPredicate<?>[] path = { p5, p3, p1, p2, p4, p6, p0 };
+			runQuery("FIXED ORDER", queryEngine, distinct, selected, path,
+					constraints);
+		}
         
     }
 
@@ -600,6 +627,8 @@ test_bsbm_q5 : Total times: static=7312, runtime=3305, delta(static-runtime)=400
             }
         }
 
+        final boolean distinct = false;
+        final IVariable<?>[] selected;
         final IConstraint[] constraints;
         final IPredicate[] preds;
         final IPredicate p0, p1, p2, p3, p4, p5, p6;
@@ -611,6 +640,8 @@ test_bsbm_q5 : Total times: static=7312, runtime=3305, delta(static-runtime)=400
             final IVariable p3Var = Var.var("p3");
             final IVariable testVar = Var.var("testVar");
 
+            selected = new IVariable[]{product,label};
+            
             // The name space for the SPO relation.
             final String[] spoRelation = new String[] { namespace + ".spo" };
 
@@ -730,8 +761,8 @@ test_bsbm_q5 : Total times: static=7312, runtime=3305, delta(static-runtime)=400
          * FIXME The optional join group is part of the tail plan and can not be
          * fed into the RTO right now.
          */
-        final IPredicate<?>[] runtimeOrder = doTest(preds, new IConstraint[] {
-                c0, c1 });
+		final IPredicate<?>[] runtimeOrder = doTest(distinct, selected, preds,
+				new IConstraint[] { c0, c1 });
 
     }
 

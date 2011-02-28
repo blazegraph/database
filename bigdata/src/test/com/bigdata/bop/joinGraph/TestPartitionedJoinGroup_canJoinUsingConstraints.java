@@ -809,6 +809,49 @@ public class TestPartitionedJoinGroup_canJoinUsingConstraints extends TestCase2 
 	}
 
 	/**
+	 * <code>[5  6  0  2  1  4 3]</code>.
+	 * 
+	 * FIXME The above join path produces a false ZERO result for the query and
+	 * all of the join path segments below produce a false exact ZERO (0E)
+	 * cardinality estimate. Figure out why. The final path chosen could have
+	 * been any of the one step extensions of a path with a false 0E cardinality
+	 * estimate.
+	 * 
+	 * <pre>
+	 * INFO : 3529      main com.bigdata.bop.joinGraph.rto.JGraph.expand(JGraph.java:1116): 
+	 * ** round=4: paths{in=14,considered=26,out=6}
+	 * path    srcCard  *          f (      in  sumRgCt tplsRead      out    limit  adjCard) =    estRead    estCard  : sumEstRead sumEstCard sumEstCost  joinPath
+	 *    0          0E *       0.00 (       0        0        0        0      200        0) =          0          0E :          1          0          0  [ 5  6  0  2  1  4 ]
+	 *    1          0E *       0.00 (       0        0        0        0      200        0) =          0          0E :          1          0          0  [ 5  6  0  2  4  3 ]
+	 *    2          0E *       0.00 (       0        0        0        0      200        0) =          0          0E :          1          0          0  [ 5  6  0  4  1  3 ]
+	 *    3          0E *       0.00 (       0        0        0        0      200        0) =          0          0E :          1          0          0  [ 5  6  2  1  4  3 ]
+	 *    4        208  *       1.00 (      26       26       26       26      400       26) =         26        208  :      16576       1447       1447  [ 5  3  1  2  4  0 ]
+	 *    5          0E *       0.00 (       0        0        0        0      200        0) =          0          0E :          2          1          1  [ 5  3  6  0  1  2 ]
+	 * </pre>
+	 */
+	public void test_attachConstraints_BSBM_Q5_path04() {
+
+		final IPredicate<?>[] path = { p5, p6, p0, p2, p1, p4, p3 };
+
+		final IConstraint[][] actual = PartitionedJoinGroup
+				.getJoinGraphConstraints(path, constraints,
+						null/* knownBoundVars */, true/* pathIsComplete */);
+
+		final Set<IConstraint>[] expected = new Set[] { //
+				NA, // p5
+				asSet(new IConstraint[] { c0, c2 }), // p6
+				NA, // p0
+				NA, // p2
+				NA, // p1
+				NA, // p4
+				C1, // p3
+		};
+
+		assertSameConstraints(expected, actual);
+
+	}
+
+	/**
 	 * Verifies that the right set of constraints is attached at each of the
 	 * vertices of a join path. Comparison of {@link IConstraint} instances is
 	 * by reference.

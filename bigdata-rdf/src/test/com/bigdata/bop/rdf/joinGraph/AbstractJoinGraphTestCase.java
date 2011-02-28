@@ -43,6 +43,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.SampleIndex.SampleType;
 import com.bigdata.bop.engine.BOpStats;
@@ -82,11 +83,7 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
     
     private Journal jnl;
     
-//    protected AbstractTripleStore database;
-
-//    private String namespace;
-
-    private QueryEngine queryEngine; 
+    protected QueryEngine queryEngine; 
 
     /** The initial sampling limit. */
     static private final int limit = 100;
@@ -236,12 +233,14 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
      *       JVM run using the known solutions produced by the runtime versus
      *       static query optimizers.
      */
-    protected IPredicate<?>[] doTest(final IPredicate<?>[] preds,
-            final IConstraint[] constraints) throws Exception {
+	protected IPredicate<?>[] doTest(final boolean distinct,
+			final IVariable<?>[] selected, final IPredicate<?>[] preds,
+			final IConstraint[] constraints) throws Exception {
 
         if (warmUp)
-            runQuery("Warmup", queryEngine, runStaticQueryOptimizer(
-                    getQueryEngine(), preds), constraints);
+			runQuery("Warmup", queryEngine, distinct, selected,
+					runStaticQueryOptimizer(getQueryEngine(), preds),
+					constraints);
 
         /*
          * Run the runtime query optimizer once (its cost is not counted
@@ -269,8 +268,8 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
             if (runGivenOrder) {
 
             	final long begin = System.currentTimeMillis();
-				final BOpStats stats = runQuery(GIVEN, queryEngine, preds,
-						constraints);
+				final BOpStats stats = runQuery(GIVEN, queryEngine, distinct,
+						selected, preds, constraints);
 				final long nout = stats.unitsOut.get();
 				if (i == 0)
 					givenSolutions = nout;
@@ -285,9 +284,9 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
 			if (runStaticQueryOptimizer) {
 
 				final long begin = System.currentTimeMillis();
-				final BOpStats stats = runQuery(STATIC, queryEngine,
-						runStaticQueryOptimizer(getQueryEngine(), preds),
-						constraints);
+				final BOpStats stats = runQuery(STATIC, queryEngine, distinct,
+						selected, runStaticQueryOptimizer(getQueryEngine(),
+								preds), constraints);
 				final long nout = stats.unitsOut.get();
 				if (i == 0)
 					staticSolutions = nout;
@@ -311,8 +310,8 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
 
 				// Evaluate the query using the selected join order.
 				final long begin = System.currentTimeMillis();
-				final BOpStats stats = runQuery(RUNTIME, queryEngine,
-						runtimePredOrder, constraints);
+				final BOpStats stats = runQuery(RUNTIME, queryEngine, distinct,
+						selected, runtimePredOrder, constraints);
 				final long nout = stats.unitsOut.get();
 				if (i == 0)
 					runtimeSolutions = nout;
@@ -428,14 +427,15 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
         
     }
 
-    /**
-     * Run a query joining a set of {@link IPredicate}s in the given join order.
-     * 
-     * @return The stats for the last operator in the pipeline.
-     */
-    private static BOpStats runQuery(final String msg,
-            final QueryEngine queryEngine, final IPredicate<?>[] predOrder,
-            final IConstraint[] constraints) throws Exception {
+	/**
+	 * Run a query joining a set of {@link IPredicate}s in the given join order.
+	 * 
+	 * @return The stats for the last operator in the pipeline.
+	 */
+	protected static BOpStats runQuery(final String msg,
+			final QueryEngine queryEngine, final boolean distinct,
+			final IVariable<?>[] selected, final IPredicate<?>[] predOrder,
+			final IConstraint[] constraints) throws Exception {
 
         if (log.isInfoEnabled())
             log.info("Running " + msg);
@@ -455,18 +455,16 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
         }
 
         final PipelineOp queryOp = PartitionedJoinGroup.getQuery(idFactory,
-                predOrder, constraints);
+                distinct, selected, predOrder, constraints);
 
         System.out.println(BOpUtility.toString(queryOp));
         
-        // submit query to runtime optimizer.
+        // run the query, counting results and chunks.
+        long nout = 0;
+        long nchunks = 0;
         final IRunningQuery q = queryEngine.eval(queryOp);
-
         try {
-
             // drain the query results.
-            long nout = 0;
-            long nchunks = 0;
             final IAsynchronousIterator<IBindingSet[]> itr = q.iterator();
             try {
                 while (itr.hasNext()) {
@@ -477,24 +475,25 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
             } finally {
                 itr.close();
             }
-
-            // check the Future for the query.
-            q.get();
-
-            // show the results.
-            final BOpStats stats = q.getStats().get(queryOp.getId());
-
-            System.err.println(msg + " : ids=" + Arrays.toString(ids)
-                    + ", elapsed=" + q.getElapsed() + ", nout=" + nout
-                    + ", nchunks=" + nchunks + ", stats=" + stats);
-
-            return stats;
-
         } finally {
-
+        	// ensure terminated.
             q.cancel(true/* mayInterruptIfRunning */);
-            
         }
+
+        // Check the Future for the query.
+		if (q.getCause() != null) {
+			// Wrap Throwable from abnormal termination.
+        	throw new RuntimeException(q.getCause());
+        }
+
+        // show the results.
+        final BOpStats stats = q.getStats().get(queryOp.getId());
+
+        System.err.println(msg + " : ids=" + Arrays.toString(ids)
+                + ", elapsed=" + q.getElapsed() + ", nout=" + nout
+                + ", nchunks=" + nchunks + ", stats=" + stats);
+
+        return stats;
 
     }
 
