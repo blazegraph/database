@@ -55,6 +55,8 @@ public interface QueryHints {
      * this interface.
      */
     String NAMESPACE = "BIGDATA_QUERY_HINTS";
+    
+    String PREFIX = "http://www.bigdata.com/queryHints#";
 
 	/**
 	 * Specify the query optimizer. For example, you can disable the query

@@ -419,6 +419,16 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
     }
 
+    public Predicate<E> setArg(final int index, final IVariableOrConstant arg) {
+
+        final Predicate<E> tmp = this.clone();
+
+        tmp._set(index, arg);
+
+        return tmp;
+
+    }
+
     /**
      * Add an {@link Annotations#INDEX_LOCAL_FILTER}. When there is a filter for
      * the named property, the filters are combined. Otherwise the filter is

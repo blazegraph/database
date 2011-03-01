@@ -35,14 +35,19 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import org.apache.log4j.Logger;
+
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.Range;
+import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.striterator.AbstractKeyOrder;
-import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Represents the key order used by an index for a triple relation.
@@ -64,6 +69,8 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
      * 
      */
     private static final long serialVersionUID = 87501920529732159L;
+    
+    private static Logger log = Logger.getLogger(SPOKeyOrder.class);
     
     /*
      * Note: these constants make it possible to use switch(index()) constructs.
@@ -466,11 +473,92 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
 //
 //    }
 
-    @Override
+    public byte[] getFromKey(final IKeyBuilder keyBuilder,
+            final IPredicate<ISPO> predicate) {
+
+        keyBuilder.reset();
+
+        final int keyArity = getKeyArity(); // use the key's "arity".
+
+        boolean noneBound = true;
+
+        final RangeBOp range = (RangeBOp)
+    		predicate.getProperty(SPOPredicate.Annotations.RANGE);
+
+        for (int i = 0; i < keyArity; i++) {
+
+        	final int index = getKeyOrder(i);
+        	
+            final IVariableOrConstant<?> term = predicate.get(index);
+
+            if (term == null || term.isVar()) {
+            	if (index == 2 && range != null && range.isFullyBound()) {
+            		final IConstant<IV> c = (IConstant<IV>) range.from();
+    	            appendKeyComponent(keyBuilder, i, c.get());
+    	            noneBound = false;
+            	} else {
+                    break;
+            	}
+            } else {
+	            appendKeyComponent(keyBuilder, i, term.get());
+	            noneBound = false;
+            }
+
+        }
+
+        final byte[] key = noneBound ? null : keyBuilder.getKey();
+
+        return key;
+        
+    }
+
+    public byte[] getToKey(final IKeyBuilder keyBuilder,
+            final IPredicate<ISPO> predicate) {
+
+        keyBuilder.reset();
+
+        final int keyArity = getKeyArity(); // use the key's "arity".
+
+        boolean noneBound = true;
+        
+        final RangeBOp range = (RangeBOp)
+        	predicate.getProperty(SPOPredicate.Annotations.RANGE);
+
+        for (int i = 0; i < keyArity; i++) {
+
+        	final int index = getKeyOrder(i);
+        	
+            final IVariableOrConstant<?> term = predicate.get(index);
+
+            // Note: term MAY be null for the context position.
+            if (term == null || term.isVar()) {
+            	if (index == 2 && range != null && range.isFullyBound()) {
+            		final IConstant<IV> c = (IConstant<IV>) range.to();
+    	            appendKeyComponent(keyBuilder, i, c.get());
+    	            noneBound = false;
+            	} else {
+                    break;
+            	}
+            } else {
+	            appendKeyComponent(keyBuilder, i, term.get());
+	            noneBound = false;
+            }
+
+        }
+
+        final byte[] key = noneBound ? null : keyBuilder.getKey();
+
+        return key == null ? null : SuccessorUtil.successor(key);
+
+    }
+
+
     protected void appendKeyComponent(final IKeyBuilder keyBuilder,
             final int index, final Object keyComponent) {
 
         ((IV) keyComponent).encode(keyBuilder);
+        
+//        log.debug("appending key component: " + keyComponent);
 
     }
 
@@ -672,32 +760,34 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
     static public SPOKeyOrder getKeyOrder(final IPredicate<ISPO> predicate,
             final int keyArity) {
 
-        final Object s = predicate.get(0).isVar() ? null : predicate
-                .get(0).get();
+    	final RangeBOp range = (RangeBOp) 
+    		predicate.getProperty(SPOPredicate.Annotations.RANGE);
+    	
+    	final boolean rangeIsBound = range != null && range.isFullyBound();
+    	
+        final boolean s = !predicate.get(0).isVar();
         
-        final Object p = predicate.get(1).isVar() ? null : predicate
-                .get(1).get();
+        final boolean p = !predicate.get(1).isVar();
         
-        final Object o = predicate.get(2).isVar() ? null : predicate
-                .get(2).get();
+        final boolean o = !predicate.get(2).isVar() || rangeIsBound;
 
         if (keyArity == 3) {
 
             // Note: Context is ignored!
 
-            if (s != null && p != null && o != null) {
+            if (s && p && o) {
                 return SPO;
-            } else if (s != null && p != null) {
+            } else if (s && p) {
                 return SPO;
-            } else if (s != null && o != null) {
+            } else if (s && o) {
                 return OSP;
-            } else if (p != null && o != null) {
+            } else if (p && o) {
                 return POS;
-            } else if (s != null) {
+            } else if (s) {
                 return SPO;
-            } else if (p != null) {
+            } else if (p) {
                 return POS;
-            } else if (o != null) {
+            } else if (o) {
                 return OSP;
             } else {
                 return SPO;
@@ -708,39 +798,31 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
             @SuppressWarnings("unchecked")
             final IVariableOrConstant<IV> t = predicate.get(3);
             
-            final IV c = t == null ? null : (t.isVar() ? null : t.get());
+            final boolean c = t != null && !t.isVar();
             
-            /*
-             * if ((s == null && p == null && o == null && c == null) || (s !=
-             * null && p == null && o == null && c == null) || (s != null && p
-             * != null && o == null && c == null) || (s != null && p != null &&
-             * o != null && c == null) || (s != null && p != null && o != null
-             * && c != null)) { return SPOKeyOrder.SPOC; }
-             */
-            
-            if ((s == null && p != null && o == null && c == null)
-                    || (s == null && p != null && o != null && c == null)
-                    || (s == null && p != null && o != null && c != null)) {
+            if ((!s && p && !o && !c)
+                    || (!s && p && o && !c)
+                    || (!s && p && o && c)) {
                 return POCS;
             }
 
-            if ((s == null && p == null && o != null && c == null)
-                    || (s == null && p == null && o != null && c != null)
-                    || (s != null && p == null && o != null && c != null)) {
+            if ((!s && !p && o && !c)
+                    || (!s && !p && o && c)
+                    || (s && !p && o && c)) {
                 return OCSP;
             }
 
-            if ((s == null && p == null && o == null && c != null)
-                    || (s != null && p == null && o == null && c != null)
-                    || (s != null && p != null && o == null && c != null)) {
+            if ((!s && !p && !o && c)
+                    || (s && !p && !o && c)
+                    || (s && p && !o && c)) {
                 return CSPO;
             }
 
-            if ((s == null && p != null && o == null && c != null)) {
+            if ((!s && p && !o && c)) {
                 return PCSO;
             }
 
-            if ((s != null && p == null && o != null && c == null)) {
+            if ((s && !p && o && !c)) {
                 return SOPC;
             }
 

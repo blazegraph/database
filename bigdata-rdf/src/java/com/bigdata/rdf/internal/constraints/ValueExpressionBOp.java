@@ -27,8 +27,8 @@ package com.bigdata.rdf.internal.constraints;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.rdf.internal.IV;
 
 /**
@@ -36,7 +36,7 @@ import com.bigdata.rdf.internal.IV;
  * evaluation on one or more value expressions as input and produce one
  * value expression as output (boolean, numeric value, etc.)
  */
-public abstract class ValueExpressionBOp extends ImmutableBOp 
+public abstract class ValueExpressionBOp extends BOpBase 
 		implements IValueExpression<IV> {
 
 	/**

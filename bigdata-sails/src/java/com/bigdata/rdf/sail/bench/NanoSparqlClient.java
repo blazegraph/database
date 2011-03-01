@@ -68,7 +68,7 @@ public class NanoSparqlClient {
 	/**
 	 * The default connection timeout (ms).
 	 */
-	static private final int DEFAULT_TIMEOUT = 5000;
+	static private final int DEFAULT_TIMEOUT = 60*1000;
 
 	/**
 	 * Helper class to figure out the type of a query.

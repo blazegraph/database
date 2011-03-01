@@ -27,16 +27,16 @@ package com.bigdata.bop.constraint;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.ImmutableBOp;
 
 /**
  * Base class for boolean value expression BOps.  Value expressions perform some
  * evaluation on one or more value expressions as input and produce one
  * boolean as output.
  */
-public abstract class BooleanValueExpression extends ImmutableBOp 
+public abstract class BooleanValueExpression extends BOpBase 
 		implements IValueExpression<Boolean> {
 
 	/**

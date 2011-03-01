@@ -62,6 +62,25 @@ final public class MathBOp extends ValueExpressionBOp
 
     }
     
+	public enum MathOp {
+		PLUS,
+		MINUS,
+		MULTIPLY,
+		DIVIDE,
+		MIN,
+		MAX;
+
+		public static MathOp valueOf(org.openrdf.query.algebra.MathExpr.MathOp op) {
+			switch(op) {
+			case PLUS: return MathOp.PLUS;
+			case MINUS: return MathOp.MINUS;
+			case MULTIPLY: return MathOp.MULTIPLY;
+			case DIVIDE: return MathOp.DIVIDE;
+			}
+			throw new IllegalArgumentException();
+		}
+	}
+    
     /**
      * 
      * @param left
@@ -189,5 +208,5 @@ final public class MathBOp extends ValueExpressionBOp
 		return h;
 		
 	}
-
+	
 }

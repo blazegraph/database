@@ -195,9 +195,12 @@ public class BOpBase implements BOp {
      */
     public BOpBase(final BOpBase op) {
         // deep copy the arguments.
-        args = deepCopy(op.args);
+//        args = deepCopy(op.args);
         // deep copy the annotations.
-        annotations = deepCopy(op.annotations);
+//        annotations = deepCopy(op.annotations);
+        // Note: only shallow copy is required to achieve immutable semantics!
+    	args = Arrays.copyOf(op.args, op.args.length);
+        annotations = new LinkedHashMap<String, Object>(op.annotations);
     }
 
 //    /**

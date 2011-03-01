@@ -86,6 +86,10 @@ public class Constraint extends com.bigdata.bop.constraint.Constraint {
     	return (EBVBOp) super.get(i);
     }
     
+	public IValueExpression<IV> getValueExpression() {
+		return get(0).get(0);
+	}
+    	
 	public boolean accept(final IBindingSet bs) {
 
 		try {
