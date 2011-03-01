@@ -28,6 +28,7 @@ import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.And;
 import org.openrdf.query.algebra.Bound;
 import org.openrdf.query.algebra.Compare;
+import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Group;
 import org.openrdf.query.algebra.IsBNode;
@@ -37,7 +38,6 @@ import org.openrdf.query.algebra.IsURI;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.LeftJoin;
 import org.openrdf.query.algebra.MathExpr;
-import org.openrdf.query.algebra.MathExpr.MathOp;
 import org.openrdf.query.algebra.MultiProjection;
 import org.openrdf.query.algebra.Not;
 import org.openrdf.query.algebra.Or;
@@ -51,7 +51,6 @@ import org.openrdf.query.algebra.Regex;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.StatementPattern.Scope;
-import org.openrdf.query.algebra.Str;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
 import org.openrdf.query.algebra.Union;
@@ -85,6 +84,10 @@ import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.internal.DummyIV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSDBooleanIV;
+import com.bigdata.rdf.internal.XSDDecimalIV;
+import com.bigdata.rdf.internal.XSDDoubleIV;
+import com.bigdata.rdf.internal.XSDIntIV;
+import com.bigdata.rdf.internal.XSDIntegerIV;
 import com.bigdata.rdf.internal.constraints.AndBOp;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.Constraint;
@@ -94,8 +97,10 @@ import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.IsLiteralBOp;
 import com.bigdata.rdf.internal.constraints.IsURIBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.OrBOp;
+import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
@@ -809,6 +814,17 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	 */
     	attachNamedGraphsFilterToSearches(sopTree);
     	
+		if (false) {
+			/*
+			 * Look for numerical filters that can be rotated inside predicates
+			 */
+			final Iterator<SOpGroup> groups = sopTree.groups();
+			while (groups.hasNext()) {
+				final SOpGroup g = groups.next();
+				attachRangeBOps(g);
+			}
+		}
+    	
     	/*
     	 * Gather variables required by Sesame outside of the query
     	 * evaluation (projection and global sesame filters).
@@ -939,7 +955,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	    final IChunkedOrderedIterator<IBindingSet> it2 = 
 	    	new ChunkedWrappedIterator<IBindingSet>(
 	            new Dechunkerator<IBindingSet>(it1));
-
+	    
 	    // Materialize IVs as RDF Values.
 	    final CloseableIteration<BindingSet, QueryEvaluationException> result =
 	    	// Monitor IRunningQuery and cancel if Sesame iterator is closed.
@@ -954,315 +970,6 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 
     }
     
-//    /**
-//     * This is the method that will attempt to take a top-level join or left
-//     * join and turn it into a native bigdata rule. The Sesame operators Join
-//     * and LeftJoin share only the common base class BinaryTupleOperator, but
-//     * other BinaryTupleOperators are not supported by this method. Other
-//     * specific types of BinaryTupleOperators will cause this method to throw
-//     * an exception.
-//     * <p>
-//     * This method will also turn a single top-level StatementPattern into a
-//     * rule with one predicate in it.
-//     * <p>
-//     * Note: As a pre-condition, the {@link Value}s in the query expression
-//     * MUST have been rewritten as {@link BigdataValue}s and their term
-//     * identifiers MUST have been resolved. Any term identifier that remains
-//     * {@link IRawTripleStore#NULL} is an indication that there is no entry for
-//     * that {@link Value} in the database. Since the JOINs are required (vs
-//     * OPTIONALs), that means that there is no solution for the JOINs and an
-//     * {@link EmptyIteration} is returned rather than evaluating the query.
-//     * 
-//     * @param join
-//     * @return native bigdata rule
-//     * @throws UnsupportedOperatorException
-//     *          this exception will be thrown if the Sesame join contains any
-//     *          SPARQL language constructs that cannot be converted into
-//     *          the bigdata native rule model
-//     * @throws QueryEvaluationException
-//     */
-//    private IRule createNativeQueryOld(final TupleExpr join)
-//            throws UnsupportedOperatorException,
-//            QueryEvaluationException {
-//
-//        if (!(join instanceof StatementPattern || 
-//              join instanceof Join || join instanceof LeftJoin || 
-//              join instanceof Filter)) {
-//            throw new AssertionError(
-//                    "only StatementPattern, Join, and LeftJoin supported");
-//        }
-//
-//        // flattened collection of statement patterns nested within this join,
-//        // along with whether or not each one is optional
-//        final Map<StatementPattern, Boolean> stmtPatterns = 
-//            new LinkedHashMap<StatementPattern, Boolean>();
-//        // flattened collection of filters nested within this join
-//        final Collection<Filter> filters = new LinkedList<Filter>();
-//        
-//        // will throw EncounteredUnknownTupleExprException if the join
-//        // contains something we don't handle yet
-////        collectStatementPatterns(join, stmtPatterns, filters);
-//        
-//        if (false) {
-//            for (Map.Entry<StatementPattern, Boolean> entry : 
-//                    stmtPatterns.entrySet()) {
-//                log.debug(entry.getKey() + ", optional=" + entry.getValue());
-//            }
-//            for (Filter filter : filters) {
-//                log.debug(filter.getCondition());
-//            }
-//        }
-//        
-//        // generate tails
-//        Collection<IPredicate> tails = new LinkedList<IPredicate>();
-//        // keep a list of free text searches for later to solve a named graphs
-//        // problem
-//        final Map<IPredicate, StatementPattern> searches = 
-//            new HashMap<IPredicate, StatementPattern>();
-//        for (Map.Entry<StatementPattern, Boolean> entry : stmtPatterns
-//                .entrySet()) {
-//            StatementPattern sp = entry.getKey();
-//            boolean optional = entry.getValue();
-//            IPredicate tail = toPredicate(sp, optional);
-//            // encountered a value not in the database lexicon
-//            if (tail == null) {
-//                if (log.isDebugEnabled()) {
-//                    log.debug("could not generate tail for: " + sp);
-//                }
-//                if (optional) {
-//                    // for optionals, just skip the tail
-//                    continue;
-//                } else {
-//                    // for non-optionals, skip the entire rule
-//                    return null;
-//                }
-//            }
-//            if (tail.getAccessPathExpander() instanceof FreeTextSearchExpander) {
-//                searches.put(tail, sp);
-//            }
-//            tails.add(tail);
-//        }
-//        
-//        /*
-//         * When in quads mode, we need to go through the free text searches and
-//         * make sure that they are properly filtered for the dataset where
-//         * needed. Joins will take care of this, so we only need to add a filter
-//         * when a search variable does not appear in any other tails that are
-//         * non-optional.
-//         * 
-//         * @todo Bryan seems to think this can be fixed with a DISTINCT JOIN
-//         * mechanism in the rule evaluation.
-//         */
-//        if (database.isQuads() && dataset != null) {
-//            for (IPredicate search : searches.keySet()) {
-//                final Set<URI> graphs;
-//                StatementPattern sp = searches.get(search);
-//                switch (sp.getScope()) {
-//                case DEFAULT_CONTEXTS: {
-//                    /*
-//                     * Query against the RDF merge of zero or more source
-//                     * graphs.
-//                     */
-//                    graphs = dataset.getDefaultGraphs();
-//                    break;
-//                }
-//                case NAMED_CONTEXTS: {
-//                    /*
-//                     * Query against zero or more named graphs.
-//                     */
-//                    graphs = dataset.getNamedGraphs();
-//                    break;
-//                }
-//                default:
-//                    throw new AssertionError();
-//                }
-//                if (graphs == null) {
-//                    continue;
-//                }
-//                // why would we use a constant with a free text search???
-//                if (search.get(0).isConstant()) {
-//                    throw new AssertionError();
-//                }
-//                // get ahold of the search variable
-//                com.bigdata.bop.Var searchVar = 
-//                    (com.bigdata.bop.Var) search.get(0);
-//                if (log.isDebugEnabled()) {
-//                    log.debug(searchVar);
-//                }
-//                // start by assuming it needs filtering, guilty until proven
-//                // innocent
-//                boolean needsFilter = true;
-//                // check the other tails one by one
-//                for (IPredicate<ISPO> tail : tails) {
-//                    IAccessPathExpander<ISPO> expander = 
-//                        tail.getAccessPathExpander();
-//                    // only concerned with non-optional tails that are not
-//                    // themselves magic searches
-//                    if (expander instanceof FreeTextSearchExpander
-//                            || tail.isOptional()) {
-//                        continue;
-//                    }
-//                    // see if the search variable appears in this tail
-//                    boolean appears = false;
-//                    for (int i = 0; i < tail.arity(); i++) {
-//                        IVariableOrConstant term = tail.get(i);
-//                        if (log.isDebugEnabled()) {
-//                            log.debug(term);
-//                        }
-//                        if (term.equals(searchVar)) {
-//                            appears = true;
-//                            break;
-//                        }
-//                    }
-//                    // if it appears, we don't need a filter
-//                    if (appears) {
-//                        needsFilter = false;
-//                        break;
-//                    }
-//                }
-//                // if it needs a filter, add it to the expander
-//                if (needsFilter) {
-//                    if (log.isDebugEnabled()) {
-//                        log.debug("needs filter: " + searchVar);
-//                    }
-//                    FreeTextSearchExpander expander = (FreeTextSearchExpander) 
-//                            search.getAccessPathExpander();
-//                    expander.addNamedGraphsFilter(graphs);
-//                }
-//            }
-//        }
-//        
-//        // generate constraints
-//        final Collection<IConstraint> constraints = 
-//            new LinkedList<IConstraint>();
-//        final Iterator<Filter> filterIt = filters.iterator();
-//        while (filterIt.hasNext()) {
-//            final Filter filter = filterIt.next();
-//            final IConstraint constraint = toConstraint(filter.getCondition());
-//            if (constraint != null) {
-//                // remove if we are able to generate a native constraint for it
-//                if (log.isDebugEnabled()) {
-//                    log.debug("able to generate a constraint: " + constraint);
-//                }
-//                filterIt.remove();
-//                constraints.add(constraint);
-//            }
-//        }
-//        
-//        /*
-//         * FIXME Native slice, DISTINCT, etc. are all commented out for now.
-//         * Except for ORDER_BY, support exists for all of these features in the
-//         * native rules, but we need to separate the rewrite of the tupleExpr
-//         * and its evaluation in order to properly handle this stuff.
-//         */
-//        IQueryOptions queryOptions = QueryOptions.NONE;
-//        // if (slice) {
-//        // if (!distinct && !union) {
-//        // final ISlice slice = new Slice(offset, limit);
-//        // queryOptions = new QueryOptions(false/* distinct */,
-//        // true/* stable */, null/* orderBy */, slice);
-//        // }
-//        // } else {
-//        // if (distinct && !union) {
-//        // queryOptions = QueryOptions.DISTINCT;
-//        // }
-//        // }
-//        
-////        if (log.isDebugEnabled()) {
-////            for (IPredicate<ISPO> tail : tails) {
-////                IAccessPathExpander<ISPO> expander = tail.getAccessPathExpander();
-////                if (expander != null) {
-////                    IAccessPath<ISPO> accessPath = database.getSPORelation()
-////                            .getAccessPath(tail);
-////                    accessPath = expander.getAccessPath(accessPath);
-////                    IChunkedOrderedIterator<ISPO> it = accessPath.iterator();
-////                    while (it.hasNext()) {
-////                        log.debug(it.next().toString(database));
-////                    }
-////                }
-////            }
-////        }
-//        
-//        /*
-//         * Collect a set of variables required beyond just the join (i.e.
-//         * aggregation, projection, filters, etc.)
-//         */
-//        Set<String> required = new HashSet<String>(); 
-//        
-//        try {
-//            
-//            QueryModelNode p = join;
-//            while (true) {
-//                p = p.getParentNode();
-//                if (log.isDebugEnabled()) {
-//                    log.debug(p.getClass());
-//                }
-//                if (p instanceof UnaryTupleOperator) {
-//                    required.addAll(collectVariables((UnaryTupleOperator) p));
-//                }
-//                if (p instanceof QueryRoot) {
-//                    break;
-//                }
-//            }
-//
-//            if (filters.size() > 0) {
-//                for (Filter filter : filters) {
-//                    required.addAll(collectVariables((UnaryTupleOperator) filter));
-//                }
-//            }
-//            
-//        } catch (Exception ex) {
-//            throw new QueryEvaluationException(ex);
-//        }
-//
-//        IVariable[] requiredVars = new IVariable[required.size()];
-//        int i = 0;
-//        for (String v : required) {
-//            requiredVars[i++] = com.bigdata.bop.Var.var(v);
-//        }
-//        
-//        if (log.isDebugEnabled()) {
-//            log.debug("required binding names: " + Arrays.toString(requiredVars));
-//        }
-//        
-////        if (starJoins) { // database.isQuads() == false) {
-////            if (log.isDebugEnabled()) {
-////                log.debug("generating star joins");
-////            }
-////            tails = generateStarJoins(tails);
-////        }
-//        
-//        // generate native rule
-//        IRule rule = new Rule("nativeJoin", 
-//                // @todo should serialize the query string here for the logs.
-//                null, // head
-//                tails.toArray(new IPredicate[tails.size()]), queryOptions,
-//                // constraints on the rule.
-//                constraints.size() > 0 ? constraints
-//                        .toArray(new IConstraint[constraints.size()]) : null,
-//                null/* constants */, null/* taskFactory */, requiredVars);
-//        
-//        if (BigdataStatics.debug) {
-//            System.err.println(join.toString());
-//            System.err.println(rule.toString());
-//        }
-//
-//        // we have filters that we could not translate natively
-//        if (filters.size() > 0) {
-//            if (log.isDebugEnabled()) {
-//                log.debug("could not translate " + filters.size()
-//                        + " filters into native constraints:");
-//                for (Filter filter : filters) {
-//                    log.debug("\n" + filter.getCondition());
-//                }
-//            }
-//            // use the basic filter iterator for remaining filters
-////            rule = new ProxyRuleWithSesameFilters(rule, filters);
-//        }
-//        
-//        return rule;
-//        
-//    }
     
     private void attachNamedGraphsFilterToSearches(final SOpTree sopTree) {
     	
@@ -1370,6 +1077,124 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         }
         
     }
+    
+    protected void attachRangeBOps(final SOpGroup g) {
+
+		final Map<IVariable,Collection<IValueExpression>> lowerBounds =
+			new LinkedHashMap<IVariable,Collection<IValueExpression>>();
+		final Map<IVariable,Collection<IValueExpression>> upperBounds =
+			new LinkedHashMap<IVariable,Collection<IValueExpression>>();
+		
+		for (SOp sop : g) {
+			final BOp bop = sop.getBOp();
+			if (!(bop instanceof Constraint)) {
+				continue;
+			}
+			final Constraint c = (Constraint) bop;
+			if (!(c.getValueExpression() instanceof CompareBOp)) {
+				continue;
+			}
+			final CompareBOp compare = (CompareBOp) c.getValueExpression();
+			final IValueExpression left = compare.get(0);
+			final IValueExpression right = compare.get(1);
+			final CompareOp op = compare.op();
+			if (left instanceof IVariable) {
+				final IVariable var = (IVariable) left;
+				final IValueExpression ve = right;
+				if (op == CompareOp.GE || op == CompareOp.GT) {
+					// ve is a lower bound
+					Collection bounds = lowerBounds.get(var);
+					if (bounds == null) {
+						bounds = new LinkedList<IValueExpression>();
+						lowerBounds.put(var, bounds);
+					}
+					bounds.add(ve);
+				} else if (op == CompareOp.LE || op == CompareOp.LT) {
+					// ve is an upper bound
+					Collection bounds = upperBounds.get(var);
+					if (bounds == null) {
+						bounds = new LinkedList<IValueExpression>();
+						upperBounds.put(var, bounds);
+					}
+					bounds.add(ve);
+				}
+			} 
+			if (right instanceof IVariable) {
+				final IVariable var = (IVariable) right;
+				final IValueExpression ve = left;
+				if (op == CompareOp.LE || op == CompareOp.LT) {
+					// ve is a lower bound
+					Collection bounds = lowerBounds.get(var);
+					if (bounds == null) {
+						bounds = new LinkedList<IValueExpression>();
+						lowerBounds.put(var, bounds);
+					}
+					bounds.add(ve);
+				} else if (op == CompareOp.GE || op == CompareOp.GT) {
+					// ve is an upper bound
+					Collection bounds = upperBounds.get(var);
+					if (bounds == null) {
+						bounds = new LinkedList<IValueExpression>();
+						upperBounds.put(var, bounds);
+					}
+					bounds.add(ve);
+				}
+			}
+		}
+		
+		final Map<IVariable,RangeBOp> rangeBOps = 
+			new LinkedHashMap<IVariable,RangeBOp>();
+		
+		for (IVariable v : lowerBounds.keySet()) {
+			if (!upperBounds.containsKey(v))
+				continue;
+			
+			IValueExpression from = null;
+			for (IValueExpression ve : lowerBounds.get(v)) {
+				if (from == null)
+					from = ve;
+				else
+					from = new MathBOp(ve, from, MathOp.MAX);
+			}
+
+			IValueExpression to = null;
+			for (IValueExpression ve : upperBounds.get(v)) {
+				if (to == null)
+					to = ve;
+				else
+					to = new MathBOp(ve, to, MathOp.MIN);
+			}
+			
+			final RangeBOp rangeBOp = new RangeBOp(v, from, to); 
+			
+			if (log.isInfoEnabled()) {
+				log.info("found a range bop: " + rangeBOp);
+			}
+			
+			rangeBOps.put(v, rangeBOp);
+		}
+		
+		for (SOp sop : g) {
+			final BOp bop = sop.getBOp();
+			if (!(bop instanceof IPredicate)) {
+				continue;
+			}
+			final IPredicate pred = (IPredicate) bop;
+			final IVariableOrConstant o = pred.get(2);
+			if (o.isVar()) {
+				final IVariable v = (IVariable) o;
+				if (!rangeBOps.containsKey(v)) {
+					continue;
+				}
+				final RangeBOp rangeBOp = rangeBOps.get(v);
+				final IPredicate rangePred = (IPredicate)
+					pred.setProperty(SPOPredicate.Annotations.RANGE, rangeBOp);
+				if (log.isInfoEnabled())
+					log.info("range pred: " + rangePred);
+				sop.setBOp(rangePred);
+			}
+		}
+    }
 
     protected IVariable[] gatherRequiredVariables(final TupleExpr root, 
     		final Collection<Filter> sesameFilters) {
@@ -1470,192 +1295,6 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         return vars;
 
     }
-    
-//    /**
-//     * This method will take a Union and attempt to turn it into a native
-//     * bigdata program. If either the left or right arg is a Union, the method
-//     * will act recursively to flatten the nested Unions into a single program.
-//     * <p>
-//     * See comments for {@link #evaluate(Union, BindingSet)}.
-//     * 
-//     * @param union
-//     * @return native bigdata program
-//     * @throws UnsupportedOperatorException
-//     *             this exception will be thrown if the Sesame join contains any
-//     *             SPARQL language constructs that cannot be converted into the
-//     *             bigdata native rule model
-//     * @throws QueryEvaluationException
-//     */
-//    private IProgram createNativeQueryOld(Union union)
-//            throws UnsupportedOperatorException,
-//            QueryEvaluationException {
-//        
-//        // create a new program that can run in parallel
-//        Program program = new Program("union", true);
-//        
-//        TupleExpr left = union.getLeftArg();
-//        // if the left arg is a union, create a program for it and merge it
-//        if (left instanceof Union) {
-//            Program p2 = (Program) createNativeQuery((Union) left);
-//            program.addSteps(p2.steps());
-//        } else if (left instanceof Join || left instanceof LeftJoin || 
-//                left instanceof Filter) {
-//            IRule rule = createNativeQueryOld(left);
-//            if (rule != null) {
-//                if (rule instanceof ProxyRuleWithSesameFilters) {
-//                    // unfortunately I think we just have to punt to be super safe
-//                    Collection<Filter> filters = 
-//                        ((ProxyRuleWithSesameFilters) rule).getSesameFilters();
-//                    if (log.isDebugEnabled()) {
-//                        log.debug("could not translate " + filters.size()
-//                                + " filters into native constraints:");
-//                        for (Filter filter : filters) {
-//                            log.debug("\n" + filter.getCondition());
-//                        }
-//                    }
-//                    throw new UnsupportedOperatorException(filters.iterator().next());
-//                }
-//                program.addStep(rule);
-//            }
-//        } else if (left instanceof StatementPattern) {
-//            IRule rule = createNativeQueryOld((StatementPattern) left);
-//            if (rule != null) {
-//                program.addStep(rule);
-//            }
-//        } else {
-//            throw new UnsupportedOperatorException(left);
-//        }
-//        
-//        TupleExpr right = union.getRightArg();
-//        // if the right arg is a union, create a program for it and merge it
-//        if (right instanceof Union) {
-//            Program p2 = (Program) createNativeQuery((Union) right);
-//            program.addSteps(p2.steps());
-//        } else if (right instanceof Join || right instanceof LeftJoin ||
-//                right instanceof Filter) {
-//            IRule rule = createNativeQueryOld(right);
-//            if (rule != null) {
-//                if (rule instanceof ProxyRuleWithSesameFilters) {
-//                    // unfortunately I think we just have to punt to be super safe
-//                    Collection<Filter> filters = 
-//                        ((ProxyRuleWithSesameFilters) rule).getSesameFilters();
-//                    if (log.isDebugEnabled()) {
-//                        log.debug("could not translate " + filters.size()
-//                                + " filters into native constraints:");
-//                        for (Filter filter : filters) {
-//                            log.debug("\n" + filter.getCondition());
-//                        }
-//                    }
-//                    throw new UnsupportedOperatorException(filters.iterator().next());
-//                }
-//                program.addStep(rule);
-//            }
-//        } else if (right instanceof StatementPattern) {
-//            IRule rule = createNativeQueryOld((StatementPattern) right);
-//            if (rule != null) {
-//                program.addStep(rule);
-//            }
-//        } else {
-//            throw new UnsupportedOperatorException(right);
-//        }
-//        
-//        return program;
-//        
-//    }
-
-//    /**
-//     * Take the supplied tuple expression and flatten all the statement patterns
-//     * into a collection that can then be fed into a bigdata rule.  So if the
-//     * tuple expression is itself a statement pattern or a filter, simply cast 
-//     * and add it to the appropriate collection.  If the tuple expression is a
-//     * join or left join, use recursion on the left and right argument of the
-//     * join.  If the tuple expression is anything else, for example a Union,
-//     * this method will throw an exception.  Currently Unions nested inside
-//     * of joins is not supported due to deficiencies in the native bigdata
-//     * rule model.
-//     * <p>
-//     * @todo support nested Unions
-//     *
-//     * @param tupleExpr
-//     * @param stmtPatterns
-//     * @param filters
-//     */
-//    private void collectStatementPatterns(final TupleExpr tupleExpr,
-//            final Map<StatementPattern, Boolean> stmtPatterns,
-//            final Collection<Filter> filters) 
-//        throws UnsupportedOperatorException {
-//        
-//        if (tupleExpr instanceof StatementPattern) {
-//            stmtPatterns.put((StatementPattern) tupleExpr, Boolean.FALSE);
-//        } else if (tupleExpr instanceof Filter) {
-//            final Filter filter = (Filter) tupleExpr;
-//            filters.add(filter);
-//            final TupleExpr arg = filter.getArg();
-//            collectStatementPatterns(arg, stmtPatterns, filters);
-//        } else if (tupleExpr instanceof Join) {
-//            final Join join = (Join) tupleExpr;
-//            final TupleExpr left = join.getLeftArg();
-//            final TupleExpr right = join.getRightArg();
-//            collectStatementPatterns(left, stmtPatterns, filters);
-//            collectStatementPatterns(right, stmtPatterns, filters);
-//        } else if (tupleExpr instanceof LeftJoin) {
-//
-//            final LeftJoin join = (LeftJoin) tupleExpr;
-//            
-//            /*
-//             * FIXME Another deficiency in the native rule model. Incorrect
-//             * scoping of join.
-//             * Example:
-//             * SELECT *
-//             * { 
-//             *   ?X  :name "paul"
-//             *   {?Y :name "george" . OPTIONAL { ?X :email ?Z } }
-//             * }
-//             * 
-//             * 1. Join 
-//             *    2. StatementPattern 
-//             *    3. LeftJoin
-//             *       4. StatementPattern
-//             *       5. StatementPattern 
-//             *       
-//             * (1) starts collecting its child nodes and gets to (3), which
-//             * puts us here in the code.  But this is not a case where we
-//             * can just flatten the whole tree.  (3) needs to be evaluated
-//             * independently, as a subprogram.
-//             */
-//            QueryModelNode operator = join;
-//            while ((operator = operator.getParentNode()) != null) {
-//                if (operator instanceof Join) {
-//                    // Use Sesame 2 evaluation
-//                    throw new UnsupportedOperatorException(join);
-//                }
-//            }
-//            
-//            // FIXME is this right?  what about multiple optionals - do they nest?
-//            final TupleExpr left = join.getLeftArg();
-//            final TupleExpr right = join.getRightArg();
-//            // all we know how to handle right now is a left join of:
-//            // { StatementPattern || Join || LeftJoin } x { StatementPattern }
-//            if (!(right instanceof StatementPattern)) {
-//                throw new UnsupportedOperatorException(right);
-//            }
-//            final ValueExpr condition = join.getCondition();
-//            if (condition != null) {
-//                /*
-//                Filter filter = new Filter(right, condition);
-//                // fake a filter, we just need the value expr later
-//                filters.add(filter);
-//                */
-//                // we have to punt on nested optional filters just to be safe
-//                throw new UnsupportedOperatorException(join);
-//            }
-//            stmtPatterns.put((StatementPattern) right, Boolean.TRUE);
-//            collectStatementPatterns(left, stmtPatterns, filters);
-//        } else {
-//            throw new UnsupportedOperatorException(tupleExpr);
-//        }
-//        
-//    }
 
     private IPredicate toPredicate(final Regex regex) 
     		throws QueryEvaluationException {
@@ -2212,16 +1851,20 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	 * value does not exist in the lexicon.
 	 */
     private IConstant<IV> toVE(final ValueConstant vc) {
-    	final IV iv;
+    	IV iv;
     	final Value v = vc.getValue();
     	if (v instanceof BooleanLiteralImpl) {
     		final BooleanLiteralImpl bl = (BooleanLiteralImpl) v;
     		iv = XSDBooleanIV.valueOf(bl.booleanValue());
     	} else {
-    		iv = ((BigdataValue) vc.getValue()).getIV();
+    		iv = ((BigdataValue) v).getIV();
+//    		if (iv instanceof XSDIntegerIV)
+//    			iv = new XSDIntIV(((XSDIntegerIV) iv).intValue());
+//    		else if (iv instanceof XSDDecimalIV)
+//    			iv = new XSDDoubleIV(((XSDDecimalIV) iv).doubleValue());
     	}
         if (iv == null)
-        	throw new UnrecognizedValueException(vc.getValue());
+        	throw new UnrecognizedValueException(v);
     	return new Constant<IV>(iv);
     }
 
@@ -2233,7 +1876,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     private MathBOp toVE(final MathExpr mathExpr) {
     	final ValueExpr left = mathExpr.getLeftArg();
     	final ValueExpr right = mathExpr.getRightArg();
-    	final MathOp op = mathExpr.getOperator();
+    	final MathOp op = MathOp.valueOf(mathExpr.getOperator());
     	final IValueExpression<IV> iv1 = toVE(left);
     	final IValueExpression<IV> iv2 = toVE(right);
         return new MathBOp(iv1, iv2, op);
@@ -2489,153 +2132,6 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 //        
 //    }
 
-    // /** @issue make protected in openrdf. */
-    // protected Value getVarValue(final Var var, final BindingSet bindings) {
-    //
-    // if (var == null) {
-    //
-    // return null;
-    //
-    // } else if (var.hasValue()) {
-    //
-    // return var.getValue();
-    //
-    // } else {
-    //
-    // return bindings.getValue(var.getName());
-    //
-    // }
-    //
-    // }
-    
-//    protected static class ProxyRuleWithSesameFilters implements IRule {
-//
-//        private IRule rule;
-//        
-//        private Collection<Filter> filters;
-//        
-//        public ProxyRuleWithSesameFilters(IRule rule, 
-//                Collection<Filter> filters) {
-//            
-//            this.rule = rule;
-//            this.filters = filters;
-//            
-//        }
-//        
-//        public IRule getProxyRule() {
-//            return rule;
-//        }
-//        
-//        public Collection<Filter> getSesameFilters() {
-//            return filters;
-//        }
-//        
-//        public IQueryOptions getQueryOptions() {
-//            return rule.getQueryOptions();
-//        }
-//
-//        public boolean isRule() {
-//            return rule.isRule();
-//        }
-//
-//        public IBindingSet getConstants() {
-//            return rule.getConstants();
-//        }
-//
-//        public IConstraint getConstraint(int index) {
-//            return rule.getConstraint(index);
-//        }
-//
-//        public int getConstraintCount() {
-//            return rule.getConstraintCount();
-//        }
-//
-//        public Iterator getConstraints() {
-//            return rule.getConstraints();
-//        }
-//
-//        public IPredicate getHead() {
-//            return rule.getHead();
-//        }
-//
-//        public String getName() {
-//            return rule.getName();
-//        }
-//
-//        public Set getSharedVars(int index1, int index2) {
-//            return rule.getSharedVars(index1, index2);
-//        }
-//
-//        public Iterator getTail() {
-//            return rule.getTail();
-//        }
-//
-//        public IPredicate getTail(int index) {
-//            return rule.getTail(index);
-//        }
-//
-//        public int getTailCount() {
-//            return rule.getTailCount();
-//        }
-//
-//        public IRuleTaskFactory getTaskFactory() {
-//            return rule.getTaskFactory();
-//        }
-//
-//        public int getVariableCount() {
-//            return rule.getVariableCount();
-//        }
-//
-//        public int getVariableCount(int index, IBindingSet bindingSet) {
-//            return rule.getVariableCount(index, bindingSet);
-//        }
-//
-//        public Iterator getVariables() {
-//            return rule.getVariables();
-//        }
-//
-//        public int getRequiredVariableCount() {
-//            return rule.getRequiredVariableCount();
-//        }
-//
-//        public Iterator getRequiredVariables() {
-//            return rule.getRequiredVariables();
-//        }
-//
-//        public boolean isConsistent(IBindingSet bindingSet) {
-//            return rule.isConsistent(bindingSet);
-//        }
-//
-//        public boolean isDeclared(IVariable var) {
-//            return rule.isDeclared(var);
-//        }
-//
-//        public boolean isFullyBound(IBindingSet bindingSet) {
-//            return rule.isFullyBound(bindingSet);
-//        }
-//
-//        public boolean isFullyBound(int index, IBindingSet bindingSet) {
-//            return rule.isFullyBound(index, bindingSet);
-//        }
-//
-//        public IRule specialize(IBindingSet bindingSet, IConstraint[] constraints) {
-//            return rule.specialize(bindingSet, constraints);
-//        }
-//
-//        public IRule specialize(String name, IBindingSet bindingSet, IConstraint[] constraints) {
-//            return rule.specialize(name, bindingSet, constraints);
-//        }
-//
-//        public String toString(IBindingSet bindingSet) {
-//            return rule.toString(bindingSet);
-//        }
-//        
-//        public String toString() {
-//            return rule.toString();
-//        }
-//        
-//    }
-    
     static private class UnrecognizedValueException extends RuntimeException {
 
         /**

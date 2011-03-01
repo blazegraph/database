@@ -25,8 +25,6 @@ package com.bigdata.bop.rdf.aggregate;
 
 import java.util.Map;
 
-import org.openrdf.query.algebra.MathExpr.MathOp;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
@@ -34,10 +32,10 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
-import com.bigdata.bop.aggregate.AggregateBase.FunctionCode;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.XSDLongIV;
+import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 /**

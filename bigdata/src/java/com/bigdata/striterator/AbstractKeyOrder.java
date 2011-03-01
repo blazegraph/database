@@ -72,7 +72,7 @@ abstract public class AbstractKeyOrder<E> implements IKeyOrder<E> {
         
     }
 
-    final public byte[] getFromKey(final IKeyBuilder keyBuilder,
+    public byte[] getFromKey(final IKeyBuilder keyBuilder,
             final IPredicate<E> predicate) {
 
         keyBuilder.reset();
@@ -99,16 +99,42 @@ abstract public class AbstractKeyOrder<E> implements IKeyOrder<E> {
 
         }
 
-        return noneBound ? null : keyBuilder.getKey();
+        final byte[] key = noneBound ? null : keyBuilder.getKey();
 
+        return key;
+        
     }
 
-    final public byte[] getToKey(final IKeyBuilder keyBuilder,
+    public byte[] getToKey(final IKeyBuilder keyBuilder,
             final IPredicate<E> predicate) {
 
-        final byte[] from = getFromKey(keyBuilder, predicate);
+        keyBuilder.reset();
 
-        return from == null ? null : SuccessorUtil.successor(from);
+        final int keyArity = getKeyArity(); // use the key's "arity".
+
+        boolean noneBound = true;
+
+        for (int i = 0; i < keyArity; i++) {
+
+            final IVariableOrConstant<?> term = predicate.get(getKeyOrder(i));
+
+            // Note: term MAY be null for the context position.
+            if (term == null || term.isVar())
+                break;
+
+            /*
+             * Note: If you need to override the default IKeyBuilder behavior do
+             * it in the invoked method.
+             */
+            appendKeyComponent(keyBuilder, i, term.get());
+
+            noneBound = false;
+
+        }
+
+        final byte[] key = noneBound ? null : keyBuilder.getKey();
+
+        return key == null ? null : SuccessorUtil.successor(key);
 
     }
 

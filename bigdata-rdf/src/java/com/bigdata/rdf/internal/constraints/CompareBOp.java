@@ -93,6 +93,10 @@ public class CompareBOp extends ValueExpressionBOp
     public CompareBOp(final CompareBOp op) {
         super(op);
     }
+    
+    public CompareOp op() {
+    	return (CompareOp) getRequiredProperty(Annotations.OP);
+    }
 
     public boolean accept(final IBindingSet s) {
         
@@ -103,7 +107,7 @@ public class CompareBOp extends ValueExpressionBOp
     	if (left == null || right == null)
         	throw new SparqlTypeErrorException();
 
-    	final CompareOp op = (CompareOp) getProperty(Annotations.OP);
+    	final CompareOp op = op();
     	
     	if (left.isTermId() && right.isTermId()) {
     		if (op == CompareOp.EQ || op == CompareOp.NE) {

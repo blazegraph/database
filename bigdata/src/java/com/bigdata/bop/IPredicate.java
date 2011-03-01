@@ -678,6 +678,12 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * @return The newly annotated {@link IPredicate}.
      */
     public IPredicate<E> setBOpId(int bopId);
+    
+    /**
+     * Return a copy of this predicate with a different {@link IVariableOrConstant}
+     * for the arg specified by the supplied index parameter.
+     */
+    public IPredicate<E> setArg(int index, IVariableOrConstant arg);
 
 	/**
 	 * Return <code>true</code> iff this operator is an access path which writes

@@ -66,4 +66,8 @@ public enum QueryOptimizerEnum {
      * minutes or hours.
      */
     Runtime;
+    
+    public static String queryHint(final QueryOptimizerEnum val) {
+    	return "prefix "+QueryHints.NAMESPACE+": <"+QueryHints.PREFIX+QueryHints.OPTIMIZER+"="+val+"> ";
+    }
 }

@@ -1593,9 +1593,11 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 				this.accessPath = context.getAccessPath(relation, predicate);
 
-				if (log.isDebugEnabled())
-					log.debug("joinOp=" + joinOp + ", #bindingSets=" + n
-							+ ", accessPath=" + accessPath);
+				if (log.isDebugEnabled()) {
+					log.debug("joinOp=" + joinOp);
+					log.debug("#bindingSets=" + n);
+					log.debug("accessPath=" + accessPath);
+				}
 
 				// convert to array for thread-safe traversal.
 				this.bindingSets = bindingSets.toArray(new IBindingSet[n]);
@@ -1644,7 +1646,11 @@ public class PipelineJoin<E> extends PipelineOp implements
 				// range count of the as-bound access path (should be cached).
 				final long rangeCount = accessPath
 						.rangeCount(false/* exact */);
-
+				
+				if (log.isDebugEnabled()) {
+					log.debug("range count: " + rangeCount);
+				}
+				
 				stats.accessPathCount.increment();
 
 				stats.accessPathRangeCount.add(rangeCount);

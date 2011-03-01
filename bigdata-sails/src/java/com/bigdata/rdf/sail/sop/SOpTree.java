@@ -83,6 +83,10 @@ public class SOpTree implements Iterable<SOp> {
 		return sops.iterator();
 	}
 	
+	public Iterator<SOpGroup> groups() {
+		return allGroups.values().iterator();
+	}
+	
 	public SOpGroup getRoot() {
 		return allGroups.get(0);
 	}

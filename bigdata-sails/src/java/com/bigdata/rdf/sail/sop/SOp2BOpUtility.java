@@ -179,13 +179,13 @@ public class SOp2BOpUtility {
     	 */
     	final Collection<IConstraint> preConditionals = 
     		new LinkedList<IConstraint>();
-    	
-    	/*
-    	 * These are constraints that use variables bound by subqueries, and
-    	 * thus cannot be attached to the predicates in this group.  They are
-    	 * handled by ConditionalRoutingOps at the end of the group, after
-    	 * the subqueries have run. 
-    	 */
+
+		/*
+		 * These are constraints that use variables bound by optionals or
+		 * subqueries, and thus cannot be attached to the non-optional
+		 * predicates in this group. They are handled by ConditionalRoutingOps
+		 * at the end of the group, after the subqueries have run.
+		 */
     	final Collection<IConstraint> postConditionals = 
     		new LinkedList<IConstraint>();
     	

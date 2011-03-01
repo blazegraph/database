@@ -5,7 +5,6 @@ import java.util.Properties;
 import java.util.UUID;
 
 import org.openrdf.query.algebra.Compare.CompareOp;
-import org.openrdf.query.algebra.MathExpr.MathOp;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.bop.BOp;
@@ -18,7 +17,6 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.IPredicate.Annotations;
-import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.journal.ITx;
@@ -30,6 +28,7 @@ import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;

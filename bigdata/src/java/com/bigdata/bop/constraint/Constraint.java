@@ -29,14 +29,14 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
-import com.bigdata.bop.ImmutableBOp;
 
 /**
  * BOpConstraint that wraps a {@link BooleanValueExpression}.
  */
-public class Constraint extends ImmutableBOp implements IConstraint {
+public class Constraint extends BOpBase implements IConstraint {
 	
 	/**
 	 * 

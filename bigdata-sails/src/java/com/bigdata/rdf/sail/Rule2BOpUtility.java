@@ -1397,7 +1397,7 @@ public class Rule2BOpUtility {
 
                 if (t.isVar()) {
 
-                    final Var<?> var = (Var<?>) t;
+                    final IVariable<?> var = (IVariable<?>) t;
 
                     if (log.isDebugEnabled()) {
 
