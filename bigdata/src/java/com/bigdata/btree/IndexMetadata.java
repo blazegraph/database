@@ -316,9 +316,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * 
          * @see #DEFAULT_BLOOM_FILTER
          */
-        String BLOOM_FILTER = com.bigdata.btree.BTree.class.getPackage()
+        String BLOOM_FILTER = (com.bigdata.btree.BTree.class.getPackage()
                 .getName()
-                + ".bloomFilter";
+                + ".bloomFilter").intern();
         
         String DEFAULT_BLOOM_FILTER = "false";
         
@@ -379,9 +379,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * application is performing sustained writes on the index (hundreds of
          * thousands to millions of records).
          */
-        String WRITE_RETENTION_QUEUE_CAPACITY = com.bigdata.btree.AbstractBTree.class
+        String WRITE_RETENTION_QUEUE_CAPACITY = (com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
-                + ".writeRetentionQueue.capacity";
+                + ".writeRetentionQueue.capacity").intern();
 
         /**
          * The #of entries on the write retention queue that will be scanned for
@@ -392,9 +392,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * incremental writes occur iff the {@link AbstractNode#referenceCount}
          * is zero and the node or leaf is dirty.
          */
-        String WRITE_RETENTION_QUEUE_SCAN = com.bigdata.btree.AbstractBTree.class
+        String WRITE_RETENTION_QUEUE_SCAN = (com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
-                + ".writeRetentionQueue.scan";
+                + ".writeRetentionQueue.scan").intern();
 
         String DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY = "500";// was 500
 
@@ -408,17 +408,17 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * 
          * FIXME {@link KeyBuilder} configuration support is not finished.
          */
-        String KEY_BUILDER_FACTORY = com.bigdata.btree.AbstractBTree.class
+        String KEY_BUILDER_FACTORY = (com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
-                + "keyBuilderFactory";
+                + "keyBuilderFactory").intern();
 
         /**
          * Override the {@link IRabaCoder} used for the keys in the nodes of a
          * B+Tree (the default is a {@link FrontCodedRabaCoder} instance).
          */
-        String NODE_KEYS_CODER = com.bigdata.btree.AbstractBTree.class
+        String NODE_KEYS_CODER = (com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
-                + "nodeKeysCoder";
+                + "nodeKeysCoder").intern();
 
         /**
          * Override the {@link IRabaCoder} used for the keys of leaves in
@@ -426,9 +426,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * 
          * @see DefaultTupleSerializer#setLeafKeysCoder(IRabaCoder)
          */
-        String LEAF_KEYS_CODER = com.bigdata.btree.AbstractBTree.class
+        String LEAF_KEYS_CODER = (com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
-                + ".leafKeysCoder";
+                + ".leafKeysCoder").intern();
 
         /**
          * Override the {@link IRabaCoder} used for the values of leaves in
@@ -436,9 +436,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * 
          * @see DefaultTupleSerializer#setLeafValuesCoder(IRabaCoder)
          */
-        String LEAF_VALUES_CODER = com.bigdata.btree.AbstractBTree.class
+        String LEAF_VALUES_CODER = (com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
-                + ".leafValuesCoder";
+                + ".leafValuesCoder").intern();
 
 //        /**
 //         * Option determines whether or not per-child locks are used by
@@ -492,7 +492,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          *       also need to override the {@link Checkpoint} class - for
          *       example the {@link MetadataIndex} does this.
          */
-        String BTREE_CLASS_NAME = BTree.class.getName()+".className";
+        String BTREE_CLASS_NAME = (BTree.class.getName()+".className").intern();
         
         /**
          * The name of an optional property whose value specifies the branching
@@ -501,7 +501,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * @see #DEFAULT_BTREE_BRANCHING_FACTOR
          * @see #INDEX_SEGMENT_BRANCHING_FACTOR
          */
-        String BTREE_BRANCHING_FACTOR = BTree.class.getName()+".branchingFactor";
+        String BTREE_BRANCHING_FACTOR = (BTree.class.getName()+".branchingFactor").intern();
 
         /**
          * The default branching factor for a mutable {@link BTree}.
@@ -595,8 +595,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * 
          * FIXME Record level compression support is not finished.
          */
-        String BTREE_RECORD_COMPRESSOR_FACTORY = BTree.class.getName()
-                + ".recordCompressorFactory";
+        String BTREE_RECORD_COMPRESSOR_FACTORY = (BTree.class.getName()
+                + ".recordCompressorFactory").intern();
 
         /**
          * 
@@ -614,9 +614,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * The name of the property whose value specifies the branching factory
          * for an immutable {@link IndexSegment}.
          */
-        String INDEX_SEGMENT_BRANCHING_FACTOR = IndexSegment.class
+        String INDEX_SEGMENT_BRANCHING_FACTOR = (IndexSegment.class
                 .getName()
-                + ".branchingFactor";
+                + ".branchingFactor").intern();
 
         /**
          * The default branching factor for an {@link IndexSegment}.
@@ -646,8 +646,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * @todo should be on by default? (but verify that the unit tests do
          * not run out of memory when it is enabled by default).
          */
-        String INDEX_SEGMENT_BUFFER_NODES = IndexSegment.class.getName()
-                + ".bufferNodes";
+        String INDEX_SEGMENT_BUFFER_NODES = (IndexSegment.class.getName()
+                + ".bufferNodes").intern();
         
         /**
          * @see #INDEX_SEGMENT_BUFFER_NODES
@@ -711,8 +711,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * 
          * FIXME Record level compression support is not finished.
          */
-        String INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY = IndexSegment.class.getName()
-                + ".recordCompressorFactory";
+        String INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY = (IndexSegment.class.getName()
+                + ".recordCompressorFactory").intern();
 
         /**
          * 
@@ -796,9 +796,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * {@link AbstractSubtask} sink handling writes for the associated index
          * partition.
          */
-        String MASTER_QUEUE_CAPACITY = AsynchronousIndexWriteConfiguration.class
+        String MASTER_QUEUE_CAPACITY = (AsynchronousIndexWriteConfiguration.class
                 .getName()
-                + ".masterQueueCapacity";
+                + ".masterQueueCapacity").intern();
 
         String DEFAULT_MASTER_QUEUE_CAPACITY = "5000";
 
@@ -806,9 +806,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * The desired size of the chunks that the master will draw from its
          * queue.
          */
-        String MASTER_CHUNK_SIZE = AsynchronousIndexWriteConfiguration.class
+        String MASTER_CHUNK_SIZE = (AsynchronousIndexWriteConfiguration.class
                 .getName()
-                + ".masterChunkSize";
+                + ".masterChunkSize").intern();
 
         String DEFAULT_MASTER_CHUNK_SIZE = "10000";
 
@@ -816,9 +816,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * The time in nanoseconds that the master will combine smaller chunks
          * so that it can satisfy the desired <i>masterChunkSize</i>.
          */
-        String MASTER_CHUNK_TIMEOUT_NANOS = AsynchronousIndexWriteConfiguration.class
+        String MASTER_CHUNK_TIMEOUT_NANOS = (AsynchronousIndexWriteConfiguration.class
                 .getName()
-                + ".masterChunkTimeoutNanos";
+                + ".masterChunkTimeoutNanos").intern();
 
         String DEFAULT_MASTER_CHUNK_TIMEOUT_NANOS = ""
                 + TimeUnit.MILLISECONDS.toNanos(50);
@@ -830,9 +830,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * the sink remains responsible rather than blocking inside of the
          * {@link IAsynchronousIterator} for long periods of time.
          */
-        String SINK_POLL_TIMEOUT_NANOS = AsynchronousIndexWriteConfiguration.class
+        String SINK_POLL_TIMEOUT_NANOS = (AsynchronousIndexWriteConfiguration.class
                 .getName()
-                + ".sinkPollTimeoutNanos";
+                + ".sinkPollTimeoutNanos").intern();
 
         String DEFAULT_SINK_POLL_TIMEOUT_NANOS = ""
                 + TimeUnit.MILLISECONDS.toNanos(50);
@@ -840,9 +840,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         /**
          * The capacity of the internal queue for the per-sink output buffer.
          */
-        String SINK_QUEUE_CAPACITY = AsynchronousIndexWriteConfiguration.class
+        String SINK_QUEUE_CAPACITY = (AsynchronousIndexWriteConfiguration.class
                 .getName()
-                + ".sinkQueueCapacity";
+                + ".sinkQueueCapacity").intern();
 
         String DEFAULT_SINK_QUEUE_CAPACITY = "5000";
 
@@ -850,9 +850,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * The desired size of the chunks written that will be written by the
          * {@link AbstractSubtask sink}.
          */
-        String SINK_CHUNK_SIZE = AsynchronousIndexWriteConfiguration.class
+        String SINK_CHUNK_SIZE = (AsynchronousIndexWriteConfiguration.class
                 .getName()
-                + ".sinkChunkSize";
+                + ".sinkChunkSize").intern();
 
         String DEFAULT_SINK_CHUNK_SIZE = "10000";
 
@@ -865,9 +865,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * the index partition. This makes it much easier to adjust the
          * performance since you simply adjust the {@link #SINK_CHUNK_SIZE}.
          */
-        String SINK_CHUNK_TIMEOUT_NANOS = AsynchronousIndexWriteConfiguration.class
+        String SINK_CHUNK_TIMEOUT_NANOS = (AsynchronousIndexWriteConfiguration.class
                 .getName()
-                + ".sinkChunkTimeoutNanos";
+                + ".sinkChunkTimeoutNanos").intern();
 
         String DEFAULT_SINK_CHUNK_TIMEOUT_NANOS = "" + Long.MAX_VALUE;
 
@@ -890,9 +890,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * sink is writing.
          */
         // GTE chunkTimeout
-        String SINK_IDLE_TIMEOUT_NANOS = AsynchronousIndexWriteConfiguration.class
+        String SINK_IDLE_TIMEOUT_NANOS = (AsynchronousIndexWriteConfiguration.class
                 .getName()
-                + ".sinkIdleTimeoutNanos";
+                + ".sinkIdleTimeoutNanos").intern();
 
         String DEFAULT_SINK_IDLE_TIMEOUT_NANOS = "" + Long.MAX_VALUE;
 
@@ -916,9 +916,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * 
          * @see OverflowManager.Options#SCATTER_SPLIT_ENABLED
          */
-        String SCATTER_SPLIT_ENABLED = ScatterSplitConfiguration.class
+        String SCATTER_SPLIT_ENABLED = (ScatterSplitConfiguration.class
                 .getName()
-                + ".enabled";
+                + ".enabled").intern();
 
         String DEFAULT_SCATTER_SPLIT_ENABLED = "true";
 
@@ -935,9 +935,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * performed. The allowable range is therefore constrained to
          * <code>(0.1 : 1.0)</code>.
          */
-        String SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD = ScatterSplitConfiguration.class
+        String SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD = (ScatterSplitConfiguration.class
                 .getName()
-                + ".percentOfSplitThreshold";
+                + ".percentOfSplitThreshold").intern();
 
         String DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD = ".25";
 
@@ -946,9 +946,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * to use all discovered data services (default
          * {@value #DEFAULT_SCATTER_SPLIT_DATA_SERVICE_COUNT}).
          */
-        String SCATTER_SPLIT_DATA_SERVICE_COUNT = ScatterSplitConfiguration.class
+        String SCATTER_SPLIT_DATA_SERVICE_COUNT = (ScatterSplitConfiguration.class
                 .getName()
-                + ".dataServiceCount";
+                + ".dataServiceCount").intern();
 
         String DEFAULT_SCATTER_SPLIT_DATA_SERVICE_COUNT = "0";
 
@@ -980,9 +980,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * asynchronous index writes in order to obtain high throughput with
          * sustained index writes.
          */
-        String SCATTER_SPLIT_INDEX_PARTITION_COUNT = ScatterSplitConfiguration.class
+        String SCATTER_SPLIT_INDEX_PARTITION_COUNT = (ScatterSplitConfiguration.class
                 .getName()
-                + ".indexPartitionCount";
+                + ".indexPartitionCount").intern();
 
         String DEFAULT_SCATTER_SPLIT_INDEX_PARTITION_COUNT = "0";
         

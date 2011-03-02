@@ -59,7 +59,7 @@ abstract public class INConstraint<T> extends BooleanValueExpression {
         /**
          * The variable against which the constraint is applied.
          */
-        String VARIABLE = INConstraint.class.getName() + ".variable";
+        String VARIABLE = (INConstraint.class.getName() + ".variable").intern();
 
         /**
          * The set of allowed values for that variable.
@@ -67,7 +67,7 @@ abstract public class INConstraint<T> extends BooleanValueExpression {
          * @todo allow large sets to be specified by reference to a resource
          *       which is then materialized on demand during evaluation.
          */
-        String SET = INConstraint.class.getName() + ".set";
+        String SET = (INConstraint.class.getName() + ".set").intern();
         
     }
     

@@ -121,14 +121,14 @@ public class PipelineJoin<E> extends PipelineOp implements
 		 * The {@link IPredicate} which is used to generate the
 		 * {@link IAccessPath}s during the join.
 		 */
-		String PREDICATE = PipelineJoin.class.getName() + ".predicate";
+		String PREDICATE = (PipelineJoin.class.getName() + ".predicate").intern();
 
 		/**
 		 * An optional {@link IVariable}[] identifying the variables to be
 		 * retained in the {@link IBindingSet}s written out by the operator. All
 		 * variables are retained unless this annotation is specified.
 		 */
-		String SELECT = PipelineJoin.class.getName() + ".select";
+		String SELECT = (PipelineJoin.class.getName() + ".select").intern();
 
 //        /**
 //         * Marks the join as "optional" in the SPARQL sense. Binding sets which
@@ -149,7 +149,7 @@ public class PipelineJoin<E> extends PipelineOp implements
          * An {@link IConstraint}[] which places restrictions on the legal
          * patterns in the variable bindings (optional).
          */
-        String CONSTRAINTS = PipelineJoin.class.getName() + ".constraints";
+        String CONSTRAINTS = (PipelineJoin.class.getName() + ".constraints").intern();
 
 		/**
 		 * The maximum parallelism with which the pipeline will consume the
@@ -175,7 +175,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 		 *       this option might well go away which would allow us to simplify
 		 *       the PipelineJoin implementation.
 		 */
-		String MAX_PARALLEL_CHUNKS = PipelineJoin.class.getName() + ".maxParallelChunks";
+		String MAX_PARALLEL_CHUNKS = (PipelineJoin.class.getName() + ".maxParallelChunks").intern();
 
 		int DEFAULT_MAX_PARALLEL_CHUNKS = 0;
 
@@ -195,8 +195,8 @@ public class PipelineJoin<E> extends PipelineOp implements
 		 * 
 		 * @todo unit tests when (en|dis)abled.
 		 */
-		String COALESCE_DUPLICATE_ACCESS_PATHS = PipelineJoin.class.getName()
-				+ ".coalesceDuplicateAccessPaths";
+		String COALESCE_DUPLICATE_ACCESS_PATHS = (PipelineJoin.class.getName()
+				+ ".coalesceDuplicateAccessPaths").intern();
 
 		boolean DEFAULT_COALESCE_DUPLICATE_ACCESS_PATHS = true;
 
@@ -206,7 +206,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 		 * 
 		 * @todo Unit tests for this feature (it is used by the JoinGraph).
 		 */
-		String LIMIT = PipelineJoin.class.getName() + ".limit";
+		String LIMIT = (PipelineJoin.class.getName() + ".limit").intern();
 
 		long DEFAULT_LIMIT = Long.MAX_VALUE;
 

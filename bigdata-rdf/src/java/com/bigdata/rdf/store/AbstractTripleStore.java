@@ -592,7 +592,7 @@ abstract public class AbstractTripleStore extends
         String TERM_CACHE_CAPACITY = AbstractTripleStore.class.getName()
                 + ".termCache.capacity";
         
-        String DEFAULT_TERM_CACHE_CAPACITY = "5000";//"50000";
+        String DEFAULT_TERM_CACHE_CAPACITY = "500";//"50000";
         
         /**
          * The name of the class that will establish the pre-defined

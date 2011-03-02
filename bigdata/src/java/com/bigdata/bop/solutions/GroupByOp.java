@@ -59,7 +59,7 @@ abstract public class GroupByOp extends PipelineOp {
 		 * {@link #GROUP_BY} declaration as simple {@link IVariable} s; or (b)
 		 * be declared by {@link #COMPUTE}.
 		 */
-        String SELECT = GroupByOp.class.getName() + ".select";
+        String SELECT = (GroupByOp.class.getName() + ".select").intern();
 
 //		/**
 //		 * The ordered set of {@link IValueExpression}s which are to be
@@ -90,7 +90,7 @@ abstract public class GroupByOp extends PipelineOp {
 		 * the aggregation groups (required). Variables references will be 
 		 * resolved against the incoming solutions.
 		 */
-        String GROUP_BY = GroupByOp.class.getName() + ".groupBy";
+        String GROUP_BY = (GroupByOp.class.getName() + ".groupBy").intern();
 
 		/**
 		 * An {@link IConstraint}[] applied to the aggregated solutions
@@ -99,7 +99,7 @@ abstract public class GroupByOp extends PipelineOp {
 		 * TODO Should be the BEV of an {@link IValueExpression}, which might or
 		 * might not be an {@link IConstraint}.
 		 */
-        String HAVING =  GroupByOp.class.getName() + ".having";
+        String HAVING =  (GroupByOp.class.getName() + ".having").intern();
         
     }
 

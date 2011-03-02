@@ -51,7 +51,7 @@ public class DistinctBindingSetOp extends PipelineOp {
          * Binding sets with distinct values for the specified variables will be
          * passed on.
          */
-        String VARIABLES = DistinctBindingSetOp.class.getName() + ".variables";
+        String VARIABLES = (DistinctBindingSetOp.class.getName() + ".variables").intern();
         
     }
 

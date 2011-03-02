@@ -74,14 +74,14 @@ public class SubqueryOp extends PipelineOp {
          * {@link SubqueryOp} (required). This should be a
          * {@link PipelineOp}.
          */
-        String SUBQUERY = SubqueryOp.class.getName() + ".subquery";
+        String SUBQUERY = (SubqueryOp.class.getName() + ".subquery").intern();
 
         /**
          * When <code>true</code> the subquery has optional semantics (if the
          * subquery fails, the original binding set will be passed along to the
          * downstream sink anyway) (default {@value #DEFAULT_OPTIONAL}).
          */
-        String OPTIONAL = SubqueryOp.class.getName() + ".optional";
+        String OPTIONAL = (SubqueryOp.class.getName() + ".optional").intern();
 
         boolean DEFAULT_OPTIONAL = false;
         

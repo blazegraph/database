@@ -90,7 +90,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 public class NanoHTTPD implements IServiceShutdown
 {
     
-    final static public Logger log = Logger.getLogger(NanoHTTPD.class);
+    final static private Logger log = Logger.getLogger(NanoHTTPD.class);
 
     /** The server socket. */
     private final ServerSocket ss;

@@ -78,17 +78,17 @@ public class InsertOp<E> extends PipelineOp implements
          * @see IPredicate#asBound(IBindingSet)
          * @see IRelation#newElement(java.util.List, IBindingSet)
          */
-        String SELECTED = InsertOp.class.getName() + ".selected";
+        String SELECTED = (InsertOp.class.getName() + ".selected").intern();
 
         /**
          * The namespace of the relation to which the index belongs.
          */
-        String RELATION = InsertOp.class.getName() + ".relation";
+        String RELATION = (InsertOp.class.getName() + ".relation").intern();
 
         /**
          * The {@link IKeyOrder} for the index.
          */
-        String KEY_ORDER = InsertOp.class.getName() + ".keyOrder";
+        String KEY_ORDER = (InsertOp.class.getName() + ".keyOrder").intern();
 
     }
 

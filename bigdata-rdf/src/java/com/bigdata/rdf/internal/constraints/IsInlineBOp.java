@@ -56,7 +56,7 @@ public class IsInlineBOp extends ValueExpressionBOp
     	 * <p>
     	 * @see IV#isInline()
     	 */
-    	String INLINE = IsInlineBOp.class.getName() + ".inline";
+    	String INLINE = (IsInlineBOp.class.getName() + ".inline").intern();
     	
     }
 

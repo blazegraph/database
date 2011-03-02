@@ -257,6 +257,108 @@ public class TestPipelineJoin extends TestCase2 {
     }
 
     /**
+     * Unit test for a join without shared variables.
+     * 
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    public void test_join_noSharedVariables() throws InterruptedException, ExecutionException {
+
+        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+        
+		final BOp startOp = new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
+				new NV(Predicate.Annotations.BOP_ID, startId),//
+				}));
+
+		final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
+				new Constant<String>("Mary"), Var.var("x") }, NV
+				.asMap(new NV[] {//
+						new NV(Predicate.Annotations.RELATION_NAME,
+								new String[] { namespace }),//
+						new NV(Predicate.Annotations.BOP_ID, predId),//
+						new NV(Annotations.TIMESTAMP,
+								ITx.READ_COMMITTED),//
+				}));
+
+		final PipelineJoin<E> query = new PipelineJoin<E>(
+				new BOp[] { startOp },//
+				new NV(Predicate.Annotations.BOP_ID, joinId),//
+				new NV(PipelineJoin.Annotations.PREDICATE, predOp)//
+//				new NV(PipelineJoin.Annotations.COALESCE_DUPLICATE_ACCESS_PATHS, false)//
+				);
+
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { Var.var("x"), Var.var("y") },//
+                        new IConstant[] { new Constant<String>("John"), new Constant<String>("Jack") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { Var.var("x"), Var.var("y") },//
+                        new IConstant[] { new Constant<String>("Paul"), new Constant<String>("Jack") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { Var.var("x"), Var.var("z") },//
+                        new IConstant[] { new Constant<String>("John"), new Constant<String>("Jill") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { Var.var("x"), Var.var("z") },//
+                        new IConstant[] { new Constant<String>("Paul"), new Constant<String>("Jill") }//
+                ),//
+        };
+
+        final PipelineJoinStats stats = query.newStats();
+
+        final IAsynchronousIterator<IBindingSet[]> source;
+        {
+
+        	final IBindingSet bset1 = new HashBindingSet();
+        	final IBindingSet bset2 = new HashBindingSet();
+
+        	bset1.set(Var.var("y"), new Constant<String>("Jack"));
+        	bset2.set(Var.var("z"), new Constant<String>("Jill"));
+            	
+			source = new ThickAsynchronousIterator<IBindingSet[]>(
+					new IBindingSet[][] { new IBindingSet[] { bset1, bset2 } });
+
+		}
+
+        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
+
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                new MockRunningQuery(null/* fed */, jnl/* indexManager */
+                ), -1/* partitionId */, stats,
+                source, sink, null/* sink2 */);
+
+        // get task.
+        final FutureTask<Void> ft = query.eval(context);
+        
+        // execute task.
+        jnl.getExecutorService().execute(ft);
+
+		TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+				new Dechunkerator<IBindingSet>(sink.iterator()));
+
+        // join task
+        assertEquals(1L, stats.chunksIn.get());
+        assertEquals(2L, stats.unitsIn.get());
+        assertEquals(4L, stats.unitsOut.get());
+        assertEquals(1L, stats.chunksOut.get());
+        // access path
+        assertEquals(1L, stats.accessPathDups.get());
+        assertEquals(1L, stats.accessPathCount.get());
+        assertEquals(1L, stats.accessPathChunksIn.get());
+        assertEquals(2L, stats.accessPathUnitsIn.get());
+        
+        assertTrue(ft.isDone());
+        assertFalse(ft.isCancelled());
+        ft.get(); // verify nothing thrown.
+
+    }
+
+    /**
      * Unit test for a pipeline join in which we expect duplicate access paths to
      * be eliminated.
      * 
@@ -463,13 +565,8 @@ public class TestPipelineJoin extends TestCase2 {
         final Var<String> x = Var.var("x");
         final Var<String> y = Var.var("y");
         
-        final int startId = 1;
 		final int joinId = 2;
 		final int predId = 3;
-
-		final BOp startOp = new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
-				new NV(BOpBase.Annotations.BOP_ID, startId),//
-				}));
 
 		final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
 				x, y },//
@@ -482,7 +579,7 @@ public class TestPipelineJoin extends TestCase2 {
 						})); 
 		
 		final PipelineJoin<E> query = new PipelineJoin<E>(
-				new BOp[] { startOp },//
+				new BOp[] { /*startOp*/ },//
 				new NV(BOpBase.Annotations.BOP_ID, joinId),//
 				new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
 				new NV(PipelineJoin.Annotations.SELECT, new IVariable[] { y }));
@@ -767,5 +864,5 @@ public class TestPipelineJoin extends TestCase2 {
         ft.get(); // verify nothing thrown.
         
     }
-    
+
 }

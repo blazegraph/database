@@ -71,7 +71,7 @@ abstract public class PipelineOp extends BOpBase {
          * the ancestor in the operator tree which serves as the default sink
          * for binding sets (optional, default is the parent).
          */
-        String SINK_REF = PipelineOp.class.getName() + ".sinkRef";
+        String SINK_REF = (PipelineOp.class.getName() + ".sinkRef").intern();
 
         /**
          * The value of the annotation is the {@link BOp.Annotations#BOP_ID} of
@@ -80,8 +80,8 @@ abstract public class PipelineOp extends BOpBase {
          * 
          * @see #ALT_SINK_GROUP
          */
-        String ALT_SINK_REF = PipelineOp.class.getName()
-                + ".altSinkRef";
+		String ALT_SINK_REF = (PipelineOp.class.getName() + ".altSinkRef")
+				.intern();
 
 		/**
 		 * The value reported by {@link PipelineOp#isSharedState()} (default
@@ -96,7 +96,8 @@ abstract public class PipelineOp extends BOpBase {
 		 * When <code>true</code>, the {@link QueryEngine} will impose the
 		 * necessary constraints when the operator is evaluated.
 		 */
-		String SHARED_STATE = PipelineOp.class.getName() + ".sharedState";
+		String SHARED_STATE = (PipelineOp.class.getName() + ".sharedState")
+				.intern();
 
 		boolean DEFAULT_SHARED_STATE = false;
 
@@ -116,7 +117,7 @@ abstract public class PipelineOp extends BOpBase {
 		 * have less effect and performance tends to be best around a modest
 		 * value (10) for those annotations.
 		 */
-		String MAX_PARALLEL = PipelineOp.class.getName() + ".maxParallel";
+		String MAX_PARALLEL = (PipelineOp.class.getName() + ".maxParallel").intern();
 
 		/**
 		 * @see #MAX_PARALLEL
@@ -136,8 +137,8 @@ abstract public class PipelineOp extends BOpBase {
 		 * data to be assigned to an evaluation task is governed by
 		 * {@link #MAX_MEMORY} instead.
 		 */
-	    String MAX_MESSAGES_PER_TASK = PipelineOp.class.getName()
-	            + ".maxMessagesPerTask";
+	    String MAX_MESSAGES_PER_TASK = (PipelineOp.class.getName()
+	            + ".maxMessagesPerTask").intern();
 
 		/**
 		 * @see #MAX_MESSAGES_PER_TASK
@@ -151,8 +152,8 @@ abstract public class PipelineOp extends BOpBase {
 		 * amount of data which can be buffered on the JVM heap during pipelined
 		 * query evaluation.
 		 */
-		String PIPELINE_QUEUE_CAPACITY = PipelineOp.class.getName()
-				+ ".pipelineQueueCapacity";
+		String PIPELINE_QUEUE_CAPACITY = (PipelineOp.class.getName()
+				+ ".pipelineQueueCapacity").intern();
 
 		/**
 		 * @see #PIPELINE_QUEUE_CAPACITY
@@ -165,7 +166,7 @@ abstract public class PipelineOp extends BOpBase {
 		 * "blocked" evaluation depending on how it buffers its data for
 		 * evaluation.
 		 */
-		String PIPELINED = PipelineOp.class.getName() + ".pipelined";
+		String PIPELINED = (PipelineOp.class.getName() + ".pipelined").intern();
 
 		/**
 		 * @see #PIPELINED
@@ -201,7 +202,7 @@ abstract public class PipelineOp extends BOpBase {
 		 * semantics. Such operators MUST throw an exception if the value of
 		 * this annotation could result in multiple evaluation passes.
 		 */
-		String MAX_MEMORY = PipelineOp.class.getName() + ".maxMemory";
+		String MAX_MEMORY = (PipelineOp.class.getName() + ".maxMemory").intern();
 
 		/**
 		 * @see #MAX_MEMORY

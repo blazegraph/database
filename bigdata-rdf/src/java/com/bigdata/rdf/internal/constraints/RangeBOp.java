@@ -25,8 +25,6 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.Constant;
@@ -54,11 +52,11 @@ final public class RangeBOp extends BOpBase
 
 	public interface Annotations extends ImmutableBOp.Annotations {
 
-		String VAR = RangeBOp.class.getName() + ".var";
+		String VAR = (RangeBOp.class.getName() + ".var").intern();
 		
-		String FROM = RangeBOp.class.getName() + ".from";
+		String FROM = (RangeBOp.class.getName() + ".from").intern();
 		
-		String TO = RangeBOp.class.getName() + ".to";
+		String TO = (RangeBOp.class.getName() + ".to").intern();
 		
     }
     

@@ -66,7 +66,7 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements IAggregate<L
 		 * the {@link IValueExpression} computed for each solution within the
 		 * group.
 		 */
-		String SEPARATOR = AggregateBase.class.getName()+".separator";
+		String SEPARATOR = (AggregateBase.class.getName()+".separator").intern();
 
 	}
 	

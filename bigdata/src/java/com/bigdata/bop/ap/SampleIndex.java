@@ -117,7 +117,7 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 		/**
 		 * The sample limit (default {@value #DEFAULT_LIMIT}).
 		 */
-		String LIMIT = SampleIndex.class.getName() + ".limit";
+		String LIMIT = (SampleIndex.class.getName() + ".limit").intern();
 
 		int DEFAULT_LIMIT = 100;
 
@@ -126,7 +126,7 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 		 * (default {@value #DEFAULT_SEED}). A non-zero value may be used to
 		 * create a repeatable sample.
 		 */
-		String SEED = SampleIndex.class.getName() + ".seed";
+		String SEED = (SampleIndex.class.getName() + ".seed").intern();
 		
 		long DEFAULT_SEED = 0L;
 		
@@ -134,12 +134,12 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 		 * The {@link IPredicate} describing the access path to be sampled
 		 * (required).
 		 */
-		String PREDICATE = SampleIndex.class.getName() + ".predicate";
+		String PREDICATE = (SampleIndex.class.getName() + ".predicate").intern();
 
 		/**
 		 * The type of sample to take (default {@value #DEFAULT_SAMPLE_TYPE)}.
 		 */
-		String SAMPLE_TYPE = SampleIndex.class.getName() + ".sampleType";
+		String SAMPLE_TYPE = (SampleIndex.class.getName() + ".sampleType").intern();
 		
 		String DEFAULT_SAMPLE_TYPE = SampleType.RANDOM.name();
 

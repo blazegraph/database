@@ -226,10 +226,13 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
 //     * @return <code>true</code> if all arguments and annotations are the same.
 //     */
 //    boolean sameData(final BOp o);
-    
-    /**
-     * Interface declaring well known annotations.
-     */
+
+	/**
+	 * Interface declaring well known annotations.
+	 * <p>
+	 * Note: Annotation names should be {@link String#intern() interned} in
+	 * order to avoid having duplicate values for those strings on the heap.
+	 */
     public interface Annotations {
 
         /**
@@ -238,7 +241,7 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
          * identifier for the {@link BOp} within the context of its owning
          * query.
          */
-        String BOP_ID = BOp.class.getName() + ".bopId";
+        String BOP_ID = (BOp.class.getName() + ".bopId").intern();
 
         /**
          * The timeout for the operator evaluation (milliseconds).
@@ -253,7 +256,7 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
          *       be interpreted with respect to the time when the query began to
          *       execute.
          */
-        String TIMEOUT = BOp.class.getName() + ".timeout";
+        String TIMEOUT = (BOp.class.getName() + ".timeout").intern();
 
         /**
          * The default timeout for operator evaluation.
@@ -266,7 +269,7 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
          * 
          * @see BOpEvaluationContext
          */
-        String EVALUATION_CONTEXT = BOp.class.getName() + ".evaluationContext";
+        String EVALUATION_CONTEXT = (BOp.class.getName() + ".evaluationContext").intern();
 
         BOpEvaluationContext DEFAULT_EVALUATION_CONTEXT = BOpEvaluationContext.ANY;
 
@@ -280,7 +283,7 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
          * 
          * @see BOp#isController()
          */
-        String CONTROLLER = BOp.class.getName()+".controller";
+        String CONTROLLER = (BOp.class.getName()+".controller").intern();
         
         boolean DEFAULT_CONTROLLER = false;
         
