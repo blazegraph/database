@@ -38,10 +38,9 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 
-import com.bigdata.cache.ConcurrentWeakValueCache;
-import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.util.CanonicalFactory;
 
 /**
  * An implementation using {@link BigdataValue}s and {@link BigdataStatement}s.
@@ -67,58 +66,81 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
         
     }
 
-    /**
-     * Canonicalizing mapping for {@link BigdataValueFactoryImpl}s based on the
-     * namespace of the {@link LexiconRelation}.
-     * <p>
-     * Note: The backing LRU is small (it could be zero if that were allowed)
-     * since instances SHOULD be finalized quickly once they are no longer
-     * strongly reachable (which would imply that there was no
-     * {@link LexiconRelation} for that instance and that all
-     * {@link BigdataValueImpl}s for that instance had become weakly reachable
-     * or been swept).
-     * 
-     * @todo replace with {@link ConcurrentWeakValueCache} and a zero backing
-     *       hard reference LRU capacity?
-     */
-    private static WeakValueCache<String/* namespace */, BigdataValueFactoryImpl> cache = new WeakValueCache<String, BigdataValueFactoryImpl>(
-            new LRUCache<String, BigdataValueFactoryImpl>(1/* capacity */));
+	/**
+	 * Canonicalizing mapping for {@link BigdataValueFactoryImpl}s based on the
+	 * namespace of the {@link LexiconRelation}.
+	 * <p>
+	 * Note: The backing LRU should be small (and can be zero) since instances
+	 * SHOULD be finalized quickly once they are no longer strongly reachable
+	 * (which would imply that there was no {@link LexiconRelation} for that
+	 * instance and that all {@link BigdataValueImpl}s for that instance had
+	 * become weakly reachable or been swept).
+	 */
+    private static CanonicalFactory<String/* namespace */, BigdataValueFactoryImpl,Void/*State*/> cache = new CanonicalFactory<String, BigdataValueFactoryImpl,Void>(
+            1/* capacity */) {
+				@Override
+				protected BigdataValueFactoryImpl newInstance(
+						final String key, final Void ignored) {
+						return new BigdataValueFactoryImpl();
+				}
+    };
+//    private static WeakValueCache<String/* namespace */, BigdataValueFactoryImpl> cache = new WeakValueCache<String, BigdataValueFactoryImpl>(
+//            new LRUCache<String, BigdataValueFactoryImpl>(1/* capacity */));
 
-    /**
-     * Return the instance associated with the <i>namespace</i>.
-     * <p>
-     * Note: This canonicalizing mapping for {@link BigdataValueFactoryImpl}s is
-     * based on the namespace of the {@link LexiconRelation}. This makes the
-     * instances canonical within a JVM instance, which is all that we care
-     * about. The actual assignments of term identifiers to {@link BigdataValue}s
-     * is performed by the {@link LexiconRelation} itself and is globally
-     * consistent for a given lexicon.
-     * 
-     * @param namespace
-     *            The namespace of the {@link LexiconRelation}.
-     */
-    public static BigdataValueFactory/*Impl*/ getInstance(final String namespace) {
-        
-        if (namespace == null)
-            throw new IllegalArgumentException();
-        
-        synchronized(cache) {
-            
-            BigdataValueFactoryImpl a = cache.get(namespace);
+	/**
+	 * Return the instance associated with the <i>namespace</i>.
+	 * <p>
+	 * Note: This canonicalizing mapping for {@link BigdataValueFactoryImpl}s is
+	 * based on the namespace of the {@link LexiconRelation}. This makes the
+	 * instances canonical within a JVM instance, which is all that we care
+	 * about. The actual assignments of term identifiers to {@link BigdataValue}
+	 * s is performed by the {@link LexiconRelation} itself and is globally
+	 * consistent for a given lexicon.
+	 * 
+	 * @param namespace
+	 *            The namespace of the {@link LexiconRelation}.
+	 */
+	public static BigdataValueFactory/* Impl */getInstance(final String namespace) {
 
-            if (a == null) {
-
-                a = new BigdataValueFactoryImpl();
-
-                cache.put(namespace, a, true/* dirty */);
-                
-            }
-            
-            return a;
-            
-        }
-        
-    }
+		return cache.getInstance(namespace, null/*state*/);
+		
+	}
+	
+//    /**
+//     * Return the instance associated with the <i>namespace</i>.
+//     * <p>
+//     * Note: This canonicalizing mapping for {@link BigdataValueFactoryImpl}s is
+//     * based on the namespace of the {@link LexiconRelation}. This makes the
+//     * instances canonical within a JVM instance, which is all that we care
+//     * about. The actual assignments of term identifiers to {@link BigdataValue}s
+//     * is performed by the {@link LexiconRelation} itself and is globally
+//     * consistent for a given lexicon.
+//     * 
+//     * @param namespace
+//     *            The namespace of the {@link LexiconRelation}.
+//     */
+//    public static BigdataValueFactory/*Impl*/ getInstance(final String namespace) {
+//        
+//        if (namespace == null)
+//            throw new IllegalArgumentException();
+//        
+//        synchronized(cache) {
+//            
+//            BigdataValueFactoryImpl a = cache.get(namespace);
+//
+//            if (a == null) {
+//
+//                a = new BigdataValueFactoryImpl();
+//
+//                cache.put(namespace, a, true/* dirty */);
+//                
+//            }
+//            
+//            return a;
+//            
+//        }
+//        
+//    }
     
     /**
      * Remove a {@link BigdataValueFactoryImpl} from the canonicalizing mapping.
@@ -133,15 +155,17 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
      */
     public void remove(final String namespace) {
         
-        if (namespace == null)
-            throw new IllegalArgumentException();
-        
-        synchronized(cache) {
-        
-            cache.remove(namespace);
-            
-        }
-        
+//        if (namespace == null)
+//            throw new IllegalArgumentException();
+//        
+//        synchronized(cache) {
+//        
+//            cache.remove(namespace);
+//            
+//        }
+
+    	cache.remove(namespace);
+    	
     }
 
     public BNodeContextFactory newBNodeContext() {

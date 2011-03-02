@@ -25,8 +25,6 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
-import org.openrdf.query.algebra.MathExpr.MathOp;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
@@ -58,7 +56,7 @@ final public class MathBOp extends ValueExpressionBOp
          * 
          * @see MathOp
          */
-        String OP = MathBOp.class.getName() + ".op";
+        String OP = (MathBOp.class.getName() + ".op").intern();
 
     }
     

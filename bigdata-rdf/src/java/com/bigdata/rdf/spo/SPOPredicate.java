@@ -26,14 +26,12 @@ package com.bigdata.rdf.spo;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.Range;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.relation.rule.IAccessPathExpander;
 
@@ -58,7 +56,7 @@ public class SPOPredicate extends Predicate<ISPO> {
 
 	public interface Annotations extends Predicate.Annotations {
 
-    	String RANGE = SPOPredicate.class.getName() + ".range";
+    	String RANGE = (SPOPredicate.class.getName() + ".range").intern();
     	
     }
     

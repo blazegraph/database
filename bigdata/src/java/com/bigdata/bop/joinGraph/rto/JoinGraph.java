@@ -83,25 +83,25 @@ public class JoinGraph extends PipelineOp {
 		/**
 		 * The variables which are projected out of the join graph.
 		 */
-		String SELECTED = JoinGraph.class.getName() + ".selected";
+		String SELECTED = (JoinGraph.class.getName() + ".selected").intern();
 		
         /**
          * The vertices of the join graph, expressed an an {@link IPredicate}[]
          * (required).
          */
-        String VERTICES = JoinGraph.class.getName() + ".vertices";
+        String VERTICES = (JoinGraph.class.getName() + ".vertices").intern();
 
         /**
          * The constraints on the join graph, expressed an an
          * {@link IConstraint}[] (optional, defaults to no constraints).
          */
-        String CONSTRAINTS = JoinGraph.class.getName() + ".constraints";
+        String CONSTRAINTS = (JoinGraph.class.getName() + ".constraints").intern();
 
         /**
          * The initial limit for cutoff sampling (default
          * {@value #DEFAULT_LIMIT}).
          */
-        String LIMIT = JoinGraph.class.getName() + ".limit";
+        String LIMIT = (JoinGraph.class.getName() + ".limit").intern();
 
 		int DEFAULT_LIMIT = 100;
 
@@ -110,7 +110,7 @@ public class JoinGraph extends PipelineOp {
 		 * cardinality will be used to generate the initial join paths (default
 		 * {@value #DEFAULT_NEDGES}). This must be a positive integer.
 		 */
-		String NEDGES = JoinGraph.class.getName() + ".nedges";
+		String NEDGES = (JoinGraph.class.getName() + ".nedges").intern();
 
 		int DEFAULT_NEDGES = 2;
 		
@@ -119,7 +119,7 @@ public class JoinGraph extends PipelineOp {
          * 
          * @see SampleIndex.SampleType
          */
-        String SAMPLE_TYPE = JoinGraph.class.getName() + ".sampleType";
+        String SAMPLE_TYPE = (JoinGraph.class.getName() + ".sampleType").intern();
         
         String DEFAULT_SAMPLE_TYPE = SampleType.RANDOM.name();
 	

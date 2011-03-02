@@ -52,4 +52,9 @@ public interface IConstraint extends BOp, Serializable {
      */
     public boolean accept(IBindingSet bindingSet);
 
+    /**
+     * A zero length empty {@link IConstraint} array.
+     */
+    public IConstraint[] EMPTY = new IConstraint[0];
+    
 }

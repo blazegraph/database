@@ -84,7 +84,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/180 (Migrate
          *      the RDFS inference and truth maintenance logic to BOPs)
          */
-        String RELATION_NAME = IPredicate.class.getName() + ".relationName";
+        String RELATION_NAME = (IPredicate.class.getName() + ".relationName").intern();
 
 //        /**
 //         * The {@link IKeyOrder} which will be used to read on the relation.
@@ -99,7 +99,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
         /**
          * <code>true</code> iff the predicate has SPARQL optional semantics.
          */
-        String OPTIONAL = IPredicate.class.getName() + ".optional";
+        String OPTIONAL = (IPredicate.class.getName() + ".optional").intern();
 
 //        /**
 //         * Constraints on the elements read from the relation.
@@ -139,7 +139,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * 
          * @see IRangeQuery#rangeIterator(byte[], byte[], int, int, IFilter)
          */
-        String INDEX_LOCAL_FILTER = IPredicate.class.getName() + ".indexLocalFilter";
+        String INDEX_LOCAL_FILTER = (IPredicate.class.getName() + ".indexLocalFilter").intern();
 
         /**
          * An optional {@link BOpFilterBase} to be applied to the elements of
@@ -156,7 +156,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * one another. You can chain {@link FilterBase} filters together as
          * well.
          */
-        String ACCESS_PATH_FILTER = IPredicate.class.getName() + ".accessPathFilter";
+        String ACCESS_PATH_FILTER = (IPredicate.class.getName() + ".accessPathFilter").intern();
 
         /**
          * Access path expander pattern. This allows you to wrap or replace the
@@ -185,13 +185,13 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * 
          * @see IAccessPathExpander
          */
-        String ACCESS_PATH_EXPANDER = IPredicate.class.getName() + ".accessPathExpander";
+        String ACCESS_PATH_EXPANDER = (IPredicate.class.getName() + ".accessPathExpander").intern();
 
         /**
          * The partition identifier -or- <code>-1</code> if the predicate does
          * not address a specific shard.
          */
-        String PARTITION_ID = IPredicate.class.getName() + ".partitionId";
+        String PARTITION_ID = (IPredicate.class.getName() + ".partitionId").intern();
         
         int DEFAULT_PARTITION_ID = -1;
 
@@ -233,7 +233,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * 
          * @see BOpEvaluationContext
          */
-        String REMOTE_ACCESS_PATH = IPredicate.class.getName() + ".remoteAccessPath";
+        String REMOTE_ACCESS_PATH = (IPredicate.class.getName() + ".remoteAccessPath").intern();
         
         boolean DEFAULT_REMOTE_ACCESS_PATH = true;
         
@@ -245,8 +245,8 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * 
          * @see #DEFAULT_FULLY_BUFFERED_READ_THRESHOLD
          */
-        String FULLY_BUFFERED_READ_THRESHOLD = IPredicate.class.getName()
-                + ".fullyBufferedReadThreshold";
+        String FULLY_BUFFERED_READ_THRESHOLD = (IPredicate.class.getName()
+                + ".fullyBufferedReadThreshold").intern();
 
         /**
          * Default for {@link #FULLY_BUFFERED_READ_THRESHOLD}.
@@ -277,7 +277,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * 
          * @see #DEFAULT_FLAGS
          */
-        String FLAGS = IPredicate.class.getName() + ".flags";
+        String FLAGS = (IPredicate.class.getName() + ".flags").intern();
 
         /**
          * The default flags will visit the keys and values of the non-deleted
@@ -302,7 +302,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 		 * 
 		 * @see #TIMESTAMP
 		 */
-		String MUTATION = IPredicate.class.getName() + ".mutation";
+		String MUTATION = (IPredicate.class.getName() + ".mutation").intern();
 
         boolean DEFAULT_MUTATION = false;
 
@@ -312,7 +312,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 		 * 
 		 * @see #MUTATION
 		 */
-		String TIMESTAMP = IPredicate.class.getName() + ".timestamp";
+		String TIMESTAMP = (IPredicate.class.getName() + ".timestamp").intern();
 
 //        /**
 //         * An optional {@link IConstraint}[] which places restrictions on the

@@ -571,11 +571,11 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			final Properties header,
 			final LinkedHashMap<String, Vector<String>> params) throws Exception {
 
-		if (log.isInfoEnabled()) {
-			log.info("uri=" + uri);
-			log.info("method=" + method);
-			log.info("headser=" + header);
-			log.info("params=" + params);
+		if (log.isDebugEnabled()) {
+			log.debug("uri=" + uri);
+			log.debug("method=" + method);
+			log.debug("headser=" + header);
+			log.debug("params=" + params);
 		}
 		
 		if("/stop".equals(uri)) {
@@ -630,11 +630,11 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			final Properties header,
 			final LinkedHashMap<String, Vector<String>> params) throws Exception {
 
-		if (log.isInfoEnabled()) {
-			log.info("uri=" + uri);
-			log.info("method=" + method);
-			log.info("headser=" + header);
-			log.info("params=" + params);
+		if (log.isDebugEnabled()) {
+			log.debug("uri=" + uri);
+			log.debug("method=" + method);
+			log.debug("headser=" + header);
+			log.debug("params=" + params);
 		}
 
 		if (uri == null || uri.length() == 0) {
@@ -981,8 +981,8 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 		}
 
-		if (log.isInfoEnabled())
-			log.info("query: " + queryStr);
+		if (log.isDebugEnabled())
+			log.debug("query: " + queryStr);
 		
 		/*
 		 * Setup pipes. The [os] will be passed into the task that executes the
@@ -1106,8 +1106,8 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		 */
         final ParsedQuery q = engine.parseQuery(queryStr, null/*baseURI*/);
         
-        if(log.isInfoEnabled())
-            log.info(q.toString());
+        if(log.isDebugEnabled())
+            log.debug(q.toString());
         
 		final NanoSparqlClient.QueryType queryType = NanoSparqlClient.QueryType
 				.fromQuery(queryStr);

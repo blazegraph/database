@@ -60,7 +60,7 @@ public class CompareBOp extends ValueExpressionBOp
         /**
          * The compare operator, which is a {@link CompareOp} enum value.
          */
-        String OP = CompareBOp.class.getName() + ".op";
+        String OP = (CompareBOp.class.getName() + ".op").intern();
 
     }
 

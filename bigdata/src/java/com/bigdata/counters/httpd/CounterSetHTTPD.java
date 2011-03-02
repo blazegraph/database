@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Vector;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.query.CounterSetSelector;
 import com.bigdata.counters.query.ICounterSelector;
@@ -30,6 +32,8 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  */
 public class CounterSetHTTPD extends AbstractHTTPD {
     
+	static private final Logger log = Logger.getLogger(CounterSetHTTPD.class); 
+	
     /**
      * The {@link CounterSet} exposed by this service.
      */

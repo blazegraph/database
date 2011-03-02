@@ -85,30 +85,30 @@ public class BOpBase implements BOp {
      *       not. A "copy on write" map might be better.
      */
     static protected final transient Map<String,Object> NOANNS = Collections.emptyMap();
-    
-    /**
-     * The argument values - <strong>direct access to this field is
-     * discouraged</strong> - the field is protected to support
-     * <em>mutation</em> APIs and should not be relied on for other purposes.
-     * <p>
-     * Note: This field is reported out as a {@link List} so we can make it
-     * thread safe and, if desired, immutable. However, it is internally a
-     * simple array and exposed to subclasses so they can implement mutation
-     * operations which return deep copies in which the argument values have
-     * been modified.
-     * <p>
-     * If we allow mutation of the arguments then caching of the arguments (or
-     * annotations) by classes such as {@link EQ} will cause {@link #clone()} to
-     * fail because (a) it will do a field-by-field copy on the concrete
-     * implementation class; and (b) it will not consistently update the cached
-     * references. In order to "fix" this problem, any classes which cache
-     * arguments or annotations would have to explicitly overrides
-     * {@link #clone()} in order to set those fields based on the arguments on
-     * the cloned {@link BOpBase} class.
-     * <p>
-     * Note: This must be at least "effectively" final per the effectively
-     * immutable contract for {@link BOp}s.
-     */
+
+	/**
+	 * The argument values - <strong>direct access to this field is
+	 * discouraged</strong> - the field is protected to support
+	 * <em>mutation</em> APIs and should not be relied on for other purposes.
+	 * <p>
+	 * Note: This field is reported out as a {@link List} so we can make it
+	 * thread safe and, if desired, immutable. However, it is internally a
+	 * simple array. Subclasses can implement mutation operations which return
+	 * deep copies in which the argument values have been modified using
+	 * {@link #_set(int, BOp)}.
+	 * <p>
+	 * If we allowed mutation of the arguments (outside of the object creation
+	 * pattern) then caching of the arguments (or annotations) by classes such
+	 * as {@link EQ} will cause {@link #clone()} to fail because (a) it will do
+	 * a field-by-field copy on the concrete implementation class; and (b) it
+	 * will not consistently update the cached references. In order to "fix"
+	 * this problem, any classes which cache arguments or annotations would have
+	 * to explicitly overrides {@link #clone()} in order to set those fields
+	 * based on the arguments on the cloned {@link BOpBase} class.
+	 * <p>
+	 * Note: This must be at least "effectively" final per the effectively
+	 * immutable contract for {@link BOp}s.
+	 */
     private final BOp[] args;
 
     /**
@@ -118,7 +118,14 @@ public class BOpBase implements BOp {
      * immutable contract for {@link BOp}s.
      */
     private final Map<String,Object> annotations;
-    
+
+	/**
+	 * The default initial capacity used for an empty annotation map -- empty
+	 * maps use the minimum initial capacity to avoid waste since we create a
+	 * large number of {@link BOp}s during query evaluation.
+	 */
+	static private transient final int DEFAULT_INITIAL_CAPACITY = 2;
+
     /**
      * Check the operator argument.
      * 
@@ -199,7 +206,12 @@ public class BOpBase implements BOp {
         // deep copy the annotations.
 //        annotations = deepCopy(op.annotations);
         // Note: only shallow copy is required to achieve immutable semantics!
-    	args = Arrays.copyOf(op.args, op.args.length);
+		if (op.args == NOARGS || op.args.length == 0) {
+			// fast path for zero arity operators.
+			args = NOARGS;
+        } else {
+        	args = Arrays.copyOf(op.args, op.args.length);
+        }
         annotations = new LinkedHashMap<String, Object>(op.annotations);
     }
 
@@ -232,11 +244,56 @@ public class BOpBase implements BOp {
         checkArgs(args);
         
         this.args = args;
-        
-        this.annotations = (annotations == null ? new LinkedHashMap<String, Object>()
-                : annotations);
-        
+
+		this.annotations = (annotations == null ? new LinkedHashMap<String, Object>(
+				DEFAULT_INITIAL_CAPACITY)
+				: annotations);
+
     }
+
+	/*
+	 * Note: This will not work since the keys provide the strong references to
+	 * the values.... For this purpose we need to use a ConcurrentHashMap with
+	 * an access policy which did not rely on weak references to clear its
+	 * entries.
+	 */
+//	static private Map<String, Object> internMap(final Map<String, Object> anns) {
+//		final int initialCapacity = (int) (anns.size() / .75f/* loadFactor */) + 1;
+//		final Map<String, Object> t = new LinkedHashMap<String, Object>(
+//				initialCapacity);
+//		for(Map.Entry<String,Object> e : t.entrySet()) {
+//			final String k = intern(e.getKey());
+//			t.put(k, e.getValue());
+//		}
+//		return t;
+//    }
+//
+//	/**
+//	 * Intern the string within a canonicalizing hash map using weak values.
+//	 * @param s
+//	 * @return
+//	 */
+//	static private String intern(final String s) {
+//
+//		final String t = termCache.putIfAbsent(s, s);
+//
+//		if (t != null)
+//			return t;
+//
+//		return s;
+//
+//	}
+//
+//	/**
+//	 * A canonicalizing hash map using weak values. Entries will be cleared from
+//	 * the map once their values are no longer referenced.
+//	 * ConcurrentWeakValueCacheWithBatchedUpdates
+//	 */
+//    static private transient final ConcurrentWeakValueCacheWithBatchedUpdates<String,String> termCache = new ConcurrentWeakValueCacheWithBatchedUpdates<String,String>(//
+//            1000, // queueCapacity
+//            .75f, // loadFactor (.75 is the default)
+//            16 // concurrency level (16 is the default)
+//    );
 
     final public Map<String, Object> annotations() {
 
@@ -375,10 +432,10 @@ public class BOpBase implements BOp {
 	 *       before returning control to the caller. This would result in less
 	 *       heap churn. 
 	 */
-    static protected BOp[] deepCopy(final BOp[] a) {
-        if (a == NOARGS) {
-            // fast path for zero arity operators.
-            return a;
+	static protected BOp[] deepCopy(final BOp[] a) {
+		if (a == NOARGS || a.length == 0) {
+			// fast path for zero arity operators.
+			return NOARGS;
         }
         final BOp[] t = new BOp[a.length];
         for (int i = 0; i < a.length; i++) {

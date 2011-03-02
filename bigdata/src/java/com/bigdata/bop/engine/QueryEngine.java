@@ -228,8 +228,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
          * {@link QueryEngine#newRunningQuery(QueryEngine, UUID, boolean, IQueryClient, PipelineOp)}
          * in which case they might not support this option.
          */
-        String RUNNING_QUERY_CLASS = QueryEngine.class.getName()
-                + ".runningQueryClass";
+        String RUNNING_QUERY_CLASS = (QueryEngine.class.getName()
+                + ".runningQueryClass").intern();
 
 //        String DEFAULT_RUNNING_QUERY_CLASS = StandaloneChainedRunningQuery.class.getName();
         String DEFAULT_RUNNING_QUERY_CLASS = ChunkedRunningQuery.class.getName();

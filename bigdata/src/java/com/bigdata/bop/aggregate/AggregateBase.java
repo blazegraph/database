@@ -103,14 +103,14 @@ public class AggregateBase<E> extends ImmutableBOp implements IAggregate<E> {
 		 * The aggregate function identifier ({@link FunctionCode#COUNT},
 		 * {@link FunctionCode#SUM}, etc).
 		 */
-		String FUNCTION_CODE = AggregateBase.class.getName() + ".functionCode";
+		String FUNCTION_CODE = (AggregateBase.class.getName() + ".functionCode").intern();
 		
 		/**
 		 * Optional boolean property indicates whether the aggregate applies to
 		 * the distinct within group solutions (default
 		 * {@value #DEFAULT_DISTINCT}).
 		 */
-		String DISTINCT = AggregateBase.class.getName() + ".distinct";
+		String DISTINCT = (AggregateBase.class.getName() + ".distinct").intern();
 
 		boolean DEFAULT_DISTINCT = false;
 		

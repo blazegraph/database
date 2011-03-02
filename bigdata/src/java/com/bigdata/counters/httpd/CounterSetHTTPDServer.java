@@ -140,7 +140,7 @@ public class CounterSetHTTPDServer implements Runnable {
                     Logger.getLogger(XHTMLRenderer.class).setLevel(level);
 
                     // set logging level on the service.
-                    NanoHTTPD.log.setLevel(level);
+                    Logger.getLogger(NanoHTTPD.class).setLevel(level);
                     
                 } else if (arg.equals("-events")) {
 

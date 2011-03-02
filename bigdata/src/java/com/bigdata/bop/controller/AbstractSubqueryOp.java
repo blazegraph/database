@@ -90,20 +90,21 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
 
     public interface Annotations extends PipelineOp.Annotations {
 
-        /**
-         * The ordered {@link BOp}[] of subqueries to be evaluated for each
-         * binding set presented (required).
-         */
-        String SUBQUERIES = SubqueryOp.class.getName() + ".subqueries";
+		/**
+		 * The ordered {@link BOp}[] of subqueries to be evaluated for each
+		 * binding set presented (required).
+		 */
+		String SUBQUERIES = (AbstractSubqueryOp.class.getName() + ".subqueries")
+				.intern();
 
-        /**
-         * The maximum parallelism with which the subqueries will be evaluated
-         * (default is unlimited).
-         */
-        String MAX_PARALLEL_SUBQUERIES = AbstractSubqueryOp.class.getName()
-                + ".maxParallelSubqueries";
+		/**
+		 * The maximum parallelism with which the subqueries will be evaluated
+		 * (default is unlimited).
+		 */
+		String MAX_PARALLEL_SUBQUERIES = (AbstractSubqueryOp.class.getName() + ".maxParallelSubqueries")
+				.intern();
 
-        int DEFAULT_MAX_PARALLEL_SUBQUERIES = Integer.MAX_VALUE;
+		int DEFAULT_MAX_PARALLEL_SUBQUERIES = Integer.MAX_VALUE;
 
     }
 

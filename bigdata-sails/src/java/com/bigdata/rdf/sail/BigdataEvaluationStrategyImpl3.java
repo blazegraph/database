@@ -814,7 +814,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	 */
     	attachNamedGraphsFilterToSearches(sopTree);
     	
-		if (false) {
+		if (true) {
 			/*
 			 * Look for numerical filters that can be rotated inside predicates
 			 */

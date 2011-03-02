@@ -36,6 +36,8 @@ import java.util.LinkedHashMap;
 import java.util.Properties;
 import java.util.Vector;
 
+import org.apache.log4j.Logger;
+
 /**
  * Overrides some methods on {@link NanoHTTPD} to (a) prevent serving files from
  * the local file system; and (b) to expose methods for handling GET, PUT, POST,
@@ -47,6 +49,8 @@ import java.util.Vector;
  */
 public abstract class AbstractHTTPD extends NanoHTTPD {
     
+    final static private Logger log = Logger.getLogger(AbstractHTTPD.class);
+
     public AbstractHTTPD(final int port) throws IOException {
         
         super(port);

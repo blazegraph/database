@@ -801,7 +801,7 @@ public class PartitionedJoinGroup {
 
         if (constraints == null) {
             // replace with an empty array.
-            constraints = new IConstraint[0];
+            constraints = IConstraint.EMPTY;
         }
         
         /*
