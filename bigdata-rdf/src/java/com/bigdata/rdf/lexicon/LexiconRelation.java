@@ -63,21 +63,24 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.filter.PrefixFilter;
+import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
+import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
-import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
+import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtensionFactory;
@@ -88,6 +91,7 @@ import com.bigdata.rdf.internal.LexiconConfiguration;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -1618,6 +1622,86 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     }
 
+    /**
+     * Utility method to (re-)build the full text index. This is a high latency
+     * operation for a database of any significant size. You must be using the
+     * unisolated view of the {@link AbstractTripleStore} for this operation.
+     * {@link AbstractTripleStore.Options#TEXT_INDEX} must be enabled. This
+     * operation is only supported when the {@link ITextIndexer} uses the
+     * {@link FullTextIndex} class.
+     * 
+     * TODO This will have to be redone once we finish
+     * http://sourceforge.net/apps/trac/bigdata/ticket/109 (store large literals
+     * as blobs) since the ID2TERM index will disappear.
+     */
+    @SuppressWarnings("unchecked")
+    public void rebuildTextIndex() {
+
+        if (getTimestamp() != ITx.UNISOLATED)
+            throw new UnsupportedOperationException();
+        
+        if(!textIndex)
+            throw new UnsupportedOperationException();
+        
+        final ITextIndexer textIndexer = getSearchEngine();
+        
+        if (textIndexer == null) {
+            throw new UnsupportedOperationException();
+        }
+
+        // destroy the existing text index.
+        textIndexer.destroy();
+        
+        // create a new index.
+        textIndexer.create();
+
+        // the index to scan for the RDF Literals.
+        final IIndex id2term = getId2TermIndex();
+
+        // used to decode the
+        final ITupleSerializer tupSer = id2term.getIndexMetadata()
+                .getTupleSerializer();
+
+        /*
+         * Visit all plain, language code, and datatype literals in the lexicon.
+         * 
+         * Note: This uses a filter on the ITupleIterator in order to filter out
+         * non-literal terms before they are shipped from a remote index shard.
+         */
+        final Iterator<BigdataValue> itr = new Striterator(id2term
+                .rangeIterator(null/* fromKey */, null/* toKey */,
+                        0/* capacity */, IRangeQuery.DEFAULT,
+                        new TupleFilter<BigdataValue>() {
+                            private static final long serialVersionUID = 1L;
+                            protected boolean isValid(
+                                    final ITuple<BigdataValue> obj) {
+                                final IV iv = (IV) tupSer.deserializeKey(obj);
+                                if (!iv.isInline() && iv.isLiteral()) {
+                                    return true;
+                                }
+                                return false;
+                            }
+                        })).addFilter(new Resolver() {
+            private static final long serialVersionUID = 1L;
+
+            protected Object resolve(final Object obj) {
+                final BigdataLiteral lit = (BigdataLiteral) tupSer
+                        .deserialize((ITuple) obj);
+//                System.err.println("lit: "+lit);
+                return lit;
+            }
+        });
+
+        final int capacity = 10000;
+
+        while (itr.hasNext()) {
+
+            indexTermText(capacity, itr);
+
+        }
+
+    }
+    
     /**
      * Batch resolution of internal values to {@link BigdataValue}s.
      * 

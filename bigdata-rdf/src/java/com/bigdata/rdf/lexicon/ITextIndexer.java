@@ -68,6 +68,9 @@ public interface ITextIndexer {
      * are tokenized using the default {@link Locale}.
      * </p>
      * 
+     * @param capacity
+     *            A hint to the underlying layer about the buffer size before an
+     *            incremental flush of the index.
      * @param itr
      *            Iterator visiting the terms to be indexed.
      * 

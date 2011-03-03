@@ -110,11 +110,15 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
     
         assertWritable();
         
-        getIndexManager().dropIndex(getNamespace() + "." + NAME_SEARCH);
+        final String name = getNamespace() + "." + NAME_SEARCH;
+        
+        getIndexManager().dropIndex(name);
 
     }
 
-    public void index(int capacity, Iterator<BigdataValue> valuesIterator) {
+    public void index(final int capacity,
+            final Iterator<BigdataValue> valuesIterator) {
+        
         final TokenBuffer buffer = new TokenBuffer(capacity, this);
 
         int n = 0;
