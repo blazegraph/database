@@ -493,6 +493,16 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
                 + ", elapsed=" + q.getElapsed() + ", nout=" + nout
                 + ", nchunks=" + nchunks + ", stats=" + stats);
 
+//        if(false) {
+//
+//        	final StringBuilder sb = new StringBuilder();
+//			
+//        	QueryLog.log(true/* tableHeader */, q, sb);
+//			
+//        	System.err.println(sb);
+//        	
+//		}
+
         return stats;
 
     }

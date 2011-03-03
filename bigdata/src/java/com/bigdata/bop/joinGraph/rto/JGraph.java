@@ -423,6 +423,14 @@ public class JGraph {
 			 * #of paths with cardinality estimate underflow to jump up and down
 			 * due to the sample which is making its way through each path in
 			 * each round.
+			 * 
+			 * TODO The RTO needs an escape hatch here. FOr example, if the sum
+			 * of the expected IOs for some path(s) strongly dominates all other
+			 * paths sharing the same vertices, then we should prune those paths
+			 * even if there is a cardinality estimate underflow in those paths.
+			 * This will allow us to focus our efforts on those paths having
+			 * less IO cost while we seek cardinality estimates which do not
+			 * underflow.
 			 */
 			int nunderflow;
 

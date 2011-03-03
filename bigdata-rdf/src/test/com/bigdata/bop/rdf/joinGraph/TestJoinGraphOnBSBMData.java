@@ -534,7 +534,8 @@ test_bsbm_q5 : Total times: static=7312, runtime=3305, delta(static-runtime)=400
         if(false){
 			// Run some fixed order.
 //			final IPredicate<?>[] path = { p5, p6, p0, p2, p1, p4, p3 }; 
-			final IPredicate<?>[] path = { p5, p3, p1, p2, p4, p6, p0 };
+//			final IPredicate<?>[] path = { p5, p3, p1, p2, p4, p6, p0 };
+			final IPredicate<?>[] path = { p3, p5, p1, p2, p6, p4, p0 };
 			runQuery("FIXED ORDER", queryEngine, distinct, selected, path,
 					constraints);
 		}
