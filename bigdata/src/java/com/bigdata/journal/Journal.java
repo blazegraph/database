@@ -1125,14 +1125,39 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     /*
      * global row store.
-     * 
-     * Note: An atomic reference provides us with a "lock" object which doubles
-     * as a reference. We are not relying on its CAS properties.
      */
     public SparseRowStore getGlobalRowStore() {
 
-        GlobalRowStoreHelper t = globalRowStoreHelper.get();
+        return getGlobalRowStoreHelper().getGlobalRowStore();
+
+    }
+
+    /**
+     * Return a view of the global row store as of the specified timestamp. This
+     * is mainly used to provide access to historical views. 
+     * 
+     * @param timestamp
+     *            The specified timestamp.
+     * 
+     * @return The global row store view -or- <code>null</code> if no view
+     *         exists as of that timestamp.
+     */
+    public SparseRowStore getGlobalRowStore(final long timestamp) {
+
+        return getGlobalRowStoreHelper().get(timestamp);
+
+    }
+
+    /**
+     * Return the {@link GlobalRowStoreHelper}.
+     * <p>
+     * Note: An atomic reference provides us with a "lock" object which doubles
+     * as a reference. We are not relying on its CAS properties.
+     */
+    private final GlobalRowStoreHelper getGlobalRowStoreHelper() {
         
+        GlobalRowStoreHelper t = globalRowStoreHelper.get();
+
         if (t == null) {
 
             synchronized (globalRowStoreHelper) {
@@ -1151,14 +1176,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                             .set(t = new GlobalRowStoreHelper(this));
 
                 }
-                
+
             }
 
         }
 
-        return globalRowStoreHelper.get().getGlobalRowStore();
-
+        return globalRowStoreHelper.get();
     }
+
     final private AtomicReference<GlobalRowStoreHelper> globalRowStoreHelper = new AtomicReference<GlobalRowStoreHelper>();
 
     /*

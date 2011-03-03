@@ -47,7 +47,6 @@ import com.bigdata.config.LongValidator;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.IResourceLockService;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.rules.FastClosure;
 import com.bigdata.rdf.rules.FullClosure;
 import com.bigdata.rdf.rules.RuleFastClosure5;
@@ -691,12 +690,12 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
         }
     
         // Write the map on the row store.
-        final Map afterMap = indexManager.getGlobalRowStore().write(
-                RelationSchema.INSTANCE, map);
-        
+        final Map<String, Object> afterMap = indexManager.getGlobalRowStore()
+                .write(RelationSchema.INSTANCE, map);
+
         if(log.isDebugEnabled()) {
             
-            log.debug("Properties after write: "+afterMap);
+            log.debug("Properties after write: " + afterMap);
             
         }
         
