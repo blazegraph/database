@@ -98,6 +98,14 @@ public class TestBOpUtility_sharedVariables extends TestCase2 {
     @SuppressWarnings("unchecked")
     public void test_getSharedVariables_nothingShared() {
 
+        // nothing shared because no variables for one operand.
+        assertTrue(BOpUtility.getSharedVars(new Constant<Integer>(12), Var.var("y"))
+                .isEmpty());
+
+        // nothing shared because no variables for the other operand.
+        assertTrue(BOpUtility.getSharedVars(Var.var("y"),new Constant<Integer>(12))
+                .isEmpty());
+
         // nothing shared.
         assertTrue(BOpUtility.getSharedVars(Var.var("x"), Var.var("y"))
                 .isEmpty());

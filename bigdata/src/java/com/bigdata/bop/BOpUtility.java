@@ -1108,11 +1108,8 @@ public class BOpUtility {
 //        if (p == c)
 //            throw new IllegalArgumentException();
 
-        // The set of variables which are shared.
-        final Set<IVariable<?>> sharedVars = new LinkedHashSet<IVariable<?>>();
-
         // Collect the variables appearing anywhere in [p].
-        final Set<IVariable<?>> p1vars = new LinkedHashSet<IVariable<?>>();
+        Set<IVariable<?>> p1vars = null;
         {
 
             final Iterator<IVariable<?>> itr = BOpUtility
@@ -1120,11 +1117,28 @@ public class BOpUtility {
 
             while (itr.hasNext()) {
 
+            	if(p1vars == null) {
+            		 
+            		// lazy initialization.
+            		p1vars = new LinkedHashSet<IVariable<?>>();
+            		
+            	}
+            	
                 p1vars.add(itr.next());
 
             }
 
         }
+
+		if (p1vars == null) {
+		
+			// Fast path when no variables in [p].
+			return Collections.emptySet();
+			
+		}
+        
+        // The set of variables which are shared.
+        Set<IVariable<?>> sharedVars = null;
 
         // Consider the variables appearing anywhere in [c].
         {
@@ -1138,7 +1152,14 @@ public class BOpUtility {
 
                 if (p1vars.contains(avar)) {
 
-                    sharedVars.add(avar);
+					if (sharedVars == null) {
+
+						// lazy initialization.
+						sharedVars = new LinkedHashSet<IVariable<?>>();
+						
+					}
+					
+					sharedVars.add(avar);
 
                 }
 
@@ -1146,7 +1167,10 @@ public class BOpUtility {
 
         }
 
-        return sharedVars;
+		if (sharedVars == null)
+			return Collections.emptySet();
+
+		return sharedVars;
 
     }
 
