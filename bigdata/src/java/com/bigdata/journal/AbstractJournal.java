@@ -3448,14 +3448,25 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
-	/**
-	 * Drops the named index. The index will no longer participate in atomic
-	 * commits and will not be visible to new transactions. Resources are NOT
-	 * reclaimed on the {@link AbstractJournal} (it is an immortal store) and
-	 * historical states of the index will continue to be accessible.
-	 */
+    /**
+     * Drops the named index. The index will no longer participate in atomic
+     * commits and will not be visible to new transactions.  Storage will be
+     * reclaimed IFF the backing store support that functionality.
+     */
 	public void dropIndex(final String name) {
 
+	    final BTree ndx = getIndex(name);
+	    
+	    if(ndx == null)
+	        throw new NoSuchIndexException(name);
+	    
+	    if(getBufferStrategy() instanceof RWStrategy) {
+            /*
+             * Reclaim storage associated with the index.
+             */
+	        ndx.removeAll();
+	    }
+	    
 		final ReadLock lock = _fieldReadWriteLock.readLock();
 
 		lock.lock();
