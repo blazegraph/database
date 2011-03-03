@@ -168,29 +168,29 @@ final public class RangeBOp extends BOpBase
     	
     }
 
-	@Override
+//	@Override
 	public boolean isVar() {
 		return true;
 	}
 
-	@Override
+//	@Override
 	public boolean isConstant() {
 		return false;
 	}
 
-	@Override
+//	@Override
 	public Range get() {
 //		log.debug("somebody tried to get me");
 		
 		return null;
 	}
 
-	@Override
+//	@Override
 	public String getName() {
 		return var().getName();
 	}
 
-	@Override
+//	@Override
 	public boolean isWildcard() {
 		return false;
 	}
