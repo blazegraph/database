@@ -40,12 +40,12 @@ import com.bigdata.btree.keys.TestKeyBuilder;
  * 
  * @see Leaf#entryIterator()
  * @see Node#childIterator(boolean)
- * @see AbstractNode#postOrderNodeIterator(boolean)
+ * @see AbstractNode#postOrderNodeIterator(boolean, boolean)
  * 
  * @see TestDirtyIterators, which handles tests when some nodes or leaves are
  *      NOT dirty and verifies that the iterators do NOT visit such nodes or
  *      leaves. This tests {@link AbstractNode#postOrderNodeIterator()} as well
- *      since that is just {@link AbstractNode#postOrderNodeIterator(boolean)}
+ *      since that is just {@link AbstractNode#postOrderNodeIterator(boolean, boolean)}
  *      with <code>false</code> passed in.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

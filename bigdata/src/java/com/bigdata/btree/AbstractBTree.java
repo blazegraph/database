@@ -625,7 +625,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * split may occur without forcing eviction of either node participating in
      * the split.
      * <p>
-     * Note: The code in {@link Node#postOrderNodeIterator(boolean)} and
+     * Note: The code in {@link Node#postOrderNodeIterator(boolean, boolean)} and
      * {@link DirtyChildIterator} MUST NOT touch the hard reference queue since
      * those iterators are used when persisting a node using a post-order
      * traversal. If a hard reference queue eviction drives the serialization of
@@ -3481,8 +3481,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          * 
          * Note: This iterator only visits dirty nodes.
          */
-        final Iterator<AbstractNode> itr = node
-                .postOrderNodeIterator(true/* dirtyNodesOnly */);
+        final Iterator<AbstractNode> itr = node.postOrderNodeIterator(
+                true/* dirtyNodesOnly */, false/* nodesOnly */);
 
         while (itr.hasNext()) {
 

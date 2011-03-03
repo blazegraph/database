@@ -1708,17 +1708,24 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
     /**
      * Visits this leaf if unless it is not dirty and the flag is true, in which
      * case the returned iterator will not visit anything.
+     * 
+     * {@inheritDoc}
      */
     @Override
     @SuppressWarnings("unchecked")
-    public Iterator<AbstractNode> postOrderNodeIterator(final boolean dirtyNodesOnly) {
+    public Iterator<AbstractNode> postOrderNodeIterator(
+            final boolean dirtyNodesOnly, final boolean nodesOnly) {
 
         if (dirtyNodesOnly && ! isDirty() ) {
 
             return EmptyIterator.DEFAULT;
 
+        } else if(nodesOnly) { 
+            
+            return EmptyIterator.DEFAULT;
+            
         } else {
-
+            
             return new SingleValueIterator(this);
 
         }

@@ -33,14 +33,18 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Properties;
 import java.util.TreeMap;
+import java.util.UUID;
 
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.SimpleEntry;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.AbstractInterruptsTestCase;
 import com.bigdata.journal.AbstractJournalTestCase;
 import com.bigdata.journal.AbstractMRMWTestCase;
@@ -56,6 +60,7 @@ import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TestJournalBasics;
 import com.bigdata.journal.Journal.Options;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.InnerCause;
 
@@ -228,7 +233,97 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 	}
 
-	/**
+    /**
+     * Unit tests for optimization when using the {@link RWStore} but not using
+     * delete markers. In this case, a post-order traversal is used to
+     * efficiently delete the nodes and leaves and the root leaf is then
+     * replaced.
+     */
+    public void test_removeAllRWStore() {
+
+        final Journal store = new Journal(getProperties());
+
+        try {
+        
+            final BTree btree;
+            {
+
+                final IndexMetadata metadata = new IndexMetadata(UUID
+                        .randomUUID());
+
+                metadata.setBranchingFactor(3);
+
+                metadata.setDeleteMarkers(false);
+
+                btree = BTree.create(store, metadata);
+
+            }
+
+            final KeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_INT);
+
+            final int NTRIALS = 100;
+
+            final int NINSERTS = 1000;
+
+            final double removeAllRate = 0.001;
+
+            final double checkpointRate = 0.001;
+
+            for (int i = 0; i < NTRIALS; i++) {
+
+                for (int j = 0; j < NINSERTS; j++) {
+
+                    if (r.nextDouble() < checkpointRate) {
+
+                        // flush to the backing store.
+                        if (log.isInfoEnabled())
+                            log.info("checkpoint: " + btree.getStatistics());
+
+                        btree.writeCheckpoint();
+
+                    }
+
+                    if (r.nextDouble() < removeAllRate) {
+
+                        if (log.isInfoEnabled())
+                            log.info("removeAll: " + btree.getStatistics());
+
+                        btree.removeAll();
+
+                    }
+
+                    final int tmp = r.nextInt(10000);
+
+                    final byte[] key = keyBuilder.reset().append(tmp).getKey();
+
+                    btree.insert(key, new SimpleEntry(tmp));
+
+                }
+
+            }
+
+            if (log.isInfoEnabled())
+                log.info("will removeAll: "+btree.getStatistics());
+
+            btree.removeAll();
+
+            if (log.isInfoEnabled())
+                log.info("will checkpoint: " + btree.getStatistics());
+
+            btree.writeCheckpoint();
+
+            if (log.isInfoEnabled())
+                log.info(" did checkpoint: " + btree.getStatistics());
+
+        } finally {
+
+            store.destroy();
+
+        }
+
+    }
+
+    /**
 	 * Test suite integration for {@link AbstractRestartSafeTestCase}.
 	 * 
 	 * @todo there are several unit tests in this class that deal with
