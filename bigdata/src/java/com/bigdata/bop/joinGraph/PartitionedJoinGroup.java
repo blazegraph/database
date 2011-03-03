@@ -1041,6 +1041,8 @@ public class PartitionedJoinGroup {
 
         PipelineOp lastOp = null;
 
+        final Set<IVariable<?>> knownBound = new LinkedHashSet<IVariable<?>>();
+        
         for (int i = 0; i < preds.length; i++) {
 
             // The next vertex in the selected join order.
@@ -1065,11 +1067,49 @@ public class PartitionedJoinGroup {
 						assignedConstraints[i]));
 			}
 
+			// collect variables used as arguments by this predicate.
+			final Set<IVariable<?>> pvars = new LinkedHashSet<IVariable<?>>();
+			{
+				final Iterator<IVariable<?>> vitr = BOpUtility
+						.getArgumentVariables(p);
+				while (vitr.hasNext()) {
+					pvars.add(vitr.next());
+				}
+			}
+
+			// figure out if there are ANY shared variables.
+			boolean shared = false;
+			{
+				for(IVariable<?> v : pvars) {
+					if(knownBound.contains(v)) {
+						shared = true;
+						break;
+					}
+				}
+			}
+
+			/*
+			 * FIXME Explore the merit of this optimization with MikeP,
+			 * including consideration of the PIPELINE_QUEUE_CAPACITY and
+			 * whether or not to request an analytic join (hash join).
+			 */
+			if (false && !shared) {
+				System.err.println("Full cross product join: " + p);
+				/*
+				 * Force at-once evaluation to ensure that we evaluate the AP
+				 * for [p] exactly once.
+				 */
+				anns.add(new NV(PipelineOp.Annotations.PIPELINED, false));
+			}
+
 			final PipelineJoin<?> joinOp = new PipelineJoin(//
 					lastOp == null ? new BOp[0] : new BOp[] { lastOp }, //
 					anns.toArray(new NV[anns.size()])//
 			);
 
+			// Add predicate argument variables to [knownBound].
+			knownBound.addAll(pvars);
+			
             lastOp = joinOp;
 
         }
