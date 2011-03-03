@@ -96,7 +96,7 @@ public class BTreeStatistics implements IBTreeStatistics, Serializable {
                 ",entryCount=" + entryCount+ //
                 ",height=" + height+ //
                 ",leafCount=" + leafCount+ //
-                ",nodeCount=" + leafCount+ //
+                ",nodeCount=" + nodeCount+ //
                 ",utilReport=" + utilReport+ //
                 "}";
     }
