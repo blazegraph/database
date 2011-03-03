@@ -38,7 +38,7 @@ import com.bigdata.btree.keys.TestKeyBuilder;
  * mechanisms.
  * 
  * @see Node#childIterator(boolean)
- * @see AbstractNode#postOrderNodeIterator(boolean)
+ * @see AbstractNode#postOrderNodeIterator(boolean, boolean)
  * 
  * @see TestIterators, which handles iterators that do not differentiate between
  *      clear and dirty nodes.

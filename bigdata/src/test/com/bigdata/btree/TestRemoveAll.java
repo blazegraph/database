@@ -27,15 +27,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.util.Properties;
 import java.util.UUID;
 
 import org.apache.log4j.Level;
 
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.TestRestartSafe;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.rwstore.RWStore;
 
 /**
  * Test suite for {@link BTree#removeAll()}.
@@ -165,5 +169,5 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
         }
         
     }
-    
+
 }

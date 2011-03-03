@@ -2874,7 +2874,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
     @Override
     @SuppressWarnings("unchecked")
     public Iterator<AbstractNode> postOrderNodeIterator(
-            final boolean dirtyNodesOnly) {
+            final boolean dirtyNodesOnly, final boolean nodesOnly) {
 
         if (dirtyNodesOnly && !dirty) {
 
@@ -2886,7 +2886,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * Iterator append this node to the iterator in the post-order position.
          */
 
-        return new Striterator(postOrderIterator1(dirtyNodesOnly))
+        return new Striterator(postOrderIterator1(dirtyNodesOnly,nodesOnly))
                 .append(new SingleValueIterator(this));
 
     }
@@ -2916,7 +2916,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      */
     @SuppressWarnings("unchecked")
     private Iterator<AbstractNode> postOrderIterator1(
-            final boolean dirtyNodesOnly) {
+            final boolean dirtyNodesOnly,final boolean nodesOnly) {
 
         /*
          * Iterator visits the direct children, expanding them in turn with a
@@ -2969,8 +2969,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
                             // visit the children (recursive post-order
                             // traversal).
                             final Striterator itr = new Striterator(
-                                    ((Node) child)
-                                            .postOrderIterator1(dirtyNodesOnly));
+                                    ((Node) child).postOrderIterator1(
+                                            dirtyNodesOnly, nodesOnly));
 
                             // append this node in post-order position.
                             itr.append(new SingleValueIterator(child));
@@ -2985,6 +2985,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
                             // BTree.log.debug("child is leaf: " + child);
                             // Visit the leaf itself.
+                            if (nodesOnly)
+                                return EmptyIterator.DEFAULT;
+
                             return new SingleValueIterator(child);
 
                         }
