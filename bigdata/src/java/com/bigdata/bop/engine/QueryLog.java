@@ -75,12 +75,16 @@ public class QueryLog {
     static public void log(final IRunningQuery q) {
 
 		if (log.isInfoEnabled()) {
-
+			
 			try {
 
-				logDetailRows(q);
+				final StringBuilder sb = new StringBuilder(1024);
+				
+				logDetailRows(q,sb);
 
-				logSummaryRow(q);
+				logSummaryRow(q,sb);
+
+				log.info(sb);
 				
 			} catch (RuntimeException t) {
 
@@ -93,9 +97,33 @@ public class QueryLog {
     }
 
 	/**
+	 * Log the query.
+	 * 
+	 * @param q
+	 *            The query.
+	 * @param sb
+	 *            Where to write the log message.
+	 */
+	static public void log(final boolean includeTableHeader,
+			final IRunningQuery q, final StringBuilder sb) {
+
+		if(includeTableHeader) {
+			
+			sb.append(getTableHeader());
+			
+		}
+		
+		logDetailRows(q, sb);
+
+    	logSummaryRow(q, sb);
+    	
+    }
+    
+	/**
 	 * Log a detail row for each operator in the query.
 	 */
-    static private void logDetailRows(final IRunningQuery q) {
+	static private void logDetailRows(final IRunningQuery q,
+			final StringBuilder sb) {
 
 		final Integer[] order = BOpUtility.getEvaluationOrder(q.getQuery());
 
@@ -103,7 +131,9 @@ public class QueryLog {
 		
 		for (Integer bopId : order) {
 
-			log.info(getTableRow(q, orderIndex, bopId, false/* summary */));
+			sb.append(getTableRow(q, orderIndex, bopId, false/* summary */));
+			
+//			sb.append('\n');
 			
 			orderIndex++;
 			
@@ -114,9 +144,11 @@ public class QueryLog {
     /**
      * Log a summary row for the query.
      */
-    static private void logSummaryRow(final IRunningQuery q) {
+    static private void logSummaryRow(final IRunningQuery q, final StringBuilder sb) {
 
-		log.info(getTableRow(q, -1/* orderIndex */, q.getQuery().getId(), true/* summary */));
+		sb.append(getTableRow(q, -1/* orderIndex */, q.getQuery().getId(), true/* summary */));
+		
+//		sb.append('\n');
 
     }
     
