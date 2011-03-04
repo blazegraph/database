@@ -114,7 +114,7 @@ public class TestLocalQuadStore extends AbstractTestCase {
     
     protected AbstractTripleStore getStore(final Properties properties) {
 
-        return new LocalTripleStore(properties);
+        return LocalTripleStore.getInstance(properties);
 
     }
  
@@ -157,7 +157,7 @@ public class TestLocalQuadStore extends AbstractTestCase {
         // Set the file property explicitly.
         properties.setProperty(Options.FILE, file.toString());
 
-        return new LocalTripleStore(properties);
+        return LocalTripleStore.getInstance(properties);
 
     }
 

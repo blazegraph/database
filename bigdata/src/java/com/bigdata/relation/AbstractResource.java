@@ -513,14 +513,34 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
     }
 
     /**
-     * Return an object wrapping the properties specified to the ctor.
+     * Wrap and return the properties specified to the ctor. Wrapping the
+     * {@link Properties} object prevents inadvertent side-effects.
      */
     public final Properties getProperties() {
-        
+
         return new Properties(properties);
         
     }
 
+    /**
+     * Return the {@link Properties} object without wrapping it. This method can
+     * be used in those cases where you need to access non-String property
+     * values. The caller is responsible for avoiding mutation to the returned
+     * Properties object.
+     * <p>
+     * Note: This explicitly does NOT wrap the properties. Doing so makes it
+     * impossible to access the default properties using Hashtable#get(), which
+     * in turn means that we can not access non-String objects which have been
+     * materialized from the GRS in the {@link Properties}. This does introduce
+     * some potential for side-effects between read-only instances of the same
+     * resource view which share the same properties object.
+     */
+    protected final Properties getBareProperties() {
+
+        return properties;
+
+    }
+    
     /**
      * Return the object used to locate indices, relations, and relation
      * containers and to execute operations on those resources.
@@ -747,5 +767,22 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
                 name, defaultValue, validator);
 
     }
+
+//    /**
+//     * Sets the property on the underlying properties object but DOES NOT set
+//     * the property on the global row store (GRS). This method may be used when
+//     * a resource is newly created in order to cache objects which are persisted
+//     * on the GRS.
+//     * 
+//     * @param name
+//     *            The property name.
+//     * @param value
+//     *            The property value.
+//     */
+//    protected void setProperty(final String name, final Object value) {
+//
+//        properties.put(name, value);
+//
+//    }
 
 }
