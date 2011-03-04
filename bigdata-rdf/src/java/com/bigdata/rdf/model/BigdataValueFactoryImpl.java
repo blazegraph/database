@@ -27,6 +27,8 @@
 
 package com.bigdata.rdf.model;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import javax.xml.datatype.XMLGregorianCalendar;
@@ -63,9 +65,11 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
      * WARNING: Use {@link #getInstance(String)} NOT this constructor.
      */
     private BigdataValueFactoryImpl() {
+
+    	xsdMap = getXSDMap();
         
     }
-
+    
 	/**
 	 * Canonicalizing mapping for {@link BigdataValueFactoryImpl}s based on the
 	 * namespace of the {@link LexiconRelation}.
@@ -220,6 +224,15 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     
     public static final transient String xsd = NAMESPACE_XSD + "#";
 
+    private final BigdataURIImpl xsd_string = new BigdataURIImpl(this, xsd
+            + "string");
+
+    private final BigdataURIImpl xsd_dateTime = new BigdataURIImpl(this,
+            xsd + "dateTime");
+    
+    private final BigdataURIImpl xsd_date = new BigdataURIImpl(this,
+            xsd + "date");
+    
     private final BigdataURIImpl xsd_long = new BigdataURIImpl(this, xsd
             + "long");
 
@@ -247,6 +260,34 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     private final BigdataLiteralImpl FALSE = new BigdataLiteralImpl(this, "false", null,
             xsd_boolean);
 
+	/**
+	 * Map for fast resolution of XSD URIs. The keys are the string values of
+	 * the URIs. The values are the URIs.
+	 */
+    private final Map<String,BigdataURIImpl> xsdMap;
+
+    /**
+     * Populate and return a map for fast resolution of XSD URIs.
+     */
+	private Map<String, BigdataURIImpl> getXSDMap() {
+
+		final Map<String, BigdataURIImpl> map = new LinkedHashMap<String, BigdataURIImpl>();
+
+		final BigdataURIImpl[] a = new BigdataURIImpl[] { xsd_string,
+				xsd_dateTime, xsd_date, xsd_long, xsd_int, xsd_byte, xsd_short,
+				xsd_double, xsd_float, xsd_boolean };
+
+		for (BigdataURIImpl x : a) {
+
+			// stringValue of URI => URI
+			map.put(x.stringValue(), x);
+
+		}
+
+		return map;
+
+    }
+    
     public BigdataLiteralImpl createLiteral(boolean arg0) {
 
         return (arg0 ? TRUE : FALSE);
@@ -318,8 +359,8 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
          */
         if (datatype != null && !(datatype instanceof BigdataURIImpl)) {
 
-            datatype = createURI(datatype.stringValue());
-
+        	datatype = createURI(datatype.stringValue());
+        	
         }
 
         return new BigdataLiteralImpl(this, label, null,
@@ -329,6 +370,21 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     public BigdataURIImpl createURI(final String uriString) {
 
+		final String str = uriString;
+		
+//		if (str.startsWith(NAMESPACE_XSD)) {
+
+			final BigdataURIImpl tmp = xsdMap.get(str);
+			
+			if(tmp != null) {
+
+				// found in canonicalizing map.
+				return tmp;
+				
+			}
+    		
+//    }
+    
         return new BigdataURIImpl(this, uriString);
 
     }

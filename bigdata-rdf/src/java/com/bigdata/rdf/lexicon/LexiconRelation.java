@@ -409,6 +409,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 /*
                  * Unshared for any other view of the triple store.
                  */
+            	System.err.println("Unshared: "+termCacheCapacity);//FIXME remove stderr.
                 termCache = new ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue>(//
                         termCacheCapacity, // queueCapacity
                         .75f, // loadFactor (.75 is the default)
@@ -1121,7 +1122,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *            into the database. Otherwise unknown terms are inserted into
      *            the database.
      */
-    @SuppressWarnings("unchecked")
+//    @SuppressWarnings("unchecked")
     public void addTerms(final BigdataValue[] terms, final int numTerms,
             final boolean readOnly) {
         
@@ -1377,9 +1378,16 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             
         }
         
+        final int nremaining = terms2.size();
+        
+        if(nremaining == 0) 
+        	return EMPTY_VALUE_ARRAY;
+        
         return terms2.toArray(new BigdataValue[terms2.size()]);
 
     }
+
+	private static transient final BigdataValue[] EMPTY_VALUE_ARRAY = new BigdataValue[0];
 
     /**
      * Index terms for keyword search.
@@ -2254,8 +2262,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         @Override
         protected ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue> newInstance(
                 NT key, Integer termCacheCapacity) {
+        	final int queueCapacity = 50000;// FIXME termCacheCapacity.intValue();
+        	System.err.println("Shared  : "+termCacheCapacity);//FIXME remove stderr.
             return new ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue>(//
-                    termCacheCapacity.intValue(), // queueCapacity
+                    queueCapacity,// backing hard reference LRU queue capacity.
                     .75f, // loadFactor (.75 is the default)
                     16 // concurrency level (16 is the default)
             );

@@ -70,7 +70,25 @@ public class TestFactory extends TestCase2 {
         assertEquals(12, l1.intValue());
         
     }
+
+    /**
+     * Unit test verifies that the created URIs are canonical for well-known
+     * XSD URIs.
+     */
+    public void test_create_xsdInt_canonical() {
+        
+		final BigdataURI v1 = vf.createURI(XSD.INT.stringValue());
+
+		final BigdataURI v2 = vf.createURI(XSD.INT.stringValue());
+
+		// verify the URI.
+		assertEquals(v1.stringValue(),XSD.INT.stringValue());
+		
+		// verify the same reference (canonical).
+		assertTrue(v1 == v2);
     
+    }
+
     /**
      * Unit test for {@link ValueFactory#createLiteral(String, URI)} when the
      * datatype URI is <code>null</code>.

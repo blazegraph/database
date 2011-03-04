@@ -148,7 +148,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
     /**
      * The default timeout for stale entries in milliseconds.
      */
-    protected static transient final long DEFAULT_CACHE_TIMEOUT = (60 * 1000);
+    protected static transient final long DEFAULT_CACHE_TIMEOUT = (10 * 1000);
 
     /**
      * Ctor uses {@link #DEFAULT_CACHE_CAPACITY} and
@@ -663,8 +663,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
              * Make the commit time against which we are reading accessible to
              * the locatable resource.
              */
-            properties.setProperty(RelationSchema.COMMIT_TIME, commitTime2
-                    .toString());
+            properties.put(RelationSchema.COMMIT_TIME, commitTime2);
 
         }
         

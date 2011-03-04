@@ -130,10 +130,12 @@ public class PartitionedJoinGroup {
      * of those {@link IPredicate}s is not yet known (it will be determined by a
      * query optimizer when it decides on an evaluation order for those joins).
      */
-    public IConstraint[] getJoinGraphConstraints() {
-        return joinGraphConstraints
-                .toArray(new IConstraint[joinGraphConstraints.size()]);
-    }
+	public IConstraint[] getJoinGraphConstraints() {
+		final int size = joinGraphConstraints.size();
+		if (size == 0)
+			return IConstraint.EMPTY;
+		return joinGraphConstraints.toArray(new IConstraint[size]);
+	}
 
 	/**
 	 * Return the set of constraints which should be attached to the last join
