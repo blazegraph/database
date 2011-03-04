@@ -83,6 +83,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
     final private String containerNamespace;
 
     final private long timestamp;
+    final private Long commitTime;
     
     final private Properties properties;
     
@@ -181,23 +182,6 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
         
     }
 
-//    /**
-//     * When <code>true</code> the {@link NestedSubqueryWithJoinThreadsTask} is
-//     * applied. Otherwise the {@link JoinMasterTask} is applied.
-//     * 
-//     * @see Options#NESTED_SUBQUERY
-//     * 
-//     * @deprecated by {@link BOp} annotations and the pipeline join, which
-//     *             always does better than the older nested subquery evaluation
-//     *             logic.
-//     */
-//    public boolean isNestedSubquery() {
-//
-////        return false;
-//        return nestedSubquery;
-//        
-//    }
-    
     /**
      * Options for locatable resources.
      * 
@@ -376,42 +360,6 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * @deprecated by {@link BOp} annotations.
          */
         String DEFAULT_MAX_PARALLEL_SUBQUERIES = "5";
-
-//        /**
-//         * Boolean option controls the JOIN evaluation strategy. When
-//         * <code>true</code>, {@link NestedSubqueryWithJoinThreadsTask} is used
-//         * to compute joins. When <code>false</code>, {@link JoinMasterTask} is
-//         * used instead (aka pipeline joins).
-//         * <p>
-//         * Note: The default depends on the deployment mode. Nested subquery
-//         * joins are somewhat faster for local data (temporary stores, journals,
-//         * and a federation that does not support scale-out). However, pipeline
-//         * joins are MUCH faster for scale-out so they are used by default
-//         * whenever {@link IBigdataFederation#isScaleOut()} reports
-//         * <code>true</code>.
-//         * <p>
-//         * Note: Cold query performance for complex high volume queries appears
-//         * to be better for the pipeline join, so it may make sense to use the
-//         * pipeline join even for local data.
-//         * 
-//         * @deprecated The {@link NestedSubqueryWithJoinThreadsTask} is much
-//         *             slower than the pipeline join algorithm, even for a
-//         *             single machine.
-//         */
-//        String NESTED_SUBQUERY = DefaultRuleTaskFactory.class.getName()
-//                + ".nestedSubquery";
-        
-//        /** 
-//         * @todo option to specify the class that will serve as the
-//         *       {@link IRuleTaskFactory} - basically, this is how you choose
-//         *       the join strategy. however, {@link DefaultRuleTaskFactory}
-//         *       needs to be refactored in order to make this choice by
-//         *       {@link Class} rather than by the object's state.  Also note
-//         *       that the pipeline join may be better off with maxParallel=0.
-//         */
-//        String RULE_TASK_FACTORY_CLASS = "ruleTaskFactoryClass";
-//
-//        String DEFAULT_RULE_TASK_FACTORY_CLASS = DefaultRuleTaskFactory.class.getName();
         
     }
     
@@ -440,12 +388,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
         // Note: Bound before we lookup property values!
         this.namespace = namespace;
 
-        {
-            String val = properties.getProperty(RelationSchema.CONTAINER);
-
-            this.containerNamespace = val;
-
-        }
+        this.containerNamespace = properties.getProperty(RelationSchema.CONTAINER);
 
         this.timestamp = timestamp;
 
@@ -463,6 +406,18 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
 
         }
 
+        /*
+         * Resolve the commit time from which this view was materialized (if
+         * known)
+         */
+        {
+            
+            final String val = getProperty(RelationSchema.COMMIT_TIME, null/* default */);
+
+            commitTime = val == null ? null : Long.valueOf(val);
+            
+        }
+
         forceSerialExecution = Boolean.parseBoolean(getProperty(
                 Options.FORCE_SERIAL_EXECUTION,
                 Options.DEFAULT_FORCE_SERIAL_EXECUTION));
@@ -470,17 +425,6 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
         maxParallelSubqueries = getProperty(Options.MAX_PARALLEL_SUBQUERIES,
                 Options.DEFAULT_MAX_PARALLEL_SUBQUERIES,
                 IntegerValidator.GTE_ZERO);
-
-        /*
-         * Note: The pipeline join is flat out better all around.
-         */
-//        final boolean pipelineIsBetter = (indexManager instanceof IBigdataFederation && ((IBigdataFederation) indexManager)
-//                .isScaleOut());
-//        
-//        nestedSubquery = Boolean.parseBoolean(getProperty(
-//                Options.NESTED_SUBQUERY, "false"));
-//        Boolean
-//                        .toString(!pipelineIsBetter)));
 
         chunkOfChunksCapacity = getProperty(Options.CHUNK_OF_CHUNKS_CAPACITY,
                 Options.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY,
@@ -553,6 +497,18 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
     public final long getTimestamp() {
         
         return timestamp;
+        
+    }
+
+    /**
+     * The commit time from which a read-only view was materialized (if known)
+     * and otherwise <code>null</code>.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/266
+     */
+    protected Long getCommitTime() {
+        
+        return commitTime;
         
     }
 

@@ -552,6 +552,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
          * across resource views backed by the same commit point (and also avoid
          * unnecessary GRS reads).
          */
+        Long commitTime2 = null;
         final Map<String, Object> map; 
         if (TimestampUtility.isReadOnly(timestamp)
                 && !TimestampUtility.isReadCommitted(timestamp)
@@ -569,6 +570,9 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
                 // find the timestamp associated with that commit record.
                 final long commitTime = commitRecord.getTimestamp();
 
+                // Save commitTime to stuff into the properties.
+                commitTime2 = commitTime;
+                
                 // Check the cache before materializing the properties from the
                 // GRS.
                 final Map<String, Object> cachedMap = propertyCache.get(new NT(
@@ -653,6 +657,17 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
 
         properties.putAll(map);
 
+        if (commitTime2 != null) {
+
+            /*
+             * Make the commit time against which we are reading accessible to
+             * the locatable resource.
+             */
+            properties.setProperty(RelationSchema.COMMIT_TIME, commitTime2
+                    .toString());
+
+        }
+        
         if (log.isTraceEnabled()) {
 
             log.trace("Read properties: indexManager=" + indexManager

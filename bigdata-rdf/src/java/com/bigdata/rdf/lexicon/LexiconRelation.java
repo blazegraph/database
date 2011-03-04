@@ -81,6 +81,7 @@ import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtensionFactory;
@@ -114,6 +115,8 @@ import com.bigdata.service.Split;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.util.CanonicalFactory;
+import com.bigdata.util.NT;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
@@ -383,11 +386,36 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     AbstractTripleStore.Options.TERM_CACHE_CAPACITY,
                     AbstractTripleStore.Options.DEFAULT_TERM_CACHE_CAPACITY));
 
-			termCache = new ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue>(//
-                    termCacheCapacity, // queueCapacity
-                    .75f, // loadFactor (.75 is the default)
-                    16 // concurrency level (16 is the default)
-            );
+            final Long commitTime = getCommitTime();
+            
+            if (commitTime != null && TimestampUtility.isReadOnly(timestamp)) {
+
+                /*
+                 * Shared for read-only views from sample commit time. Sharing
+                 * allows us to reuse the same instances of the term cache for
+                 * queries reading from the same commit point. The cache size is
+                 * automatically increased to take advantage of the fact that it
+                 * is a shared resource.
+                 * 
+                 * Note: Sharing is limited to the same commit time to prevent
+                 * life cycle issues across drop/create sequences for the triple
+                 * store.
+                 */
+                termCache = termCacheFactory.getInstance(new NT(namespace,
+                        commitTime.longValue()), termCacheCapacity * 2);
+
+            } else {
+
+                /*
+                 * Unshared for any other view of the triple store.
+                 */
+                termCache = new ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue>(//
+                        termCacheCapacity, // queueCapacity
+                        .75f, // loadFactor (.75 is the default)
+                        16 // concurrency level (16 is the default)
+                );
+
+            }
             
         }
         
@@ -560,13 +588,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             }
 
             // discard the value factory for the lexicon's namespace.
-			this.valueFactory.remove(getNamespace());
+			valueFactory.remove(getNamespace());
             
-            if (termCache != null) {
-
-                termCache.clear();
-                
-            }
+			termCache.clear();
             
         } finally {
 
@@ -1792,9 +1816,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             if (log.isInfoEnabled())
                 log.info("nterms=" + n + ", numNotFound=" + numNotFound
-                        + (termCache!=null?(", cacheSize=" + termCache.size() + "\n"
-//                        + termCache.getStatistics()
-                        ): ""));
+                        + ", cacheSize=" + termCache.size());
 
             /*
              * sort term identifiers into index order.
@@ -2010,27 +2032,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     // Set the term identifier.
                     value.setIV(tid);
 
-                    if (termCache != null) {
+                    final BigdataValue tmp = termCache.putIfAbsent(tid, value);
 
-//                        synchronized (termCache) {
-//
-//                            if (termCache.get(id) == null) {
-//
-//                                termCache.put(id, value, false/* dirty */);
-//
-//                            }
-//                            
-//                        }
-                        
-						final BigdataValue tmp = termCache.putIfAbsent(tid,
-                                value);
+                    if (tmp != null) {
 
-                        if (tmp != null) {
+                        value = tmp;
 
-                            value = tmp;
-
-                        }
-                            
                     }
 
                     /*
@@ -2237,7 +2244,23 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *       Or perhaps this can be rolled into the {@link ValueFactory} impl
      *       along with the reverse bnodes mapping?
      */
-	private ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue> termCache;
+    private ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue> termCache;
+    
+    /**
+     * Factory used for {@link #termCache} for read-only views of the lexicon.
+     */
+    static private CanonicalFactory<NT/* key */, ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue>, Integer/* state */> termCacheFactory = new CanonicalFactory<NT, ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue>, Integer>(
+            1/* queueCapacity */) {
+        @Override
+        protected ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue> newInstance(
+                NT key, Integer termCacheCapacity) {
+            return new ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue>(//
+                    termCacheCapacity.intValue(), // queueCapacity
+                    .75f, // loadFactor (.75 is the default)
+                    16 // concurrency level (16 is the default)
+            );
+        }
+    };
     
     /**
      * The {@link ILexiconConfiguration} instance, which will determine how
@@ -2337,15 +2360,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         }
 
-        // test the term cache.
-        if (termCache != null) {
-
-            // Note: passing the IV from the caller as the cache key.
-            return termCache.get(tid);
-
-        }
-        
-        return null;
+        // test the term cache,  passing IV from caller as the cache key.
+        return termCache.get(tid);
 
     }
     
@@ -2403,33 +2419,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         // This sets the term identifier.
         value.setIV(iv);
 
-        if (termCache != null) {
+        // Note: passing the IV object as the key.
+        final BigdataValue tmp = termCache.putIfAbsent(iv, value);
 
-//            synchronized (termCache) {
-//
-//            /*
-//             * Note: This code block is synchronized to address a possible race
-//             * condition where concurrent threads resolve the term against the
-//             * database. It both threads attempt to insert their resolved term
-//             * definitions, which are distinct objects, into the cache then one
-//             * will get an IllegalStateException since the other's object will
-//             * already be in the cache.
-//             */
-//
-//            if (termCache.get(id) == null) {
-//
-//                termCache.put(id, value, false/* dirty */);
-//
-//            }
-            
-            // Note: passing the IV object as the key.
-			final BigdataValue tmp = termCache.putIfAbsent(iv, value);
+        if (tmp != null) {
 
-            if (tmp != null) {
-
-                value = tmp;
-
-            }
+            value = tmp;
 
         }
 
@@ -2530,7 +2525,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
              * do not replace the entry if there is one already there.
              */
 
-            if (termCache != null && impl.getValueFactory() == valueFactory) {
+            if (impl.getValueFactory() == valueFactory) {
 
                 if (storeBlankNodes || !tid.isBNode()) {
 
