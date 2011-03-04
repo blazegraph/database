@@ -408,15 +408,9 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
 
         /*
          * Resolve the commit time from which this view was materialized (if
-         * known)
+         * known and otherwise null).
          */
-        {
-            
-            final String val = getProperty(RelationSchema.COMMIT_TIME, null/* default */);
-
-            commitTime = val == null ? null : Long.valueOf(val);
-            
-        }
+        commitTime = (Long)properties.get(RelationSchema.COMMIT_TIME);
 
         forceSerialExecution = Boolean.parseBoolean(getProperty(
                 Options.FORCE_SERIAL_EXECUTION,

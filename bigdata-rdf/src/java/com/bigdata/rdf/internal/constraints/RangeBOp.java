@@ -102,13 +102,22 @@ final public class RangeBOp extends BOpBase
     	return (IVariable<IV>) getRequiredProperty(Annotations.VAR);
     }
     
-    public IValueExpression<IV> from() {
-    	return (IValueExpression<IV>) getRequiredProperty(Annotations.FROM);
-    }
+	public IValueExpression<IV> from() {
+		if (from == null) {
+			from = (IValueExpression<IV>) getRequiredProperty(Annotations.FROM);
+		}
+		return from;
+	}
     
-    public IValueExpression<IV> to() {
-    	return (IValueExpression<IV>) getRequiredProperty(Annotations.TO);
+	public IValueExpression<IV> to() {
+		if (to == null) {
+			to = (IValueExpression<IV>) getRequiredProperty(Annotations.TO);
+		}
+		return to;
     }
+
+	// cache to/from lookups.
+    private transient volatile IValueExpression<IV> to, from;
     
     final public Range get(final IBindingSet bs) {
         
@@ -214,18 +223,18 @@ final public class RangeBOp extends BOpBase
     	
     }
     
-    final private boolean _equals(final RangeBOp op) {
-    	
-    	return var().equals(op.var())
-    		&& from().equals(op.from())
-    		&& to().equals(op.to());
-
-    }
+//    final private boolean _equals(final RangeBOp op) {
+//    	
+//    	return var().equals(op.var())
+//    		&& from().equals(op.from())
+//    		&& to().equals(op.to());
+//
+//    }
     
 	/**
 	 * Caches the hash code.
 	 */
-	private int hash = 0;
+//	private int hash = 0;
 	public int hashCode() {
 //		
 //		int h = hash;

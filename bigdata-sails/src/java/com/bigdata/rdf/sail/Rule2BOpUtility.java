@@ -31,7 +31,6 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
@@ -56,7 +55,6 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.bindingSet.HashBindingSet;
@@ -109,6 +107,8 @@ public class Rule2BOpUtility {
 
     protected static final Logger log = Logger.getLogger(Rule2BOpUtility.class);
 
+    private static final transient IConstraint[][] NO_ASSIGNED_CONSTRAINTS = new IConstraint[0][];
+    
     /**
      * Flag to conditionally enable the new named and default graph support.
      * <p>
@@ -344,7 +344,7 @@ public class Rule2BOpUtility {
 //        // true iff the database is in quads mode.
 //        final boolean isQuadsQuery = db.isQuads();
         
-        final PipelineOp startOp = applyQueryHints(new StartOp(new BOp[] {},
+        final PipelineOp startOp = applyQueryHints(new StartOp(BOpBase.NOARGS,
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, idFactory
                                 .incrementAndGet()),//
@@ -576,22 +576,28 @@ public class Rule2BOpUtility {
          * from SOp2BOpUtility anymore so ok for now
          */
         final IConstraint[][] assignedConstraints;
-        {
-            // Extract IConstraint[] from the rule.
-            final IConstraint[] constraints = new IConstraint[rule.getConstraintCount()];
-            for(int i=0; i<constraints.length; i++) {
-                constraints[i] = rule.getConstraint(i);
-            }
-            
-            // figure out which constraints are attached to which predicates.
-            assignedConstraints = PartitionedJoinGroup.getJoinGraphConstraints(
-                    preds, constraints, 
-                    knownBound.toArray(new IVariable<?>[knownBound.size()]),
-                    true// pathIsComplete
-                    );
-        }
+		{
 
-        /*
+			final int nconstraints = rule.getConstraintCount();
+
+			// Extract IConstraint[] from the rule.
+			final IConstraint[] constraints = new IConstraint[nconstraints];
+			for (int i = 0; i < constraints.length; i++) {
+				constraints[i] = rule.getConstraint(i);
+			}
+
+			final int nknownBound = knownBound.size();
+			
+			// figure out which constraints are attached to which
+			// predicates.
+			assignedConstraints = PartitionedJoinGroup.getJoinGraphConstraints(
+					preds, constraints,
+					nknownBound == 0 ? IVariable.EMPTY : knownBound
+							.toArray(new IVariable<?>[nknownBound]), true// pathIsComplete
+					);
+		}
+
+		/*
          * 
          */
         for (int i = 0; i < preds.length; i++) {

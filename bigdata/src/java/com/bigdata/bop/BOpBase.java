@@ -75,7 +75,7 @@ public class BOpBase implements BOp {
     /**
      * An empty array.
      */
-    static protected final transient BOp[] NOARGS = new BOp[] {};
+    static public final transient BOp[] NOARGS = new BOp[] {};
 
     /**
      * An empty immutable annotations map.
