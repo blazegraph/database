@@ -28,11 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.locator;
 
-import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -389,6 +387,16 @@ public class TestDefaultResourceLocator extends TestCase2 {
                 assertEquals(tx1, view_tx1.getTimestamp());
                 assertEquals(tx2, view_tx2.getTimestamp());
 
+                /*
+                 * Read-only views report the commit time from which they were
+                 * materialized.
+                 */
+                assertEquals(null, ((MockRelation) view_un).getCommitTime());
+                assertEquals(Long.valueOf(lastCommitTime),
+                        ((MockRelation) view_tx1).getCommitTime());
+                assertEquals(Long.valueOf(lastCommitTime),
+                        ((MockRelation) view_tx2).getCommitTime());
+
                 // each view has its own Properties object.
                 final Properties p_un = view_un.getProperties();
                 final Properties p_tx1 = view_tx1.getProperties();
@@ -458,6 +466,14 @@ public class TestDefaultResourceLocator extends TestCase2 {
         static final private String indexName = "foo";
         
         private IIndex ndx;
+        
+        /**
+         * Exposed to the unit tests.
+         */
+        @Override
+        public Long getCommitTime() {
+            return super.getCommitTime();
+        }
         
         /**
          * @param indexManager
