@@ -693,7 +693,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
      * @param properties
      *            Configuration properties for the relation.
      * 
-     * @return A new instance of the identifed resource.
+     * @return A new instance of the identified resource.
      */
     protected T newInstance(final Class<? extends T> cls,
             final IIndexManager indexManager, final String namespace,

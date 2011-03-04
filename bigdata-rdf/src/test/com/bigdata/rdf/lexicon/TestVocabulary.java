@@ -160,7 +160,7 @@ public class TestVocabulary extends AbstractTripleStoreTestCase {
     
     public void test_RdfsVocabulary() {
         
-        Properties properties = getProperties();
+        final Properties properties = getProperties();
         
         // override the default.
         properties.setProperty(Options.VOCABULARY_CLASS, RDFSVocabulary.class

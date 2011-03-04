@@ -93,7 +93,6 @@ import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.Var;
-import org.openrdf.query.algebra.evaluation.EvaluationStrategy;
 import org.openrdf.query.algebra.evaluation.impl.BindingAssigner;
 import org.openrdf.query.algebra.evaluation.impl.CompareOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
@@ -674,8 +673,21 @@ public class BigdataSail extends SailBase implements Sail {
         closeOnShutdown = true;
 
     }
-    
-    private static LocalTripleStore createLTS(Properties properties) {
+
+    /**
+     * If the {@link LocalTripleStore} with the appropriate namespace exists,
+     * then return it. Otherwise, create the {@link LocalTripleStore}. When the
+     * properties indicate that full transactional isolation should be
+     * supported, a new {@link LocalTripleStore} will be created within a
+     * transaction in order to ensure that it uses isolatable indices. Otherwise
+     * it is created using the {@link ITx#UNISOLATED} connection.
+     * 
+     * @param properties
+     *            The properties.
+     *            
+     * @return The {@link LocalTripleStore}.
+     */
+    private static LocalTripleStore createLTS(final Properties properties) {
         
         final Journal journal = new Journal(properties);
         
@@ -689,23 +701,38 @@ public class BigdataSail extends SailBase implements Sail {
         // throws an exception if there are inconsistent properties
         checkProperties(properties);
         
-        final LocalTripleStore lts = new LocalTripleStore(
-                journal, namespace, ITx.UNISOLATED, properties);
-        
         try {
             
-            final long tx0 = txService.newTx(ITx.READ_COMMITTED);
-
-            // verify kb does not exist (can not be located).
-            final boolean create = 
-                journal.getResourceLocator().locate(namespace, tx0) == null;
-
-            txService.abort(tx0);
+//            final boolean create;
+//            final long tx0 = txService.newTx(ITx.READ_COMMITTED);
+//            try {
+//                // verify kb does not exist (can not be located).
+//                create = journal.getResourceLocator().locate(namespace, tx0) == null;
+//            } finally {
+//                txService.abort(tx0);
+//            }
             
-//          if (!new SPORelation(journal, namespace + "."
-//                  + SPORelation.NAME_SPO_RELATION, ITx.UNISOLATED, properties).exists()) {
-            if (create) {
+            // Check for pre-existing instance.
+            {
+
+                final LocalTripleStore lts = (LocalTripleStore) journal
+                        .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+
+                if (lts != null) {
+
+                    return lts;
+
+                }
+
+            }
             
+            // Create a new instance.
+//            if (create) 
+            {
+            
+                final LocalTripleStore lts = new LocalTripleStore(
+                        journal, namespace, ITx.UNISOLATED, properties);
+                
                 if (Boolean.parseBoolean(properties.getProperty(
                         BigdataSail.Options.ISOLATABLE_INDICES,
                         BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES))) {
@@ -728,14 +755,37 @@ public class BigdataSail extends SailBase implements Sail {
                 }
                 
             }
+
+            /*
+             * Now that we have created the instance, either using a tx or the
+             * unisolated connection, locate the triple store resource and
+             * return it.
+             */
+            {
+
+                final LocalTripleStore lts = (LocalTripleStore) journal
+                        .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+
+                if (lts == null) {
+
+                    /*
+                     * This should only occur if there is a concurrent destroy,
+                     * which is highly unlikely to say the least.
+                     */
+                    throw new RuntimeException("Concurrent create/destroy: "
+                            + namespace);
+
+                }
+
+                return lts;
+                
+            }
             
         } catch (IOException ex) {
             
             throw new RuntimeException(ex);
             
         }
-        
-        return lts;
         
     }
 

@@ -723,7 +723,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             // add two
             {
             
-                StatementBuffer assertionBuffer = new StatementBuffer(tm
+                final StatementBuffer assertionBuffer = new StatementBuffer(tm
                         .newTempTripleStore(), store, 100/* capacity */);
 
                 assertionBuffer.add(a, sco, b );
@@ -746,7 +746,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             // retract one
             {
                 
-                StatementBuffer retractionBuffer = new StatementBuffer(tm
+                final StatementBuffer retractionBuffer = new StatementBuffer(tm
                         .newTempTripleStore(), store, 100/* capacity */);
 
                 retractionBuffer.add(b, sco, c);
@@ -759,7 +759,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
 
                 if (log.isInfoEnabled())
                     log.info("\ndump after retraction and re-closure:\n"
-                        + store.dumpStore(true,true,false));
+                            + store.dumpStore(true, true, false));
                 
             }
             
@@ -770,17 +770,18 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
              */
             {
 
-                TempTripleStore controlStore = new TempTripleStore(store
+                final TempTripleStore controlStore = new TempTripleStore(store
                         .getProperties());
 
                 // Note: maintains closure on the controlStore.
-                TruthMaintenance tmControlStore = new TruthMaintenance(
+                final TruthMaintenance tmControlStore = new TruthMaintenance(
                         controlStore.getInferenceEngine());
 
                 try {
 
-                    StatementBuffer assertionBuffer = new StatementBuffer(
-                            tmControlStore.newTempTripleStore(), controlStore, 100/* capacity */);
+                    final StatementBuffer assertionBuffer = new StatementBuffer(
+                            tmControlStore.newTempTripleStore(), controlStore,
+                            100/* capacity */);
 
                     assertionBuffer.add(a, sco, b);
                     // assertionBuffer.add(c, sco, d );

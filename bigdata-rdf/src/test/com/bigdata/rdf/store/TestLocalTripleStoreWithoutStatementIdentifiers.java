@@ -116,7 +116,7 @@ public class TestLocalTripleStoreWithoutStatementIdentifiers extends AbstractTes
     
     protected AbstractTripleStore getStore(Properties properties) {
         
-        return new LocalTripleStore(properties);
+        return LocalTripleStore.getInstance(properties);
         
     }
  
@@ -159,7 +159,7 @@ public class TestLocalTripleStoreWithoutStatementIdentifiers extends AbstractTes
         // Set the file property explicitly.
         properties.setProperty(Options.FILE, file.toString());
 
-        return new LocalTripleStore(properties);
+        return LocalTripleStore.getInstance(properties);
 
     }
 

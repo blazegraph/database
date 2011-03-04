@@ -471,7 +471,8 @@ abstract public class AbstractTripleStore extends
          * @see LexiconRelation
          * @see KeyBuilder.Options
          */
-        String LEXICON = AbstractTripleStore.class.getName() + ".lexicon";
+        String LEXICON = (AbstractTripleStore.class.getName() + ".lexicon")
+                .intern();
 
         String DEFAULT_LEXICON = "true";
 
@@ -494,7 +495,8 @@ abstract public class AbstractTripleStore extends
          * this option in order to spend less time writing the forward lexicon
          * index (and it will also take up less space).
          */
-        String STORE_BLANK_NODES = AbstractTripleStore.class.getName() + ".storeBlankNodes";
+        String STORE_BLANK_NODES = (AbstractTripleStore.class.getName() + ".storeBlankNodes")
+                .intern();
         
         String DEFAULT_STORE_BLANK_NODES = "false";
 
@@ -556,9 +558,8 @@ abstract public class AbstractTripleStore extends
          * partitions for the statement indices, then SQRT(50) =~ 7 would be a
          * good choice.
          */
-        String TERMID_BITS_TO_REVERSE = AbstractTripleStore.class
-                .getName()
-                + ".termIdBitsToReverse";
+        String TERMID_BITS_TO_REVERSE = (AbstractTripleStore.class.getName() + ".termIdBitsToReverse")
+                .intern();
 
         String DEFAULT_TERMID_BITS_TO_REVERSE = "6";
 
@@ -569,7 +570,8 @@ abstract public class AbstractTripleStore extends
          * 
          * @see #TEXT_INDEXER_CLASS
          */
-        String TEXT_INDEX = AbstractTripleStore.class.getName() + ".textIndex";
+        String TEXT_INDEX = (AbstractTripleStore.class.getName() + ".textIndex")
+                .intern();
 
         String DEFAULT_TEXT_INDEX = "true";
 
@@ -578,9 +580,8 @@ abstract public class AbstractTripleStore extends
          * full text index that may be used to lookup datatype literals by
          * tokens found in the text of those literals.
          */
-        String TEXT_INDEX_DATATYPE_LITERALS = AbstractTripleStore.class
-                .getName()
-                + ".textIndex.datatypeLiterals";
+        String TEXT_INDEX_DATATYPE_LITERALS = (AbstractTripleStore.class
+                .getName() + ".textIndex.datatypeLiterals").intern();
 
         String DEFAULT_TEXT_INDEX_DATATYPE_LITERALS = "true";
         
@@ -589,8 +590,8 @@ abstract public class AbstractTripleStore extends
          * cache provides fast lookup of frequently used RDF {@link Value}s by
          * their term identifier.
          */
-        String TERM_CACHE_CAPACITY = AbstractTripleStore.class.getName()
-                + ".termCache.capacity";
+        String TERM_CACHE_CAPACITY = (AbstractTripleStore.class.getName()
+                + ".termCache.capacity").intern();
         
         String DEFAULT_TERM_CACHE_CAPACITY = "500";//"50000";
         
@@ -609,7 +610,8 @@ abstract public class AbstractTripleStore extends
          * @see NoVocabulary
          * @see RDFSVocabulary
          */
-        String VOCABULARY_CLASS = AbstractTripleStore.class.getName() + ".vocabularyClass";
+        String VOCABULARY_CLASS = (AbstractTripleStore.class.getName() + ".vocabularyClass")
+                .intern();
 
         String DEFAULT_VOCABULARY_CLASS = RDFSVocabulary.class.getName();
         
@@ -621,8 +623,9 @@ abstract public class AbstractTripleStore extends
          * {@link BaseAxioms}. This option is ignored if the lexicon is
          * disabled.  Use {@link NoAxioms} to disable inference.
          */
-        String AXIOMS_CLASS = AbstractTripleStore.class.getName() + ".axiomsClass";
-        
+        String AXIOMS_CLASS = (AbstractTripleStore.class.getName() + ".axiomsClass")
+                .intern();
+
         String DEFAULT_AXIOMS_CLASS = OwlAxioms.class.getName();
 
         /**
@@ -653,7 +656,8 @@ abstract public class AbstractTripleStore extends
          * at query time. Both {@link FastClosure} and {@link FullClosure} are
          * aware of this and handle it correctly (e.g., as configured).
          */
-        String CLOSURE_CLASS = AbstractTripleStore.class.getName() + ".closureClass";
+        String CLOSURE_CLASS = (AbstractTripleStore.class.getName() + ".closureClass")
+                .intern();
         
         String DEFAULT_CLOSURE_CLASS = FastClosure.class.getName();
 
@@ -673,7 +677,8 @@ abstract public class AbstractTripleStore extends
          * use the {@link #BLOOM_FILTER}. Otherwise it may be turned off to
          * realize some (minimal) performance gain.
          */
-        String ONE_ACCESS_PATH = AbstractTripleStore.class.getName() + ".oneAccessPath";
+        String ONE_ACCESS_PATH = (AbstractTripleStore.class.getName() + ".oneAccessPath")
+                .intern();
 
         String DEFAULT_ONE_ACCESS_PATH = "false";
 
@@ -709,8 +714,9 @@ abstract public class AbstractTripleStore extends
          *       which of them would benefit from the SPO bloom filter (TM,
          *       backchainers, SIDs fixed point, etc).
          */
-        String BLOOM_FILTER = AbstractTripleStore.class.getName() + ".bloomFilter";
-        
+        String BLOOM_FILTER = (AbstractTripleStore.class.getName() + ".bloomFilter")
+                .intern();
+
         String DEFAULT_BLOOM_FILTER = "true";
         
         /**
@@ -727,7 +733,8 @@ abstract public class AbstractTripleStore extends
          * justifications are maintained in a distinct index and are only used
          * when retracting assertions.
          */
-        String JUSTIFY = AbstractTripleStore.class.getName() + ".justify";
+        String JUSTIFY = (AbstractTripleStore.class.getName() + ".justify")
+                .intern();
 
         String DEFAULT_JUSTIFY = "true";
 
@@ -776,8 +783,8 @@ abstract public class AbstractTripleStore extends
          * <p>
          * There are examples for using the provenance mode online.
          */
-        String STATEMENT_IDENTIFIERS = AbstractTripleStore.class.getName()
-                + ".statementIdentifiers";
+        String STATEMENT_IDENTIFIERS = (AbstractTripleStore.class.getName() + ".statementIdentifiers")
+                .intern();
 
         String DEFAULT_STATEMENT_IDENTIFIERS = "false";
 
@@ -787,7 +794,8 @@ abstract public class AbstractTripleStore extends
          * {@link #STATEMENT_IDENTIFIERS} option determines whether or not the
          * provenance mode is enabled.
          */
-        String QUADS = AbstractTripleStore.class.getName() + ".quads";
+        String QUADS = (AbstractTripleStore.class.getName() + ".quads")
+                .intern();
         
         String DEFAULT_QUADS = "false";
         
@@ -802,8 +810,8 @@ abstract public class AbstractTripleStore extends
          *          = <code>false</code></li>
          * </ul> 
          */
-        String TRIPLES_MODE = AbstractTripleStore.class.getName()
-                + ".triplesMode";
+        String TRIPLES_MODE = (AbstractTripleStore.class.getName() + ".triplesMode")
+                .intern();
         
         String DEFAULT_TRIPLES_MODE = "false";
 
@@ -818,8 +826,8 @@ abstract public class AbstractTripleStore extends
          *          = <code>true</code></li>
          * </ul> 
          */
-        String TRIPLES_MODE_WITH_PROVENANCE = AbstractTripleStore.class.getName()
-                + ".triplesModeWithProvenance";
+        String TRIPLES_MODE_WITH_PROVENANCE = (AbstractTripleStore.class
+                .getName() + ".triplesModeWithProvenance").intern();
         
         String DEFAULT_TRIPLES_MODE_WITH_PROVENANCE = "false";
 
@@ -837,8 +845,8 @@ abstract public class AbstractTripleStore extends
          *          = <code>com.bigdata.rdf.store.AbstractTripleStore.NoAxioms</code></li>
          * </ul> 
          */
-        String QUADS_MODE = AbstractTripleStore.class.getName()
-                + ".quadsMode";
+        String QUADS_MODE = (AbstractTripleStore.class.getName() + ".quadsMode")
+                .intern();
 
         String DEFAULT_QUADS_MODE = "false";
 
@@ -853,8 +861,8 @@ abstract public class AbstractTripleStore extends
          * 
          * @see #DEFAULT_VALUE_FACTORY_CLASS
          */
-        String VALUE_FACTORY_CLASS = AbstractTripleStore.class.getName()
-                + ".valueFactoryClass";
+        String VALUE_FACTORY_CLASS = (AbstractTripleStore.class.getName() + ".valueFactoryClass")
+                .intern();
 
         String DEFAULT_VALUE_FACTORY_CLASS = BigdataValueFactoryImpl.class
                 .getName();
@@ -872,8 +880,8 @@ abstract public class AbstractTripleStore extends
          * 
          * @see #DEFAULT_TEXT_INDEXER_CLASS
          */
-        String TEXT_INDEXER_CLASS = AbstractTripleStore.class.getName()
-                + ".textIndexerClass";
+        String TEXT_INDEXER_CLASS = (AbstractTripleStore.class.getName() + ".textIndexerClass")
+                .intern();
 
         String DEFAULT_TEXT_INDEXER_CLASS = BigdataRDFFullTextIndex.class
                 .getName();
@@ -883,8 +891,8 @@ abstract public class AbstractTripleStore extends
          * statement indices rather than using the lexicon to map them to term 
          * identifiers and back.
          */
-        String INLINE_LITERALS = AbstractTripleStore.class.getName()
-                + ".inlineLiterals";
+        String INLINE_LITERALS = (AbstractTripleStore.class.getName() + ".inlineLiterals")
+                .intern();
 
         String DEFAULT_INLINE_LITERALS = "true";
 
@@ -895,8 +903,8 @@ abstract public class AbstractTripleStore extends
          * <p>
          * See {@link Options#STORE_BLANK_NODES}.
          */
-        String INLINE_BNODES = AbstractTripleStore.class.getName()
-                + ".inlineBNodes";
+        String INLINE_BNODES = (AbstractTripleStore.class.getName()
+                + ".inlineBNodes").intern();
 
         String DEFAULT_INLINE_BNODES = "false";
 
@@ -911,8 +919,8 @@ abstract public class AbstractTripleStore extends
          * 
          * @see #INLINE_DATE_TIMES_TIMEZONE
          */
-        String INLINE_DATE_TIMES = AbstractTripleStore.class.getName()
-                + ".inlineDateTimes";
+        String INLINE_DATE_TIMES = (AbstractTripleStore.class.getName()
+                + ".inlineDateTimes").intern();
 
         String DEFAULT_INLINE_DATE_TIMES = "false";
 
@@ -925,8 +933,8 @@ abstract public class AbstractTripleStore extends
          * 
          * @see #INLINE_DATE_TIMES
          */
-        String INLINE_DATE_TIMES_TIMEZONE = AbstractTripleStore.class.getName()
-                + ".inlineDateTimesTimezone";
+        String INLINE_DATE_TIMES_TIMEZONE = (AbstractTripleStore.class.getName()
+                + ".inlineDateTimesTimezone").intern();
 
         /**
          * @see #INLINE_DATE_TIMES_TIMEZONE
@@ -944,8 +952,8 @@ abstract public class AbstractTripleStore extends
          * 
          * @see #DEFAULT_EXTENSION_FACTORY_CLASS
          */
-        String EXTENSION_FACTORY_CLASS = AbstractTripleStore.class.getName()
-                + ".extensionFactoryClass";
+        String EXTENSION_FACTORY_CLASS = (AbstractTripleStore.class.getName() + ".extensionFactoryClass")
+                .intern();
 
         String DEFAULT_EXTENSION_FACTORY_CLASS = DefaultExtensionFactory.class
                 .getName();
@@ -972,8 +980,8 @@ abstract public class AbstractTripleStore extends
          * 
          * @see XXXCShardSplitHandler
          */
-        String CONSTRAIN_XXXC_SHARDS = AbstractTripleStore.class.getName()
-                + ".constrainXXXCShards";
+        String CONSTRAIN_XXXC_SHARDS = (AbstractTripleStore.class.getName() + ".constrainXXXCShards")
+                .intern();
         
         String DEFAULT_CONSTRAIN_XXXC_SHARDS = "true";
         
@@ -1326,7 +1334,6 @@ abstract public class AbstractTripleStore extends
         
         // set property that will let the contained relations locate their container.
         tmp.setProperty(RelationSchema.CONTAINER, getNamespace());
-        
 
         if (Boolean.valueOf(tmp.getProperty(Options.TEXT_INDEX,
                 Options.DEFAULT_TEXT_INDEX))) {
@@ -1437,9 +1444,11 @@ abstract public class AbstractTripleStore extends
 
                     // axioms.
                     map.put(TripleStoreSchema.AXIOMS, axioms);
+//                    setProperty(TripleStoreSchema.AXIOMS,axioms);
 
                     // vocabulary.
                     map.put(TripleStoreSchema.VOCABULARY, vocab);
+//                    setProperty(TripleStoreSchema.VOCABULARY,vocab);
 
                     if (lexiconRelation.isTextIndex()) {
                         /*
@@ -1548,13 +1557,18 @@ abstract public class AbstractTripleStore extends
                 if (axioms == null) {
 
                     /*
-                     * Extract the de-serialized axiom model from the global row
-                     * store.
+                     * The vocabulary is stored in properties for the triple
+                     * store instance in the global row store. However, we
+                     * pre-materialize those properties so we can directly
+                     * retrieve the vocabulary from the materialized properties.
                      */
-                    
-                    axioms = (Axioms) getIndexManager().getGlobalRowStore()
-                            .get(RelationSchema.INSTANCE, getNamespace(),
-                                    TripleStoreSchema.AXIOMS);
+
+                    axioms = (Axioms) getBareProperties().get(
+                            TripleStoreSchema.AXIOMS);
+
+//                    axioms = (Axioms) getIndexManager().getGlobalRowStore()
+//                            .get(RelationSchema.INSTANCE, getNamespace(),
+//                                    TripleStoreSchema.AXIOMS);
 
                     if (axioms == null)
                         throw new RuntimeException("No axioms defined? : "
@@ -1599,13 +1613,18 @@ abstract public class AbstractTripleStore extends
                 if (vocab == null) {
 
                     /*
-                     * Extract the de-serialized vocabulary from the global row
-                     * store.
+                     * The vocabulary is stored in properties for the triple
+                     * store instance in the global row store. However, we
+                     * pre-materialize those properties so we can directly
+                     * retrieve the vocabulary from the materialized properties.
                      */
 
-                    vocab = (Vocabulary) getIndexManager().getGlobalRowStore().get(
-                            RelationSchema.INSTANCE, getNamespace(),
+                    vocab = (Vocabulary) getBareProperties().get(
                             TripleStoreSchema.VOCABULARY);
+                    
+//                    vocab = (Vocabulary) getIndexManager().getGlobalRowStore().get(
+//                            RelationSchema.INSTANCE, getNamespace(),
+//                            TripleStoreSchema.VOCABULARY);
 
                     if (vocab == null)
                         throw new RuntimeException("No vocabulary defined? : "
