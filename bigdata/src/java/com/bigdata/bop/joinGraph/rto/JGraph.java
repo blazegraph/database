@@ -1270,41 +1270,44 @@ public class JGraph {
                 if (!PartitionedJoinGroup.canJoinUsingConstraints(
                         new IPredicate[] { v.pred }, vp.pred, C)) {
 
-                    /*
-                     * If there are no shared variables, either directly or
-                     * indirectly via the constraints, then we can not use this
-                     * as an initial edge.
-                     * 
-                     * @todo UNIT TEST : correct rejection of initial paths for
-                     * vertices which are unconstrained joins.
-                     * 
-                     * @todo UNIT TEST : correct acceptance of initial paths for
-                     * vertices which are unconstrained joins IFF there are no
-                     * constrained joins in the join graph.
-                     */
+					/*
+					 * If there are no shared variables, either directly or
+					 * indirectly via the constraints, then we can not use this
+					 * as an initial edge.
+					 * 
+					 * TODO It may be possible to execute the join in one
+					 * direction or the other but not both. This seems to be
+					 * true for RangeBOp.
+					 * 
+					 * @todo UNIT TEST : correct rejection of initial paths for
+					 * vertices which are unconstrained joins.
+					 * 
+					 * @todo UNIT TEST : correct acceptance of initial paths for
+					 * vertices which are unconstrained joins IFF there are no
+					 * constrained joins in the join graph.
+					 */
                     
                     continue;
                     
-                }
-                        
-                // The path segment
-                final IPredicate<?>[] preds = new IPredicate[] { v.pred, vp.pred };
+				}
 
-                // cutoff join of the edge (v,vp)
-                final EdgeSample edgeSample = Path.cutoffJoin(
-                        queryEngine,// 
-                        limit, // sample limit
-                        preds, // ordered path segment.
-                        C, // constraints
-                        pathIsComplete,//
-                        v.sample // sourceSample
-                        );
+				// The path segment
+				final IPredicate<?>[] preds = new IPredicate[] { v.pred, vp.pred };
 
-                final Path p = new Path(v, vp, edgeSample);
+				// cutoff join of the edge (v,vp)
+				final EdgeSample edgeSample = Path.cutoffJoin(queryEngine,// 
+						limit, // sample limit
+						preds, // ordered path segment.
+						C, // constraints
+						pathIsComplete,//
+						v.sample // sourceSample
+						);
 
-                paths.add(p);
+				final Path p = new Path(v, vp, edgeSample);
 
-            }
+				paths.add(p);
+
+			}
         
         }
         

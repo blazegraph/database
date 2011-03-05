@@ -46,28 +46,49 @@ public class SparqlTypeErrorException extends W3CQueryLanguageException {
     static public String SPARQL_TYPE_ERROR_0000 = toURI(0);
 
     /**
+     * Type error used to indicate an unbound variable.
+     */
+    static public String SPARQL_TYPE_ERROR_0001 = toURI(1);
+
+    /**
      * Generic SPARQL type error.
      * 
      * @see #SPARQL_TYPE_ERROR_0000
      */
     public SparqlTypeErrorException() {
 
-        super(LanguageFamily.SP, ErrorCategory.TY, 0/* errorCode */,
-                SPARQL_TYPE_ERROR_0000);
+		this(0/* errorCode */, SPARQL_TYPE_ERROR_0000);
 
     }
 
-    /**
-     * @param errorCode
-     *            The four digit error code.
-     */
-    public SparqlTypeErrorException(int errorCode) {
+	/**
+	 * Type error thrown when there is an unbound variable.
+	 */
+	static public class UnboundVarException extends SparqlTypeErrorException {
+
+		private static final long serialVersionUID = 1L;
+
+		public UnboundVarException() {
+
+			super(0001/* errorCode */, SPARQL_TYPE_ERROR_0001);
+
+		}
+
+	}
+
+	/**
+	 * @param errorCode
+	 *            The four digit error code.
+	 * @param uri
+	 *            The uri of the error.
+	 */
+	protected SparqlTypeErrorException(final int errorCode, final String uri) {
 
         super(LanguageFamily.SP, ErrorCategory.TY, errorCode, null/* msg */);
 
     }
 
-    static protected String toURI(int errorCode) {
+    static protected String toURI(final int errorCode) {
 
         return W3CQueryLanguageException.toURI(LanguageFamily.SP,
                 ErrorCategory.TY, errorCode);

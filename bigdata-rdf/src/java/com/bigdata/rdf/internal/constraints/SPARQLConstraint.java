@@ -40,27 +40,27 @@ import com.bigdata.util.InnerCause;
  * BOpConstraint that wraps a {@link EBVBOp}, which itself computes the 
  * effective boolean value of an IValueExpression.
  */
-public class Constraint extends com.bigdata.bop.constraint.Constraint {
+public class SPARQLConstraint extends com.bigdata.bop.constraint.Constraint {
 
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = -5796492538735372727L;
 	
-	protected static final Logger log = Logger.getLogger(Constraint.class);
+	protected static final Logger log = Logger.getLogger(SPARQLConstraint.class);
 	
 	/**
 	 * Convenience method to generate a constraint from a value expression.
 	 */
 	public static IConstraint wrap(final IValueExpression<IV> ve) {
 		if (ve instanceof EBVBOp)
-			return new Constraint((EBVBOp) ve);
+			return new SPARQLConstraint((EBVBOp) ve);
 		else
-			return new Constraint(new EBVBOp(ve));
+			return new SPARQLConstraint(new EBVBOp(ve));
 	}
 	
 	
-	public Constraint(final EBVBOp x) {
+	public SPARQLConstraint(final EBVBOp x) {
 
 		this(new BOp[] { x }, null/*annocations*/);
 		
@@ -69,7 +69,7 @@ public class Constraint extends com.bigdata.bop.constraint.Constraint {
     /**
      * Required shallow copy constructor.
      */
-    public Constraint(final BOp[] args, 
+    public SPARQLConstraint(final BOp[] args, 
     		final Map<String, Object> anns) {
         super(args, anns);
     }
@@ -77,7 +77,7 @@ public class Constraint extends com.bigdata.bop.constraint.Constraint {
     /**
      * Required deep copy constructor.
      */
-    public Constraint(final Constraint op) {
+    public SPARQLConstraint(final SPARQLConstraint op) {
         super(op);
     }
 

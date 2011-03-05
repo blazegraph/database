@@ -90,7 +90,7 @@ import com.bigdata.rdf.internal.XSDIntIV;
 import com.bigdata.rdf.internal.XSDIntegerIV;
 import com.bigdata.rdf.internal.constraints.AndBOp;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
-import com.bigdata.rdf.internal.constraints.Constraint;
+import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.EBVBOp;
 import com.bigdata.rdf.internal.constraints.IsBNodeBOp;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
@@ -1087,10 +1087,10 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 		
 		for (SOp sop : g) {
 			final BOp bop = sop.getBOp();
-			if (!(bop instanceof Constraint)) {
+			if (!(bop instanceof SPARQLConstraint)) {
 				continue;
 			}
-			final Constraint c = (Constraint) bop;
+			final SPARQLConstraint c = (SPARQLConstraint) bop;
 			if (!(c.getValueExpression() instanceof CompareBOp)) {
 				continue;
 			}
@@ -1679,7 +1679,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     private IConstraint toConstraint(final ValueExpr ve) {
 
     	final IValueExpression<IV> veBOp = toVE(ve);
-    	return Constraint.wrap(veBOp);
+    	return SPARQLConstraint.wrap(veBOp);
     	
     }
 

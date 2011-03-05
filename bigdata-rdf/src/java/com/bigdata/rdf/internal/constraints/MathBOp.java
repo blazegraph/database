@@ -131,11 +131,16 @@ final public class MathBOp extends ValueExpressionBOp
     final public IV get(final IBindingSet bs) {
         
         final IV left = left().get(bs);
+
+        // not yet bound?
+        if (left == null)
+        	throw new SparqlTypeErrorException.UnboundVarException();
+
         final IV right = right().get(bs);
         
-        // not yet bound
-        if (left == null || right == null)
-        	throw new SparqlTypeErrorException();
+        // not yet bound?
+        if (right == null)
+        	throw new SparqlTypeErrorException.UnboundVarException();
         
         return IVUtility.numericalMath(left, right, op());
 
