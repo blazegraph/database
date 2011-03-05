@@ -1,6 +1,7 @@
 package com.bigdata.bop.rdf.joinGraph;
 
 import java.io.File;
+import java.math.BigInteger;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -22,11 +23,13 @@ import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.internal.XSDIntIV;
+import com.bigdata.rdf.internal.XSDIntegerIV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
-import com.bigdata.rdf.internal.constraints.Constraint;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
+import com.bigdata.rdf.internal.constraints.RangeBOp;
+import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -273,6 +276,40 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
 			}
 		}
 
+		/*
+		 * This demonstrates the translation of one of the constraints into a
+		 * key-range constraint on the access path.
+		 * 
+		 * FIXME What is the purpose of RangeBOp#var? Why is it simProperty and
+		 * not origProperty
+		 * 
+		 * FIXME Is the RangeBOp in addition to, or instead of, the original
+		 * constraint?
+		 * 
+		 * [java] PipelineJoin[14](PipelineJoin[13])[ BOp.bopId=14,
+		 * PipelineJoin.
+		 * 
+		 * constraints=[Constraint(EBVBOp(CompareBOp(simProperty1,MINUS
+		 * (origProperty1, XSDInteger(120)))[ CompareBOp.op=GT])),
+		 * Constraint(EBVBOp(CompareBOp(simProperty1,PLUS(origProperty1,
+		 * XSDInteger(120)))[ CompareBOp.op=LT]))],
+		 * 
+		 * BOp.evaluationContext=ANY,
+		 * 
+		 * PipelineJoin.predicate=SPOPredicate[7](product=null, TermId(279564U), simProperty1=null)[
+		 * 
+		 * IPredicate.relationName=[BSBM_284826.spo],
+		 * 
+		 * IPredicate.timestamp=1299271044298,
+		 * 
+		 * IPredicate.flags=[KEYS,VALS,READONLY,PARALLEL],
+		 * 
+		 * SPOPredicate.range=RangeBOp()[ RangeBOp.var=simProperty1,
+		 * RangeBOp.from=MINUS(origProperty1, XSDInteger(120)),
+		 * RangeBOp.to=PLUS(origProperty1, XSDInteger(120))
+		 * 
+		 * ], BOp.bopId=7], QueryHints.optimizer=None]
+		 */
 		final boolean distinct = true;
 		final IVariable<?>[] selected;
 		final IConstraint[] constraints;
@@ -351,6 +388,15 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
                     },//
                     new NV(BOp.Annotations.BOP_ID, nextId++),//
                     new NV(Annotations.TIMESTAMP, timestamp),//
+					new NV(SPOPredicate.Annotations.RANGE, new RangeBOp(//
+							origProperty1,// FIXME verify correct var w/ MikeP
+							new MathBOp(origProperty1, new Constant(
+									new XSDIntegerIV(BigInteger.valueOf(120))),
+									MathOp.MINUS),//
+							new MathBOp(origProperty1, new Constant(
+									new XSDIntegerIV(BigInteger.valueOf(120))),
+									MathOp.PLUS)//
+							)),//
                     new NV(IPredicate.Annotations.RELATION_NAME, spoRelation)//
             );
 
@@ -373,6 +419,15 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
                     },//
                     new NV(BOp.Annotations.BOP_ID, nextId++),//
                     new NV(Annotations.TIMESTAMP, timestamp),//
+					new NV(SPOPredicate.Annotations.RANGE, new RangeBOp(//
+							origProperty2,// FIXME verify correct var with MikeP
+							new MathBOp(origProperty2, new Constant(
+									new XSDIntegerIV(BigInteger.valueOf(170))),
+									MathOp.MINUS),//
+							new MathBOp(origProperty2, new Constant(
+									new XSDIntegerIV(BigInteger.valueOf(170))),
+									MathOp.PLUS)//
+							)),//
                     new NV(IPredicate.Annotations.RELATION_NAME, spoRelation)//
             );
 
@@ -433,7 +488,7 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
             // the constraints on the join graph.
             constraints = new IConstraint[ves.length];
             for (int i = 0; i < ves.length; i++) {
-            	constraints[i] = Constraint.wrap(ves[i]);
+            	constraints[i] = SPARQLConstraint.wrap(ves[i]);
             }
 
         }
@@ -737,17 +792,17 @@ test_bsbm_q5 : Total times: static=7312, runtime=3305, delta(static-runtime)=400
             preds = new IPredicate[] { p0, p1, p2, p3, p4, p5, p6 };
 
             // FILTER ( ?p1 > %x% )
-            c0 = Constraint.wrap(new CompareBOp(new BOp[] { p1Var,
+            c0 = SPARQLConstraint.wrap(new CompareBOp(new BOp[] { p1Var,
                     new Constant(x.getIV()) }, NV.asMap(new NV[] { new NV(
                     CompareBOp.Annotations.OP, CompareOp.GT) })));
 
             // FILTER (?p3 < %y% )
-            c1 = Constraint.wrap(new CompareBOp(new BOp[] { p3Var,
+            c1 = SPARQLConstraint.wrap(new CompareBOp(new BOp[] { p3Var,
                     new Constant(y.getIV()) }, NV.asMap(new NV[] { new NV(
                     CompareBOp.Annotations.OP, CompareOp.LT) })));
 
             // FILTER (!bound(?testVar))
-            c2 = Constraint.wrap(new NotBOp(new IsBoundBOp(testVar)));
+            c2 = SPARQLConstraint.wrap(new NotBOp(new IsBoundBOp(testVar)));
             
             // the constraints on the join graph.
             constraints = new IConstraint[] { c0, c1, c2 };

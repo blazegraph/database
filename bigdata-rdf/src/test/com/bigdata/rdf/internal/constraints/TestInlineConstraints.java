@@ -173,7 +173,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                        			Constraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GT))
+                        			SPARQLConstraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GT))
                                 }
                         );
                 
@@ -279,7 +279,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                        			Constraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GE))
+                        			SPARQLConstraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GE))
                                 });
                 
                 try {
@@ -386,7 +386,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                        			Constraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LT))
+                        			SPARQLConstraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LT))
                                 });
                 
                 if (log.isInfoEnabled())
@@ -494,7 +494,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                        			Constraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LE))
+                        			SPARQLConstraint.wrap(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LE))
                                 });
                 
                 if (log.isInfoEnabled())
@@ -611,7 +611,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                        			Constraint.wrap(new CompareBOp(a, new MathBOp(dAge, new Constant<IV>(_5.getIV()), MathOp.PLUS), CompareOp.GT))
+                        			SPARQLConstraint.wrap(new CompareBOp(a, new MathBOp(dAge, new Constant<IV>(_5.getIV()), MathOp.PLUS), CompareOp.GT))
                                 });
                 
                 try {
@@ -724,7 +724,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                                    Constraint.wrap(new CompareBOp(a, new Constant<IV>(l2.getIV()), CompareOp.GT))
+                                    SPARQLConstraint.wrap(new CompareBOp(a, new Constant<IV>(l2.getIV()), CompareOp.GT))
                                 });
                 
                 try {

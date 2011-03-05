@@ -39,6 +39,11 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.Range;
 
+/**
+ * Operator used to impose a key-range constraint on an access path.
+ * 
+ * @author mrpersonick
+ */
 final public class RangeBOp extends BOpBase 
 		implements IVariable<Range> {
 
@@ -49,7 +54,6 @@ final public class RangeBOp extends BOpBase
 	
 //	private static final Logger log = Logger.getLogger(RangeBOp.class);
 	
-
 	public interface Annotations extends ImmutableBOp.Annotations {
 
 		String VAR = (RangeBOp.class.getName() + ".var").intern();
@@ -75,7 +79,7 @@ final public class RangeBOp extends BOpBase
 	/**
 	 * Required shallow copy constructor.
 	 */
-    public RangeBOp(final BOp[] args, Map<String,Object> anns) {
+    public RangeBOp(final BOp[] args, final Map<String,Object> anns) {
     
         super(args,anns);
 
@@ -124,15 +128,22 @@ final public class RangeBOp extends BOpBase
 //    	log.debug("getting the asBound value");
     	
     	final IV from = from().get(bs);
-    	final IV to = to().get(bs);
     	
 //    	log.debug("from: " + from);
+    	
+    	// sort of like Var.get(), which returns null when the variable
+    	// is not yet bound
+		if (from == null)
+			return null;
+    	
+    	final IV to = to().get(bs);
+    	
 //    	log.debug("to: " + to);
     	
     	// sort of like Var.get(), which returns null when the variable
     	// is not yet bound
-    	if (from == null || to == null)
-    		return null;
+		if (to == null)
+			return null;
 
     	try {
     		// let Range ctor() do the type checks and valid range checks
@@ -149,20 +160,28 @@ final public class RangeBOp extends BOpBase
     
     final public RangeBOp asBound(final IBindingSet bs) {
 
-    	final RangeBOp asBound = (RangeBOp) this.clone();
-    	
 //    	log.debug("getting the asBound value");
     	
     	final IV from = from().get(bs);
-    	final IV to = to().get(bs);
     	
 //    	log.debug("from: " + from);
+
+    	// sort of like Var.get(), which returns null when the variable
+    	// is not yet bound
+		if (from == null)
+			return this;
+
+    	final IV to = to().get(bs);
+    	
 //    	log.debug("to: " + to);
     	
     	// sort of like Var.get(), which returns null when the variable
     	// is not yet bound
-    	if (from == null || to == null)
-    		return asBound;
+    	if (to == null)
+    		return this;
+    	
+    	// Note: defer clone() until everything is bound.
+    	final RangeBOp asBound = (RangeBOp) this.clone();
     	
     	asBound._setProperty(Annotations.FROM, new Constant(from));
     	asBound._setProperty(Annotations.TO, new Constant(to));
