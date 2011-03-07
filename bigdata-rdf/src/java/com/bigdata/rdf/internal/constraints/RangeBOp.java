@@ -57,9 +57,11 @@ final public class RangeBOp extends BOpBase
 	public interface Annotations extends ImmutableBOp.Annotations {
 
 		String VAR = (RangeBOp.class.getName() + ".var").intern();
-		
+
+		/** The inclusive lower bound. */
 		String FROM = (RangeBOp.class.getName() + ".from").intern();
 		
+		/** The exclusive upper bound. */
 		String TO = (RangeBOp.class.getName() + ".to").intern();
 		
     }
@@ -160,35 +162,49 @@ final public class RangeBOp extends BOpBase
     
     final public RangeBOp asBound(final IBindingSet bs) {
 
-//    	log.debug("getting the asBound value");
-    	
-    	final IV from = from().get(bs);
-    	
-//    	log.debug("from: " + from);
+		IV from, to;
+		try {
+			// log.debug("getting the asBound value");
 
-    	// sort of like Var.get(), which returns null when the variable
-    	// is not yet bound
-		if (from == null)
+			from = from().get(bs);
+
+			// log.debug("from: " + from);
+
+			// sort of like Var.get(), which returns null when the variable
+			// is not yet bound
+			if (from == null)
+				return this;
+
+			to = to().get(bs);
+
+			// log.debug("to: " + to);
+
+			// sort of like Var.get(), which returns null when the variable
+			// is not yet bound
+			if (to == null)
+				return this;
+
+		} catch (SparqlTypeErrorException ex) {
+
+			/*
+			 * Ignore. If the variables in the RangeBOp value expressions are
+			 * not fully bound or has the wrong dynamic type then the range bop
+			 * can not be evaluated yet.
+			 */
+			
 			return this;
+	
+		}
 
-    	final IV to = to().get(bs);
-    	
-//    	log.debug("to: " + to);
-    	
-    	// sort of like Var.get(), which returns null when the variable
-    	// is not yet bound
-    	if (to == null)
-    		return this;
-    	
-    	// Note: defer clone() until everything is bound.
-    	final RangeBOp asBound = (RangeBOp) this.clone();
-    	
-    	asBound._setProperty(Annotations.FROM, new Constant(from));
-    	asBound._setProperty(Annotations.TO, new Constant(to));
-    	
-    	return asBound;
-    	
-    }
+		// Note: defer clone() until everything is bound.
+		final RangeBOp asBound = (RangeBOp) this.clone();
+
+		asBound._setProperty(Annotations.FROM, new Constant(from));
+		asBound._setProperty(Annotations.TO, new Constant(to));
+
+		return asBound;
+
+	}
     
     final public boolean isFullyBound() {
     	

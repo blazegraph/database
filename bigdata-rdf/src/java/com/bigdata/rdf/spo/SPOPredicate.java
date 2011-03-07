@@ -322,37 +322,13 @@ public class SPOPredicate extends Predicate<ISPO> {
         if (rangeBOp == null)
         	return tmp;
 
-		try {
+		/*
+		 * Attempt to evaluate the RangeBOp.
+		 */
+		final RangeBOp asBound = rangeBOp.asBound(bindingSet);
 
-			/*
-			 * Attempt to evaluate the RangeBOp.
-			 */
-			final RangeBOp asBound = rangeBOp.asBound(bindingSet);
+		tmp._setProperty(Annotations.RANGE, asBound);
 
-			tmp._setProperty(Annotations.RANGE, asBound);
-
-		} catch (SparqlTypeErrorException.UnboundVarException ex) {
-
-			/*
-			 * If there was an unbound variable in the RangeBOp annotation then
-			 * we will drop the RangeBOp.
-			 * 
-			 * FIXME I have modified SPOPredicate#asBound(...) to trap type
-			 * errors arising from attempts to evaluate a RangeBOp when some
-			 * variable(s) are not bound. This presumes that the RangeBOp is in
-			 * addition to (not instead of) the value expression from which the
-			 * RangeBOp constraint was derived. Verify with MikeP.
-			 * 
-			 * I am not sure that this is the right thing to do, but it allows
-			 * the RTO to run. It may be that the underlying problem is making
-			 * the PartitionedJoinGroup aware of the RangeBOp such that we do
-			 * not attempt evaluation orders which would cause the RangeBOP to
-			 * throw a type error. This gets into the area of alternative query
-			 * plans rather than just alternative join orderings.
-			 */
-
-		}
-		
 		return tmp;
 
 	}
