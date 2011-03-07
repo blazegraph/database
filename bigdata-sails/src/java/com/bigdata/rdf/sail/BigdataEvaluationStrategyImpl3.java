@@ -28,7 +28,6 @@ import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.And;
 import org.openrdf.query.algebra.Bound;
 import org.openrdf.query.algebra.Compare;
-import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Group;
 import org.openrdf.query.algebra.IsBNode;
@@ -50,13 +49,14 @@ import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.Regex;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
-import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
 import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
+import org.openrdf.query.algebra.Compare.CompareOp;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
@@ -68,12 +68,12 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -84,33 +84,29 @@ import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.internal.DummyIV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSDBooleanIV;
-import com.bigdata.rdf.internal.XSDDecimalIV;
-import com.bigdata.rdf.internal.XSDDoubleIV;
-import com.bigdata.rdf.internal.XSDIntIV;
-import com.bigdata.rdf.internal.XSDIntegerIV;
 import com.bigdata.rdf.internal.constraints.AndBOp;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
-import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.EBVBOp;
 import com.bigdata.rdf.internal.constraints.IsBNodeBOp;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.IsLiteralBOp;
 import com.bigdata.rdf.internal.constraints.IsURIBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
-import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
+import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.sop.SOp;
 import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree;
-import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
 import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
+import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
@@ -592,7 +588,6 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 			 */
 			throw new UnsupportedOperatorException(ex);
 		} catch (Throwable ex) {
-//			log.error("Remove log stmt:"+ex,ex);// FIXME remove this - I am just looking for the root cause of something in the SAIL.
 			throw new QueryEvaluationException(ex);
 		}
 	}
@@ -814,7 +809,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	 */
     	attachNamedGraphsFilterToSearches(sopTree);
     	
-		if (false) {
+		if (true) {
 			/*
 			 * Look for numerical filters that can be rotated inside predicates
 			 */
@@ -891,6 +886,9 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 
     }
     
+    /*
+     * FIXME What is [bs]?  It is not being used within this context.
+     */
     CloseableIteration<BindingSet, QueryEvaluationException> 
 		doEvaluateNatively(final PipelineOp query, final BindingSet bs,
 			final QueryEngine queryEngine, final IVariable[] required
@@ -925,7 +923,6 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 				// ensure query is halted.
 				runningQuery.cancel(true/* mayInterruptIfRunning */);
 			}
-//			log.error("Remove log stmt"+t,t);// FIXME remove this - I am just looking for the root cause of something in the SAIL.
 			throw new QueryEvaluationException(t);
 		}
     	

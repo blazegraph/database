@@ -107,7 +107,7 @@ public class Rule2BOpUtility {
 
     protected static final Logger log = Logger.getLogger(Rule2BOpUtility.class);
 
-    private static final transient IConstraint[][] NO_ASSIGNED_CONSTRAINTS = new IConstraint[0][];
+//    private static final transient IConstraint[][] NO_ASSIGNED_CONSTRAINTS = new IConstraint[0][];
     
     /**
      * Flag to conditionally enable the new named and default graph support.
@@ -221,17 +221,6 @@ public class Rule2BOpUtility {
 
     }
 
-//    /**
-//     * A list of annotations to be cleared from {@link Predicate} when they are
-//     * copied into a query plan.
-//     */
-//    private static final String[] ANNS_TO_CLEAR_FROM_PREDICATE = new String[] {
-//            Annotations.QUADS,//
-//            Annotations.DATASET,//
-//            Annotations.SCOPE,//
-//            IPredicate.Annotations.OPTIONAL //
-//    };
-    
     /**
      * Convert an {@link IStep} into an operator tree. This should handle
      * {@link IRule}s and {@link IProgram}s as they are currently implemented
@@ -296,7 +285,7 @@ public class Rule2BOpUtility {
      *       really all that accessible.
      */
     private static PipelineOp applyQueryHints(PipelineOp op,
-            Properties queryHints) {
+            final Properties queryHints) {
 
         final Enumeration<?> pnames = queryHints.propertyNames();
 

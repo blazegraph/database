@@ -49,9 +49,11 @@ import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.engine.QueryEngine.Counters;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.service.IBigdataFederation;
@@ -1046,9 +1048,28 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
                 // log summary statistics for the query.
                 if (isController())
                     QueryLog.log(this);
+				final String tag = getQuery().getProperty(QueryHints.TAG,
+						QueryHints.DEFAULT_TAG);
+				final Counters c = tag == null ? null : queryEngine
+						.getCounters(tag);
+				// track #of done queries.
+				queryEngine.counters.doneCount.increment();
+				if (c != null)
+					c.doneCount.increment();
+				// track elapsed run time of done queries.
+				final long elapsed = getElapsed();
+				queryEngine.counters.elapsedMillis.add(elapsed);
+				if (c != null)
+					c.elapsedMillis.add(elapsed);
+				if (future.getCause() != null) {
+					// track #of queries with abnormal termination.
+					queryEngine.counters.errorCount.increment();
+					if (c != null)
+						c.errorCount.increment();
+				}
+				// remove from the collection of running queries.
+				queryEngine.halt(this);
             }
-            // remove from the collection of running queries.
-            queryEngine.halt(this);
             // true iff we cancelled something.
             return cancelled;
         } finally {
