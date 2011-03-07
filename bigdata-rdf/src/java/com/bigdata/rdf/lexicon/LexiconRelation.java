@@ -699,9 +699,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         return textIndex;
         
     }
-    
+
     /**
-     * Overridden to return the hard reference for the index.
+     * Overridden to use {@link #getTerm2IdIndex()} and
+     * {@link #getId2TermIndex()} as appropriate.
      */
     @Override
     public IIndex getIndex(final IKeyOrder<? extends BigdataValue> keyOrder) {
@@ -730,7 +731,24 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
                 if (term2id == null) {
 
-                    term2id = super.getIndex(LexiconKeyOrder.TERM2ID);
+                    final long timestamp = getTimestamp();
+                    
+                    if (TimestampUtility.isReadWriteTx(timestamp)) {
+                        /*
+                         * We always use the unisolated view of the lexicon
+                         * indices for mutation and the lexicon indices do NOT
+                         * set the [isolatable] flag even if the kb supports
+                         * full tx isolation. This is because we use an
+                         * eventually consistent strategy to write on the
+                         * lexicon indices.
+                         */
+                        term2id = AbstractRelation
+                                .getIndex(getIndexManager(),
+                                        getFQN(LexiconKeyOrder.TERM2ID),
+                                        ITx.UNISOLATED);
+                    } else {
+                        term2id = super.getIndex(LexiconKeyOrder.TERM2ID);
+                    }
 
                     if (term2id == null)
                         throw new IllegalStateException();
@@ -753,7 +771,24 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 
                 if (id2term == null) {
 
-                    id2term = super.getIndex(LexiconKeyOrder.ID2TERM);
+                    final long timestamp = getTimestamp();
+                    
+                    if (TimestampUtility.isReadWriteTx(timestamp)) {
+                        /*
+                         * We always use the unisolated view of the lexicon
+                         * indices for mutation and the lexicon indices do NOT
+                         * set the [isolatable] flag even if the kb supports
+                         * full tx isolation. This is because we use an
+                         * eventually consistent strategy to write on the
+                         * lexicon indices.
+                         */
+                        id2term = AbstractRelation
+                                .getIndex(getIndexManager(),
+                                        getFQN(LexiconKeyOrder.ID2TERM),
+                                        ITx.UNISOLATED);
+                    } else {
+                        id2term = super.getIndex(LexiconKeyOrder.ID2TERM);
+                    }
                 
                     if (id2term == null)
                         throw new IllegalStateException();
@@ -1075,7 +1110,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         if (buri.getIV() == null) {
             
             // will set tid on buri as a side effect
-            TermId tid = getTermId(buri);
+            final TermId<?> tid = getTermId(buri);
         
             if (tid == null) {
             

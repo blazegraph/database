@@ -84,7 +84,9 @@ public class TestBigdataSailWithSids extends AbstractBigdataSailTestCase {
         suite.addTestSuite(TestDescribe.class);
         
         suite.addTestSuite(TestInlineValues.class);
-        
+       
+        suite.addTestSuite(TestTxCreate.class);
+
         return suite;
         
     }
