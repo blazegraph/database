@@ -78,15 +78,22 @@ public interface QueryHints {
 
 	/**
 	 * A label which may be used to tag the instances of some SPARQL query
-	 * template in manner which makes sense to the application. The tag is used
-	 * to aggregate performance statistics for tagged queries.
+	 * template in manner which makes sense to the application (default
+	 * {@value #DEFAULT_TAG}). The tag is used to aggregate performance
+	 * statistics for tagged queries.
 	 * 
 	 * <pre>
 	 * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sail.QueryHints.tag=Query12&gt;
 	 * </pre>
 	 * 
-	 * @see http://sourceforge.net/apps/trac/bigdata/ticket/207
+	 * @see http://sourceforge.net/apps/trac/bigdata/ticket/207 (Report on Top-N queries)
+	 * @see http://sourceforge.net/apps/trac/bigdata/ticket/256 (Amortize RTO cost)
 	 */
     String TAG = QueryHints.class.getName() + ".tag";
+
+    /**
+     * @see #TAG
+     */
+    String DEFAULT_TAG = "N/A";
 
 }

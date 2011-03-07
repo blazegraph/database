@@ -64,13 +64,11 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
-import org.openrdf.query.TupleQuery;
 import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.query.parser.QueryParser;
 import org.openrdf.query.parser.sparql.SPARQLParserFactory;
 import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
 import org.openrdf.repository.RepositoryException;
-import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailException;
 
@@ -83,7 +81,9 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IAtomicStore;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
@@ -97,6 +97,7 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sail.bench.NanoSparqlClient.QueryType;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.AbstractResource;
@@ -118,16 +119,26 @@ import com.bigdata.util.httpd.NanoHTTPD;
  * @todo Allow configuration options for the sparql endpoint either as URI
  *       parameters, in the property file, as request headers, or as query hints
  *       using the PREFIX mechanism.
-
- * @todo Allow timestamp for server reads as protocol parameter (URL query
- *       parameter or header).
  * 
  * @todo Add an "?explain" URL query parameter and show the execution plan and
  *       costs (or make this a navigable option from the set of running queries
  *       to drill into their running costs and offer an opportunity to kill them
  *       as well).
  * 
- * @todo Add command to kill a running query.
+ * @todo Add command to kill a running query, e.g., from the view of the long
+ *       running queries.
+ * 
+ * @todo Report other performance counters using {@link CounterSetHTTPD}
+ * 
+ * @todo Simple update protocol.
+ * 
+ * @todo Remote command to bulk load data from a remote or local resource (it's
+ *       pretty much up to people handling deployment to secure access to
+ *       queries, update requests, and bulk load requests).
+ * 
+ * @todo Remote command to advance the read-behind point. This will let people
+ *       bulk load a bunch of stuff before advancing queries to read from the
+ *       new consistent commit point.
  */
 public class NanoSparqlServer extends AbstractHTTPD {
 
@@ -151,17 +162,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 	 * The character set used for the response (not negotiated).
 	 */
     static private final String charset = "UTF-8";
-    
-//    /**
-//     * The target Sail.
-//     */
-//    private final BigdataSail sail;
-//
-//    /**
-//	 * The target repository.
-//	 */
-//	private final BigdataSailRepository repo;
-
+   
     /**
      * The configuration object.
      */
@@ -185,19 +186,40 @@ public class NanoSparqlServer extends AbstractHTTPD {
     /**
      * Metadata about running queries.
      */
-    private static class RunningQuery {
-    	/** The unique identifier for this query. */
-    	final long queryId;
-    	/** The query. */
-    	final String query;
-    	/** The timestamp when the query was accepted (ns). */
-    	final long begin;
-        public RunningQuery(long queryId, String query, long begin) {
-    		this.queryId = queryId;
-    		this.query = query;
-    		this.begin = begin;
-    	}
-    }
+	private static class RunningQuery {
+
+		/**
+		 * The unique identifier for this query for the {@link NanoSparqlServer}.
+		 */
+		final long queryId;
+
+		/**
+		 * The unique identifier for this query for the {@link QueryEngine}.
+		 * 
+		 * @see QueryEngine#getRunningQuery(UUID)
+		 */
+		final UUID queryId2;
+
+		/** The query. */
+		final String query;
+		
+		/** The timestamp when the query was accepted (ns). */
+		final long begin;
+
+		public RunningQuery(final long queryId, final UUID queryId2,
+				final String query, final long begin) {
+
+			this.queryId = queryId;
+
+			this.queryId2 = queryId2;
+			
+			this.query = query;
+
+			this.begin = begin;
+
+		}
+
+	}
 
     /**
      * The currently executing queries (does not include queries where a client
@@ -205,12 +227,23 @@ public class NanoSparqlServer extends AbstractHTTPD {
      * {@link #queryService} is blocking).
      */
     private final ConcurrentHashMap<Long/* queryId */, RunningQuery> queries = new ConcurrentHashMap<Long, RunningQuery>();
-
+    
     /**
      * Factory for the query identifiers.
      */
-    private final AtomicLong queryIdFactory = new AtomicLong(); 
-    
+    private final AtomicLong queryIdFactory = new AtomicLong();
+
+	/**
+	 * 
+	 * @param config
+	 *            The configuration for the server.
+	 * @param indexManager
+	 *            The database instance that the server will operate against.
+	 * 
+	 * @throws IOException
+	 * @throws SailException
+	 * @throws RepositoryException
+	 */
 	public NanoSparqlServer(final Config config,
 			final IIndexManager indexManager) throws IOException,
 			SailException, RepositoryException {
@@ -277,7 +310,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 					.getValue();
 
 			try {
-				final Class cls = Class.forName(className);
+				final Class<?> cls = Class.forName(className);
 				if (AbstractTripleStore.class.isAssignableFrom(cls)) {
 					// this is a triple store (vs something else).
 					namespaces.add(namespace);
@@ -695,24 +728,37 @@ public class NanoSparqlServer extends AbstractHTTPD {
         // return the namespace.
         return uri.substring(beginIndex + 1, endIndex);
 
-	}
+    }
 
-    /**
-     * Return the timestamp which will be used to execute the query.
-     * 
-     * @todo the configured timestamp should only be used for the default
-     *       namespace (or it should be configured for each graph explicitly, or
-     *       we should bundle the (namespace,timestamp) together as a single
-     *       object).
-     * 
-     * @todo use path for the timestamp or acquire read lock when the server
-     *       starts against a specific namespace?
-     */
-    private long getTimestamp(final String uri,
-            final LinkedHashMap<String, Vector<String>> params) {
+	/**
+	 * Return the timestamp which will be used to execute the query. The uri
+	 * query parameter <code>timestamp</code> may be used to communicate the
+	 * desired commit time against which the query will be issued. If that uri
+	 * query parameter is not given then the default configured commit time will
+	 * be used. Applications may create protocols for sharing interesting commit
+	 * times as reported by {@link IAtomicStore#commit()} or by a distributed
+	 * data loader (for scale-out).
+	 * 
+	 * @todo the configured timestamp should only be used for the default
+	 *       namespace (or it should be configured for each graph explicitly, or
+	 *       we should bundle the (namespace,timestamp) together as a single
+	 *       object).
+	 */
+	private long getTimestamp(final String uri,
+			final LinkedHashMap<String, Vector<String>> params) {
 
-        return config.timestamp;
-        
+		final Vector<String> tmp = params.get("timestamp");
+
+		if (tmp == null || tmp.size() == 0 || tmp.get(0) == null) {
+
+			return config.timestamp;
+
+		}
+
+		final String val = tmp.get(0);
+
+		return Long.valueOf(val);
+
     }
 
 	/**
@@ -970,17 +1016,21 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
         final String namespace = getNamespace(uri);
 
-        final long timestamp = getTimestamp(uri, params);
-	    
-		final String queryStr = params.get("query").get(0);
+		final long timestamp = getTimestamp(uri, params);
 
-		if (queryStr == null) {
+		final String queryStr;
+		{
 
-			return new Response(HTTP_BADREQUEST, MIME_TEXT_PLAIN,
-					"Specify query using ?query=....");
+			final Vector<String> tmp = params.get("query");
+
+			if (tmp == null || tmp.isEmpty() || tmp.get(0) == null)
+				return new Response(HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+						"Specify query using ?query=....");
+
+			queryStr = tmp.get(0);
 
 		}
-
+		
 		if (log.isDebugEnabled())
 			log.debug("query: " + queryStr);
 		
@@ -1201,6 +1251,23 @@ public class NanoSparqlServer extends AbstractHTTPD {
         /** A pipe used to incrementally deliver the results to the client. */
         private final PipedOutputStream os;
 
+		/**
+		 * Sesame has an option for a base URI during query evaluation. This
+		 * provides a symbolic placeholder for that URI in case we ever provide
+		 * a hook to set it.
+		 */
+        protected final String baseURI = null;
+        
+        /**
+         * The queryId used by the {@link NanoSparqlServer}.
+         */
+        protected final Long queryId;
+        
+        /**
+         * The queryId used by the {@link QueryEngine}.
+         */
+        protected final UUID queryId2;
+        
         /**
          * 
          * @param namespace
@@ -1222,6 +1289,8 @@ public class NanoSparqlServer extends AbstractHTTPD {
             this.timestamp = timestamp;
             this.queryStr = queryStr;
             this.os = os;
+            this.queryId = Long.valueOf(queryIdFactory.incrementAndGet());
+            this.queryId2 = UUID.randomUUID();
 
         }
 
@@ -1235,16 +1304,15 @@ public class NanoSparqlServer extends AbstractHTTPD {
          * 
          * @throws Exception
          */
-        abstract protected void doQuery(SailRepositoryConnection cxn,
+        abstract protected void doQuery(BigdataSailRepositoryConnection cxn,
                 OutputStream os) throws Exception;
 
         final public Void call() throws Exception {
-            final Long queryId = Long.valueOf(queryIdFactory.incrementAndGet());
-            final SailRepositoryConnection cxn = getQueryConnection(namespace,
-                    timestamp);
-            final long begin = System.nanoTime();
+			final BigdataSailRepositoryConnection cxn = getQueryConnection(
+					namespace, timestamp);
+			final long begin = System.nanoTime();
             try {
-                queries.put(queryId, new RunningQuery(queryId.longValue(),
+                queries.put(queryId, new RunningQuery(queryId.longValue(),queryId2,
                         queryStr, begin));
                 try {
                 	doQuery(cxn, os);
@@ -1276,50 +1344,27 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
     }
 
-    /**
-     * Executes a tuple query.
-     */
+	/**
+	 * Executes a tuple query.
+	 */
 	private class TupleQueryTask extends AbstractQueryTask {
 
-        public TupleQueryTask(final String namespace, final long timestamp,
-                final String queryStr, final PipedOutputStream os) {
+		public TupleQueryTask(final String namespace, final long timestamp,
+				final String queryStr, final PipedOutputStream os) {
 
-            super(namespace, timestamp, queryStr, os);
+			super(namespace, timestamp, queryStr, os);
 
 		}
 
-        protected void doQuery(final SailRepositoryConnection cxn,
-                final OutputStream os) throws Exception {
+		protected void doQuery(final BigdataSailRepositoryConnection cxn,
+				final OutputStream os) throws Exception {
 
-            final TupleQuery query = cxn.prepareTupleQuery(
-                    QueryLanguage.SPARQL, queryStr);
-            
-            query.evaluate(new SPARQLResultsXMLWriter(new XMLWriter(os)));
-            
-        }
-        
-//		public Void call() throws Exception {
-//			final Long queryId = Long.valueOf(queryIdFactory.incrementAndGet());
-//			final SailRepositoryConnection cxn = getQueryConnection();
-//			try {
-//				final long begin = System.nanoTime();
-//				queries.put(queryId, new RunningQuery(queryId.longValue(), queryStr, begin));
-//				final TupleQuery query = cxn.prepareTupleQuery(
-//						QueryLanguage.SPARQL, queryStr);
-//				query.evaluate(new SPARQLResultsXMLWriter(new XMLWriter(os)));
-//				os.close();
-//				return null;
-//			} catch (Throwable t) {
-//				// launder and rethrow the exception.
-//				throw launderThrowable(t,os);
-//			} finally {
-//				try {
-//					cxn.close();
-//				} finally {
-//					queries.remove(queryId);
-//				}
-//			}
-//		}
+			final BigdataSailTupleQuery query = cxn.prepareTupleQuery(
+					QueryLanguage.SPARQL, queryStr, baseURI);
+			
+			query.evaluate(new SPARQLResultsXMLWriter(new XMLWriter(os)));
+
+		}
 
 	}
 
@@ -1328,43 +1373,21 @@ public class NanoSparqlServer extends AbstractHTTPD {
 	 */
 	private class GraphQueryTask extends AbstractQueryTask {
 
-        public GraphQueryTask(final String namespace, final long timestamp,
-                final String queryStr, final PipedOutputStream os) {
+		public GraphQueryTask(final String namespace, final long timestamp,
+				final String queryStr, final PipedOutputStream os) {
 
-            super(namespace,timestamp,queryStr,os);
+			super(namespace, timestamp, queryStr, os);
 
 		}
 
-//		public Void call() throws Exception {
-//			final Long queryId = Long.valueOf(queryIdFactory.incrementAndGet());
-//			final SailRepositoryConnection cxn = getQueryConnection();
-//			try {
-//				final long begin = System.nanoTime();
-//				queries.put(queryId, new RunningQuery(queryId.longValue(), queryStr, begin));
-//				final BigdataSailGraphQuery query = (BigdataSailGraphQuery) cxn
-//						.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
-//				query.evaluate(new RDFXMLWriter(os));
-//				os.close();
-//				return null;
-//			} catch (Throwable t) {
-//				throw launderThrowable(t, os);
-//			} finally {
-//				try {
-//					cxn.close();
-//				} finally {
-//					queries.remove(queryId);
-//				}
-//			}
-//		}
+		@Override
+		protected void doQuery(final BigdataSailRepositoryConnection cxn,
+				final OutputStream os) throws Exception {
 
-        @Override
-        protected void doQuery(final SailRepositoryConnection cxn,
-                final OutputStream os) throws Exception {
+			final BigdataSailGraphQuery query = cxn.prepareGraphQuery(
+					QueryLanguage.SPARQL, queryStr, baseURI);
 
-            final BigdataSailGraphQuery query = (BigdataSailGraphQuery) cxn
-                    .prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
-
-            query.evaluate(new RDFXMLWriter(os));
+           query.evaluate(new RDFXMLWriter(os));
 
         }
 
@@ -1540,6 +1563,14 @@ public class NanoSparqlServer extends AbstractHTTPD {
 	 *            <dd>Force a compacting merge of all shards on all data
 	 *            services in a bigdata federation (this option should only be
 	 *            used for benchmarking purposes).</dd>
+	 *            <dt>readLock</dt>
+	 *            <dd>The commit time against which the server will assert a
+	 *            read lock by holding open a read-only transaction against that
+	 *            commit point. When given, queries will default to read against
+	 *            this commit point. Otherwise queries will default to read
+	 *            against the most recent commit point on the database.
+	 *            Regardless, each query will be issued against a read-only
+	 *            transaction.</dt>
 	 *            </dl>
 	 *            </p>
 	 */
@@ -1550,6 +1581,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		JiniClient<?> jiniClient = null;
 		NanoSparqlServer server = null;
 		ITransactionService txs = null;
+		Long readLock = null; 
 		try {
 			/*
 			 * First, handle the [port -stop] command, where "port" is the port
@@ -1595,6 +1627,15 @@ public class NanoSparqlServer extends AbstractHTTPD {
 						if (config.queryThreadPoolSize < 0) {
 							usage(1/* status */,
 									"-nthreads must be non-negative, not: " + s);
+						}
+					} else if (arg.equals("-readLock")) {
+						final String s = args[++i];
+						readLock = Long.valueOf(s);
+						if (!TimestampUtility
+								.isCommitTime(readLock.longValue())) {
+							usage(1/* status */,
+									"Read lock must be commit time: "
+											+ readLock);
 						}
 					} else {
 						usage(1/* status */, "Unknown argument: " + arg);
@@ -1714,15 +1755,37 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			}
 
             txs = (indexManager instanceof Journal ? ((Journal) indexManager)
-                    .getTransactionManager().getTransactionService()
-                    : ((IBigdataFederation<?>) indexManager)
-                            .getTransactionService());
+					.getTransactionManager().getTransactionService()
+					: ((IBigdataFederation<?>) indexManager)
+							.getTransactionService());
 
-			config.timestamp = txs.newTx(ITx.READ_COMMITTED);
+			if (readLock != null) {
 
-			if (!config.quiet) {
+				/*
+				 * Obtain a read-only transaction which will assert a read lock
+				 * for the specified commit time. The database WILL NOT release
+				 * storage associated with the specified commit point while this
+				 * server is running. Queries will read against the specified
+				 * commit time by default, but this may be overridden on a query
+				 * by query basis.
+				 */
+				config.timestamp = txs.newTx(readLock);
 
-				System.out.println("tx: " + config.timestamp);
+				if (!config.quiet) {
+
+					System.out.println("Holding read lock: readLock="
+							+ readLock + ", tx: " + config.timestamp);
+
+				}
+
+			} else {
+
+				/*
+				 * The default for queries is to read against then most recent
+				 * commit time as of the moment when the request is accepted.
+				 */
+
+				config.timestamp = ITx.READ_COMMITTED;
 
 			}
 
@@ -1805,7 +1868,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		} catch (Throwable ex) {
 			ex.printStackTrace();
         } finally {
-            if (txs != null) {
+            if (txs != null && readLock != null) {
                 try {
                     txs.abort(config.timestamp);
                 } catch (IOException e) {

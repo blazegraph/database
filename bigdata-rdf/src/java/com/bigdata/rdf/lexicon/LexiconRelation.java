@@ -409,7 +409,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 /*
                  * Unshared for any other view of the triple store.
                  */
-            	System.err.println("Unshared: "+termCacheCapacity);//FIXME remove stderr.
                 termCache = new ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue>(//
                         termCacheCapacity, // queueCapacity
                         .75f, // loadFactor (.75 is the default)
@@ -2262,10 +2261,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         @Override
         protected ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue> newInstance(
                 NT key, Integer termCacheCapacity) {
-        	final int queueCapacity = 50000;// FIXME termCacheCapacity.intValue();
-        	System.err.println("Shared  : "+termCacheCapacity);//FIXME remove stderr.
             return new ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue>(//
-                    queueCapacity,// backing hard reference LRU queue capacity.
+                    termCacheCapacity.intValue(),// backing hard reference LRU queue capacity.
                     .75f, // loadFactor (.75 is the default)
                     16 // concurrency level (16 is the default)
             );

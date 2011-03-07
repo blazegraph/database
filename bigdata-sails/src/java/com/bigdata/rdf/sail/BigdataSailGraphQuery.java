@@ -3,7 +3,7 @@ package com.bigdata.rdf.sail;
 import info.aduna.iteration.CloseableIteration;
 import info.aduna.iteration.ConvertingIteration;
 import info.aduna.iteration.FilterIteration;
-import java.util.Arrays;
+
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -43,6 +43,7 @@ import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.repository.sail.SailGraphQuery;
 import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.sail.SailException;
+
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 
 public class BigdataSailGraphQuery extends SailGraphQuery 
@@ -64,6 +65,12 @@ public class BigdataSailGraphQuery extends SailGraphQuery
      */
     private boolean useNativeConstruct = false;
     
+    public Properties getQueryHints() {
+    	
+    	return queryHints;
+    	
+    }
+
     public BigdataSailGraphQuery(final ParsedGraphQuery tupleQuery,
             final SailRepositoryConnection con, final Properties queryHints, 
             final boolean describe) {

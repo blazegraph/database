@@ -23,10 +23,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
+import java.util.Properties;
+
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.TupleExpr;
 
 /**
+ * Extension API for bigdata queries.
+ * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  */
 public interface BigdataSailQuery {
@@ -36,5 +40,12 @@ public interface BigdataSailQuery {
      * evaluated by this query.
      */
     TupleExpr getTupleExpr() throws QueryEvaluationException;
+    
+	/**
+	 * Return query hints associated with this query. Query hints are embedded
+	 * in query strings as namespaces. See {@link QueryHints#NAMESPACE} for more
+	 * information.
+	 */
+    Properties getQueryHints(); 
     
 }
