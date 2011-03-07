@@ -512,6 +512,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
         
     }
 
+    @Override
     public byte[] getToKey(final IKeyBuilder keyBuilder,
             final IPredicate<ISPO> predicate) {
 
