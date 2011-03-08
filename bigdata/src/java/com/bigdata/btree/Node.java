@@ -2581,7 +2581,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * If we can resolve a hard reference to the child then we do not need
          * to look any further.
          */
-        synchronized (childRefs) {
+//        synchronized (childRefs) 
+        {
 
             /*
              * Note: we need to synchronize on here to ensure visibility for
