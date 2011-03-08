@@ -1426,7 +1426,23 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      */
     private FileChannel reopenChannel() throws IOException {
 
-        synchronized (opener) {
+		/*
+		 * Note: This is basically a double-checked locking pattern. It is
+		 * used to avoid synchronizing when the backing channel is already
+		 * open.
+		 */
+		{
+			final RandomAccessFile tmp = raf;
+			if (tmp != null) {
+				final FileChannel channel = tmp.getChannel();
+				if (channel.isOpen()) {
+					// The channel is still open.
+					return channel;
+				}
+			}
+		}
+
+		synchronized (opener) {
 
             assertOpen();
 
