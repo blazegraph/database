@@ -56,6 +56,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -80,6 +81,7 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.journal.AbstractJournal;
@@ -183,6 +185,8 @@ public class NanoSparqlServer extends AbstractHTTPD {
      */
     private final ExecutorService queryService;
 
+    private final LinkedBlockingQueue<byte[]> pipeBufferPool;
+    
     /**
      * Metadata about running queries.
      */
@@ -269,13 +273,26 @@ public class NanoSparqlServer extends AbstractHTTPD {
                     .newCachedThreadPool(new DaemonThreadFactory
                             (getClass().getName()+".queryService"));
 
-        } else {
+            // no buffer pool since the #of requests is unbounded.
+			pipeBufferPool = null;
 
-            queryService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                    config.queryThreadPoolSize, new DaemonThreadFactory
-                    (getClass().getName()+".queryService"));
+		} else {
 
-        }
+			queryService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
+					config.queryThreadPoolSize, new DaemonThreadFactory(
+							getClass().getName() + ".queryService"));
+
+			// create a buffer pool which is reused for each request.
+			pipeBufferPool = new LinkedBlockingQueue<byte[]>(
+					config.queryThreadPoolSize);
+			
+			for (int i = 0; i < config.queryThreadPoolSize; i++) {
+
+				pipeBufferPool.add(new byte[config.bufferCapacity]);
+
+			}
+
+		}
 
 	}
 
@@ -1033,7 +1050,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		
 		if (log.isDebugEnabled())
 			log.debug("query: " + queryStr);
-		
+
 		/*
 		 * Setup pipes. The [os] will be passed into the task that executes the
 		 * query. The [is] will be passed into the Response. The task is
@@ -1044,7 +1061,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		 * rather than running on in the background with a disconnected client.
 		 */
 		final PipedOutputStream os = new PipedOutputStream();
-		final InputStream is = new PipedInputStream(os,Bytes.kilobyte32*1); // note: default is 1k.
+		final InputStream is = newPipedInputStream(os);
 		final FutureTask<Void> ft = new FutureTask<Void>(getQueryTask(
                 namespace, timestamp, queryStr, os));
 		try {
@@ -1088,6 +1105,59 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 		}
 
+	}
+
+	/**
+	 * Class reuses the a pool of buffers for each pipe. This is a significant
+	 * performance win.
+	 * 
+	 * @see NanoSparqlServer#pipeBufferPool
+	 */
+	private class MyPipedInputStream extends PipedInputStream {
+		
+		MyPipedInputStream(final PipedOutputStream os) throws IOException,
+				InterruptedException {
+		
+			super(os, 1/* size */);
+			
+			// override the buffer.
+			this.buffer = pipeBufferPool.take();
+			
+		}
+
+		public void close() throws IOException {
+	
+			super.close();
+			
+			// return the buffer to the pool.
+			pipeBufferPool.add(buffer);
+			
+		}
+		
+	}
+
+	/**
+	 * Factory for the {@link PipedInputStream} which supports reuse of the
+	 * buffer instances. The buffer pool is only used when there is an upper
+	 * bound on the number of queries which will be concurrently evaluated.
+	 * 
+	 * @see Config#queryThreadPoolSize
+	 * @see Config#bufferCapacity
+	 * @see NanoSparqlServer#pipeBufferPool
+	 * 
+	 * @throws InterruptedException
+	 */
+	private PipedInputStream newPipedInputStream(final PipedOutputStream os)
+			throws IOException, InterruptedException {
+
+		if (pipeBufferPool != null) {
+
+			return new MyPipedInputStream(os);
+
+		}
+		
+		return new PipedInputStream(os, config.bufferCapacity);
+		
 	}
 
 	static private RuntimeException launderThrowable(final Throwable t,
@@ -1144,7 +1214,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
     private Callable<Void> getQueryTask(final String namespace,
             final long timestamp, final String queryStr,
             final PipedOutputStream os) throws MalformedQueryException {
-
+    	
 		/*
 		 * Parse the query so we can figure out how it will need to be executed.
 		 * 
@@ -1487,6 +1557,12 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		 * unbounded pool.
 		 */
     	public int queryThreadPoolSize = 8;
+
+		/**
+		 * The capacity of the buffers for the pipe connecting the running query
+		 * to the HTTP response.
+		 */
+		public int bufferCapacity = Bytes.kilobyte32 * 1;
     	
     	public Config() {
     	}
@@ -1571,6 +1647,11 @@ public class NanoSparqlServer extends AbstractHTTPD {
 	 *            against the most recent commit point on the database.
 	 *            Regardless, each query will be issued against a read-only
 	 *            transaction.</dt>
+	 *            <dt>bufferCapacity [#bytes]</dt>
+	 *            <dd>Specify the capacity of the buffers used to decouple the
+	 *            query evaluation from the consumption of the HTTP response by
+	 *            the clinet. The capacity may be specified in bytes or
+	 *            kilobytes, e.g., <code>5k</code>.</dd>
 	 *            </dl>
 	 *            </p>
 	 */
@@ -1628,6 +1709,20 @@ public class NanoSparqlServer extends AbstractHTTPD {
 							usage(1/* status */,
 									"-nthreads must be non-negative, not: " + s);
 						}
+					} else if (arg.equals("-bufferCapacity")) {
+						final String s = args[++i];
+						final long tmp = BytesUtil.getByteCount(s);
+						if (tmp < 1) {
+							usage(1/* status */,
+									"-bufferCapacity must be non-negative, not: "
+											+ s);
+						}
+						if (tmp > Bytes.kilobyte32 * 100) {
+							usage(1/* status */,
+									"-bufferCapacity must be less than 100kb, not: "
+											+ s);
+						}
+						config.bufferCapacity = (int) tmp;
 					} else if (arg.equals("-readLock")) {
 						final String s = args[++i];
 						readLock = Long.valueOf(s);
