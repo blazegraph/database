@@ -1422,7 +1422,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      * @param <T>
      *            The generic type of the outcome for the {@link Future}.
      */
-    static public class LockFutureTask<R extends Comparable<R>, T> extends FutureTask<T> {
+    static public class LockFutureTask<R extends Comparable<R>, T> extends FutureTaskMon<T> {
 
         /**
          * The instance of the outer class.

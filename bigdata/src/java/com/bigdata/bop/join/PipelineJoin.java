@@ -60,6 +60,7 @@ import com.bigdata.bop.ap.Predicate.HashedPredicate;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.counters.CAT;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
@@ -1411,7 +1412,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 				for (AccessPathTask task : tasks) {
 
-					final FutureTask<Void> ft = new FutureTask<Void>(task);
+					final FutureTask<Void> ft = new FutureTaskMon<Void>(task);
 
 					futureTasks.add(ft);
 

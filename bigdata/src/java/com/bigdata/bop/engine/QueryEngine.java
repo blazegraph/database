@@ -58,6 +58,7 @@ import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.view.FusedView;
+import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
@@ -614,7 +615,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     public void init() {
 
-        final FutureTask<Void> ft = new FutureTask<Void>(new QueryEngineTask(
+        final FutureTask<Void> ft = new FutureTaskMon<Void>(new QueryEngineTask(
                 priorityQueue), (Void) null);
 
         if (engineFuture.compareAndSet(null/* expect */, ft)) {
