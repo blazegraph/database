@@ -50,6 +50,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NoSuchBOpException;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.fed.FederatedRunningQuery;
+import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.relation.accesspath.BufferClosedException;
@@ -593,7 +594,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
      * responsible for communicating the changes in the query's running state
      * back to the {@link RunState} object on the query controller.
      */
-    private class ChunkFutureTask extends FutureTask<Void> {
+    private class ChunkFutureTask extends FutureTaskMon<Void> {
 
         private final ChunkTask t;
 

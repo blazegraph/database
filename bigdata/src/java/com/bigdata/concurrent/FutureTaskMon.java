@@ -42,6 +42,7 @@ public class FutureTaskMon<T> extends FutureTask<T> {
 	static private final transient Logger log = Logger
 	.getLogger(FutureTaskMon.class);
 
+	private volatile boolean didStart = false;
 	
 	public FutureTaskMon(Callable<T> callable) {
 		super(callable);
@@ -50,17 +51,41 @@ public class FutureTaskMon<T> extends FutureTask<T> {
 	public FutureTaskMon(Runnable runnable, T result) {
 		super(runnable, result);
 	}
+
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * Hooked to notice when the task has been started.
+	 */
+	@Override
+	public void run() {
+		didStart = true;
+		super.run();
+	}
 	
-	public boolean cancel(boolean mayInterruptIfRunning) {
-		if (mayInterruptIfRunning && log.isDebugEnabled()) {
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * Overridden to conditionally log @ DEBUG if the caller caused the task to
+	 * be interrupted. This can be used to search for sources of interrupts.
+	 */
+	@Override
+	public boolean cancel(final boolean mayInterruptIfRunning) {
+
+		final boolean didStart = this.didStart;
+		
+		final boolean ret = super.cancel(mayInterruptIfRunning);
+
+		if (didStart && mayInterruptIfRunning && ret && log.isDebugEnabled()) {
 			try {
 				throw new RuntimeException("cancel call trace");
 			} catch (RuntimeException re) {
 				log.debug("May interrupt running task", re);
 			}
 		}
-		
-		return super.cancel(mayInterruptIfRunning);
+
+		return ret;
+
 	}
 
 }

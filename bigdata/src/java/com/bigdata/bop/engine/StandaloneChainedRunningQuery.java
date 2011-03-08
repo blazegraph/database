@@ -44,6 +44,7 @@ import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NoSuchBOpException;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -345,7 +346,7 @@ public class StandaloneChainedRunningQuery extends AbstractRunningQuery {
         final OperatorTask opTask = new OperatorTask(bopId, src);
 
         // Wrap task with error handling and handshaking logic.
-        final FutureTask<Void> ft = new FutureTask<Void>(
+        final FutureTask<Void> ft = new FutureTaskMon<Void>(
                 new OperatorTaskWrapper(opTask), null/* result */);
 
         if (operatorFutures.putIfAbsent(bopId, ft) != null) {

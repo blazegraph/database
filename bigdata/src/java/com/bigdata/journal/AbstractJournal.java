@@ -63,6 +63,7 @@ import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerRangeValidator;
@@ -3764,7 +3765,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			// true the token is valid and this service is the quorum leader
 			final boolean isLeader = quorum.getMember().isLeader(prepareToken);
 			
-			final FutureTask<Boolean> ft = new FutureTask<Boolean>(new Runnable() {
+			final FutureTask<Boolean> ft = new FutureTaskMon<Boolean>(new Runnable() {
 
 				public void run() {
 
@@ -3842,7 +3843,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		public Future<Void> commit2Phase(final long commitTime) {
 
-			final FutureTask<Void> ft = new FutureTask<Void>(new Runnable() {
+			final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
 			    
 				public void run() {
 
@@ -3896,7 +3897,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         public Future<Void> abort2Phase(final long token) {
 
-            final FutureTask<Void> ft = new FutureTask<Void>(new Runnable() {
+            final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
                 public void run() {
 
                     getQuorum().assertQuorum(token);
@@ -4011,7 +4012,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		/** NOP. */
         public Future<Void> bounceZookeeperConnection() {
-            final FutureTask<Void> ft = new FutureTask<Void>(new Runnable() {
+            final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
                 public void run() {
                 }
             }, null);
@@ -4023,7 +4024,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * Does pipeline remove/add.
          */
         public Future<Void> moveToEndOfPipeline() {
-            final FutureTask<Void> ft = new FutureTask<Void>(new Runnable() {
+            final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
                 public void run() {
                     final QuorumActor<?, ?> actor = quorum.getActor();
                     actor.pipelineRemove();
