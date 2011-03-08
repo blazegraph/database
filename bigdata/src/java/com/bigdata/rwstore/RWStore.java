@@ -3149,14 +3149,7 @@ public class RWStore implements IStore {
 				if (tmp != null) {
 					final FileChannel channel = tmp.getChannel();
 					if (channel.isOpen()) {
-						/*
-						 * The channel is still open. If you are allowing
-						 * concurrent reads on the channel, then this could
-						 * indicate that two readers each found the channel
-						 * closed and that one was able to re-open the channel
-						 * before the other such that the channel was open again
-						 * by the time the 2nd reader got here.
-						 */
+						// The channel is still open.
 						return channel;
 					}
 				}
@@ -3167,6 +3160,14 @@ public class RWStore implements IStore {
 				if (raf != null) {
 					final FileChannel channel = raf.getChannel();
 					if (channel.isOpen()) {
+						/*
+						 * The channel is still open. If you are allowing
+						 * concurrent reads on the channel, then this could
+						 * indicate that two readers each found the channel
+						 * closed and that one was able to re-open the channel
+						 * before the other such that the channel was open again
+						 * by the time the 2nd reader got here.
+						 */
 						return channel;
 					}
 				}
