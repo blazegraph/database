@@ -27,52 +27,45 @@ package com.bigdata.rdf.internal.constraints;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSDBooleanIV;
 
 /**
- * Imposes the constraint <code>!x</code>.
+ * Base class for RDF value expression BOps.  Value expressions perform some
+ * evaluation on one or more value expressions as input and produce one
+ * value expression as output (boolean, numeric value, etc.)
  */
-public class NotBOp extends XSDBooleanIVValueExpression {
+public abstract class IVValueExpression<T extends IV> extends BOpBase 
+		implements IValueExpression<T> {
 
 	/**
 	 * 
 	 */
-	private static final long serialVersionUID = -5701967329003122236L;
+	private static final long serialVersionUID = -7068219781217676085L;
 
-    public NotBOp(final IValueExpression<? extends IV> x) {
-
-        this(new BOp[] { x }, null/*Annotations*/);
-
-    }
-
-    /**
+	/**
      * Required shallow copy constructor.
      */
-    public NotBOp(final BOp[] args, final Map<String, Object> anns) {
-    	
+    public IVValueExpression(final BOp[] args, final Map<String, Object> anns) {
         super(args, anns);
-        
-        if (args.length != 1 || args[0] == null)
-            throw new IllegalArgumentException();
-
     }
 
     /**
      * Required deep copy constructor.
      */
-    public NotBOp(final NotBOp op) {
+    public IVValueExpression(final IVValueExpression op) {
         super(op);
     }
 
-    public boolean accept(final IBindingSet bs) {
-
-    	final XSDBooleanIV iv = (XSDBooleanIV) get(0).get(bs);
-    	
-        return !iv.booleanValue();
-
+    @Override
+    public IValueExpression<T> get(final int i) {
+    	try {
+    		return (IValueExpression<T>) super.get(i);
+    	} catch (ClassCastException ex) {
+    		throw new SparqlTypeErrorException();
+    	}
     }
     
 }

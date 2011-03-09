@@ -5,6 +5,7 @@ import java.util.Arrays;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -496,7 +497,7 @@ public class OwlSameAsPropertiesExpandingIterator implements
         }
     };
 
-    private class RejectSameAsSelf extends BooleanValueExpression {
+    private class RejectSameAsSelf extends BOpBase implements BooleanValueExpression {
 
         /**
 		 * 

@@ -36,16 +36,15 @@ import com.bigdata.rdf.internal.XSDBooleanIV;
 /**
  * Compare two terms for exact equality. 
  */
-public class SameTermBOp extends ValueExpressionBOp 
-		implements IValueExpression<IV> {
+public class SameTermBOp extends XSDBooleanIVValueExpression {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
     
-    public SameTermBOp(final IValueExpression<IV> left, 
-    		final IValueExpression<IV> right) {
+    public SameTermBOp(final IValueExpression<? extends IV> left, 
+    		final IValueExpression<? extends IV> right) {
     	
         this(new BOp[] { left, right }, null);
         
@@ -81,12 +80,6 @@ public class SameTermBOp extends ValueExpressionBOp
 
 		return left.equals(right);
 		
-    }
-    
-    public IV get(final IBindingSet bs) {
-    	
-    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
-    	
     }
     
 }

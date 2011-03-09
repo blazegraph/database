@@ -47,7 +47,8 @@ import com.bigdata.rdf.spo.InGraphHashSetFilter;
  *          {@link InGraphHashSetFilter} and also with the use of an in-memory
  *          join against the incoming binding sets to handle SPARQL data sets.
  */
-abstract public class INConstraint<T> extends BooleanValueExpression {
+abstract public class INConstraint<T> extends BOpBase 
+		implements BooleanValueExpression {
 
     /**
 	 * 

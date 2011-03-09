@@ -792,19 +792,19 @@ public class TestInlineConstraints extends ProxyTestCase {
     
     public void testAnd() {
     	
-    	final IValueExpression<IV> T = new ValueExpressionBOp(new BOp[] { }, null/*anns*/) {
+    	final IValueExpression<IV> T = new IVValueExpression(new BOp[] { }, null/*anns*/) {
 			public IV get(IBindingSet bindingSet) {
 				return XSDBooleanIV.TRUE;
 			}
 		};
     	
-    	final IValueExpression<IV> F = new ValueExpressionBOp(new BOp[] { }, null/*anns*/) {
+    	final IValueExpression<IV> F = new IVValueExpression(new BOp[] { }, null/*anns*/) {
 			public IV get(IBindingSet bindingSet) {
 				return XSDBooleanIV.FALSE;
 			}
 		};
     	
-    	final IValueExpression<IV> E = new ValueExpressionBOp(new BOp[] { }, null/*anns*/) {
+    	final IValueExpression<IV> E = new IVValueExpression(new BOp[] { }, null/*anns*/) {
 			public IV get(IBindingSet bindingSet) {
 				throw new SparqlTypeErrorException();
 			}
@@ -871,19 +871,19 @@ public class TestInlineConstraints extends ProxyTestCase {
     
     public void testOr() {
     	
-    	final IValueExpression<IV> T = new ValueExpressionBOp(new BOp[] { }, null/*anns*/) {
+    	final IValueExpression<IV> T = new IVValueExpression(new BOp[] { }, null/*anns*/) {
 			public IV get(IBindingSet bindingSet) {
 				return XSDBooleanIV.TRUE;
 			}
 		};
     	
-    	final IValueExpression<IV> F = new ValueExpressionBOp(new BOp[] { }, null/*anns*/) {
+    	final IValueExpression<IV> F = new IVValueExpression(new BOp[] { }, null/*anns*/) {
 			public IV get(IBindingSet bindingSet) {
 				return XSDBooleanIV.FALSE;
 			}
 		};
     	
-    	final IValueExpression<IV> E = new ValueExpressionBOp(new BOp[] { }, null/*anns*/) {
+    	final IValueExpression<IV> E = new IVValueExpression(new BOp[] { }, null/*anns*/) {
 			public IV get(IBindingSet bindingSet) {
 				throw new SparqlTypeErrorException();
 			}

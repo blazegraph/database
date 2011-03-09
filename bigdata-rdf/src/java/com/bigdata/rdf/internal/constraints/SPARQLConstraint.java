@@ -34,6 +34,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.XSDBooleanIV;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -52,7 +53,7 @@ public class SPARQLConstraint extends com.bigdata.bop.constraint.Constraint {
 	/**
 	 * Convenience method to generate a constraint from a value expression.
 	 */
-	public static IConstraint wrap(final IValueExpression<IV> ve) {
+	public static IConstraint wrap(final IValueExpression<? extends IV> ve) {
 		if (ve instanceof EBVBOp)
 			return new SPARQLConstraint((EBVBOp) ve);
 		else
@@ -86,7 +87,7 @@ public class SPARQLConstraint extends com.bigdata.bop.constraint.Constraint {
     	return (EBVBOp) super.get(i);
     }
     
-	public IValueExpression<IV> getValueExpression() {
+	public IValueExpression<XSDBooleanIV> getValueExpression() {
 		return get(0).get(0);
 	}
     	

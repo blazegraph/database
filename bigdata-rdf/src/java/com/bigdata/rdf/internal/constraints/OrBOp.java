@@ -36,15 +36,15 @@ import com.bigdata.rdf.internal.XSDBooleanIV;
 /**
  * Imposes the constraint <code>x OR y</code>.
  */
-public class OrBOp extends ValueExpressionBOp 
-		implements IValueExpression<IV> {
+public class OrBOp extends XSDBooleanIVValueExpression {
 	
     /**
 	 * 
 	 */
 	private static final long serialVersionUID = 610253427197564102L;
 
-	public OrBOp(final IValueExpression<IV> x, final IValueExpression<IV> y) {
+	public OrBOp(final IValueExpression<? extends IV> x, 
+			final IValueExpression<? extends IV> y) {
 
         this(new BOp[] { x, y }, null/*annocations*/);
 
@@ -79,13 +79,13 @@ public class OrBOp extends ValueExpressionBOp
     	XSDBooleanIV left, right;
     	
     	try {
-    		left = (XSDBooleanIV) get(0).get(bs);
+    		left = get(0).get(bs);
     	} catch (SparqlTypeErrorException ex) {
     		left = null;
     	}
     	
     	try {
-    		right = (XSDBooleanIV) get(1).get(bs);
+    		right = get(1).get(bs);
     	} catch (SparqlTypeErrorException ex) {
     		right = null;
     	}
@@ -103,12 +103,6 @@ public class OrBOp extends ValueExpressionBOp
     	
     	return left.booleanValue() || right.booleanValue();
 
-    }
-    
-    public XSDBooleanIV get(final IBindingSet bs) {
-    	
-    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
-    	
     }
     
 }

@@ -54,7 +54,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.OrBOp;
-import com.bigdata.rdf.internal.constraints.ValueExpressionBOp;
+import com.bigdata.rdf.internal.constraints.IVValueExpression;
 import com.bigdata.rdf.store.BD;
 
 /**
@@ -146,7 +146,7 @@ public class TestBOpUtility extends TestCase2 {
         
     }
     
-    private static class DummyVE extends ValueExpressionBOp {
+    private static class DummyVE extends IVValueExpression {
     	
     	/**
 		 * 
@@ -157,7 +157,7 @@ public class TestBOpUtility extends TestCase2 {
 			super(args, annotations);
 		}
 
-		public DummyVE(ValueExpressionBOp op) {
+		public DummyVE(IVValueExpression op) {
 			super(op);
 		}
 

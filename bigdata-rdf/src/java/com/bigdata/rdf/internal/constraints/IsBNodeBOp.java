@@ -28,7 +28,6 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
@@ -37,8 +36,7 @@ import com.bigdata.rdf.internal.XSDBooleanIV;
 /**
  * Imposes the constraint <code>isBNode(x)</code>.
  */
-public class IsBNodeBOp extends ValueExpressionBOp 
-		implements IValueExpression<IV> {
+public class IsBNodeBOp extends XSDBooleanIVValueExpression {
 
     /**
 	 * 
@@ -82,10 +80,4 @@ public class IsBNodeBOp extends ValueExpressionBOp
 
     }
     
-    public IV get(final IBindingSet bs) {
-    	
-    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
-    	
-    }
-
 }

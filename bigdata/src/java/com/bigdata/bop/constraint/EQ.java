@@ -27,6 +27,7 @@ package com.bigdata.bop.constraint;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
@@ -34,7 +35,7 @@ import com.bigdata.bop.IVariable;
 /**
  * Imposes the constraint <code>x == y</code>.
  */
-public class EQ extends BooleanValueExpression {
+public class EQ extends BOpBase implements BooleanValueExpression {
 
     /**
 	 * 

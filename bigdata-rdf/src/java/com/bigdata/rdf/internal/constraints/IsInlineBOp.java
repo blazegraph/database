@@ -39,8 +39,7 @@ import com.bigdata.rdf.internal.XSDBooleanIV;
 /**
  * Imposes the constraint <code>isInline(x)</code>.
  */
-public class IsInlineBOp extends ValueExpressionBOp 
-		implements IValueExpression<IV> {
+public class IsInlineBOp extends XSDBooleanIVValueExpression {
 
     /**
 	 * 
@@ -100,10 +99,4 @@ public class IsInlineBOp extends ValueExpressionBOp
 
     }
     
-    public IV get(final IBindingSet bs) {
-    	
-    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
-    	
-    }
-
 }

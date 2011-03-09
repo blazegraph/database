@@ -43,8 +43,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 /**
  * Imposes the constraint <code>isURI(x)</code>.
  */
-public class StrBOp extends ValueExpressionBOp 
-		implements IValueExpression<IV> {
+public class StrBOp extends IVValueExpression<IV> {
 
     /**
 	 * 

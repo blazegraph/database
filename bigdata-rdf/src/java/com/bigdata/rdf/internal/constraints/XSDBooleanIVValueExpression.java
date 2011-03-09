@@ -27,17 +27,16 @@ package com.bigdata.rdf.internal.constraints;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
-import com.bigdata.bop.IValueExpression;
-import com.bigdata.rdf.internal.IV;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.internal.XSDBooleanIV;
 
 /**
  * Base class for RDF value expression BOps.  Value expressions perform some
  * evaluation on one or more value expressions as input and produce one
  * value expression as output (boolean, numeric value, etc.)
  */
-public abstract class ValueExpressionBOp extends BOpBase 
-		implements IValueExpression<IV> {
+public abstract class XSDBooleanIVValueExpression 
+		extends IVValueExpression<XSDBooleanIV> {
 
 	/**
 	 * 
@@ -47,20 +46,23 @@ public abstract class ValueExpressionBOp extends BOpBase
 	/**
      * Required shallow copy constructor.
      */
-    public ValueExpressionBOp(final BOp[] args, final Map<String, Object> anns) {
+    public XSDBooleanIVValueExpression(final BOp[] args, final Map<String, Object> anns) {
         super(args, anns);
     }
 
     /**
      * Required deep copy constructor.
      */
-    public ValueExpressionBOp(final ValueExpressionBOp op) {
+    public XSDBooleanIVValueExpression(final XSDBooleanIVValueExpression op) {
         super(op);
     }
 
-    @Override
-    public IValueExpression<IV> get(final int i) {
-    	return (IValueExpression<IV>) super.get(i);
+    public boolean accept(final IBindingSet bs) {
+    	return false;
     }
     
+    public XSDBooleanIV get(final IBindingSet bs) {
+    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
+    }
+
 }
