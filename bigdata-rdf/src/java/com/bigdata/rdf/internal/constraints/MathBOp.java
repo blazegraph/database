@@ -39,8 +39,7 @@ import com.bigdata.rdf.internal.IVUtility;
  * operation to be applied to the operands is specified by the
  * {@link Annotations#OP} annotation.
  */
-final public class MathBOp extends ValueExpressionBOp 
-		implements IValueExpression<IV> {
+final public class MathBOp extends IVValueExpression<IV> { 
 
     /**
 	 * 
@@ -89,8 +88,8 @@ final public class MathBOp extends ValueExpressionBOp
      *            The annotation specifying the operation to be performed on
      *            those operands.
      */
-    public MathBOp(final IValueExpression<IV> left, 
-    		final IValueExpression<IV> right, final MathOp op) {
+    public MathBOp(final IValueExpression<? extends IV> left, 
+    		final IValueExpression<? extends IV> right, final MathOp op) {
 
         this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op)));
 

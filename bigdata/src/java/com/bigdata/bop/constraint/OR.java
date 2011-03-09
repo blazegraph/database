@@ -27,12 +27,13 @@ package com.bigdata.bop.constraint;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 
 /**
  * Imposes the constraint <code>x OR y</code>.
  */
-public class OR extends BooleanValueExpression {
+public class OR extends BOpBase implements BooleanValueExpression {
 
     /**
 	 * 

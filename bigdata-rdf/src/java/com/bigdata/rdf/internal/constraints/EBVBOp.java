@@ -37,14 +37,14 @@ import com.bigdata.rdf.internal.XSDBooleanIV;
  * Calculates the "effective boolean value" of an IValueExpression.  See the
  * SPARQL spec for details.
  */
-public class EBVBOp extends ValueExpressionBOp {
+public class EBVBOp extends XSDBooleanIVValueExpression {
 
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = -5701967329003122236L;
 
-    public EBVBOp(final IValueExpression<IV> x) {
+    public EBVBOp(final IValueExpression<? extends IV> x) {
 
         this(new BOp[] { x }, null/*Annotations*/);
 
@@ -112,18 +112,6 @@ public class EBVBOp extends ValueExpressionBOp {
     	
         throw new SparqlTypeErrorException();
 
-    }
-    
-    /**
-     * We know we can strengthen the return type on this one since its whole
-     * purpose is to evaluate the effective boolean value of a wrapped
-     * expression.
-     */
-//    @Override
-    public XSDBooleanIV get(final IBindingSet bs) {
-    	
-    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
-    	
     }
     
 }

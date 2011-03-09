@@ -28,6 +28,7 @@ import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.And;
 import org.openrdf.query.algebra.Bound;
 import org.openrdf.query.algebra.Compare;
+import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Group;
 import org.openrdf.query.algebra.IsBNode;
@@ -49,14 +50,13 @@ import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.Regex;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
 import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
-import org.openrdf.query.algebra.Compare.CompareOp;
-import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
@@ -68,12 +68,12 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -92,21 +92,22 @@ import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.IsLiteralBOp;
 import com.bigdata.rdf.internal.constraints.IsURIBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
-import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
+import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.sop.SOp;
 import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree;
+import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
 import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
-import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
@@ -1675,7 +1676,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
      */
     private IConstraint toConstraint(final ValueExpr ve) {
 
-    	final IValueExpression<IV> veBOp = toVE(ve);
+    	final IValueExpression<? extends IV> veBOp = toVE(ve);
     	return SPARQLConstraint.wrap(veBOp);
     	
     }
@@ -1686,7 +1687,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
      * value constants, and math expressions. Is there anything else we need
      * to handle?
      */
-    private IValueExpression<IV> toVE(final ValueExpr ve) 
+    private IValueExpression<? extends IV> toVE(final ValueExpr ve) 
     		throws UnsupportedOperatorException {
     	
     	if (ve instanceof Var) {
@@ -1720,8 +1721,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         throw new UnsupportedOperatorException(ve);
     }
 
-    private IValueExpression<IV> toVE(Or or) {
-    	IValueExpression<IV> left = null, right = null;
+    private IValueExpression<? extends IV> toVE(Or or) {
+    	IValueExpression<? extends IV> left = null, right = null;
         UnrecognizedValueException uve = null;
     	try {
             left = toVE(or.getLeftArg());
@@ -1754,65 +1755,65 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	}
     }
 
-    private IValueExpression<IV> toVE(And and) {
-        IValueExpression<IV> left = toVE(and.getLeftArg());
+    private IValueExpression<? extends IV> toVE(And and) {
+    	IValueExpression<? extends IV> left = toVE(and.getLeftArg());
         if (left instanceof IVariableOrConstant)
         	left = new EBVBOp(left);
-        IValueExpression<IV> right = toVE(and.getRightArg());
+        IValueExpression<? extends IV> right = toVE(and.getRightArg());
         if (right instanceof IVariableOrConstant)
         	right = new EBVBOp(right);
         return new AndBOp(left, right);
     }
 
-    private IValueExpression<IV> toVE(Not not) {
-        IValueExpression<IV> ve = toVE(not.getArg());
+    private IValueExpression<? extends IV> toVE(Not not) {
+    	IValueExpression<? extends IV> ve = toVE(not.getArg());
         if (ve instanceof IVariableOrConstant)
         	ve = new EBVBOp(ve);
     	return new NotBOp(ve);
     }
 
-    private IValueExpression<IV> toVE(SameTerm sameTerm) {
-    	final IValueExpression<IV> iv1 = 
+    private IValueExpression<? extends IV> toVE(SameTerm sameTerm) {
+    	final IValueExpression<? extends IV> iv1 = 
     		toVE(sameTerm.getLeftArg());
-    	final IValueExpression<IV> iv2 = 
+    	final IValueExpression<? extends IV> iv2 = 
     		toVE(sameTerm.getRightArg());
         return new SameTermBOp(iv1, iv2);
     }
 
-    private IValueExpression<IV> toVE(final Compare compare) {
+    private IValueExpression<? extends IV> toVE(final Compare compare) {
     	if (!database.isInlineLiterals()) {
     		throw new UnsupportedOperatorException(compare);
     	}
-    	final IValueExpression<IV> iv1 = 
+    	final IValueExpression<? extends IV> iv1 = 
     		toVE(compare.getLeftArg());
-    	final IValueExpression<IV> iv2 = 
+    	final IValueExpression<? extends IV> iv2 = 
     		toVE(compare.getRightArg());
         return new CompareBOp(iv1, iv2, compare.getOperator());
     }
 
-    private IValueExpression<IV> toVE(final Bound bound) {
+    private IValueExpression<? extends IV> toVE(final Bound bound) {
     	final IVariable<IV> var = 
     		com.bigdata.bop.Var.var(bound.getArg().getName());
     	return new IsBoundBOp(var);
     }
 
-    private IValueExpression<IV> toVE(final IsLiteral isLiteral) {
+    private IValueExpression<? extends IV> toVE(final IsLiteral isLiteral) {
     	final IVariable<IV> var = (IVariable<IV>) toVE(isLiteral.getArg());
     	return new IsLiteralBOp(var);
     }
 
-    private IValueExpression<IV> toVE(final IsBNode isBNode) {
+    private IValueExpression<? extends IV> toVE(final IsBNode isBNode) {
     	final IVariable<IV> var = (IVariable<IV>) toVE(isBNode.getArg());
     	return new IsBNodeBOp(var);
     }
 
-    private IValueExpression<IV> toVE(final IsResource isResource) {
+    private IValueExpression<? extends IV> toVE(final IsResource isResource) {
     	final IVariable<IV> var = (IVariable<IV>) toVE(isResource.getArg());
     	// isResource == isURI || isBNode == !isLiteral
     	return new NotBOp(new IsLiteralBOp(var));
     }
 
-    private IValueExpression<IV> toVE(final IsURI isURI) {
+    private IValueExpression<? extends IV> toVE(final IsURI isURI) {
     	final IVariable<IV> var = (IVariable<IV>) toVE(isURI.getArg());
     	return new IsURIBOp(var);
     }
@@ -1874,8 +1875,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	final ValueExpr left = mathExpr.getLeftArg();
     	final ValueExpr right = mathExpr.getRightArg();
     	final MathOp op = MathOp.valueOf(mathExpr.getOperator());
-    	final IValueExpression<IV> iv1 = toVE(left);
-    	final IValueExpression<IV> iv2 = toVE(right);
+    	final IValueExpression<? extends IV> iv1 = toVE(left);
+    	final IValueExpression<? extends IV> iv2 = toVE(right);
         return new MathBOp(iv1, iv2, op);
     }
     

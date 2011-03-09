@@ -37,6 +37,7 @@ import java.util.Set;
 import junit.framework.TestCase2;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -241,7 +242,8 @@ public class TestPartitionedJoinGroup_canJoinUsingConstraints extends TestCase2 
      * used to test the logic which decides when two predicates can join based
      * on variable(s) shared via a constraint.
      */
-    static private final class MyCompareOp extends BooleanValueExpression {
+    static private final class MyCompareOp extends BOpBase 
+    		implements BooleanValueExpression {
 
         private static final long serialVersionUID = 1L;
 
@@ -273,7 +275,8 @@ public class TestPartitionedJoinGroup_canJoinUsingConstraints extends TestCase2 
      * used to test the logic which decides when two predicates can join based
      * on variable(s) shared via a constraint.
      */
-    static private final class NEConstant extends BooleanValueExpression {
+    static private final class NEConstant extends BOpBase 
+    		implements BooleanValueExpression {
 
         private static final long serialVersionUID = 1L;
 

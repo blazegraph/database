@@ -24,41 +24,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop.constraint;
 
-import java.util.Map;
-
-import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 
 /**
- * Base class for boolean value expression BOps.  Value expressions perform some
+ * Interface for boolean value expression BOps.  Value expressions perform some
  * evaluation on one or more value expressions as input and produce one
  * boolean as output.
  */
-public abstract class BooleanValueExpression extends BOpBase 
-		implements IValueExpression<Boolean> {
+public interface BooleanValueExpression extends IValueExpression<Boolean> {
 
-	/**
-	 * 
-	 */
-	private static final long serialVersionUID = 1140290634566864478L;
-
-	/**
-     * Required shallow copy constructor.
-     */
-    public BooleanValueExpression(final BOp[] args, 
-    		final Map<String, Object> anns) {
-        super(args, anns);
-    }
-
-    /**
-     * Required deep copy constructor.
-     */
-    public BooleanValueExpression(final BooleanValueExpression op) {
-        super(op);
-    }
-
-    public abstract Boolean get(final IBindingSet bs);
+    Boolean get(final IBindingSet bs);
     
 }

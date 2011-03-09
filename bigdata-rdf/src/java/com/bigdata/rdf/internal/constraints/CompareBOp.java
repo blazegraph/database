@@ -44,8 +44,7 @@ import com.bigdata.rdf.internal.XSDBooleanIV;
  * 
  * @see IVUtility#numericalCompare(IV, IV) 
  */
-public class CompareBOp extends ValueExpressionBOp 
-		implements IValueExpression<IV> {
+public class CompareBOp extends XSDBooleanIVValueExpression {
 
 	/**
 	 * 
@@ -64,8 +63,8 @@ public class CompareBOp extends ValueExpressionBOp
 
     }
 
-    public CompareBOp(final IValueExpression<IV> left, 
-    		final IValueExpression<IV> right, final CompareOp op) {
+    public CompareBOp(final IValueExpression<? extends IV> left, 
+    		final IValueExpression<? extends IV> right, final CompareOp op) {
     	
         this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op)));
         
@@ -166,35 +165,4 @@ public class CompareBOp extends ValueExpressionBOp
     	
     }
 
-    public IV get(final IBindingSet bs) {
-    	
-    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
-    	
-    }
-
-    public static class NotNumericalException extends RuntimeException {
-
-		/**
-		 * 
-		 */
-		private static final long serialVersionUID = -8853739187628588335L;
-
-		public NotNumericalException() {
-			super();
-		}
-
-		public NotNumericalException(String s, Throwable t) {
-			super(s, t);
-		}
-
-		public NotNumericalException(String s) {
-			super(s);
-		}
-
-		public NotNumericalException(Throwable t) {
-			super(t);
-		}
-    	
-    }
-    
 }

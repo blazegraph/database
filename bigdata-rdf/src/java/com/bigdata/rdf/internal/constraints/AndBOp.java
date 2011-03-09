@@ -36,15 +36,15 @@ import com.bigdata.rdf.internal.XSDBooleanIV;
 /**
  * Imposes the constraint <code>x AND y</code>.
  */
-public class AndBOp extends ValueExpressionBOp 
-		implements IValueExpression<IV> {
+public class AndBOp extends XSDBooleanIVValueExpression { 
 
     /**
 	 * 
 	 */
 	private static final long serialVersionUID = -1217715173822304819L;
 
-	public AndBOp(final IValueExpression<IV> x, final IValueExpression<IV> y) {
+	public AndBOp(final IValueExpression<? extends IV> x, 
+			final IValueExpression<? extends IV> y) {
 
         this(new BOp[] { x, y }, null/*annocations*/);
 
@@ -79,13 +79,13 @@ public class AndBOp extends ValueExpressionBOp
     	XSDBooleanIV left, right;
     	
     	try {
-    		left = (XSDBooleanIV) get(0).get(bs);
+    		left = get(0).get(bs);
     	} catch (SparqlTypeErrorException ex) {
     		left = null;
     	}
     	
     	try {
-    		right = (XSDBooleanIV) get(1).get(bs);
+    		right = get(1).get(bs);
     	} catch (SparqlTypeErrorException ex) {
     		right = null;
     	}
@@ -105,10 +105,5 @@ public class AndBOp extends ValueExpressionBOp
 
     }
     
-    public XSDBooleanIV get(final IBindingSet bs) {
-    	
-    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
-    	
-    }
     
 }

@@ -37,8 +37,7 @@ import com.bigdata.rdf.internal.XSDBooleanIV;
 /**
  * Imposes the constraint <code>isLiteral(x)</code>.
  */
-public class IsLiteralBOp extends ValueExpressionBOp 
-		implements IValueExpression<IV> {
+public class IsLiteralBOp extends XSDBooleanIVValueExpression {
 
     /**
 	 * 
@@ -82,10 +81,4 @@ public class IsLiteralBOp extends ValueExpressionBOp
 
     }
     
-    public IV get(final IBindingSet bs) {
-    	
-    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
-    	
-    }
-
 }

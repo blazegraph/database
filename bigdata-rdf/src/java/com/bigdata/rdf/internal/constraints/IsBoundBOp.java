@@ -36,8 +36,7 @@ import com.bigdata.rdf.internal.XSDBooleanIV;
 /**
  * Imposes the constraint <code>bound(x)</code> for the variable x.
  */
-public class IsBoundBOp extends ValueExpressionBOp 
-		implements IValueExpression<IV> {
+public class IsBoundBOp extends XSDBooleanIVValueExpression {
 
 	/**
 	 * 
@@ -73,12 +72,6 @@ public class IsBoundBOp extends ValueExpressionBOp
 
         return get(0).get(s) != null;
 
-    }
-    
-    public IV get(final IBindingSet bs) {
-    	
-    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
-    	
     }
     
 }

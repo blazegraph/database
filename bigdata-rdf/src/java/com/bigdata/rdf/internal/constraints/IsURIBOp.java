@@ -37,8 +37,7 @@ import com.bigdata.rdf.internal.XSDBooleanIV;
 /**
  * Imposes the constraint <code>isURI(x)</code>.
  */
-public class IsURIBOp extends ValueExpressionBOp 
-		implements IValueExpression<IV> {
+public class IsURIBOp extends XSDBooleanIVValueExpression {
 
     /**
 	 * 
@@ -82,10 +81,4 @@ public class IsURIBOp extends ValueExpressionBOp
 
     }
     
-    public IV get(final IBindingSet bs) {
-    	
-    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
-    	
-    }
-
 }
