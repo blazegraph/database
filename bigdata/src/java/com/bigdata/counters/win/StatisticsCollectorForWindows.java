@@ -63,13 +63,14 @@ public class StatisticsCollectorForWindows extends AbstractStatisticsCollector {
 
     }
 
-    private boolean countersAdded = false;
+//    private boolean countersAdded = false;
     
-    synchronized public CounterSet getCounters() {
+    @Override
+    /*synchronized*/ public CounterSet getCounters() {
         
-        CounterSet root = super.getCounters();
+        final CounterSet root = super.getCounters();
         
-        if( ! countersAdded ) {
+//        if( ! countersAdded ) {
 
             /*
              * These are per-host counters. We attach them under the fully
@@ -77,9 +78,9 @@ public class StatisticsCollectorForWindows extends AbstractStatisticsCollector {
              */
             root.makePath(fullyQualifiedHostName).attach( typeperf.getCounters() );
          
-            countersAdded = true;
-            
-        }
+//            countersAdded = true;
+//            
+//        }
         
         return root;
         

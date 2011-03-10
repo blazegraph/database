@@ -74,8 +74,16 @@ public class TestJournalShutdown extends TestCase2 {
         }
 
         final int limit = 200;
-        
+
         final Properties properties = new Properties();
+
+        properties.setProperty(Journal.Options.COLLECT_PLATFORM_STATISTICS,
+                "false");
+
+        properties.setProperty(Journal.Options.COLLECT_QUEUE_STATISTICS,
+                "false");
+
+        properties.setProperty(Journal.Options.HTTPD_PORT, "-1"/* none */);
 
         properties.setProperty(Journal.Options.BUFFER_MODE,
                 BufferMode.Transient.toString());

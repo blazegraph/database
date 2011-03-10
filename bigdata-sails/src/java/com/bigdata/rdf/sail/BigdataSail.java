@@ -3732,10 +3732,10 @@ public class BigdataSail extends SailBase implements Sail {
          * Set the change log on the SAIL connection.  See {@link IChangeLog} 
          * and {@link IChangeRecord}.
          * 
-         * @param log
+         * @param changeLog
          *          the change log
          */
-        public void setChangeLog(final IChangeLog changeLog) {
+        synchronized public void setChangeLog(final IChangeLog changeLog) {
             
             this.changeLog = changeLog;
             
@@ -3744,6 +3744,7 @@ public class BigdataSail extends SailBase implements Sail {
                 assertBuffer.setChangeLog(changeLog);
                 
             }
+
         }
         
         private IChangeLog changeLog;

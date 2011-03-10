@@ -155,7 +155,7 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
      * The recommended default weight.
      */
     public static final double DEFAULT_WEIGHT = .2d;
-    
+
     /**
      * Ctor variant when the {@link ThreadPoolExecutor} does not have hooks for
      * an {@link AbstractTask} and therefore does not update
@@ -167,7 +167,8 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
      * @param service
      *            The service to be monitored.
      */
-    public ThreadPoolExecutorStatisticsTask(String serviceName, ThreadPoolExecutor service) {
+    public ThreadPoolExecutorStatisticsTask(final String serviceName,
+            final ThreadPoolExecutor service) {
 
         this(serviceName, service, null/* taskCounters */, DEFAULT_WEIGHT);
 
@@ -185,8 +186,8 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
      *            The per-task counters used to compute the latency data for
      *            tasks run on that service.
      */
-    public ThreadPoolExecutorStatisticsTask(String serviceName, ThreadPoolExecutor service,
-            TaskCounters taskCounters) {
+    public ThreadPoolExecutorStatisticsTask(final String serviceName,
+            final ThreadPoolExecutor service, final TaskCounters taskCounters) {
 
         this(serviceName, service, taskCounters, DEFAULT_WEIGHT);
 
@@ -206,9 +207,10 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
      *            The weight to be used by
      *            {@link #getMovingAverage(double, double, double)}
      */
-    public ThreadPoolExecutorStatisticsTask(String serviceName, ThreadPoolExecutor service,
-            TaskCounters taskCounters, double w) {
-    
+    public ThreadPoolExecutorStatisticsTask(final String serviceName,
+            final ThreadPoolExecutor service, final TaskCounters taskCounters,
+            final double w) {
+
         if (serviceName == null)
             throw new IllegalArgumentException();
 
@@ -1002,6 +1004,6 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
 
         return counterSet;
 
-}
+    }
 
 }

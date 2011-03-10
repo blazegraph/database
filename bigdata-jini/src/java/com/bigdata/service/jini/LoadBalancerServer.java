@@ -2,13 +2,9 @@ package com.bigdata.service.jini;
 
 import java.io.IOException;
 import java.io.StringWriter;
-import java.net.Inet4Address;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
-import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.Vector;
@@ -21,7 +17,7 @@ import net.jini.lookup.entry.Name;
 
 import org.apache.log4j.MDC;
 
-import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.journal.ITx;
 import com.bigdata.service.DefaultServiceFederationDelegate;
@@ -33,8 +29,8 @@ import com.bigdata.service.jini.util.DumpFederation.FormatRecord;
 import com.bigdata.service.jini.util.DumpFederation.FormatTabTable;
 import com.bigdata.util.config.NicUtil;
 import com.bigdata.util.httpd.AbstractHTTPD;
+import com.bigdata.util.httpd.HTTPGetHandler;
 import com.bigdata.util.httpd.NanoHTTPD;
-import com.bigdata.util.httpd.NanoHTTPD.Response;
 import com.sun.jini.start.LifeCycle;
 import com.sun.jini.start.ServiceDescriptor;
 import com.sun.jini.start.ServiceStarter;
@@ -166,7 +162,7 @@ public class LoadBalancerServer extends AbstractServer {
             try {
 
                 // Note: This is an RMI request!
-                final Class serviceIface = service.getServiceIface();
+                final Class<?> serviceIface = service.getServiceIface();
                 
                 // Note: This is an RMI request!
                 final String hostname = service.getHostname();
@@ -201,46 +197,6 @@ public class LoadBalancerServer extends AbstractServer {
         }
 
         /**
-         * Interface allows for implementation of different handlers for "GET".
-         * <p>
-         * Note: The implementations MUST be an inner class of a class derived
-         * from {@link NanoHTTPD} since the {@link Response} ctor requires an
-         * outer {@link NanoHTTPD} instance.
-         * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-         *         Thompson</a>
-         * @version $Id$
-         */
-        public interface HTTPGetHandler {
-
-            /**
-             * HTTP GET 
-             * 
-             * @param uri
-             *            Percent-decoded URI without parameters, for example
-             *            "/index.cgi"
-             * @param method
-             *            "GET", "POST" etc.
-             * @param parms
-             *            Parsed, percent decoded parameters from URI and, in
-             *            case of POST, data. The keys are the parameter names.
-             *            Each value is a {@link Collection} of {@link String}s
-             *            containing the bindings for the named parameter. The
-             *            order of the URL parameters is preserved.
-             * @param header
-             *            Header entries, percent decoded
-             * 
-             * @return HTTP response
-             * 
-             * @see Response
-             */
-            public Response doGet(String uri, String method, Properties header,
-                    LinkedHashMap<String, Vector<String>> parms)
-                    throws Exception;
-        
-        }
-        
-        /**
          * Hacked to recognize URL paths other than the root and dispatch to an
          * appropriate handler. Handlers include performance counters (at the
          * root path), dump of the indices in the federation (/indices), and
@@ -248,9 +204,9 @@ public class LoadBalancerServer extends AbstractServer {
          */
         @Override
         public AbstractHTTPD newHttpd(final int httpdPort,
-                final CounterSet counterSet) throws IOException {
+                final ICounterSetAccess access) throws IOException {
             
-            return new CounterSetHTTPD(httpdPort, counterSet, service) {
+            return new CounterSetHTTPD(httpdPort, access, service) {
 
                 /**
                  * Handler provides dump of index partitions for either all
@@ -264,13 +220,12 @@ public class LoadBalancerServer extends AbstractServer {
                  */
                 class IndicesHandler implements HTTPGetHandler {
 
-                    public Response doGet(String uri, String method, Properties header,
-                            LinkedHashMap<String, Vector<String>> parms)
+                    public Response doGet(final Request req)
                             throws Exception {
                         
-                        Vector<String> namespaces = parms.get("namespace");
+                        Vector<String> namespaces = req.params.get("namespace");
 
-                        Vector<String> timestamps = parms.get("timestamp");
+                        Vector<String> timestamps = req.params.get("timestamp");
 
                         // default is all indices.
                         if (namespaces == null) {
@@ -290,7 +245,7 @@ public class LoadBalancerServer extends AbstractServer {
 
                         }
                         
-                        final JiniFederation fed = (JiniFederation) ((LoadBalancerService) service)
+                        final JiniFederation<?> fed = (JiniFederation<?>) ((LoadBalancerService) getService())
                                 .getFederation();
                         
                         final StringWriter w = new StringWriter();
@@ -365,35 +320,35 @@ public class LoadBalancerServer extends AbstractServer {
                 final IndicesHandler indicesHandler = new IndicesHandler();
                 
                 @Override
-                public Response doGet(String uri, String method, Properties header,
-                        LinkedHashMap<String, Vector<String>> parms)
+                public Response doGet(final Request req)
                         throws Exception {
 
-                    if(uri.equals("/indices")) {
+                    if(req.uri.equals("/indices")) {
                         
-                        return indicesHandler.doGet(uri, method, header, parms);
-                        
-                    } else if(uri.equals("/")) {
-                    
-                        try {
-
-                            reattachDynamicCounters();
-
-                        } catch (Exception ex) {
-
-                            /*
-                             * Typically this is because the live journal has
-                             * been concurrently closed during the request.
-                             */
-
-                            log.warn("Could not re-attach dynamic counters: "
-                                    + ex, ex);
-
-                        }
+                        return indicesHandler.doGet(req);
                         
                     }
+//                    if(uri.equals("/")) {
+//                    
+//                        try {
+//
+//                            reattachDynamicCounters();
+//
+//                        } catch (Exception ex) {
+//
+//                            /*
+//                             * Typically this is because the live journal has
+//                             * been concurrently closed during the request.
+//                             */
+//
+//                            log.warn("Could not re-attach dynamic counters: "
+//                                    + ex, ex);
+//
+//                        }
+//                        
+//                    }
 
-                    return super.doGet(uri, method, header, parms);
+                    return super.doGet(req);
                     
                 }
 

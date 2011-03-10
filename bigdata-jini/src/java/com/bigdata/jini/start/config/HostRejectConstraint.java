@@ -29,6 +29,8 @@ package com.bigdata.jini.start.config;
 
 import java.net.UnknownHostException;
 
+import org.apache.log4j.Logger;
+
 /**
  * Allows any of the specified hosts.
  * 
@@ -41,6 +43,8 @@ public class HostRejectConstraint extends AbstractHostConstraint {
      * 
      */
     private static final long serialVersionUID = -638226286725616233L;
+
+    private static final transient Logger log = Logger.getLogger(HostRejectConstraint.class);
 
     public HostRejectConstraint(String host) throws UnknownHostException {
         
@@ -58,7 +62,7 @@ public class HostRejectConstraint extends AbstractHostConstraint {
 
         final boolean allow = allow(false/* accept */);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("allow=" + allow + " : " + this);
 
         return allow;

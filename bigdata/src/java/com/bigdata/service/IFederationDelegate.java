@@ -32,6 +32,8 @@ import java.io.IOException;
 import java.util.UUID;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
+import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
@@ -74,13 +76,26 @@ public interface IFederationDelegate<T> {
      * @see AbstractService#setServiceUUID(UUID)
      */
     public UUID getServiceUUID();
-    
+
     /**
      * Offers the service an opportunity to dynamically detach and re-attach
      * performance counters. This can be invoked either in response to an http
      * GET or the periodic reporting of performance counters to the
      * {@link ILoadBalancerService}. In general, implementations should limit
      * the frequency of update, e.g., to no more than once a second.
+     * 
+     * FIXME TransactionServer counters might not be properly attached.
+     * 
+     * FIXME DataServer counters might not be properly attached. See the
+     * DataService's {@link IFederationDelegate}'s setupCounters() method.
+     * 
+     * @deprecated This has been replaced by {@link ICounterSetAccess} which is
+     *             now passed into {@link CounterSetHTTPD}. That provides the
+     *             necessary indirection for periodic refresh of the performance
+     *             counters. The {@link CounterSetHTTPD} now also handles the
+     *             limitation on the update frequency for the materialized
+     *             counters. With this change none of the services should be
+     *             caching a local {@link CounterSet} object anymore.
      */
     public void reattachDynamicCounters();
 
@@ -123,14 +138,15 @@ public interface IFederationDelegate<T> {
      * 
      * @param port
      *            The port, or zero for a random port.
-     * @param counterSet
-     *            The root {@link CounterSet} that will be served up.
+     * @param access
+     *            Used to materialize the {@link CounterSet} that will be served
+     *            up.
      * 
      * @return The httpd daemon.
      * 
      * @throws IOException
      */
     public AbstractHTTPD newHttpd(final int httpdPort,
-            final CounterSet counterSet) throws IOException;
+            final ICounterSetAccess access) throws IOException;
 
 }

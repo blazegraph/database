@@ -32,7 +32,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
@@ -46,7 +45,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 
@@ -59,19 +57,14 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterSet;
-import com.bigdata.counters.IHostCounters;
-import com.bigdata.counters.IRequiredHostCounters;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.IServiceCounters;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.counters.query.QueryUtil;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TemporaryStoreFactory;
-import com.bigdata.journal.ConcurrencyManager.IConcurrencyManagerCounters;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.locator.DefaultResourceLocator;
-import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
-import com.bigdata.resources.StoreManager.IStoreManagerCounters;
-import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.service.ndx.ScaleOutIndexCounters;
@@ -81,7 +74,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ShutdownHelper;
 import com.bigdata.util.concurrent.TaskCounters;
 import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
-import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorTaskCounters;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
@@ -508,20 +500,39 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
     }
 
-    synchronized public CounterSet getCounterSet() {
+    final /*synchronized*/ public CounterSet getCounters() {
 
-        if (countersRoot == null) {
+//        if (countersRoot == null) {
 
-            countersRoot = new CounterSet();
+        final CounterSet countersRoot = new CounterSet();
+        {
 
-            if (statisticsCollector != null) {
+            final AbstractStatisticsCollector tmp = statisticsCollector;
 
-                countersRoot.attach(statisticsCollector.getCounters());
+            if (tmp != null) {
+
+                countersRoot.attach(tmp.getCounters());
 
             }
+        
+        }
 
-            serviceRoot = countersRoot.makePath(getServiceCounterPathPrefix());
+        serviceRoot = countersRoot.makePath(getServiceCounterPathPrefix());
 
+        {
+
+            final String s = httpdURL;
+            
+            if (s != null) {
+            
+                // add counter reporting that url to the load balancer.
+                serviceRoot.addCounter(IServiceCounters.LOCAL_HTTPD,
+                        new OneShotInstrument<String>(httpdURL));
+
+            }
+            
+        }
+            
             /*
              * Basic counters.
              */
@@ -530,12 +541,12 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                     serviceRoot, getServiceName(), getServiceIface(), client
                             .getProperties());
 
-        }
+//        }
 
         return countersRoot;
         
     }
-    private CounterSet countersRoot;
+//    private CounterSet countersRoot;
     private CounterSet serviceRoot;
 
     public CounterSet getHostCounterSet() {
@@ -543,14 +554,14 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         final String pathPrefix = ICounterSet.pathSeparator
                 + AbstractStatisticsCollector.fullyQualifiedHostName;
 
-        return (CounterSet) getCounterSet().getPath(pathPrefix);
+        return (CounterSet) getCounters().getPath(pathPrefix);
         
     }
     
     public CounterSet getServiceCounterSet() {
 
         // note: defines [serviceRoot] as side effect.
-        getCounterSet();
+        getCounters();
         
         return serviceRoot;
         
@@ -929,11 +940,11 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * Delegated. {@inheritDoc}
      */
     public AbstractHTTPD newHttpd(final int httpdPort,
-            final CounterSet counterSet) throws IOException {
+            final ICounterSetAccess accessor) throws IOException {
 
         assertOpen();
 
-        return client.getDelegate().newHttpd(httpdPort, counterSet);
+        return client.getDelegate().newHttpd(httpdPort, accessor);
         
     }
 
@@ -999,25 +1010,18 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     static private String ERR_NO_SERVICE_UUID = "Service UUID is not assigned yet.";
 
     static private String ERR_SERVICE_NOT_READY = "Service is not ready yet.";
-    
+
     /**
-     * This task runs once. Once {@link #getServiceUUID()} reports a
-     * non-<code>null</code> value, it will start an (optional)
-     * {@link AbstractStatisticsCollector}, an (optional) httpd service, and
-     * the (required) {@link ReportTask}.
+     * This task starts an (optional) {@link AbstractStatisticsCollector}, an
+     * (optional) httpd service, and the (required) {@link ReportTask}.
      * <p>
      * Note: The {@link ReportTask} will relay any collected performance
      * counters to the {@link ILoadBalancerService}, but it also lets the
      * {@link ILoadBalancerService} know which services exist, which is
      * important for some of its functions.
-     * <p>
      * 
-     * FIXME This should explicitly await jini registrar discovery, zookeeper
-     * client connected, and whatever other preconditions must be statisified
-     * before the service can be started.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
      */
     protected class StartDeferredTasksTask implements Runnable {
 
@@ -1026,7 +1030,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
          * class the name uses a "$" delimiter (vs a ".") between the outer and
          * the inner class names.
          */
-        final protected Logger log = Logger.getLogger(StartDeferredTasksTask.class);
+        final private Logger log = Logger.getLogger(StartDeferredTasksTask.class);
         
         /**
          * The timestamp when we started running this task.
@@ -1036,33 +1040,15 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         private StartDeferredTasksTask() {
         }
 
-        /**
-         * @throws RuntimeException
-         *             once the deferred task(s) are running to prevent
-         *             re-execution of this startup task.
-         */
         public void run() {
 
             try {
-                
-//                /*
-//                 * @todo Work on event driven startup and event drive service
-//                 * up/down more.
-//                 * 
-//                 * @todo Specify the timeout via IBigdataClient.Options.
-//                 */
-//                if (!awaitPreconditions(1000, TimeUnit.MILLISECONDS)) {
-//                    
-//                    if(log.isInfoEnabled())
-//                        log.info("Preconditions not yet satisified.");
-//                    
-//                    return;
-//                    
-//                }
+
                 startDeferredTasks();
+                
             } catch (Throwable t) {
 
-                log.warn("Problem in report task?", t);
+                log.error(t, t);
 
                 return;
                 
@@ -1071,8 +1057,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         }
 
         /**
-         * Starts performance counter collection once the service {@link UUID}
-         * is known.
+         * Starts performance counter collection.
          * 
          * @throws IOException
          *             if {@link IDataService#getServiceUUID()} throws this
@@ -1132,7 +1117,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
             startQueueStatisticsCollection();
             
             // start collecting performance counters (if enabled).
-            startPerformanceCounterCollection();
+            startPlatformStatisticsCollection();
 
 //            // notify the load balancer of this service join.
 //            notifyJoin();
@@ -1181,41 +1166,46 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                     delay, unit);
 
         }
-        
+
         /**
          * Start collecting performance counters from the OS (if enabled).
          */
-        protected void startPerformanceCounterCollection() {
+        protected void startPlatformStatisticsCollection() {
 
             final UUID serviceUUID = getServiceUUID();
 
             final Properties p = getClient().getProperties();
 
-            if (getClient().getCollectPlatformStatistics()) {
+            if (!getClient().getCollectPlatformStatistics()) {
 
-                p.setProperty(AbstractStatisticsCollector.Options.PROCESS_NAME,
-                        "service" + ICounterSet.pathSeparator
-                                + getServiceIface().getName()
-                                + ICounterSet.pathSeparator
-                                + serviceUUID.toString());
-
-                statisticsCollector = AbstractStatisticsCollector
-                        .newInstance(p);
-
-                statisticsCollector.start();
-
-                /*
-                 * Attach the counters that will be reported by the statistics
-                 * collector service.
-                 */
-                ((CounterSet) getCounterSet()).attach(statisticsCollector
-                        .getCounters());
-
-                if (log.isInfoEnabled())
-                    log.info("Collecting platform statistics: uuid="
-                            + serviceUUID);
+                return;
 
             }
+
+            p.setProperty(AbstractStatisticsCollector.Options.PROCESS_NAME,
+                    "service" + ICounterSet.pathSeparator
+                            + getServiceIface().getName()
+                            + ICounterSet.pathSeparator
+                            + serviceUUID.toString());
+
+            {
+
+                final AbstractStatisticsCollector tmp = AbstractStatisticsCollector
+                        .newInstance(p);
+
+                tmp.start();
+                
+                // Note: synchronized to keep findbugs happy.
+                synchronized (AbstractFederation.this) {
+                
+                    statisticsCollector = tmp;
+                    
+                }
+                
+            }
+
+            if (log.isInfoEnabled())
+                log.info("Collecting platform statistics: uuid=" + serviceUUID);
 
         }
 
@@ -1277,7 +1267,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
             final AbstractHTTPD httpd;
             try {
 
-                httpd = newHttpd(httpdPort, getCounterSet());
+                httpd = newHttpd(httpdPort, AbstractFederation.this);
 
             } catch (IOException e) {
 
@@ -1302,15 +1292,11 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                 if (log.isInfoEnabled())
                     log.info("start:\n" + httpdURL);
 
-                // add counter reporting that url to the load balancer.
-                serviceRoot.addCounter(IServiceCounters.LOCAL_HTTPD,
-                        new OneShotInstrument<String>(httpdURL));
-
             }
 
         }
         
-    }
+    } // class StartDeferredTasks
     
     /**
      * Periodically report performance counter data to the
@@ -1414,7 +1400,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 			final boolean reportAll = Boolean.valueOf(p.getProperty(
 					Options.REPORT_ALL, Options.DEFAULT_REPORT_ALL));
 
-			fed.getCounterSet().asXML(
+			fed.getCounters().asXML(
 					baos,
 					"UTF-8",
 					reportAll ? null/* filter */: QueryUtil

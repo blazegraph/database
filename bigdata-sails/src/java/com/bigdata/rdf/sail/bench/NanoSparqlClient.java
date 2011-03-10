@@ -54,7 +54,7 @@ import org.openrdf.query.parser.sparql.SPARQLParserFactory;
  */
 public class NanoSparqlClient {
 
-	protected static final Logger log = Logger.getLogger(NanoSparqlClient.class);
+	private static final Logger log = Logger.getLogger(NanoSparqlClient.class);
 	
 	/**
 	 * A SPARQL results set in XML.
@@ -497,7 +497,7 @@ public class NanoSparqlClient {
 				this.val = val;
 			}
 
-			public int compareTo(Pair other) {
+			public int compareTo(final Pair other) {
 				if (this == other)
 					return 0;
 				if (this.r < other.r)
@@ -533,14 +533,14 @@ public class NanoSparqlClient {
     /**
 	 * Options for the query.
 	 */
-	private static class QueryOptions {
+	public static class QueryOptions {
 
 		/** The URL of the SPARQL endpoint. */
 		public String serviceURL = null;
 		public String username = null;
 		public String password = null;
 		/** The SPARQL query. */
-		public String queryStr = null;
+		public String queryStr;
 		/** The default graph URI (optional). */
 		public String defaultGraphUri = null;
 		/** The connection timeout (ms). */
@@ -552,6 +552,30 @@ public class NanoSparqlClient {
         public boolean verbose = false;
         public boolean quiet = false;
 
+        /**
+         * The query is not specified to the constructor must be set explicitly
+         * by the caller.
+         */
+        public QueryOptions() {
+
+            this(null/*serviceURL*/,null/*queryStr*/);
+            
+        }
+
+        /**
+         * @param serviceURL
+         *            The SPARQL end point URL.
+         * @param queryStr
+         *            The SPARQL query.
+         */
+        public QueryOptions(final String serviceURL, final String queryStr) {
+
+            this.serviceURL = serviceURL;
+            
+            this.queryStr = queryStr;
+
+        }
+        
 	}
 
 	private static void usage() {

@@ -34,17 +34,17 @@ package com.bigdata.counters;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IStatisticsCollector {
+public interface IStatisticsCollector extends ICounterSetAccess {
 
     /**
      * The interval in seconds at which the counter values are sampled.
      */
     public int getInterval();
 
-    /**
-     * Return the counter hierarchy.
-     */
-    public CounterSet getCounters();
+//    /**
+//     * Return the counter hierarchy.
+//     */
+//    public CounterSet getCounters();
 
     /**
      * Start collecting performance data.

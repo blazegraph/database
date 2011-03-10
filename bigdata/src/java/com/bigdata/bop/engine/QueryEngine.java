@@ -64,7 +64,6 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.QueryHints;
-import com.bigdata.rdf.sail.bench.NanoSparqlServer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.resources.IndexManager;
@@ -1232,8 +1231,6 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 	 * 
 	 * @return The {@link AbstractRunningQuery} -or- <code>null</code> if there
 	 *         is no query associated with that query identifier.
-	 * 
-	 * @todo Exposed to {@link NanoSparqlServer}
 	 */
     public /*protected*/ AbstractRunningQuery getRunningQuery(final UUID queryId) {
 

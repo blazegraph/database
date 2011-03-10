@@ -33,6 +33,7 @@ import java.util.Properties;
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 import com.bigdata.rdf.axioms.NoAxioms;
 

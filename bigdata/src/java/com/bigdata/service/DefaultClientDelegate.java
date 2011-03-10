@@ -1,15 +1,12 @@
 package com.bigdata.service;
 
 import java.io.IOException;
-import java.util.LinkedHashMap;
-import java.util.Properties;
 import java.util.UUID;
-import java.util.Vector;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.AbstractStatisticsCollector;
-import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
@@ -23,11 +20,11 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  */
 public class DefaultClientDelegate<T> implements IFederationDelegate<T> {
 
-    protected static final Logger log = Logger.getLogger(DefaultClientDelegate.class);
+    private static final Logger log = Logger.getLogger(DefaultClientDelegate.class);
     
     private final UUID uuid = UUID.randomUUID();
 
-    private final AbstractFederation fed;
+    private final AbstractFederation<?> fed;
 
     private final T clientOrService;
 
@@ -40,7 +37,7 @@ public class DefaultClientDelegate<T> implements IFederationDelegate<T> {
      *            <code>null</code> but then {@link #getService()} will also
      *            return <code>null</code>.
      */
-    public DefaultClientDelegate(final AbstractFederation fed,
+    public DefaultClientDelegate(final AbstractFederation<?> fed,
             final T clientOrService) {
 
         if (fed == null)
@@ -73,7 +70,7 @@ public class DefaultClientDelegate<T> implements IFederationDelegate<T> {
     /**
      * Return a stable identifier for this client based on the name of the
      * implementation class, the hostname, and the hash code of the client
-     * (readable and likely to be unique, but uniqueness is not guarenteed).
+     * (readable and likely to be unique, but uniqueness is not guaranteed).
      */
     public String getServiceName() {
         
@@ -123,34 +120,35 @@ public class DefaultClientDelegate<T> implements IFederationDelegate<T> {
     }
 
     public AbstractHTTPD newHttpd(final int httpdPort,
-            final CounterSet counterSet) throws IOException {
+            final ICounterSetAccess access) throws IOException {
         
-        return new CounterSetHTTPD(httpdPort, counterSet) {
-
-            public Response doGet(String uri, String method, Properties header,
-                    LinkedHashMap<String, Vector<String>> parms)
-                    throws Exception {
-
-                try {
-
-                    reattachDynamicCounters();
-
-                } catch (Exception ex) {
-
-                    /*
-                     * Typically this is because the live journal has been
-                     * concurrently closed during the request.
-                     */
-
-                    log.warn("Could not re-attach dynamic counters: " + ex, ex);
-
-                }
-
-                return super.doGet(uri, method, header, parms);
-
-            }
-
-        };
+        return new CounterSetHTTPD(httpdPort, access);
+//        {
+//
+//            public Response doGet(String uri, String method, Properties header,
+//                    LinkedHashMap<String, Vector<String>> parms)
+//                    throws Exception {
+//
+//                try {
+//
+//                    reattachDynamicCounters();
+//
+//                } catch (Exception ex) {
+//
+//                    /*
+//                     * Typically this is because the live journal has been
+//                     * concurrently closed during the request.
+//                     */
+//
+//                    log.warn("Could not re-attach dynamic counters: " + ex, ex);
+//
+//                }
+//
+//                return super.doGet(uri, method, header, parms);
+//
+//            }
+//
+//        };
 
     }
 

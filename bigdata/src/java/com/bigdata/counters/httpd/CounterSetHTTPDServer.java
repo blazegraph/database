@@ -38,6 +38,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.PeriodEnum;
 import com.bigdata.counters.query.QueryUtil;
 import com.bigdata.counters.render.XHTMLRenderer;
@@ -106,6 +107,16 @@ public class CounterSetHTTPDServer implements Runnable {
         final PeriodEnum unit = PeriodEnum.Minutes;
         
         final CounterSet counterSet = new CounterSet();
+        
+        final ICounterSetAccess access = new ICounterSetAccess() {
+            
+            public CounterSet getCounters() {
+            
+                return counterSet;
+                
+            }
+            
+        };
         
         final DummyEventReportingService service = new DummyEventReportingService();
 
@@ -185,7 +196,7 @@ public class CounterSetHTTPDServer implements Runnable {
 
         // new server.
         final CounterSetHTTPDServer server = new CounterSetHTTPDServer(port,
-                counterSet, service);
+                access, service);
 
         // run server.
         server.run();
@@ -199,8 +210,9 @@ public class CounterSetHTTPDServer implements Runnable {
      * 
      * @param port
      */
-    public CounterSetHTTPDServer(final int port, final CounterSet counterSet,
-            final IService service) throws Exception {
+    public CounterSetHTTPDServer(final int port,
+            final ICounterSetAccess counterSet, final IService service)
+            throws Exception {
 
         /*
          * The runtime shutdown hook appears to be a robust way to handle ^C by
