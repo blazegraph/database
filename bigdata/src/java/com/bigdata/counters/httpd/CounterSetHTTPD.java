@@ -7,14 +7,12 @@ import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Properties;
-import java.util.Vector;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.query.CounterSetSelector;
 import com.bigdata.counters.query.ICounterSelector;
 import com.bigdata.counters.query.URLQueryModel;
@@ -32,18 +30,37 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  */
 public class CounterSetHTTPD extends AbstractHTTPD {
     
-	static private final Logger log = Logger.getLogger(CounterSetHTTPD.class); 
-	
+	static private final Logger log = Logger.getLogger(CounterSetHTTPD.class);
+
     /**
-     * The {@link CounterSet} exposed by this service.
+     * Access to the {@link CounterSet} exposed by this service.
      */
-    protected final CounterSet counterSet;
+    private final ICounterSetAccess accessor;
     
     /**
      * The service reference iff one one specified to the ctor (may be null).
      */
-    protected final IService service;
+    private final IService service;
 
+    /**
+     * The minimum time before a client can force the re-materialization of the
+     * {@link CounterSet}. This is designed to limit the impact of the client on
+     * the service.
+     * 
+     * TODO Configuration parameter for {@link #minUpdateLatency}
+     */
+    private final long minUpdateLatency = 5000;
+    
+    /**
+     * The last materialized {@link CounterSet}.
+     */
+    private volatile CounterSet counterSet = null;
+
+    /**
+     * The timestamp of the last materialized {@link CounterSet}.
+     */
+    private volatile long lastTimestamp = 0L;
+    
     /**
      * Class used to pre-declare classpath resources that are available for
      * download via httpd.
@@ -106,28 +123,38 @@ public class CounterSetHTTPD extends AbstractHTTPD {
      * downloaded via httpd.
      */
     private final Map<String/*uri*/,DeclaredResource> allowedClassPathResources;
-    
-    public CounterSetHTTPD(final int port, final CounterSet root) throws IOException {
 
-        this(port, root, null/*fed*/);
+    /**
+     * The service reference iff one one specified to the ctor (may be null).
+     */
+    final protected IService getService() {
+        return service;
+    }
+
+    public CounterSetHTTPD(final int port, final ICounterSetAccess accessor) throws IOException {
+
+        this(port, accessor, null/*fed*/);
         
     }
     
     /**
      * 
      * @param port
-     * @param root
+     * @param accessor
      * @param service
      *            Optional reference to the service within which this httpd is
      *            hosted.
      * @throws IOException
      */
-    public CounterSetHTTPD(final int port, final CounterSet root,
+    public CounterSetHTTPD(final int port, final ICounterSetAccess accessor,
             final IService service) throws IOException {
 
         super(port);
 
-        this.counterSet = root;
+        if(accessor == null)
+            throw new IllegalArgumentException();
+        
+        this.accessor = accessor;
         
         // Note: MAY be null.
         this.service = service;
@@ -152,14 +179,13 @@ public class CounterSetHTTPD extends AbstractHTTPD {
         
     }
 
-    public Response doGet(final String uri, final String method,
-            final Properties header,
-            final LinkedHashMap<String, Vector<String>> parms) throws Exception {
+    @Override
+    public Response doGet(final Request req) throws Exception {
         
         final ByteArrayOutputStream baos = new ByteArrayOutputStream(
                 2 * Bytes.kilobyte32);
 
-        final String charset = "UTF-8";
+        final String charset = UTF8;
         
         final InputStream is;
 
@@ -167,7 +193,7 @@ public class CounterSetHTTPD extends AbstractHTTPD {
          * If the request uri is one of the pre-declared resources then we send
          * that resource.
          */
-        final DeclaredResource decl = allowedClassPathResources.get(uri);
+        final DeclaredResource decl = allowedClassPathResources.get(req.uri);
 
         if (decl != null) {
 
@@ -176,6 +202,29 @@ public class CounterSetHTTPD extends AbstractHTTPD {
 
         }
 
+        /*
+         * Materialization the CounterSet iff necessary or stale.
+         * 
+         * Note: This bit needs to be single threaded to avoid concurrent
+         * requests causing concurrent materialization of the counter set.
+         */
+        final ICounterSelector counterSelector;
+        synchronized(this) {
+            
+            final long now = System.currentTimeMillis();
+
+            final long elapsed = now - lastTimestamp;
+
+            if (counterSet == null || elapsed > minUpdateLatency/* ms */) {
+
+                counterSet = accessor.getCounters();
+                
+            }
+
+            counterSelector = new CounterSetSelector(counterSet);
+
+        }
+        
         /*
          * Obtain a renderer.
          * 
@@ -192,11 +241,8 @@ public class CounterSetHTTPD extends AbstractHTTPD {
         {
 
             // build model of the controller state.
-            final URLQueryModel model = new URLQueryModel(service, uri, parms,
-                    header);
-
-            final ICounterSelector counterSelector = new CounterSetSelector(
-                    counterSet);
+            final URLQueryModel model = new URLQueryModel(getService(),
+                    req.uri, req.params, req.headers);
 
             renderer = RendererFactory.get(model, counterSelector, mimeType);
             

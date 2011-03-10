@@ -33,11 +33,8 @@ import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryLanguage;
-import org.openrdf.query.TupleQuery;
-import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.TupleExpr;
 
 import com.bigdata.rdf.axioms.NoAxioms;
@@ -47,6 +44,8 @@ import com.bigdata.rdf.vocab.NoVocabulary;
 /**
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
+ * 
+ * FIXME These unit tests do not verify the expected result.
  */
 public class TestDescribe extends ProxyBigdataSailTestCase {
 

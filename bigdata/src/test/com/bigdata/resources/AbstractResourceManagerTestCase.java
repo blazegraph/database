@@ -48,6 +48,7 @@ import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ConcurrencyManager;
@@ -451,7 +452,7 @@ public class AbstractResourceManagerTestCase extends
             return null;
         }
 
-        public CounterSet getCounterSet() {
+        public CounterSet getCounters() {
 
             return null;
         }
@@ -605,7 +606,8 @@ public class AbstractResourceManagerTestCase extends
             return true;
         }
 
-        public AbstractHTTPD newHttpd(int httpdPort, CounterSet counterSet) throws IOException {
+        public AbstractHTTPD newHttpd(int httpdPort, ICounterSetAccess access)
+                throws IOException {
             return null;
         }
 

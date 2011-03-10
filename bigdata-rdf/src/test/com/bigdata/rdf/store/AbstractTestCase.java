@@ -39,13 +39,16 @@ import java.util.TreeMap;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
+
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.helpers.RDFHandlerBase;
+
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
@@ -56,6 +59,7 @@ import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
@@ -182,13 +186,25 @@ abstract public class AbstractTestCase
             // disregard the inherited properties.
 //            m_properties = new Properties();
             
-//            m_properties = new Properties( m_properties );
 
-            // disable platform statistics collection.
+            // m_properties = new Properties( m_properties );
+
+            // disable statistics collection (federation)
             m_properties
                     .setProperty(
                             AbstractClient.Options.COLLECT_PLATFORM_STATISTICS,
                             "false");
+            m_properties.setProperty(
+                    AbstractClient.Options.COLLECT_QUEUE_STATISTICS, "false");
+            m_properties.setProperty(AbstractClient.Options.HTTPD_PORT, "-1");
+
+            // disable statistics collection (journal)
+            m_properties.setProperty(
+                    Journal.Options.COLLECT_PLATFORM_STATISTICS, "false");
+            m_properties.setProperty(Journal.Options.COLLECT_QUEUE_STATISTICS,
+                    "false");
+            m_properties
+                    .setProperty(Journal.Options.HTTPD_PORT, "-1"/* none */);
 
             m_properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
 //            m_properties.setProperty(Options.BUFFER_MODE,BufferMode.Transient.toString());

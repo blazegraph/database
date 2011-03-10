@@ -32,7 +32,6 @@ import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.List;
@@ -115,7 +114,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
         
     }
     
-    protected AbstractStatisticsCollector(int interval) {
+    protected AbstractStatisticsCollector(final int interval) {
     
         if (interval <= 0)
             throw new IllegalArgumentException();
@@ -168,10 +167,10 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
 //
 //    }
     
-    /**
-     * {@link CounterSet} hierarchy.
-     */
-    private CounterSet countersRoot;
+//    /**
+//     * {@link CounterSet} hierarchy.
+//     */
+//    private CounterSet countersRoot;
 
     /**
      * Return the counter hierarchy. The returned hierarchy only includes those
@@ -182,10 +181,11 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * Note: Subclasses MUST extend this method to initialize their own
      * counters.
      */
-    synchronized public CounterSet getCounters() {
+    /*synchronized*/public CounterSet getCounters() {
         
-        if (countersRoot == null) {
+//        if (countersRoot == null) {
 
+        final CounterSet 
             countersRoot = new CounterSet();
 
             // os.arch
@@ -213,7 +213,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
                     + IHostCounters.Info_ProcessorInfo,
                     new OneShotInstrument<String>(SystemUtil.cpuInfo()));
             
-        }
+//        }
         
         return countersRoot;
         
@@ -233,8 +233,9 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * @param properties
      *            The properties used to configure that service or client.
      */
-    static public void addBasicServiceOrClientCounters(CounterSet serviceRoot,
-            String serviceName, Class serviceIface, Properties properties) {
+    static public void addBasicServiceOrClientCounters(
+            final CounterSet serviceRoot, final String serviceName,
+            final Class serviceIface, final Properties properties) {
         
         // Service info.
         {
@@ -252,6 +253,18 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
             
         }
 
+        serviceRoot.attach(getMemoryCounterSet());
+        
+    }
+
+    /**
+     * Return the {@link IProcessCounters#Memory memory counter set}. This
+     * should be attached to the service root.
+     */
+    static public CounterSet getMemoryCounterSet() {
+        
+        final CounterSet serviceRoot = new CounterSet();
+        
         // Service per-process memory data
         {
 
@@ -278,18 +291,13 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
                     .addGarbageCollectorMXBeanCounters(serviceRoot
                             .makePath(ICounterHierarchy.Memory_GarbageCollectors));
 
-            // Moved since counters must be dynamically reattached to reflect pool hierarchy.
-//            /*
-//             * Add counters reporting on the various DirectBufferPools.
-//             */
-//            {
-//
-//                serviceRoot.makePath(
-//                        IProcessCounters.Memory + ICounterSet.pathSeparator
-//                                + "DirectBufferPool").attach(
-//                        DirectBufferPool.getCounters());
-//                
-//            }
+            /*
+             * Add counters reporting on the various DirectBufferPools.
+             */
+            serviceRoot.makePath(
+                    IProcessCounters.Memory + ICounterSet.pathSeparator
+                            + "DirectBufferPool").attach(
+                    DirectBufferPool.getCounters());
 
             if (LRUNexus.INSTANCE != null) {
 
@@ -306,7 +314,9 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
             }
             
         }
-                
+        
+        return serviceRoot;
+
     }
 
     /**
@@ -675,7 +685,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
             final int port = 8080;
             if (port != 0) {
                 try {
-                    httpd = new CounterSetHTTPD(port,client.countersRoot);
+                    httpd = new CounterSetHTTPD(port, client);
                 } catch (IOException e) {
                     log.warn("Could not start httpd: port=" + port+" : "+e);
                 }

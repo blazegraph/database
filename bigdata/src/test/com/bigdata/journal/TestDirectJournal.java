@@ -95,9 +95,17 @@ public class TestDirectJournal extends AbstractJournalTestCase {
 
     public Properties getProperties() {
 
-        Properties properties = super.getProperties();
+        final Properties properties = super.getProperties();
 
-        properties.setProperty(Options.DELETE_ON_EXIT,"true");
+        properties.setProperty(Journal.Options.COLLECT_PLATFORM_STATISTICS,
+                "false");
+
+        properties.setProperty(Journal.Options.COLLECT_QUEUE_STATISTICS,
+                "false");
+
+        properties.setProperty(Journal.Options.HTTPD_PORT, "-1"/* none */);
+
+        properties.setProperty(Options.DELETE_ON_EXIT, "true");
 
         properties.setProperty(Options.CREATE_TEMP_FILE,"true");
 

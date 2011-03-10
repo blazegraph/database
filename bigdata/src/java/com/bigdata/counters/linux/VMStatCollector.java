@@ -193,11 +193,11 @@ public class VMStatCollector extends AbstractProcessCollector implements
     /**
      * Declares the counters that we will collect
      */
-    synchronized public CounterSet getCounters() {
+    /*synchronized*/ public CounterSet getCounters() {
         
-        if(root == null) {
+//        if(root == null) {
         
-            root = new CounterSet();
+        final CounterSet root = new CounterSet();
             
             inst = new LinkedList<I>();
             
@@ -270,13 +270,13 @@ public class VMStatCollector extends AbstractProcessCollector implements
                 
             }
             
-        }
+//        }
         
         return root;
         
     }
     private List<I> inst = null;
-    private CounterSet root = null;
+//    private CounterSet root = null;
 
     public AbstractProcessReader getProcessReader() {
         

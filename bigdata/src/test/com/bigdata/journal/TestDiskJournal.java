@@ -98,6 +98,14 @@ public class TestDiskJournal extends AbstractJournalTestCase {
 
         final Properties properties = super.getProperties();
 
+        properties.setProperty(Journal.Options.COLLECT_PLATFORM_STATISTICS,
+                "false");
+
+        properties.setProperty(Journal.Options.COLLECT_QUEUE_STATISTICS,
+                "false");
+
+        properties.setProperty(Journal.Options.HTTPD_PORT, "-1"/* none */);
+
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
         properties.setProperty(Options.CREATE_TEMP_FILE, "true");

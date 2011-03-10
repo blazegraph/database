@@ -32,6 +32,7 @@ import junit.framework.TestCase;
 import junit.framework.TestCase2;
 
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 
 /**
@@ -134,6 +135,14 @@ abstract public class AbstractBigdataSailTestCase extends TestCase2 {
              */
             m_properties = new Properties(super.getProperties());
 
+            m_properties.setProperty(Journal.Options.COLLECT_PLATFORM_STATISTICS,
+                    "false");
+
+            m_properties.setProperty(Journal.Options.COLLECT_QUEUE_STATISTICS,
+                    "false");
+
+            m_properties.setProperty(Journal.Options.HTTPD_PORT, "-1"/* none */);
+            
             // transient means that there is nothing to delete after the test.
 //            m_properties.setProperty(Options.BUFFER_MODE,BufferMode.Transient.toString());
             m_properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());

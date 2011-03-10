@@ -25,6 +25,8 @@ package com.bigdata.journal;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
@@ -33,12 +35,17 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bfs.GlobalFileSystemHelper;
+import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ILocalBTreeView;
@@ -48,7 +55,10 @@ import com.bigdata.btree.ReadCommittedView;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.config.IntegerValidator;
 import com.bigdata.config.LongValidator;
+import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.quorum.Quorum;
@@ -57,15 +67,21 @@ import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.IndexManager;
+import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorReason;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.LoadBalancerService;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.ShutdownHelper;
+import com.bigdata.util.concurrent.TaskCounters;
+import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
+import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
  * Concrete implementation suitable for a local and unpartitioned database.
@@ -80,18 +96,6 @@ import com.bigdata.util.concurrent.ShutdownHelper;
 public class Journal extends AbstractJournal implements IConcurrencyManager,
         /*ILocalTransactionManager,*/ IResourceManager {
 
-//    /*
-//     * These fields were historically marked as [final] and set by the
-//     * constructor. With the introduction of high availability these fields can
-//     * not be final because the CREATE of the journal must be deferred until a
-//     * quorum leader has been elected.
-//     * 
-//     * The pattern for these fields is that they are assigned by create() and
-//     * are thereafter immutable. The fields are marked as [volatile] so the
-//     * state change when they are set will be visible without explicit
-//     * synchronization (many methods use volatile reads on these fields).
-//     */
-    
     /**
      * Object used to manage local transactions. 
      */
@@ -154,7 +158,57 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         String READ_POOL_SIZE = Journal.class.getName() + ".readPoolSize";
 
         String DEFAULT_READ_POOL_SIZE = "0";
+        
+        /*
+         * Performance counters options.
+         */
+        
+        /**
+         * Boolean option for the collection of statistics from the underlying
+         * operating system (default
+         * {@value #DEFAULT_COLLECT_PLATFORM_STATISTICS}).
+         * 
+         * @see AbstractStatisticsCollector#newInstance(Properties)
+         */
+        String COLLECT_PLATFORM_STATISTICS = Journal.class.getName()
+                + ".collectPlatformStatistics";
 
+        String DEFAULT_COLLECT_PLATFORM_STATISTICS = "false"; 
+
+        /**
+         * Boolean option for the collection of statistics from the various
+         * queues using to run tasks (default
+         * {@link #DEFAULT_COLLECT_QUEUE_STATISTICS}).
+         * 
+         * @see ThreadPoolExecutorStatisticsTask
+         */
+        String COLLECT_QUEUE_STATISTICS = Journal.class.getName()
+                + ".collectQueueStatistics";
+
+        String DEFAULT_COLLECT_QUEUE_STATISTICS = "false";
+
+        /**
+         * Integer option specifies the port on which an httpd service will be
+         * started that exposes the {@link CounterSet} for the client (default
+         * {@value #DEFAULT_HTTPD_PORT}). When ZERO (0), a random port will be
+         * used. The httpd service may be disabled by specifying <code>-1</code>
+         * as the port.
+         * <p>
+         * Note: The httpd service for the {@link LoadBalancerService} is
+         * normally run on a known port in order to make it easy to locate that
+         * service, e.g., port 80, 8000 or 8080, etc. This MUST be overridden for
+         * the {@link LoadBalancerService} it its configuration since
+         * {@link #DEFAULT_HTTPD_PORT} will otherwise cause a random port to be
+         * assigned.
+         */
+        String HTTPD_PORT = Journal.class.getName() + ".httpdPort";
+
+        /**
+         * The default http service port is <code>-1</code>, which means
+         * performance counter reporting is disabled by default.
+         */
+        String DEFAULT_HTTPD_PORT = "-1";
+        
     }
     
     /**
@@ -176,9 +230,25 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         tempStoreFactory = new TemporaryStoreFactory(properties);
         
-        executorService = Executors.newCachedThreadPool(new DaemonThreadFactory
-                (getClass().getName()+".executorService"));
+        executorService = (ThreadPoolExecutor) Executors
+                .newCachedThreadPool(new DaemonThreadFactory(getClass()
+                        .getName()
+                        + ".executorService"));
 
+        if (Boolean.valueOf(properties.getProperty(
+                Options.COLLECT_QUEUE_STATISTICS,
+                Options.DEFAULT_COLLECT_QUEUE_STATISTICS))) {
+            
+            scheduledExecutorService = Executors
+                    .newSingleThreadScheduledExecutor(new DaemonThreadFactory(
+                            getClass().getName() + ".sampleService"));
+            
+        } else {
+         
+            scheduledExecutorService = null;
+            
+        }
+        
         {
             
             final int readPoolSize = Integer.valueOf(properties.getProperty(
@@ -221,19 +291,10 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         concurrencyManager = new ConcurrencyManager(properties,
                 localTransactionManager, this);
         
-     }
+        getExecutorService().execute(new StartDeferredTasksTask());
+        
+    }
 
-//    public void init() {
-//        
-//        super.init();
-//        
-//        localTransactionManager = newLocalTransactionManager();
-//
-//        concurrencyManager = new ConcurrencyManager(properties,
-//                localTransactionManager, this);
-//        
-//    }
-    
     protected AbstractLocalTransactionManager newLocalTransactionManager() {
 
         final JournalTransactionService abstractTransactionService = new JournalTransactionService(
@@ -318,15 +379,104 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     }
 
+    /**
+     * Interface defines and documents the counters and counter namespaces
+     * reported by the {@link Journal} and the various services which it uses.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    public static interface IJournalCounters extends
+            ConcurrencyManager.IConcurrencyManagerCounters,
+//            ...TransactionManager.XXXCounters,
+            ResourceManager.IResourceManagerCounters
+            {
+       
+        /**
+         * The namespace for the counters pertaining to the {@link ConcurrencyManager}.
+         */
+        String concurrencyManager = "Concurrency Manager";
+
+        /**
+         * The namespace for the counters pertaining to the {@link ILocalTransactionService}.
+         */
+        String transactionManager = "Transaction Manager";
+        
+        /**
+         * The namespace for counters pertaining to the
+         * {@link Journal#getExecutorService()}.
+         */
+        String executorService = "Executor Service";
+        
+        /**
+         * Performance counters for the query engine associated with this
+         * journal (if any).
+         */
+        String queryEngine = "Query Engine";
+        
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to attach additional performance counters.
+     */
+    @Override
     public CounterSet getCounters() {
 
-        final CounterSet counters = super.getCounters();
-            
-        counters.attach(concurrencyManager.getCounters());
+        final CounterSet root = new CounterSet();
 
-        counters.attach(localTransactionManager.getCounters());
+        // Host wide performance counters (collected from the OS).
+        if (platformStatisticsCollector != null) {
+
+            root.attach(platformStatisticsCollector.getCounters());
+
+        }
+
+        // JVM wide performance counters.
+        {
             
-        return counters;
+            final CounterSet tmp = root.makePath("JVM");
+            
+            tmp.attach(AbstractStatisticsCollector.getMemoryCounterSet());
+            
+        }
+
+        // Journal performance counters.
+        {
+
+            final CounterSet tmp = root.makePath("Journal");
+            
+            tmp.attach(super.getCounters());
+
+            tmp.makePath(IJournalCounters.concurrencyManager)
+                    .attach(concurrencyManager.getCounters());
+
+            tmp.makePath(IJournalCounters.transactionManager)
+                    .attach(localTransactionManager.getCounters());
+
+            if (threadPoolExecutorStatisticsTask != null) {
+
+                tmp.makePath(IJournalCounters.executorService)
+                        .attach(threadPoolExecutorStatisticsTask.getCounters());
+
+            }
+
+        }
+        
+        // Lookup an existing query engine, but do not cause one to be created.
+        final QueryEngine queryEngine = QueryEngineFactory
+                .getExistingQueryController(this);
+
+        if (queryEngine != null) {
+
+            final CounterSet tmp = root.makePath(IJournalCounters.queryEngine);
+
+            tmp.attach(queryEngine.getCounters());
+            
+        }
+
+        return root;
         
     }
     
@@ -888,6 +1038,31 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          */
         localTransactionManager.shutdown();
 
+        if (platformStatisticsCollector != null) {
+
+            platformStatisticsCollector.stop();
+
+            platformStatisticsCollector = null;
+
+        }
+
+        if (scheduledExecutorService != null) {
+
+            scheduledExecutorService.shutdown();
+            
+        }
+        
+        // optional httpd service for the local counters.
+        if (httpd != null) {
+
+            httpd.shutdown();
+
+            httpd = null;
+
+            httpdURL = null;
+
+        }
+        
         /*
          * Shutdown the executor service. This will wait for any tasks being run
          * on that service by the application to complete.
@@ -940,6 +1115,28 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         if (!isOpen())
             return;
+
+        if (platformStatisticsCollector != null) {
+
+            platformStatisticsCollector.stop();
+
+            platformStatisticsCollector = null;
+
+        }
+
+        if (scheduledExecutorService != null)
+            scheduledExecutorService.shutdownNow();
+        
+        // optional httpd service for the local counters.
+        if (httpd != null) {
+
+            httpd.shutdown();
+
+            httpd = null;
+
+            httpdURL = null;
+
+        }
 
         // Note: can be null if error in ctor.
         if (executorService != null)
@@ -1077,7 +1274,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * @throws UnsupportedOperationException
      *             always.
      */
-    public IBigdataFederation getFederation() {
+    public IBigdataFederation<?> getFederation() {
 
         throw new UnsupportedOperationException();
         
@@ -1102,16 +1299,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         throw new UnsupportedOperationException();
         
     }
-
-//    /**
-//     * @throws UnsupportedOperationException
-//     *             always.
-//     */
-//    public UUID[] getDataServiceUUIDs() {
-//
-//        throw new UnsupportedOperationException();
-//        
-//    }
 
     /**
      * Always returns <code>null</code> since index partition moves are not
@@ -1266,7 +1453,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         return resourceLocator;
         
     }
-    private final DefaultResourceLocator resourceLocator;
+    private final DefaultResourceLocator<?> resourceLocator;
     
     public IResourceLockService getResourceLockService() {
         
@@ -1284,8 +1471,61 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         return executorService;
         
     }
-    private final ExecutorService executorService;
+    private final ThreadPoolExecutor executorService;
 
+    /**
+     * Used to sample and report on the queue associated with the
+     * {@link #executorService} and <code>null</code> if we will not be
+     * collecting data on task execution.
+     */
+    private final ScheduledExecutorService scheduledExecutorService;
+
+    /**
+     * Collects interesting statistics on the {@link #executorService}.
+     * 
+     * @see Options#COLLECT_QUEUE_STATISTICS
+     */
+    private ThreadPoolExecutorStatisticsTask threadPoolExecutorStatisticsTask = null;
+
+    /**
+     * Counters that aggregate across all tasks submitted to the Journal's
+     * {@link ExecutorService}. Those counters are sampled by a
+     * {@link ThreadPoolExecutorStatisticsTask}.
+     * 
+     * @see Options#COLLECT_QUEUE_STATISTICS
+     */
+    private final TaskCounters taskCounters = new TaskCounters();
+
+    /**
+     * Collects interesting statistics on the host and process.
+     * 
+     * @see Options#COLLECT_PLATFORM_STATISTICS
+     */
+    private AbstractStatisticsCollector platformStatisticsCollector = null;
+
+    /**
+     * httpd reporting the live counters -or- <code>null</code> if not enabled.
+     * 
+     * @see Options#HTTPD_PORT
+     */
+    private AbstractHTTPD httpd = null;
+    
+    /**
+     * The URL that may be used to access the httpd service exposed by this
+     * client -or- <code>null</code> if not enabled.
+     */
+    private String httpdURL = null;
+
+    /**
+     * The URL that may be used to access the httpd service exposed by this
+     * client -or- <code>null</code> if not enabled.
+     */
+    final public String getHttpdURL() {
+        
+        return httpdURL;
+        
+    }
+    
     /**
      * An executor service used to read on the local disk.
      * 
@@ -1309,5 +1549,215 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
     private final LatchedExecutor readService;
-    
+
+    /**
+     * This task runs once starts an (optional)
+     * {@link AbstractStatisticsCollector} and an (optional) httpd service.
+     * <p>
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * 
+     *         FIXME Make sure that we disable this by default for the unit
+     *         tests or we will have a bunch of sampling processes running!
+     */
+    private class StartDeferredTasksTask implements Runnable {
+
+        /**
+         * Note: The logger is named for this class, but since it is an inner
+         * class the name uses a "$" delimiter (vs a ".") between the outer and
+         * the inner class names.
+         */
+        final private Logger log = Logger.getLogger(StartDeferredTasksTask.class);
+
+        private StartDeferredTasksTask() {
+        }
+
+        public void run() {
+
+            try {
+                
+                startDeferredTasks();
+                
+            } catch (Throwable t) {
+
+                log.error(t, t);
+
+                return;
+                
+            }
+
+        }
+
+        /**
+         * Starts performance counter collection.
+         */
+        protected void startDeferredTasks() throws IOException {
+
+            // start collection on various work queues.
+            startQueueStatisticsCollection();
+            
+            // start collecting performance counters (if enabled).
+            startPlatformStatisticsCollection();
+
+            // start the local httpd service reporting on this service.
+            startHttpdService();
+
+        }
+
+        /**
+         * Setup sampling on the client's thread pool. This collects interesting
+         * statistics about the thread pool for reporting to the load balancer
+         * service.
+         */
+        protected void startQueueStatisticsCollection() {
+
+            final boolean collectQueueStatistics = Boolean.valueOf(getProperty(
+                    Options.COLLECT_QUEUE_STATISTICS,
+                    Options.DEFAULT_COLLECT_QUEUE_STATISTICS));
+
+            if (log.isInfoEnabled())
+                log.info(Options.COLLECT_QUEUE_STATISTICS + "="
+                        + collectQueueStatistics);
+
+            if (!collectQueueStatistics) {
+
+                return;
+
+            }
+
+            final long initialDelay = 0; // initial delay in ms.
+            final long delay = 1000; // delay in ms.
+            final TimeUnit unit = TimeUnit.MILLISECONDS;
+
+            final String relpath = "Thread Pool";
+
+            threadPoolExecutorStatisticsTask = new ThreadPoolExecutorStatisticsTask(
+                    relpath, executorService, taskCounters);
+
+            scheduledExecutorService
+                    .scheduleWithFixedDelay(threadPoolExecutorStatisticsTask,
+                            initialDelay, delay, unit);
+
+        }
+        
+        /**
+         * Start collecting performance counters from the OS (if enabled).
+         */
+        protected void startPlatformStatisticsCollection() {
+
+            final boolean collectPlatformStatistics = Boolean
+                    .valueOf(getProperty(Options.COLLECT_PLATFORM_STATISTICS,
+                            Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
+
+            if (log.isInfoEnabled())
+                log.info(Options.COLLECT_PLATFORM_STATISTICS + "="
+                        + collectPlatformStatistics);
+
+            if (!collectPlatformStatistics) {
+
+                return;
+
+            }
+
+            final Properties p = getProperties();
+
+            if (p.getProperty(AbstractStatisticsCollector.Options.PROCESS_NAME) == null) {
+
+                // Set default name for this process.
+                p.setProperty(AbstractStatisticsCollector.Options.PROCESS_NAME,
+                        "service" + ICounterSet.pathSeparator
+                                + Journal.class.getName());
+
+            }
+
+            try {
+
+                final AbstractStatisticsCollector tmp = AbstractStatisticsCollector
+                        .newInstance(p);
+
+                tmp.start();
+
+                // Note: synchronized(Journal.this) keeps find bugs happy.
+                synchronized(Journal.this) {
+                    
+                    Journal.this.platformStatisticsCollector = tmp;
+                    
+                }
+                
+                if (log.isInfoEnabled())
+                    log.info("Collecting platform statistics.");
+
+            } catch (Throwable t) {
+
+                log.error(t, t);
+                
+            }
+
+        }
+
+        /**
+         * Start the local httpd service (if enabled). The service is started on
+         * the {@link IBigdataClient#getHttpdPort()}, on a randomly assigned
+         * port if the port is <code>0</code>, or NOT started if the port is
+         * <code>-1</code>. If the service is started, then the URL for the
+         * service is reported to the load balancer and also written into the
+         * file system. When started, the httpd service will be shutdown with
+         * the federation.
+         * 
+         * @throws UnsupportedEncodingException
+         */
+        protected void startHttpdService() throws UnsupportedEncodingException {
+            
+            final int httpdPort = Integer.valueOf(getProperty(
+                    Options.HTTPD_PORT, Options.DEFAULT_HTTPD_PORT));
+
+            if (log.isInfoEnabled())
+                log.info(Options.HTTPD_PORT + "=" + httpdPort
+                        + (httpdPort == -1 ? " (disabled)" : ""));
+
+            if (httpdPort == -1) {
+
+                return;
+
+            }
+
+            final AbstractHTTPD httpd;
+            try {
+
+                httpd = new CounterSetHTTPD(httpdPort, Journal.this);
+
+            } catch (IOException e) {
+
+                log.error("Could not start httpd: port=" + httpdPort, e);
+
+                return;
+                
+            }
+
+            if (httpd != null) {
+
+                // Note: synchronized(Journal.this) keeps findbugs happy.
+                synchronized (Journal.this) {
+
+                    // save reference to the daemon.
+                    Journal.this.httpd = httpd;
+
+                    // the URL that may be used to access the local httpd.
+                    Journal.this.httpdURL = "http://"
+                            + AbstractStatisticsCollector.fullyQualifiedHostName
+                            + ":" + httpd.getPort() + "/?path="
+                            + URLEncoder.encode("", "UTF-8");
+
+                    if (log.isInfoEnabled())
+                        log.info("start:\n" + httpdURL);
+                
+                }
+
+            }
+
+        }
+        
+    } // class StartDeferredTasks
+
 }

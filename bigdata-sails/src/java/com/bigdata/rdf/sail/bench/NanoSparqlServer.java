@@ -63,6 +63,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Resource;
+import org.openrdf.model.Statement;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.parser.ParsedQuery;
@@ -70,6 +72,13 @@ import org.openrdf.query.parser.QueryParser;
 import org.openrdf.query.parser.sparql.SPARQLParserFactory;
 import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
 import org.openrdf.repository.RepositoryException;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFHandlerException;
+import org.openrdf.rio.RDFParser;
+import org.openrdf.rio.RDFParserFactory;
+import org.openrdf.rio.RDFParserRegistry;
+import org.openrdf.rio.helpers.RDFHandlerBase;
+import org.openrdf.rio.rdfxml.RDFXMLParser;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailException;
 
@@ -100,8 +109,10 @@ import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.bench.NanoSparqlClient.QueryType;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.rwstore.RWStore;
@@ -122,6 +133,8 @@ import com.bigdata.util.httpd.NanoHTTPD;
  *       parameters, in the property file, as request headers, or as query hints
  *       using the PREFIX mechanism.
  * 
+ * @todo Isn't there a baseURI option for SPARQL end points?
+ * 
  * @todo Add an "?explain" URL query parameter and show the execution plan and
  *       costs (or make this a navigable option from the set of running queries
  *       to drill into their running costs and offer an opportunity to kill them
@@ -134,6 +147,9 @@ import com.bigdata.util.httpd.NanoHTTPD;
  * 
  * @todo Simple update protocol.
  * 
+ * @todo If the addressed instance uses full transactions, then mutation should
+ *       also use a full transaction.
+ * 
  * @todo Remote command to bulk load data from a remote or local resource (it's
  *       pretty much up to people handling deployment to secure access to
  *       queries, update requests, and bulk load requests).
@@ -141,6 +157,17 @@ import com.bigdata.util.httpd.NanoHTTPD;
  * @todo Remote command to advance the read-behind point. This will let people
  *       bulk load a bunch of stuff before advancing queries to read from the
  *       new consistent commit point.
+ * 
+ * @todo Review the settings for the {@link RDFParser} instances, e.g.,
+ *       verifyData, preserveBNodeIds, etc. Perhaps we should use the same
+ *       defaults as the {@link DataLoader}?
+ * 
+ * @todo It is possible that we could have concurrent requests which each get
+ *       the unisolated connection. This could cause two problems: (1) we could
+ *       exhaust our request pool, which would cause the server to block; and
+ *       (2) I need to verify that the exclusive semaphore logic for the
+ *       unisolated sail connection works with cross thread access. Someone had
+ *       pointed out a bizarre hole in this....
  */
 public class NanoSparqlServer extends AbstractHTTPD {
 
@@ -153,12 +180,12 @@ public class NanoSparqlServer extends AbstractHTTPD {
 	/**
 	 * A SPARQL results set in XML.
 	 */
-	static private final String MIME_SPARQL_RESULTS_XML = "application/sparql-results+xml";
+	static public final String MIME_SPARQL_RESULTS_XML = "application/sparql-results+xml";
 
 	/**
 	 * RDF/XML.
 	 */
-	static private final String MIME_RDF_XML = "application/rdf+xml";
+	static public final String MIME_RDF_XML = "application/rdf+xml";
 
 	/**
 	 * The character set used for the response (not negotiated).
@@ -549,16 +576,28 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
     }
     
-    synchronized public void shutdown() {
-        System.err.println("Normal shutdown.");
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to wait until all running queries are complete before 
+     */
+    @Override
+    public void shutdown() {
+        if(log.isInfoEnabled())
+            log.info("Normal shutdown.");
+        // Tell NanoHTTP to stop accepting new requests.
+        super.shutdown();
+        // Stop servicing new requests. 
         queryService.shutdown();
         try {
-            System.err.println("Awaiting termination of running queries.");
             queryService.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
         } catch (InterruptedException ex) {
             throw new RuntimeException(ex);
         }
-    	super.shutdown();
+        /*
+         * Note: This is using the atomic boolean as a lock in addition to
+         * relying on its visibility guarantee.
+         */
 		synchronized (alive) {
 			alive.set(false);
 			alive.notifyAll();
@@ -566,23 +605,28 @@ public class NanoSparqlServer extends AbstractHTTPD {
     }
 
     /**
-     * FIXME Must abort any open transactions.
+     * {@inheritDoc}
+     * <p>
+     * Overridden to interrupt all running requests.
+     * 
+     * FIXME Must abort any open transactions. This does not matter for the
+     * standalone database, but it will make a difference in scale-out. The
+     * transaction identifiers could be obtained from the {@link #queries}
+     * map.
      */
-    synchronized public void shutdownNow() {
-        System.err.println("Immediate shutdown");
-        // interrupt all running queries.
+    @Override
+    public void shutdownNow() {
+        if(log.isInfoEnabled())
+            log.info("Normal shutdown.");
+        // Immediately stop accepting connections and interrupt open requests.
+        super.shutdownNow();
+        // Interrupt all running queries.
     	queryService.shutdownNow();
         /*
-         * Wait a moment for any running queries to close their query
-         * connections.
+         * Note: This is using the atomic boolean as a lock in addition to
+         * relying on its visibility guarantee.
          */
-        try {
-            Thread.sleep(1000/* ms */);
-        } catch (InterruptedException ex) {
-            // ignore 
-        }
-    	super.shutdown();
-		synchronized (alive) {
+        synchronized (alive) {
 			alive.set(false);
 			alive.notifyAll();
 		}
@@ -595,121 +639,794 @@ public class NanoSparqlServer extends AbstractHTTPD {
      */
     private final AtomicBoolean alive = new AtomicBoolean(true);
 
-//    @Override
-//    public Response serve(final String uri, final String method,
-//            final Properties header,
-//            final LinkedHashMap<String, Vector<String>> parms) {
-//    
-//        if ("STOP".equalsIgnoreCase(method)) {
-//
-//        	queryService.execute(new Runnable(){
-//        		public void run() {
-//        			shutdown();
-//        		}
-//        	});
-//        	
-//            return new Response(HTTP_OK, MIME_TEXT_PLAIN, "Shutting down.");
-//            
-//        }
-//        
-//    	return super.serve(uri, method, header, parms);
-//    	
-//    }
-
+    /**
+     * <p>
+     * Perform an HTTP-POST, which corresponds to the basic CRUD operation
+     * "create" according to the generic interaction semantics of HTTP REST. The
+     * operation will be executed against the target namespace per the URI.
+     * </p>
+     * 
+     * <pre>
+     * POST [/namespace/NAMESPACE]
+     * ...
+     * Content-Type: 
+     * ...
+     * 
+     * BODY
+     * </pre>
+     * <p>
+     * Where <code>BODY</code> is the new RDF content using the representation
+     * indicated by the <code>Content-Type</code>.
+     * </p>
+     * <p>
+     * -OR-
+     * </p>
+     * 
+     * <pre>
+     * POST [/namespace/NAMESPACE] ?uri=URL
+     * </pre>
+     * <p>
+     * Where <code>URI</code> identifies a resource whose RDF content will be
+     * inserted into the database. The <code>uri</code> query parameter may
+     * occur multiple times. All identified resources will be loaded within a
+     * single native transaction. Bigdata provides snapshot isolation so you can
+     * continue to execute queries against the last commit point while this
+     * operation is executed.
+     * </p>
+     * 
+     * <p>
+     * You can shutdown the server using:
+     * </p>
+     * 
+     * <pre>
+     * POST /stop
+     * </pre>
+     * 
+     * <p>
+     * A status page is available:
+     * </p>
+     * 
+     * <pre>
+     * POST /status
+     * </pre>
+     */
 	@Override
-	public Response doPost(final String uri, final String method,
-			final Properties header,
-			final LinkedHashMap<String, Vector<String>> params) throws Exception {
+	public Response doPost(final Request req) throws Exception {
 
-		if (log.isDebugEnabled()) {
-			log.debug("uri=" + uri);
-			log.debug("method=" + method);
-			log.debug("headser=" + header);
-			log.debug("params=" + params);
-		}
-		
+        final String uri = req.uri;
+        
 		if("/stop".equals(uri)) {
 
-            /*
-             * Create a new thread to run shutdown since we do not want this to
-             * block on the queryService.
-             */
-			final Thread t = new Thread(new Runnable() {
-				public void run() {
-					System.err.println("Will shutdown.");
-					try {
-						/*
-						 * Sleep for a bit so the Response will be delivered
-						 * before we shutdown the server.
-						 */
-						Thread.sleep(100/* ms */);
-					} catch (InterruptedException ex) {
-						// ignore
-					}
-					// Shutdown the server.
-					shutdown();
-				}
-			});
-
-			t.setDaemon(true);
-			
-			// Start the shutdown thread.
-			t.start();
-			
-//			// Shutdown.
-//			shutdown();
-
-            /*
-             * Note: Client probably might not see this response since the
-             * shutdown thread may have already terminated the httpd service.
-             */
-			return new Response(HTTP_OK, MIME_TEXT_PLAIN, "Shutting down.");
+		    return doStop(req);
 
 		}
-		
-		return new Response(HTTP_NOTIMPLEMENTED, MIME_TEXT_PLAIN,
-				"SPARQL POST QUERY not implemented.");
+
+        if("/status".equals(uri)) {
+            
+            return doStatus(req);
+
+        }
+
+        final String queryStr = getQueryStr(req.params);
+        
+        if (queryStr != null) {
+
+            return doQuery(req);
+            
+        }
+
+        final String contentType = req.getContentType();
+
+        if (contentType != null) {
+
+            return doPostWithBody(req);
+
+        }
+ 
+        if (req.params.get("uri") != null) {
+
+            return doPostWithURIs(req);
+            
+        }
+        
+        return new Response(HTTP_BADREQUEST, MIME_TEXT_PLAIN, uri);
+
+	}
+
+    /**
+     * POST with request body containing statements to be inserted.
+     * 
+     * @param req
+     *            The request.
+     *
+     * @return The response.
+     * 
+     * @throws Exception
+     */
+    private Response doPostWithBody(final Request req) throws Exception {
+        
+        final String baseURI = "";// @todo baseURI query parameter?
+        
+        final String namespace = getNamespace(req.uri);
+
+        final String contentType = req.getContentType();
+
+        if (contentType == null)
+            throw new UnsupportedOperationException();
+
+        if (log.isInfoEnabled())
+            log.info("Request body: " + contentType);
+
+        final RDFFormat format = RDFFormat.forMIMEType(contentType);
+
+        if (format == null) {
+            return new Response(HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    "Content-Type not recognized as RDF: "
+                            + contentType);
+        }
+
+        if (log.isInfoEnabled())
+            log.info("RDFFormat=" + format);
+        
+        final RDFParserFactory rdfParserFactory = RDFParserRegistry
+                .getInstance().get(format);
+
+        if (rdfParserFactory == null) {
+            return new Response(HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                    "Parser not found: Content-Type=" + contentType);
+        }
+
+        try {
+
+            // resolve the default namespace.
+            final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+                    .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+
+            if (tripleStore == null)
+                return new Response(HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                        "Not found: namespace=" + namespace);
+
+            final AtomicLong nmodified = new AtomicLong(0L);
+
+            // Wrap with SAIL.
+            final BigdataSail sail = new BigdataSail(tripleStore);
+            BigdataSailConnection conn = null;
+            try {
+
+                sail.initialize();
+                conn = sail.getConnection();
+
+                /*
+                 * There is a request body, so let's try and parse it.
+                 */
+
+                final RDFParser rdfParser = rdfParserFactory.getParser();
+
+                rdfParser.setValueFactory(tripleStore.getValueFactory());
+
+                rdfParser.setVerifyData(true);
+
+                rdfParser.setStopAtFirstError(true);
+
+                rdfParser
+                        .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+
+                rdfParser.setRDFHandler(new AddStatementHandler(conn,nmodified));
+
+                /*
+                 * Run the parser, which will cause statements to be inserted.
+                 */
+                rdfParser.parse(req.getInputStream(), baseURI);
+
+                // Commit the mutation.
+                conn.commit();
+
+                return new Response(HTTP_OK, MIME_TEXT_PLAIN, nmodified.get()
+                        + " statements modified.");
+
+            } finally {
+
+                if (conn != null)
+                    conn.close();
+
+//                sail.shutDown();
+                
+            }
+
+        } catch (Exception ex) {
+
+            // Will be rendered as an INTERNAL_ERROR.
+            throw new RuntimeException(ex);
+            
+        }
+
+    }
+
+    /**
+     * Helper class adds statements to the sail as they are visited by a parser.
+     */
+    private static class AddStatementHandler extends RDFHandlerBase {
+
+        private final BigdataSailConnection conn;
+        private final AtomicLong nmodified;
+        
+        public AddStatementHandler(final BigdataSailConnection conn,
+                final AtomicLong nmodified) {
+            this.conn = conn;
+            this.nmodified = nmodified;
+        }
+
+        public void handleStatement(Statement stmt) throws RDFHandlerException {
+
+            try {
+
+                conn.addStatement(//
+                        stmt.getSubject(), //
+                        stmt.getPredicate(), //
+                        stmt.getObject(), //
+                        (Resource[]) (stmt.getContext() == null ? null
+                                : new Resource[] { stmt.getContext() })//
+                        );
+
+            } catch (SailException e) {
+
+                throw new RDFHandlerException(e);
+
+            }
+
+            nmodified.incrementAndGet();
+
+        }
+
+    }
+    
+    /**
+     * Helper class removes statements from the sail as they are visited by a parser.
+     */
+    private static class RemoveStatementHandler extends RDFHandlerBase {
+
+        private final BigdataSailConnection conn;
+        private final AtomicLong nmodified;
+        
+        public RemoveStatementHandler(final BigdataSailConnection conn,
+                final AtomicLong nmodified) {
+            this.conn = conn;
+            this.nmodified = nmodified;
+        }
+
+        public void handleStatement(Statement stmt) throws RDFHandlerException {
+
+            try {
+
+                conn.removeStatements(//
+                        stmt.getSubject(), //
+                        stmt.getPredicate(), //
+                        stmt.getObject(), //
+                        (Resource[]) (stmt.getContext() == null ? null
+                                : new Resource[] { stmt.getContext() })//
+                        );
+
+            } catch (SailException e) {
+
+                throw new RDFHandlerException(e);
+
+            }
+
+            nmodified.incrementAndGet();
+
+        }
+
+    }
+    
+    /**
+     * POST with URIs of resources to be inserted.
+     * 
+     * @param req
+     *            The request.
+     *
+     * @return The response.
+     * 
+     * @throws Exception
+     */
+    private Response doPostWithURIs(final Request req) throws Exception {
+        
+        final String namespace = getNamespace(req.uri);
+
+        final String contentType = req.getContentType();
+
+        final Vector<String> uris = req.params.get("uri");
+        
+        if (uris == null)
+            throw new UnsupportedOperationException();
+
+        if (uris.isEmpty())
+            return new Response(HTTP_OK, MIME_TEXT_PLAIN,
+                    "0 statements modified");
+
+        if (log.isInfoEnabled())
+            log.info("URIs: " + uris);
+
+        // Before we do anything, make sure we have valid URLs.
+        final Vector<URL> urls = new Vector<URL>(uris.size());
+        for (String uri : uris) {
+            urls.add(new URL(uri));
+        }
+
+        try {
+
+            // resolve the default namespace.
+            final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+                    .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+
+            if (tripleStore == null)
+                return new Response(HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                        "Not found: namespace=" + namespace);
+
+            final AtomicLong nmodified = new AtomicLong(0L);
+
+            // Wrap with SAIL.
+            final BigdataSail sail = new BigdataSail(tripleStore);
+            BigdataSailConnection conn = null;
+            try {
+
+                conn = sail.getConnection();
+
+                for (URL url : urls) {
+
+                    HttpURLConnection hconn = null;
+                    try {
+
+                        hconn = (HttpURLConnection) url.openConnection();
+                        hconn.setRequestMethod(NanoHTTPD.GET);
+                        hconn.setReadTimeout(0);// no timeout? http param?
+
+                        /*
+                         * There is a request body, so let's try and parse it.
+                         */
+
+                        final RDFFormat format = RDFFormat
+                                .forMIMEType(contentType);
+
+                        if (format == null) {
+                            return new Response(HTTP_BADREQUEST,
+                                    MIME_TEXT_PLAIN,
+                                    "Content-Type not recognized as RDF: "
+                                            + contentType);
+                        }
+
+                        final RDFParserFactory rdfParserFactory = RDFParserRegistry
+                                .getInstance().get(format);
+
+                        if (rdfParserFactory == null) {
+                            return new Response(HTTP_INTERNALERROR,
+                                    MIME_TEXT_PLAIN,
+                                    "Parser not found: Content-Type="
+                                            + contentType);
+                        }
+
+                        final RDFParser rdfParser = rdfParserFactory
+                                .getParser();
+
+                        rdfParser
+                                .setValueFactory(tripleStore.getValueFactory());
+
+                        rdfParser.setVerifyData(true);
+
+                        rdfParser.setStopAtFirstError(true);
+
+                        rdfParser
+                                .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+
+                        rdfParser.setRDFHandler(new AddStatementHandler(conn, nmodified));
+
+                        /*
+                         * Run the parser, which will cause statements to be
+                         * inserted.
+                         */
+                        
+                        rdfParser.parse(req.getInputStream(), url
+                                .toExternalForm()/* baseURL */);
+
+                    } finally {
+                        
+                        if (hconn != null)
+                            hconn.disconnect();
+
+                    } // next URI.
+
+                }
+
+                // Commit the mutation.
+                conn.commit();
+
+                return new Response(HTTP_OK, MIME_TEXT_PLAIN, nmodified.get()
+                        + " statements modified.");
+
+            } finally {
+
+                if (conn != null)
+                    conn.close();
+
+//                sail.shutDown();
+
+            }
+
+        } catch (Exception ex) {
+
+            // Will be rendered as an INTERNAL_ERROR.
+            throw new RuntimeException(ex);
+            
+        }
+
+    }
+	
+    /**
+     * Halt the server.
+     * 
+     * @param req
+     *            The request.
+     *            
+     * @return The response.
+     * 
+     * @throws Exception
+     */
+	private Response doStop(final Request req) throws Exception {
+	    
+        /*
+         * Create a new thread to run shutdown since we do not want this to
+         * block on the queryService.
+         */
+        final Thread t = new Thread(new Runnable() {
+
+            public void run() {
+            
+                log.warn("Will shutdown.");
+                
+                try {
+            
+                    /*
+                     * Sleep for a bit so the Response will be delivered
+                     * before we shutdown the server.
+                     */
+                    
+                    Thread.sleep(100/* ms */);
+
+                } catch (InterruptedException ex) {
+                
+                    // ignore
+                    
+                }
+
+                // Shutdown the server.
+                shutdown();
+                
+            }
+            
+        });
+
+        t.setDaemon(true);
+        
+        // Start the shutdown thread.
+        t.start();
+        
+//      // Shutdown.
+//      shutdown();
+
+        /*
+         * Note: Client might not see this response since the shutdown thread
+         * may have already terminated the httpd service.
+         */
+        return new Response(HTTP_OK, MIME_TEXT_PLAIN, "Shutting down.");
 
 	}
 	
     /**
-	 * Accepts SPARQL queries.
-	 */
+     * Accepts SPARQL queries.
+     * 
+     * <pre>
+     * GET [/namespace/NAMESPACE] ?query=QUERY
+     * </pre>
+     * 
+     * Where <code>QUERY</code> is the SPARQL query.
+     */
 	@Override
-	public Response doGet(final String uri, final String method,
-			final Properties header,
-			final LinkedHashMap<String, Vector<String>> params) throws Exception {
+	public Response doGet(final Request req) throws Exception {
 
-		if (log.isDebugEnabled()) {
-			log.debug("uri=" + uri);
-			log.debug("method=" + method);
-			log.debug("headser=" + header);
-			log.debug("params=" + params);
-		}
-
-		if (uri == null || uri.length() == 0) {
-
-			return doQuery(uri, method, header, params);
-
-		}
+		final String uri = req.uri;
 		
-		if("/status".equals(uri)) {
-			
-            // @todo Could list the known namespaces.
-			return doStatus(uri, method, header, params);
+        if("/status".equals(uri)) {
+            
+            return doStatus(req);
 
         }
 
-        if (uri.startsWith("/namespace/")) {
+        final String queryStr = getQueryStr(req.params);
+        
+        if (queryStr != null) {
 
-            // @todo allow status query against any namespace.
-            return doQuery(uri, method, header, params);
+            return doQuery(req);
             
         }
 
 		return new Response(HTTP_NOTFOUND, MIME_TEXT_PLAIN, uri);
 		
 	}
+
+//    /**
+//     * TODO Perform an HTTP-PUT, which corresponds to the basic CRUD operation
+//     * "update" according to the generic interaction semantics of HTTP REST.
+//     * 
+//     */
+//	@Override
+//    public Response doPut(final Request req) {
+//
+//        return new Response(HTTP_NOTFOUND, MIME_TEXT_PLAIN, req.uri);
+//
+//    }
+
+    /**
+     * REST DELETE. There are two forms for this operation.
+     * 
+     * <pre>
+     * DELETE [/namespace/NAMESPACE]
+     * ...
+     * Content-Type
+     * ...
+     * 
+     * BODY
+     * 
+     * </pre>
+     * <p>
+     * BODY contains RDF statements according to the specified Content-Type.
+     * Statements parsed from the BODY are deleted from the addressed namespace.
+     * </p>
+     * <p>
+     * -OR-
+     * </p>
+     * 
+     * <pre>
+     * DELETE [/namespace/NAMESPACE] ?query=...
+     * </pre>
+     * <p>
+     * Where <code>query</code> is a CONSTRUCT or DESCRIBE query. Statements are
+     * materialized using the query from the addressed namespace are deleted
+     * from that namespace.
+     * </p>
+     */
+    @Override
+    public Response doDelete(final Request req) {
+
+        final String contentType = req.getContentType();
+        
+        final String queryStr = getQueryStr(req.params);
+
+        if(contentType != null) {
+        
+            return doDeleteWithBody(req);
+            
+        } else if (queryStr != null) {
+            
+            return doDeleteWithQuery(req);
+            
+        }
+            
+        return new Response(HTTP_BADREQUEST, MIME_TEXT_PLAIN, "");
+           
+    }
+
+    /**
+     * Delete all statements materialized by a DESCRIBE or CONSTRUCT query.
+     * <p>
+     * Note: To avoid materializing the statements, this runs the query against
+     * the last commit time. This is done while it is holding the unisolated
+     * connection which prevents concurrent modifications. Therefore the entire
+     * SELECT + DELETE operation is ACID.
+     */
+    private Response doDeleteWithQuery(final Request req) {
+        
+        final String baseURI = "";// @todo baseURI query parameter?
+        
+        final String namespace = getNamespace(req.uri);
+        
+        final String queryStr = getQueryStr(req.params);
+
+        if(queryStr == null)
+            throw new UnsupportedOperationException();
+                
+        if (log.isInfoEnabled())
+            log.info("delete with query: "+queryStr);
+        
+        try {
+
+            // resolve the default namespace.
+            final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+                    .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+
+            if (tripleStore == null)
+                return new Response(HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                        "Not found: namespace=" + namespace);
+
+            /*
+             * Note: pipe is drained by this thread to consume the query
+             * results, which are the statements to be deleted.
+             */
+            final PipedOutputStream os = new PipedOutputStream();
+            final InputStream is = newPipedInputStream(os);
+            try {
+
+                final AbstractQueryTask queryTask = getQueryTask(namespace,
+                        ITx.READ_COMMITTED, queryStr, req.params, req.headers,
+                        os);
+
+                switch (queryTask.queryType) {
+                case DESCRIBE:
+                case CONSTRUCT:
+                    break;
+                default:
+                    return new Response(HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                            "Must be DESCRIBE or CONSTRUCT query.");
+                }
+
+                final AtomicLong nmodified = new AtomicLong(0L);
+
+                // Wrap with SAIL.
+                final BigdataSail sail = new BigdataSail(tripleStore);
+                BigdataSailConnection conn = null;
+                try {
+
+                    sail.initialize();
+                    
+                    // get the unisolated connection.
+                    conn = sail.getConnection();
+
+                    final RDFXMLParser rdfParser = new RDFXMLParser(
+                            tripleStore.getValueFactory());
+
+                    rdfParser.setVerifyData(false);
+                    
+                    rdfParser.setStopAtFirstError(true);
+                    
+                    rdfParser
+                            .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+
+                    rdfParser.setRDFHandler(new RemoveStatementHandler(conn, nmodified));
+
+                    /*
+                     * Run the parser, which will cause statements to be
+                     * deleted.
+                     */
+                    rdfParser.parse(is, baseURI);
+
+                    // Commit the mutation.
+                    conn.commit();
+
+                } finally {
+
+                    if (conn != null)
+                        conn.close();
+
+//                    sail.shutDown();
+
+                }
+
+                return new Response(HTTP_OK, MIME_TEXT_PLAIN, nmodified.get()
+                        + " statements modified.");
+
+            } catch (Throwable t) {
+
+                throw launderThrowable(t, os, queryStr);
+
+            }
+
+        } catch (Exception ex) {
+
+            // Will be rendered as an INTERNAL_ERROR.
+            throw new RuntimeException(ex);
+
+        }
+
+    }
+
+    /**
+     * DELETE request with a request body containing the statements to be
+     * removed.
+     */
+    private Response doDeleteWithBody(final Request req) {
+
+        final String baseURI = "";// @todo baseURI query parameter?
+        
+        final String namespace = getNamespace(req.uri);
+
+        final String contentType = req.getContentType();
+
+        if (contentType == null)
+            throw new UnsupportedOperationException();
+
+        if (log.isInfoEnabled())
+            log.info("Request body: " + contentType);
+
+        try {
+
+            // resolve the default namespace.
+            final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+                    .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+
+            if (tripleStore == null)
+                return new Response(HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                        "Not found: namespace=" + namespace);
+
+            final AtomicLong nmodified = new AtomicLong(0L);
+
+            // Wrap with SAIL.
+            final BigdataSail sail = new BigdataSail(tripleStore);
+            BigdataSailConnection conn = null;
+            try {
+
+                sail.initialize();
+                conn = sail.getConnection();
+
+                /*
+                 * There is a request body, so let's try and parse it.
+                 */
+
+                final RDFFormat format = RDFFormat.forMIMEType(contentType);
+
+                if (format == null) {
+                    return new Response(HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                            "Content-Type not recognized as RDF: "
+                                    + contentType);
+                }
+
+                final RDFParserFactory rdfParserFactory = RDFParserRegistry
+                        .getInstance().get(format);
+
+                if (rdfParserFactory == null) {
+                    return new Response(HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                            "Parser not found: Content-Type=" + contentType);
+                }
+
+                final RDFParser rdfParser = rdfParserFactory.getParser();
+
+                rdfParser.setValueFactory(tripleStore.getValueFactory());
+
+                rdfParser.setVerifyData(true);
+
+                rdfParser.setStopAtFirstError(true);
+
+                rdfParser
+                        .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+
+                rdfParser.setRDFHandler(new RemoveStatementHandler(conn,
+                        nmodified));
+
+                /*
+                 * Run the parser, which will cause statements to be deleted.
+                 */
+                rdfParser.parse(req.getInputStream(), baseURI);
+
+                // Commit the mutation.
+                conn.commit();
+
+                return new Response(HTTP_OK, MIME_TEXT_PLAIN, nmodified.get()
+                        + " statements modified.");
+
+            } finally {
+
+                if (conn != null)
+                    conn.close();
+
+//                sail.shutDown();
+
+            }
+
+        } catch (Exception ex) {
+
+            // Will be rendered as an INTERNAL_ERROR.
+            throw new RuntimeException(ex);
+            
+        }
+
+    }
 
     /**
      * Return the namespace which will be used to execute the query. The
@@ -794,21 +1511,19 @@ public class NanoSparqlServer extends AbstractHTTPD {
 	 * @todo Report on the average query latency, average concurrency of query
 	 *       evaluation, etc.
 	 */
-	public Response doStatus(final String uri, final String method,
-			final Properties header,
-			final LinkedHashMap<String, Vector<String>> params) throws Exception {
+	public Response doStatus(final Request req) throws Exception {
 
 		// SPARQL queries accepted by the SPARQL end point.
-        final boolean showQueries = params.get("showQueries") != null;
+        final boolean showQueries = req.params.get("showQueries") != null;
 
         // IRunningQuery objects currently running on the query controller.
-        final boolean showRunningQueries = params.get("showRunningQueries") != null;
+        final boolean showRunningQueries = req.params.get("showRunningQueries") != null;
 
         // Information about the KB (stats, properties).
-        final boolean showKBInfo = params.get("showKBInfo") != null;
+        final boolean showKBInfo = req.params.get("showKBInfo") != null;
 
         // bigdata namespaces known to the index manager.
-        final boolean showNamespaces = params.get("showNamespaces") != null;
+        final boolean showNamespaces = req.params.get("showNamespaces") != null;
 
         final StringBuilder sb = new StringBuilder();
 
@@ -835,7 +1550,8 @@ public class NanoSparqlServer extends AbstractHTTPD {
         if (showKBInfo) {
 
             // General information on the connected kb.
-            sb.append(getKBInfo(getNamespace(uri), getTimestamp(uri, params)));
+            sb.append(getKBInfo(getNamespace(req.uri), getTimestamp(req.uri,
+                    req.params)));
 
         }
 		
@@ -1027,29 +1743,17 @@ public class NanoSparqlServer extends AbstractHTTPD {
 	 * @return
 	 * @throws Exception
 	 */
-	public Response doQuery(final String uri, final String method,
-			final Properties header,
-			final LinkedHashMap<String, Vector<String>> params) throws Exception {
+	public Response doQuery(final Request req) throws Exception {
 
-        final String namespace = getNamespace(uri);
+        final String namespace = getNamespace(req.uri);
 
-		final long timestamp = getTimestamp(uri, params);
+		final long timestamp = getTimestamp(req.uri, req.params);
 
-		final String queryStr;
-		{
+        final String queryStr = getQueryStr(req.params);
 
-			final Vector<String> tmp = params.get("query");
-
-			if (tmp == null || tmp.isEmpty() || tmp.get(0) == null)
-				return new Response(HTTP_BADREQUEST, MIME_TEXT_PLAIN,
-						"Specify query using ?query=....");
-
-			queryStr = tmp.get(0);
-
-		}
-		
-		if (log.isDebugEnabled())
-			log.debug("query: " + queryStr);
+        if (queryStr == null)
+            return new Response(HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    "Specify query using ?query=....");
 
 		/*
 		 * Setup pipes. The [os] will be passed into the task that executes the
@@ -1060,34 +1764,25 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		 * passed into the Response will be closed and the task will terminate
 		 * rather than running on in the background with a disconnected client.
 		 */
-		final PipedOutputStream os = new PipedOutputStream();
-		final InputStream is = newPipedInputStream(os);
-		final FutureTask<Void> ft = new FutureTask<Void>(getQueryTask(
-                namespace, timestamp, queryStr, os));
-		try {
+        final PipedOutputStream os = new PipedOutputStream();
+        final InputStream is = newPipedInputStream(os);
+        try {
 
-			// Choose an appropriate MIME type.
-			final String mimeType;
-			final QueryType queryType = QueryType.fromQuery(queryStr);
-			switch(queryType) {
-			case DESCRIBE:
-			case CONSTRUCT:
-				mimeType = MIME_RDF_XML;
-				break;
-			case ASK:
-			case SELECT:
-				mimeType = MIME_SPARQL_RESULTS_XML;
-				break;
-			default:
-				throw new RuntimeException("Unknown query type: "+queryType);
-			}
+            final AbstractQueryTask queryTask = getQueryTask(namespace, timestamp,
+                    queryStr, req.params, req.headers, os);
+            
+            final FutureTask<Void> ft = new FutureTask<Void>(queryTask);
+            
+            // Setup the response.
+            // TODO Move charset choice into conneg logic.
+            final Response r = new Response(HTTP_OK, queryTask.mimeType
+                    + "; charset='" + charset + "'", is);
 
-			// Begin executing the query (asynchronous).
-			queryService.execute(ft);
-			
-			// Setup the response.
-			final Response r = new Response(HTTP_OK, mimeType + "; charset='"
-					+ charset + "'", is);
+            if (log.isTraceEnabled())
+                log.trace("Will run query: " + queryStr);
+            
+            // Begin executing the query (asynchronous).
+            queryService.execute(ft);
 
 			/*
 			 * Sets the cache behavior.
@@ -1101,12 +1796,39 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 		} catch (Throwable e) {
 
-			throw launderThrowable(e, os);
+			throw launderThrowable(e, os, queryStr);
 
 		}
 
 	}
 
+    /**
+     * Return the query string.
+     * 
+     * @param params
+     * 
+     * @return The query string -or- <code>null</code> if none was specified.
+     */
+    private String getQueryStr(final Map<String, Vector<String>> params) {
+
+        final String queryStr;
+
+        final Vector<String> tmp = params.get("query");
+
+        if (tmp == null || tmp.isEmpty() || tmp.get(0) == null) {
+            queryStr = null;
+        } else {
+            queryStr = tmp.get(0);
+
+            if (log.isDebugEnabled())
+                log.debug("query: " + queryStr);
+
+        }
+
+        return queryStr;
+
+    }
+	
 	/**
 	 * Class reuses the a pool of buffers for each pipe. This is a significant
 	 * performance win.
@@ -1160,17 +1882,46 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		
 	}
 
-	static private RuntimeException launderThrowable(final Throwable t,
-			final OutputStream os) throws Exception {
+    /**
+     * Write the stack trace onto the output stream. This will show up in the
+     * client's response. This code path should be used iff we have already
+     * begun writing the response. Otherwise, an HTTP error status should be
+     * used instead.
+     * 
+     * @param t
+     *            The thrown error.
+     * @param os
+     *            The stream on which the response will be written.
+     * @param queryStr
+     *            The query string (if available).
+     * 
+     * @return The laundered exception.
+     * 
+     * @throws Exception
+     */
+    static private RuntimeException launderThrowable(final Throwable t,
+            final OutputStream os, final String queryStr) throws Exception {
+        try {
+            // log an error for the service.
+            log.error(t, t);
+        } finally {
+            // ignore any problems here.
+        }
 		if (os != null) {
 			try {
-				/*
-				 * Write the stack trace onto the output stream. This will show
-				 * up in the client's response. This code path will only be
-				 * taken if we have already begun writing the response.
-				 * Otherwise, an HTTP error status will be used instead.
-				 */
-				t.printStackTrace(new PrintWriter(os));
+                final PrintWriter w = new PrintWriter(os);
+                if (queryStr != null) {
+                    /*
+                     * Write the query onto the output stream.
+                     */
+                    w.write(queryStr);
+                    w.write("\n");
+                }
+                /*
+                 * Write the stack trace onto the output stream.
+                 */
+                t.printStackTrace(w);
+                w.flush();
 				// flush the output stream.
 				os.flush();
 			} finally {
@@ -1182,12 +1933,6 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			} catch (Throwable t2) {
 				// ignore any problems here.
 			}
-		}
-		try {
-			// log an error for the service.
-			log.error(t, t);
-		} finally {
-			// ignore any problems here.
 		}
 		if (t instanceof RuntimeException) {
 			return (RuntimeException) t;
@@ -1211,8 +1956,10 @@ public class NanoSparqlServer extends AbstractHTTPD {
 	 * 
 	 * @throws MalformedQueryException 
 	 */
-    private Callable<Void> getQueryTask(final String namespace,
+    private AbstractQueryTask getQueryTask(final String namespace,
             final long timestamp, final String queryStr,
+            final Map<String,Vector<String>> params,
+            final Map<String,String> headers,
             final PipedOutputStream os) throws MalformedQueryException {
     	
 		/*
@@ -1232,6 +1979,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		final NanoSparqlClient.QueryType queryType = NanoSparqlClient.QueryType
 				.fromQuery(queryStr);
 
+		final String mimeType;
 		switch (queryType) {
 		case ASK:
 			/*
@@ -1240,20 +1988,28 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			break;
 		case DESCRIBE:
 		case CONSTRUCT:
-			return new GraphQueryTask(namespace, timestamp, queryStr, os);
-		case SELECT:
-			return new TupleQueryTask(namespace, timestamp, queryStr, os);
-		}
+            // FIXME Conneg for the mime type for construct/describe!
+            mimeType = MIME_RDF_XML;
+            return new GraphQueryTask(namespace, timestamp, queryStr,
+                    queryType, mimeType, os);
+        case SELECT:
+            mimeType = MIME_SPARQL_RESULTS_XML;
+            return new TupleQueryTask(namespace, timestamp, queryStr,
+                    queryType, mimeType, os);
+        }
 
 		throw new RuntimeException("Unknown query type: " + queryType);
 
 	}
 
     /**
-     * Note: A read-only connection.
+     * Return a read-only transaction which will read from the commit point
+     * associated with the given timestamp.
      * 
      * @param namespace
+     *            The namespace.
      * @param timestamp
+     *            The timestamp.
      * 
      * @throws RepositoryException
      * 
@@ -1318,14 +2074,24 @@ public class NanoSparqlServer extends AbstractHTTPD {
         /** The SPARQL query string. */
         protected final String queryStr;
 
+        /**
+         * A symbolic constant indicating the type of query.
+         */
+        protected final QueryType queryType;
+        
+        /**
+         * The negotiated MIME type to be used for the query response.
+         */
+        protected final String mimeType;
+        
         /** A pipe used to incrementally deliver the results to the client. */
         private final PipedOutputStream os;
 
-		/**
-		 * Sesame has an option for a base URI during query evaluation. This
-		 * provides a symbolic placeholder for that URI in case we ever provide
-		 * a hook to set it.
-		 */
+        /**
+         * Sesame has an option for a base URI during query evaluation. This
+         * provides a symbolic place holder for that URI in case we ever provide
+         * a hook to set it.
+         */
         protected final String baseURI = null;
         
         /**
@@ -1353,11 +2119,15 @@ public class NanoSparqlServer extends AbstractHTTPD {
          */
         protected AbstractQueryTask(final String namespace,
                 final long timestamp, final String queryStr,
+                final QueryType queryType,
+                final String mimeType,
                 final PipedOutputStream os) {
 
             this.namespace = namespace;
             this.timestamp = timestamp;
             this.queryStr = queryStr;
+            this.queryType = queryType;
+            this.mimeType = mimeType;
             this.os = os;
             this.queryId = Long.valueOf(queryIdFactory.incrementAndGet());
             this.queryId2 = UUID.randomUUID();
@@ -1378,25 +2148,32 @@ public class NanoSparqlServer extends AbstractHTTPD {
                 OutputStream os) throws Exception;
 
         final public Void call() throws Exception {
-			final BigdataSailRepositoryConnection cxn = getQueryConnection(
-					namespace, timestamp);
-			final long begin = System.nanoTime();
+            final long begin = System.nanoTime();
+			BigdataSailRepositoryConnection cxn = null;
             try {
+                cxn = getQueryConnection(namespace, timestamp);
                 queries.put(queryId, new RunningQuery(queryId.longValue(),queryId2,
                         queryStr, begin));
-                try {
+                if(log.isTraceEnabled())
+                    log.trace("Query running...");
+//                try {
                 	doQuery(cxn, os);
-                } catch(Throwable t) {
-                	/*
-                	 * Log the query and the exception together.
-                	 */
-					log.error(t.getLocalizedMessage() + ":\n" + queryStr, t);
-                }
+//                } catch(Throwable t) {
+//                	/*
+//                	 * Log the query and the exception together.
+//                	 */
+//					log.error(t.getLocalizedMessage() + ":\n" + queryStr, t);
+//                }
+                	if(log.isTraceEnabled())
+                	    log.trace("Query done - flushing results.");
                 os.flush();
+                os.close();
+                if(log.isTraceEnabled())
+                    log.trace("Query done - output stream closed.");
                 return null;
             } catch (Throwable t) {
                 // launder and rethrow the exception.
-                throw launderThrowable(t, os);
+                throw launderThrowable(t, os, queryStr);
             } finally {
                 queries.remove(queryId);
                 try {
@@ -1405,7 +2182,8 @@ public class NanoSparqlServer extends AbstractHTTPD {
                     log.error(t, t);
                 }
                 try {
-                    cxn.close();
+                    if (cxn != null)
+                        cxn.close();
                 } catch (Throwable t) {
                     log.error(t, t);
                 }
@@ -1419,10 +2197,11 @@ public class NanoSparqlServer extends AbstractHTTPD {
 	 */
 	private class TupleQueryTask extends AbstractQueryTask {
 
-		public TupleQueryTask(final String namespace, final long timestamp,
-				final String queryStr, final PipedOutputStream os) {
+        public TupleQueryTask(final String namespace, final long timestamp,
+                final String queryStr, final QueryType queryType,
+                final String mimeType, final PipedOutputStream os) {
 
-			super(namespace, timestamp, queryStr, os);
+			super(namespace, timestamp, queryStr, queryType, mimeType, os);
 
 		}
 
@@ -1441,14 +2220,15 @@ public class NanoSparqlServer extends AbstractHTTPD {
 	/**
 	 * Executes a graph query.
 	 */
-	private class GraphQueryTask extends AbstractQueryTask {
+    private class GraphQueryTask extends AbstractQueryTask {
 
-		public GraphQueryTask(final String namespace, final long timestamp,
-				final String queryStr, final PipedOutputStream os) {
+        public GraphQueryTask(final String namespace, final long timestamp,
+                final String queryStr, final QueryType queryType,
+                final String mimeType, final PipedOutputStream os) {
 
-			super(namespace, timestamp, queryStr, os);
+            super(namespace, timestamp, queryStr, queryType, mimeType, os);
 
-		}
+        }
 
 		@Override
 		protected void doQuery(final BigdataSailRepositoryConnection cxn,
@@ -1530,7 +2310,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
     /**
      * Configuration object.
      */
-    private static class Config {
+    public static class Config {
 
     	/**
     	 * When true, suppress various things otherwise written on stdout.
@@ -1538,7 +2318,8 @@ public class NanoSparqlServer extends AbstractHTTPD {
     	public boolean quiet = false;
     	
 		/**
-		 * The port on which the server will answer requests.
+		 * The port on which the server will answer requests -or- ZERO to
+		 * use any open port.
 		 */
 		public int port = 80;
 		
@@ -1548,9 +2329,11 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		public String namespace;
     	
 		/**
-		 * The default timestamp used to query the default namespace.
+		 * The default timestamp used to query the default namespace. The server
+		 * will obtain a read only transaction which reads from the commit point
+		 * associated with this timestamp.  
 		 */
-		public long timestamp;
+		public long timestamp = ITx.UNISOLATED;
 		
     	/**
 		 * The #of threads to use to handle SPARQL queries -or- ZERO (0) for an
@@ -1593,68 +2376,69 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		
 	}
 
-	/**
-	 * Run an httpd service exposing a SPARQL endpoint. The service will respond
-	 * to the following URL paths:
-	 * <dl>
-	 * <dt>http://localhost:port/</dt>
-	 * <dd>The SPARQL end point for the default namespace as specified by the
-	 * <code>namespace</code> command line argument.</dd>
-	 * <dt>http://localhost:port/namespace/NAMESPACE</dt>
-	 * <dd>where <code>NAMESPACE</code> is the namespace of some triple store or
-	 * quad store, may be used to address ANY triple or quads store in the
-	 * bigdata instance.</dd>
-	 * <dt>http://localhost:port/status</dt>
-	 * <dd>A status page.</dd>
-	 * </dl>
-	 * 
-	 * @param args
-	 *            USAGE:<br/>
-	 *            To stop the server:<br/>
-	 *            <code>port -stop</code><br/>
-	 *            To start the server:<br/>
-	 *            <code>(options) <i>namespace</i> (propertyFile|configFile) )</code>
-	 *            <p>
-	 *            <i>Where:</i>
-	 *            <dl>
-	 *            <dt>port</dt>
-	 *            <dd>The port on which the service will respond.</dd>
-	 *            <dt>namespace</dt>
-	 *            <dd>The namespace of the default SPARQL endpoint (the
-	 *            namespace will be <code>kb</code> if none was specified when
-	 *            the triple/quad store was created).</dd>
-	 *            <dt>propertyFile</dt>
-	 *            <dd>A java properties file for a standalone {@link Journal}.</dd>
-	 *            <dt>configFile</dt>
-	 *            <dd>A jini configuration file for a bigdata federation.</dd>
-	 *            </dl>
-	 *            and <i>options</i> are any of:
-	 *            <dl>
-	 *            <dt>-q</dt>
-	 *            <dd>Suppress messages on stdout.</dd>
-	 *            <dt>-nthreads</dt>
-	 *            <dd>The #of threads which will be used to answer SPARQL
-	 *            queries (default 8).</dd>
-	 *            <dt>-forceOverflow</dt>
-	 *            <dd>Force a compacting merge of all shards on all data
-	 *            services in a bigdata federation (this option should only be
-	 *            used for benchmarking purposes).</dd>
-	 *            <dt>readLock</dt>
-	 *            <dd>The commit time against which the server will assert a
-	 *            read lock by holding open a read-only transaction against that
-	 *            commit point. When given, queries will default to read against
-	 *            this commit point. Otherwise queries will default to read
-	 *            against the most recent commit point on the database.
-	 *            Regardless, each query will be issued against a read-only
-	 *            transaction.</dt>
-	 *            <dt>bufferCapacity [#bytes]</dt>
-	 *            <dd>Specify the capacity of the buffers used to decouple the
-	 *            query evaluation from the consumption of the HTTP response by
-	 *            the clinet. The capacity may be specified in bytes or
-	 *            kilobytes, e.g., <code>5k</code>.</dd>
-	 *            </dl>
-	 *            </p>
-	 */
+    /**
+     * Run an httpd service exposing a SPARQL endpoint. The service will respond
+     * to the following URL paths:
+     * <dl>
+     * <dt>http://localhost:port/</dt>
+     * <dd>The SPARQL end point for the default namespace as specified by the
+     * <code>namespace</code> command line argument.</dd>
+     * <dt>http://localhost:port/namespace/NAMESPACE</dt>
+     * <dd>where <code>NAMESPACE</code> is the namespace of some triple store or
+     * quad store, may be used to address ANY triple or quads store in the
+     * bigdata instance.</dd>
+     * <dt>http://localhost:port/status</dt>
+     * <dd>A status page.</dd>
+     * </dl>
+     * 
+     * @param args
+     *            USAGE:<br/>
+     *            To stop the server:<br/>
+     *            <code>port -stop</code><br/>
+     *            To start the server:<br/>
+     *            <code>(options) <i>namespace</i> (propertyFile|configFile) )</code>
+     *            <p>
+     *            <i>Where:</i>
+     *            <dl>
+     *            <dt>port</dt>
+     *            <dd>The port on which the service will respond -or-
+     *            <code>0</code> to use any open port.</dd>
+     *            <dt>namespace</dt>
+     *            <dd>The namespace of the default SPARQL endpoint (the
+     *            namespace will be <code>kb</code> if none was specified when
+     *            the triple/quad store was created).</dd>
+     *            <dt>propertyFile</dt>
+     *            <dd>A java properties file for a standalone {@link Journal}.</dd>
+     *            <dt>configFile</dt>
+     *            <dd>A jini configuration file for a bigdata federation.</dd>
+     *            </dl>
+     *            and <i>options</i> are any of:
+     *            <dl>
+     *            <dt>-q</dt>
+     *            <dd>Suppress messages on stdout.</dd>
+     *            <dt>-nthreads</dt>
+     *            <dd>The #of threads which will be used to answer SPARQL
+     *            queries (default 8).</dd>
+     *            <dt>-forceOverflow</dt>
+     *            <dd>Force a compacting merge of all shards on all data
+     *            services in a bigdata federation (this option should only be
+     *            used for benchmarking purposes).</dd>
+     *            <dt>readLock</dt>
+     *            <dd>The commit time against which the server will assert a
+     *            read lock by holding open a read-only transaction against that
+     *            commit point. When given, queries will default to read against
+     *            this commit point. Otherwise queries will default to read
+     *            against the most recent commit point on the database.
+     *            Regardless, each query will be issued against a read-only
+     *            transaction.</dt>
+     *            <dt>bufferCapacity [#bytes]</dt>
+     *            <dd>Specify the capacity of the buffers used to decouple the
+     *            query evaluation from the consumption of the HTTP response by
+     *            the clinet. The capacity may be specified in bytes or
+     *            kilobytes, e.g., <code>5k</code>.</dd>
+     *            </dl>
+     *            </p>
+     */
 	public static void main(final String[] args) {
 		final Config config = new Config();
 		boolean forceOverflow = false;
@@ -1888,9 +2672,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			server = new NanoSparqlServer(config, indexManager);
 
             /*
-             * Install a shutdown hook so that the master will cancel any
-             * running clients if it is interrupted (normal kill will trigger
-             * this hook).
+             * Install a shutdown hook (normal kill will trigger this hook).
              */
             {
                 
@@ -1902,8 +2684,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
                         tmp.shutdownNow();
 
-                        System.err.println("Caught signal, shutting down: "
-                                + new Date());
+                        log.warn("Caught signal, shutting down: " + new Date());
 
                     }
 
@@ -1913,8 +2694,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 			if (!config.quiet) {
 
-				System.out.println("Service is running: http://localhost:"
-						+ config.port);
+                log.warn("Service is running: port=" + config.port);
             	
             }
 

@@ -44,7 +44,8 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Properties;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.Vector;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -55,6 +56,7 @@ import java.util.regex.Pattern;
 
 import javax.xml.parsers.ParserConfigurationException;
 
+import org.CognitiveWeb.util.CaseInsensitiveStringComparator;
 import org.apache.log4j.Logger;
 import org.xml.sax.SAXException;
 
@@ -129,12 +131,14 @@ public class CounterSetQuery {
 
         // Extract the URL query parameters.
         final LinkedHashMap<String, Vector<String>> params = NanoHTTPD
-                .decodeParms(url.getQuery());
+                .decodeParams(url.getQuery(),
+                        new LinkedHashMap<String, Vector<String>>());
 
         // add any relevant headers
-        final Properties headers = new Properties();
+        final Map<String, String> headers = new TreeMap<String, String>(
+                new CaseInsensitiveStringComparator());
 
-        headers.setProperty("host", url.getHost() + ":" + url.getPort());
+        headers.put("host", url.getHost() + ":" + url.getPort());
 
         return new URLQueryModel(null/* service */, url.toString(), params,
                 headers);

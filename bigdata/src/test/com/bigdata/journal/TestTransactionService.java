@@ -212,8 +212,6 @@ public class TestTransactionService extends TestCase2 {
         /**
          * Awaits the specified run state.
          * 
-         * @param service
-         *            The service.
          * @param expectedRunState
          *            The expected run state.
          * 

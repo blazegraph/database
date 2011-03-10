@@ -42,7 +42,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Vector;
 import java.util.regex.Pattern;
 
@@ -211,7 +210,7 @@ public class URLQueryModel {
     /**
      * The request headers.
      */
-    final public Properties headers;
+    final public Map<String,String> headers;
     
     /**
      * The value of the {@link #PATH} query parameter. 
@@ -348,8 +347,8 @@ public class URLQueryModel {
      */
     public URLQueryModel(final IService service, final String uri,
             final LinkedHashMap<String, Vector<String>> params,
-            final Properties headers) {
-    
+            final Map<String, String> headers) {
+
         this.uri = uri;
 
         this.params = params;

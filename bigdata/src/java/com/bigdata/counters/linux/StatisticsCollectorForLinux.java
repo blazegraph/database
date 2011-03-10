@@ -96,13 +96,14 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
 
     }
     
-    private boolean countersAdded = false;
+//    private boolean countersAdded = false;
     
-    synchronized public CounterSet getCounters() {
+    @Override
+    /*synchronized*/ public CounterSet getCounters() {
         
         final CounterSet root = super.getCounters();
         
-        if( ! countersAdded ) {
+//        if( ! countersAdded ) {
 
             if (sar1 != null) {
              
@@ -141,9 +142,9 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
 
             }
             
-            countersAdded = true;
-            
-        }
+//            countersAdded = true;
+//            
+//        }
         
         return root;
         

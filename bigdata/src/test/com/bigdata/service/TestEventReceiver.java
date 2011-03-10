@@ -46,6 +46,7 @@ import junit.framework.TestCase2;
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITransactionService;
@@ -585,7 +586,7 @@ public class TestEventReceiver extends TestCase2 {
             return null;
         }
 
-        public CounterSet getCounterSet() {
+        public CounterSet getCounters() {
             return null;
         }
 
@@ -697,7 +698,7 @@ public class TestEventReceiver extends TestCase2 {
             return false;
         }
 
-        public AbstractHTTPD newHttpd(int httpdPort, CounterSet counterSet) throws IOException {
+        public AbstractHTTPD newHttpd(int httpdPort, ICounterSetAccess access) throws IOException {
             return null;
         }
 

@@ -282,13 +282,13 @@ public class PIDStatCollector extends AbstractProcessCollector implements
      * declared using the bare path for the counter. E.g., as
      * {@link IProcessCounters#Memory_virtualSize}.
      */
-    synchronized public CounterSet getCounters() {
+    /*synchronized*/ public CounterSet getCounters() {
         
-        if(root == null) {
+//        if(root == null) {
         
-            root = new CounterSet();
+        final CounterSet root = new CounterSet();
             
-            inst = new LinkedList<AbstractInst>();
+            inst = new LinkedList<AbstractInst<?>>();
             
             /*
              * Note: Counters are all declared as Double to facilitate
@@ -315,11 +315,11 @@ public class PIDStatCollector extends AbstractProcessCollector implements
             inst.add(new ID(IProcessCounters.PhysicalDisk_BytesReadPerSec, Bytes.kilobyte32));
             inst.add(new ID(IProcessCounters.PhysicalDisk_BytesWrittenPerSec, Bytes.kilobyte32));
 
-        }
+//        }
         
-        for(Iterator<AbstractInst> itr = inst.iterator(); itr.hasNext(); ) {
+        for(Iterator<AbstractInst<?>> itr = inst.iterator(); itr.hasNext(); ) {
             
-            AbstractInst i = itr.next();
+            final AbstractInst<?> i = itr.next();
             
             root.addCounter(i.getPath(), i);
             
@@ -328,8 +328,8 @@ public class PIDStatCollector extends AbstractProcessCollector implements
         return root;
         
     }
-    private List<AbstractInst> inst = null;
-    private CounterSet root = null;
+    private List<AbstractInst<?>> inst = null;
+//    private CounterSet root = null;
     
     /**
      * Extended to force <code>pidstat</code> to use a consistent

@@ -31,6 +31,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
@@ -51,7 +52,8 @@ import com.bigdata.sparse.SparseRowStore;
  * @param <T>
  *            The generic type of the client or service.
  */
-public interface IBigdataFederation<T> extends IIndexManager, IFederationDelegate<T> {
+public interface IBigdataFederation<T> extends IIndexManager,
+        IFederationDelegate<T>, ICounterSetAccess {
 
     /**
      * Return the client object that was used to connect to the federation.
@@ -111,16 +113,16 @@ public interface IBigdataFederation<T> extends IIndexManager, IFederationDelegat
      * @see #getServiceCounterSet()
      * @see #getServiceCounterPathPrefix()
      */
-    public CounterSet getCounterSet();
+    public CounterSet getCounters();
     
     /**
-     * The node in {@link #getCounterSet()} corresponding to the root of the
+     * The node in {@link #getCounters()} corresponding to the root of the
      * host on which the client or service is executing.
      */
     public CounterSet getHostCounterSet();
     
     /**
-     * The node in {@link #getCounterSet()} corresponding to the root of the
+     * The node in {@link #getCounters()} corresponding to the root of the
      * client or service connected using this federation.
      */
     public CounterSet getServiceCounterSet();
