@@ -657,63 +657,169 @@ public class NicUtil {
      * @throws IOException if a network error occurs while determining
      *         if a candidate return address is <i>reachable</i>.
      */
-    public static String getDefaultIpv4Address(boolean loopbackOk)
+    public static String getDefaultIpv4Address(final boolean loopbackOk)
                              throws SocketException, IOException
     {
-        //get all nics on the current node
-        Enumeration<NetworkInterface> nics = 
-            NetworkInterface.getNetworkInterfaces();
-        while( nics.hasMoreElements() ) {
-            NetworkInterface curNic = nics.nextElement();
-            List<InterfaceAddress> interfaceAddrs = 
-                                       curNic.getInterfaceAddresses();
-            for(InterfaceAddress interfaceAddr : interfaceAddrs) {
-                InetAddress inetAddr = interfaceAddr.getAddress();
-                boolean isIpv4 = inetAddr instanceof Inet4Address;
-                boolean isLoopbackAddress = inetAddr.isLoopbackAddress();
-                if(isIpv4) {
-                    if(isLoopbackAddress) continue;
-                    boolean isReachable = inetAddr.isReachable(3*1000);
-                    Inet4Address inet4Addr = (Inet4Address)inetAddr;
-                    String retVal = inet4Addr.getHostAddress();
-
-                    jiniConfigLogger.log
-                        (CONFIG, "default IPv4 address: "+retVal);
-                    utilLogger.log
-                        (Level.TRACE, "default IPv4 address: "+retVal);
-                    return retVal;
+        /*
+         * Note: I've commented out the inetAddr.isReachable() lines. Their
+         * return value was not being used, the method call was imposing
+         * significant latency on this method, and the possible IOException was
+         * not being trapped through the standard invocation code paths, e.g.,
+         * NicUtil.getInetAddress/3.
+         * 
+         * One thing to note is that the method getDefaultIpv4Address where
+         * isReachable is called was created as a convenience; specifically, to
+         * allow one to use NicUtil with Windows, where the NIC name(s) can't
+         * necessarily be known a priori. It also turned out to then be
+         * convenient to use that method in the config files used by the tests;
+         * where dealing with multiple NICs is generally not an issue.
+         * 
+         * But it was always intended that in a real system deployment, the NICs
+         * would be known and explicitly specified in the config files used in
+         * that real deployment, rather than running all network traffic through
+         * the single, default NIC. Thus, if the latency of the call is a
+         * concern, you might shorten the timeout that's currently baked into
+         * the call to isReachable; and test the return value, executing a
+         * continue when that value is false.
+         * 
+         * Note: For a timeout of 500ms or less, isReachable(timeout) will
+         * return false under Windows. Therefore I have added a static cache for
+         * the loopback address so we do not suffer either lookup failures or
+         * large latencies on lookup.
+         */
+        final int timeout = 3000;
+        // first consider the non-loopback addresses.
+        {
+            { // test the cache
+                final String cached = nonLoopbackCache.get();
+                if (cached != null)
+                    return cached;
+            }
+            // get all nics on the current node
+            final Enumeration<NetworkInterface> nics = 
+                NetworkInterface.getNetworkInterfaces();
+            while( nics.hasMoreElements() ) {
+                final NetworkInterface curNic = nics.nextElement();
+                final List<InterfaceAddress> interfaceAddrs = 
+                                           curNic.getInterfaceAddresses();
+                for(InterfaceAddress interfaceAddr : interfaceAddrs) {
+                    final InetAddress inetAddr = interfaceAddr.getAddress();
+                    final boolean isIpv4 = inetAddr instanceof Inet4Address;
+                    final boolean isLoopbackAddress = inetAddr.isLoopbackAddress();
+                    if(isIpv4) {
+                        if(isLoopbackAddress) continue;
+                        final boolean isReachable = inetAddr.isReachable(timeout);
+                        if (!isReachable) continue;
+                        final Inet4Address inet4Addr = (Inet4Address)inetAddr;
+                        final String retVal = inet4Addr.getHostAddress();
+    
+                        jiniConfigLogger.log
+                            (CONFIG, "default IPv4 address: "+retVal);
+                        utilLogger.log
+                            (Level.TRACE, "default IPv4 address: "+retVal);
+                        
+                        // update the cache
+                        nonLoopbackCache.set(retVal);
+                        
+                        return retVal;
+                    }
                 }
             }
         }
 
         if(!loopbackOk) return null;
 
-        nics = NetworkInterface.getNetworkInterfaces();
-        while( nics.hasMoreElements() ) {
-            NetworkInterface curNic = nics.nextElement();
-            List<InterfaceAddress> interfaceAddrs = 
-                                       curNic.getInterfaceAddresses();
-            for(InterfaceAddress interfaceAddr : interfaceAddrs) {
-                InetAddress inetAddr = interfaceAddr.getAddress();
-                boolean isIpv4 = inetAddr instanceof Inet4Address;
-                boolean isLoopbackAddress = inetAddr.isLoopbackAddress();
-                if(isIpv4) {
-                    if(!isLoopbackAddress) continue;
-                    boolean isReachable = inetAddr.isReachable(3*1000);
-                    Inet4Address inet4Addr = (Inet4Address)inetAddr;
-                    String retVal = inet4Addr.getHostAddress();
+        // now examine the loopback addresses.
+        {
+            {// test the cache
+                final String cached = loopbackCache.get();
+                if (cached != null)
+                    return cached;
+            }
+            // get all nics on the current node
+            final Enumeration<NetworkInterface> nics = 
+                NetworkInterface.getNetworkInterfaces();
+            while( nics.hasMoreElements() ) {
+                final NetworkInterface curNic = nics.nextElement();
+                final List<InterfaceAddress> interfaceAddrs = 
+                                           curNic.getInterfaceAddresses();
+                for(InterfaceAddress interfaceAddr : interfaceAddrs) {
+                    final InetAddress inetAddr = interfaceAddr.getAddress();
+                    final boolean isIpv4 = inetAddr instanceof Inet4Address;
+                    final boolean isLoopbackAddress = inetAddr.isLoopbackAddress();
+                    if(isIpv4) {
+                        if(!isLoopbackAddress) continue;
+                        final boolean isReachable = inetAddr.isReachable(timeout);
+                        if (!isReachable) continue;
+                        final Inet4Address inet4Addr = (Inet4Address)inetAddr;
+                        final String retVal = inet4Addr.getHostAddress();
+    
+                        jiniConfigLogger.log
+                            (CONFIG, "default IPv4 address: "+retVal);
+                        utilLogger.log
+                            (Level.TRACE, "default IPv4 address: "+retVal);
 
-                    jiniConfigLogger.log
-                        (CONFIG, "default IPv4 address: "+retVal);
-                    utilLogger.log
-                        (Level.TRACE, "default IPv4 address: "+retVal);
-                    return retVal;
+                        // update the cache
+                        loopbackCache.set(retVal);
+                        
+                        return retVal;
+                    }
                 }
             }
         }
+        
         return null;
+        
     }
 
+    static private long cacheTimeout = 60 * 1000;// ms
+    
+    /**
+     * A simple cache with an expiration time and refresh on read.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private static class AddrCache<T> {
+
+        private volatile T cache = null;
+
+        private volatile long timestamp = 0L;
+
+        /**
+         * Return the address from the cache iff one exists in the cache and the
+         * cache has not expired. If the cache is expired, then it is cleared
+         * and <code>null</code> is returned. If the cache is empty, then
+         * <code>null</code> is returned. If the cache is not expired and has an
+         * address, then the cache age is touched to defer expiration.
+         * 
+         * @return The address if found in the cache.
+         */
+        synchronized T get() {
+            final long now = System.currentTimeMillis();
+            if (cache != null) {
+                final boolean expired = (now - timestamp) > cacheTimeout;
+                if (expired) {
+                    cache = null;
+                    return null;
+                }
+                timestamp = now;
+                return cache;
+            }
+            return null;
+        }
+
+        /**
+         * Sets the cached value.
+         */
+        synchronized void set(final T addr) {
+            cache = addr;
+            timestamp = System.currentTimeMillis();
+        }
+
+    }
+    private static AddrCache<String> loopbackCache = new AddrCache<String>();
+    private static AddrCache<String> nonLoopbackCache = new AddrCache<String>();
+        
     public static String getDefaultIpv4Address()
                              throws SocketException, IOException
     {
