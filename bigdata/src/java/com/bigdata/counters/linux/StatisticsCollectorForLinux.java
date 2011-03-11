@@ -68,13 +68,25 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
         super.start();
         
         if (sar1 != null)
-            sar1.start();
+			try {
+				sar1.start();
+			} catch (Throwable t) {
+				log.error(t, t);
+			}
 
         if (vmstat != null)
-            vmstat.start();
+			try {
+				vmstat.start();
+			} catch (Throwable t) {
+				log.error(t, t);
+			}
         
         if (pidstat != null)
-            pidstat.start();
+			try {
+				pidstat.start();
+			} catch (Throwable t) {
+				log.error(t, t);
+			}
 
     }
 
@@ -86,13 +98,25 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
         super.stop();
 
         if (sar1 != null)
-            sar1.stop();
+			try {
+				sar1.stop();
+			} catch (Throwable t) {
+				log.error(t, t);
+			}
 
         if (vmstat != null)
-            vmstat.stop();
+			try {
+				vmstat.stop();
+			} catch (Throwable t) {
+				log.error(t, t);
+			}
 
         if (pidstat != null)
-            pidstat.stop();
+			try {
+				pidstat.stop();
+			} catch (Throwable t) {
+				log.error(t, t);
+			}
 
     }
     

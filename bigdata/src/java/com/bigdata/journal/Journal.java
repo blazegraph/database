@@ -36,6 +36,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -73,14 +74,12 @@ import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.LoadBalancerService;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.ShutdownHelper;
-import com.bigdata.util.concurrent.TaskCounters;
-import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
+import com.bigdata.util.concurrent.ThreadPoolExecutorBaseStatisticsTask;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
@@ -179,28 +178,20 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          * Boolean option for the collection of statistics from the various
          * queues using to run tasks (default
          * {@link #DEFAULT_COLLECT_QUEUE_STATISTICS}).
-         * 
-         * @see ThreadPoolExecutorStatisticsTask
          */
         String COLLECT_QUEUE_STATISTICS = Journal.class.getName()
                 + ".collectQueueStatistics";
 
         String DEFAULT_COLLECT_QUEUE_STATISTICS = "false";
 
-        /**
-         * Integer option specifies the port on which an httpd service will be
-         * started that exposes the {@link CounterSet} for the client (default
-         * {@value #DEFAULT_HTTPD_PORT}). When ZERO (0), a random port will be
-         * used. The httpd service may be disabled by specifying <code>-1</code>
-         * as the port.
-         * <p>
-         * Note: The httpd service for the {@link LoadBalancerService} is
-         * normally run on a known port in order to make it easy to locate that
-         * service, e.g., port 80, 8000 or 8080, etc. This MUST be overridden for
-         * the {@link LoadBalancerService} it its configuration since
-         * {@link #DEFAULT_HTTPD_PORT} will otherwise cause a random port to be
-         * assigned.
-         */
+		/**
+		 * Integer option specifies the port on which an httpd service will be
+		 * started that exposes the {@link CounterSet} for the client (default
+		 * {@value #DEFAULT_HTTPD_PORT}). When ZERO (0), a random port will be
+		 * used and the actual port selected may be discovered using
+		 * {@link Journal#getHttpdURL()}. The httpd service may be disabled by
+		 * specifying <code>-1</code> as the port.
+		 */
         String HTTPD_PORT = Journal.class.getName() + ".httpdPort";
 
         /**
@@ -455,10 +446,10 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             tmp.makePath(IJournalCounters.transactionManager)
                     .attach(localTransactionManager.getCounters());
 
-            if (threadPoolExecutorStatisticsTask != null) {
+            if (queueSampleTask != null) {
 
                 tmp.makePath(IJournalCounters.executorService)
-                        .attach(threadPoolExecutorStatisticsTask.getCounters());
+                        .attach(queueSampleTask.getCounters());
 
             }
 
@@ -1485,16 +1476,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * 
      * @see Options#COLLECT_QUEUE_STATISTICS
      */
-    private ThreadPoolExecutorStatisticsTask threadPoolExecutorStatisticsTask = null;
-
-    /**
-     * Counters that aggregate across all tasks submitted to the Journal's
-     * {@link ExecutorService}. Those counters are sampled by a
-     * {@link ThreadPoolExecutorStatisticsTask}.
-     * 
-     * @see Options#COLLECT_QUEUE_STATISTICS
-     */
-    private final TaskCounters taskCounters = new TaskCounters();
+    private ThreadPoolExecutorBaseStatisticsTask queueSampleTask = null;
 
     /**
      * Collects interesting statistics on the host and process.
@@ -1627,17 +1609,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             }
 
             final long initialDelay = 0; // initial delay in ms.
-            final long delay = 1000; // delay in ms.
-            final TimeUnit unit = TimeUnit.MILLISECONDS;
+			final long delay = 1000; // delay in ms.
+			final TimeUnit unit = TimeUnit.MILLISECONDS;
 
-            final String relpath = "Thread Pool";
+			queueSampleTask = new ThreadPoolExecutorBaseStatisticsTask(
+					executorService);
 
-            threadPoolExecutorStatisticsTask = new ThreadPoolExecutorStatisticsTask(
-                    relpath, executorService, taskCounters);
-
-            scheduledExecutorService
-                    .scheduleWithFixedDelay(threadPoolExecutorStatisticsTask,
-                            initialDelay, delay, unit);
+			addScheduledTask(queueSampleTask, initialDelay,
+					delay, unit);
 
         }
         
@@ -1749,8 +1728,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                             + ":" + httpd.getPort() + "/?path="
                             + URLEncoder.encode("", "UTF-8");
 
-                    if (log.isInfoEnabled())
-                        log.info("start:\n" + httpdURL);
+                    if(log.isInfoEnabled())
+                    	log.info("Performance counters: " + httpdURL);
                 
                 }
 
@@ -1759,5 +1738,53 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         }
         
     } // class StartDeferredTasks
+
+    public ScheduledFuture<?> addScheduledTask(final Runnable task,
+            final long initialDelay, final long delay, final TimeUnit unit) {
+
+        if (task == null)
+            throw new IllegalArgumentException();
+
+        if (log.isInfoEnabled())
+            log.info("Scheduling task: task=" + task.getClass()
+                    + ", initialDelay=" + initialDelay + ", delay=" + delay
+                    + ", unit=" + unit);
+
+		return scheduledExecutorService.scheduleWithFixedDelay(task,
+				initialDelay, delay, unit);
+
+    }
+
+	/**
+	 * {@inheritDoc}
+	 * 
+	 * @see Options#COLLECT_PLATFORM_STATISTICS
+	 */
+    final public boolean getCollectPlatformStatistics() {
+		return Boolean.valueOf(properties.getProperty(
+				Options.COLLECT_PLATFORM_STATISTICS,
+				Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
+	}
+
+	/**
+	 * {@inheritDoc}
+	 * 
+	 * @see Options#COLLECT_QUEUE_STATISTICS
+	 */
+	final public boolean getCollectQueueStatistics() {
+		return Boolean.valueOf(properties.getProperty(
+				Options.COLLECT_QUEUE_STATISTICS,
+				Options.DEFAULT_COLLECT_QUEUE_STATISTICS));
+	}
+
+	/**
+	 * {@inheritDoc}
+	 * 
+	 * @see Options#HTTPD_PORT
+	 */
+	final public int getHttpdPort() {
+		return Integer.valueOf(properties.getProperty(Options.HTTPD_PORT,
+				Options.DEFAULT_HTTPD_PORT));
+	}
 
 }

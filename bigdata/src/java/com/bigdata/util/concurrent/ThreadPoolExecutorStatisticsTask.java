@@ -29,7 +29,7 @@ import com.bigdata.util.concurrent.IQueueCounters.IWriteServiceExecutorCounters;
  */
 public class ThreadPoolExecutorStatisticsTask implements Runnable {
 
-    protected static final Logger log = Logger.getLogger(ThreadPoolExecutorStatisticsTask.class);
+    private static final Logger log = Logger.getLogger(ThreadPoolExecutorStatisticsTask.class);
     
     /**
      * The label for the executor service (used in log messages).

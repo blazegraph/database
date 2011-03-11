@@ -49,24 +49,72 @@ public class SysstatUtil {
     final protected static Logger log = Logger
             .getLogger(AbstractStatisticsCollector.class);
 
-    /**
-     * Returns the path to the sysstat utilities (pidstat, sar, etc). The
-     * default is <code>/usr/bin</code>. This may be overridden using the
-     * <code>com.bigdata.counters.linux.sysstat.path</code> property.
-     * 
-     * @return The path.
-     */
-    static public final File getPath() {
+    public interface Options {
+    	
+    	String PATH = "com.bigdata.counters.linux.sysstat.path";
+    	
+    	String DEFAULT_PATH = "/usr/bin";
+    }
 
-        final String PATH = "com.bigdata.counters.linux.sysstat.path";
+	/**
+	 * Returns the path to the specified sysstat utility (pidstat, sar, etc).
+	 * The default is directory is {@value Options#DEFAULT_PATH}. This may be
+	 * overridden using the {@value Options#PATH} property. The following
+	 * directories are also searched if the program is not found in the
+	 * configured default location:
+	 * <ul>
+	 * <li>/usr/bin</li>
+	 * <li>/usr/local/bin</li>
+	 * </ul>
+	 * 
+	 * @return The path to the specified utility. If the utility was not found,
+	 *         then the configured path to the utility will be returned anyway.
+	 */
+    static public final File getPath(final String cmd) {
 
-        final File file = new File(System.getProperty(PATH, "/usr/bin/"));
+		File f, path;
+		final File configuredPath = path = new File(System.getProperty(Options.PATH,
+				Options.DEFAULT_PATH));
 
         if (log.isInfoEnabled())
-            log.info(PATH + "=" + file);
+            log.info(Options.PATH + "=" + configuredPath);
 
-        return file;
-        
+		if (!(f=new File(path, cmd)).exists() && true) {
+
+			log.warn("Not found: " + f);
+			
+			path = new File("/usr/bin");
+			
+			if (!(f = new File(path, cmd)).exists()) {
+
+				log.warn("Not found: " + f);
+
+				path = new File("/usr/local/bin");
+
+				if (!(f = new File(path, cmd)).exists()) {
+
+					log.warn("Not found: " + f);
+
+					log.error("Could not locate: '" + cmd + "'. Set '-D"
+							+ Options.PATH + "=<dir>'");
+
+					// restore default even though not found.
+					path = configuredPath;
+					
+				}
+
+			}
+
+		}
+
+		if (configuredPath != path) {
+
+			log.warn("Using effective path: " + Options.PATH + "=" + path);
+
+		}
+
+		return new File(path, cmd);
+
     }
     
     /**
