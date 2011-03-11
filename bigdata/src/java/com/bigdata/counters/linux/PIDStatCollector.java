@@ -251,7 +251,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
         
         final List<String> command = new LinkedList<String>();
         
-        command.add(new File(SysstatUtil.getPath(), "pidstat").getPath());
+        command.add(SysstatUtil.getPath("pidstat").getPath());
 
         command.add("-p");
         command.add(""+pid);

@@ -57,6 +57,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -82,7 +83,6 @@ import org.openrdf.rio.rdfxml.RDFXMLParser;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.LRUNexus;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.IPredicate;
@@ -93,11 +93,9 @@ import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IAtomicStore;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -121,6 +119,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.concurrent.ThreadPoolExecutorBaseStatisticsTask;
 import com.bigdata.util.httpd.AbstractHTTPD;
 import com.bigdata.util.httpd.NanoHTTPD;
 
@@ -321,7 +320,29 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 		}
 
+		if (indexManager.getCollectQueueStatistics()) {
+
+			final long initialDelay = 0; // initial delay in ms.
+			final long delay = 1000; // delay in ms.
+			final TimeUnit unit = TimeUnit.MILLISECONDS;
+
+			queueSampleTask = new ThreadPoolExecutorBaseStatisticsTask(
+					(ThreadPoolExecutor) queryService);
+			
+			queueStatsFuture = indexManager.addScheduledTask(queueSampleTask,
+					initialDelay, delay, unit);
+
+		} else {
+		
+			queueSampleTask = null;
+			
+			queueStatsFuture = null;
+			
+		}
+
 	}
+	private final ScheduledFuture<?> queueStatsFuture;
+	private final ThreadPoolExecutorBaseStatisticsTask queueSampleTask;
 
 	/**
 	 * Return a list of the registered {@link AbstractTripleStore}s.
@@ -585,6 +606,9 @@ public class NanoSparqlServer extends AbstractHTTPD {
     public void shutdown() {
         if(log.isInfoEnabled())
             log.info("Normal shutdown.");
+        // Stop collecting queue statistics.
+		if (queueStatsFuture != null)
+			queueStatsFuture.cancel(true/* mayInterruptIfRunning */);
         // Tell NanoHTTP to stop accepting new requests.
         super.shutdown();
         // Stop servicing new requests. 
@@ -618,6 +642,9 @@ public class NanoSparqlServer extends AbstractHTTPD {
     public void shutdownNow() {
         if(log.isInfoEnabled())
             log.info("Normal shutdown.");
+        // Stop collecting queue statistics.
+		if (queueStatsFuture != null)
+			queueStatsFuture.cancel(true/* mayInterruptIfRunning */);
         // Immediately stop accepting connections and interrupt open requests.
         super.shutdownNow();
         // Interrupt all running queries.
@@ -1508,10 +1535,8 @@ public class NanoSparqlServer extends AbstractHTTPD {
 	 * @todo add statistics for top-N queries based on query template
 	 *       identifiers, which can be communicated using query hints. See //
 	 *       wait for the subquery.
-	 * @todo Report on the average query latency, average concurrency of query
-	 *       evaluation, etc.
 	 */
-	public Response doStatus(final Request req) throws Exception {
+	private Response doStatus(final Request req) throws Exception {
 
 		// SPARQL queries accepted by the SPARQL end point.
         final boolean showQueries = req.params.get("showQueries") != null;
@@ -1554,40 +1579,47 @@ public class NanoSparqlServer extends AbstractHTTPD {
                     req.params)));
 
         }
+        
+        if(queueSampleTask != null) {
+        	
+        	// Performance counters for the NSS queries.
+        	sb.append(queueSampleTask.getCounters().toString());
+        	
+        }
 		
-		if (indexManager instanceof IJournal) {
-
-	        /*
-	         * Stuff which is specific to a local/embedded database.
-	         */
-
-			final AbstractJournal jnl = (AbstractJournal) indexManager;
-
-            sb.append("file\t= " + jnl.getFile() + "\n");
-
-            sb.append("BufferMode\t= "
-                    + jnl.getBufferStrategy().getBufferMode() + "\n");
-
-            sb.append("nextOffset\t= " + jnl.getRootBlockView().getNextOffset()
-                    + "\n");
-
-			if (LRUNexus.INSTANCE != null) {
-
-				sb.append(LRUNexus.Options.CLASS + "="
-						+ LRUNexus.INSTANCE.toString().getClass() + "\n");
-
-				sb.append(LRUNexus.INSTANCE.toString() + "\n");
-
-			} else {
-				
-				sb.append("LRUNexus is disabled.");
-				
-			}
-
-			// show the disk access details.
-			sb.append(jnl.getBufferStrategy().getCounters().toString()+"\n");
-
-		}
+//		if (indexManager instanceof IJournal) {
+//
+//	        /*
+//	         * Stuff which is specific to a local/embedded database.
+//	         */
+//
+//			final AbstractJournal jnl = (AbstractJournal) indexManager;
+//
+//            sb.append("file\t= " + jnl.getFile() + "\n");
+//
+//            sb.append("BufferMode\t= "
+//                    + jnl.getBufferStrategy().getBufferMode() + "\n");
+//
+//            sb.append("nextOffset\t= " + jnl.getRootBlockView().getNextOffset()
+//                    + "\n");
+//
+//			if (LRUNexus.INSTANCE != null) {
+//
+//				sb.append(LRUNexus.Options.CLASS + "="
+//						+ LRUNexus.INSTANCE.toString().getClass() + "\n");
+//
+//				sb.append(LRUNexus.INSTANCE.toString() + "\n");
+//
+//			} else {
+//				
+//				sb.append("LRUNexus is disabled.");
+//				
+//			}
+//
+//			// show the disk access details.
+//			sb.append(jnl.getBufferStrategy().getCounters().toString()+"\n");
+//
+//		}
 		
 		if(showQueries) {
 		    

@@ -46,6 +46,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -2701,6 +2702,23 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
         
+    	public ScheduledFuture<?> addScheduledTask(Runnable task,
+    			long initialDelay, long delay, TimeUnit unit) {
+    		return getFederation().addScheduledTask(task, initialDelay, delay, unit);
+    	}
+
+    	public boolean getCollectPlatformStatistics() {
+    		return getFederation().getCollectPlatformStatistics();
+    	}
+
+    	public boolean getCollectQueueStatistics() {
+    		return getFederation().getCollectQueueStatistics();
+    	}
+
+    	public int getHttpdPort() {
+    		return getFederation().getHttpdPort();
+    	}
+
     } // class ManagedJournal
 
     /**

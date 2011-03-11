@@ -350,7 +350,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
 				final Counters counters = e.getValue();
 
-				groups.makePath(tag).attach(counters.getCounters());
+				// Note: path component may not be empty!
+				groups.makePath(tag == null | tag.length() == 0 ? "None" : tag)
+						.attach(counters.getCounters());
 
 			}
 
@@ -624,8 +626,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
                             QueryEngine.class + ".engineService")));
 
             engineService.get().execute(ft);
-//            localIndexManager.getExecutorService().execute(ft);
-            
+
         } else {
             
             throw new IllegalStateException("Already running");

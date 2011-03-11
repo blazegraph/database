@@ -94,6 +94,6 @@ public interface QueryHints {
     /**
      * @see #TAG
      */
-    String DEFAULT_TAG = "N/A";
+    String DEFAULT_TAG = "";
 
 }

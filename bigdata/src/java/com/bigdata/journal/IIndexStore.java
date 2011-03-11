@@ -24,12 +24,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounter;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.IResourceLocator;
+import com.bigdata.service.ILoadBalancerService;
+import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.sparse.GlobalRowStoreSchema;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -121,10 +127,47 @@ public interface IIndexStore {
      */
     public ExecutorService getExecutorService();
 
+	/**
+	 * Adds a task which will run until canceled, until it throws an exception,
+	 * or until the service is shutdown.
+	 * 
+	 * @param task
+	 *            The task.
+	 * @param initialDelay
+	 *            The initial delay.
+	 * @param delay
+	 *            The delay between invocations.
+	 * @param unit
+	 *            The units for the delay parameters.
+	 * 
+	 * @return The {@link ScheduledFuture} for that task.
+	 */
+	public ScheduledFuture<?> addScheduledTask(final Runnable task,
+			final long initialDelay, final long delay, final TimeUnit unit);
+
     /**
-     * The service that may be used to acquire synchronous distributed locks
-     * <strong>without deadlock detection</strong>.
+     * <code>true</code> iff performance counters will be collected for the
+     * platform on which the client is running.
      */
+    public boolean getCollectPlatformStatistics();
+
+    /**
+     * <code>true</code> iff statistics will be collected for work queues.
+     */
+    public boolean getCollectQueueStatistics();
+
+    /**
+     * The port on which the optional httpd service will be run. The httpd
+     * service exposes statistics about the client, its work queues, the
+     * platform on which it is running, etc. If this is ZERO (0), then the
+     * port will be chosen randomly.
+     */
+    public int getHttpdPort();
+    
+	/**
+	 * The service that may be used to acquire synchronous distributed locks
+	 * <strong>without deadlock detection</strong>.
+	 */
     public IResourceLockService getResourceLockService();
 
     /**

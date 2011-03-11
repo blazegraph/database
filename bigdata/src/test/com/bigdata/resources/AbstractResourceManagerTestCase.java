@@ -39,6 +39,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.bfs.BigdataFileSystem;
@@ -621,9 +623,25 @@ public class AbstractResourceManagerTestCase extends
         }
 
         public CounterSet getHostCounterSet() {
-            // TODO Auto-generated method stub
             return null;
         }
+
+		public ScheduledFuture<?> addScheduledTask(Runnable task,
+				long initialDelay, long delay, TimeUnit unit) {
+			return null;
+		}
+
+		public boolean getCollectPlatformStatistics() {
+			return false;
+		}
+
+		public boolean getCollectQueueStatistics() {
+			return false;
+		}
+
+		public int getHttpdPort() {
+			return 0;
+		}
         
     }
     

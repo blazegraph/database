@@ -98,6 +98,10 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      */
     private AbstractClient<T> client;
     
+    private final boolean collectPlatformStatistics;
+    private final boolean collectQueueStatistics;
+    private final int httpdPort;
+
     /**
      * <code>true</code> iff open.  Note that during shutdown this will be set
      * to <code>false</code> before the client reference is cleared in order to
@@ -340,6 +344,38 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     }
     
     /**
+     * {@inheritDoc}
+     * @see IBigdataClient.Options#COLLECT_PLATFORM_STATISTICS
+     */
+    public boolean getCollectPlatformStatistics() {
+        
+        return collectPlatformStatistics;
+        
+    }
+    
+    /**
+     * {@inheritDoc}
+     * 
+     * @see IBigdataClient.Options#COLLECT_QUEUE_STATISTICS
+     */
+    public boolean getCollectQueueStatistics() {
+        
+        return collectQueueStatistics;
+        
+    }
+    
+    /**
+     * {@inheritDoc}
+     * 
+     * @see IBigdataClient.Options#HTTPD_PORT
+     */
+    public int getHttpdPort() {
+        
+        return httpdPort;
+        
+    }
+    
+    /**
      * httpd reporting the live counters for the client while it is connected to
      * the federation.
      */
@@ -459,33 +495,8 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      */
     private AbstractStatisticsCollector statisticsCollector;
     
-    /**
-     * Adds a task which will run until canceled, until it throws an exception,
-     * or until the federation is {@link #shutdown()}.
-     * <p>
-     * Note: Tasks run on this service generally update sampled values on
-     * {@link ICounter}s reported to the {@link ILoadBalancerService}. Basic
-     * information on the {@link #getExecutorService()} is reported
-     * automatically. Clients may add additional tasks to report on client-side
-     * aspects of their application.
-     * <p>
-     * Note: Non-sampled counters are automatically conveyed to the
-     * {@link ILoadBalancerService} once added to the basic {@link CounterSet}
-     * returned by {@link #getCounterSet()}.
-     * 
-     * @param task
-     *            The task.
-     * @param initialDelay
-     *            The initial delay.
-     * @param delay
-     *            The delay between invocations.
-     * @param unit
-     *            The units for the delay parameters.
-     * 
-     * @return The {@link ScheduledFuture} for that task.
-     */
-    public ScheduledFuture addScheduledTask(Runnable task,
-            long initialDelay, long delay, TimeUnit unit) {
+    public ScheduledFuture<?> addScheduledTask(final Runnable task,
+            final long initialDelay, final long delay, final TimeUnit unit) {
 
         if (task == null)
             throw new IllegalArgumentException();
@@ -495,8 +506,8 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                     + ", initialDelay=" + initialDelay + ", delay=" + delay
                     + ", unit=" + unit);
 
-        return scheduledExecutorService.scheduleWithFixedDelay(task, initialDelay, delay,
-                unit);
+		return scheduledExecutorService.scheduleWithFixedDelay(task,
+				initialDelay, delay, unit);
 
     }
 
@@ -660,6 +671,48 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 //        tempStoreFactory = new TemporaryStoreFactory(this.client
 //                .getTempStoreMaxExtent());
 
+        final Properties properties = client.getProperties();
+        {
+            
+            collectPlatformStatistics = Boolean.parseBoolean(properties
+                    .getProperty(Options.COLLECT_PLATFORM_STATISTICS,
+                            Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
+
+            if (log.isInfoEnabled())
+                log.info(Options.COLLECT_PLATFORM_STATISTICS + "="
+                        + collectPlatformStatistics);
+            
+        }
+
+        {
+            
+            collectQueueStatistics = Boolean.parseBoolean(properties
+                    .getProperty(Options.COLLECT_QUEUE_STATISTICS,
+                            Options.DEFAULT_COLLECT_QUEUE_STATISTICS));
+
+            if (log.isInfoEnabled())
+                log.info(Options.COLLECT_QUEUE_STATISTICS + "="
+                        + collectQueueStatistics);
+            
+        }
+
+        {
+
+            httpdPort = Integer.parseInt(properties.getProperty(
+                    Options.HTTPD_PORT,
+                    Options.DEFAULT_HTTPD_PORT));
+
+            if (log.isInfoEnabled())
+                log.info(Options.HTTPD_PORT+ "="
+                        + httpdPort);
+
+            if (httpdPort < 0 && httpdPort != -1)
+                throw new RuntimeException(
+                        Options.HTTPD_PORT
+                                + " must be -1 (disabled), 0 (random port), or positive");
+
+        }
+        
         addScheduledTask(
                 new SendEventsTask(),// task to run.
                 100, // initialDelay (ms)
@@ -1140,7 +1193,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
          */
         protected void startQueueStatisticsCollection() {
 
-            if (!client.getCollectQueueStatistics()) {
+            if (!getCollectQueueStatistics()) {
 
                 if (log.isInfoEnabled())
                     log.info("Queue statistics collection disabled: "
@@ -1176,7 +1229,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
             final Properties p = getClient().getProperties();
 
-            if (!getClient().getCollectPlatformStatistics()) {
+            if (!getCollectPlatformStatistics()) {
 
                 return;
 
@@ -1238,22 +1291,21 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
         }
 
-        /**
-         * Start the local httpd service (if enabled). The service is started on
-         * the {@link IBigdataClient#getHttpdPort()}, on a randomly assigned
-         * port if the port is <code>0</code>, or NOT started if the port is
-         * <code>-1</code>. If the service is started, then the URL for the
-         * service is reported to the load balancer and also written into the
-         * file system. When started, the httpd service will be shutdown with
-         * the federation.
-         * 
-         * @throws UnsupportedEncodingException
-         */
+		/**
+		 * Start the local httpd service (if enabled). The service is started on
+		 * the {@link #getHttpdPort()}, on a randomly assigned port if the port
+		 * is <code>0</code>, or NOT started if the port is <code>-1</code>. If
+		 * the service is started, then the URL for the service is reported to
+		 * the load balancer and also written into the file system. When
+		 * started, the httpd service will be shutdown with the federation.
+		 * 
+		 * @throws UnsupportedEncodingException
+		 */
         protected void startHttpdService() throws UnsupportedEncodingException {
 
             final String path = getServiceCounterPathPrefix();
             
-            final int httpdPort = client.getHttpdPort();
+            final int httpdPort = getHttpdPort();
 
             if (httpdPort == -1) {
 

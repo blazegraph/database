@@ -177,7 +177,7 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
 
         final List<String> command = new LinkedList<String>();
         
-        command.add(new File(SysstatUtil.getPath(), "sar").getPath());
+        command.add(SysstatUtil.getPath("sar").getPath());
 
         // Note: Request the CPU stats.
         command.add("-u");

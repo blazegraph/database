@@ -66,9 +66,6 @@ abstract public class AbstractClient<T> implements IBigdataClient<T> {
     private final int indexCacheCapacity;
     private final long indexCacheTimeout;
 //    private final long tempStoreMaxExtent;
-    private final boolean collectPlatformStatistics;
-    private final boolean collectQueueStatistics;
-    private final int httpdPort;
     
     /*
      * IBigdataClient API.
@@ -140,24 +137,6 @@ abstract public class AbstractClient<T> implements IBigdataClient<T> {
 //        
 //    }
     
-    public boolean getCollectPlatformStatistics() {
-        
-        return collectPlatformStatistics;
-        
-    }
-    
-    public boolean getCollectQueueStatistics() {
-        
-        return collectQueueStatistics;
-        
-    }
-    
-    public int getHttpdPort() {
-        
-        return httpdPort;
-        
-    }
-
     /**
      * 
      * @param properties
@@ -337,47 +316,6 @@ abstract public class AbstractClient<T> implements IBigdataClient<T> {
 //
 //        }
 
-        {
-            
-            collectPlatformStatistics = Boolean.parseBoolean(properties
-                    .getProperty(Options.COLLECT_PLATFORM_STATISTICS,
-                            Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
-
-            if (log.isInfoEnabled())
-                log.info(Options.COLLECT_PLATFORM_STATISTICS + "="
-                        + collectPlatformStatistics);
-            
-        }
-
-        {
-            
-            collectQueueStatistics = Boolean.parseBoolean(properties
-                    .getProperty(Options.COLLECT_QUEUE_STATISTICS,
-                            Options.DEFAULT_COLLECT_QUEUE_STATISTICS));
-
-            if (log.isInfoEnabled())
-                log.info(Options.COLLECT_QUEUE_STATISTICS + "="
-                        + collectQueueStatistics);
-            
-        }
-
-        {
-
-            httpdPort = Integer.parseInt(properties.getProperty(
-                    Options.HTTPD_PORT,
-                    Options.DEFAULT_HTTPD_PORT));
-
-            if (log.isInfoEnabled())
-                log.info(Options.HTTPD_PORT+ "="
-                        + httpdPort);
-
-            if (httpdPort < 0 && httpdPort != -1)
-                throw new RuntimeException(
-                        Options.HTTPD_PORT
-                                + " must be -1 (disabled), 0 (random port), or positive");
-
-        }
-        
     }
     
     private IFederationDelegate<T> delegate = null;
