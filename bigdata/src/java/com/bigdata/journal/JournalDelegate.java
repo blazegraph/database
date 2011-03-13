@@ -234,7 +234,6 @@ public class JournalDelegate implements IJournal {
 		return delegate.addScheduledTask(task, initialDelay, delay, unit);
 	}
 
-	@Override
 	public boolean getCollectPlatformStatistics() {
 		return delegate.getCollectPlatformStatistics();
 	}
