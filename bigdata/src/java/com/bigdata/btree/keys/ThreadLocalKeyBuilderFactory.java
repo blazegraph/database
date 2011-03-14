@@ -76,4 +76,10 @@ public class ThreadLocalKeyBuilderFactory implements IKeyBuilderFactory {
         
     }
 
+    public String toString() {
+
+        return getClass().getName() + "{" + delegate + "}";
+
+    }
+    
 }
