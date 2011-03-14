@@ -33,6 +33,7 @@ import java.util.Random;
 import java.util.TimeZone;
 import java.util.UUID;
 
+import javax.xml.datatype.DatatypeConfigurationException;
 import javax.xml.datatype.DatatypeFactory;
 
 import junit.framework.TestCase2;
@@ -768,6 +769,9 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
     }
 
+    /**
+     * Unit test for round-trip of xsd:dateTime values.
+     */
     public void test_SPO_encodeDecodeDateTime() throws Exception {
         
         final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
@@ -777,7 +781,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final DateTimeExtension<BigdataValue> ext = 
             new DateTimeExtension<BigdataValue>(new IDatatypeURIResolver() {
 	            public BigdataURI resolve(URI uri) {
-	                BigdataURI buri = vf.createURI(uri.stringValue());
+	                final BigdataURI buri = vf.createURI(uri.stringValue());
 	                buri.setIV(new TermId(VTE.URI, 1024));
 	                return buri;
 	            }
@@ -800,31 +804,91 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         		df.newXMLGregorianCalendar("2001-10-26T21:32:52.12679")),
     		vf.createLiteral(
         		df.newXMLGregorianCalendar("1901-10-26T21:32:52")),
-        };
+        		};
         
-        final IV<?, ?>[] e = {//
-                ext.createIV(dt[0]),
-                ext.createIV(dt[1]),
-                ext.createIV(dt[2]),
-                ext.createIV(dt[3]),
-                ext.createIV(dt[4]),
-                ext.createIV(dt[5]),
-                ext.createIV(dt[6]),
-//                ext.createIV(dt[7]),
-        };
+        final IV<?, ?>[] e = new IV[dt.length];
+        
+        for (int i = 0; i < dt.length; i++)
+            e[i] = ext.createIV(dt[i]);
         
         final IV<?, ?>[] a = doEncodeDecodeTest(e);
 
         if (log.isInfoEnabled()) {
         	for (int i = 0; i < e.length; i++) {
-	        	log.info(dt[i]);
-	        	log.info(ext.asValue((ExtensionIV) e[i], vf));
-	        	log.info(ext.asValue((ExtensionIV) a[i], vf));
+	        	log.info("original: "+dt[i]);
+	        	log.info("asValue : "+ext.asValue((ExtensionIV) e[i], vf));
+	        	log.info("decoded : "+ext.asValue((ExtensionIV) a[i], vf));
 	        	log.info("");
 	        }
+//        	log.info(svf.createLiteral(
+//                df.newXMLGregorianCalendar("2001-10-26T21:32:52.12679")));
         }
         
+    }
+
+    /**
+     * Unit test verifies that the inline xsd:dateTime representation preserves
+     * the milliseconds units. However, precision beyond milliseconds is NOT
+     * preserved by the inline representation, which is based on milliseconds
+     * since the epoch.
+     * 
+     * @throws DatatypeConfigurationException
+     */
+    public void test_dateTime_preservesMillis()
+            throws DatatypeConfigurationException {
+
+        final BigdataValueFactory vf = BigdataValueFactoryImpl
+                .getInstance("test");
+
+        final DatatypeFactory df = DatatypeFactory.newInstance();
+
+        final DateTimeExtension<BigdataValue> ext = new DateTimeExtension<BigdataValue>(
+                new IDatatypeURIResolver() {
+                    public BigdataURI resolve(URI uri) {
+                        final BigdataURI buri = vf.createURI(uri.stringValue());
+                        buri.setIV(new TermId(VTE.URI, 1024));
+                        return buri;
+                    }
+                }, TimeZone.getTimeZone("GMT"));
+
+        /*
+         * The string representation of the dateTime w/ milliseconds+ precision.
+         * This is assumed to be a time in the time zone specified to the date
+         * time extension.
+         */
+        final String givenStr = "2001-10-26T21:32:52.12679";
+
+        /*
+         * The string representation w/ only milliseconds precision. This will
+         * be a time in the time zone given to the date time extension. The
+         * canonical form of a GMT time zone is "Z", indicating "Zulu", which is
+         * why that is part of the expected representation here.
+         */
+        final String expectedStr = "2001-10-26T21:32:52.126Z";
+
+        /*
+         * A bigdata literal w/o inlining from the *givenStr*. This
+         * representation has greater milliseconds+ precision.
+         */
+        final BigdataLiteral lit = vf.createLiteral(df
+                .newXMLGregorianCalendar(givenStr));
+        
+        // Verify the representation is exact.
+        assertEquals(givenStr, lit.stringValue());
+
+        /*
+         * The IV representation of the dateTime. This will convert the date
+         * time into the time zone given to the extension and will also truncate
+         * the precision to no more than milliseconds.
+         */
+        final ExtensionIV<?> iv = ext.createIV(lit);
+
+        // Convert the IV back into a bigdata literal.
+        final BigdataLiteral lit2 = (BigdataLiteral) ext.asValue(iv, vf);
+
+        // Verify that millisecond precision was retained.
+        assertEquals(expectedStr, lit2.stringValue());
 
     }
-    
+
 }
