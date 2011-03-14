@@ -37,6 +37,9 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
@@ -49,6 +52,10 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
+import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
  * A diagnostic utility for problems with Unicode collation issues which can
@@ -78,8 +85,10 @@ public class JournalMoveDiagnostic {
      *            <code>
      * journalFile (indexName)*
      * </code>
+     * 
+     * @throws Exception 
      */
-    public static void main(final String[] args) {
+    public static void main(final String[] args) throws Exception {
         
         if (args.length == 0) {
 
@@ -92,11 +101,55 @@ public class JournalMoveDiagnostic {
 
         final File journalFile = new File(args[0]);
         
-        if(!journalFile.exists()) {
+        if (!journalFile.exists()) {
+
+            System.out.println("\n\nCREATING NEW JOURNAL "+journalFile);
             
-            System.err.println("Not found: "+journalFile);
+            final Properties properties = new Properties();
             
-            System.exit(1);
+            properties.setProperty(Options.FILE, journalFile.toString());
+            
+            // triples only w/o inference.
+            properties.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+            properties.setProperty(BigdataSail.Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
+            properties.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
+            properties.setProperty(BigdataSail.Options.JUSTIFY, "false");
+            properties.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
+
+            final BigdataSail sail = new BigdataSail(properties);
+            
+            try {
+            
+                sail.initialize();
+                
+                final BigdataSailConnection cxn = sail.getConnection();
+                
+                try {
+                    
+                    // add a single statement.
+                    cxn.addStatement(//
+                            new URIImpl("http://www.bigdata.com"),
+                            RDF.TYPE, //
+                            RDFS.RESOURCE
+                            );
+
+                    cxn.commit();
+                    
+                } finally {
+                    
+                    cxn.close();
+                    
+                }
+                
+            } finally {
+             
+                sail.shutDown();
+
+            }
+            
+//            System.err.println("Not found: " + journalFile);
+//            
+//            System.exit(1);
             
         }
 
@@ -119,7 +172,6 @@ public class JournalMoveDiagnostic {
         }
 
         final Properties properties = new Properties();
-
         {
         
             properties.setProperty(Options.FILE, journalFile.toString());
