@@ -29,6 +29,7 @@ package com.bigdata.journal;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
@@ -53,12 +54,12 @@ public class RootBlockUtility {
     /**
      * The 1st root block.
      */
-    public IRootBlockView rootBlock0;
+    public final IRootBlockView rootBlock0;
 
     /**
      * The 2nd root block.
      */
-    public IRootBlockView rootBlock1;
+    public final IRootBlockView rootBlock1;
 
     /**
      * The current root block. For a new file, this is "rootBlock0". For an
@@ -82,6 +83,7 @@ public class RootBlockUtility {
         FileChannelUtility.readAll(opener, tmp1, FileMetadata.OFFSET_ROOT_BLOCK1);
         tmp0.position(0); // resets the position.
         tmp1.position(0);
+        IRootBlockView rootBlock0 = null, rootBlock1 = null;
         try {
             rootBlock0 = new RootBlockView(true, tmp0, checker);
         } catch (RootBlockException ex) {
@@ -96,6 +98,9 @@ public class RootBlockUtility {
             throw new RuntimeException(
                     "Both root blocks are bad - journal is not usable: " + file);
         }
+        // save references.
+        this.rootBlock0 = rootBlock0;
+        this.rootBlock1 = rootBlock1;
         if (alternateRootBlock)
             log.warn("Using alternate root block");
         /*
@@ -113,4 +118,89 @@ public class RootBlockUtility {
                 : rootBlock0) : (alternateRootBlock ? rootBlock0 : rootBlock1));
     }
 
+    /**
+     * Dumps the root blocks for the specified file.
+     * 
+     * @param args
+     *            <code>filename</code>
+     *            
+     * @throws IOException
+     */
+    public static void main(final String[] args) throws IOException {
+
+        if (args.length == 0) {
+            
+            System.err.println("usage: <filename>");
+            
+            System.exit(1);
+            
+        }
+
+        final File file = new File(args[0]);
+        
+        if (!file.exists()) {
+            
+            System.err.println("Not found: " + file);
+            
+            System.exit(1);
+            
+        }
+        
+        /**
+         * Used to re-open the {@link FileChannel} in this class.
+         */
+        final IReopenChannel<FileChannel> opener = new IReopenChannel<FileChannel>() {
+
+            // read-only.
+            static private final String fileMode = "r";
+            
+            private RandomAccessFile raf = null;
+            
+            public String toString() {
+
+                return file.toString();
+
+            }
+
+            public FileChannel reopenChannel() throws IOException {
+
+                if (raf != null && raf.getChannel().isOpen()) {
+
+                    /*
+                     * The channel is still open. If you are allowing concurrent reads
+                     * on the channel, then this could indicate that two readers each
+                     * found the channel closed and that one was able to re-open the
+                     * channel before the other such that the channel was open again by
+                     * the time the 2nd reader got here.
+                     */
+
+                    return raf.getChannel();
+
+                }
+
+                // open the file.
+                this.raf = new RandomAccessFile(file, fileMode);
+
+                return raf.getChannel();
+
+            }
+
+        };
+
+        final boolean validateChecksum = true;
+        
+        final boolean alternateRootBlock = false;
+        
+        final RootBlockUtility u = new RootBlockUtility(opener, file,
+                validateChecksum, alternateRootBlock);
+        
+        System.out.println("rootBlock0: " + u.rootBlock0);
+        
+        System.out.println("rootBlock1: " + u.rootBlock1);
+
+        System.out.println("Current root block is rootBlock"
+                + (u.rootBlock == u.rootBlock0 ? "0" : "1"));
+        
+    }
+    
 }
