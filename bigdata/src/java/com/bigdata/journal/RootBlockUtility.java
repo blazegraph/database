@@ -101,21 +101,53 @@ public class RootBlockUtility {
         // save references.
         this.rootBlock0 = rootBlock0;
         this.rootBlock1 = rootBlock1;
-        if (alternateRootBlock)
-            log.warn("Using alternate root block");
+        
+        if(alternateRootBlock) {
+            /*
+             * A request was made to use the alternative root block.
+             */
+            if (rootBlock0 == null || rootBlock1 == null) {
+                /*
+                 * Note: The [alternateRootBlock] flag only makes sense
+                 * when you have two to choose from and you want to
+                 * choose the other one. In this case, your only choice
+                 * is to use the undamaged root block.
+                 */
+                throw new RuntimeException(
+                        "Can not use alternative root block since one root block is damaged.");
+            } else {
+                log.warn("Using alternate root block");
+            }
+        }
         /*
          * Choose the root block based on the commit counter.
          * 
-         * Note: The commit counters MAY be equal. This will happen if we
-         * rollback the journal and override the current root block with the
-         * alternate root block.
+         * Note: The commit counters MAY be equal. This will happen if
+         * we rollback the journal and override the current root block
+         * with the alternate root block.
+         * 
+         * Note: If either root block was damaged then that rootBlock
+         * reference will be null and we will use the other rootBlock
+         * reference automatically. (The case where both root blocks are
+         * bad is trapped above.)
          */
         final long cc0 = rootBlock0 == null ? -1L : rootBlock0
                 .getCommitCounter();
         final long cc1 = rootBlock1 == null ? -1L : rootBlock1
                 .getCommitCounter();
-        this.rootBlock = (cc0 > cc1 ? (alternateRootBlock ? rootBlock1
-                : rootBlock0) : (alternateRootBlock ? rootBlock0 : rootBlock1));
+        if (rootBlock0 == null) {
+            // No choice. The other root block does not exist.
+            rootBlock = rootBlock1;
+        } else if (rootBlock1 == null) {
+            // No choice. The other root block does not exist.
+            rootBlock = rootBlock0;
+        } else {
+            // A choice exists, compare the timestamps.
+            this.rootBlock = (cc0 > cc1 //
+                    ? (alternateRootBlock ? rootBlock1 : rootBlock0) //
+                    : (alternateRootBlock ? rootBlock0 : rootBlock1)//
+                    );
+        }
     }
 
     /**
