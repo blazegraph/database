@@ -518,20 +518,41 @@ public class FileMetadata {
                 if( rootBlock0 == null && rootBlock1 == null ) {
                     throw new RuntimeException("Both root blocks are bad - journal is not usable: "+file);
                 }
-                if(alternateRootBlock)
-                    log.warn("Using alternate root block");
+                if(alternateRootBlock) {
+                    if (rootBlock0 == null || rootBlock1 == null) {
+                        /*
+                         * Note: The [alternateRootBlock] flag only makes sense
+                         * when you have two to choose from and you want to
+                         * choose the other one. In this case, your only choice
+                         * is to use the undamaged root block.
+                         */
+                        throw new RuntimeException(
+                                "Can not use alternative root block since one root block is damaged.");
+                    } else {
+                        log.warn("Using alternate root block");
+                    }
+                }
                 /*
                  * Choose the root block based on the commit counter.
                  * 
                  * Note: The commit counters MAY be equal. This will happen if
                  * we rollback the journal and override the current root block
                  * with the alternate root block.
+                 * 
+                 * Note: If either root block was damaged then that rootBlock
+                 * reference will be null and we will use the other rootBlock
+                 * reference automatically. (The case where both root blocks are
+                 * bad is trapped above.)
                  */
-                this.rootBlock =
-                    ( rootBlock0.getCommitCounter() > rootBlock1.getCommitCounter()
-                        ? (alternateRootBlock ?rootBlock1 :rootBlock0)
-                        : (alternateRootBlock ?rootBlock0 :rootBlock1)
-                        );
+                if (rootBlock0 == null) {
+                    rootBlock = rootBlock1;
+                } else if (rootBlock1 == null) {
+                    rootBlock = rootBlock0;
+                } else {
+                    rootBlock = (rootBlock0.getCommitCounter() > rootBlock1.getCommitCounter() //
+                            ? (alternateRootBlock ? rootBlock1 : rootBlock0)
+                            : (alternateRootBlock ? rootBlock0 : rootBlock1));
+                }
 
                 // use the offset bits from the root block.
                 this.offsetBits = rootBlock.getOffsetBits();
