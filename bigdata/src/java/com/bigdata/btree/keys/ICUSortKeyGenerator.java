@@ -86,7 +86,8 @@ import com.ibm.icu.text.RuleBasedCollator;
  */
 class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
 
-    protected static final Logger log = Logger.getLogger(ICUSortKeyGenerator.class);
+    transient private static final Logger log = Logger
+            .getLogger(ICUSortKeyGenerator.class);
     
     /**
      * Used to encode unicode strings into compact byte[]s that have the same
@@ -167,6 +168,17 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
                 
             }
             
+        } else {
+
+            /*
+             * Note: This is the default strength per the ICU documentation.
+             */
+            if (collator.getStrength() != Collator.TERTIARY) {
+                throw new AssertionError("Strength: " + collator.getStrength()
+                        + ", but expected: " + Collator.TERTIARY);
+            }
+                //collator.setStrength(Collator.TERTIARY);
+            
         }
         
         if (mode != null) {
@@ -192,6 +204,16 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
             
             }
         
+        } else {
+            /*
+             * Note: This is the default decomposition per the ICU documentation.
+             */
+            if (collator.getDecomposition() != Collator.NO_DECOMPOSITION) {
+                throw new AssertionError("Decomposition: "
+                        + collator.getDecomposition() + ", but expected: "
+                        + Collator.NO_DECOMPOSITION);
+            }
+                //collator.setDecomposition(Collator.NO_DECOMPOSITION);
         }
 
     }
@@ -211,6 +233,77 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
         keyBuilder.append(0, raw.size - 1/* do not include the nul byte */,
                 raw.bytes);
 
+    }
+
+    /**
+     * Human readable representation, including the {@link Locale}, Strength,
+     * and Decomposition mode for the backing ICU collator.
+     */
+    public String toString() {
+        final StringBuilder sb = new StringBuilder();
+        sb.append(getClass().getName());
+        sb.append("{locale=" + getLocale()); // Note: Not self-reported by Collator.
+        sb.append(",strength=" + collator.getStrength() + "("
+                + getStrength(collator.getStrength()) + ")");
+        sb.append(",decomposition=" + collator.getDecomposition() + "("
+                + getDecomposition(collator.getDecomposition()) + ")");
+        sb.append("}");
+        return sb.toString();
+    }
+
+    /**
+     * Decode an ICU collator strength, returning the corresponding type safe
+     * enumeration value.
+     * 
+     * @param strength
+     *            The ICU collator strength.
+     * 
+     * @return The type safe enumeration value.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>strength</i> is not a known value.
+     */
+    public static StrengthEnum getStrength(final int strength) {
+        switch (strength) {
+        case Collator.PRIMARY:
+            return StrengthEnum.Primary;
+        case Collator.SECONDARY:
+            return StrengthEnum.Secondary;
+        case Collator.TERTIARY:
+            return StrengthEnum.Tertiary;
+        case Collator.QUATERNARY:
+            return StrengthEnum.Quaternary;
+        case Collator.IDENTICAL:
+            return StrengthEnum.Identical;
+        default:
+            throw new IllegalArgumentException("Unknown value: " + strength);
+        }
+    }
+
+    /**
+     * Decode an ICU collator decomposition mode, returning the corresponding type safe
+     * enumeration value.
+     * 
+     * @param decomposition
+     *            The ICU collator decomposition mode.
+     * 
+     * @return The type safe enumeration value.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>decomposition</i> is not a known value.
+     */
+    public static DecompositionEnum getDecomposition(final int decomposition) {
+        switch (decomposition) {
+        case Collator.CANONICAL_DECOMPOSITION:
+            return DecompositionEnum.Canonical;
+        case Collator.NO_DECOMPOSITION:
+            return DecompositionEnum.None;
+        case Collator.FULL_DECOMPOSITION:
+            return DecompositionEnum.Full;
+        default:
+            throw new IllegalArgumentException("Unknown value: "
+                    + decomposition);
+        }
     }
 
 }

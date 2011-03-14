@@ -152,6 +152,9 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      * Factory for a new instance using default values for the
      * {@link #getKeyBuilder()}, the {@link #getLeafKeysCoder()}, and the
      * {@link #getLeafValuesCoder()}.
+     * 
+     * @deprecated This is only used by unit tests and they should do something
+     *             explicit, even if it is encapsulated by a test helper method.
      */
     public static ITupleSerializer newInstance() {
 

@@ -66,12 +66,15 @@ import com.bigdata.btree.ITupleSerializer;
  */
 public class KeyBuilder implements IKeyBuilder {
 
-    protected static final Logger log = Logger.getLogger(KeyBuilder.class);
-    
-//    protected static final boolean INFO = log.isInfoEnabled();
+    private static final transient Logger log = Logger
+            .getLogger(KeyBuilder.class);
 
-//    protected static final boolean DEBUG = log.isDebugEnabled();
-    
+    /**
+     * Text of the exception thrown when the ICU library is required but is not
+     * available.
+     */
+    final private static transient String ERR_ICU_NOT_AVAILABLE = "The ICU library is not available.";
+
     /**
      * The default capacity of the key buffer.
      */
@@ -1595,6 +1598,8 @@ public class KeyBuilder implements IKeyBuilder {
          * While both libraries define <strong>IDENTICAL</strong> they use
          * different values for this strength, hence the use of the type safe
          * enums is recommended.
+         * 
+         * @see StrengthEnum
          */
         public String STRENGTH = KeyBuilder.class.getName()+".collator.strength";
 
@@ -1779,7 +1784,7 @@ public class KeyBuilder implements IKeyBuilder {
              * Windows and Un*x.
              */
 
-            throw new UnsupportedOperationException(DefaultKeyBuilderFactory.ICU_NOT_AVAILABLE);
+            throw new UnsupportedOperationException(ERR_ICU_NOT_AVAILABLE);
 
         }
 
@@ -1809,5 +1814,13 @@ public class KeyBuilder implements IKeyBuilder {
         }
 
     }
-    
+
+    public String toString() {
+        final StringBuilder sb = new StringBuilder();
+        sb.append(getClass().getName());
+        sb.append("{sortKeyGenerator=" + getSortKeyGenerator());
+        sb.append("}");
+        return sb.toString();
+    }
+
 }

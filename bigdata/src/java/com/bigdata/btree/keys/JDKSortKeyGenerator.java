@@ -26,8 +26,6 @@ package com.bigdata.btree.keys;
 import java.text.Collator;
 import java.util.Locale;
 
-
-
 /**
  * Implementation that uses the JDK library (does not support compressed sort
  * keys).
@@ -74,7 +72,7 @@ class JDKSortKeyGenerator implements UnicodeSortKeyGenerator {
 
             } else {
 
-                StrengthEnum str = (StrengthEnum) strength;
+                final StrengthEnum str = (StrengthEnum) strength;
 
                 switch (str) {
 
@@ -133,7 +131,7 @@ class JDKSortKeyGenerator implements UnicodeSortKeyGenerator {
 
     }
 
-    public void appendSortKey(KeyBuilder keyBuilder, String s) {
+    public void appendSortKey(final KeyBuilder keyBuilder, final String s) {
 
         /*
          * Note: the collation key is expressed as signed bytes since that
@@ -146,6 +144,71 @@ class JDKSortKeyGenerator implements UnicodeSortKeyGenerator {
 
         keyBuilder.append( sortKey );
 
+    }
+
+    public String toString() {
+        final StringBuilder sb = new StringBuilder();
+        sb.append(getClass().getName());
+        sb.append("{locale=" + getLocale()); // Note: Not self-reported by Collator.
+        sb.append(",strength=" + collator.getStrength() + "("
+                + getStrength(collator.getStrength()) + ")");
+        sb.append(",decomposition=" + collator.getDecomposition() + "("
+                + getDecomposition(collator.getDecomposition()) + ")");
+        sb.append("}");
+        return sb.toString();
+    }
+
+    /**
+     * Decode a JDK collator strength, returning the corresponding type safe
+     * enumeration value.
+     * 
+     * @param strength
+     *            The JDK collator strength.
+     * 
+     * @return The type safe enumeration value.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>strength</i> is not a known value.
+     */
+    public static StrengthEnum getStrength(final int strength) {
+        switch (strength) {
+        case Collator.PRIMARY:
+            return StrengthEnum.Primary;
+        case Collator.SECONDARY:
+            return StrengthEnum.Secondary;
+        case Collator.TERTIARY:
+            return StrengthEnum.Tertiary;
+        case Collator.IDENTICAL:
+            return StrengthEnum.Identical;
+        default:
+            throw new IllegalArgumentException("Unknown value: " + strength);
+        }
+    }
+
+    /**
+     * Decode a JDK collator decomposition mode, returning the corresponding
+     * type safe enumeration value.
+     * 
+     * @param decomposition
+     *            The JDK collator decomposition mode.
+     * 
+     * @return The type safe enumeration value.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>decomposition</i> is not a known value.
+     */
+    public static DecompositionEnum getDecomposition(final int decomposition) {
+        switch (decomposition) {
+        case Collator.CANONICAL_DECOMPOSITION:
+            return DecompositionEnum.Canonical;
+        case Collator.NO_DECOMPOSITION:
+            return DecompositionEnum.None;
+        case Collator.FULL_DECOMPOSITION:
+            return DecompositionEnum.Full;
+        default:
+            throw new IllegalArgumentException("Unknown value: "
+                    + decomposition);
+        }
     }
 
 }

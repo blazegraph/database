@@ -51,11 +51,7 @@ import com.bigdata.btree.keys.KeyBuilder.Options;
  */
 public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializable {
 
-    protected static final transient Logger log = Logger.getLogger(DefaultKeyBuilderFactory.class);
-    
-//    protected static final transient boolean INFO = log.isInfoEnabled();
-//
-//    protected static final transient boolean log.isDebugEnabled() = log.isDebugEnabled();
+    private static final transient Logger log = Logger.getLogger(DefaultKeyBuilderFactory.class);
     
     /**
      * 
@@ -313,7 +309,10 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
             if (language == null) {
 
                 locale = Locale.getDefault();
-
+                
+                if( locale == null)
+                    throw new AssertionError();
+                
             } else {
                 
                 if (country == null) {
@@ -421,12 +420,6 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
                 strength, decompositionMode);
 
     }
-    
-    /**
-     * Text of the exception thrown when the ICU library is required but is not
-     * available.
-     */
-    final public static String ICU_NOT_AVAILABLE = "The ICU library is not available.";
     
     /**
      * Figures out whether or not the ICU library is available.
