@@ -831,54 +831,58 @@ public class FileMetadata {
 
 	}
 
-	/**
-	 * This constructor handles cases where the file exists and is non-empty.
-	 * 
-	 * @param file
-	 *            The name of the file to be opened.
-	 * @param useDirectBuffers
-	 *            true if a buffer should be allocated using
-	 *            {@link ByteBuffer#allocateDirect(int)} rather than
-	 *            {@link ByteBuffer#allocate(int)}. This has no effect for the
-	 *            {@link BufferMode#Disk} and {@link BufferMode#Mapped} modes.
-	 * @param readOnly
-	 *            When true, the file is opened in a read-only mode and it is an
-	 *            error if the file does not exist.
-	 * @param forceWrites
-	 *            When true, the file is opened in "rwd" mode and individual IOs
-	 *            are forced to disk. This option SHOULD be false since we only
-	 *            need to write through to disk on commit, not on each IO.
-	 * @param writeCacheEnabled
-	 *            When <code>true</code>, the {@link DiskOnlyStrategy} will
-	 *            allocate a direct {@link ByteBuffer} from the
-	 *            {@link DirectBufferPool} to service as a write cache.
-	 * @param writeCacheBufferCount
-	 *            The #of buffers to allocate for the {@link WriteCacheService}.
-	 * @param validateChecksum
-	 *            When <code>true</code>, the checksum stored in the root blocks
-	 *            of an existing file will be validated when the file is opened.
-	 *            See {@link Options#VALIDATE_CHECKSUM}.
-	 * @param alternateRootBlock
-	 *            When <code>true</code> the prior root block will be used. This
-	 *            option may be used when a commit record is valid but the data
-	 *            associated with the commit point is invalid. There are two
-	 *            root blocks. Normally the one which has been most recently
-	 *            written will be loaded on restart. When this option is
-	 *            specified, the older of the two root blocks will be loaded
-	 *            instead. <strong>If you use this option and then do a commit
-	 *            then the more recent of the root blocks will be lost and any
-	 *            data associated with that commit point will be lost as
-	 *            well!</strong>
-	 * 
-	 * @throws RuntimeException
-	 *             if there is a problem preparing the file for use by the
-	 *             journal.
-	 */
+    /**
+     * This constructor handles cases where the file exists and is non-empty.
+     * 
+     * @param file
+     *            The name of the file to be opened.
+     * @param useDirectBuffers
+     *            true if a buffer should be allocated using
+     *            {@link ByteBuffer#allocateDirect(int)} rather than
+     *            {@link ByteBuffer#allocate(int)}. This has no effect for the
+     *            {@link BufferMode#Disk} and {@link BufferMode#Mapped} modes.
+     * @param readOnly
+     *            When true, the file is opened in a read-only mode and it is an
+     *            error if the file does not exist.
+     * @param forceWrites
+     *            When true, the file is opened in "rwd" mode and individual IOs
+     *            are forced to disk. This option SHOULD be false since we only
+     *            need to write through to disk on commit, not on each IO.
+     * @param writeCacheEnabled
+     *            When <code>true</code>, the {@link DiskOnlyStrategy} will
+     *            allocate a direct {@link ByteBuffer} from the
+     *            {@link DirectBufferPool} to service as a write cache.
+     * @param writeCacheBufferCount
+     *            The #of buffers to allocate for the {@link WriteCacheService}.
+     * @param validateChecksum
+     *            When <code>true</code>, the checksum stored in the root blocks
+     *            of an existing file will be validated when the file is opened.
+     *            See {@link Options#VALIDATE_CHECKSUM}.
+     * @param alternateRootBlock
+     *            When <code>true</code> the prior root block will be used. This
+     *            option may be used when a commit record is valid but the data
+     *            associated with the commit point is invalid. There are two
+     *            root blocks. Normally the one which has been most recently
+     *            written will be loaded on restart. When this option is
+     *            specified, the older of the two root blocks will be loaded
+     *            instead. <strong>If you use this option and then do a commit
+     *            then the more recent of the root blocks will be lost and any
+     *            data associated with that commit point will be lost as
+     *            well!</strong>
+     * @param ignoreBadRootBlock
+     *            When <code>true</code>, the application will be allowed to
+     *            proceed with one damaged root block. The undamaged root block
+     *            will be automatically chosen.
+     * 
+     * @throws RuntimeException
+     *             if there is a problem preparing the file for use by the
+     *             journal.
+     */
 	FileMetadata(final File file, final boolean useDirectBuffers,
 			final boolean readOnly, final ForceEnum forceWrites,
 			final boolean writeCacheEnabled, final int writeCacheBufferCount,
 			final boolean validateChecksum, final boolean alternateRootBlock,
-			final Properties properties)
+			final boolean ignoreBadRootBlock, final Properties properties)
 			throws RuntimeException {
 
 		if (file == null)
@@ -976,7 +980,7 @@ public class FileMetadata {
 			 * constants (slotSize, segmentId).
 			 */
             final RootBlockUtility tmp = new RootBlockUtility(opener, file,
-                    validateChecksum, alternateRootBlock);
+                    validateChecksum, alternateRootBlock, ignoreBadRootBlock);
             this.rootBlock0 = tmp.rootBlock0;
             this.rootBlock1 = tmp.rootBlock1;
             this.rootBlock = tmp.rootBlock;
@@ -1422,8 +1426,11 @@ public class FileMetadata {
 				properties, Options.VALIDATE_CHECKSUM,
 				Options.DEFAULT_VALIDATE_CHECKSUM));
 
-		final boolean alternateRootBlock = Boolean.parseBoolean(getProperty(
-				properties, Options.ALTERNATE_ROOT_BLOCK, "false"));
+        final boolean alternateRootBlock = Boolean.parseBoolean(getProperty(
+                properties, Options.ALTERNATE_ROOT_BLOCK, "false"));
+
+        final boolean ignoreBadRootBlock = Boolean.parseBoolean(getProperty(
+                properties, Options.IGNORE_BAD_ROOT_BLOCK, "false"));
 
         if (alternateRootBlock && !readOnly) {
 
@@ -1440,7 +1447,8 @@ public class FileMetadata {
 			
 			return new FileMetadata(file, useDirectBuffers, readOnly,
 					forceWrites, writeCacheEnabled, writeCacheBufferCount,
-					validateChecksum, alternateRootBlock, properties);
+					validateChecksum, alternateRootBlock, ignoreBadRootBlock,
+					properties);
 
 		} else {
 

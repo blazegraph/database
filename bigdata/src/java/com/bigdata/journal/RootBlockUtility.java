@@ -67,10 +67,24 @@ public class RootBlockUtility {
      */
     public final IRootBlockView rootBlock;
 
+    /**
+     * 
+     * @param opener
+     * @param file
+     * @param validateChecksum 
+     * @param alternateRootBlock 
+     * @param ignoreBadRootBlock
+     * 
+     * @throws IOException
+     * 
+     * @see com.bigdata.journal.Options#ALTERNATE_ROOT_BLOCK
+     * @see com.bigdata.journal.Options#IGNORE_BAD_ROOT_BLOCK
+     */
     public RootBlockUtility(final IReopenChannel<FileChannel> opener,
             final File file, final boolean validateChecksum,
-            final boolean alternateRootBlock) throws IOException {
-        
+            final boolean alternateRootBlock, final boolean ignoreBadRootBlock)
+            throws IOException {
+
         final ChecksumUtility checker = validateChecksum ? ChecksumUtility.threadChk
                 .get()
                 : null;
@@ -87,31 +101,43 @@ public class RootBlockUtility {
         try {
             rootBlock0 = new RootBlockView(true, tmp0, checker);
         } catch (RootBlockException ex) {
-            log.warn("Bad root block zero: " + ex);
+            log.error("Bad root block zero: " + ex);
         }
         try {
             rootBlock1 = new RootBlockView(false, tmp1, checker);
         } catch (RootBlockException ex) {
-            log.warn("Bad root block one: " + ex);
+            log.error("Bad root block one: " + ex);
         }
         if (rootBlock0 == null && rootBlock1 == null) {
             throw new RuntimeException(
                     "Both root blocks are bad - journal is not usable: " + file);
         }
+
         // save references.
         this.rootBlock0 = rootBlock0;
         this.rootBlock1 = rootBlock1;
-        
+
+        if (!ignoreBadRootBlock
+                && (rootBlock0 == null || rootBlock1 == null)) {
+            /*
+             * Do not permit the application to continue with a damaged
+             * root block.
+             */
+            throw new RuntimeException(
+                    "Bad root block(s): rootBlock0 is "
+                            + (rootBlock0 == null ? "bad" : "ok")
+                            + ", rootBlock1="
+                            + (rootBlock1 == null ? "bad" : "ok"));
+        }
         if(alternateRootBlock) {
             /*
              * A request was made to use the alternative root block.
              */
             if (rootBlock0 == null || rootBlock1 == null) {
                 /*
-                 * Note: The [alternateRootBlock] flag only makes sense
-                 * when you have two to choose from and you want to
-                 * choose the other one. In this case, your only choice
-                 * is to use the undamaged root block.
+                 * Note: The [alternateRootBlock] flag only makes sense when you
+                 * have two root blocks to choose from and you want to choose
+                 * the other one.
                  */
                 throw new RuntimeException(
                         "Can not use alternative root block since one root block is damaged.");
@@ -219,12 +245,17 @@ public class RootBlockUtility {
 
         };
 
+        // validate the root blocks using their checksums.
         final boolean validateChecksum = true;
-        
+
+        // option is ignored since we are not not opening the Journal.
         final boolean alternateRootBlock = false;
+
+        // Open even if one root block is bad.
+        final boolean ignoreBadRootBlock = true;
         
         final RootBlockUtility u = new RootBlockUtility(opener, file,
-                validateChecksum, alternateRootBlock);
+                validateChecksum, alternateRootBlock, ignoreBadRootBlock);
         
         System.out.println("rootBlock0: " + u.rootBlock0);
         

@@ -2068,7 +2068,8 @@ public class RWStore implements IStore {
 		try {
 
             final RootBlockUtility tmp = new RootBlockUtility(m_reopener, m_fd,
-                    true/* validateChecksum */, false/* alternateRootBlock */);
+                    true/* validateChecksum */, false/* alternateRootBlock */,
+                    false/* ignoreBadRootBlock */);
 
             final IRootBlockView rootBlock = tmp.rootBlock;
             

@@ -322,18 +322,33 @@ public interface Options {
      * the more current root block is used to (re-)open the store. However, if
      * this option is specified, the <em>previous</em> root block will be used
      * to open the store. This will allow you to access the previous commit
-     * point. <strong>If you subsequently perform a commit then the most root
-     * block will be overwritten and any data associated with the last commit
-     * point will be unreachable.</strong> This option may be considered in the
-     * cases where the application is otherwise unable to proceed. It is
-     * strongly recommended that you also specify {@link #READ_ONLY} so that you
-     * do not <em>accidentally</em> trigger a commit and thereby make the data
+     * point. <strong>If you subsequently perform a commit then the other root
+     * block will be overwritten and any data associated with its commit point
+     * will be unreachable.</strong> This option may be considered in the cases
+     * where the application is otherwise unable to proceed. It is strongly
+     * recommended that you also specify {@link #READ_ONLY} so that you do not
+     * <em>accidentally</em> trigger a commit and thereby make the data
      * associated with the other root block unreachable. You may of course
      * deliberately allow a commit as an attempt to restore the database to
      * service accepting that you have rolled back the database by one commit
      * point in doing so.
      */
     String ALTERNATE_ROOT_BLOCK = AbstractJournal.class.getName()+".alternateRootBlock";
+
+    /**
+     * <strong>WARNING - The use of this option is dangerous.</strong> This
+     * option MAY be used to permit the database to be opened if one of the root
+     * blocks is bad. This will allow you to access the remaining root block and
+     * the associated commit point. <strong>If you subsequently perform a commit
+     * then the damaged root block will be overwritten.</strong> This option may
+     * be considered in the cases where the application is otherwise unable to
+     * proceed. It is strongly recommended that you also specify
+     * {@link #READ_ONLY} so that you do not <em>accidentally</em> trigger a
+     * commit. You may of course deliberately allow a commit as an attempt to
+     * restore the database to service accepting that you may have rolled back
+     * the database by one commit point in doing so.
+     */
+    String IGNORE_BAD_ROOT_BLOCK = AbstractJournal.class.getName()+".ignoreBadRootBlock";
 
     /**
      * An optional boolean property (default is {@value #DEFAULT_CREATE}). When
