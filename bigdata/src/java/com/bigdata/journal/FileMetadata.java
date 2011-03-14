@@ -508,29 +508,38 @@ public class FileMetadata {
                 try {
                     rootBlock0 = new RootBlockView(true,tmp0,validateChecksum?checker:null);
                 } catch(RootBlockException ex ) {
-                    log.warn("Bad root block zero: "+ex);
+                    log.error("Bad root block zero: "+ex);
                 }
                 try {
                     rootBlock1 = new RootBlockView(false,tmp1,validateChecksum?checker:null);
                 } catch(RootBlockException ex ) {
-                    log.warn("Bad root block one: "+ex);
+                    log.error("Bad root block one: "+ex);
                 }
                 if( rootBlock0 == null && rootBlock1 == null ) {
                     throw new RuntimeException("Both root blocks are bad - journal is not usable: "+file);
                 }
-                if(alternateRootBlock) {
-                    if (rootBlock0 == null || rootBlock1 == null) {
-                        /*
-                         * Note: The [alternateRootBlock] flag only makes sense
-                         * when you have two to choose from and you want to
-                         * choose the other one. In this case, your only choice
-                         * is to use the undamaged root block.
-                         */
-                        throw new RuntimeException(
-                                "Can not use alternative root block since one root block is damaged.");
-                    } else {
-                        log.warn("Using alternate root block");
-                    }
+                /*
+                 * Note: In the trunk, you can explicitly permit this by a code
+                 * edit here. In the next release, we have rolled that behavior
+                 * into Options.IGNORE_BAD_ROOT_BLOCK.
+                 */
+                final boolean ignoreBadRootBlock = false;
+                if (!ignoreBadRootBlock
+                        && (rootBlock0 == null || rootBlock1 == null)) {
+                    /*
+                     * Do not permit the application to continue with a damaged
+                     * root block.
+                     */
+                    throw new RuntimeException(
+                            "Bad root block(s): rootBlock0 is "
+                                    + (rootBlock0 == null ? "bad" : "ok")
+                                    + ", rootBlock1="
+                                    + (rootBlock1 == null ? "bad" : "ok"));
+                } else if(alternateRootBlock) {
+                    /*
+                     * Note: This is only possible if both root blocks are good.
+                     */
+                    log.warn("Using alternate root block");
                 }
                 /*
                  * Choose the root block based on the commit counter.
