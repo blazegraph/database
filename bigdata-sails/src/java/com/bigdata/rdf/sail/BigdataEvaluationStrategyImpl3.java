@@ -1986,7 +1986,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
             log.debug("languageCode=" + languageCode + ", label=" + label);
         }
         
-        final Iterator<IHit> itr = database.getLexiconRelation()
+        final Iterator<IHit> itr = (Iterator)database.getLexiconRelation()
                 .getSearchEngine().search(label, languageCode,
                         false/* prefixMatch */, 0d/* minCosine */,
                         10000/* maxRank */, 1000L/* timeout */,

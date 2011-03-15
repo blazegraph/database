@@ -28,8 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.search;
 
-import info.aduna.i18n.languagetag.IanaLanguageTag;
-
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
@@ -51,10 +49,7 @@ import org.apache.log4j.Logger;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.LowerCaseFilter;
 import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.standard.StandardFilter;
-import org.apache.lucene.analysis.standard.StandardTokenizer;
 import org.apache.lucene.analysis.tokenattributes.TermAttribute;
-import org.apache.lucene.util.Version;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
@@ -1017,7 +1012,7 @@ public class FullTextIndex extends AbstractRelation {
      *       iterator that is sent to the data service such that the search
      *       terms are visited only when they occur in the matching field(s).
      */
-    public Hiterator search(final String query, final String languageCode,
+    public Hiterator<Hit> search(final String query, final String languageCode,
             final boolean prefixMatch, final double minCosine,
             final int maxRank, long timeout, final TimeUnit unit) {
 
@@ -1048,7 +1043,7 @@ public class FullTextIndex extends AbstractRelation {
 
         if (timeout == 0L) {
 
-            // treat ZERO as eqivalent to MAX_LONG.
+            // treat ZERO as equivalent to MAX_LONG.
             timeout = Long.MAX_VALUE;
             
         }
@@ -1187,11 +1182,6 @@ public class FullTextIndex extends AbstractRelation {
     public long insert(IChunkedOrderedIterator itr) {
         throw new UnsupportedOperationException();
     }
-
-//    @SuppressWarnings("unchecked")
-//    public IAccessPath getAccessPath(IPredicate predicate) {
-//        throw new UnsupportedOperationException();
-//    }
 
     public Set<String> getIndexNames() {
         throw new UnsupportedOperationException();
