@@ -813,7 +813,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *       already imposes a canonicalizing mapping within for the index name
      *       and timestamp inside of a JVM.
      */
-    public ITextIndexer getSearchEngine() {
+    public ITextIndexer<?> getSearchEngine() {
 
         if (!textIndex)
             return null;
@@ -829,13 +829,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
                 if (viewRef.get() == null) {
 
-                    final ITextIndexer tmp;
+                    final ITextIndexer<?> tmp;
                     try {
                         final Class<?> vfc = determineTextIndexerClass();
                         final Method gi = vfc.getMethod("getInstance",
                                 IIndexManager.class, String.class, Long.class,
                                 Properties.class);
-                        tmp = (ITextIndexer) gi.invoke(null/* object */,
+                        tmp = (ITextIndexer<?>) gi.invoke(null/* object */,
                                 getIndexManager(), getNamespace(),
                                 getTimestamp(), getProperties());
                         if(tmp instanceof ILocatableResource<?>) {

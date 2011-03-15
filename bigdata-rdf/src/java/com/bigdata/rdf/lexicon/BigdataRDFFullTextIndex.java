@@ -37,8 +37,8 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.search.FullTextIndex;
+import com.bigdata.search.Hit;
 import com.bigdata.search.TokenBuffer;
 
 /**
@@ -48,18 +48,18 @@ import com.bigdata.search.TokenBuffer;
  * @version $Id$
  */
 public class BigdataRDFFullTextIndex extends FullTextIndex implements
-        ITextIndexer {
+        ITextIndexer<Hit> {
 
-    static public ITextIndexer getInstance(final IIndexManager indexManager,
-            final String namespace, final Long timestamp,
-            final Properties properties) {
+    static public BigdataRDFFullTextIndex getInstance(
+            final IIndexManager indexManager, final String namespace,
+            final Long timestamp, final Properties properties) {
 
         if (namespace == null)
             throw new IllegalArgumentException();
-        
+
         return new BigdataRDFFullTextIndex(indexManager, namespace, timestamp,
                 properties);
-        
+
     }
 
     /**
@@ -79,8 +79,9 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
      * @param timestamp
      * @param properties
      */
-    public BigdataRDFFullTextIndex(IIndexManager indexManager,
-            String namespace, Long timestamp, Properties properties) {
+    public BigdataRDFFullTextIndex(final IIndexManager indexManager,
+            final String namespace, final Long timestamp,
+            final Properties properties) {
 
         super(indexManager, namespace, timestamp, properties);
 
@@ -163,10 +164,9 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
              * cost of re-indexing each time we see a term.
              */
 
-            final IV termId = val.getIV();
+            final IV<?,?> termId = val.getIV();
 
-            assert termId != null; // the termId must have been
-                                                    // assigned.
+            assert termId != null; // the termId must have been assigned.
 
             // don't bother text indexing inline values for now
             if (termId.isInline()) {
