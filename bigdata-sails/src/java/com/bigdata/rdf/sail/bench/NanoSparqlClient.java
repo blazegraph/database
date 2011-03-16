@@ -654,9 +654,7 @@ public class NanoSparqlClient {
 
 				for (String x : a) {
 
-					// FIXME This is ignoring search queries!
-					if (!x.contains("#search"))
-						map.put(file.toString() + "#" + i, x);
+					map.put(file.toString() + "#" + i, x);
 
 					i++;
 
@@ -1196,7 +1194,7 @@ public class NanoSparqlClient {
 				nerrors++;
 				
 				log.error("nerrors=" + nerrors + ", source=" + source
-						+ ", cause=" + t, t);
+						+ ", cause=" + t);// , t);
 				
 			}
 
