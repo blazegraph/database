@@ -30,12 +30,8 @@ import java.util.concurrent.TimeUnit;
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounter;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.IResourceLocator;
-import com.bigdata.service.ILoadBalancerService;
-import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.sparse.GlobalRowStoreSchema;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -53,7 +49,8 @@ public interface IIndexStore {
      * @param name
      *            The index name.
      * @param timestamp
-     *            The timestamp.
+     *            A timestamp which represents either a possible commit time on
+     *            the store or a read-only transaction identifier.
      * 
      * @return The index or <code>null</code> iff there is no index registered
      *         with that name for that timestamp.

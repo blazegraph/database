@@ -3121,9 +3121,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	}
 
 	/**
-	 * 
-	 * @param commitTime
-	 *            A positive timestamp (a possible commit time on the store).
+	 * {@inheritDoc}
 	 * 
 	 * @throws UnsupportedOperationException
 	 *             If you pass in {@link ITx#UNISOLATED},
