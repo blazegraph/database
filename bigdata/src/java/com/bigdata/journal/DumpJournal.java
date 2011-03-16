@@ -33,13 +33,10 @@ import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.DumpIndex;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.InnerCause;
 
@@ -92,6 +89,8 @@ public class DumpJournal {
      *            committed state).</dd>
      *            <dt>-indices</dt>
      *            <dd>Dump the indices (does not show the tuples by default).</dd>
+     *            <dt>-pages</dt>
+     *            <dd>Dump the pages of the indices and reports some information on the page size.</dd>
      *            <dt>-tuples</dt>
      *            <dd>Dump the records in the indices.</dd>
      *            </dl>
@@ -111,6 +110,8 @@ public class DumpJournal {
         boolean dumpHistory = false;
         
         boolean dumpIndices = false;
+
+        boolean dumpPages = false;
         
         boolean showTuples = false;
         
@@ -131,17 +132,26 @@ public class DumpJournal {
                 
             }
             
-            if(arg.equals("-indices")) {
+            else if(arg.equals("-indices")) {
                 
                 dumpIndices = true;
                 
             }
 
-            if(arg.equals("-tuples")) {
+            else if(arg.equals("-pages")) {
+                
+                dumpPages = true;
+                
+            }
+
+            else if(arg.equals("-tuples")) {
                 
                 showTuples = true;
                 
             }
+            
+			else
+				throw new RuntimeException("Unknown argument: " + arg);
             
         }
         
@@ -151,7 +161,7 @@ public class DumpJournal {
 
             try {
 
-                dumpJournal(file,dumpHistory,dumpIndices,showTuples);
+                dumpJournal(file,dumpHistory,dumpPages,dumpIndices,showTuples);
                 
             } catch( RuntimeException ex) {
                 
@@ -161,20 +171,20 @@ public class DumpJournal {
                 
             }
             
-            System.err.println("==================================");
+            System.out.println("==================================");
 
         }
         
     }
     
-    public static void dumpJournal(File file,boolean dumpHistory,boolean dumpIndices,boolean showTuples) {
+    public static void dumpJournal(File file,boolean dumpHistory,boolean dumpPages,boolean dumpIndices,boolean showTuples) {
         
         /*
          * Stat the file and report on its size, etc.
          */
         {
             
-          System.err.println("File: "+file);
+          System.out.println("File: "+file);
 
           if(!file.exists()) {
 
@@ -192,9 +202,9 @@ public class DumpJournal {
               
           }
           
-          System.err.println("Length: "+file.length());
+          System.out.println("Length: "+file.length());
 
-          System.err.println("Last Modified: "+new Date(file.lastModified()));
+          System.out.println("Last Modified: "+new Date(file.lastModified()));
           
         }
         
@@ -210,7 +220,7 @@ public class DumpJournal {
         
         }
         
-        System.err.println("Opening (read-only): "+file);
+        System.out.println("Opening (read-only): "+file);
         
         final Journal journal = new Journal(properties);
 
@@ -219,15 +229,15 @@ public class DumpJournal {
             final FileMetadata fmd = journal.getFileMetadata();
 
             // dump the MAGIC and VERSION.
-            System.err.println("magic="+Integer.toHexString(fmd.magic));
-            System.err.println("version="+Integer.toHexString(fmd.version));
+            System.out.println("magic="+Integer.toHexString(fmd.magic));
+            System.out.println("version="+Integer.toHexString(fmd.version));
             
             // dump the root blocks.
-            System.err.println(fmd.rootBlock0.toString());
-            System.err.println(fmd.rootBlock1.toString());
+            System.out.println(fmd.rootBlock0.toString());
+            System.out.println(fmd.rootBlock1.toString());
 
             // report on which root block is the current root block.
-            System.err.println("The current root block is #"
+            System.out.println("The current root block is #"
                     + (journal.getRootBlockView().isRootBlock0() ? 0 : 1));
             
             /* 
@@ -241,14 +251,14 @@ public class DumpJournal {
 
             final long bytesAvailable = (fmd.userExtent - fmd.nextOffset);
             
-            System.err.println("extent="+fmd.extent+"("+fmd.extent/Bytes.megabyte+"M)"+
+            System.out.println("extent="+fmd.extent+"("+fmd.extent/Bytes.megabyte+"M)"+
                     ", userExtent="+fmd.userExtent+"("+fmd.userExtent/Bytes.megabyte+"M)"+
                     ", bytesAvailable="+bytesAvailable+"("+bytesAvailable/Bytes.megabyte+"M)"+
                     ", nextOffset="+fmd.nextOffset);
 
             if (dumpHistory) {
 
-                System.err.println("Historical commit points follow in temporal sequence (first to last):");
+                System.out.println("Historical commit points follow in temporal sequence (first to last):");
                 
                 CommitRecordIndex commitRecordIndex = journal.getCommitRecordIndex();
 //                CommitRecordIndex commitRecordIndex = journal._commitRecordIndex;
@@ -257,19 +267,19 @@ public class DumpJournal {
                 
                 while(itr.hasNext()) {
                     
-                    System.err.println("----");
+                    System.out.println("----");
 
                     final CommitRecordIndex.Entry entry = itr.next().getObject();
                     
-                    System.err.print("Commit Record: " + entry.commitTime
+                    System.out.print("Commit Record: " + entry.commitTime
                             + ", addr=" + journal.toString(entry.addr)+", ");
                     
                     final ICommitRecord commitRecord = journal
                             .getCommitRecord(entry.commitTime);
                     
-                    System.err.println(commitRecord.toString());
+                    System.out.println(commitRecord.toString());
 
-                    dumpNamedIndicesMetadata(journal,commitRecord,dumpIndices,showTuples);
+                    dumpNamedIndicesMetadata(journal,commitRecord,dumpPages,dumpIndices,showTuples);
                     
                 }
                 
@@ -281,9 +291,9 @@ public class DumpJournal {
                 
                 final ICommitRecord commitRecord = journal.getCommitRecord();
                 
-                System.err.println(commitRecord.toString());
+                System.out.println(commitRecord.toString());
 
-                dumpNamedIndicesMetadata(journal,commitRecord,dumpIndices,showTuples);
+                dumpNamedIndicesMetadata(journal,commitRecord,dumpPages,dumpIndices,showTuples);
                 
             }
 
@@ -302,7 +312,7 @@ public class DumpJournal {
      * @param commitRecord
      */
     private static void dumpNamedIndicesMetadata(AbstractJournal journal,
-            ICommitRecord commitRecord, boolean dumpIndices, boolean showTuples) {
+            ICommitRecord commitRecord, boolean dumpPages, boolean dumpIndices, boolean showTuples) {
 
         // view as of that commit record.
         final IIndex name2Addr = journal.getName2Addr(commitRecord.getTimestamp());
@@ -315,7 +325,7 @@ public class DumpJournal {
             final Name2Addr.Entry entry = Name2Addr.EntrySerializer.INSTANCE
                     .deserialize(itr.next().getValueStream());
 
-            System.err.println("name=" + entry.name + ", addr="
+            System.out.println("name=" + entry.name + ", addr="
                     + journal.toString(entry.checkpointAddr));
 
             // load B+Tree from its checkpoint record.
@@ -347,85 +357,19 @@ public class DumpJournal {
             }
 
             // show checkpoint record.
-            System.err.println("\t" + ndx.getCheckpoint());
+            System.out.println("\t" + ndx.getCheckpoint());
 
             // show metadata record.
-            System.err.println("\t" + ndx.getIndexMetadata());
+            System.out.println("\t" + ndx.getIndexMetadata());
+
+            if (dumpPages)
+				DumpIndex.dumpPages(ndx, false/* dumpNodeState */);
 
             if (dumpIndices)
-                dumpIndex(ndx, showTuples);
+                DumpIndex.dumpIndex(ndx, showTuples);
 
         }
         
     }
 
-    /**
-     * Utility method using an {@link ITupleIterator} to dump the keys and
-     * values in an {@link AbstractBTree}.
-     * 
-     * @param btree
-     * @param showTuples
-     *            When <code>true</code> the data for the keys and values will
-     *            be displayed. Otherwise the scan will simply exercise the
-     *            iterator.
-     */
-    public static void dumpIndex(AbstractBTree btree, boolean showTuples) {
-        
-        // @todo offer the version metadata also if the index supports isolation.
-        final ITupleIterator itr = btree.rangeIterator(null, null);
-        
-        final long begin = System.currentTimeMillis();
-        
-        int i = 0;
-        
-        while(itr.hasNext()) {
-            
-            final ITuple tuple = itr.next();
-
-            if(showTuples) {
-
-                System.err.println("rec="+i+dumpTuple( tuple ));
-                
-            }
-            
-            i++;
-            
-        }
-        
-        final long elapsed = System.currentTimeMillis() - begin;
-        
-        System.err.println("Visited "+i+" tuples in "+elapsed+"ms");
-        
-    }
-    
-    private static String dumpTuple(ITuple tuple) {
-        
-        final ITupleSerializer tupleSer = tuple.getTupleSerializer();
-        
-        final StringBuilder sb = new StringBuilder();
-        
-        try {
-
-            sb.append("\nkey="+tupleSer.deserializeKey(tuple));
-            
-        } catch(Throwable t) {
-            
-            sb.append("\nkey="+BytesUtil.toString(tuple.getKey()));
-            
-        }
-
-        try {
-
-            sb.append("\nval="+tupleSer.deserialize(tuple));
-            
-        } catch(Throwable t) {
-
-            sb.append("\nval="+BytesUtil.toString(tuple.getValue()));
-            
-        }
-
-        return sb.toString();
-        
-    }
-    
 }
