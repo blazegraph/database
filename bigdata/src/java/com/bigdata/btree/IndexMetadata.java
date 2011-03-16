@@ -2347,7 +2347,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         sb.append(", btreeRecordCompressorFactory="
                 + (btreeRecordCompressorFactory == null ? "N/A"
                         : btreeRecordCompressorFactory));
-        sb.append(", tupleSerializer=" + tupleSer.getClass().getName());
+        sb.append(", tupleSerializer=" + tupleSer);//.getClass().getName());
         sb.append(", conflictResolver="
                 + (conflictResolver == null ? "N/A" : conflictResolver
                         .getClass().getName()));
