@@ -158,6 +158,7 @@ public class Banner {
         "\n"+SystemUtil.operatingSystem() + "/" + SystemUtil.osVersion()
                 + " " + SystemUtil.architecture() + //
         "\n"+SystemUtil.cpuInfo() + " #CPU="+SystemUtil.numProcessors() +//
+        "\n"+System.getProperty("java.vendor")+" "+System.getProperty("java.version")+
         "\n"
         ;
     
