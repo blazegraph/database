@@ -93,24 +93,25 @@ public class DumpIndex {
 	 * @param dumpNodeState
 	 *            When <code>true</code>, provide gruesome detail on each
 	 *            visited page.
+	 * 
+	 * @return Some interesting statistics about the pages in that index which
+	 *         the caller can print out.
 	 */
-	public static void dumpPages(final AbstractBTree ndx,
+	public static PageStats dumpPages(final AbstractBTree ndx,
 			final boolean dumpNodeState) {
 
 		final PageStats stats = new PageStats();
 		
 		dumpPages(ndx, ndx.getRoot(), stats, dumpNodeState);
 
-		System.out.println("name=" + ndx.getIndexMetadata().getName() + " : "
-				+ stats);
+		return stats;
 		
 	}
-	
-	/*
-	 * FIXME report the min/max page size as well and report as a nice table in
-	 * DumpJournal.
+
+	/**
+	 * Class reports various summary statistics for nodes and leaves.
 	 */
-	static class PageStats {
+	public static class PageStats {
 		
 		/** The #of nodes visited. */
 		public long nnodes;
@@ -120,16 +121,39 @@ public class DumpIndex {
 		public long nodeBytes;
 		/** The #of bytes in the raw records for the leaves visited. */
 		public long leafBytes;
+		/** The min/max bytes per node. */
+		public long minNodeBytes, maxNodeBytes;
+		/** The min/max bytes per leaf. */
+		public long minLeafBytes, maxLeafBytes;
+		
+		/** Return {@link #nodeBytes} plus {@link #leafBytes}. */
+		public long getTotalBytes() {
+			return nodeBytes + leafBytes;
+		}
+
+		/** The average bytes per node. */
+		public long getBytesPerNode() {
+			return (nnodes == 0 ? 0 : nodeBytes / nnodes);
+		}
+
+		/** The average bytes per leaf. */
+		public long getBytesPerLeaf() {
+			return (nleaves == 0 ? 0 : leafBytes / nleaves);
+		}
 		
 		public String toString() {
 			final StringBuilder sb = new StringBuilder();
 			sb.append(getClass().getName());
-			sb.append("{nnodes="+nnodes);
-			sb.append(",nleaves="+nleaves);
-			sb.append(",nodeBytes="+nodeBytes);
-			sb.append(",leafBytes="+leafBytes);
-			sb.append(",bytesPerNode="+(nnodes==0?0:nodeBytes/nnodes));
-			sb.append(",bytesPerLeaf="+(nleaves==0?0:leafBytes/nleaves));
+			sb.append("{nnodes=" + nnodes);
+			sb.append(",nleaves=" + nleaves);
+			sb.append(",nodeBytes=" + nodeBytes);
+			sb.append(",minNodeBytes=" + minNodeBytes);
+			sb.append(",maxNodeBytes=" + maxNodeBytes);
+			sb.append(",leafBytes=" + leafBytes);
+			sb.append(",minLeafBytes=" + minLeafBytes);
+			sb.append(",maxLeafBytes=" + maxLeafBytes);
+			sb.append(",bytesPerNode=" + getBytesPerNode());
+			sb.append(",bytesPerLeaf=" + getBytesPerLeaf());
 			sb.append("}");
 			return sb.toString();
 		}
@@ -153,11 +177,19 @@ public class DumpIndex {
 
 			stats.nleaves++;
 			stats.leafBytes += nbytes;
+			if (stats.minLeafBytes > nbytes || stats.minLeafBytes == 0)
+				stats.minLeafBytes = nbytes;
+			if (stats.maxLeafBytes < nbytes)
+				stats.maxLeafBytes = nbytes;
 
 		} else {
 
 			stats.nnodes++;
 			stats.nodeBytes += nbytes;
+			if (stats.minNodeBytes > nbytes || stats.minNodeBytes == 0)
+				stats.minNodeBytes = nbytes;
+			if (stats.maxNodeBytes < nbytes)
+				stats.maxNodeBytes = nbytes;
 
 			final int nkeys = node.getKeyCount();
 
