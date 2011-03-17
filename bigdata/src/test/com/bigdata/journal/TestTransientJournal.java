@@ -96,7 +96,15 @@ public class TestTransientJournal extends AbstractJournalTestCase {
 
     public Properties getProperties() {
 
-        Properties properties = super.getProperties();
+        final Properties properties = super.getProperties();
+
+        properties.setProperty(Journal.Options.COLLECT_PLATFORM_STATISTICS,
+                "false");
+
+        properties.setProperty(Journal.Options.COLLECT_QUEUE_STATISTICS,
+                "false");
+
+        properties.setProperty(Journal.Options.HTTPD_PORT, "-1"/* none */);
 
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
 

@@ -32,11 +32,10 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.UUID;
 
-import org.openrdf.query.algebra.MathExpr.MathOp;
-
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 
@@ -235,6 +234,10 @@ public class IVUtility {
     		return new XSDDecimalIV(left.multiply(right));
     	case DIVIDE:
     		return new XSDDecimalIV(left.divide(right));
+    	case MIN:
+    		return new XSDDecimalIV(left.compareTo(right) < 0 ? left : right);
+    	case MAX:
+    		return new XSDDecimalIV(left.compareTo(right) > 0 ? left : right);
     	default:
     		throw new UnsupportedOperationException();
     	}
@@ -253,6 +256,10 @@ public class IVUtility {
     		return new XSDIntegerIV(left.multiply(right));
     	case DIVIDE:
     		return new XSDIntegerIV(left.divide(right));
+    	case MIN:
+    		return new XSDIntegerIV(left.compareTo(right) < 0 ? left : right);
+    	case MAX:
+    		return new XSDIntegerIV(left.compareTo(right) > 0 ? left : right);
     	default:
     		throw new UnsupportedOperationException();
     	}
@@ -271,6 +278,10 @@ public class IVUtility {
     		return new XSDFloatIV(left*right);
     	case DIVIDE:
     		return new XSDFloatIV(left/right);
+    	case MIN:
+    		return new XSDFloatIV(Math.min(left,right));
+    	case MAX:
+    		return new XSDFloatIV(Math.max(left,right));
     	default:
     		throw new UnsupportedOperationException();
     	}
@@ -289,6 +300,10 @@ public class IVUtility {
     		return new XSDDoubleIV(left*right);
     	case DIVIDE:
     		return new XSDDoubleIV(left/right);
+    	case MIN:
+    		return new XSDDoubleIV(Math.min(left,right));
+    	case MAX:
+    		return new XSDDoubleIV(Math.max(left,right));
     	default:
     		throw new UnsupportedOperationException();
     	}
@@ -307,6 +322,10 @@ public class IVUtility {
     		return new XSDIntIV(left*right);
     	case DIVIDE:
     		return new XSDIntIV(left/right);
+    	case MIN:
+    		return new XSDIntIV(Math.min(left,right));
+    	case MAX:
+    		return new XSDIntIV(Math.max(left,right));
     	default:
     		throw new UnsupportedOperationException();
     	}
@@ -325,6 +344,10 @@ public class IVUtility {
     		return new XSDLongIV(left*right);
     	case DIVIDE:
     		return new XSDLongIV(left/right);
+    	case MIN:
+    		return new XSDLongIV(Math.min(left,right));
+    	case MAX:
+    		return new XSDLongIV(Math.max(left,right));
     	default:
     		throw new UnsupportedOperationException();
     	}

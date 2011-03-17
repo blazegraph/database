@@ -68,13 +68,13 @@ public class CopyOp extends PipelineOp {
          * An optional {@link IConstraint}[] which places restrictions on the
          * legal patterns in the variable bindings.
          */
-        String CONSTRAINTS = CopyOp.class.getName() + ".constraints";
+        String CONSTRAINTS = (CopyOp.class.getName() + ".constraints").intern();
 
         /**
          * An optional {@link IBindingSet}[] to be used <strong>instead</strong>
          * of the default source.
          */
-        String BINDING_SETS = CopyOp.class.getName() + ".bindingSets";
+        String BINDING_SETS = (CopyOp.class.getName() + ".bindingSets").intern();
         
     }
 

@@ -1,5 +1,6 @@
 package com.bigdata.relation;
 
+import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.sparse.KeyType;
 import com.bigdata.sparse.Schema;
@@ -52,6 +53,20 @@ public class RelationSchema extends Schema {
             .getName()
             + ".container";
 
+    /**
+     * A dynamically injected property which can reveal the commit time from
+     * which a locatable resource was materialized.
+     * 
+     * @see DefaultResourceLocator
+     * @see AbstractResource
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/266
+     * 
+     *      TODO This is a workaround for and should be removed when we replace
+     *      the native long tx identifier with a thin interface.
+     */
+    public static final String COMMIT_TIME = (RelationSchema.class.getPackage()
+            .getName() + ".commitTime").intern(); 
+    
     /**
      * A shared instance.
      */

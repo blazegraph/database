@@ -81,8 +81,12 @@ abstract public class BOpFilterBase extends BOpBase implements IFilter {
     final public Iterator filter(Iterator src, final Object context) {
 
         // wrap source with each additional filter from the filter chain.
-        for (BOp arg : args()) {
+    	final Iterator<BOp> itr = argIterator();
+
+    	while(itr.hasNext()) {
         
+        	final BOp arg = itr.next();
+        	
             src = ((BOpFilterBase) arg).filter(src, context);
             
         }

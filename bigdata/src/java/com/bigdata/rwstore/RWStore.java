@@ -2068,7 +2068,8 @@ public class RWStore implements IStore {
 		try {
 
             final RootBlockUtility tmp = new RootBlockUtility(m_reopener, m_fd,
-                    true/* validateChecksum */, false/* alternateRootBlock */);
+                    true/* validateChecksum */, false/* alternateRootBlock */,
+                    false/* ignoreBadRootBlock */);
 
             final IRootBlockView rootBlock = tmp.rootBlock;
             
@@ -3137,35 +3138,56 @@ public class RWStore implements IStore {
 
         }
 
-        synchronized public FileChannel reopenChannel() throws IOException {
+        public FileChannel reopenChannel() throws IOException {
 
-            if (raf != null && raf.getChannel().isOpen()) {
+			/*
+			 * Note: This is basically a double-checked locking pattern. It is
+			 * used to avoid synchronizing when the backing channel is already
+			 * open.
+			 */
+			{
+				final RandomAccessFile tmp = raf;
+				if (tmp != null) {
+					final FileChannel channel = tmp.getChannel();
+					if (channel.isOpen()) {
+						// The channel is still open.
+						return channel;
+					}
+				}
+			}
+        	
+        	synchronized(this) {
 
-                /*
-                 * The channel is still open. If you are allowing concurrent
-                 * reads on the channel, then this could indicate that two
-                 * readers each found the channel closed and that one was able
-                 * to re-open the channel before the other such that the channel
-                 * was open again by the time the 2nd reader got here.
-                 */
+				if (raf != null) {
+					final FileChannel channel = raf.getChannel();
+					if (channel.isOpen()) {
+						/*
+						 * The channel is still open. If you are allowing
+						 * concurrent reads on the channel, then this could
+						 * indicate that two readers each found the channel
+						 * closed and that one was able to re-open the channel
+						 * before the other such that the channel was open again
+						 * by the time the 2nd reader got here.
+						 */
+						return channel;
+					}
+				}
 
-                return raf.getChannel();
+				// open the file.
+				this.raf = new RandomAccessFile(file, mode);
 
-            }
+				// Update counters.
+				final StoreCounters<?> c = (StoreCounters<?>) storeCounters
+						.get().acquire();
+				try {
+					c.nreopen++;
+				} finally {
+					c.release();
+				}
 
-            // open the file.
-            this.raf = new RandomAccessFile(file, mode);
+				return raf.getChannel();
 
-            // Update counters.
-            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
-                    .acquire();
-            try {
-                c.nreopen++;
-            } finally {
-                c.release();
-            }
-            
-            return raf.getChannel();
+			}
 
         }
 

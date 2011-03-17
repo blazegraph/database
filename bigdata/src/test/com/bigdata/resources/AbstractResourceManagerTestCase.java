@@ -39,6 +39,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.bfs.BigdataFileSystem;
@@ -48,6 +50,7 @@ import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ConcurrencyManager;
@@ -451,7 +454,7 @@ public class AbstractResourceManagerTestCase extends
             return null;
         }
 
-        public CounterSet getCounterSet() {
+        public CounterSet getCounters() {
 
             return null;
         }
@@ -605,7 +608,8 @@ public class AbstractResourceManagerTestCase extends
             return true;
         }
 
-        public AbstractHTTPD newHttpd(int httpdPort, CounterSet counterSet) throws IOException {
+        public AbstractHTTPD newHttpd(int httpdPort, ICounterSetAccess access)
+                throws IOException {
             return null;
         }
 
@@ -619,9 +623,25 @@ public class AbstractResourceManagerTestCase extends
         }
 
         public CounterSet getHostCounterSet() {
-            // TODO Auto-generated method stub
             return null;
         }
+
+		public ScheduledFuture<?> addScheduledTask(Runnable task,
+				long initialDelay, long delay, TimeUnit unit) {
+			return null;
+		}
+
+		public boolean getCollectPlatformStatistics() {
+			return false;
+		}
+
+		public boolean getCollectQueueStatistics() {
+			return false;
+		}
+
+		public int getHttpdPort() {
+			return 0;
+		}
         
     }
     

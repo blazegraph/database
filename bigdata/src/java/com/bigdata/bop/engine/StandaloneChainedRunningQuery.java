@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
-import java.nio.channels.ClosedByInterruptException;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -45,12 +44,11 @@ import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NoSuchBOpException;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.MultiplexBlockingBuffer;
-import com.bigdata.util.InnerCause;
 
 /**
  * An {@link IRunningQuery} implementation for a standalone database in which a
@@ -68,7 +66,9 @@ import com.bigdata.util.InnerCause;
  * sources for the sink have been closed.
  * <p>
  * This implementation does not use {@link IChunkMessage}s, can not be used with
- * scale-out, and does not support sharded indices.
+ * scale-out, and does not support sharded indices. This implementation ONLY
+ * supports pipelined operators. If "at-once" evaluation semantics are required,
+ * then use {@link ChunkedRunningQuery}.
  * 
  * @todo Since each operator task runs exactly once there is less potential
  *       parallelism in the operator task execution when compared to
@@ -81,8 +81,16 @@ import com.bigdata.util.InnerCause;
  * @todo Run all unit tests of the query engine against the appropriate
  *       strategies.
  * 
+ * @todo Since this class does not support "at-once" evaluation, it can not be
+ *       used with ORDER BY operator implementations. That really restricts its
+ *       utility. We could allow the "tail" of the query to use "at-once"
+ *       evaluation to work around this, but it would be too much to allow
+ *       arbitrary mixtures of pipelined and at-once operators within this same
+ *       query.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: StandaloneChainedRunningQuery.java 4110 2011-01-16 18:59:43Z
+ *          thompsonbry $
  */
 public class StandaloneChainedRunningQuery extends AbstractRunningQuery {
 
@@ -259,6 +267,15 @@ public class StandaloneChainedRunningQuery extends AbstractRunningQuery {
 
         final PipelineOp bop = (PipelineOp) op;
 
+		if (!bop.isPipelined()) {
+			/*
+			 * The standalone chained running query does not support "at-once"
+			 * evaluation semantics (it might be possible to support them in the
+			 * tail of the query, but not mixed in throughout the query).
+			 */
+			throw new UnsupportedOperationException();
+		}
+        
         final int bopId = bop.getId();
 
         /*
@@ -329,7 +346,7 @@ public class StandaloneChainedRunningQuery extends AbstractRunningQuery {
         final OperatorTask opTask = new OperatorTask(bopId, src);
 
         // Wrap task with error handling and handshaking logic.
-        final FutureTask<Void> ft = new FutureTask<Void>(
+        final FutureTask<Void> ft = new FutureTaskMon<Void>(
                 new OperatorTaskWrapper(opTask), null/* result */);
 
         if (operatorFutures.putIfAbsent(bopId, ft) != null) {

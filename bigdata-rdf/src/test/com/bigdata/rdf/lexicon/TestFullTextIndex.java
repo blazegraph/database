@@ -362,5 +362,161 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
         }
         
     }
+
+    /**
+     * Unit test for {@link LexiconRelation#rebuildTextIndex()}.
+     */
+    public void test_rebuildIndex() {
+        
+        AbstractTripleStore store = getStore();
+
+        try {
+
+            assertNotNull(store.getLexiconRelation().getSearchEngine());
+
+            final BigdataValueFactory f = store.getValueFactory();
+            
+            final BigdataValue[] terms = new BigdataValue[] {//
+                    f.createLiteral("abc"),//
+                    f.createLiteral("abc", "en"),//
+                    f.createLiteral("good day", "en"),//
+                    f.createLiteral("gutten tag", "de"),//
+                    f.createLiteral("tag team", "en"),//
+                    f.createLiteral("the first day", "en"),// // 'the' is a stopword.
+
+                    f.createURI("http://www.bigdata.com"),//
+                    f.asValue(RDF.TYPE),//
+                    f.asValue(RDFS.SUBCLASSOF),//
+                    f.asValue(XMLSchema.DECIMAL),//
+
+                    f.createBNode(UUID.randomUUID().toString()),//
+                    f.createBNode("a12"),//
+            };
+
+            store.addTerms(terms);
+
+            if(log.isInfoEnabled()) {
+                log.info(store.getLexiconRelation().dumpTerms());
+            }
+
+            /*
+             * Note: the language code is only used when tokenizing literals. It
+             * IS NOT applied as a filter to the recovered literals.
+             */
+            
+            assertExpectedHits(store, "abc", null/* languageCode */,
+                    new BigdataValue[] { //
+                    f.createLiteral("abc"),//
+                            f.createLiteral("abc", "en") //
+                    });
+
+            assertExpectedHits(store, "tag", "en", new BigdataValue[] {//
+                    f.createLiteral("gutten tag", "de"), //
+                    f.createLiteral("tag team", "en") //
+                    });
+
+            assertExpectedHits(store, "tag", "de", new BigdataValue[] {//
+                    f.createLiteral("gutten tag", "de"), //
+                    f.createLiteral("tag team", "en") //
+                    });
+
+            assertExpectedHits(store, "GOOD DAY", "en", //
+                    .0f, // minCosine
+                    new BigdataValue[] {//
+                    f.createLiteral("good day", "en"), //
+                    f.createLiteral("the first day", "en") //
+                    });
+
+            assertExpectedHits(store, "GOOD DAY", "en", //
+                    .4f, // minCosine
+                    new BigdataValue[] {//
+                    f.createLiteral("good day", "en"), //
+                    });
+
+            assertExpectedHits(store, "day", "en", //
+                    .0f, // minCosine
+                    new BigdataValue[] {
+                    f.createLiteral("good day", "en"),
+                    f.createLiteral("the first day", "en") });
+
+            // 'the' is a stopword, so there are no hits.
+            assertExpectedHits(store, "the", "en", new BigdataValue[] {});
+
+            /*
+             * re-open the store before search to verify that the data were made
+             * restart safe.
+             */
+            if (store.isStable()) {
+
+                store.commit();
+
+                store = reopenStore(store);
+
+            }
+
+            // rebuild the full text index.
+            store.getLexiconRelation().rebuildTextIndex();
+            
+            /*
+             * re-open the store before search to verify that the data were made
+             * restart safe.
+             */
+            if (store.isStable()) {
+
+                store.commit();
+
+                store = reopenStore(store);
+
+            }
+            
+            // re-verify the full text index.
+            {
+
+                assertNotNull(store.getLexiconRelation().getSearchEngine());
+                
+                assertExpectedHits(store, "abc", null/* languageCode */,
+                        new BigdataValue[] { //
+                        f.createLiteral("abc"),//
+                                f.createLiteral("abc", "en") //
+                        });
+
+                assertExpectedHits(store, "tag", "en", new BigdataValue[] {//
+                        f.createLiteral("gutten tag", "de"), //
+                        f.createLiteral("tag team", "en") //
+                        });
+
+                assertExpectedHits(store, "tag", "de", new BigdataValue[] {//
+                        f.createLiteral("gutten tag", "de"), //
+                        f.createLiteral("tag team", "en") //
+                        });
+
+                assertExpectedHits(store, "GOOD DAY", "en", //
+                        .0f, // minCosine
+                        new BigdataValue[] {//
+                        f.createLiteral("good day", "en"), //
+                        f.createLiteral("the first day", "en") //
+                        });
+
+                assertExpectedHits(store, "GOOD DAY", "en", //
+                        .4f, // minCosine
+                        new BigdataValue[] {//
+                        f.createLiteral("good day", "en"), //
+                        });
+
+                assertExpectedHits(store, "day", "en", //
+                        .0f, // minCosine
+                        new BigdataValue[] {
+                        f.createLiteral("good day", "en"),
+                        f.createLiteral("the first day", "en") });
+                
+            }
+            
+        } finally {
+
+            store.__tearDownUnitTest();
+
+        }
+
+    }
     
 }

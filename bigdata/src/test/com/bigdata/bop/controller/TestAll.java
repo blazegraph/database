@@ -23,12 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop.controller;
 
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
-
-import com.bigdata.relation.rule.eval.DefaultEvaluationPlan2;
 
 /**
  * Aggregates test suites into increasing dependency order.
@@ -57,10 +54,6 @@ public class TestAll extends TestCase {
     /**
      * Returns a test that will run each of the implementation specific test
      * suites in turn.
-     * 
-     * @todo If the static optimization is reworked as a controller operator
-     *       based on {@link DefaultEvaluationPlan2}, then add a test suite for
-     *       that operator here.
      */
     public static Test suite()
     {
@@ -70,22 +63,13 @@ public class TestAll extends TestCase {
         // test UNION
         suite.addTestSuite(TestUnion.class);
 
-        // test STEPS
-//        suite.addTestSuite(TestUnion.class);
+        // @todo test STEPS
+//        suite.addTestSuite(TestSteps.class);
 
         suite.addTestSuite(TestSubqueryOp.class);
-
-        suite.addTestSuite(TestPartitionedJoinGroup.class);
-        
-        suite.addTestSuite(TestJoinGraph.class);
-
-        suite.addTestSuite(TestJGraph.class);
         
         // @todo test STAR (transitive closure).
 //        suite.addTestSuite(TestStar.class);
-
-        // @todo join graph test suite.
-//        suite.addTestSuite(TestJoinGraph.class);
 
         return suite;
         

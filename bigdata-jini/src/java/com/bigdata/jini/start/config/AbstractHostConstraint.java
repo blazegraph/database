@@ -49,12 +49,13 @@ import com.bigdata.util.config.NicUtil;
  */
 abstract public class AbstractHostConstraint implements IServiceConstraint {
 
-    protected static final Logger log = Logger.getLogger(AbstractHostConstraint.class);
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    private static final transient Logger log = Logger.getLogger(AbstractHostConstraint.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
-
     protected final String[] hosts;
     
     public String toString() {
@@ -159,12 +160,12 @@ abstract public class AbstractHostConstraint implements IServiceConstraint {
     static final public boolean isLocalHost(final String hostname)
             throws SocketException, UnknownHostException {
 
-        InetAddress[] localAddrs = 
+        final InetAddress[] localAddrs = 
             ((NicUtil.getInetAddressMap()).keySet()).toArray(new InetAddress[1]);
 
         final InetAddress[] hostAddrs = InetAddress.getAllByName(hostname);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Considering: " + hostname + " : localAddrs="
                     + Arrays.toString(localAddrs) + ", hostAddrs="
                     + Arrays.toString(localAddrs) + ", hostAddrs="

@@ -1,5 +1,6 @@
 package com.bigdata.rdf.store;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -30,6 +31,8 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
 public class BigdataBindingSetResolverator
         extends
         AbstractChunkedResolverator<IBindingSet, IBindingSet, AbstractTripleStore> {
+	
+	private final IVariable[] required;
 
     /**
      * 
@@ -45,12 +48,24 @@ public class BigdataBindingSetResolverator
      */
     public BigdataBindingSetResolverator(final AbstractTripleStore db,
             final IChunkedOrderedIterator<IBindingSet> src) {
+    	
+    	this(db, src, null);
+    	
+    }
+    
+    public BigdataBindingSetResolverator(final AbstractTripleStore db,
+            final IChunkedOrderedIterator<IBindingSet> src,
+            final IVariable[] required) {
 
         super(db, src, new BlockingBuffer<IBindingSet[]>(
                 db.getChunkOfChunksCapacity(),
                 db.getChunkCapacity(),
                 db.getChunkTimeout(),
                 TimeUnit.MILLISECONDS));
+        
+        this.required = required;
+        
+//        System.err.println("required: " + (required != null ? Arrays.toString(required) : "null"));
 
     }
 
@@ -85,29 +100,60 @@ public class BigdataBindingSetResolverator
 
             final IBindingSet bindingSet = solution;
 
+//            System.err.println(solution);
+            
             assert bindingSet != null;
 
-            final Iterator<Map.Entry<IVariable, IConstant>> itr = bindingSet
-                    .iterator();
+            if (required == null) {
+            	
+                final Iterator<Map.Entry<IVariable, IConstant>> itr = 
+                	bindingSet.iterator();
 
-            while (itr.hasNext()) {
+	            while (itr.hasNext()) {
+	
+	                final Map.Entry<IVariable, IConstant> entry = itr.next();
+	                
+	                final IV iv = (IV) entry.getValue().get();
+	
+	                if (iv == null) {
+	
+	                    throw new RuntimeException("NULL? : var=" + entry.getKey()
+	                            + ", " + bindingSet);
+	                    
+	                }
+	                
+	                ids.add(iv);
+	
+	            }
+	            
+            } else {
+            	
+            	for (IVariable v : required) {
 
-                final Map.Entry<IVariable, IConstant> entry = itr.next();
-
-                final IV iv = (IV) entry.getValue().get();
-
-                if (iv == null) {
-
-                    throw new RuntimeException("NULL? : var=" + entry.getKey()
-                            + ", " + bindingSet);
-                    
-                }
-                
-                ids.add(iv);
-
+            		final IConstant c = bindingSet.get(v);
+            		
+            		if (c == null) {
+            			continue;
+            		}
+            		
+            		final IV iv = (IV) c.get();
+	            	
+	                if (iv == null) {
+	
+	                    throw new RuntimeException("NULL? : var=" + v
+	                            + ", " + bindingSet);
+	                    
+	                }
+	                
+	                ids.add(iv);
+	                
+            	}
+            	
             }
 
         }
+        
+//        System.err.println("resolving: " + Arrays.toString(ids.toArray()));
 
         if (log.isInfoEnabled())
             log.info("Resolving " + ids.size() + " term identifiers");
@@ -171,14 +217,19 @@ public class BigdataBindingSetResolverator
         if (terms == null)
             throw new IllegalArgumentException();
 
-        final IBindingSet bindingSet = solution;
-        
-        if(bindingSet == null) {
+        if(solution == null) {
             
             throw new IllegalStateException("BindingSet was not materialized");
             
         }
 
+        final IBindingSet bindingSet;
+        if (required == null) {
+        	bindingSet = solution;
+        } else {
+        	bindingSet = solution.copy(required);
+        }
+        	
         final Iterator<Map.Entry<IVariable, IConstant>> itr = bindingSet
                 .iterator();
 
@@ -214,6 +265,8 @@ public class BigdataBindingSetResolverator
                     value));
             
         }
+	        
+//        System.err.println(bindingSet);
         
         return bindingSet;
 

@@ -16,6 +16,8 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
+import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlanFactory2;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURIImpl;
@@ -26,8 +28,6 @@ import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.ActionEnum;
-import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
-import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ISolution;
@@ -68,7 +68,7 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
         
     }
     
-    public void testStarJoin1() throws Exception {
+    private void _testStarJoin1() throws Exception {
         
         final AbstractTripleStore store = getStore(getProperties());
         
@@ -206,7 +206,7 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
         
     }
 
-    public void testStarJoin2() throws Exception {
+    private void _testStarJoin2() throws Exception {
         
         final AbstractTripleStore store = getStore(getProperties());
         

@@ -177,7 +177,7 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
 
         final List<String> command = new LinkedList<String>();
         
-        command.add(new File(SysstatUtil.getPath(), "sar").getPath());
+        command.add(SysstatUtil.getPath("sar").getPath());
 
         // Note: Request the CPU stats.
         command.add("-u");
@@ -195,11 +195,11 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
     /**
      * Declares the counters that we will collect using <code>sar</code>.
      */
-    synchronized public CounterSet getCounters() {
+    /*synchronized*/ public CounterSet getCounters() {
         
-        if(root == null) {
+//        if(root == null) {
         
-            root = new CounterSet();
+            final CounterSet root = new CounterSet();
             
             inst = new LinkedList<I>();
             
@@ -219,19 +219,19 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
             
             for(Iterator<I> itr = inst.iterator(); itr.hasNext(); ) {
                 
-                I i = itr.next();
+                final I i = itr.next();
                 
                 root.addCounter(i.getPath(), i);
                 
             }
             
-        }
+//        }
         
         return root;
         
     }
     private List<I> inst = null;
-    private CounterSet root = null;
+//    private CounterSet root = null;
    
     /**
      * Extended to force <code>sar</code> to use a consistent timestamp

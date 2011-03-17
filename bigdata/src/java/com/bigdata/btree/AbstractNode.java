@@ -551,24 +551,45 @@ public abstract class AbstractNode<T extends AbstractNode
 
     }
 
-    public Iterator<AbstractNode> postOrderNodeIterator() {
+    final public Iterator<AbstractNode> postOrderNodeIterator() {
 
-        return postOrderNodeIterator(false);
+        return postOrderNodeIterator(false/* dirtyNodesOnly */, false/* nodesOnly */);
 
     }
 
     /**
-     * Post-order traversal of nodes and leaves in the tree. For any given
-     * node, its children are always visited before the node itself (hence
-     * the node occurs in the post-order position in the traversal). The
-     * iterator is NOT safe for concurrent modification.
+     * Post-order traversal of nodes and leaves in the tree. For any given node,
+     * its children are always visited before the node itself (hence the node
+     * occurs in the post-order position in the traversal). The iterator is NOT
+     * safe for concurrent modification.
      * 
      * @param dirtyNodesOnly
      *            When true, only dirty nodes and leaves will be visited
-     *            
+     * 
      * @return Iterator visiting {@link AbstractNode}s.
      */
-    abstract public Iterator<AbstractNode> postOrderNodeIterator(boolean dirtyNodesOnly);
+    final public Iterator<AbstractNode> postOrderNodeIterator(
+            final boolean dirtyNodesOnly) {
+
+        return postOrderNodeIterator(dirtyNodesOnly, false/* nodesOnly */);
+
+    }
+
+    /**
+     * Post-order traversal of nodes and leaves in the tree. For any given node,
+     * its children are always visited before the node itself (hence the node
+     * occurs in the post-order position in the traversal). The iterator is NOT
+     * safe for concurrent modification.
+     * 
+     * @param dirtyNodesOnly
+     *            When true, only dirty nodes and leaves will be visited
+     * @param nodesOnly
+     *            When <code>true</code>, the leaves will not be visited.
+     * 
+     * @return Iterator visiting {@link AbstractNode}s.
+     */
+    abstract public Iterator<AbstractNode> postOrderNodeIterator(
+            final boolean dirtyNodesOnly, final boolean nodesOnly);
 
     public ITupleIterator entryIterator() {
 

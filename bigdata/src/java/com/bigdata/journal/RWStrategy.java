@@ -612,7 +612,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
          */
         final byte buf[] = new byte[sze + 4]; // 4 bytes for checksum
 
-        m_store.getData(rwaddr, buf);
+        m_store.getData(rwaddr, buf, 0, sze+4);
 
         return ByteBuffer.wrap(buf, 0, sze);
 

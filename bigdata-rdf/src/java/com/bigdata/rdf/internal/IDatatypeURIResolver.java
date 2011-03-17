@@ -28,6 +28,19 @@ import org.openrdf.model.URI;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
 
+/**
+ * Specialized interface for resolving (and creating if necessary) datatype
+ * URIs. This interface requires access to a mutable view of the database since
+ * unknown URIs will be registered.
+ * 
+ * TODO This is not going to be efficient in scale-out since it does not batch
+ * the resolution of the URIs. It will be more efficient to pass in the set of
+ * URIs of interest and have them all be registered at once.
+ * {@link LexiconRelation#addTerms(com.bigdata.rdf.model.BigdataValue[], int, boolean)}
+ * already provides for this kind of batched resolution.
+ * 
+ * @author mrpersonick
+ */
 public interface IDatatypeURIResolver {
 
     /**

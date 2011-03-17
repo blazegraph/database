@@ -40,6 +40,8 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.rdf.sail.Rule2BOpUtility;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -52,7 +54,9 @@ import com.bigdata.striterator.IKeyOrder;
  */
 public class QueryLog {
 
-    protected static final transient Logger log = Logger
+    private static final String NA = "N/A";
+    
+	protected static final transient Logger log = Logger
             .getLogger(QueryLog.class);
 
     static {
@@ -63,24 +67,44 @@ public class QueryLog {
     	if(log.isInfoEnabled())
     		log.info(QueryLog.getTableHeader());
     }
-    
+
+    /**
+     * A single buffer is reused to keep down the heap churn.
+     */
+	final private static StringBuilder sb = new StringBuilder(
+			Bytes.kilobyte32 * 4);
+
     /**
      * Log rule execution statistics.
      * 
      * @param q
      *            The running query.
-     *            
-     *            @todo need start and end time for the query.
      */
     static public void log(final IRunningQuery q) {
 
 		if (log.isInfoEnabled()) {
-
+			
 			try {
 
-				logDetailRows(q);
+				/*
+				 * Note: We could use a striped lock here over a small pool of
+				 * StringBuilder's to decrease contention for the single buffer
+				 * while still avoiding heap churn for buffer allocation. Do
+				 * this if the monitor for this StringBuilder shows up as a hot
+				 * spot when query logging is enabled.
+				 */
+				synchronized(sb) {
+				
+					// clear the buffer.
+					sb.setLength(0);
 
-				logSummaryRow(q);
+					logDetailRows(q, sb);
+
+					logSummaryRow(q, sb);
+
+					log.info(sb);
+
+				}
 				
 			} catch (RuntimeException t) {
 
@@ -93,9 +117,33 @@ public class QueryLog {
     }
 
 	/**
+	 * Log the query.
+	 * 
+	 * @param q
+	 *            The query.
+	 * @param sb
+	 *            Where to write the log message.
+	 */
+	static public void log(final boolean includeTableHeader,
+			final IRunningQuery q, final StringBuilder sb) {
+
+		if(includeTableHeader) {
+			
+			sb.append(getTableHeader());
+			
+		}
+		
+		logDetailRows(q, sb);
+
+    	logSummaryRow(q, sb);
+    	
+    }
+    
+	/**
 	 * Log a detail row for each operator in the query.
 	 */
-    static private void logDetailRows(final IRunningQuery q) {
+	static private void logDetailRows(final IRunningQuery q,
+			final StringBuilder sb) {
 
 		final Integer[] order = BOpUtility.getEvaluationOrder(q.getQuery());
 
@@ -103,7 +151,9 @@ public class QueryLog {
 		
 		for (Integer bopId : order) {
 
-			log.info(getTableRow(q, orderIndex, bopId, false/* summary */));
+			sb.append(getTableRow(q, orderIndex, bopId, false/* summary */));
+			
+//			sb.append('\n');
 			
 			orderIndex++;
 			
@@ -114,9 +164,11 @@ public class QueryLog {
     /**
      * Log a summary row for the query.
      */
-    static private void logSummaryRow(final IRunningQuery q) {
+    static private void logSummaryRow(final IRunningQuery q, final StringBuilder sb) {
 
-		log.info(getTableRow(q, -1/* orderIndex */, q.getQuery().getId(), true/* summary */));
+		sb.append(getTableRow(q, -1/* orderIndex */, q.getQuery().getId(), true/* summary */));
+		
+//		sb.append('\n');
 
     }
     
@@ -128,6 +180,7 @@ public class QueryLog {
          * Common columns for the overall query and for each pipeline operator.
          */
         sb.append("queryId");
+        sb.append("\ttag");
         sb.append("\tbeginTime");
         sb.append("\tdoneTime");
         sb.append("\tdeadline");
@@ -201,6 +254,9 @@ public class QueryLog {
         
         sb.append(q.getQueryId());
         sb.append('\t');
+		sb.append(q.getQuery().getProperty(QueryHints.TAG,
+				QueryHints.DEFAULT_TAG));
+		sb.append('\t');
         sb.append(dateFormat.format(new Date(q.getStartTime())));
         sb.append('\t');
         sb.append(dateFormat.format(new Date(q.getDoneTime())));
@@ -210,7 +266,7 @@ public class QueryLog {
         sb.append('\t');
         sb.append(elapsed);
         sb.append('\t');
-        sb.append(serviceId == null ? "N/A" : serviceId.toString());
+        sb.append(serviceId == null ? NA : serviceId.toString());
         sb.append('\t');
         if (cause != null) 
             sb.append(cause.getLocalizedMessage());
@@ -267,12 +323,13 @@ public class QueryLog {
 		 */
 		{
 
+			@SuppressWarnings("unchecked")
 			final IPredicate pred = (IPredicate<?>) bop
 					.getProperty(PipelineJoin.Annotations.PREDICATE);
 			
 			if (pred != null) {
 			
-				final IKeyOrder keyOrder = (IKeyOrder<?>) pred
+				final IKeyOrder<?> keyOrder = (IKeyOrder<?>) pred
 						.getProperty(Rule2BOpUtility.Annotations.ORIGINAL_INDEX);
 				
 				final Long rangeCount = (Long) pred
@@ -332,7 +389,7 @@ public class QueryLog {
 		sb.append('\t');
 		sb.append(stats.unitsOut.get());
 		sb.append('\t');
-		sb.append(unitsIn == 0 ? "N/A" : unitsOut / (double) unitsIn);
+		sb.append(unitsIn == 0 ? NA : unitsOut / (double) unitsIn);
 		sb.append('\t');
 		sb.append(stats.accessPathDups.get());
 		sb.append('\t');

@@ -42,6 +42,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
@@ -246,7 +247,7 @@ public class TestCopyBindingSets extends TestCase2 {
                         new NV(BOp.Annotations.BOP_ID, bopId),//
                         new NV(CopyOp.Annotations.CONSTRAINTS,
                                 new IConstraint[] {
-                                new EQConstant(x, new Constant<String>("Mary"))
+                        		Constraint.wrap(new EQConstant(x, new Constant<String>("Mary")))
                         }),//
                 }));
 

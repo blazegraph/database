@@ -37,7 +37,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.journal.DumpJournal;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -192,7 +191,7 @@ public class DumpIndexSegment {
 
             writeBanner("dump keys and values using iterator");
 
-            DumpJournal.dumpIndex(store.loadIndexSegment(),showTuples);
+            DumpIndex.dumpIndex(store.loadIndexSegment(),showTuples);
 
         }
 

@@ -55,7 +55,7 @@ abstract public class SortOp extends PipelineOp {
          * 
          * @see ComparatorOp
          */
-        String COMPARATOR = MemorySortOp.class.getName() + ".comparator";
+        String COMPARATOR = (MemorySortOp.class.getName() + ".comparator").intern();
 
     }
 

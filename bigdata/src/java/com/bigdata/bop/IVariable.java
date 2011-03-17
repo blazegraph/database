@@ -41,5 +41,13 @@ public interface IVariable<E> extends IVariableOrConstant<E> {
      * {@link IVariableOrConstant#getName()}
      */
     int hashCode();
-    
+
+    /**
+     * Return <code>true</code> iff this is the special variable <code>*</code>
+     */
+    boolean isWildcard();
+
+	/** An empty {@link IVariable} array. */
+	IVariable<?>[] EMPTY = new IVariable[0];
+
 }

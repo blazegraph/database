@@ -169,6 +169,9 @@ public class TransactionServer extends AbstractServer {
 
             /*
              * Service specific counters.
+             * 
+             * FIXME These may no longer be properly attached! See 
+             * IFederationDelegate#reattachDynamicCounters().
              */
 
             final CounterSet serviceRoot = service.getFederation()

@@ -30,7 +30,7 @@ public class PipelineDelayOp extends PipelineOp {
         /**
          * The delay imposed by the operator (milliseconds).
          */
-        String DELAY = PipelineDelayOp.class.getName() + ".delay";
+        String DELAY = (PipelineDelayOp.class.getName() + ".delay").intern();
 
     }
 

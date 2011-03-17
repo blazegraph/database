@@ -10,6 +10,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -279,7 +280,7 @@ public class FastClosure extends BaseClosure {
                         program.addStep(tmp.specialize(//
                                 noBindings,//
                                 new IConstraint[] { //
-                                new NEConstant(p, owlSameAs) //
+                        		Constraint.wrap(new NEConstant(p, owlSameAs)) //
                                 }//
                                 ));
 
@@ -297,7 +298,7 @@ public class FastClosure extends BaseClosure {
                         program.addStep(tmp.specialize(//
                                 noBindings,//
                                 new IConstraint[] { //
-                                new NEConstant(p, owlSameAs) //
+                        		Constraint.wrap(new NEConstant(p, owlSameAs)) //
                                 }//
                                 ));
 

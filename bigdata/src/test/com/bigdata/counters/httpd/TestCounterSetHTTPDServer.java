@@ -36,6 +36,7 @@ import junit.framework.TestCase;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.History;
 import com.bigdata.counters.HistoryInstrument;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.counters.PeriodEnum;
@@ -61,11 +62,16 @@ public class TestCounterSetHTTPDServer extends TestCase {
         final Random r = new Random();
         {
 
-            CounterSet cset = root.makePath("localhost");
+            final CounterSet cset = root.makePath("localhost");
 
-            String localIpAddr = NicUtil.getIpAddress("default.nic", "default", true);
-            cset.addCounter("hostname", new OneShotInstrument<String>(localIpAddr));
-            cset.addCounter("ipaddr", new OneShotInstrument<String>(localIpAddr));
+            final String localIpAddr = NicUtil.getIpAddress("default.nic",
+                    "default", true);
+
+            cset.addCounter("hostname", new OneShotInstrument<String>(
+                    localIpAddr));
+
+            cset.addCounter("ipaddr",
+                    new OneShotInstrument<String>(localIpAddr));
 
             // 60 minutes of data : @todo replace with CounterSetBTree (no fixed limit).
             final HistoryInstrument<Double> history1 = new HistoryInstrument<Double>(
@@ -101,7 +107,7 @@ public class TestCounterSetHTTPDServer extends TestCase {
         
         {
             
-            CounterSet cset = root.makePath("www.bigdata.com");
+            final CounterSet cset = root.makePath("www.bigdata.com");
 
             cset.addCounter("ipaddr", new OneShotInstrument<String>(
                     InetAddress.getByName("www.bigdata.com").getHostAddress()));
@@ -123,16 +129,26 @@ public class TestCounterSetHTTPDServer extends TestCase {
      */
     public void test_server() throws Exception {
 
-        CounterSet counterSet = new CounterSet();
+        final CounterSet counterSet = new CounterSet();
         
-        DummyEventReportingService service = new DummyEventReportingService();
+        final ICounterSetAccess access = new ICounterSetAccess() {
+            
+            public CounterSet getCounters() {
+             
+                return counterSet;
+                
+            }
+
+        };
+        
+        final DummyEventReportingService service = new DummyEventReportingService();
 
         setUp(counterSet);
 
-        final int port = 8080;
+        final int port = 8081;
 
-        CounterSetHTTPDServer server = new CounterSetHTTPDServer(port,
-                counterSet, service);
+        final CounterSetHTTPDServer server = new CounterSetHTTPDServer(port,
+                access, service);
 
         server.run();
 

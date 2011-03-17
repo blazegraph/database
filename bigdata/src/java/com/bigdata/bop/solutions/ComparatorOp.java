@@ -55,7 +55,7 @@ abstract public class ComparatorOp extends BOpBase implements
          * will be imposed and the order (ascending or descending) for each
          * variable.
          */
-        String ORDER = ComparatorOp.class.getName() + ".order";
+        String ORDER = (ComparatorOp.class.getName() + ".order").intern();
 
     }
 

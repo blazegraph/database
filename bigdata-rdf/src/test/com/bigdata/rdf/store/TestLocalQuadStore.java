@@ -33,6 +33,7 @@ import java.util.Properties;
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 import com.bigdata.rdf.axioms.NoAxioms;
 
@@ -114,7 +115,7 @@ public class TestLocalQuadStore extends AbstractTestCase {
     
     protected AbstractTripleStore getStore(final Properties properties) {
 
-        return new LocalTripleStore(properties);
+        return LocalTripleStore.getInstance(properties);
 
     }
  
@@ -157,7 +158,7 @@ public class TestLocalQuadStore extends AbstractTestCase {
         // Set the file property explicitly.
         properties.setProperty(Options.FILE, file.toString());
 
-        return new LocalTripleStore(properties);
+        return LocalTripleStore.getInstance(properties);
 
     }
 

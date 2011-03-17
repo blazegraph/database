@@ -1,6 +1,8 @@
 package com.bigdata.bop.fed;
 
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
@@ -129,7 +131,24 @@ class DelegateIndexManager implements IIndexManager {
 
     }
 
-    public String toString() {
+	public ScheduledFuture<?> addScheduledTask(Runnable task,
+			long initialDelay, long delay, TimeUnit unit) {
+		return dataService.getFederation().addScheduledTask(task, initialDelay, delay, unit);
+	}
+
+	public boolean getCollectPlatformStatistics() {
+		return dataService.getFederation().getCollectPlatformStatistics();
+	}
+
+	public boolean getCollectQueueStatistics() {
+		return dataService.getFederation().getCollectQueueStatistics();
+	}
+
+	public int getHttpdPort() {
+		return dataService.getFederation().getHttpdPort();
+	}
+
+	public String toString() {
 
     	return super.toString() + "{dataServiceUUID="
 				+ dataService.getServiceUUID() + "}";

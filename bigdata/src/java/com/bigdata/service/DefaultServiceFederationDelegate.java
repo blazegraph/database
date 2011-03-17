@@ -33,19 +33,12 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
-import java.util.LinkedHashMap;
-import java.util.Properties;
 import java.util.UUID;
-import java.util.Vector;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounterSet;
-import com.bigdata.counters.IProcessCounters;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
-import com.bigdata.io.DirectBufferPool;
-import com.bigdata.journal.ConcurrencyManager.IConcurrencyManagerCounters;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
@@ -96,29 +89,29 @@ public class DefaultServiceFederationDelegate<T extends AbstractService>
         
     }
 
-    /** Reattaches the {@link DirectBufferPool} counters. */
 	public void reattachDynamicCounters() {
 
-		// The service's counter set hierarchy.
-		final CounterSet serviceRoot = service.getFederation()
-				.getServiceCounterSet();
-
-		// Ensure path exists.
-		final CounterSet tmp = serviceRoot.makePath(IProcessCounters.Memory);
-
-		/*
-		 * Add counters reporting on the various DirectBufferPools.
-		 */
-		synchronized (tmp) {
-
-			// detach the old counters (if any).
-			tmp.detach("DirectBufferPool");
-
-			// attach the current counters.
-			tmp.makePath("DirectBufferPool").attach(
-					DirectBufferPool.getCounters());
-
-        }
+//	    /* Reattaches the {@link DirectBufferPool} counters. */
+//		// The service's counter set hierarchy.
+//		final CounterSet serviceRoot = service.getFederation()
+//				.getServiceCounterSet();
+//
+//		// Ensure path exists.
+//		final CounterSet tmp = serviceRoot.makePath(IProcessCounters.Memory);
+//
+//		/*
+//		 * Add counters reporting on the various DirectBufferPools.
+//		 */
+//		synchronized (tmp) {
+//
+//			// detach the old counters (if any).
+//			tmp.detach("DirectBufferPool");
+//
+//			// attach the current counters.
+//			tmp.makePath("DirectBufferPool").attach(
+//					DirectBufferPool.getCounters());
+//
+//        }
 
 
     }
@@ -150,13 +143,12 @@ public class DefaultServiceFederationDelegate<T extends AbstractService>
     }
 
     public AbstractHTTPD newHttpd(final int httpdPort,
-            final CounterSet counterSet) throws IOException {
+            final ICounterSetAccess access) throws IOException {
         
-        return new CounterSetHTTPD(httpdPort, counterSet, service) {
+        return new CounterSetHTTPD(httpdPort, access, service) {
 
-            public Response doGet(String uri, String method, Properties header,
-                    LinkedHashMap<String, Vector<String>> parms)
-                    throws Exception {
+            @Override
+            public Response doGet(final Request req) throws Exception {
 
                 try {
 
@@ -173,7 +165,7 @@ public class DefaultServiceFederationDelegate<T extends AbstractService>
 
                 }
 
-                return super.doGet(uri, method, header, parms);
+                return super.doGet(req);
 
             }
 

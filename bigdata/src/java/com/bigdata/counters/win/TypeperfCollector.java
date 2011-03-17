@@ -468,9 +468,9 @@ public class TypeperfCollector extends AbstractProcessCollector {
      */
     public CounterSet getCounters() {
 
-        if (root == null) {
+//        if (root == null) {
 
-            root = new CounterSet();
+        final CounterSet root = new CounterSet();
             
             final String p = ""; // @todo remove this variable.
 
@@ -566,13 +566,13 @@ public class TypeperfCollector extends AbstractProcessCollector {
 
             }
 
-        }
+//        }
 
         return root;
 
     }
 
-    private CounterSet root;
+//    private CounterSet root;
     
     /**
      * List of performance counters that we will be collecting.

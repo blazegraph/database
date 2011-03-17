@@ -10,7 +10,9 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.solutions.MemoryGroupByOp.Annotations;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
@@ -20,8 +22,26 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
  *          thompsonbry $
  * 
- * @todo unit tests.
+ *          FIXME ORDER_BY is defined in terms of Expressions, not just Vars.
+ *          Either this will need to be an {@link IValueExpression} which is
+ *          evaluated during the ordering or we will have to pre-compute a
+ *          hidden variable which can be ordered directly. Presumably
+ *          BrackettedExpression provides a computed RDF Value while Constraint
+ *          orders based on the BEV. Write unit tests for those computed
+ *          expressions.
+ * 
+ *          <pre>
+ * [22]  	OrderClause	      ::=  	'ORDER' 'BY' OrderCondition+
+ * [23]  	OrderCondition	  ::=  	( ( 'ASC' | 'DESC' ) BrackettedExpression ) | ( Constraint | Var )
+ * </pre>
+ * 
+ *          FIXME ORDER_BY should be written out of a CONSTRUCT or DESCRIBE
+ *          query since it will not have any affect on the solutions.
+ * 
  * @todo do an external merge sort operator.
+ * @todo do a wordsort operator w/ ties broken by the {@link ComparatorOp} after
+ *       the main sort.
+ * @todo do a radix sort operator (for main memory only?)
  */
 public class MemorySortOp extends SortOp {
 
@@ -46,15 +66,27 @@ public class MemorySortOp extends SortOp {
         super(args, annotations);
 
         switch (getEvaluationContext()) {
-        case CONTROLLER:
-            break;
-        default:
-            throw new UnsupportedOperationException(
-                    Annotations.EVALUATION_CONTEXT + "="
-                            + getEvaluationContext());
-        }
+		case CONTROLLER:
+			break;
+		default:
+			throw new UnsupportedOperationException(
+					Annotations.EVALUATION_CONTEXT + "="
+							+ getEvaluationContext());
+		}
 
-    }
+		// operator may not be broken into multiple tasks.
+		if (getMaxParallel() != 1) {
+			throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
+					+ "=" + getMaxParallel());
+		}
+
+		// operator is "at-once" (not pipelined).
+		if (isPipelined()) {
+			throw new UnsupportedOperationException(Annotations.PIPELINED + "="
+					+ isPipelined());
+		}
+
+	}
     
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
@@ -76,7 +108,7 @@ public class MemorySortOp extends SortOp {
 
         SortTask(final MemorySortOp op,
                 final BOpContext<IBindingSet> context) {
-
+        	
             this.context = context;
 
             this.comparator = op.getComparator();
@@ -113,5 +145,5 @@ public class MemorySortOp extends SortOp {
         }
 
     }
-
+    
 }

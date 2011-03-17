@@ -28,6 +28,7 @@ package com.bigdata.btree;
 
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
+import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.BigdataStatics;
@@ -1174,19 +1175,64 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
 
         assertNotReadOnly();
 
-        /*
-         * FIXME Per https://sourceforge.net/apps/trac/bigdata/ticket/221, we
-         * should special case this for the RWStore when delete markers are not
-         * enabled and just issue deletes against each node and leave in the
-         * BTree. This could be done using a post-order traversal of the nodes
-         * and leaves such that the parent is not removed from the store until
-         * its children have been removed. The deletes should be low-level
-         * IRawStore#delete(addr) invocations without maintenance to the B+Tree
-         * data structures. Afterwards replaceRootWithEmptyLeaf() should be
-         * invoked to discard the hard reference ring buffer and associate a new
-         * root leaf with the B+Tree.
-         */
-        if (getIndexMetadata().getDeleteMarkers()
+        if (!getIndexMetadata().getDeleteMarkers()
+                && getStore() instanceof RWStrategy) {
+
+            /*
+             * Per https://sourceforge.net/apps/trac/bigdata/ticket/221, we
+             * special case this for the RWStore when delete markers are not
+             * enabled and just issue deletes against each node and leave in the
+             * BTree. This is done using a post-order traversal of the nodes and
+             * leaves such that the parent is not removed from the store until
+             * its children have been removed. The deletes are low-level
+             * IRawStore#delete(addr) invocations without maintenance to the
+             * B+Tree data structures. Afterwards replaceRootWithEmptyLeaf() is
+             * invoked to discard the hard reference ring buffer and associate a
+             * new root leaf with the B+Tree.
+             * 
+             * FIXME https://sourceforge.net/apps/trac/bigdata/ticket/217 - we
+             * should update the performance counters when we use this short
+             * cut to release the storage associated with the B+Tree.
+             */
+
+            /*
+             * Visit all Nodes using a pre-order traversal, but do not
+             * materialize the leaves.
+             */
+            final Iterator<AbstractNode> itr = getRoot().postOrderNodeIterator(
+                    false/* dirtyNodesOnly */, true/* nodesOnly */);
+
+            while(itr.hasNext()) {
+                
+                final Node node = (Node) itr.next();
+                
+                final int nchildren = node.getChildCount();
+                
+                for (int i = 0; i < nchildren; i++) {
+                    
+                    final long childAddr = node.getChildAddr(i);
+
+                    if(childAddr != 0L) {
+
+                        // delete persistent child.
+                        getStore().delete(childAddr);
+                        
+                    }
+                    
+                }
+                
+            }
+
+            // delete root iff persistent.
+            if (getRoot().getIdentity() != 0L) {
+             
+                getStore().delete(getRoot().getIdentity());
+                
+            }
+            
+            replaceRootWithEmptyLeaf();
+
+        } else if (getIndexMetadata().getDeleteMarkers()
                 || getStore() instanceof RWStrategy) {
 
             /*

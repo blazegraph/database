@@ -26,6 +26,7 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.Compare.CompareOp;
 
 import com.bigdata.bop.BOp;
@@ -33,37 +34,56 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.constraint.BOpConstraint;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.XSDBooleanIV;
 
 /**
  * Use inline terms to perform numerical comparison operations.
  * 
  * @see IVUtility#numericalCompare(IV, IV) 
  */
-public class CompareBOp extends BOpConstraint {
+public class CompareBOp extends XSDBooleanIVValueExpression {
 
-    /**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 5661497748051783499L;
+	
+	protected static final Logger log = Logger.getLogger(CompareBOp.class);
+	
     
     public interface Annotations extends PipelineOp.Annotations {
 
         /**
          * The compare operator, which is a {@link CompareOp} enum value.
          */
-        String OP = CompareBOp.class.getName() + ".op";
+        String OP = (CompareBOp.class.getName() + ".op").intern();
 
     }
 
+    public CompareBOp(final IValueExpression<? extends IV> left, 
+    		final IValueExpression<? extends IV> right, final CompareOp op) {
+    	
+        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op)));
+        
+    }
+    
     /**
      * Required shallow copy constructor.
      */
-    public CompareBOp(final BOp[] values,
-            final Map<String, Object> annotations) {
-        super(values, annotations);
+    public CompareBOp(final BOp[] args, final Map<String, Object> anns) {
+
+    	super(args, anns);
+    	
+        if (args.length != 2 || args[0] == null || args[1] == null
+        		|| getProperty(Annotations.OP) == null) {
+
+			throw new IllegalArgumentException();
+		
+		}
+
     }
 
     /**
@@ -72,33 +92,37 @@ public class CompareBOp extends BOpConstraint {
     public CompareBOp(final CompareBOp op) {
         super(op);
     }
-
-    public CompareBOp(final IValueExpression<IV> left, 
-    		final IValueExpression<IV> right, final CompareOp op) {
-    	
-        super(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op)));
-        
-        if (left == null || right == null || op == null)
-            throw new IllegalArgumentException();
-
-    }
     
+    public CompareOp op() {
+    	return (CompareOp) getRequiredProperty(Annotations.OP);
+    }
+
     public boolean accept(final IBindingSet s) {
         
-    	final IV left = ((IValueExpression<IV>) get(0)).get(s);
-    	final IV right = ((IValueExpression<IV>) get(1)).get(s);
-
-    	if (left == null || right == null)
-//            return true; // not yet bound.
-    		return false; // no longer allow unbound values
-
-    	final CompareOp op = (CompareOp) getProperty(Annotations.OP);
+    	final IV left = get(0).get(s);
+    	final IV right = get(1).get(s);
     	
-    	if (left.isTermId() && right.isTermId() &&
-    			(op == CompareOp.EQ || op == CompareOp.NE)) {
-    		return _accept(left.compareTo(right));
+        // not yet bound
+    	if (left == null || right == null)
+        	throw new SparqlTypeErrorException();
+
+    	final CompareOp op = op();
+    	
+    	if (left.isTermId() && right.isTermId()) {
+    		if (op == CompareOp.EQ || op == CompareOp.NE) {
+    			return _accept(left.compareTo(right));
+    		} else {
+    			if (log.isInfoEnabled())
+    				log.info("cannot compare: " 
+    					+ left + " " + op + " " + right);
+    			
+    			throw new SparqlTypeErrorException();
+    		}
     	}
     	
+    	/*
+    	 * This code is bad.
+    	 */
     	if (!IVUtility.canNumericalCompare(left) ||
     			!IVUtility.canNumericalCompare(right)) {
     		if (op == CompareOp.EQ) {
@@ -106,8 +130,11 @@ public class CompareBOp extends BOpConstraint {
     		} else if (op == CompareOp.NE) {
     			return true;
     		} else {
-    			throw new NotNumericalException("cannot numerical compare: " 
+    			if (log.isInfoEnabled())
+    				log.info("cannot numerical compare: " 
     					+ left + " " + op + " " + right);
+    			
+    			throw new SparqlTypeErrorException();
     		}
     	}
     	
@@ -121,7 +148,7 @@ public class CompareBOp extends BOpConstraint {
     	
     	switch(op) {
     	case EQ:
-    		return compare == 0;
+    		return compare == 0; 
     	case NE:
     		return compare != 0;
     	case GT:
@@ -137,30 +164,5 @@ public class CompareBOp extends BOpConstraint {
     	}
     	
     }
-    
-    public static class NotNumericalException extends RuntimeException {
 
-		/**
-		 * 
-		 */
-		private static final long serialVersionUID = -8853739187628588335L;
-
-		public NotNumericalException() {
-			super();
-		}
-
-		public NotNumericalException(String s, Throwable t) {
-			super(s, t);
-		}
-
-		public NotNumericalException(String s) {
-			super(s);
-		}
-
-		public NotNumericalException(Throwable t) {
-			super(t);
-		}
-    	
-    }
-    
 }

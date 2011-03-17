@@ -31,7 +31,9 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.relation.rule.IAccessPathExpander;
 
 /**
@@ -49,9 +51,16 @@ import com.bigdata.relation.rule.IAccessPathExpander;
 public class SPOPredicate extends Predicate<ISPO> {
 
     /**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
+	 * 
+	 */
+	private static final long serialVersionUID = 3517916629931687107L;
+
+	public interface Annotations extends Predicate.Annotations {
+
+    	String RANGE = (SPOPredicate.class.getName() + ".range").intern();
+    	
+    }
+    
 
     /**
      * Variable argument version of the shallow copy constructor.
@@ -248,7 +257,7 @@ public class SPOPredicate extends Predicate<ISPO> {
 
         final SPOPredicate tmp = this.clone();
 
-        tmp.set(3/*c*/, c);
+        tmp._set(3/*c*/, c);
         
         return tmp;
 
@@ -275,9 +284,9 @@ public class SPOPredicate extends Predicate<ISPO> {
     }
 
     @SuppressWarnings("unchecked")
-    final public IVariableOrConstant<IV> o() {
+    final public IVariableOrConstant o() {
         
-        return (IVariableOrConstant<IV>) get(2/* o */);
+        return (IVariableOrConstant) get(2/* o */);
         
     }
     
@@ -286,6 +295,12 @@ public class SPOPredicate extends Predicate<ISPO> {
         
         return (IVariableOrConstant<IV>) get(3/* c */);
         
+    }
+    
+    final public RangeBOp range() {
+    	
+    	return (RangeBOp) getProperty(Annotations.RANGE);
+    	
     }
 
     /**
@@ -296,8 +311,26 @@ public class SPOPredicate extends Predicate<ISPO> {
     @Override
     public SPOPredicate asBound(final IBindingSet bindingSet) {
 
-        return (SPOPredicate) super.asBound(bindingSet);
+        if (bindingSet == null)
+            throw new IllegalArgumentException();
         
-    }
+        final SPOPredicate tmp = (SPOPredicate) super.asBound(bindingSet);
+
+        final RangeBOp rangeBOp = range();
+        
+        // we don't have a range bop for ?o
+        if (rangeBOp == null)
+        	return tmp;
+
+		/*
+		 * Attempt to evaluate the RangeBOp.
+		 */
+		final RangeBOp asBound = rangeBOp.asBound(bindingSet);
+
+		tmp._setProperty(Annotations.RANGE, asBound);
+
+		return tmp;
+
+	}
 
 }

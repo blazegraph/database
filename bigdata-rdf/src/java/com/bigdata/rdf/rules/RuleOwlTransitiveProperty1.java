@@ -31,6 +31,7 @@ import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.vocab.Vocabulary;
@@ -66,9 +67,9 @@ public class RuleOwlTransitiveProperty1 extends Rule
                     new SPOPredicate(relationName,var("x"), var("a"), var("y")),//
                     new SPOPredicate(relationName,var("y"), var("a"), var("z"))//
                 }, new IConstraint[] {
-                    new NE(var("x"),var("y")),
-                    new NE(var("y"),var("z")),
-                    new NE(var("x"),var("z")),
+        			Constraint.wrap(new NE(var("x"),var("y"))),
+        			Constraint.wrap(new NE(var("y"),var("z"))),
+					Constraint.wrap(new NE(var("x"),var("z"))),
                     }
                 );
         

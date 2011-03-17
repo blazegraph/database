@@ -27,25 +27,39 @@ package com.bigdata.bop.constraint;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 
 /**
  * Imposes the constraint <code>x == y</code>.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class EQ extends BOpConstraint {
-
-    private static final long serialVersionUID = 1L;
+public class EQ extends BOpBase implements BooleanValueExpression {
 
     /**
-     * Required deep copy constructor.
+	 * 
+	 */
+	private static final long serialVersionUID = 9207324734456820516L;
+
+	public EQ(final IVariable<?> x, final IVariable<?> y) {
+
+        this(new BOp[] { x, y }, null/* annotations */);
+
+    }
+    
+    /**
+     * Required shallow copy constructor.
      */
     public EQ(final BOp[] args, final Map<String, Object> annotations) {
         super(args, annotations);
+
+        if (args.length != 2 || args[0] == null || args[1] == null)
+            throw new IllegalArgumentException();
+
+        if (args[0] == args[1])
+            throw new IllegalArgumentException();
+        
     }
 
     /**
@@ -55,19 +69,7 @@ public class EQ extends BOpConstraint {
         super(op);
     }
 
-    public EQ(final IVariable<?> x, final IVariable<?> y) {
-
-        super(new BOp[] { x, y }, null/* annotations */);
-
-        if (x == null || y == null)
-            throw new IllegalArgumentException();
-
-        if (x == y)
-            throw new IllegalArgumentException();
-        
-    }
-    
-    public boolean accept(final IBindingSet s) {
+    public Boolean get(final IBindingSet s) {
         
         // get binding for "x".
         final IConstant<?> x = s.get((IVariable<?>) get(0)/* x */);

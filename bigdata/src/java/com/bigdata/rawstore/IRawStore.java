@@ -34,7 +34,7 @@ import java.util.UUID;
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.BTree;
 import com.bigdata.cache.IGlobalLRU;
-import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.io.IByteArrayBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.mdi.IResourceMetadata;
@@ -86,7 +86,7 @@ import com.bigdata.mdi.IResourceMetadata;
  *      .
  * 
  */
-public interface IRawStore extends IAddressManager {
+public interface IRawStore extends IAddressManager, ICounterSetAccess {
     
     /**
      * Write the data (unisolated).
@@ -292,9 +292,9 @@ public interface IRawStore extends IAddressManager {
      */
     public long size();
 
-    /**
-     * Reports performance counters.
-     */
-    public CounterSet getCounters();
+//    /**
+//     * Reports performance counters.
+//     */
+//    public CounterSet getCounters();
     
 }

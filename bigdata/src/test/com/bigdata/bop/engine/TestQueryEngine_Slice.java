@@ -37,7 +37,10 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.EmptyBindingSet;
+import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.solutions.MemorySortOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SliceOp.SliceStats;
 import com.bigdata.journal.BufferMode;
@@ -123,13 +126,15 @@ public class TestQueryEngine_Slice extends TestCase2 {
 
     }
 
-//    public void testStressThreadSafe() throws Exception {
-//        
-//        for(int i=0; i<1000; i++) {
-//            test_slice_threadSafe();
-//        }
-//        
-//    }
+    public void testStressThreadSafe() throws Exception {
+        
+        for(int i=0; i<100; i++) {
+            
+        	test_slice_threadSafe();
+        	
+        }
+        
+    }
     
     public void test_slice_threadSafe() throws Exception {
 
@@ -170,9 +175,23 @@ public class TestQueryEngine_Slice extends TestCase2 {
                 }
             }
         }
-        final int sliceId = 1;
-        final SliceOp query = new SliceOp(new BOp[] {}, NV.asMap(new NV[] {//
+
+        final int startId = 1;
+        final int sliceId = 2;
+
+		/*
+		 * Note: The StartOp breaks up the initial set of chunks into multiple
+		 * IChunkMessages, which results in multiple invocations of the StartOp.
+		 */
+    	final PipelineOp startOp = new StartOp(new BOp[]{}, NV.asMap(new NV[]{//
+                new NV(SliceOp.Annotations.BOP_ID, startId),//
+                new NV(MemorySortOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+    	}));
+
+        final SliceOp query = new SliceOp(new BOp[] {startOp}, NV.asMap(new NV[] {//
                 new NV(SliceOp.Annotations.BOP_ID, sliceId),//
+            	new NV(SliceOp.Annotations.SHARED_STATE,true),//
                         new NV(SliceOp.Annotations.OFFSET, offset),//
                         new NV(SliceOp.Annotations.LIMIT, limit),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
@@ -197,8 +216,8 @@ public class TestQueryEngine_Slice extends TestCase2 {
 
         // Verify stats.
         final SliceStats stats = (SliceStats) q.getStats().get(sliceId);
-        System.err.println(getClass().getName() + "." + getName() + " : "
-                + stats);
+		if (log.isInfoEnabled())
+			log.info(getClass().getName() + "." + getName() + " : " + stats);
         assertNotNull(stats);
         assertEquals(limit, stats.naccepted.get());
         assertEquals(limit, nsolutions);

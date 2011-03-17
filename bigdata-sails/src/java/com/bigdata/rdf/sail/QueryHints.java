@@ -55,6 +55,8 @@ public interface QueryHints {
      * this interface.
      */
     String NAMESPACE = "BIGDATA_QUERY_HINTS";
+    
+    String PREFIX = "http://www.bigdata.com/queryHints#";
 
 	/**
 	 * Specify the query optimizer. For example, you can disable the query
@@ -73,5 +75,25 @@ public interface QueryHints {
 	 * @see QueryOptimizerEnum
 	 */
     String OPTIMIZER = QueryHints.class.getName() + ".optimizer";
+
+	/**
+	 * A label which may be used to tag the instances of some SPARQL query
+	 * template in manner which makes sense to the application (default
+	 * {@value #DEFAULT_TAG}). The tag is used to aggregate performance
+	 * statistics for tagged queries.
+	 * 
+	 * <pre>
+	 * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sail.QueryHints.tag=Query12&gt;
+	 * </pre>
+	 * 
+	 * @see http://sourceforge.net/apps/trac/bigdata/ticket/207 (Report on Top-N queries)
+	 * @see http://sourceforge.net/apps/trac/bigdata/ticket/256 (Amortize RTO cost)
+	 */
+    String TAG = QueryHints.class.getName() + ".tag";
+
+    /**
+     * @see #TAG
+     */
+    String DEFAULT_TAG = "";
 
 }

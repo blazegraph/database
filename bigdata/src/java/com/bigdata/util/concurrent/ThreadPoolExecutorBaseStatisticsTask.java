@@ -21,7 +21,7 @@ import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorCounters;
  */
 public class ThreadPoolExecutorBaseStatisticsTask implements Runnable {
 
-    protected static final Logger log = Logger
+    private static final Logger log = Logger
             .getLogger(ThreadPoolExecutorBaseStatisticsTask.class);
 
     /**

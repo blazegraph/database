@@ -118,7 +118,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                     "         ?p = <"+property1+">) " +
                     "}";
                 
-                { // evalute it once so i can see it
+                { // evaluate it once so i can see it
                     
                     final StringWriter sw = new StringWriter();
                     final SPARQLResultsXMLWriter handler = new SPARQLResultsXMLWriter(
@@ -711,7 +711,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                     "where { " +
                     "  ?s <"+RDF.TYPE+"> <"+person+"> . " +   // [160, 8, 164], [156, 8, 164]
                     "  ?s <"+RDFS.LABEL+"> ?label . " +       // [160, 148, 174], [156, 148, 170] 
-                    "  ?label <"+search+"> \"Mi\" . " +     // [174, 0, 0]
+                    "  ?label <"+search+"> \"Mi*\" . " +     // [174, 0, 0]
                     "}";
                 
                 { // evalute it once so i can see it
@@ -891,6 +891,29 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
         
     }
     
+    public void test_join_combo_3() throws Exception {
+
+        // define the vocabulary
+        
+        // define the graph
+        Graph graph = new GraphImpl();
+        
+        // define the query
+        String query = 
+            "PREFIX :    <http://example/> " +
+            "SELECT * " +
+            "{  " +
+            "    { ?x :p ?y } UNION { ?p :a ?z } " +
+            "}";
+        
+        // define the correct answer
+        Collection<BindingSet> answer = new LinkedList<BindingSet>();
+        
+        // run the test
+        runQuery(graph, query, answer);
+        
+    }
+    
     public void test_two_nested_opt() throws Exception {
 
         // define the vocabulary
@@ -944,6 +967,59 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
         
     }
     
+    
+    public void test_prune_groups() throws Exception {
+
+        // define the vocabulary
+        final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
+        final URI jane = new URIImpl(BD.NAMESPACE + "Jane");
+        final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
+        final URI person = new URIImpl(BD.NAMESPACE + "Person");
+        final URI object = new URIImpl(BD.NAMESPACE + "Object");
+        final Literal mikeLabel = new LiteralImpl("mike label");
+        final Literal mikeComment = new LiteralImpl("mike comment");
+        final Literal janeLabel = new LiteralImpl("jane label");
+        final URI p1 = new URIImpl(BD.NAMESPACE + "p1");
+        final URI p2 = new URIImpl(BD.NAMESPACE + "p2");
+        
+        // define the graph
+        Graph graph = new GraphImpl();
+        graph.add(mike, RDF.TYPE, person);
+        graph.add(jane, RDF.TYPE, person);
+        graph.add(bryan, RDF.TYPE, person);
+        graph.add(mike, RDF.TYPE, object);
+        graph.add(jane, RDF.TYPE, object);
+        graph.add(bryan, RDF.TYPE, object);
+        graph.add(mike, RDFS.LABEL, mikeLabel);
+        graph.add(mike, RDFS.COMMENT, mikeComment);
+        graph.add(jane, RDFS.LABEL, janeLabel);
+        
+        // define the query
+        String query = 
+            "select * " +
+            "where { " +
+            "  ?s <"+RDF.TYPE+"> <"+person+"> . " +
+            "  OPTIONAL { " +
+            "    ?s <"+p1+"> ?p1 . " +
+            "    OPTIONAL {" +
+            "      ?p1 <"+p2+"> ?o2 . " +
+            "    } " +
+            "  } " + 
+            "}";
+        
+        // define the correct answer
+        Collection<BindingSet> answer = new LinkedList<BindingSet>();
+        answer.add(createBindingSet(
+                new BindingImpl("s", mike)));
+        answer.add(createBindingSet(
+                new BindingImpl("s", jane)));
+        answer.add(createBindingSet(
+                new BindingImpl("s", bryan)));
+        
+        // run the test
+        runQuery(graph, query, answer);
+        
+    }
     
     private void runQuery(final Graph data, final String query, 
             final Collection<BindingSet> answer) throws Exception {

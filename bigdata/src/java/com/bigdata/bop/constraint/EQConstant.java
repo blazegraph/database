@@ -27,28 +27,36 @@ package com.bigdata.bop.constraint;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 
 /**
  * Imposes the constraint <code>var == constant</code>.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class EQConstant extends BOpConstraint {
+public class EQConstant extends BOpBase implements BooleanValueExpression {
 
-    /**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 4619002304068158318L;
 
+	public EQConstant(final IVariable<?> x, final IConstant<?> y) {
+
+        this(new BOp[] { x, y }, null/* annotations */);
+
+    }
+    
     /**
-     * Required deep copy constructor.
+     * Required shallow copy constructor.
      */
     public EQConstant(final BOp[] args, final Map<String, Object> annotations) {
         super(args, annotations);
+
+        if (args.length != 2 || args[0] == null || args[1] == null)
+            throw new IllegalArgumentException();
+
     }
 
     /**
@@ -58,19 +66,7 @@ public class EQConstant extends BOpConstraint {
         super(op);
     }
     
-    public EQConstant(final IVariable<?> var, final IConstant<?> val) {
-
-        super(new BOp[] { var, val }, null/*annotations*/);
-        
-        if (var == null)
-            throw new IllegalArgumentException();
-        
-        if (val == null)
-            throw new IllegalArgumentException();
-        
-    }
-    
-    public boolean accept(final IBindingSet bset) {
+    public Boolean get(final IBindingSet bset) {
         
         final IVariable<?> var = (IVariable<?>) get(0)/* var */;
         

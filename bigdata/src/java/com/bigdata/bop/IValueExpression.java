@@ -2,6 +2,11 @@ package com.bigdata.bop;
 
 import java.io.Serializable;
 
+/**
+ * An expression which may be evaluated to a value.
+ * 
+ * @author mrpersonick
+ */
 public interface IValueExpression<E> extends BOp, Serializable {
 
     /**

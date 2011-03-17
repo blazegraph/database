@@ -1636,7 +1636,7 @@ public class TestNamedGraphs extends QuadsTestCase {
                 final String query = 
                     "select ?x ?y " +
                     "where {  " +
-                    "    ?y <"+ BD.SEARCH+"> \"Chris\" . " +
+                    "    ?y <"+ BD.SEARCH+"> \"Chris*\" . " +
                     "    ?x <"+ RDFS.LABEL.stringValue() + "> ?y . " +
                     "}";
 
@@ -1669,7 +1669,7 @@ public class TestNamedGraphs extends QuadsTestCase {
                     "select ?x ?y " +
                     "where { " +
                     "    graph <http://example.org> { " +
-                    "        ?y <"+ BD.SEARCH+"> \"Chris\" . " +
+                    "        ?y <"+ BD.SEARCH+"> \"Chris*\" . " +
                     "        ?x <"+ RDFS.LABEL.stringValue() + "> ?y ." +
                     "    } . " +
                     "}";

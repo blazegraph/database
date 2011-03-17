@@ -28,6 +28,7 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.vocab.Vocabulary;
@@ -65,7 +66,7 @@ public class RuleFastClosure13 extends AbstractRuleFastClosure_11_13 {
                     new SPOPredicate(relationName,var("a"), vocab.getConstant(RDFS.RANGE), var("b"))//
                 },
                 new IConstraint[] {
-                    new NE(var("y"),var("a"))
+        			Constraint.wrap(new NE(var("y"),var("a")))
                 });
         
     }

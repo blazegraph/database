@@ -21,57 +21,70 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ */
 
 package cutthecrap.utils.striterators;
 
 import java.util.*;
 
+import cutthecrap.utils.striterators.IStriterator.ITailOp;
+
 /**
  * Appenderator
  **/
 
-public class Appenderator implements Iterator {
+public class Appenderator extends Prefetch implements ITailOp {
 
 	private final Iterator m_src;
-	protected final Object   m_ctx;
+	protected final Object m_ctx;
 	private final Iterator m_xtra;
-	
+
 	private Iterator m_current;
+	private boolean m_isxtra = false;
 
-  public Appenderator(Iterator src, Object ctx, Iterator xtra) {
-    m_src = src;
-    m_ctx = ctx;
-    m_xtra = xtra;
+	public Appenderator(Iterator src, Object ctx, Iterator xtra) {
+		m_src = src;
+		m_ctx = ctx;
+		m_xtra = xtra;
 
-    m_current = m_src;
-  }
+		m_current = m_src;
+	}
 
-  //-------------------------------------------------------------
+	// -------------------------------------------------------------
 
-  public boolean hasNext() {
-  	if (m_current.hasNext()) {
-  		return true;
-  	}
-  	
-  	m_current = m_xtra;
-  	
-  	return m_current.hasNext();
-  }
+	protected Object getNext() {
+		Object ret = null;
+		if (m_current.hasNext()) {
+			ret = m_current.next();
+		} else if (m_isxtra) { // no need to call twice
+			return null;
+		} else {		
+			m_current = m_xtra;
+			m_isxtra = true;
+	
+			if (m_current.hasNext()) {
+				ret = m_current.next();
+			}
+		}
+		// experimental tail optimisation
+		if (m_current instanceof ITailOp) {
+			m_current = ((ITailOp) m_current).availableTailOp();
+		}
+		
+		return ret;
+	}
 
-  //-------------------------------------------------------------
-  // must call hasNext() to ensure m_current is correct
-  public Object next() {
-  	if (hasNext()) {
-  		return m_current.next();
-  	}
+	public Iterator availableTailOp() {
+		if (m_isxtra) {
+			return m_current;
+		} else {
+			return this;
+		}
+	}
 
-  	throw new NoSuchElementException("Appenderator");
-  }
+	// -------------------------------------------------------------
 
-  //-------------------------------------------------------------
-
-  public void remove() {
-  	m_current.remove();
-  }
+	public void remove() {
+		m_current.remove();
+	}
 }

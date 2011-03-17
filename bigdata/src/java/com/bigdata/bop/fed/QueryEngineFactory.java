@@ -38,7 +38,6 @@ import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ManagedResourceService;
@@ -78,6 +77,29 @@ public class QueryEngineFactory {
     private static ConcurrentWeakValueCache<IBigdataFederation<?>, FederatedQueryEngine> federationQECache = new ConcurrentWeakValueCache<IBigdataFederation<?>, FederatedQueryEngine>(
             0/* queueCapacity */
     );
+
+    /**
+     * Singleton factory test (does not create the query controller) for
+     * standalone or scale-out.
+     * 
+     * @param indexManager
+     *            The database.
+     * 
+     * @return The query controller iff one has been obtained from the factory
+     *         and its weak reference has not been cleared.
+     */
+    static public QueryEngine getExistingQueryController(
+            final IIndexManager indexManager) {
+
+        if (indexManager instanceof IBigdataFederation<?>) {
+
+            return federationQECache.get((IBigdataFederation<?>) indexManager);
+            
+        }
+        
+        return standaloneQECache.get((Journal)indexManager);
+        
+    }
 
     /**
      * Singleton factory for standalone or scale-out.

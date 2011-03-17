@@ -31,6 +31,8 @@ import java.io.File;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bfs.GlobalFileSystemHelper;
@@ -437,5 +439,34 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         return this;
         
     }
+
+    /**
+     * Not supported, returns <code>null</code>.
+     */
+	public ScheduledFuture<?> addScheduledTask(Runnable task,
+			long initialDelay, long delay, TimeUnit unit) {
+		return null;
+	}
+
+    /**
+     * Not supported, returns <code>false</code>.
+     */
+	public boolean getCollectPlatformStatistics() {
+		return false;
+	}
+
+    /**
+     * Not supported, returns <code>false</code>.
+     */
+	public boolean getCollectQueueStatistics() {
+		return false;
+	}
+
+    /**
+     * Not supported, returns <code>false</code>.
+     */
+	public int getHttpdPort() {
+		return -1;
+	}
     
 }

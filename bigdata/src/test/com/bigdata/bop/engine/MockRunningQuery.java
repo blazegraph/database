@@ -97,6 +97,10 @@ public class MockRunningQuery implements IRunningQuery {
 		return null;
 	}
 
+//	public boolean isLastInvocation(final int bopId,final int nconsumed) {
+//		throw new UnsupportedOperationException();
+//	}
+	
 	public Map<Integer, BOpStats> getStats() {
 		return null;
 	}

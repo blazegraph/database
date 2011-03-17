@@ -196,30 +196,6 @@ public interface IBigdataClient<T> {
     public long getIndexCacheTimeout();
 
     /**
-     * <code>true</code> iff performance counters will be collected for the
-     * platform on which the client is running.
-     * 
-     * @see Options#COLLECT_PLATFORM_STATISTICS
-     */
-    public boolean getCollectPlatformStatistics();
-
-    /**
-     * <code>true</code> iff statistics will be collected for work queues.
-     * 
-     * @see Options#COLLECT_QUEUE_STATISTICS
-     */
-    public boolean getCollectQueueStatistics();
-
-    /**
-     * The port on which the optional httpd service will be run. The httpd
-     * service exposes statistics about the client, its work queues, the
-     * platform on which it is running, etc.
-     * 
-     * @see Options#HTTPD_PORT
-     */
-    public int getHttpdPort();
-    
-    /**
      * An object wrapping the properties used to configure the client.
      */
     public Properties getProperties();

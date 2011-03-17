@@ -63,6 +63,7 @@ import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerRangeValidator;
@@ -3120,9 +3121,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	}
 
 	/**
-	 * 
-	 * @param commitTime
-	 *            A positive timestamp (a possible commit time on the store).
+	 * {@inheritDoc}
 	 * 
 	 * @throws UnsupportedOperationException
 	 *             If you pass in {@link ITx#UNISOLATED},
@@ -3448,14 +3447,25 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
-	/**
-	 * Drops the named index. The index will no longer participate in atomic
-	 * commits and will not be visible to new transactions. Resources are NOT
-	 * reclaimed on the {@link AbstractJournal} (it is an immortal store) and
-	 * historical states of the index will continue to be accessible.
-	 */
+    /**
+     * Drops the named index. The index will no longer participate in atomic
+     * commits and will not be visible to new transactions.  Storage will be
+     * reclaimed IFF the backing store support that functionality.
+     */
 	public void dropIndex(final String name) {
 
+	    final BTree ndx = getIndex(name);
+	    
+	    if(ndx == null)
+	        throw new NoSuchIndexException(name);
+	    
+	    if(getBufferStrategy() instanceof RWStrategy) {
+            /*
+             * Reclaim storage associated with the index.
+             */
+	        ndx.removeAll();
+	    }
+	    
 		final ReadLock lock = _fieldReadWriteLock.readLock();
 
 		lock.lock();
@@ -3753,7 +3763,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			// true the token is valid and this service is the quorum leader
 			final boolean isLeader = quorum.getMember().isLeader(prepareToken);
 			
-			final FutureTask<Boolean> ft = new FutureTask<Boolean>(new Runnable() {
+			final FutureTask<Boolean> ft = new FutureTaskMon<Boolean>(new Runnable() {
 
 				public void run() {
 
@@ -3831,7 +3841,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		public Future<Void> commit2Phase(final long commitTime) {
 
-			final FutureTask<Void> ft = new FutureTask<Void>(new Runnable() {
+			final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
 			    
 				public void run() {
 
@@ -3885,7 +3895,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         public Future<Void> abort2Phase(final long token) {
 
-            final FutureTask<Void> ft = new FutureTask<Void>(new Runnable() {
+            final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
                 public void run() {
 
                     getQuorum().assertQuorum(token);
@@ -4000,7 +4010,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		/** NOP. */
         public Future<Void> bounceZookeeperConnection() {
-            final FutureTask<Void> ft = new FutureTask<Void>(new Runnable() {
+            final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
                 public void run() {
                 }
             }, null);
@@ -4012,7 +4022,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * Does pipeline remove/add.
          */
         public Future<Void> moveToEndOfPipeline() {
-            final FutureTask<Void> ft = new FutureTask<Void>(new Runnable() {
+            final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
                 public void run() {
                     final QuorumActor<?, ?> actor = quorum.getActor();
                     actor.pipelineRemove();

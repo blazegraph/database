@@ -541,7 +541,7 @@ class RunState {
          * Since it is defacto done when [isAllDone] is satisfied, this tests
          * for that condition first and then for isOperatorDone().
          */
-        final boolean isOpDone = isAllDone||isOperatorDone(msg.bopId);
+		final boolean isOpDone = isAllDone || isOperatorDone(msg.bopId);
         
 //        if (isAllDone && !isOpDone)
 //            throw new RuntimeException("Whoops!: "+this);
@@ -575,27 +575,46 @@ class RunState {
 
     }
 
-    /**
-     * Return <code>true</code> the specified operator can no longer be
-     * triggered by the query. The specific criteria are that no operators which
-     * are descendants of the specified operator are running or have chunks
-     * available against which they could run. Under those conditions it is not
-     * possible for a chunk to show up which would cause the operator to be
-     * executed.
-     * 
-     * @param bopId
-     *            Some operator identifier.
-     * 
-     * @return <code>true</code> if the operator can not be triggered given the
-     *         current query activity.
-     * 
-     * @throws IllegalMonitorStateException
-     *             unless the {@link #runStateLock} is held by the caller.
-     */
+	/**
+	 * Return <code>true</code> the specified operator can no longer be
+	 * triggered by the query. The specific criteria are that no operators which
+	 * are descendants of the specified operator are running or have chunks
+	 * available against which they could run. Under those conditions it is not
+	 * possible for a chunk to show up which would cause the operator to be
+	 * executed.
+	 * <p>
+	 * Note: The caller MUST hold a lock across this operation in order for it
+	 * to be atomic with respect to the concurrent evaluation of other operators
+	 * for the same query.
+	 * 
+	 * @param bopId
+	 *            Some operator identifier.
+	 * 
+	 * @return <code>true</code> if the operator can not be triggered given the
+	 *         current query activity.
+	 */
     private boolean isOperatorDone(final int bopId) {
 
         return PipelineUtility.isDone(bopId, query, bopIndex, runningMap,
                 availableMap);
+
+    }
+
+	/**
+	 * Return <code>true</code> iff the preconditions have been satisfied for
+	 * the "at-once" invocation of the specified operator (no predecessors are
+	 * running or could be triggered and the operator has not been evaluated).
+	 * 
+	 * @param bopId
+	 *            Some operator identifier.
+	 * 
+	 * @return <code>true</code> iff the "at-once" evaluation of the operator
+	 *         may proceed.
+	 */
+    boolean isAtOnceReady(final int bopId) {
+
+		return PipelineUtility.isAtOnceReady(bopId, query, bopIndex,
+				runningMap, availableMap);
 
     }
 

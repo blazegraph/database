@@ -30,6 +30,7 @@ package com.bigdata.bop.engine;
 import java.lang.reflect.Constructor;
 import java.rmi.RemoteException;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -57,8 +58,12 @@ import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.view.FusedView;
+import com.bigdata.concurrent.FutureTaskMon;
+import com.bigdata.counters.CAT;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.Instrument;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.sail.bench.NanoSparqlServer;
+import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.resources.IndexManager;
@@ -212,6 +217,16 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     public interface Annotations extends PipelineOp.Annotations {
 
+		/**
+		 * Annotation may be used to impose a specific {@link UUID} for a query.
+		 * This may be used by an external process such that it can then use
+		 * {@link QueryEngine#getRunningQuery(UUID)} to gain access to the
+		 * running query instance. It is an error if there is a query already
+		 * running with the same {@link UUID}.
+		 */
+		String QUERY_ID = (QueryEngine.class.getName() + ".runningQueryClass")
+				.intern();
+    	
         /**
          * The name of the {@link IRunningQuery} implementation class which will
          * be used to evaluate a query marked by this annotation (optional). The
@@ -228,14 +243,185 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
          * {@link QueryEngine#newRunningQuery(QueryEngine, UUID, boolean, IQueryClient, PipelineOp)}
          * in which case they might not support this option.
          */
-        String RUNNING_QUERY_CLASS = QueryEngine.class.getName()
-                + ".runningQueryClass";
+        String RUNNING_QUERY_CLASS = (QueryEngine.class.getName()
+                + ".runningQueryClass").intern();
 
 //        String DEFAULT_RUNNING_QUERY_CLASS = StandaloneChainedRunningQuery.class.getName();
         String DEFAULT_RUNNING_QUERY_CLASS = ChunkedRunningQuery.class.getName();
 
     }
+
+	/**
+	 * Statistics collected for queries.
+	 * 
+	 * @author thompsonbry
+	 */
+    protected static class Counters {
+
+		/**
+		 * The #of queries which have been executed (set on completion).
+		 */
+		final CAT startCount = new CAT();
+		
+		/**
+		 * The #of queries which have been executed (set on completion).
+		 */
+		final CAT doneCount = new CAT();
+
+		/**
+		 * The #of instances of the query which terminated abnormally.
+		 */
+		final CAT errorCount = new CAT();
+
+		/**
+		 * The total elapsed time (millis) for evaluation queries. This is the
+		 * wall clock time per query. The aggregated wall clock time per query
+		 * will sum to greater than the elapsed wall clock time in any interval
+		 * where there is more than one query running concurrently.
+		 */
+		final CAT elapsedMillis = new CAT();
+
+		public CounterSet getCounters() {
+
+			final CounterSet root = new CounterSet();
+
+			// #of queries started on this server.
+			root.addCounter("startCount", new Instrument<Long>() {
+				public void sample() {
+					setValue(startCount.get());
+				}
+			});
+
+			// #of queries retired on this server.
+			root.addCounter("doneCount", new Instrument<Long>() {
+				public void sample() {
+					setValue(doneCount.get());
+				}
+			});
+
+			// #of queries with abnormal termination on this server.
+			root.addCounter("errorCount", new Instrument<Long>() {
+				public void sample() {
+					setValue(errorCount.get());
+				}
+			});
+
+			// #of queries retired per second on this server.
+			root.addCounter("queriesPerSecond", new Instrument<Double>() {
+				public void sample() {
+					final long ms = elapsedMillis.get();
+					final long n = doneCount.get();
+					// compute throughput, normalized to q/s := (q*1000)/ms.
+					final double d = ms == 0 ? 0d : ((1000d * n) / ms);
+					setValue(d);
+				}
+			});
+
+			return root;
+
+		}
+		
+    }
+
+    /**
+     * Return a {@link CounterSet} which reports various statistics for the
+     * {@link QueryEngine}.
+     */
+    public CounterSet getCounters() {
+
+		final CounterSet root = new CounterSet();
+
+		// global counters.
+        root.attach(counters.getCounters());
+		
+        // counters per tagged query group.
+		{
+
+			final CounterSet groups = root.makePath("groups");
+
+			final Iterator<Map.Entry<String, Counters>> itr = groupCounters
+					.entrySet().iterator();
+
+			while (itr.hasNext()) {
+
+				final Map.Entry<String, Counters> e = itr.next();
+
+				final String tag = e.getKey();
+
+				final Counters counters = e.getValue();
+
+				// Note: path component may not be empty!
+				groups.makePath(tag == null | tag.length() == 0 ? "None" : tag)
+						.attach(counters.getCounters());
+
+			}
+
+		}
+
+		return root;
+
+    }
     
+    /**
+     * Counters at the global level.
+     */
+	final protected Counters counters = newCounters();
+
+	/**
+	 * Statistics for queries which are "tagged" so we can recognize their
+	 * instances as members of some group.
+	 */
+	final protected ConcurrentHashMap<String/* groupId */, Counters> groupCounters = new ConcurrentHashMap<String, Counters>();
+
+	/**
+	 * Factory for {@link Counters} instances associated with a query group. A
+	 * query is marked as a member of a group using {@link QueryHints#TAG}. This
+	 * is typically used to mark queries which are instances of the same query
+	 * template.
+	 * 
+	 * @param tag
+	 *            The tag identifying a query group.
+	 * 
+	 * @return The {@link Counters} for that query group.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if the argument is <code>null</code>.
+	 */
+	protected Counters getCounters(final String tag) {
+
+		if(tag == null)
+			throw new IllegalArgumentException();
+		
+		Counters c = groupCounters.get(tag);
+
+		if (c == null) {
+
+			c = new Counters();
+
+			final Counters tmp = groupCounters.putIfAbsent(tag, c);
+
+			if (tmp != null) {
+
+				// someone else won the data race.
+				c = tmp;
+
+			}
+
+		}
+
+		return c;
+
+	}
+
+	/**
+	 * Extension hook for new {@link Counters} instances.
+	 */
+	protected Counters newCounters() {
+		
+		return new Counters();
+		
+	}
+	
     /**
      * Access to the indices.
      * <p>
@@ -430,7 +616,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     public void init() {
 
-        final FutureTask<Void> ft = new FutureTask<Void>(new QueryEngineTask(
+        final FutureTask<Void> ft = new FutureTaskMon<Void>(new QueryEngineTask(
                 priorityQueue), (Void) null);
 
         if (engineFuture.compareAndSet(null/* expect */, ft)) {
@@ -440,8 +626,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
                             QueryEngine.class + ".engineService")));
 
             engineService.get().execute(ft);
-//            localIndexManager.getExecutorService().execute(ft);
-            
+
         } else {
             
             throw new IllegalStateException("Already running");
@@ -708,7 +893,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         
     }
     
-    public void bufferReady(IChunkMessage<IBindingSet> msg) {
+    public void bufferReady(final IChunkMessage<IBindingSet> msg) {
 
         throw new UnsupportedOperationException();
 
@@ -719,7 +904,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * <p>
      * The default implementation is a NOP.
      */
-    public void cancelQuery(UUID queryId, Throwable cause) {
+    public void cancelQuery(final UUID queryId, final Throwable cause) {
         // NOP
     }
 
@@ -811,14 +996,20 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     public AbstractRunningQuery eval(final BOp op, final IBindingSet bset)
             throws Exception {
+    	
+    	// Use a random UUID unless the UUID was specified on the query.
+    	final UUID queryId = op.getProperty(QueryEngine.Annotations.QUERY_ID,
+				UUID.randomUUID());
 
-        return eval(op, newBindingSetIterator(bset));
+        return eval(queryId, op, newBindingSetIterator(bset));
 
     }
 
     /**
      * Evaluate a query. This node will serve as the controller for the query.
      * 
+     * @param queryId
+     *            The unique identifier for the query.
      * @param query
      *            The query to evaluate.
      * @param bsets
@@ -830,14 +1021,12 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *             if the {@link QueryEngine} has been {@link #shutdown()}.
      * @throws Exception
      */
-    public AbstractRunningQuery eval(final BOp op,
+    public AbstractRunningQuery eval(final UUID queryId, final BOp op,
             final IAsynchronousIterator<IBindingSet[]> bsets) throws Exception {
 
         final BOp startOp = BOpUtility.getPipelineStart(op);
 
         final int startId = startOp.getId();
-
-        final UUID queryId = UUID.randomUUID();
 
         return eval(queryId, (PipelineOp) op,
                 new LocalChunkMessage<IBindingSet>(this/* queryEngine */,
@@ -916,8 +1105,31 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         // verify query engine is running.
         assertRunning();
 
-        // add to running query table.
-        putIfAbsent(queryId, runningQuery);
+		// add to running query table.
+		if (putIfAbsent(queryId, runningQuery) != runningQuery) {
+
+			/*
+			 * UUIDs should not collide when assigned randomly. However, the
+			 * UUID may be imposed by an exterior process, such as a SPARQL end
+			 * point, so it can access metadata about the running query even
+			 * when it is not a direct client of the QueryEngine. This provides
+			 * a safety check against UUID collisions which might be non-random.
+			 */
+			throw new RuntimeException("Query exists with that UUID: uuid="
+					+ runningQuery.getQueryId());
+
+		}
+
+		final String tag = query.getProperty(QueryHints.TAG,
+				QueryHints.DEFAULT_TAG);
+
+		final Counters c = tag == null ? null : getCounters(tag);
+
+		// track #of started queries.
+		counters.startCount.increment();
+
+		if (c != null)
+			c.startCount.increment();
 
         // notify query start
         runningQuery.startQuery(msg);
@@ -1020,8 +1232,6 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 	 * 
 	 * @return The {@link AbstractRunningQuery} -or- <code>null</code> if there
 	 *         is no query associated with that query identifier.
-	 * 
-	 * @todo Exposed to {@link NanoSparqlServer}
 	 */
     public /*protected*/ AbstractRunningQuery getRunningQuery(final UUID queryId) {
 
@@ -1156,7 +1366,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * 
      * @see Annotations#RUNNING_QUERY_CLASS
      */
-    protected AbstractRunningQuery newRunningQuery(
+    @SuppressWarnings("unchecked")
+	protected AbstractRunningQuery newRunningQuery(
             /*final QueryEngine queryEngine,*/ final UUID queryId,
             final boolean controller, final IQueryClient clientProxy,
             final PipelineOp query) {

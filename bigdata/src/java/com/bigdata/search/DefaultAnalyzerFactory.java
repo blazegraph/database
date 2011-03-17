@@ -27,9 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.search;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.br.BrazilianAnalyzer;
@@ -69,7 +72,7 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
         
     }
     
-    public Analyzer getAnalyzer(final String languageCode) {
+    public Analyzer getAnalyzer(final String languageCode, final boolean filterStopwords) {
 
         final IKeyBuilder keyBuilder = fullTextIndex.getKeyBuilder();
 
@@ -86,7 +89,7 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
                         .getSortKeyGenerator().getLocale();
 
                 // The analyzer for that locale.
-                Analyzer a = getAnalyzer(locale.getLanguage());
+                Analyzer a = getAnalyzer(locale.getLanguage(), filterStopwords);
 
                 if (a != null)
                     return a;
@@ -137,7 +140,7 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
             
         }
 
-        Analyzer a = ctor.newInstance();
+        Analyzer a = ctor.newInstance(filterStopwords);
         
         return a;
         
@@ -145,7 +148,7 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
 
     abstract private static class AnalyzerConstructor {
         
-        abstract public Analyzer newInstance();
+        abstract public Analyzer newInstance(final boolean filterStopwords);
         
     }
 
@@ -187,13 +190,17 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
             return analyzers;
             
         }
-
+        
         analyzers = new HashMap<String, AnalyzerConstructor>();
+        
+        final Set<?> emptyStopwords = Collections.EMPTY_SET;
 
         {
             AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new BrazilianAnalyzer(Version.LUCENE_CURRENT);
+                public Analyzer newInstance(final boolean filterStopwords) {
+                    return filterStopwords ?
+                		new BrazilianAnalyzer(Version.LUCENE_CURRENT) :
+                    	new BrazilianAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
                 }
             };
             analyzers.put("por", a);
@@ -212,8 +219,8 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
          */
         {
             AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new ChineseAnalyzer();
+                public Analyzer newInstance(final boolean filterStopwords) {
+            		return new ChineseAnalyzer();
                 }
             };
             analyzers.put("zho", a);
@@ -227,8 +234,10 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
          */
         {
             AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new CJKAnalyzer(Version.LUCENE_CURRENT);
+                public Analyzer newInstance(final boolean filterStopwords) {
+                    return filterStopwords ?
+                		new CJKAnalyzer(Version.LUCENE_CURRENT) :
+                		new CJKAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
                 }
             };
 //            analyzers.put("zho", a);
@@ -243,8 +252,10 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
 
         {
             AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new CzechAnalyzer(Version.LUCENE_CURRENT);
+                public Analyzer newInstance(final boolean filterStopwords) {
+                    return filterStopwords ?
+                		new CzechAnalyzer(Version.LUCENE_CURRENT) :
+            			new CzechAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
                 }
             };
             analyzers.put("ces",a);
@@ -254,8 +265,10 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
 
         {
             AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new DutchAnalyzer(Version.LUCENE_CURRENT);
+                public Analyzer newInstance(final boolean filterStopwords) {
+                    return filterStopwords ?
+                		new DutchAnalyzer(Version.LUCENE_CURRENT) :
+            			new DutchAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
                 }
             };
             analyzers.put("dut",a);
@@ -265,8 +278,10 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
         
         {  
             AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new FrenchAnalyzer(Version.LUCENE_CURRENT);
+                public Analyzer newInstance(final boolean filterStopwords) {
+                    return filterStopwords ?
+                		new FrenchAnalyzer(Version.LUCENE_CURRENT) :
+            			new FrenchAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
                 }
             };
             analyzers.put("fra",a); 
@@ -280,8 +295,10 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
          */
         {  
             AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new GermanAnalyzer(Version.LUCENE_CURRENT);
+                public Analyzer newInstance(final boolean filterStopwords) {
+                    return filterStopwords ?
+                		new GermanAnalyzer(Version.LUCENE_CURRENT) :
+            			new GermanAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
                 }
             };
             analyzers.put("deu",a); 
@@ -292,8 +309,10 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
         // Note: ancient greek has a different code (grc).
         {  
             AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new GreekAnalyzer(Version.LUCENE_CURRENT);
+                public Analyzer newInstance(final boolean filterStopwords) {
+                    return filterStopwords ?
+                		new GreekAnalyzer(Version.LUCENE_CURRENT) :
+            			new GreekAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
                 }
             };
             analyzers.put("gre",a); 
@@ -304,8 +323,10 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
         // @todo what about other Cyrillic scripts?
         {  
             AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new RussianAnalyzer(Version.LUCENE_CURRENT);
+                public Analyzer newInstance(final boolean filterStopwords) {
+                    return filterStopwords ?
+                		new RussianAnalyzer(Version.LUCENE_CURRENT) :
+                    	new RussianAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
                 }
             };
             analyzers.put("rus",a); 
@@ -314,7 +335,7 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
         
         {
             AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
+                public Analyzer newInstance(final boolean filterStopwords) {
                     return new ThaiAnalyzer(Version.LUCENE_CURRENT);
                 }
             };
@@ -325,8 +346,10 @@ public class DefaultAnalyzerFactory implements IAnalyzerFactory {
         // English
         {
             AnalyzerConstructor a = new AnalyzerConstructor() {
-                public Analyzer newInstance() {
-                    return new StandardAnalyzer(Version.LUCENE_CURRENT);
+                public Analyzer newInstance(final boolean filterStopwords) {
+                    return filterStopwords ?
+                		new StandardAnalyzer(Version.LUCENE_CURRENT) :
+                		new StandardAnalyzer(Version.LUCENE_CURRENT, emptyStopwords);
                 }
             };
             analyzers.put("eng", a);

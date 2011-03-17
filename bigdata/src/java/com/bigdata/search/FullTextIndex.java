@@ -28,8 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.search;
 
-import info.aduna.i18n.languagetag.IanaLanguageTag;
-
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
@@ -322,7 +320,7 @@ public class FullTextIndex extends AbstractRelation {
          */
         String INDEXER_TIMEOUT = FullTextIndex.class.getName() + ".timeout";
 
-        String DEFAULT_INDEXER_TIMEOUT = "1000";
+        String DEFAULT_INDEXER_TIMEOUT = "0";
 
         /**
          * When <code>true</code>, the <code>fieldId</code> is stored as part of
@@ -596,9 +594,9 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @return The token analyzer best suited to the indicated language family.
      */
-    protected Analyzer getAnalyzer(final String languageCode) {
+    protected Analyzer getAnalyzer(final String languageCode, final boolean filterStopwords) {
 
-        return analyzerFactory.getAnalyzer(languageCode);
+        return analyzerFactory.getAnalyzer(languageCode, filterStopwords);
         
     }
     
@@ -661,6 +659,19 @@ public class FullTextIndex extends AbstractRelation {
     }
 
     /**
+     * See {@link #index(TokenBuffer, long, int, String, Reader, boolean)}.
+     * <p>
+     * Uses a default filterStopwords value of true.
+     * 
+     */
+    public void index(final TokenBuffer buffer, final long docId, final int fieldId,
+            final String languageCode, final Reader r) {
+    	
+    	index(buffer, docId, fieldId, languageCode, r, true/* filterStopwords */);
+    	
+    }
+    
+    /**
      * Index a field in a document.
      * <p>
      * Note: This method does NOT force a write on the indices. If the <i>buffer</i>
@@ -684,11 +695,13 @@ public class FullTextIndex extends AbstractRelation {
      *            {@link Locale}.
      * @param r
      *            A reader on the text to be indexed.
+     * @param filterStopwords
+     * 			  if true, filter stopwords from the token stream            
      * 
      * @see TokenBuffer#flush()
      */
     public void index(final TokenBuffer buffer, final long docId, final int fieldId,
-            final String languageCode, final Reader r) {
+            final String languageCode, final Reader r, final boolean filterStopwords) {
 
         /*
          * Note: You can invoke this on a read-only index. It is only overflow
@@ -701,7 +714,7 @@ public class FullTextIndex extends AbstractRelation {
         int n = 0;
         
         // tokenize (note: docId,fieldId are not on the tokenStream, but the field could be).
-        final TokenStream tokenStream = getTokenStream(languageCode, r);
+        final TokenStream tokenStream = getTokenStream(languageCode, r, filterStopwords);
         try {
         while (tokenStream.incrementToken()) {
             TermAttribute term=tokenStream.getAttribute(TermAttribute.class);
@@ -729,17 +742,21 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @param r
      *            A reader on the text to be indexed.
+     *            
+     * @param filterStopwords
+     * 			  if true, filter stopwords from the token stream            
      * 
      * @return The extracted token stream.
      */
-    protected TokenStream getTokenStream(final String languageCode, final Reader r) {
+    protected TokenStream getTokenStream(final String languageCode, 
+    		final Reader r, final boolean filterStopwords) {
 
         /*
          * Note: This stripping out stopwords by default.
          * 
          * @todo is it using a language family specific stopword list?
          */
-        final Analyzer a = getAnalyzer(languageCode);
+        final Analyzer a = getAnalyzer(languageCode, filterStopwords);
         
         TokenStream tokenStream = a.tokenStream(null/* @todo field? */, r);
         
@@ -995,7 +1012,7 @@ public class FullTextIndex extends AbstractRelation {
      *       iterator that is sent to the data service such that the search
      *       terms are visited only when they occur in the matching field(s).
      */
-    public Hiterator search(final String query, final String languageCode,
+    public Hiterator<Hit> search(final String query, final String languageCode,
             final boolean prefixMatch, final double minCosine,
             final int maxRank, long timeout, final TimeUnit unit) {
 
@@ -1026,7 +1043,7 @@ public class FullTextIndex extends AbstractRelation {
 
         if (timeout == 0L) {
 
-            // treat ZERO as eqivalent to MAX_LONG.
+            // treat ZERO as equivalent to MAX_LONG.
             timeout = Long.MAX_VALUE;
             
         }
@@ -1037,9 +1054,15 @@ public class FullTextIndex extends AbstractRelation {
             
             final TokenBuffer buffer = new TokenBuffer(1, this);
             
+            /*
+             * If we are using prefix match (* operator) then we don't want
+             * to filter stopwords from the search query.
+             */
+            final boolean filterStopwords = !prefixMatch;
+            
             index(buffer, Long.MIN_VALUE/* docId */,
                     Integer.MIN_VALUE/* fieldId */, languageCode,
-                    new StringReader(query));
+                    new StringReader(query), filterStopwords);
 
             if (buffer.size() == 0) {
 
@@ -1159,11 +1182,6 @@ public class FullTextIndex extends AbstractRelation {
     public long insert(IChunkedOrderedIterator itr) {
         throw new UnsupportedOperationException();
     }
-
-//    @SuppressWarnings("unchecked")
-//    public IAccessPath getAccessPath(IPredicate predicate) {
-//        throw new UnsupportedOperationException();
-//    }
 
     public Set<String> getIndexNames() {
         throw new UnsupportedOperationException();

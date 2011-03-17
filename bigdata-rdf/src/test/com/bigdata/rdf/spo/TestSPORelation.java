@@ -39,7 +39,12 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NE;
+import com.bigdata.bop.joinGraph.IEvaluationPlan;
+import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
+import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
+import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlanFactory2;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
@@ -54,10 +59,6 @@ import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.ActionEnum;
-import com.bigdata.relation.rule.eval.DefaultEvaluationPlan2;
-import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
-import com.bigdata.relation.rule.eval.IEvaluationPlan;
-import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IRuleState;
 import com.bigdata.relation.rule.eval.ISolution;
@@ -149,7 +150,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                             new P(relation, var("v"), rdfType, var("u")) //
                     },//
                     new IConstraint[] {
-                            new NE(var("u"),var("x"))
+            			Constraint.wrap(new NE(var("u"),var("x")))
                         }
             );
             

@@ -33,7 +33,7 @@ public class SOpTreeBuilder {
 			final Collection<SOpGroup> groupsToPrune) {
 		final Collection<SOpGroup> children = new LinkedList<SOpGroup>();
 		for (SOpGroup g : groupsToPrune)
-			collectChildren(tree, g, groupsToPrune);
+			collectChildren(tree, g, children);
 		groupsToPrune.addAll(children);
 		final Collection<SOp> sopsToPrune = new LinkedList<SOp>();
 		for (SOpGroup g : groupsToPrune) {
@@ -121,6 +121,8 @@ public class SOpTreeBuilder {
             collectSOps(sops, (LeftJoin) left, rslj, g, pg);
         } else if (left instanceof SingletonSet){
             // do nothing
+        } else if (left instanceof Union){
+            collectSOps(sops, (Union) left, rslj, groupId.incrementAndGet(), g);
         } else {
             throw new UnsupportedOperatorException(left);
         }
@@ -170,6 +172,8 @@ public class SOpTreeBuilder {
             collectSOps(sops, (Join) left, rslj, g, pg);
         } else if (left instanceof LeftJoin) {
             collectSOps(sops, (LeftJoin) left, rslj, groupId.incrementAndGet(), g);
+        } else if (left instanceof Union) {
+            collectSOps(sops, (Union) left, rslj, groupId.incrementAndGet(), g);
         } else {
             throw new UnsupportedOperatorException(left);
         }

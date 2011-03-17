@@ -47,19 +47,20 @@ import com.bigdata.rdf.spo.InGraphHashSetFilter;
  *          {@link InGraphHashSetFilter} and also with the use of an in-memory
  *          join against the incoming binding sets to handle SPARQL data sets.
  */
-abstract public class INConstraint<T> extends BOpConstraint {
+abstract public class INConstraint<T> extends BOpBase 
+		implements BooleanValueExpression {
 
     /**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
+	 * 
+	 */
+	private static final long serialVersionUID = -774833617971700165L;
 
-    public interface Annotations extends BOpConstraint.Annotations {
+	public interface Annotations extends BOpBase.Annotations {
 
         /**
          * The variable against which the constraint is applied.
          */
-        String VARIABLE = INConstraint.class.getName() + ".variable";
+        String VARIABLE = (INConstraint.class.getName() + ".variable").intern();
 
         /**
          * The set of allowed values for that variable.
@@ -67,14 +68,14 @@ abstract public class INConstraint<T> extends BOpConstraint {
          * @todo allow large sets to be specified by reference to a resource
          *       which is then materialized on demand during evaluation.
          */
-        String SET = INConstraint.class.getName() + ".set";
+        String SET = (INConstraint.class.getName() + ".set").intern();
         
     }
     
     /**
      * @param op
      */
-    public INConstraint(BOpBase op) {
+    public INConstraint(final INConstraint<T> op) {
         super(op);
     }
 

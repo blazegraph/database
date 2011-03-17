@@ -44,6 +44,7 @@ import com.bigdata.btree.AbstractNode;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
+import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.SingleValueIterator;
@@ -57,7 +58,8 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class BOpUtility {
 
-    private static final Logger log = Logger.getLogger(BOpUtility.class);
+    private static transient final Logger log = Logger
+            .getLogger(BOpUtility.class);
     
     /**
      * Pre-order recursive visitation of the operator tree (arguments only, no
@@ -67,7 +69,7 @@ public class BOpUtility {
     public static Iterator<BOp> preOrderIterator(final BOp op) {
 
         return new Striterator(new SingleValueIterator(op))
-                .append(preOrderIterator2(op));
+                .append(preOrderIterator2(0,op));
 
     }
 
@@ -76,14 +78,18 @@ public class BOpUtility {
      * NOT visit this node.
      */
     @SuppressWarnings("unchecked")
-    static private Iterator<AbstractNode> preOrderIterator2(final BOp op) {
+	static private Iterator<AbstractNode> preOrderIterator2(final int depth, final BOp op) {
 
         /*
          * Iterator visits the direct children, expanding them in turn with a
          * recursive application of the pre-order iterator.
          */
+    	
+		// mild optimization when no children are present.
+		if (op.arity() == 0)
+			return EmptyIterator.DEFAULT;
 
-        return new Striterator(op.args().iterator()).addFilter(new Expander() {
+        return new Striterator(op.argIterator()).addFilter(new Expander() {
 
             private static final long serialVersionUID = 1L;
 
@@ -106,11 +112,13 @@ public class BOpUtility {
                      * Visit the children (recursive pre-order traversal).
                      */
 
+//            		System.err.println("Node["+depth+"]: "+op.getClass().getName());
+
                     final Striterator itr = new Striterator(
                             new SingleValueIterator(child));
 
-                    // append this node in post-order position.
-                    itr.append(preOrderIterator2(child));
+					// append this node in post-order position.
+					itr.append(preOrderIterator2(depth+1,child));
 
                     return itr;
 
@@ -120,10 +128,13 @@ public class BOpUtility {
                      * The child is a leaf.
                      */
 
+//                	System.err.println("Leaf["+depth+"]: "+op.getClass().getName());
+                	
                     // Visit the leaf itself.
                     return new SingleValueIterator(child);
 
                 }
+
             }
         });
 
@@ -153,7 +164,7 @@ public class BOpUtility {
          * recursive application of the post-order iterator.
          */
 
-        return new Striterator(op.args().iterator()).addFilter(new Expander() {
+        return new Striterator(op.argIterator()).addFilter(new Expander() {
 
             private static final long serialVersionUID = 1L;
 
@@ -297,7 +308,7 @@ public class BOpUtility {
                     }
                 });
                 
-                // append the pre-order traveral of each annotation.
+                // append the pre-order traversal of each annotation.
                 itr.append(itr2);
 
                 return itr;
@@ -307,10 +318,11 @@ public class BOpUtility {
         
     }
 
-    /**
-     * Return all variables recursively using a pre-order traversal present
-     * whether in the operator tree or on annotations attached to operators.
-     */
+	/**
+	 * Return the distinct variables recursively using a pre-order traversal
+	 * present whether in the operator tree or on annotations attached to
+	 * operators.
+	 */
     @SuppressWarnings("unchecked")
     public static Iterator<IVariable<?>> getSpannedVariables(final BOp op) {
 
@@ -322,7 +334,7 @@ public class BOpUtility {
                     public boolean isValid(Object arg0) {
                         return arg0 instanceof IVariable<?>;
                     }
-                });
+                }).makeUnique();
 
     }
 
@@ -337,7 +349,7 @@ public class BOpUtility {
     @SuppressWarnings("unchecked")
     static public Iterator<IVariable<?>> getArgumentVariables(final BOp op) {
 
-        return new Striterator(op.args().iterator())
+        return new Striterator(op.argIterator())
                 .addFilter(new Filter() {
 
                     private static final long serialVersionUID = 1L;
@@ -357,7 +369,7 @@ public class BOpUtility {
      */
     static public int getArgumentVariableCount(final BOp op) {
         int nvars = 0;
-        final Iterator<BOp> itr = op.args().iterator();
+        final Iterator<BOp> itr = op.argIterator();
         while(itr.hasNext()) {
             final BOp arg = itr.next();
             if (arg instanceof IVariable<?>)
@@ -504,7 +516,7 @@ public class BOpUtility {
         if (op == null)
             throw new IllegalArgumentException();
 
-        final Iterator<BOp> itr = root.args().iterator();
+        final Iterator<BOp> itr = root.argIterator();
 
         while (itr.hasNext()) {
 
@@ -661,7 +673,7 @@ public class BOpUtility {
     static public IBindingSet[] toArray(final Iterator<IBindingSet[]> itr,
             final BOpStats stats) {
 
-        final List<IBindingSet[]> list = new LinkedList<IBindingSet[]>();
+    	final List<IBindingSet[]> list = new LinkedList<IBindingSet[]>();
 
         int nchunks = 0, nelements = 0;
         {
@@ -675,8 +687,6 @@ public class BOpUtility {
                 nchunks++;
 
                 nelements += a.length;
-
-                list.add(a);
 
             }
 
@@ -699,18 +709,26 @@ public class BOpUtility {
             
             final IBindingSet[] a = new IBindingSet[nelements];
             
-            final Iterator<IBindingSet[]> itr2 = list.iterator();
-            
-            while (itr2.hasNext()) {
-            
-                final IBindingSet[] t = itr2.next();
-                
-                System.arraycopy(t/* src */, 0/* srcPos */, a/* dest */,
-                        n/* destPos */, t.length/* length */);
-                
-                n += t.length;
-            
-            }
+			final Iterator<IBindingSet[]> itr2 = list.iterator();
+
+			while (itr2.hasNext()) {
+
+				final IBindingSet[] t = itr2.next();
+				try {
+					System.arraycopy(t/* src */, 0/* srcPos */, a/* dest */,
+							n/* destPos */, t.length/* length */);
+				} catch (IndexOutOfBoundsException ex) {
+					// Provide some more detail in the stack trace.
+					final IndexOutOfBoundsException ex2 = new IndexOutOfBoundsException(
+							"t.length=" + t.length + ", a.length=" + a.length
+									+ ", n=" + n);
+					ex2.initCause(ex);
+					throw ex2;
+				}
+
+				n += t.length;
+
+			}
 
             return a;
 
@@ -764,8 +782,12 @@ public class BOpUtility {
         if (bop == null)
             return;
         
-        for (BOp arg : bop.args()) {
+    	final Iterator<BOp> itr = bop.argIterator();
 
+    	while(itr.hasNext()) {
+        
+        	final BOp arg = itr.next();
+        
             if (!(arg instanceof IVariableOrConstant<?>)) {
              
                 toString(arg, sb, indent+1);
@@ -799,7 +821,7 @@ public class BOpUtility {
 
     }
 
-    private static final transient String ws = "                                                                                                                                                                                                                  ";
+    private static final transient String ws = "                                                                                                                                                                                                                                                                                ";
 
 //    /**
 //     * Verify that all bops from the identified <i>startId</i> to the root are
@@ -989,40 +1011,40 @@ public class BOpUtility {
 
     }
 
-	/**
-	 * Inject (or replace) an {@link Integer} "rowId" column. This does not have
-	 * a side-effect on the source {@link IBindingSet}s.
-	 * 
-	 * @param var
-	 *            The name of the column.
-	 * @param start
-	 *            The starting value for the identifier.
-	 * @param in
-	 *            The source {@link IBindingSet}s.
-	 * 
-	 * @return The modified {@link IBindingSet}s.
-	 */
-	public static IBindingSet[] injectRowIdColumn(final IVariable var,
-			final int start, final IBindingSet[] in) {
-
-		if (in == null)
-			throw new IllegalArgumentException();
-		
-		final IBindingSet[] out = new IBindingSet[in.length];
-		
-		for (int i = 0; i < out.length; i++) {
-		
-			final IBindingSet bset = in[i].clone();
-
-			bset.set(var, new Constant<Integer>(Integer.valueOf(start + i)));
-
-			out[i] = bset;
-			
-		}
-		
-		return out;
-
-	}
+//	/**
+//	 * Inject (or replace) an {@link Integer} "rowId" column. This does not have
+//	 * a side-effect on the source {@link IBindingSet}s.
+//	 * 
+//	 * @param var
+//	 *            The name of the column.
+//	 * @param start
+//	 *            The starting value for the identifier.
+//	 * @param in
+//	 *            The source {@link IBindingSet}s.
+//	 * 
+//	 * @return The modified {@link IBindingSet}s.
+//	 */
+//	public static IBindingSet[] injectRowIdColumn(final IVariable<?> var,
+//			final int start, final IBindingSet[] in) {
+//
+//		if (in == null)
+//			throw new IllegalArgumentException();
+//		
+//		final IBindingSet[] out = new IBindingSet[in.length];
+//		
+//		for (int i = 0; i < out.length; i++) {
+//		
+//			final IBindingSet bset = in[i].clone();
+//
+//			bset.set(var, new Constant<Integer>(Integer.valueOf(start + i)));
+//
+//			out[i] = bset;
+//			
+//		}
+//		
+//		return out;
+//
+//	}
 
     /**
      * Return an ordered array of the bopIds associated with an ordered array of
@@ -1056,29 +1078,20 @@ public class BOpUtility {
     }
 
     /**
-     * Return the variable references shared by tw operators. All variables
-     * spanned by either {@link BOp} are considered.
+     * Return the variable references shared by two operators. All variables
+     * spanned by either {@link BOp} are considered, regardless of whether they
+     * appear as operands or within annotations.
      * 
      * @param p
      *            An operator.
      * @param c
      *            Another operator.
      * 
-     * @param p
-     *            A predicate.
-     * 
-     * @param c
-     *            A constraint.
-     * 
-     * @return The variables in common -or- <code>null</code> iff there are no
-     *         variables in common.
+     * @return The variable(s) in common. This may be an empty set, but it is
+     *         never <code>null</code>.
      * 
      * @throws IllegalArgumentException
      *             if the two either reference is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if the reference are the same.
-     * 
-     * @todo unit tests.
      */
     public static Set<IVariable<?>> getSharedVars(final BOp p, final BOp c) {
 
@@ -1088,14 +1101,15 @@ public class BOpUtility {
         if (c == null)
             throw new IllegalArgumentException();
 
-        if (p == c)
-            throw new IllegalArgumentException();
-
-        // The set of variables which are shared.
-        final Set<IVariable<?>> sharedVars = new LinkedHashSet<IVariable<?>>();
+        /*
+         * Note: This is allowed since both arguments might be the same variable
+         * or constant.
+         */
+//        if (p == c)
+//            throw new IllegalArgumentException();
 
         // Collect the variables appearing anywhere in [p].
-        final Set<IVariable<?>> p1vars = new LinkedHashSet<IVariable<?>>();
+        Set<IVariable<?>> p1vars = null;
         {
 
             final Iterator<IVariable<?>> itr = BOpUtility
@@ -1103,11 +1117,28 @@ public class BOpUtility {
 
             while (itr.hasNext()) {
 
+            	if(p1vars == null) {
+            		 
+            		// lazy initialization.
+            		p1vars = new LinkedHashSet<IVariable<?>>();
+            		
+            	}
+            	
                 p1vars.add(itr.next());
 
             }
 
         }
+
+		if (p1vars == null) {
+		
+			// Fast path when no variables in [p].
+			return Collections.emptySet();
+			
+		}
+        
+        // The set of variables which are shared.
+        Set<IVariable<?>> sharedVars = null;
 
         // Consider the variables appearing anywhere in [c].
         {
@@ -1121,7 +1152,14 @@ public class BOpUtility {
 
                 if (p1vars.contains(avar)) {
 
-                    sharedVars.add(avar);
+					if (sharedVars == null) {
+
+						// lazy initialization.
+						sharedVars = new LinkedHashSet<IVariable<?>>();
+						
+					}
+					
+					sharedVars.add(avar);
 
                 }
 
@@ -1129,7 +1167,10 @@ public class BOpUtility {
 
         }
 
-        return sharedVars;
+		if (sharedVars == null)
+			return Collections.emptySet();
+
+		return sharedVars;
 
     }
 

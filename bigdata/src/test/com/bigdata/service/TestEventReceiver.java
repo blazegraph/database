@@ -40,12 +40,15 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import junit.framework.TestCase2;
 
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITransactionService;
@@ -585,7 +588,7 @@ public class TestEventReceiver extends TestCase2 {
             return null;
         }
 
-        public CounterSet getCounterSet() {
+        public CounterSet getCounters() {
             return null;
         }
 
@@ -697,7 +700,7 @@ public class TestEventReceiver extends TestCase2 {
             return false;
         }
 
-        public AbstractHTTPD newHttpd(int httpdPort, CounterSet counterSet) throws IOException {
+        public AbstractHTTPD newHttpd(int httpdPort, ICounterSetAccess access) throws IOException {
             return null;
         }
 
@@ -716,6 +719,23 @@ public class TestEventReceiver extends TestCase2 {
         public CounterSet getHostCounterSet() {
             return null;
         }
+
+		public ScheduledFuture<?> addScheduledTask(Runnable task,
+				long initialDelay, long delay, TimeUnit unit) {
+			return null;
+		}
+
+		public boolean getCollectPlatformStatistics() {
+			return false;
+		}
+
+		public boolean getCollectQueueStatistics() {
+			return false;
+		}
+
+		public int getHttpdPort() {
+			return 0;
+		}
         
     }
     

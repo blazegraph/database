@@ -59,4 +59,16 @@ public interface IStriterator extends Iterator, Enumeration {
 	 *		iter.map(this, MyClass.aMethod);
 	 **/
 	public IStriterator map(Object client, Method method);
+	
+	public interface ITailOp {
+		/** 
+		 * Opportunity for a Striterator to provide a "tail iterator" to
+		 * shorten the call stack.  For example, an Appenderator would return
+		 * the second iterator if current. Or an Expanderator the child iterator
+		 * if there were no more source objects.
+		 * 
+		 * @return a tail optimizing iterator if possible
+		 */
+		public Iterator availableTailOp();
+	}
 }

@@ -81,14 +81,14 @@ public class DataSetJoin extends PipelineOp {
         /**
          * The variable to be bound.
          */
-        String VAR = DataSetJoin.class.getName() + ".var";
+        String VAR = (DataSetJoin.class.getName() + ".var").intern();
 
         /**
          * The {@link Set} of {@link IV}s to be bound. A {@link LinkedHashSet}
          * should be used for efficiency since it provides fast ordered scans
          * and fast point tests.
          */
-        String GRAPHS = DataSetJoin.class.getName() + ".graphs";
+        String GRAPHS = (DataSetJoin.class.getName() + ".graphs").intern();
 
     }
 

@@ -59,6 +59,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -81,7 +82,8 @@ import com.bigdata.util.concurrent.WriteTaskCounters;
  * possible).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: NonBlockingLockManagerWithNewDesign.java 4280 2011-03-08
+ *          15:06:58Z thompsonbry $
  * 
  * @param R
  *            The type of the object that identifies a resource for the purposes
@@ -130,7 +132,8 @@ import com.bigdata.util.concurrent.WriteTaskCounters;
  *       ensure anything except lower latency when compared to other operations
  *       awaiting their own locks.
  */
-public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<R>> {
+public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comparable<R>>
+        implements ICounterSetAccess {
 
     final protected static Logger log = Logger
             .getLogger(NonBlockingLockManagerWithNewDesign.class);
@@ -1422,7 +1425,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      * @param <T>
      *            The generic type of the outcome for the {@link Future}.
      */
-    static public class LockFutureTask<R extends Comparable<R>, T> extends FutureTask<T> {
+    static public class LockFutureTask<R extends Comparable<R>, T> extends FutureTaskMon<T> {
 
         /**
          * The instance of the outer class.

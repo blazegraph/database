@@ -1005,16 +1005,21 @@ public class DataLoader {
         loader.addRioLoaderListener( new RioLoaderListener() {
             
             public void processingNotification( final RioLoaderEvent e ) {
-                
-                if (log.isInfoEnabled()) {
-                    log.info
-                    ( e.getStatementsProcessed() + 
-                      " stmts added in " + 
-                      (e.getTimeElapsed() / 1000d) +
-                      " secs, rate= " + 
-                      e.getInsertRate()
-                      );
-                }
+				/*
+				 * This reports as statements are parsed. Depending on how
+				 * things are buffered, the parser can run ahead of the index
+				 * writes.
+				 */
+				if (log.isInfoEnabled()) {
+					log.info(e.getStatementsProcessed() + " stmts buffered in "
+							+ (e.getTimeElapsed() / 1000d) + " secs, rate= "
+							+ e.getInsertRate()
+							+ (baseURL != null ? ", baseURL=" + baseURL : "") + //
+							(", totalStatementsSoFar="//
+							+ (e.getStatementsProcessed()//
+							+ totals.toldTriples.get()))// 
+					);
+				}
                 
             }
             
@@ -1079,7 +1084,8 @@ public class DataLoader {
             totals.add(stats);
 
             if (log.isInfoEnabled()) {
-				log.info("file:: " + stats + "; totals:: " + totals);
+				log.info("file:: " + stats + "; totals:: " + totals
+						+ (baseURL != null ? "; baseURL=" + baseURL : ""));
                 if (buffer != null
                         && buffer.getDatabase() instanceof AbstractLocalTripleStore) {
                 	if(log.isDebugEnabled())
