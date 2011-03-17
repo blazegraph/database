@@ -320,7 +320,7 @@ public class FullTextIndex extends AbstractRelation {
          */
         String INDEXER_TIMEOUT = FullTextIndex.class.getName() + ".timeout";
 
-        String DEFAULT_INDEXER_TIMEOUT = "1000";
+        String DEFAULT_INDEXER_TIMEOUT = "0";
 
         /**
          * When <code>true</code>, the <code>fieldId</code> is stored as part of
