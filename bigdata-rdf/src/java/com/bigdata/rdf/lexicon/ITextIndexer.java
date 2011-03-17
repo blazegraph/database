@@ -37,6 +37,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.Hiterator;
+import com.bigdata.search.IHit;
 
 /**
  * Abstraction for the text indexer for RDF {@link Value}s allowing either the
@@ -46,14 +47,8 @@ import com.bigdata.search.Hiterator;
  * @version $Id$
  * 
  * @see AbstractTripleStore.Options#TEXT_INDEXER_CLASS
- * 
- * @todo Provide a lucene integration point as an alternative to the
- *       {@link FullTextIndex}. Integrate for query and search of course. For
- *       extra credit, make the Lucene integration cluster aware.
- * 
- * @todo mg4j support (see notes in my email) including clustered support.
  */
-public interface ITextIndexer {
+public interface ITextIndexer<A extends IHit> {
    
     public void create();
 
@@ -68,6 +63,9 @@ public interface ITextIndexer {
      * are tokenized using the default {@link Locale}.
      * </p>
      * 
+     * @param capacity
+     *            A hint to the underlying layer about the buffer size before an
+     *            incremental flush of the index.
      * @param itr
      *            Iterator visiting the terms to be indexed.
      * 
@@ -80,17 +78,38 @@ public interface ITextIndexer {
      * Return <code>true</code> iff datatype literals are being indexed.
      */
     public boolean getIndexDatatypeLiterals();
-    
-//    public Hiterator search(final String languageCode, final String text)
-//            throws InterruptedException;
-//
-//    public Hiterator search(final String query, final String languageCode,
-//            final boolean prefixMatch);
-//
-//    public Hiterator search(final String query, final String languageCode,
-//            final double minCosine, final int maxRank);
 
-    public Hiterator search(final String query, final String languageCode,
+    /**
+     * Do free text search
+     * 
+     * @param query
+     *            The query (it will be parsed into tokens).
+     * @param languageCode
+     *            The language code that should be used when tokenizing the
+     *            query -or- <code>null</code> to use the default {@link Locale}
+     *            ).
+     * @param prefixMatch
+     *            When <code>true</code>, the matches will be on tokens which
+     *            include the query tokens as a prefix. This includes exact
+     *            matches as a special case when the prefix is the entire token,
+     *            but it also allows longer matches. For example,
+     *            <code>free</code> will be an exact match on <code>free</code>
+     *            but a partial match on <code>freedom</code>. When
+     *            <code>false</code>, only exact matches will be made.
+     * @param minCosine
+     *            The minimum cosine that will be returned.
+     * @param maxRank
+     *            The upper bound on the #of hits in the result set.
+     * @param timeout
+     *            The timeout -or- ZERO (0) for NO timeout (this is equivalent
+     *            to using {@link Long#MAX_VALUE}).
+     * @param unit
+     *            The unit in which the timeout is expressed.
+     * 
+     * @return The result set.
+     */
+    public Hiterator<A> search(final String query, final String languageCode,
             final boolean prefixMatch, final double minCosine,
             final int maxRank, long timeout, final TimeUnit unit);
+
 }

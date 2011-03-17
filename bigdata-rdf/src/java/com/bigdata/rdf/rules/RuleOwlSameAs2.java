@@ -29,6 +29,7 @@ package com.bigdata.rdf.rules;
 import org.openrdf.model.vocabulary.OWL;
 
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.rdf.spo.SPOPredicate;
@@ -68,8 +69,8 @@ public class RuleOwlSameAs2 extends Rule  {
                      * Reject (y sameAs z) as the head.
                      */
 //                    new RejectAnythingSameAsItself(var("y"),var("a"),var("z"),vocab.getConstant(OWL.SAMEAS))
-                    new NEConstant(var("a"),vocab.getConstant(OWL.SAMEAS)),
-                    new NE(var("x"),var("y"))
+        			Constraint.wrap(new NEConstant(var("a"),vocab.getConstant(OWL.SAMEAS))),
+        			Constraint.wrap(new NE(var("x"),var("y")))
                 }
         );
        

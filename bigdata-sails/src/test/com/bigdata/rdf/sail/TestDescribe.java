@@ -23,9 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import java.util.Collection;
-import java.util.LinkedList;
 import java.util.Properties;
+
+import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -33,24 +33,24 @@ import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-import org.openrdf.query.Binding;
-import org.openrdf.query.BindingSet;
-import org.openrdf.query.GraphQuery;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryLanguage;
-import org.openrdf.query.TupleQuery;
-import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.TupleExpr;
-import org.openrdf.query.impl.BindingImpl;
+
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
+ * 
+ * FIXME These unit tests do not verify the expected result.
  */
 public class TestDescribe extends ProxyBigdataSailTestCase {
 
+	protected static Logger log = Logger.getLogger(TestDescribe.class);
+	
     @Override
     public Properties getProperties() {
         
@@ -90,15 +90,21 @@ public class TestDescribe extends ProxyBigdataSailTestCase {
         
         try {
     
-            URI mike = new URIImpl("_:Mike");
-            URI person = new URIImpl("_:Person");
-            URI likes = new URIImpl("_:likes");
-            URI rdf = new URIImpl("_:RDF");
-            Literal label = new LiteralImpl("Mike");
+            URI mike = new URIImpl(BD.NAMESPACE+"Mike");
+            URI bryan = new URIImpl(BD.NAMESPACE+"Bryan");
+            URI person = new URIImpl(BD.NAMESPACE+"Person");
+            URI likes = new URIImpl(BD.NAMESPACE+"likes");
+            URI rdf = new URIImpl(BD.NAMESPACE+"RDF");
+            URI rdfs = new URIImpl(BD.NAMESPACE+"RDFS");
+            Literal label1 = new LiteralImpl("Mike");
+            Literal label2 = new LiteralImpl("Bryan");
 /**/
             cxn.add(mike, RDF.TYPE, person);
             cxn.add(mike, likes, rdf);
-            cxn.add(mike, RDFS.LABEL, label);
+            cxn.add(mike, RDFS.LABEL, label1);
+            cxn.add(bryan, RDF.TYPE, person);
+            cxn.add(bryan, likes, rdfs);
+            cxn.add(bryan, RDFS.LABEL, label2);
 /**/
 
             /*
@@ -116,11 +122,21 @@ public class TestDescribe extends ProxyBigdataSailTestCase {
             {
                 
                 String query = 
-//                    "describe ?x " +
-//                    "WHERE { " +
-//                    "  ?x <"+RDF.TYPE+"> <"+person+"> . " +
-//                    "}";
-                   "describe <"+mike+">";
+                	"prefix bd: <"+BD.NAMESPACE+"> " +
+                	"prefix rdf: <"+RDF.NAMESPACE+"> " +
+                	"prefix rdfs: <"+RDFS.NAMESPACE+"> " +
+
+                    "describe ?x " +
+                    "WHERE { " +
+//                    "  { " +
+                    "  ?x rdf:type bd:Person . " +
+                    "  ?x bd:likes bd:RDF " +
+//                    "  } union { " +
+//                    "  ?x rdf:type bd:Person . " +
+//                    "  ?x bd:likes bd:RDFS " +
+//                    "  } " +
+                    "}";
+//                   "describe <"+mike+">";
 //                    "construct { " +
 //                    "  <"+mike+"> ?p1 ?o . " +
 //                    "  ?s ?p2 <"+mike+"> . " +
@@ -158,25 +174,28 @@ public class TestDescribe extends ProxyBigdataSailTestCase {
                 GraphQueryResult result = graphQuery.evaluate();
                 
                 final TupleExpr tupleExpr = graphQuery.getTupleExpr();
-                System.err.println(tupleExpr);
+                log.info(tupleExpr);
                 
                 while(result.hasNext()) {
                     Statement s = result.next();
-                    System.err.println(s);
+                    log.info(s);
                 }
             }
             
             {
                 
                 String query = 
-                    "construct { " +
-                    "  ?x ?px1 ?ox . " +
-                    "  ?sx ?px2 ?x . " +
+                    "construct { " + 
+                    "  ?x ?p1 ?o . " + 
+                    "  ?s ?p2 ?x . " + 
                     "} " +
                     "WHERE { " +
                     "  ?x <"+RDF.TYPE+"> <"+person+"> . " +
-                    "  OPTIONAL { ?x ?px1 ?ox . } . " +
-                    "  OPTIONAL { ?sx ?px2 ?x . } . " +
+                    "  {" +
+                    "    ?x ?p1 ?ox . " +
+                    "  } UNION {" +
+                    "    ?sx ?p2 ?x . " +
+                    "  } " +
                     "}";
                 
 /*                
@@ -204,11 +223,11 @@ public class TestDescribe extends ProxyBigdataSailTestCase {
                 GraphQueryResult result = graphQuery.evaluate();
                 
                 final TupleExpr tupleExpr = graphQuery.getTupleExpr();
-                System.err.println(tupleExpr);
+                log.info(tupleExpr);
                 
                 while(result.hasNext()) {
                     Statement s = result.next();
-                    System.err.println(s);
+                    log.info(s);
                 }
                 
             }
@@ -295,147 +314,14 @@ public class TestDescribe extends ProxyBigdataSailTestCase {
                 GraphQueryResult result = graphQuery.evaluate();
                 
                 final TupleExpr tupleExpr = graphQuery.getTupleExpr();
-                System.err.println(tupleExpr);
+                log.info(tupleExpr);
                 
                 while(result.hasNext()) {
                     Statement s = result.next();
-                    System.err.println(s);
+                    log.info(s);
                 }
             }
             
-            {
-                
-                String query = 
-//                    "construct {" +
-//                    "  ?x ?px1 ?ox . " + 
-//                    "  ?sx ?px2 ?x . " + 
-//                    "  ?y ?py1 ?oy . " + 
-//                    "  ?sy ?py2 ?y . " +
-//                    "} " +
-                    "SELECT * " +
-                    "WHERE { " +
-                    "  ?x <"+likes+"> ?y . " +
-                    "  OPTIONAL { ?x ?px1 ?ox . } . " +
-                    "  OPTIONAL { ?sx ?px2 ?x . } . " +
-                    "  OPTIONAL { ?y ?py1 ?oy . } . " +
-                    "  OPTIONAL { ?sy ?py2 ?y . } . " +
-                    "}";
-                
-/*                
-                construct {
-                    ?s ?p ?o .
-                }
-                where {
-                    ?x likes ?y .
-                    ?s ?p ?o .
-                    FILTER(?s == ?x || ?o == ?x || ?s == ?y || ?o == ?y) .
-                }
-                
-                construct { 
-                    ?x ?px1 ?ox . 
-                    ?sx ?px2 ?x . 
-                    ?y ?py1 ?oy . 
-                    ?sy ?py2 ?y . 
-                }
-                where {
-                    ?x likes ?y . 
-                    OPTIONAL { ?x ?px1 ?ox . } .
-                    OPTIONAL { ?sx ?px2 ?x . } .
-                    OPTIONAL { ?y ?py1 ?oy . } .
-                    OPTIONAL { ?sy ?py2 ?y . } .
-                }
-*/              
-/*                
-                final BigdataSailGraphQuery graphQuery = (BigdataSailGraphQuery) 
-                    cxn.prepareGraphQuery(QueryLanguage.SPARQL, query);
-                GraphQueryResult result = graphQuery.evaluate();
-                
-                final TupleExpr tupleExpr = graphQuery.getTupleExpr();
-                System.err.println(tupleExpr);
-                
-                while(result.hasNext()) {
-                    Statement s = result.next();
-                    System.err.println(s);
-                }
-*/
-                final TupleQuery tupleQuery = 
-                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                final TupleQueryResult result = tupleQuery.evaluate();
-                
-                while(result.hasNext()) {
-                    BindingSet bs = result.next();
-                    System.err.println(bs);
-                }
-                
-            }
-            
-            {
-                
-                String query = 
-//                    "construct {" +
-//                    "  ?x ?px1 ?ox . " + 
-//                    "  ?sx ?px2 ?x . " + 
-//                    "  ?y ?py1 ?oy . " + 
-//                    "  ?sy ?py2 ?y . " +
-//                    "} " +
-                    "SELECT * " +
-                    "WHERE { " +
-                    "  { ?x <"+likes+"> ?y . ?x ?px1 ?ox . } " +
-                    "  UNION " +
-                    "  { ?x <"+likes+"> ?y . ?sx ?px2 ?x . } " +
-                    "  UNION " +
-                    "  { ?x <"+likes+"> ?y . ?y ?py1 ?oy . } " +
-                    "  UNION " +
-                    "  { ?x <"+likes+"> ?y . ?sy ?py2 ?y . } " +
-                    "}";
-                
-/*                
-                construct {
-                    ?s ?p ?o .
-                }
-                where {
-                    ?x likes ?y .
-                    ?s ?p ?o .
-                    FILTER(?s == ?x || ?o == ?x || ?s == ?y || ?o == ?y) .
-                }
-                
-                construct { 
-                    ?x ?px1 ?ox . 
-                    ?sx ?px2 ?x . 
-                    ?y ?py1 ?oy . 
-                    ?sy ?py2 ?y . 
-                }
-                where {
-                    ?x likes ?y . 
-                    OPTIONAL { ?x ?px1 ?ox . } .
-                    OPTIONAL { ?sx ?px2 ?x . } .
-                    OPTIONAL { ?y ?py1 ?oy . } .
-                    OPTIONAL { ?sy ?py2 ?y . } .
-                }
-*/
-/*                
-                final BigdataSailGraphQuery graphQuery = (BigdataSailGraphQuery) 
-                    cxn.prepareGraphQuery(QueryLanguage.SPARQL, query);
-                GraphQueryResult result = graphQuery.evaluate();
-                
-                final TupleExpr tupleExpr = graphQuery.getTupleExpr();
-                System.err.println(tupleExpr);
-                
-                while(result.hasNext()) {
-                    Statement s = result.next();
-                    System.err.println(s);
-                }
-*/
-                final TupleQuery tupleQuery = 
-                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                final TupleQueryResult result = tupleQuery.evaluate();
-                
-                while(result.hasNext()) {
-                    BindingSet bs = result.next();
-                    System.err.println(bs);
-                }
-                
-            }
             
         } finally {
             cxn.close();

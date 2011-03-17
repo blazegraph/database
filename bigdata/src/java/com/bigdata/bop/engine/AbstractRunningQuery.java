@@ -29,6 +29,8 @@ package com.bigdata.bop.engine;
 
 import java.nio.ByteBuffer;
 import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,9 +49,11 @@ import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.engine.QueryEngine.Counters;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.service.IBigdataFederation;
@@ -235,6 +239,16 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      */
     private final AtomicBoolean didQueryTearDown = new AtomicBoolean(false);
 
+	/**
+	 * A collection reporting on whether or not a given operator has been torn
+	 * down. This collection is used to provide the guarantee that an operator
+	 * is torn down exactly once, regardless of the #of invocations of the
+	 * operator or the #of errors which might occur during query processing.
+	 * 
+	 * @see PipelineOp#tearDown()
+	 */
+	private final Map<Integer/* bopId */, AtomicBoolean> tornDown = new LinkedHashMap<Integer, AtomicBoolean>();
+
     /**
      * Set the query deadline. The query will be cancelled when the deadline is
      * passed. If the deadline is passed, the query is immediately cancelled.
@@ -393,6 +407,33 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     }
 
+	/**
+	 * Return the {@link BOp} having the specified id.
+	 * 
+	 * @param bopId
+	 *            The {@link BOp} identifier.
+	 * 
+	 * @return The {@link BOp}.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if there is no {@link BOp} with that identifier declared in
+	 *             this query.
+	 */
+	final public BOp getBOp(final int bopId) {
+
+		final BOp bop = getBOpIndex().get(bopId);
+
+		if (bop == null) {
+
+			throw new IllegalArgumentException("Not found: id=" + bopId
+					+ ", query=" + query);
+
+		}
+
+		return bop;
+    	
+    }
+
     /**
      * @param queryEngine
      *            The {@link QueryEngine} on which the query is running. In
@@ -523,10 +564,17 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
              * Visit children, but not if this is a CONTROLLER operator since
              * its children belong to a subquery.
              */
-            for (BOp t : op.args()) {
+        	final Iterator<BOp> itr = op.argIterator();
+
+        	while(itr.hasNext()) {
+            
+            	final BOp t = itr.next();
+            
                 // visit children (recursion)
                 populateStatsMap(t);
+                
             }
+        	
         }
 
     }
@@ -601,8 +649,26 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
         try {
 
-            if (runState.startOp(msg))
+    		if(log.isInfoEnabled())//FIXME TRACE
+    			log.info(msg.toString());
+    		
+            if (runState.startOp(msg)) {
+
+				/*
+				 * Set a flag in this collection so we will know that this
+				 * operator needs to be torn down (we do not bother to tear down
+				 * operators which have never been setup).
+				 */
+            	tornDown.put(msg.bopId, new AtomicBoolean(false));
+
+				/*
+				 * TODO It is a bit dangerous to hold the lock while we do this
+				 * but this needs to be executed before any other thread can
+				 * start an evaluation task for that operator.
+				 */
                 lifeCycleSetUpOperator(msg.bopId);
+                
+            }
 
         } catch (TimeoutException ex) {
 
@@ -616,19 +682,19 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     }
 
-    /**
-     * Message provides notice that the operator has ended execution. The
-     * termination conditions for the query are checked. (For scale-out, the
-     * node node controlling the query needs to be involved for each operator
-     * start/stop in order to make the termination decision atomic).
-     * 
-     * @param msg
-     *            The {@link HaltOpMessage}
-     * 
-     * @throws UnsupportedOperationException
-     *             If this node is not the query coordinator.
-     */
-    final protected void haltOp(final HaltOpMessage msg) {
+	/**
+	 * Message provides notice that the operator has ended execution. The
+	 * termination conditions for the query are checked. (For scale-out, the
+	 * node controlling the query needs to be involved for each operator
+	 * start/stop in order to make the termination decision atomic).
+	 * 
+	 * @param msg
+	 *            The {@link HaltOpMessage}
+	 * 
+	 * @throws UnsupportedOperationException
+	 *             If this node is not the query coordinator.
+	 */
+    /*final*/ protected void haltOp(final HaltOpMessage msg) {
 
         if (!controller)
             throw new UnsupportedOperationException(ERR_NOT_CONTROLLER);
@@ -639,9 +705,12 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         if (!queryId.equals(msg.queryId))
             throw new IllegalArgumentException();
 
-        lock.lock();
+		lock.lock();
 
         try {
+
+    		if(log.isInfoEnabled())//FIXME TRACE
+    			log.info(msg.toString());
 
             // update per-operator statistics.
             final BOpStats tmp = statsMap.putIfAbsent(msg.bopId, msg.taskStats);
@@ -653,12 +722,19 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
             if (runState.haltOp(msg)) {
 
-                /*
-                 * No more chunks can appear for this operator so invoke its end
-                 * of life cycle hook.
-                 */
+				/*
+				 * No more chunks can appear for this operator so invoke its end
+				 * of life cycle hook IFF it has not yet been invoked.
+				 */
 
-                lifeCycleTearDownOperator(msg.bopId);
+				final AtomicBoolean tornDown = AbstractRunningQuery.this.tornDown
+						.get(msg.bopId);
+
+				if (tornDown.compareAndSet(false/* expect */, true/* update */)) {
+
+					lifeCycleTearDownOperator(msg.bopId);
+
+				}
 
                 if (runState.isAllDone()) {
 
@@ -681,6 +757,69 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     }
 
+	/**
+	 * Return <code>true</code> iff the preconditions have been satisfied for
+	 * the "at-once" invocation of the specified operator (no predecessors are
+	 * running or could be triggered and the operator has not been evaluated).
+	 * 
+	 * @param bopId
+	 *            Some operator identifier.
+	 * 
+	 * @return <code>true</code> iff the "at-once" evaluation of the operator
+	 *         may proceed.
+	 */
+	protected boolean isAtOnceReady(final int bopId) {
+    	
+    	lock.lock();
+    	
+    	try {
+
+//			if (isDone()) {
+//				// The query has already halted.
+//				throw new InterruptedException();
+//			}
+    		
+			return runState.isAtOnceReady(bopId);
+    		
+    	} finally {
+    		
+    		lock.unlock();
+    		
+    	}
+    	
+    }
+
+//	/**
+//	 * Return <code>true</code> iff there is already an instance of the operator
+//	 * running.
+//	 * 
+//	 * @param bopId
+//	 *            The bopId of the operator.
+//	 *            
+//	 * @return True iff there is at least one instance of the operator running
+//	 *         (globally for this query).
+//	 */
+//	public boolean isOperatorRunning(final int bopId) {
+//
+//		lock.lock();
+//
+//		try {
+//
+//			final AtomicLong nrunning = runState.runningMap.get(bopId);
+//
+//			if (nrunning == null)
+//				return false;
+//
+//			return nrunning.get() > 0;
+//    		
+//    	} finally {
+//    		
+//    		lock.unlock();
+//    		
+//    	}
+//    	
+//    }
+
     /**
      * Hook invoked the first time the given operator is evaluated for the
      * query. This may be used to set up life cycle resources for the operator,
@@ -690,27 +829,53 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      * @param bopId
      *            The operator identifier.
      */
-    protected void lifeCycleSetUpOperator(final int bopId) {
+	protected void lifeCycleSetUpOperator(final int bopId) {
 
-        if (log.isTraceEnabled())
-            log.trace("queryId=" + queryId + ", bopId=" + bopId);
+		final BOp op = getBOpIndex().get(bopId);
 
-    }
+		if (op instanceof PipelineOp) {
 
-    /**
-     * Hook invoked the after the given operator has been evaluated for the
-     * query for what is known to be the last time. This may be used to tear
-     * down life cycle resources for the operator, such as a distributed hash
-     * table on a set of nodes identified by annotations of the operator.
-     * 
-     * @param bopId
-     *            The operator identifier.
-     */
-    protected void lifeCycleTearDownOperator(final int bopId) {
+			try {
 
-        if (log.isTraceEnabled())
-            log.trace("queryId=" + queryId + ", bopId=" + bopId);
+				((PipelineOp) op).setUp();
+				
+			} catch (Exception ex) {
+				
+				throw new RuntimeException(ex);
+				
+			}
 
+		}
+
+	}
+
+	/**
+	 * Hook invoked the after the given operator has been evaluated for the
+	 * query for what is known to be the last time. This may be used to tear
+	 * down life cycle resources for the operator, such as a distributed hash
+	 * table on a set of nodes identified by annotations of the operator.
+	 * 
+	 * @param bopId
+	 *            The operator identifier.
+	 */
+	protected void lifeCycleTearDownOperator(final int bopId) {
+
+		final BOp op = getBOpIndex().get(bopId);
+
+		if (op instanceof PipelineOp) {
+
+			try {
+				
+				((PipelineOp) op).tearDown();
+				
+			} catch (Exception ex) {
+				
+				throw new RuntimeException(ex);
+				
+			}
+        	
+        }
+        
     }
 
     /**
@@ -730,6 +895,27 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      */
     protected void lifeCycleTearDownQuery() {
 
+		final Iterator<Map.Entry<Integer/* bopId */, AtomicBoolean/* tornDown */>> itr = tornDown
+				.entrySet().iterator();
+        
+		while(itr.hasNext()) {
+			
+			final Map.Entry<Integer/* bopId */, AtomicBoolean/* tornDown */> entry = itr
+					.next();
+			
+			final AtomicBoolean tornDown = entry.getValue();
+
+			if (tornDown.compareAndSet(false/* expect */, true/* update */)) {
+
+				/*
+				 * Guaranteed one time tear down for this operator.
+				 */
+				lifeCycleTearDownOperator(entry.getKey()/* bopId */);
+
+			}
+			
+		}
+		
         if (log.isTraceEnabled())
             log.trace("queryId=" + queryId);
 
@@ -862,9 +1048,28 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
                 // log summary statistics for the query.
                 if (isController())
                     QueryLog.log(this);
+				final String tag = getQuery().getProperty(QueryHints.TAG,
+						QueryHints.DEFAULT_TAG);
+				final Counters c = tag == null ? null : queryEngine
+						.getCounters(tag);
+				// track #of done queries.
+				queryEngine.counters.doneCount.increment();
+				if (c != null)
+					c.doneCount.increment();
+				// track elapsed run time of done queries.
+				final long elapsed = getElapsed();
+				queryEngine.counters.elapsedMillis.add(elapsed);
+				if (c != null)
+					c.elapsedMillis.add(elapsed);
+				if (future.getCause() != null) {
+					// track #of queries with abnormal termination.
+					queryEngine.counters.errorCount.increment();
+					if (c != null)
+						c.errorCount.increment();
+				}
+				// remove from the collection of running queries.
+				queryEngine.halt(this);
             }
-            // remove from the collection of running queries.
-            queryEngine.halt(this);
             // true iff we cancelled something.
             return cancelled;
         } finally {
@@ -978,6 +1183,21 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     }
 
+	/**
+	 * Return the textual representation of the {@link RunState} of this query.
+	 * <p>
+	 * Note: Exposed for log messages in derived classes since {@link #runState}
+	 * is private.
+	 */
+	protected String runStateString() {
+		lock.lock();
+		try {
+			return runState.toString();
+		} finally {
+			lock.unlock();
+		}
+	}
+    
     public String toString() {
         final StringBuilder sb = new StringBuilder(getClass().getName());
 		sb.append("{queryId=" + queryId);

@@ -33,7 +33,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 
 /**
@@ -154,46 +153,130 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
         store = (Journal) indexManager;
         
     }
-    
+
     /**
      * Create or re-open a triple store using a local embedded database.
+     * <p>
+     * Note: This is only used by the test suites.
      */
-	/* public */LocalTripleStore(final Properties properties) {
+	/* public */static LocalTripleStore getInstance(final Properties properties) {
 
-        /*
-         * FIXME This should pass up the existing properties for the KB instance
-         * when the KB instance is pre-existing.  Really though, you should first
-         * obtain the Journal and then attempt to locate the KB and create it if
-         * it does not exist.
-         */
-        this(new Journal(properties), "kb"/* namespace */, ITx.UNISOLATED,
-                properties);
-        
-        /*
-         * FIXME Modify this to use a row scan for the contained relations.
-         * There is one other place where the same test is being used. The
-         * reason for this test is that getSPORelation() tries to _locate_ the
-         * relation, but that will fail if it does not exist. By using the ctor
-         * and exists() we can test for pre-existence. However, the best route
-         * is to perform a row scan when the container is created and then we
-         * can just materialize the existing relations and create them if they
-         * are not found.
-         */
-        if (!new SPORelation(getIndexManager(), getNamespace() + "."
-                + SPORelation.NAME_SPO_RELATION, getTimestamp(), getProperties()).exists()) {
+	    final String namespace = "kb";
+	    
+	    // create/re-open journal.
+	    final Journal journal = new Journal(properties);
+	    
+        try {
+            
+          // Check for pre-existing instance.
+          {
+
+              final LocalTripleStore lts = (LocalTripleStore) journal
+                      .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+
+              if (lts != null) {
+
+                  return lts;
+
+              }
+
+          }
+          
+          // Create a new instance.
+          {
+          
+              final LocalTripleStore lts = new LocalTripleStore(
+                      journal, namespace, ITx.UNISOLATED, properties);
+              
+//              if (Boolean.parseBoolean(properties.getProperty(
+//                      BigdataSail.Options.ISOLATABLE_INDICES,
+//                      BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES))) {
+//              
+//                  final long txCreate = txService.newTx(ITx.UNISOLATED);
+//      
+//                  final AbstractTripleStore txCreateView = new LocalTripleStore(
+//                          journal, namespace, Long.valueOf(txCreate), properties);
+//      
+//                  // create the kb instance within the tx.
+//                  txCreateView.create();
+//      
+//                  // commit the tx.
+//                  txService.commit(txCreate);
+//                  
+//              } else {
+                  
+                  lts.create();
+                  
+//              }
+              
+          }
 
             /*
-             * If we could not find the SPO relation then presume that this is a
-             * new KB and create it now.
+             * Now that we have created the instance locate the triple store
+             * resource and return it.
              */
-            
-            create();
+          {
 
-        } else {
-        	
-        	init();
-        	
-        }
+              final LocalTripleStore lts = (LocalTripleStore) journal
+                      .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+
+              if (lts == null) {
+
+                  /*
+                   * This should only occur if there is a concurrent destroy,
+                   * which is highly unlikely to say the least.
+                   */
+                  throw new RuntimeException("Concurrent create/destroy: "
+                          + namespace);
+
+              }
+
+              return lts;
+              
+          }
+          
+      } catch (Throwable ex) {
+          
+          journal.shutdownNow();
+          
+          throw new RuntimeException(ex);
+          
+      }
+
+//      /*
+//         * FIXME This should pass up the existing properties for the KB instance
+//         * when the KB instance is pre-existing.  Really though, you should first
+//         * obtain the Journal and then attempt to locate the KB and create it if
+//         * it does not exist.
+//         */
+//        this(new Journal(properties), "kb"/* namespace */, ITx.UNISOLATED,
+//                properties);
+//        
+//        /*
+//         * FIXME Modify this to use a row scan for the contained relations.
+//         * There is one other place where the same test is being used. The
+//         * reason for this test is that getSPORelation() tries to _locate_ the
+//         * relation, but that will fail if it does not exist. By using the ctor
+//         * and exists() we can test for pre-existence. However, the best route
+//         * is to perform a row scan when the container is created and then we
+//         * can just materialize the existing relations and create them if they
+//         * are not found.
+//         */
+//        if (!new SPORelation(getIndexManager(), getNamespace() + "."
+//                + SPORelation.NAME_SPO_RELATION, getTimestamp(), getProperties()).exists()) {
+//
+//            /*
+//             * If we could not find the SPO relation then presume that this is a
+//             * new KB and create it now.
+//             */
+//            
+//            create();
+//
+//        } else {
+//        	
+//        	init();
+//        	
+//        }
 
     }
 

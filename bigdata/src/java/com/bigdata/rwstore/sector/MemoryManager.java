@@ -31,60 +31,98 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.io.IByteArraySlice;
 
 /**
- * The MemoryManager manages an off-heap Direct Buffer.  It uses the new
- * SectorAllocator to allocate slots within the address range.
+ * The MemoryManager manages an off-heap Direct {@link ByteBuffer}. It uses the
+ * new SectorAllocator to allocate slots within the address range.
  * 
- * The interface is designed to support efficient transfer between NIO
- * buffers.
+ * The interface is designed to support efficient transfer between NIO buffers.
  * 
  * The most complex aspect of the implementation is the BLOB representation,
- * requiring a mapping across multiple allocation slots.  This is managed
- * using recursive calls in the main three methods: allocate, free and get.
+ * requiring a mapping across multiple allocation slots. This is managed using
+ * recursive calls in the main three methods: allocate, free and get.
  * 
  * @author Martyn Cutcher
- *
  */
 public class MemoryManager implements IMemoryManager, ISectorManager {
 
-    protected static final Logger log = Logger
+    private static final Logger log = Logger
     .getLogger(MemoryManager.class);
 
-    final ByteBuffer m_resource;
+    final DirectBufferPool m_pool;
+    private final ByteBuffer[] m_resources;
 	
     final private ReentrantLock m_allocationLock = new ReentrantLock();
 
     int m_allocation = 0;
-    final int m_sectorSize;
-    final int m_maxResource;
+    private final int m_sectorSize;
 	
-	final ArrayList<SectorAllocator> m_sectors = new ArrayList<SectorAllocator>();
-	final ArrayList<SectorAllocator> m_free = new ArrayList<SectorAllocator>();
+	private final ArrayList<SectorAllocator> m_sectors = new ArrayList<SectorAllocator>();
+	private final ArrayList<SectorAllocator> m_free = new ArrayList<SectorAllocator>();
 	
-	public MemoryManager(final int maxResource, final int sectorSize) {
-		m_resource = ByteBuffer.allocateDirect(maxResource);
-		m_sectorSize = sectorSize;
-		m_maxResource = maxResource;
+	public MemoryManager(final DirectBufferPool pool, final int sectors) {
+		m_pool = pool;
+		m_resources = new ByteBuffer[sectors];
+		m_sectorSize = pool.getBufferCapacity();
+	}
+
+	protected void finalize() throws Throwable {
+		// release to pool.
+		releaseDirectBuffers();
 	}
 	
-	public class MemoryManagerResourceError extends RuntimeException {
-		protected MemoryManagerResourceError() {}
+	protected void releaseDirectBuffers() throws Throwable {
+		// release to pool.
+		for (ByteBuffer buf : m_resources) {
+			if (buf != null)
+				DirectBufferPool.INSTANCE.release(buf);
+		}
 	}
 	
+	/**
+	 * The memory manager can handle the ByteBuffer allocation and copying
+	 * directly.
+	 */
 	public long allocate(final ByteBuffer data) {
+		if (data == null)
+			throw new IllegalArgumentException();
+		
+		final long retaddr = allocate(data.remaining());
+		
+		ByteBuffer[] bufs = get(retaddr);
+		final ByteBuffer src = data.duplicate();
+		int pos = 0;
+		for (int i = 0; i < bufs.length; i++) {
+			final int tsize = bufs[i].remaining();
+			src.position(pos);
+			src.limit(pos + tsize);
+			bufs[i].put(src);
+			pos += tsize;
+		}
+		
+		return retaddr;
+	}
+	
+	public long allocate(final int nbytes) {
 		m_allocationLock.lock();
 		try {
-			final int size = data.remaining();
-			if (size <= SectorAllocator.BLOB_SIZE) {
+			if (nbytes <= SectorAllocator.BLOB_SIZE) {
 				if (m_free.size() == 0) {
-					if ((m_allocation + m_sectorSize) > m_maxResource) {
+					if (!(m_sectors.size() < m_resources.length)) {
 						throw new MemoryManagerResourceError();
 					}
+					// Allocate new buffer
+					ByteBuffer nbuf = m_pool.acquire();
+					if (nbuf == null) {
+						throw new MemoryManagerResourceError();
+					}
+					
+					m_resources[m_sectors.size()] = nbuf;
+					
 					SectorAllocator sector = new SectorAllocator(this, null);
 					sector.setSectorAddress(m_allocation, m_sectorSize);
 					sector.setIndex(m_sectors.size());
+					
 					m_sectors.add(sector);
 					
 					m_allocation += m_sectorSize;				
@@ -92,7 +130,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 				
 				final SectorAllocator sector = m_free.get(0);
 				
-				final int rwaddr = sector.alloc(size);
+				final int rwaddr = sector.alloc(nbytes);
 				
 				if (SectorAllocator.getSectorIndex(rwaddr) >= m_sectors.size()) {
 					throw new IllegalStateException("Address: " + rwaddr + " yields index: " + SectorAllocator.getSectorIndex(rwaddr));
@@ -102,31 +140,29 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 					log.trace("allocating bit: " + SectorAllocator.getSectorOffset(rwaddr));
 
 				// Now copy the data to the backing resource
-				final long paddr = sector.getPhysicalAddress(SectorAllocator.getSectorOffset(rwaddr));
-				final ByteBuffer dest = m_resource.duplicate();
-				dest.position((int) paddr);
-				dest.limit((int) (paddr + size));
-				dest.put(data);
+//				final long paddr = sector.getPhysicalAddress(SectorAllocator.getSectorOffset(rwaddr));
+//				final ByteBuffer dest = m_resources[sector.m_index].duplicate();
+//				final int bufferAddr = (int) (paddr - (sector.m_index * m_sectorSize));
+//				dest.position(bufferAddr);
+//				dest.limit(bufferAddr + nbytes);
+//				dest.put(data);
 				
-				return makeAddr(rwaddr, size);
+				return makeAddr(rwaddr, nbytes);
 			} else {
 				/**
 				 * For Blob allocation call the normal allocate and retrieve
 				 * the allocation address to store in the blob header.
 				 */
-				final int nblocks = SectorAllocator.getBlobBlockCount(size);
+				final int nblocks = SectorAllocator.getBlobBlockCount(nbytes);
 				final ByteBuffer hdrbuf = ByteBuffer.allocate(nblocks * 4);
 				for (int i = 0; i < nblocks; i++) {
-					final ByteBuffer src = data.duplicate();
 					final int pos = SectorAllocator.BLOB_SIZE * i;
-					src.position(pos);
-					final int bsize = i < (nblocks-1) ? SectorAllocator.BLOB_SIZE : size - pos;
-					src.limit(pos + bsize);
+					final int bsize = i < (nblocks-1) ? SectorAllocator.BLOB_SIZE : nbytes - pos;
 
 					/*
 					 * BLOB RECURSION
 					 */
-					final long bpaddr = allocate(src);
+					final long bpaddr = allocate(bsize);
 					hdrbuf.putInt(getAllocationAddress(bpaddr));
 				}
 				
@@ -134,36 +170,19 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 				hdrbuf.flip();
 				final int retaddr = getAllocationAddress(allocate(hdrbuf));
 				
-				return makeAddr(retaddr, size);
+				return makeAddr(retaddr, nbytes);
 			}
 			
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
 		} finally {
 			m_allocationLock.unlock();
 		}
 	}
 	
-	/**
-	 * The ByteBuffer[] return enables the handling of blobs that span more
-	 * than a single slot, without the need to create an intermediate ByteBuffer.
-	 * 
-	 * This will support transfers directly to other direct ByteBuffers, for
-	 * example for network IO.
-	 * 
-	 * Using ByteBuffer:put the returned array can be efficiently copied to
-	 * another ByteBuffer:
-	 * 
-	 * ByteBuffer mybb;
-	 * ByteBuffer[] bufs = get(addr);
-	 * for (ByteBuffer b : bufs) {
-	 *   mybb.put(b);
-	 * }
-	 * 
-	 * @param addr
-	 * @return
-	 */
 	public ByteBuffer[] get(final long addr) {
-		int rwaddr = getAllocationAddress(addr);
-		int size = getAllocationSize(addr);
+		final int rwaddr = getAllocationAddress(addr);
+		final int size = getAllocationSize(addr);
 
 		if (size <= SectorAllocator.BLOB_SIZE) {
 			return new ByteBuffer[] { getBuffer(rwaddr, size) };
@@ -179,6 +198,8 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 			for (int i = 0; i < nblocks; i++) {
 				int blockSize = remaining <= SectorAllocator.BLOB_SIZE ? remaining : SectorAllocator.BLOB_SIZE;
 				blobbufs[i] = getBuffer(hdrbuf.getInt(), blockSize);
+				
+				remaining -= blockSize;
 			}
 			
 			return blobbufs;
@@ -210,16 +231,16 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		final SectorAllocator sector = getSector(rwaddr);
 		final int offset = SectorAllocator.getSectorOffset(rwaddr);
 		
-		int resAddr = (int) sector.getPhysicalAddress(offset);
-		
-		final ByteBuffer ret = m_resource.duplicate();
-		ret.position(resAddr);
-		ret.limit(resAddr + size);
+		final long paddr = sector.getPhysicalAddress(offset);
+		final ByteBuffer ret = m_resources[sector.m_index].duplicate();
+		final int bufferAddr = (int) (paddr - (sector.m_index * m_sectorSize));
+		ret.position(bufferAddr);
+		ret.limit(bufferAddr + size);
 		
 		return ret;
 	}
 	
-	private SectorAllocator getSector(int rwaddr) {
+	private SectorAllocator getSector(final int rwaddr) {
 		final int index = SectorAllocator.getSectorIndex(rwaddr);
 		if (index >= m_sectors.size())
 			throw new IllegalStateException("Address: " + rwaddr + " yields index: " + index + " >= sector:size(): " + m_sectors.size());
@@ -231,7 +252,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		return (int) (addr >> 32L);
 	}
 
-	static int getAllocationSize(long addr) {
+	static int getAllocationSize(final long addr) {
 		return (int) (addr & 0xFFFFL);
 	}
 
@@ -281,20 +302,33 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	}
 	
 	public void clear() {
-		m_sectors.clear();
-		m_free.clear();
-		m_allocation = 0;
+		m_allocationLock.lock();
+		try {
+			m_sectors.clear();
+			m_free.clear();
+			m_allocation = 0;
+			try {
+				releaseDirectBuffers();
+			} catch (Throwable e) {
+				log.warn("Unable to release direct buffers", e);
+			}
+			for (int i = 0; i < m_resources.length; i++) {
+				m_resources[i] = null;
+			}
+		} finally {
+			m_allocationLock.unlock();
+		}
 	}
 	
-	public void releaseResources() throws InterruptedException {
-		DirectBufferPool.INSTANCE.release(m_resource);
-	}
+//	public void releaseResources() throws InterruptedException {
+//		DirectBufferPool.INSTANCE.release(m_resource);
+//	}
 	
 	public void addToFreeList(final SectorAllocator sector) {
 		m_free.add(sector);
 	}
 
-	public void removeFromFreeList(SectorAllocator sector) {
+	public void removeFromFreeList(final SectorAllocator sector) {
 		assert m_free.get(0) == sector;
 		
 		m_free.remove(sector);
@@ -303,11 +337,16 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	public void trimSector(final long trim, final SectorAllocator sector) {
 		assert m_free.get(0) == sector;
 		
-		m_allocation -= trim;		
+		// Do not trim when using buffer pool
+		// m_allocation -= trim;		
 	}
 
-	public AllocationContext createAllocationContext() {
+	public IMemoryManager createAllocationContext() {
 		return new AllocationContext(this);
+	}
+
+	public int allocationSize(final long addr) {
+		return getAllocationSize(addr);
 	}
 
 }

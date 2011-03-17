@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.util;
 
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -60,7 +59,7 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("util");
+        final TestSuite suite = new TestSuite("util");
 
         // test of the millisecond resolution timestamp factory.
         suite.addTestSuite( TestMillisecondTimestampFactory.class );
@@ -78,6 +77,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestByteBufferBitVector.class);
 
         suite.addTestSuite( TestCSVReader.class );
+        
+        suite.addTest(com.bigdata.util.httpd.TestAll.suite());
 
         return suite;
         

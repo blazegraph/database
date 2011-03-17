@@ -23,8 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal;
 
+import org.openrdf.model.ValueFactory;
+
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataBNode;
-import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -54,9 +56,8 @@ abstract public class AbstractBNodeIV<V extends BigdataBNode, T> extends
 
     }
 
-    public V asValue(final BigdataValueFactory f, 
-            final ILexiconConfiguration config)
-            throws UnsupportedOperationException {
+    public V asValue(final LexiconRelation lex) {
+    	final ValueFactory f = lex.getValueFactory();
         final V bnode = (V) f.createBNode(stringValue());
         bnode.setIV(this);
         return bnode;

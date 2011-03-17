@@ -27,17 +27,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
+import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.btree.ILocalBTreeView;
-import com.bigdata.journal.IIndexManager;
+import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.service.IBigdataFederation;
 
 /**
  * The evaluation context for the operator (NOT serializable).
@@ -62,6 +63,41 @@ public class BOpContext<E> extends BOpContextBase {
 
     private final IBlockingBuffer<E[]> sink2;
 
+    private final AtomicBoolean lastInvocation = new AtomicBoolean(false);
+
+	/**
+	 * Set by the {@link QueryEngine} when the criteria specified by
+	 * {@link #isLastInvocation()} are satisfied.
+	 */
+    public void setLastInvocation() {
+    	lastInvocation.set(true);
+    }
+
+	/**
+	 * <code>true</code> iff this is the last invocation of the operator. The
+	 * property is only set to <code>true</code> for operators which:
+	 * <ol>
+	 * <li>{@link BOp.Annotations#EVALUATION_CONTEXT} is
+	 * {@link BOpEvaluationContext#CONTROLLER}</li>
+	 * <li>{@link PipelineOp.Annotations#MAX_PARALLEL} is <code>1</code></li>
+	 * <li>{@link PipelineOp.Annotations#PIPELINED} is <code>true</code></li>
+	 * </ol>
+	 * Under these circumstances, it is possible for the {@link IQueryClient} to
+	 * atomically decide that a specific invocation of the operator task for the
+	 * query will be the last invocation for that task. This is not possible if
+	 * the operator allows concurrent evaluation tasks. Sharded operators are
+	 * intrinsically concurrent since they can evaluate at each shard in
+	 * parallel. This is why the evaluation context is locked to the query
+	 * controller. In addition, the operator must declare that it is NOT thread
+	 * safe in order for the query engine to serialize its evaluation tasks.
+	 * 
+	 * @todo This should be a ctor parameter.  We just have to update the test
+	 * suites for the changed method signature.
+	 */
+    public boolean isLastInvocation() {
+    	return lastInvocation.get();
+    }
+    
     /**
      * The interface for a running query.
      * <p>
@@ -137,56 +173,40 @@ public class BOpContext<E> extends BOpContextBase {
         return sink2;
     }
 
-    /**
-     * 
-     * @param fed
-     *            The {@link IBigdataFederation} IFF the operator is being
-     *            evaluated on an {@link IBigdataFederation}. When evaluating
-     *            operations against an {@link IBigdataFederation}, this
-     *            reference provides access to the scale-out view of the indices
-     *            and to other bigdata services.
-     * @param indexManager
-     *            The <strong>local</strong> {@link IIndexManager}. Query
-     *            evaluation occurs against the local indices. In scale-out,
-     *            query evaluation proceeds shard wise and this
-     *            {@link IIndexManager} MUST be able to read on the
-     *            {@link ILocalBTreeView}.
-     * @param readTimestamp
-     *            The timestamp or transaction identifier against which the
-     *            query is reading.
-     * @param writeTimestamp
-     *            The timestamp or transaction identifier against which the
-     *            query is writing.
-     * @param partitionId
-     *            The index partition identifier -or- <code>-1</code> if the
-     *            index is not sharded.
-     * @param stats
-     *            The object used to collect statistics about the evaluation of
-     *            this operator.
-     * @param source
-     *            Where to read the data to be consumed by the operator.
-     * @param sink
-     *            Where to write the output of the operator.
-     * @param sink2
-     *            Alternative sink for the output of the operator (optional).
-     *            This is used by things like SPARQL optional joins to route
-     *            failed joins outside of the join group.
-     * 
-     * @throws IllegalArgumentException
-     *             if the <i>stats</i> is <code>null</code>
-     * @throws IllegalArgumentException
-     *             if the <i>source</i> is <code>null</code> (use an empty
-     *             source if the source will be ignored).
-     * @throws IllegalArgumentException
-     *             if the <i>sink</i> is <code>null</code>
-     * 
-     * @todo modify to accept {@link IChunkMessage} or an interface available
-     *       from getChunk() on {@link IChunkMessage} which provides us with
-     *       flexible mechanisms for accessing the chunk data.
-     *       <p>
-     *       When doing that, modify to automatically track the {@link BOpStats}
-     *       as the <i>source</i> is consumed.
-     */
+	/**
+	 * 
+	 * @param runningQuery
+	 *            The {@link IRunningQuery}.
+	 * @param partitionId
+	 *            The index partition identifier -or- <code>-1</code> if the
+	 *            index is not sharded.
+	 * @param stats
+	 *            The object used to collect statistics about the evaluation of
+	 *            this operator.
+	 * @param source
+	 *            Where to read the data to be consumed by the operator.
+	 * @param sink
+	 *            Where to write the output of the operator.
+	 * @param sink2
+	 *            Alternative sink for the output of the operator (optional).
+	 *            This is used by things like SPARQL optional joins to route
+	 *            failed joins outside of the join group.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if the <i>stats</i> is <code>null</code>
+	 * @throws IllegalArgumentException
+	 *             if the <i>source</i> is <code>null</code> (use an empty
+	 *             source if the source will be ignored).
+	 * @throws IllegalArgumentException
+	 *             if the <i>sink</i> is <code>null</code>
+	 * 
+	 * @todo modify to accept {@link IChunkMessage} or an interface available
+	 *       from getChunk() on {@link IChunkMessage} which provides us with
+	 *       flexible mechanisms for accessing the chunk data.
+	 *       <p>
+	 *       When doing that, modify to automatically track the {@link BOpStats}
+	 *       as the <i>source</i> is consumed.
+	 */
     public BOpContext(final IRunningQuery runningQuery,final int partitionId,
             final BOpStats stats, final IAsynchronousIterator<E[]> source,
             final IBlockingBuffer<E[]> sink, final IBlockingBuffer<E[]> sink2) {

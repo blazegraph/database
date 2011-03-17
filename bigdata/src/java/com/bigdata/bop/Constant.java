@@ -44,7 +44,7 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
          * The {@link IVariable} which is bound to that constant value
          * (optional).
          */
-        String VAR = Constant.class.getName() + ".var";
+        String VAR = (Constant.class.getName() + ".var").intern();
 
     }
     

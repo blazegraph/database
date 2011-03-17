@@ -33,7 +33,9 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rwstore.FixedOutputStream;
+import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.IWriteCacheManager;
+import com.bigdata.rwstore.RWWriteCacheService;
 
 /**
  * The SectorAllocator is designed as an alternative the the standard RWStore
@@ -72,10 +74,15 @@ import com.bigdata.rwstore.IWriteCacheManager;
  * TODO: add parameterisation of META_SIZE for exploitation by MemoryManager.
  * TODO: cache block starts in m_addresses to simplify/optimise bit2Offset
  * 
+ * When a new SectorAllocator is at the head of the free list, a store
+ * such as the RWSectorStore can use an in-memory buffer to write the data
+ * to - sized to the full size of the sector.  This can be written in a single
+ * write to the WriteCacheService.
+ * 
  * @author Martyn Cutcher
  *
  */
-public class SectorAllocator {
+public class SectorAllocator implements Comparable {
     protected static final Logger log = Logger
     .getLogger(SectorAllocator.class);
 
@@ -92,12 +99,12 @@ public class SectorAllocator {
 
 	static final int META_SIZE = 8192; // 8K
 	
-	final static int SECTOR_SIZE = 64 * 1024 * 1024; // 10M
-	final static int NUM_ENTRIES = (META_SIZE - 12) / (4 + 1); // 8K - index - address / (4 + 1) bits plus tag
+	final static int SECTOR_SIZE = 64 * 1024 * 1024; // 64M
+	final static int NUM_ENTRIES = (META_SIZE - 12) / (4 + 1); // 8K - index - address (- chksum) / (4 + 1) bits plus tag
 	final int[] BIT_MASKS = {0x1, 0x3, 0x7, 0xF, 0xFF, 0xFFFF, 0xFFFFFFFF};
-	final static int BLOB_SIZE = 4096;
+	final public static int BLOB_SIZE = 4096;
 	final static int BLOB_CHAIN_OFFSET = BLOB_SIZE - 4;
-	final static int[] ALLOC_SIZES = {64, 128, 256, 512, 1024, 2048, BLOB_SIZE};
+	final public static int[] ALLOC_SIZES = {64, 128, 256, 512, 1024, 2048, BLOB_SIZE};
 	final static int[] ALLOC_BITS = {32, 32, 32, 32, 32, 32, 32};
 	int m_index;
 	long m_sectorAddress;
@@ -125,7 +132,7 @@ public class SectorAllocator {
 	
 	final ISectorManager m_store;
 	boolean m_onFreeList = false;
-	private long m_diskAddr;
+	private int m_diskAddr;
 	private final IWriteCacheManager m_writes;
 
 	public SectorAllocator(ISectorManager store, IWriteCacheManager writes) {
@@ -186,6 +193,14 @@ public class SectorAllocator {
 					
 					if (m_free[tag] == 0) {
 						if (!addNewTag(tag)) {
+							if (log.isInfoEnabled()) {
+								StringBuffer str = new StringBuffer("Removing Sector #" + m_index + ": ");
+								for (int t = 0; t < m_free.length; t++) {
+									str.append("[" + m_allocations[t] + "," + m_free[t] + "," + m_recycles[t] + "]");
+								}
+							
+								log.info(str.toString());
+							}
 							m_store.removeFromFreeList(this);
 							m_onFreeList = false;
 						}
@@ -210,7 +225,7 @@ public class SectorAllocator {
 	}
 	
 	public static int makeAddr(final int index, final int bit) {
-		return -((index << SECTOR_OFFSET_BITS) + bit);
+		return -(((index+1) << SECTOR_OFFSET_BITS) + bit);
 	}
 
 	private boolean addNewTag(byte tag) {
@@ -277,8 +292,16 @@ public class SectorAllocator {
 			// The hasFree test is too coarse, ideally we should test for
 			//	percentage of free bits - say 10% PLUS a minimum of say 10
 			//	for each tag type.
-			if ((!m_onFreeList) && hasFree(5)) { // minimum of 10 bits for all tags
+			if ((!m_onFreeList) && hasFree(2)) { // minimum of 5 bits for each 32 bit block
 				m_onFreeList = true;
+				if (log.isInfoEnabled()) {
+					StringBuffer str = new StringBuffer("Returning Sector #" + m_index + ": ");
+					for (int t = 0; t < m_free.length; t++) {
+						str.append("("+ (m_free[t]/m_total[t]) + ")[T" + (m_total[t] * 32) + ",A" + m_allocations[t] + ",F" + m_free[t] + ",R" + m_recycles[t] + "]");
+					}
+				
+					log.info(str.toString());
+				}
 				m_store.addToFreeList(this);
 			}
 			
@@ -367,7 +390,11 @@ public class SectorAllocator {
 	 * 
 	 */
 	public long getPhysicalAddress(int offset) {
-		return m_sectorAddress + bit2Offset(offset);
+		if (!tstBit(m_transientbits, offset)) {
+			return 0L;
+		} else {
+			return m_sectorAddress + bit2Offset(offset);
+		}
 	}
 
 	public int getPhysicalSize(int offset) {
@@ -383,9 +410,14 @@ public class SectorAllocator {
 		return null;
 	}
 
+	/**
+	 * 
+	 * @param threshold the minimum number of bits free per 32 bit block
+	 * @return whether there are sufficient free for all block sizes
+	 */
 	public boolean hasFree(int threshold) {
 		for (int i = 0; i < m_free.length; i++) {
-			if ((m_free[i]/m_total[i]) < threshold)
+			if (m_free[i] < (threshold * m_total[i]))
 				return false;
 		}
 		return true;
@@ -408,12 +440,15 @@ public class SectorAllocator {
 		try {
 			m_index = str.readInt();
 			m_sectorAddress = str.readLong();
+			
+			System.out.println("Sector: " + m_index + " managing sector at " + m_sectorAddress);
+			
 			int taglen = str.read(m_tags);
 			assert taglen == m_tags.length;
 			
 			m_addresses[0] = 0;
 			for (int i = 0; i < NUM_ENTRIES; i++) {
-				m_bits[i] = str.readInt();
+				m_commitbits[i] = m_transientbits[i] = m_bits[i] = str.readInt();
 				
 				// maintain cached block offset
 				if (i < (NUM_ENTRIES-1)) {
@@ -428,11 +463,11 @@ public class SectorAllocator {
 		}
 	}
 
-	public long getDiskAddr() {
+	public int getDiskAddr() {
 		return m_diskAddr;
 	}
 	
-	public void setDiskAddr(long addr) {
+	public void setDiskAddr(int addr) {
 		m_diskAddr = addr;
 	}
 
@@ -532,7 +567,7 @@ public class SectorAllocator {
 	 */
 	public void setSectorAddress(final long sectorAddress, final int maxsize) {
 		if (log.isInfoEnabled())
-			log.info("setting sector address: " + sectorAddress);
+			log.info("setting sector #" + m_index + " address: " + sectorAddress);
 		
 		m_sectorAddress = sectorAddress;
 		m_maxSectorSize = maxsize;
@@ -554,7 +589,7 @@ public class SectorAllocator {
 	}
 
 	public static int getSectorIndex(int rwaddr) {
-		return (-rwaddr) >> SECTOR_OFFSET_BITS;
+		return ((-rwaddr) >>> SECTOR_OFFSET_BITS) - 1;
 	}
 
 	public static int getSectorOffset(int rwaddr) {
@@ -565,6 +600,74 @@ public class SectorAllocator {
 		final int nblocks = (size + BLOB_SIZE - 1) / BLOB_SIZE;
 		
 		return nblocks;
+	}
+
+	public static int getBlockForSize(int size) {
+		for (int i = 0; i < ALLOC_SIZES.length; i++) {
+			if (size <= ALLOC_SIZES[i]) {
+				return ALLOC_SIZES[i];
+			}
+		}
+		
+		throw new IllegalArgumentException("Size does not fit in a slot");
+	}
+
+	public int compareTo(Object other) {
+		final int oindex = ((SectorAllocator) other).m_index;
+		
+		return m_index < oindex ? -1 : (m_index > oindex ? 1 : 0);
+	}
+
+	public int getIndex() {
+		return m_index;
+	}
+
+	public void releaseSession(IWriteCacheManager cache) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	public boolean addressInRange(int addr) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	public int getAllocatedBlocks() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public long getFileStorage() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public long getAllocatedSlots() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public boolean canImmediatelyFree(int addr, int sze, IAllocationContext context) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	public boolean isAllocated(int addrOffset) {
+		return tstBit(m_bits, addrOffset);
+	}
+
+	public void free(int addr, int sze, boolean overrideSession) {
+		free(addr);
+	}
+
+	public void setAllocationContext(IAllocationContext m_context) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	public int alloc(int size, IAllocationContext context) {
+
+		return alloc(size);
 	}
 
 }

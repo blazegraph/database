@@ -29,6 +29,7 @@ package com.bigdata.journal;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
@@ -53,12 +54,12 @@ public class RootBlockUtility {
     /**
      * The 1st root block.
      */
-    public IRootBlockView rootBlock0;
+    public final IRootBlockView rootBlock0;
 
     /**
      * The 2nd root block.
      */
-    public IRootBlockView rootBlock1;
+    public final IRootBlockView rootBlock1;
 
     /**
      * The current root block. For a new file, this is "rootBlock0". For an
@@ -66,10 +67,24 @@ public class RootBlockUtility {
      */
     public final IRootBlockView rootBlock;
 
+    /**
+     * 
+     * @param opener
+     * @param file
+     * @param validateChecksum 
+     * @param alternateRootBlock 
+     * @param ignoreBadRootBlock
+     * 
+     * @throws IOException
+     * 
+     * @see com.bigdata.journal.Options#ALTERNATE_ROOT_BLOCK
+     * @see com.bigdata.journal.Options#IGNORE_BAD_ROOT_BLOCK
+     */
     public RootBlockUtility(final IReopenChannel<FileChannel> opener,
             final File file, final boolean validateChecksum,
-            final boolean alternateRootBlock) throws IOException {
-        
+            final boolean alternateRootBlock, final boolean ignoreBadRootBlock)
+            throws IOException {
+
         final ChecksumUtility checker = validateChecksum ? ChecksumUtility.threadChk
                 .get()
                 : null;
@@ -82,35 +97,173 @@ public class RootBlockUtility {
         FileChannelUtility.readAll(opener, tmp1, FileMetadata.OFFSET_ROOT_BLOCK1);
         tmp0.position(0); // resets the position.
         tmp1.position(0);
+        IRootBlockView rootBlock0 = null, rootBlock1 = null;
         try {
             rootBlock0 = new RootBlockView(true, tmp0, checker);
         } catch (RootBlockException ex) {
-            log.warn("Bad root block zero: " + ex);
+            log.error("Bad root block zero: " + ex);
         }
         try {
             rootBlock1 = new RootBlockView(false, tmp1, checker);
         } catch (RootBlockException ex) {
-            log.warn("Bad root block one: " + ex);
+            log.error("Bad root block one: " + ex);
         }
         if (rootBlock0 == null && rootBlock1 == null) {
             throw new RuntimeException(
                     "Both root blocks are bad - journal is not usable: " + file);
         }
-        if (alternateRootBlock)
-            log.warn("Using alternate root block");
+
+        // save references.
+        this.rootBlock0 = rootBlock0;
+        this.rootBlock1 = rootBlock1;
+
+        if (!ignoreBadRootBlock
+                && (rootBlock0 == null || rootBlock1 == null)) {
+            /*
+             * Do not permit the application to continue with a damaged
+             * root block.
+             */
+            throw new RuntimeException(
+                    "Bad root block(s): rootBlock0 is "
+                            + (rootBlock0 == null ? "bad" : "ok")
+                            + ", rootBlock1="
+                            + (rootBlock1 == null ? "bad" : "ok"));
+        }
+        if(alternateRootBlock) {
+            /*
+             * A request was made to use the alternative root block.
+             */
+            if (rootBlock0 == null || rootBlock1 == null) {
+                /*
+                 * Note: The [alternateRootBlock] flag only makes sense when you
+                 * have two root blocks to choose from and you want to choose
+                 * the other one.
+                 */
+                throw new RuntimeException(
+                        "Can not use alternative root block since one root block is damaged.");
+            } else {
+                log.warn("Using alternate root block");
+            }
+        }
         /*
          * Choose the root block based on the commit counter.
          * 
-         * Note: The commit counters MAY be equal. This will happen if we
-         * rollback the journal and override the current root block with the
-         * alternate root block.
+         * Note: The commit counters MAY be equal. This will happen if
+         * we rollback the journal and override the current root block
+         * with the alternate root block.
+         * 
+         * Note: If either root block was damaged then that rootBlock
+         * reference will be null and we will use the other rootBlock
+         * reference automatically. (The case where both root blocks are
+         * bad is trapped above.)
          */
         final long cc0 = rootBlock0 == null ? -1L : rootBlock0
                 .getCommitCounter();
         final long cc1 = rootBlock1 == null ? -1L : rootBlock1
                 .getCommitCounter();
-        this.rootBlock = (cc0 > cc1 ? (alternateRootBlock ? rootBlock1
-                : rootBlock0) : (alternateRootBlock ? rootBlock0 : rootBlock1));
+        if (rootBlock0 == null) {
+            // No choice. The other root block does not exist.
+            rootBlock = rootBlock1;
+        } else if (rootBlock1 == null) {
+            // No choice. The other root block does not exist.
+            rootBlock = rootBlock0;
+        } else {
+            // A choice exists, compare the timestamps.
+            this.rootBlock = (cc0 > cc1 //
+                    ? (alternateRootBlock ? rootBlock1 : rootBlock0) //
+                    : (alternateRootBlock ? rootBlock0 : rootBlock1)//
+                    );
+        }
     }
 
+    /**
+     * Dumps the root blocks for the specified file.
+     * 
+     * @param args
+     *            <code>filename</code>
+     *            
+     * @throws IOException
+     */
+    public static void main(final String[] args) throws IOException {
+
+        if (args.length == 0) {
+            
+            System.err.println("usage: <filename>");
+            
+            System.exit(1);
+            
+        }
+
+        final File file = new File(args[0]);
+        
+        if (!file.exists()) {
+            
+            System.err.println("Not found: " + file);
+            
+            System.exit(1);
+            
+        }
+        
+        /**
+         * Used to re-open the {@link FileChannel} in this class.
+         */
+        final IReopenChannel<FileChannel> opener = new IReopenChannel<FileChannel>() {
+
+            // read-only.
+            static private final String fileMode = "r";
+            
+            private RandomAccessFile raf = null;
+            
+            public String toString() {
+
+                return file.toString();
+
+            }
+
+            public FileChannel reopenChannel() throws IOException {
+
+                if (raf != null && raf.getChannel().isOpen()) {
+
+                    /*
+                     * The channel is still open. If you are allowing concurrent reads
+                     * on the channel, then this could indicate that two readers each
+                     * found the channel closed and that one was able to re-open the
+                     * channel before the other such that the channel was open again by
+                     * the time the 2nd reader got here.
+                     */
+
+                    return raf.getChannel();
+
+                }
+
+                // open the file.
+                this.raf = new RandomAccessFile(file, fileMode);
+
+                return raf.getChannel();
+
+            }
+
+        };
+
+        // validate the root blocks using their checksums.
+        final boolean validateChecksum = true;
+
+        // option is ignored since we are not not opening the Journal.
+        final boolean alternateRootBlock = false;
+
+        // Open even if one root block is bad.
+        final boolean ignoreBadRootBlock = true;
+        
+        final RootBlockUtility u = new RootBlockUtility(opener, file,
+                validateChecksum, alternateRootBlock, ignoreBadRootBlock);
+        
+        System.out.println("rootBlock0: " + u.rootBlock0);
+        
+        System.out.println("rootBlock1: " + u.rootBlock1);
+
+        System.out.println("Current root block is rootBlock"
+                + (u.rootBlock == u.rootBlock0 ? "0" : "1"));
+        
+    }
+    
 }

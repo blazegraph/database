@@ -135,11 +135,12 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
 	    	final XMLGregorianCalendar xmlGC = 
 	    		DatatypeFactory.newInstance().newXMLGregorianCalendar(c);
 	    	
-	    	String s = xmlGC.toString();
-	    	final int i = s.lastIndexOf('.');
-	    	if (i >= 0) {
-	    		s = s.substring(0, i);
-	    	}
+	    	final String s = xmlGC.toString();
+//	    	Note: removed code which was chopping off the milliseconds part.
+//	    	final int i = s.lastIndexOf('.');
+//	    	if (i >= 0) {
+//	    		s = s.substring(0, i);
+//	    	}
 	    	
 	        return (V) vf.createLiteral(s, dateTime);
 

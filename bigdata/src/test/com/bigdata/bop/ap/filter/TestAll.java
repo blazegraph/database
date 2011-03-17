@@ -28,8 +28,8 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
+import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.eval.DefaultEvaluationPlan2;
 
 /**
  * Aggregates test suites into increasing dependency order.

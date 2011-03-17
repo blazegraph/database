@@ -30,6 +30,7 @@ package com.bigdata.bop.solutions;
 
 import java.io.Serializable;
 
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 
 /**
@@ -40,9 +41,19 @@ import com.bigdata.bop.IVariable;
  */
 public interface ISortOrder<E> extends Serializable {
 
-    /**
-     * The variable whose values will be sorted.
-     */
+	/**
+	 * The variable whose values will be sorted.
+	 * 
+	 * FIXME ORDER_BY is defined in terms of Expressions, not just Vars. Either
+	 * this will need to be an {@link IValueExpression} which is evaluated
+	 * during the ordering or we will have to pre-compute a hidden variable
+	 * which can be ordered directly. Presumably BrackettedExpression provides a
+	 * computed RDF Value while Constraint orders based on the BEV.
+	 * 
+	 * <pre>
+	 * [23]  	OrderCondition	  ::=  	( ( 'ASC' | 'DESC' ) BrackettedExpression ) | ( Constraint | Var )
+	 * </pre>
+	 */
     IVariable<E> getVariable();
 
     /**

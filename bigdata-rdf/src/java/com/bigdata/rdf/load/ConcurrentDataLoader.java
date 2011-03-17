@@ -360,7 +360,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
     /**
      * Return the {@link CounterSet} to be reported to the
      * {@link ILoadBalancerService}. The caller is responsible for attaching
-     * the counters to those reported by {@link JiniFederation#getCounterSet()}
+     * the counters to those reported by {@link JiniFederation#getCounters()}
      * <p>
      * Note: the CDL relies on some side-effects on the returned
      * {@link CounterSet} to establish the

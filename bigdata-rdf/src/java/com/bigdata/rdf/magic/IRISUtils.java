@@ -32,6 +32,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+
 import org.apache.log4j.Logger;
 import org.deri.iris.api.IProgramOptimisation.Result;
 import org.deri.iris.api.basics.ILiteral;
@@ -45,8 +46,7 @@ import org.deri.iris.basics.BasicFactory;
 import org.deri.iris.builtins.BuiltinsFactory;
 import org.deri.iris.optimisations.magicsets.MagicSets;
 import org.deri.iris.terms.TermFactory;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
+
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
@@ -55,6 +55,8 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.constraint.BooleanValueExpression;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.constraint.INBinarySearch;
@@ -631,8 +633,14 @@ type (triple vs. NOT_EQUAL for example).
      * @return
      *              the bigdata constraint
      */
-    private static IConstraint convertToBigdataConstraint(ILiteral literal) {
+    private static IConstraint convertToBigdataConstraint(final ILiteral literal) {
 
+    	return Constraint.wrap(convertToBigdataVE(literal));
+    	
+    }
+    
+    private static BooleanValueExpression convertToBigdataVE(final ILiteral literal) {
+    	
         ITuple tuple = literal.getAtom().getTuple();
         org.deri.iris.api.basics.IPredicate p = 
             literal.getAtom().getPredicate(); 

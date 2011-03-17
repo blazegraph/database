@@ -43,10 +43,14 @@ public class SOpTree implements Iterable<SOp> {
 			}
 			group.add(sop);
 		}
+		if (!groups.containsKey(0)) {
+			// need a dummy root group
+			groups.put(0, new LinkedList<SOp>());
+		}
 		
 		for (Integer g : groups.keySet()) {
 			final List<SOp> group = groups.get(g);
-			final int pg = group.get(0).getParentGroup();
+			final int pg = group.isEmpty() ? -1 : group.get(0).getParentGroup();
 			allGroups.put(g, new SOpGroup(g, pg, group));
 		}
 		
@@ -77,6 +81,10 @@ public class SOpTree implements Iterable<SOp> {
 //	@Override
 	public Iterator<SOp> iterator() {
 		return sops.iterator();
+	}
+	
+	public Iterator<SOpGroup> groups() {
+		return allGroups.values().iterator();
 	}
 	
 	public SOpGroup getRoot() {
@@ -195,7 +203,10 @@ public class SOpTree implements Iterable<SOp> {
         }
         sb.append("SOp -> parent:").append(nl);
         for (Map.Entry<Integer, SOpGroup> e : this.parents.entrySet()) {
-        	sb.append(e.getKey() + " -> " + e.getValue().getGroup()).append(nl);
+        	sb.append(e.getKey());
+        	sb.append(" -> ");
+        	sb.append(e.getValue() == null ? "null" : e.getValue().getGroup());
+        	sb.append(nl);
         }
         sb.append("SOp -> children:").append(nl);
         for (Map.Entry<Integer, SOpGroups> e : this.children.entrySet()) {
@@ -206,7 +217,9 @@ public class SOpTree implements Iterable<SOp> {
         	}
         	sb2.setLength(sb2.length()-2);
         	sb.append(e.getKey() + " -> {" + sb2.toString() + "}");
+        	sb.append(nl);
         }
+        sb.setLength(sb.length()-1);
         return sb.toString();
 	}
 

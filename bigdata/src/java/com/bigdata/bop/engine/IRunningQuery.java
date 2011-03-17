@@ -9,15 +9,15 @@ Contact:
      licenses@bigdata.com
 
 This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
+it under the terms of the GNU General License as published by
 the Free Software Foundation; version 2 of the License.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+GNU General License for more details.
 
-You should have received a copy of the GNU General Public License
+You should have received a copy of the GNU General License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
@@ -114,26 +114,45 @@ public interface IRunningQuery extends IHaltable<Void> {
      * @return The query deadline (milliseconds since the epoch) and
      *         {@link Long#MAX_VALUE} if no explicit deadline was specified.
      */
-    public long getDeadline();
+    long getDeadline();
 
     /**
      * The timestamp (ms) when the query began execution.
      */
-    public long getStartTime();
+    long getStartTime();
 
     /**
      * The timestamp (ms) when the query was done and ZERO (0) if the query is
      * not yet done.
      */
-    public long getDoneTime();
+    long getDoneTime();
 
     /**
      * The elapsed time (ms) for the query. This will be updated for each call
      * until the query is done executing.
      */
-    public long getElapsed();
-    
-    /**
+    long getElapsed();
+
+//	/**
+//	 * Return <code>true</code> if there are no operators which could
+//	 * (re-)trigger the specified operator.
+//	 * <p>
+//	 * Note: This is intended to be invoked synchronously from within the
+//	 * evaluation of the operator in order to determine whether or not the
+//	 * operator can be invoked again for this running query.
+//	 * 
+//	 * @param bopId
+//	 *            The specified operator.
+//	 * @param nconsumed
+//	 *            The #of {@link IChunkMessage} consumed by the operator during
+//	 *            its current invocation.
+//	 * 
+//	 * @return <code>true</code> iff it is not possible for the specified
+//	 *         operator to be retriggered.
+//	 */
+//    boolean isLastInvocation(final int bopId,final int nconsumed);
+
+//    /**
 //     * Cancel the running query (normal termination).
 //     * <p>
 //     * Note: This method provides a means for an operator to indicate that the

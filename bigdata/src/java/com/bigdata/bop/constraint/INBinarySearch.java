@@ -49,7 +49,6 @@ package com.bigdata.bop.constraint;
 
 import java.util.Arrays;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
@@ -67,11 +66,11 @@ import com.bigdata.bop.NV;
 public class INBinarySearch<T> extends INConstraint<T> {
 
     /**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
+	 * 
+	 */
+	private static final long serialVersionUID = 2251370041131847351L;
 
-    /**
+	/**
      * The variable (cached).
      * <p>
      * Note: This cache is not serialized and is compiled on demand when the
@@ -154,7 +153,7 @@ public class INBinarySearch<T> extends INConstraint<T> {
 
     }
     
-    public boolean accept(final IBindingSet bindingSet) {
+    public Boolean get(final IBindingSet bindingSet) {
         
         if (var == null) {
 

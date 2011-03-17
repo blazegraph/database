@@ -25,13 +25,12 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
-import org.openrdf.query.algebra.MathExpr.MathOp;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 
@@ -40,8 +39,7 @@ import com.bigdata.rdf.internal.IVUtility;
  * operation to be applied to the operands is specified by the
  * {@link Annotations#OP} annotation.
  */
-final public class MathBOp extends ImmutableBOp 
-		implements IValueExpression<IV> {
+final public class MathBOp extends IVValueExpression<IV> { 
 
     /**
 	 * 
@@ -57,19 +55,44 @@ final public class MathBOp extends ImmutableBOp
          * 
          * @see MathOp
          */
-        String OP = MathBOp.class.getName() + ".op";
+        String OP = (MathBOp.class.getName() + ".op").intern();
 
     }
     
-    /**
-     * Required deep copy constructor.
-     * 
-     * @param op
-     */
-    public MathBOp(final MathBOp op) {
+	public enum MathOp {
+		PLUS,
+		MINUS,
+		MULTIPLY,
+		DIVIDE,
+		MIN,
+		MAX;
 
-        super(op);
-        
+		public static MathOp valueOf(org.openrdf.query.algebra.MathExpr.MathOp op) {
+			switch(op) {
+			case PLUS: return MathOp.PLUS;
+			case MINUS: return MathOp.MINUS;
+			case MULTIPLY: return MathOp.MULTIPLY;
+			case DIVIDE: return MathOp.DIVIDE;
+			}
+			throw new IllegalArgumentException();
+		}
+	}
+    
+    /**
+     * 
+     * @param left
+     *            The left operand.
+     * @param right
+     *            The right operand.
+     * @param op
+     *            The annotation specifying the operation to be performed on
+     *            those operands.
+     */
+    public MathBOp(final IValueExpression<? extends IV> left, 
+    		final IValueExpression<? extends IV> right, final MathOp op) {
+
+        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op)));
+
     }
 
 	/**
@@ -94,37 +117,40 @@ final public class MathBOp extends ImmutableBOp
     }
 
     /**
+     * Required deep copy constructor.
      * 
-     * @param left
-     *            The left operand.
-     * @param right
-     *            The right operand.
      * @param op
-     *            The annotation specifying the operation to be performed on
-     *            those operands.
      */
-    public MathBOp(final IValueExpression<IV> left, 
-    		final IValueExpression<IV> right, final MathOp op) {
+    public MathBOp(final MathBOp op) {
 
-        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op)));
+        super(op);
+        
+    }
+
+    final public IV get(final IBindingSet bs) {
+        
+        final IV left = left().get(bs);
+
+        // not yet bound?
+        if (left == null)
+        	throw new SparqlTypeErrorException.UnboundVarException();
+
+        final IV right = right().get(bs);
+        
+        // not yet bound?
+        if (right == null)
+        	throw new SparqlTypeErrorException.UnboundVarException();
+        
+        return IVUtility.numericalMath(left, right, op());
 
     }
 
-//    /**
-//     * Clone is overridden to reduce heap churn.
-//     */
-//    final public Math clone() {
-//
-//        return this;
-//        
-//    }
-
     public IValueExpression<IV> left() {
-    	return (IValueExpression<IV>) get(0);
+    	return get(0);
     }
     
     public IValueExpression<IV> right() {
-    	return (IValueExpression<IV>) get(1);
+    	return get(1);
     }
     
     public MathOp op() {
@@ -156,11 +182,10 @@ final public class MathBOp extends ImmutableBOp
     
     final public boolean equals(final IValueExpression<IV> o) {
 
-        if(!(o instanceof MathBOp)) {
+    	if(!(o instanceof MathBOp)) {
             // incomparable types.
             return false;
         }
-        
         return equals((MathBOp) o);
         
     }
@@ -172,39 +197,18 @@ final public class MathBOp extends ImmutableBOp
 	private int hash = 0;
 
 	public int hashCode() {
-
+		
 		int h = hash;
-
 		if (h == 0) {
-
 			final int n = arity();
-
 			for (int i = 0; i < n; i++) {
-
 				h = 31 * h + get(i).hashCode();
-
 			}
-
 			h = 31 * h + op().hashCode();
-
 			hash = h;
-
 		}
-
 		return h;
-
+		
 	}
-
-    final public IV get(final IBindingSet bindingSet) {
-        
-        final IV left = left().get(bindingSet);
-        final IV right = right().get(bindingSet);
-        
-        if (left == null || right == null)
-        	return null;
-        
-        return IVUtility.numericalMath(left, right, op());
-
-    }
-
+	
 }

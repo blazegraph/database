@@ -1,7 +1,9 @@
 package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
+
 import java.util.Properties;
+
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
@@ -9,8 +11,8 @@ import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.parser.ParsedBooleanQuery;
 import org.openrdf.repository.sail.SailBooleanQuery;
 import org.openrdf.repository.sail.SailRepositoryConnection;
-import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
+
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 
 public class BigdataSailBooleanQuery extends SailBooleanQuery 
@@ -22,10 +24,19 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
      */
     private final Properties queryHints;
     
+    public Properties getQueryHints() {
+    	
+    	return queryHints;
+    	
+    }
+
     public BigdataSailBooleanQuery(ParsedBooleanQuery tupleQuery,
             SailRepositoryConnection con, Properties queryHints) {
-        super(tupleQuery, con);
+
+    	super(tupleQuery, con);
+    	
         this.queryHints = queryHints;
+        
     }
 
     /**

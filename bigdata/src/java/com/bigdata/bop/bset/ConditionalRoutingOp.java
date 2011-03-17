@@ -69,7 +69,7 @@ public class ConditionalRoutingOp extends PipelineOp {
          * When the condition is not satisfied, the binding set is routed to the
          * alternative sink.
          */
-        String CONDITION = ConditionalRoutingOp.class.getName() + ".condition";
+        String CONDITION = (ConditionalRoutingOp.class.getName() + ".condition").intern();
 
     }
 

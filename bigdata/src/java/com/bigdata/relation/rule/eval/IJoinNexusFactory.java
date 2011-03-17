@@ -31,6 +31,7 @@ package com.bigdata.relation.rule.eval;
 import java.io.Serializable;
 import java.util.Properties;
 
+import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.relation.accesspath.IElementFilter;

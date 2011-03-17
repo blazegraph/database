@@ -29,11 +29,12 @@ package com.bigdata.bop.fed;
 
 import java.util.Properties;
 
+import junit.framework.TestCase2;
+
+import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
-
-import junit.framework.TestCase2;
 
 /**
  * Stress test for correct shutdown of query controllers as allocated by the
@@ -55,6 +56,41 @@ public class TestQueryEngineFactory extends TestCase2 {
      */
     public TestQueryEngineFactory(String name) {
         super(name);
+    }
+    
+    public void test_basics() {
+
+        final Properties properties = new Properties();
+
+        properties.setProperty(Journal.Options.BUFFER_MODE,
+                BufferMode.Transient.toString());
+
+        properties.setProperty(Journal.Options.INITIAL_EXTENT, ""
+                + Bytes.megabyte * 10);
+
+        final Journal jnl = new Journal(properties);
+
+        try {
+
+            // does not exist yet.
+            assertNull(QueryEngineFactory.getExistingQueryController(jnl));
+
+            // was not created.
+            assertNull(QueryEngineFactory.getExistingQueryController(jnl));
+
+            final QueryEngine queryEngine = QueryEngineFactory
+                    .getQueryController(jnl);
+
+            // still exists and is the same reference.
+            assertTrue(queryEngine == QueryEngineFactory
+                    .getExistingQueryController(jnl));
+
+        } finally {
+
+            jnl.destroy();
+            
+        }
+
     }
 
     /**
@@ -91,7 +127,16 @@ public class TestQueryEngineFactory extends TestCase2 {
 
                 Journal jnl = new Journal(properties);
 
-                QueryEngineFactory.getQueryController(jnl);
+                // does not exist yet.
+                assertNull(QueryEngineFactory.getExistingQueryController(jnl));
+                
+                // was not created.
+                assertNull(QueryEngineFactory.getExistingQueryController(jnl));
+                
+                final QueryEngine queryEngine = QueryEngineFactory.getQueryController(jnl);
+                
+                // still exists and is the same reference.
+                assertTrue(queryEngine == QueryEngineFactory.getExistingQueryController(jnl));
 
                 ncreated++;
 

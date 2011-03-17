@@ -33,24 +33,30 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.cache.ConcurrentWeakValueCache;
+import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.util.NT;
 
 /**
  * Generic implementation relies on a ctor for the resource with the following
@@ -108,20 +114,26 @@ import com.bigdata.sparse.SparseRowStore;
  * @param <T>
  *            The generic type of the [R]elation.
  */
-public class DefaultResourceLocator<T extends ILocatableResource> extends
-        AbstractCachingResourceLocator<T> implements IResourceLocator<T> {
+public class DefaultResourceLocator<T extends ILocatableResource> // 
+        implements IResourceLocator<T> {
 
     protected static final transient Logger log = Logger
             .getLogger(DefaultResourceLocator.class);
-    
-    protected static final boolean INFO = log.isInfoEnabled();
-    
-    protected static final boolean DEBUG = log.isDebugEnabled();
 
     protected final transient IIndexManager indexManager;
 
     private final IResourceLocator<T> delegate;
-    
+
+    /**
+     * Cache for recently located resources.
+     */
+    final private transient ConcurrentWeakValueCache<NT, T> resourceCache;
+
+    /**
+     * Cache for recently materialized properties from the GRS.
+     */
+    final /*private*/ transient ConcurrentWeakValueCache<NT, Map<String,Object>> propertyCache;
+
     /**
      * Provides locks on a per-namespace basis for higher concurrency.
      */
@@ -136,7 +148,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
     /**
      * The default timeout for stale entries in milliseconds.
      */
-    protected static transient final long DEFAULT_CACHE_TIMEOUT = (60 * 1000);
+    protected static transient final long DEFAULT_CACHE_TIMEOUT = (10 * 1000);
 
     /**
      * Ctor uses {@link #DEFAULT_CACHE_CAPACITY} and
@@ -170,14 +182,24 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
             final IResourceLocator<T> delegate, final int cacheCapacity,
             final long cacheTimeout) {
 
-        super(cacheCapacity, cacheTimeout);
-        
         if (indexManager == null)
             throw new IllegalArgumentException();
 
         this.indexManager = indexManager;
 
         this.delegate = delegate;// MAY be null.
+
+        if (cacheCapacity <= 0)
+            throw new IllegalArgumentException();
+
+        if (cacheTimeout < 0)
+            throw new IllegalArgumentException();
+
+        this.resourceCache = new ConcurrentWeakValueCacheWithTimeout<NT, T>(
+                cacheCapacity, TimeUnit.MILLISECONDS.toNanos(cacheTimeout));
+
+        this.propertyCache = new ConcurrentWeakValueCacheWithTimeout<NT, Map<String, Object>>(
+                cacheCapacity, TimeUnit.MILLISECONDS.toNanos(cacheTimeout));
 
     }
 
@@ -187,46 +209,86 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
         if (namespace == null)
             throw new IllegalArgumentException();
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
-            log.info("namespace=" + namespace+", timestamp="+timestamp);
+            log.info("namespace=" + namespace + ", timestamp=" + timestamp);
 
         }
 
+        T resource = null;
+        final NT nt;
+
+        /*
+         * Note: The drawback with resolving the resource against the
+         * [commitTime] is that the views will be the same object instance and
+         * will have the timestamp associated with the [commitTime] rather than
+         * the caller's timestamp. This breaks the assumption that
+         * resource#getTimestamp() returns the transaction identifier for a
+         * read-only transaction. In order to fix that, we resort to sharing the
+         * Properties object instead of the resource view.
+         */
+//        if (TimestampUtility.isReadOnly(timestamp)
+//                && indexManager instanceof Journal) {
+//
+//            /*
+//             * If we are looking on a local Journal (standalone database) then
+//             * we resolve the caller's [timestamp] to the commit point against
+//             * which the resource will be located and handle caching of the
+//             * resource using that commit point. This is done in order to share
+//             * a read-only view of a resource with any request which would be
+//             * serviced by the same commit point. Any such views are read-only
+//             * and immutable.
+//             */
+//            
+//            final Journal journal = (Journal) indexManager;
+//
+//            // find the commit record on which we need to read.
+//            final long commitTime = journal.getCommitRecord(
+//                    TimestampUtility.asHistoricalRead(timestamp))
+//                    .getTimestamp();
+//
+//            nt = new NT(namespace, commitTime);
+//
+//        } else {
+
+            nt = new NT(namespace, timestamp);
+//
+//        }
+
         // test cache: hotspot 93% of method time.
-        T resource = get(namespace, timestamp);
+        resource = resourceCache.get(nt);
 
         if (resource != null) {
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("cache hit: " + resource);
 
             // cache hit.
             return resource;
 
         }
-        
+
         /*
-         * Since there was a cache miss, acquire a lock the named relation so
-         * that the locate + cache.put sequence will be atomic.
+         * Since there was a cache miss, acquire a lock for the named relation
+         * so that the locate + cache.put sequence will be atomic.
          */
         final Lock lock = namedLock.acquireLock(namespace);
 
         try {
 
             // test cache now that we have the lock.
-            resource = get(namespace, timestamp);
+            resource = resourceCache.get(nt);
 
             if (resource != null) {
 
-                if (DEBUG)
+                if (log.isDebugEnabled())
                     log.debug("cache hit: " + resource);
 
                 return resource;
 
             }
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("cache miss: namespace=" + namespace + ", timestamp="
                         + timestamp);
           
@@ -250,7 +312,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                      * resolve this request.
                      */
                     
-                    if(INFO) {
+                    if(log.isInfoEnabled()) {
                         
                         log.info("Not found - passing to delegate: namespace="
                                 + namespace + ", timestamp=" + timestamp);
@@ -262,7 +324,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                     
                     if (resource != null) {
 
-                        if (INFO) {
+                        if (log.isInfoEnabled()) {
 
                             log.info("delegate answered: " + resource);
 
@@ -275,15 +337,15 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                 }
 
                 if (log.isInfoEnabled())
-                log.info("Not found: namespace=" + namespace + ", timestamp="
-                        + timestamp);
+                    log.info("Not found: namespace=" + namespace
+                            + ", timestamp=" + timestamp);
 
                 // not found.
                 return null;
 
             }
 
-            if (DEBUG) {
+            if (log.isDebugEnabled()) {
 
                 log.debug(properties.toString());
 
@@ -310,7 +372,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
             }
 
-            if (DEBUG) {
+            if (log.isDebugEnabled()) {
 
                 log.debug("Implementation class=" + cls.getName());
 
@@ -321,8 +383,8 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                     properties);
 
             // Add to the cache.
-            put(resource);
-            
+            resourceCache.put(nt, resource);
+
             return resource;
 
         } finally {
@@ -373,7 +435,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                          * and removed from the [seeAlso] weak value cache.
                          */
                         
-                        if (INFO)
+                        if (log.isInfoEnabled())
                             log.info("Closed? " + indexManager);
                         
                     } else {
@@ -400,7 +462,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
                 if (properties != null) {
 
-                    if (INFO) {
+                    if (log.isInfoEnabled()) {
 
                         log.info("Found: namespace=" + namespace + " on "
                                 + indexManager);
@@ -428,7 +490,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
         if (properties != null) {
 
-            if (INFO) {
+            if (log.isInfoEnabled()) {
 
                 log.info("Found: namespace=" + namespace + " on "
                         + indexManager);
@@ -460,28 +522,19 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
      * @param indexManager
      * @param namespace
      *            The resource identifier - this is the primary key.
-     * @param timestampIsIgnored
+     * @param timestamp
      *            The timestamp of the resource view.
      * 
      * @return The {@link Properties} iff there is a logical row for the given
      *         namespace.
-     * 
-     * @todo The timestamp of the resource view is currently ignored. This
-     *       probably should be modified to use the corresponding view of the
-     *       global row store rather than always using the read-committed /
-     *       unisolated view. That would make the properties immutable for a
-     *       historical resource view and thus more easily cached.  However,
-     *       it would also make it impossible to modify those properties for
-     *       historical views as any changes would only apply to views whose
-     *       commit time was after the change to the global row store.
      */
     protected Properties locateResourceOn(final IIndexManager indexManager,
-            final String namespace, final long timestampIsIgnored) {
+            final String namespace, final long timestamp) {
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
             log.info("indexManager=" + indexManager + ", namespace="
-                    + namespace + ", timestamp=" + timestampIsIgnored);
+                    + namespace + ", timestamp=" + timestamp);
 
         }
 
@@ -489,23 +542,109 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
          * Look at the global row store view corresponding to the specified
          * timestamp.
          * 
-         * @todo caching may be useful here for historical reads.
+         * Note: caching here is important in order to reduce the heap pressure
+         * associated with large numbers of concurrent historical reads against
+         * the same commit point when those reads are performed within read-only
+         * transactions and, hence, each read is performed with a DISTINCT
+         * timestamp. Since the timestamps are distinct, the resource [cache]
+         * will have cache misses. This code provides for a [propertyCache]
+         * which ensures that we share the materialized properties from the GRS
+         * across resource views backed by the same commit point (and also avoid
+         * unnecessary GRS reads).
          */
-        final SparseRowStore rowStore = indexManager
-                .getGlobalRowStore(/*timestamp*/);
-        
-        final Map<String, Object> map = rowStore == null ? null : rowStore
-                .read(RelationSchema.INSTANCE, namespace);
+        Long commitTime2 = null;
+        final Map<String, Object> map; 
+        if (TimestampUtility.isReadOnly(timestamp)
+                && !TimestampUtility.isReadCommitted(timestamp)
+                && indexManager instanceof Journal) {
 
-//        System.err.println("Reading properties: namespace="+namespace+", timestamp="+timestampIsIgnored);
-//        log.fatal("Reading properties: "+namespace,new RuntimeException());
-        
+            final Journal journal = (Journal) indexManager;
+
+            // find the commit record on which we need to read.
+            final ICommitRecord commitRecord = journal
+                    .getCommitRecord(TimestampUtility
+                            .asHistoricalRead(timestamp));
+
+            if (commitRecord != null) {
+
+                // find the timestamp associated with that commit record.
+                final long commitTime = commitRecord.getTimestamp();
+
+                // Save commitTime to stuff into the properties.
+                commitTime2 = commitTime;
+                
+                // Check the cache before materializing the properties from the
+                // GRS.
+                final Map<String, Object> cachedMap = propertyCache.get(new NT(
+                        namespace, commitTime));
+
+                if (cachedMap != null) {
+
+                    // The properties are in the cache.
+                    map = cachedMap;
+
+                } else {
+
+                    // Use the GRS view as of that commit point.
+                    final SparseRowStore rowStore = journal
+                            .getGlobalRowStore(commitTime);
+
+                    // Read the properties from the GRS.
+                    map = rowStore == null ? null : rowStore.read(
+                            RelationSchema.INSTANCE, namespace);
+
+                    if (map != null) {
+
+                        // Stuff the properties into the cache.
+                        propertyCache.put(new NT(namespace, commitTime), map);
+
+                    }
+
+                }
+
+            } else {
+
+                /*
+                 * No such commit record.
+                 * 
+                 * @todo We can probably just return [null] for this case.
+                 */
+
+                final SparseRowStore rowStore = indexManager
+                        .getGlobalRowStore(/* timestamp */);
+
+                // Read the properties from the GRS.
+                map = rowStore == null ? null : rowStore.read(
+                        RelationSchema.INSTANCE, namespace);
+                
+            }
+
+        } else {
+
+            /*
+             * @todo The timestamp of the resource view is currently ignored.
+             * This probably should be modified to use the corresponding view of
+             * the global row store rather than always using the read-committed
+             * / unisolated view, which will require exposing a
+             * getGlobalRowStore(timestamp) method on IIndexStore.
+             */
+
+            final SparseRowStore rowStore = indexManager
+                    .getGlobalRowStore(/* timestamp */);
+
+            // Read the properties from the GRS.
+            map = rowStore == null ? null : rowStore.read(
+                    RelationSchema.INSTANCE, namespace);
+            
+        }
+
         if (map == null) {
 
-            if (DEBUG) {
+            if (log.isDebugEnabled()) {
 
-                log.debug("No properties: indexManager=" + indexManager
-                        + ", namespace=" + namespace);
+                log.debug("Not found: indexManager=" + indexManager
+                        + ", namespace=" + namespace + ", timestamp="
+                        + timestamp);
 
             }
 
@@ -513,21 +652,33 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
         }
 
+        // wrap with properties object to prevent cross view mutation.
         final Properties properties = new Properties();
 
         properties.putAll(map);
 
-        if (DEBUG) {
+        if (commitTime2 != null) {
 
-            log.debug("Read properties: indexManager=" + indexManager
-                    + ", namespace=" + namespace + " :: " + properties);
+            /*
+             * Make the commit time against which we are reading accessible to
+             * the locatable resource.
+             */
+            properties.put(RelationSchema.COMMIT_TIME, commitTime2);
+
+        }
+        
+        if (log.isTraceEnabled()) {
+
+            log.trace("Read properties: indexManager=" + indexManager
+                    + ", namespace=" + namespace + ", timestamp=" + timestamp
+                    + " :: " + properties);
 
         }
 
         return properties;
 
     }
-
+   
     /**
      * Create a new view of the relation.
      * 
@@ -541,7 +692,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
      * @param properties
      *            Configuration properties for the relation.
      * 
-     * @return A new instance of the identifed resource.
+     * @return A new instance of the identified resource.
      */
     protected T newInstance(final Class<? extends T> cls,
             final IIndexManager indexManager, final String namespace,
@@ -588,7 +739,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
             r.init();
             
-            if(INFO) {
+            if(log.isInfoEnabled()) {
                 
                 log.info("new instance: "+r);
                 
@@ -614,7 +765,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
      * @param instance
      *            The instance.
      */
-    public T putInstance(T instance) {
+    public T putInstance(final T instance) {
       
         if (instance == null)
             throw new IllegalArgumentException();
@@ -623,7 +774,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
         
         final long timestamp = instance.getTimestamp();
         
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
             log.info("namespace=" + namespace+", timestamp="+timestamp);
 
@@ -634,11 +785,13 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
         try {
 
-            final T tmp = get(namespace, timestamp);
+            final NT nt = new NT(namespace, timestamp);
             
+            final T tmp = resourceCache.get(nt);
+
             if (tmp != null) {
 
-                if(INFO) {
+                if(log.isInfoEnabled()) {
                     
                     log.info("Existing instance already in cache: "+tmp);
                     
@@ -648,9 +801,9 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                 
             }
             
-            put(instance);
-            
-            if (INFO) {
+            resourceCache.put(nt, instance);
+
+            if (log.isInfoEnabled()) {
 
                 log.info("Instance added to cache: " + instance);
                 
@@ -665,15 +818,15 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
         }
         
     }
-    
+
     /**
-     * Resources that hold hard references to local index objects MUST discarded
-     * during abort processing. Otherwise the same resource objects will be
-     * returned from the cache and buffered writes on the indices for those
-     * relations (if they are local index objects) will still be visible, this
-     * defeating the abort semantics.
+     * Resources that hold hard references to local index objects MUST be
+     * discarded during abort processing. Otherwise the same resource objects
+     * will be returned from the cache and buffered writes on the indices for
+     * those relations (if they are local index objects) will still be visible,
+     * thus defeating the abort semantics.
      */
-    public void discard(ILocatableResource<T> instance) {
+    public void discard(final ILocatableResource<T> instance) {
         
         if (instance == null)
             throw new IllegalArgumentException();
@@ -682,9 +835,9 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
         
         final long timestamp = instance.getTimestamp();
         
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
-            log.info("namespace=" + namespace+", timestamp="+timestamp);
+            log.info("namespace=" + namespace + ", timestamp=" + timestamp);
 
         }
 
@@ -693,9 +846,15 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
         try {
 
-            final boolean found = clear(namespace, timestamp);
-            
-            if (INFO) {
+            final NT nt = new NT(namespace, timestamp);
+
+            /*
+             * Clear the resource cache, but we do not need to clear the
+             * property cache since it only retains immutable historical state.
+             */
+            final boolean found = resourceCache.remove(nt) != null;
+
+            if (log.isInfoEnabled()) {
 
                 log.info("instance=" + instance + ", found=" + found);
                 
@@ -744,7 +903,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
              */
             seeAlso.put(indexManager, null);
 
-            if (INFO) {
+            if (log.isInfoEnabled()) {
 
                 log.info("size=" + seeAlso.size() + ", added indexManager="
                         + indexManager);

@@ -37,7 +37,7 @@ import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.impl.BindingImpl;
 
-import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.PipelineOp;
 
 /**
  * Unit tests the query hints aspect of the {@link BigdataSail} implementation.
@@ -103,7 +103,7 @@ public class TestQueryHints extends QuadsTestCase {
                 
                 final String query = "PREFIX " + QueryHints.NAMESPACE
                         + ": " + "<http://www.bigdata.com/queryOption#" + //
-                        PipelineJoin.Annotations.MAX_PARALLEL + "=-5" //
+                        PipelineOp.Annotations.MAX_PARALLEL + "=-5" //
                         + "&" + "com.bigdata.fullScanTreshold=1000" //
                         + ">\n"//
                         + "SELECT * " + //

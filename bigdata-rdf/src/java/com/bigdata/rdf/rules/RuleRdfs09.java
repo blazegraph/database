@@ -27,6 +27,7 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.vocab.Vocabulary;
@@ -55,7 +56,7 @@ public class RuleRdfs09 extends Rule {
                     new SPOPredicate(relationName,var("v"), vocab.getConstant(RDF.TYPE), var("u"))//
                 },
                 new IConstraint[] {
-                    new NE(var("u"),var("x"))
+        			Constraint.wrap(new NE(var("u"),var("x")))
                 });
     }
 

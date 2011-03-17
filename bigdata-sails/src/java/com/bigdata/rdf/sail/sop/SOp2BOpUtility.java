@@ -40,6 +40,7 @@ import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.StatementPattern;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IConstraint;
@@ -104,6 +105,18 @@ public class SOp2BOpUtility {
     	
 	}
     
+    public static boolean isEmptyUnion(final SOpGroup sopGroup) {
+    	
+    	if (isUnion(sopGroup)) {
+    		final SOpGroups children = sopGroup.getChildren();
+    		if (children == null || children.size() == 0) {
+    			return true;
+    		}
+    	}
+    	return false;
+    	
+    }
+    
     /**
      * Because of the way we parse the Sesame operator tree, the single
      * optional tails get placed in their own singleton subgroup without any
@@ -132,7 +145,8 @@ public class SOp2BOpUtility {
     
     private static boolean isNonOptionalJoinGroup(final SOpGroup sopGroup) {
     	
-    	return !(isUnion(sopGroup) || isOptional(sopGroup));
+    	return sopGroup.size() > 0 && 
+    		!(isUnion(sopGroup) || isOptional(sopGroup));
     	
     }
     
@@ -165,44 +179,101 @@ public class SOp2BOpUtility {
     	 */
     	final Collection<IConstraint> preConditionals = 
     		new LinkedList<IConstraint>();
-    	
-    	/*
-    	 * These are constraints that use variables bound by subqueries, and
-    	 * thus cannot be attached to the predicates in this group.  They are
-    	 * handled by ConditionalRoutingOps at the end of the group, after
-    	 * the subqueries have run. 
-    	 */
+
+		/*
+		 * These are constraints that use variables bound by optionals or
+		 * subqueries, and thus cannot be attached to the non-optional
+		 * predicates in this group. They are handled by ConditionalRoutingOps
+		 * at the end of the group, after the subqueries have run.
+		 */
     	final Collection<IConstraint> postConditionals = 
     		new LinkedList<IConstraint>();
     	
-    	final IRule rule = rule(join, preConditionals, postConditionals);
+    	PipelineOp left = rule2BOp(join, preConditionals, postConditionals, 
+    			idFactory, db, queryEngine, queryHints);
     	
-    	PipelineOp left = Rule2BOpUtility.convert(
-    			rule, preConditionals, idFactory, db, queryEngine, queryHints);
+//    	PipelineOp left = Rule2BOpUtility.convert(
+//    			rule, preConditionals, idFactory, db, queryEngine, queryHints);
     	
     	/*
     	 * Start with left=<this join group> and add a SubqueryOp for each
     	 * sub group.
     	 */
+//    	final SOpGroups children = join.getChildren();
+//    	if (children != null) {
+//	    	for (SOpGroup child : children) {
+//	    		if (isSingleOptional(child)) {
+//	    			// handled by the rule() conversion above
+//	    			continue;
+//	    		}
+//	    		final PipelineOp subquery = convert(
+//	    				child, idFactory, db, queryEngine, queryHints);
+//	    		final boolean optional = isOptional(child);
+//	    		final int subqueryId = idFactory.incrementAndGet();
+//	    		left = new SubqueryOp(new BOp[]{left}, 
+//	                    new NV(Predicate.Annotations.BOP_ID, subqueryId),//
+//	                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
+//	                    new NV(SubqueryOp.Annotations.OPTIONAL,optional)//
+//	            );
+//	    		if (log.isInfoEnabled()) {
+//	    			log.info("adding a subquery: " + subqueryId + "\n" + left);
+//	    		}
+//	    	}
+//    	}
     	
     	final SOpGroups children = join.getChildren();
     	if (children != null) {
-	    	for (SOpGroup child : join.getChildren()) {
-	    		if (isSingleOptional(child)) {
-	    			// handled by the rule() conversion above
+        	/*
+        	 * First do the non-optional subqueries (UNIONs) 
+        	 */
+	    	for (SOpGroup child : children) {
+	    		if (!isUnion(child) || isEmptyUnion(child))
 	    			continue;
-	    		}
-	    		final PipelineOp subquery = convert(
-	    				child, idFactory, db, queryEngine, queryHints);
+	    		
 	    		final boolean optional = isOptional(child);
+	    		final PipelineOp subquery = union(
+	    				child, idFactory, db, queryEngine, queryHints);
 	    		final int subqueryId = idFactory.incrementAndGet();
 	    		left = new SubqueryOp(new BOp[]{left}, 
 	                    new NV(Predicate.Annotations.BOP_ID, subqueryId),//
 	                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
-	                    new NV(SubqueryOp.Annotations.OPTIONAL,optional)//
+	                    new NV(SubqueryOp.Annotations.OPTIONAL, optional)//
 	            );
 	    		if (log.isInfoEnabled()) {
 	    			log.info("adding a subquery: " + subqueryId + "\n" + left);
+	    		}
+	    	}
+
+	    	/*
+	    	 * Next do the optional subqueries and optional tails 
+	    	 */
+	    	for (SOpGroup child : children) {
+	    		if (isUnion(child))
+	    			continue;
+	    		
+	    		if (isSingleOptional(child)) {
+	    			final SOp sop = child.getSingletonSOp();
+	    			final BOp bop = sop.getBOp();
+					Predicate pred = (Predicate) bop.setProperty(
+							IPredicate.Annotations.OPTIONAL, Boolean.TRUE);
+					pred = pred.setBOpId(idFactory.incrementAndGet());
+					left = Rule2BOpUtility.join(
+							queryEngine, left, pred, 
+							idFactory, 
+							queryHints);
+	    		} else {
+		    		final PipelineOp subquery = convert(
+		    				child, idFactory, db, queryEngine, queryHints);
+		    		final boolean optional = isOptional(child);
+		    		final int subqueryId = idFactory.incrementAndGet();
+		    		left = new SubqueryOp(new BOp[]{left}, 
+		                    new NV(Predicate.Annotations.BOP_ID, subqueryId),//
+		                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
+		                    new NV(SubqueryOp.Annotations.OPTIONAL,optional)//
+		            );
+		    		if (log.isInfoEnabled()) {
+		    			log.info("adding a subquery: " + subqueryId + "\n" + left);
+		    		}
 	    		}
 	    	}
     	}
@@ -242,10 +313,12 @@ public class SOp2BOpUtility {
 			 * incorrect termination under some circumstances.
 			 */
             left = new SliceOp(new BOp[] { left }, NV.asMap(//
-                    new NV(BOp.Annotations.BOP_ID, idFactory
-                            .incrementAndGet()), //
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER)));
+					new NV(BOp.Annotations.BOP_ID, idFactory
+							.incrementAndGet()), //
+					new NV(BOp.Annotations.EVALUATION_CONTEXT,
+							BOpEvaluationContext.CONTROLLER),//
+					new NV(PipelineOp.Annotations.SHARED_STATE, true)//
+			));
         }
     	
     	return left;
@@ -286,9 +359,11 @@ public class SOp2BOpUtility {
 
     }
 
-    protected static IRule rule(final SOpGroup group,
+    protected static PipelineOp rule2BOp(final SOpGroup group,
     		final Collection<IConstraint> preConditionals,
-    		final Collection<IConstraint> postConditionals) {
+    		final Collection<IConstraint> postConditionals,
+            final AtomicInteger idFactory, final AbstractTripleStore db,
+            final QueryEngine queryEngine, final Properties queryHints) {
     	
     	final Collection<IPredicate> preds = new LinkedList<IPredicate>();
     	final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
@@ -313,23 +388,23 @@ public class SOp2BOpUtility {
     		}
     	}
     	
-    	/*
-    	 * The way that the Sesame operator tree is parsed, optional tails
-    	 * become single-operator (predicate) join groups without any children
-    	 * of their own.
-    	 */
-    	final SOpGroups children = group.getChildren();
-    	if (children != null) {
-	    	for (SOpGroup child : group.getChildren()) {
-	    		if (isSingleOptional(child)) {
-	    			final SOp sop = child.getSingletonSOp();
-	    			final BOp bop = sop.getBOp();
-					final IPredicate pred = (IPredicate) bop.setProperty(
-							IPredicate.Annotations.OPTIONAL, Boolean.TRUE);
-					preds.add(pred);
-	    		}
-	    	}
-    	}
+//    	/*
+//    	 * The way that the Sesame operator tree is parsed, optional tails
+//    	 * become single-operator (predicate) join groups without any children
+//    	 * of their own.
+//    	 */
+//    	final SOpGroups children = group.getChildren();
+//    	if (children != null) {
+//	    	for (SOpGroup child : children) {
+//	    		if (isSingleOptional(child)) {
+//	    			final SOp sop = child.getSingletonSOp();
+//	    			final BOp bop = sop.getBOp();
+//					final IPredicate pred = (IPredicate) bop.setProperty(
+//							IPredicate.Annotations.OPTIONAL, Boolean.TRUE);
+//					preds.add(pred);
+//	    		}
+//	    	}
+//    	}
     	
     	/*
     	 * Gather up all the variables used by predicates in this group
@@ -432,7 +507,11 @@ public class SOp2BOpUtility {
 				null/* constants */, null/* taskFactory */, 
 				required);    	
     	
-		return rule;
+		final PipelineOp left = Rule2BOpUtility.convert(
+				rule, preConditionals, nonOptParentVars, 
+				idFactory, db, queryEngine, queryHints);
+
+		return left;
 		
     }
     

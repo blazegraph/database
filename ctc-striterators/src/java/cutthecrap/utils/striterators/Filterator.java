@@ -41,20 +41,10 @@ import java.util.NoSuchElementException;
  * <p>The Filterator provide the protocol support to utilize Filter objects.</p>
  */
 
-public class Filterator implements Iterator {
+public class Filterator extends Prefetch {
 
 	final private Iterator m_src;
 	
-	/**
-	 * Flag set once {@link #getNext()} is invoked at least once.
-	 */
-	private boolean didInit = false;
-	
-	/**
-	 * Pre-fetched, but initial prefetch must not be done in the constructor.
-	 */
-	private Object m_value = null;
-
 	final protected Object m_context;
 	final protected Filter m_filter;
 
@@ -62,35 +52,8 @@ public class Filterator implements Iterator {
 		m_src = src;
 		m_context = context;
 		m_filter = filter;
-
-        /*
-         * Note: eager initialization causes problems when we are stacking
-         * filters.
-         */
-//		m_value = getNext();
 	}
 
-	//-------------------------------------------------------------
-
-    public boolean hasNext() {
-        if (!didInit) {
-            m_value = getNext();
-        }
-		return m_value != null;
-	}
-
-	//-------------------------------------------------------------
-	// must call hasNext() to ensure m_child is setup
-	public Object next() {
-		if (hasNext()) {
-			Object val = m_value;
-			m_value = getNext();
-
-			return val;
-		}
-
-		throw new NoSuchElementException("FilterIterator");
-	}
 
 	//-------------------------------------------------------------
 
@@ -101,7 +64,6 @@ public class Filterator implements Iterator {
 	//-------------------------------------------------------------
 
 	protected Object getNext() {
-        didInit = true;
 		while (m_src.hasNext()) {
 			final Object next = m_src.next();
 

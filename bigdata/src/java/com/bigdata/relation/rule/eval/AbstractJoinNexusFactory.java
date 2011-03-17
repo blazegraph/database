@@ -35,6 +35,8 @@ import java.util.WeakHashMap;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.joinGraph.IEvaluationPlan;
+import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.IBuffer;

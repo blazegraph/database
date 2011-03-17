@@ -30,6 +30,8 @@ import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
@@ -225,5 +227,22 @@ public class JournalDelegate implements IJournal {
 
 	public TemporaryStore getTempStore() {
 		return delegate.getTempStore();
+	}
+
+	public ScheduledFuture<?> addScheduledTask(Runnable task,
+			long initialDelay, long delay, TimeUnit unit) {
+		return delegate.addScheduledTask(task, initialDelay, delay, unit);
+	}
+
+	public boolean getCollectPlatformStatistics() {
+		return delegate.getCollectPlatformStatistics();
+	}
+
+	public boolean getCollectQueueStatistics() {
+		return delegate.getCollectQueueStatistics();
+	}
+
+	public int getHttpdPort() {
+		return delegate.getHttpdPort();
 	}
 }

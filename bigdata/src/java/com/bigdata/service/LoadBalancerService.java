@@ -999,7 +999,7 @@ abstract public class LoadBalancerService extends AbstractService
             final Vector<HostScore> scores = new Vector<HostScore>();
             
             // For each host
-            final Iterator<ICounterSet> itrh = getFederation().getCounterSet()
+            final Iterator<ICounterSet> itrh = getFederation().getCounters()
                     .counterSetIterator();
             
             while(itrh.hasNext()) {
@@ -1103,7 +1103,7 @@ abstract public class LoadBalancerService extends AbstractService
             final Vector<ServiceScore> scores = new Vector<ServiceScore>();
             
             // For each host
-            final Iterator<ICounterSet> itrh = getFederation().getCounterSet()
+            final Iterator<ICounterSet> itrh = getFederation().getCounters()
                     .counterSetIterator();
             
             while(itrh.hasNext()) {
@@ -1998,7 +1998,7 @@ abstract public class LoadBalancerService extends AbstractService
 
             os = new BufferedOutputStream( new FileOutputStream(file) );
             
-            getFederation().getCounterSet().asXML(os, "UTF-8", null/* filter */);
+            getFederation().getCounters().asXML(os, "UTF-8", null/* filter */);
             
         } catch(Exception ex) {
             
@@ -2149,7 +2149,7 @@ abstract public class LoadBalancerService extends AbstractService
                  * notify()s the LBS (60 seconds later).
                  */
 
-                getFederation().getCounterSet().makePath(
+                getFederation().getCounters().makePath(
                         AbstractFederation.getServiceCounterPathPrefix(
                                 serviceUUID, serviceIface, hostname));
                 
@@ -2285,7 +2285,7 @@ abstract public class LoadBalancerService extends AbstractService
                 try {
 
                     // read the counters into our local history.
-                    getFederation().getCounterSet().readXML(
+                    getFederation().getCounters().readXML(
                             new ByteArrayInputStream(data), instrumentFactory,
                             null/* filter */);
 

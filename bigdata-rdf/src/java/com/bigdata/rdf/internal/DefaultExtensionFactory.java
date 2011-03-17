@@ -6,7 +6,13 @@ import java.util.LinkedList;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 
 /**
- * Empty {@link IExtensionFactory}.
+ * Default {@link IExtensionFactory}. The following extensions are supported:
+ * <dl>
+ * <dt>{@link DateTimeExtension}</dt>
+ * <dd>Inlining literals which represent <code>xsd:dateTime</code> values into
+ * the statement indices.</dd>
+ * <dt></dt><dd></dd>
+ * </dl>
  */
 public class DefaultExtensionFactory implements IExtensionFactory {
 

@@ -38,18 +38,19 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.engine.BOpStats;
@@ -57,7 +58,6 @@ import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.engine.ChunkedRunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
@@ -440,6 +440,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         })//
         );
 
@@ -558,6 +559,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         })//
         );
 
@@ -718,8 +720,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 						BOpEvaluationContext.SHARDED),//
 				// impose constraint on the join.
 				new NV(PipelineJoin.Annotations.CONSTRAINTS,
-						new IConstraint[] { new EQConstant(y,
-								new Constant<String>("Paul")) }));
+						new IConstraint[] { Constraint.wrap(new EQConstant(y,
+								new Constant<String>("Paul"))) }));
         
         final PipelineOp query = new SliceOp(new BOp[] { joinOp },
         // slice annotations
@@ -727,6 +729,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         })//
         );
 
@@ -873,6 +876,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         })//
         );
 
@@ -1041,6 +1045,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         }));
 
         // start the query.
@@ -1236,7 +1241,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 						BOpEvaluationContext.SHARDED),//
 				// constraint x == z
 				new NV(PipelineJoin.Annotations.CONSTRAINTS,
-						new IConstraint[] { new EQ(x, z) }),
+						new IConstraint[] { Constraint.wrap(new EQ(x,z)) }),
 				// optional target is the same as the default target.
 				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
 
@@ -1246,6 +1251,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(BOp.Annotations.BOP_ID, sliceId),//
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         }));
 
         final PipelineOp query = sliceOp;
@@ -1298,14 +1304,20 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                             new Constant<String>("Paul") }//
             ),
             /*
-             * Plus anything we read from the first access path which
-             * did not pass the 2nd join.
+             * No. The CONSTRAINT on the 2nd join [x == y] filters all
+             * solutions. For solutions where the optional join fails, [y] is
+             * not bound. Since [y] is part of the constraint on that join we DO
+             * NOT observe those solutions which only join on the first access
+             * path.
+             * 
+//             * Plus anything we read from the first access path which
+//             * did not pass the 2nd join.
              */
-            new ArrayBindingSet(//
-                    new IVariable[] { Var.var("x"), Var.var("y") },//
-                    new IConstant[] { new Constant<String>("Mary"),
-                            new Constant<String>("Paul") }//
-            ),
+//            new ArrayBindingSet(//
+//                    new IVariable[] { Var.var("x"), Var.var("y") },//
+//                    new IConstant[] { new Constant<String>("Mary"),
+//                            new Constant<String>("Paul") }//
+//            ),
             };
 
             TestQueryEngine.assertSameSolutionsAnyOrder(expected,
@@ -1369,7 +1381,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             // verify query solution stats details.
 //            assertEquals(1L, stats.chunksIn.get());
             assertEquals(5L, stats.unitsIn.get());
-            assertEquals(5L, stats.unitsOut.get());
+            assertEquals(4L, stats.unitsOut.get());
 //            assertEquals(1L, stats.chunksOut.get());
         }
         
@@ -1382,8 +1394,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
             // verify query solution stats details.
 //            assertEquals(2L, stats.chunksIn.get());
-            assertEquals(5L, stats.unitsIn.get());
-            assertEquals(5L, stats.unitsOut.get());
+            assertEquals(4L, stats.unitsIn.get());
+            assertEquals(4L, stats.unitsOut.get());
 //            assertEquals(1L, stats.chunksOut.get());
         }
 

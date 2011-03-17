@@ -42,6 +42,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -2531,7 +2532,24 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 			delegate.detachContext(this);
 		}
 
-    }
+		public ScheduledFuture<?> addScheduledTask(Runnable task,
+				long initialDelay, long delay, TimeUnit unit) {
+			return delegate.addScheduledTask(task, initialDelay, delay, unit);
+		}
+
+		public boolean getCollectPlatformStatistics() {
+			return delegate.getCollectPlatformStatistics();
+		}
+
+		public boolean getCollectQueueStatistics() {
+			return delegate.getCollectQueueStatistics();
+		}
+
+		public int getHttpdPort() {
+			return delegate.getHttpdPort();
+		}
+
+    } // class IsolatatedActionJournal
 
     /**
      * A read-only view of an {@link IJournal} that is used to enforce read-only
@@ -2900,7 +2918,24 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 			return delegate.getRootBlocks(startTime);
 		}
 
-    }
+		public ScheduledFuture<?> addScheduledTask(Runnable task,
+				long initialDelay, long delay, TimeUnit unit) {
+			return delegate.addScheduledTask(task, initialDelay, delay, unit);
+		}
+
+		public boolean getCollectPlatformStatistics() {
+			return delegate.getCollectPlatformStatistics();
+		}
+
+		public boolean getCollectQueueStatistics() {
+			return delegate.getCollectQueueStatistics();
+		}
+
+		public int getHttpdPort() {
+			return delegate.getHttpdPort();
+		}
+
+    } // class ReadOnlyJournal
 
     /**
      * Delegate pattern for {@link IIndexManager}.
@@ -2959,6 +2994,23 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         public TemporaryStore getTempStore() {
             return delegate.getTempStore();
         }
+
+		public ScheduledFuture<?> addScheduledTask(Runnable task,
+				long initialDelay, long delay, TimeUnit unit) {
+			return delegate.addScheduledTask(task, initialDelay, delay, unit);
+		}
+
+		public boolean getCollectPlatformStatistics() {
+			return delegate.getCollectPlatformStatistics();
+		}
+
+		public boolean getCollectQueueStatistics() {
+			return delegate.getCollectQueueStatistics();
+		}
+
+		public int getHttpdPort() {
+			return delegate.getHttpdPort();
+		}
         
     }
     

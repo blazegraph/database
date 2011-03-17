@@ -79,7 +79,7 @@ public class SparqlBindingSetComparatorOp extends ComparatorOp {
 
             final ISortOrder<?> o = order[i];
 
-            final IVariable v = o.getVariable();
+            final IVariable<?> v = o.getVariable();
 
             int ret = vc.compare(bs1.get(v).get(), bs2.get(v).get());
 

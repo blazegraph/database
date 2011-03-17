@@ -42,9 +42,6 @@ import com.bigdata.service.IBigdataFederation;
 
 /**
  * Base class for the bigdata operation evaluation context (NOT serializable).
- * 
- * @param <E>
- *            The generic type of the objects processed by the operator.
  */
 public class BOpContextBase {
 

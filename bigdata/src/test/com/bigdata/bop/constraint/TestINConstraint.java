@@ -123,9 +123,9 @@ public abstract class TestINConstraint extends TestCase2
         IBindingSet notin = new ArrayBindingSet ( new IVariable<?> [] { x }, new IConstant [] { val3 } ) ;
         IBindingSet nb = new ArrayBindingSet ( new IVariable<?> [] {}, new IConstant [] {} ) ;
 
-        assertTrue ( op.accept ( in ) ) ;
-        assertFalse ( op.accept ( notin ) ) ;
-        assertTrue ( op.accept ( nb ) ) ;
+        assertTrue ( op.get ( in ) ) ;
+        assertFalse ( op.get ( notin ) ) ;
+        assertTrue ( op.get ( nb ) ) ;
     }
 
     protected abstract INConstraint newINConstraint ( IVariable<?> var, IConstant<?> vals [] ) ;

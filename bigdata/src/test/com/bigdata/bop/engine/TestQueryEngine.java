@@ -62,6 +62,7 @@ import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.fed.TestFederatedQueryEngine;
@@ -297,6 +298,19 @@ public class TestQueryEngine extends TestCase2 {
         
     }
 
+    public void test_slice_threadSafe() throws Exception {
+
+    	// @todo also stress with parallel trials.
+        final int ntrials = 10000;
+
+        for(int i=0; i<ntrials; i++) {
+
+        	test_query_join1_without_StartOp();
+        	
+        }
+        
+    }
+    
     /**
      * Test the ability run a simple join without a {@link StartOp}. An empty
      * binding set[] is fed into the join. The join probes the index once for
@@ -496,7 +510,7 @@ public class TestQueryEngine extends TestCase2 {
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 new NV(PipelineOp.Annotations.CHUNK_CAPACITY, 1),//
                 new NV(PipelineOp.Annotations.CHUNK_OF_CHUNKS_CAPACITY, nsources),//
-                new NV(QueryEngineTestAnnotations.ONE_MESSAGE_PER_CHUNK, true),//
+                new NV(PipelineOp.Annotations.MAX_MESSAGES_PER_TASK, 1),//
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 }));
@@ -521,6 +535,7 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
 //                        new NV(
 //                                QueryEngineTestAnnotations.COMBINE_RECEIVED_CHUNKS,
 //                                false),//
@@ -697,7 +712,7 @@ public class TestQueryEngine extends TestCase2 {
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 new NV(PipelineOp.Annotations.CHUNK_CAPACITY, 1),//
                 new NV(PipelineOp.Annotations.CHUNK_OF_CHUNKS_CAPACITY, nsources),//
-                new NV(QueryEngineTestAnnotations.ONE_MESSAGE_PER_CHUNK, true),//
+                new NV(PipelineOp.Annotations.MAX_MESSAGES_PER_TASK, 1),//
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 }));
@@ -800,7 +815,7 @@ public class TestQueryEngine extends TestCase2 {
         final int sliceId = 2;
 
         /*
-         * Enforce a constraint on the source such that it hands 3 each source
+         * Enforce a constraint on the source such that it hands each source
          * chunk to the join operator as a separate chunk
          */
         final int nsources = 4;
@@ -808,7 +823,7 @@ public class TestQueryEngine extends TestCase2 {
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 new NV(PipelineOp.Annotations.CHUNK_CAPACITY, 1),//
                 new NV(PipelineOp.Annotations.CHUNK_OF_CHUNKS_CAPACITY, nsources),//
-                new NV(QueryEngineTestAnnotations.ONE_MESSAGE_PER_CHUNK, true),//
+                new NV(PipelineOp.Annotations.MAX_MESSAGES_PER_TASK, 1),//
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 }));
@@ -821,6 +836,7 @@ public class TestQueryEngine extends TestCase2 {
                                         new NV(SliceOp.Annotations.LIMIT, Long.MAX_VALUE),//
                                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                                 BOpEvaluationContext.CONTROLLER),//
+                                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
 //                                        // Require the chunked running query impl.
 //                                        new NV(QueryEngine.Annotations.RUNNING_QUERY_CLASS,
 //                                                ChunkedRunningQuery.class.getName()),//
@@ -988,6 +1004,7 @@ public class TestQueryEngine extends TestCase2 {
                                 new NV(SliceOp.Annotations.LIMIT, 2L),//
                                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                         BOpEvaluationContext.CONTROLLER),//
+                                new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         })//
         );
 
@@ -1128,8 +1145,8 @@ public class TestQueryEngine extends TestCase2 {
 				new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
 				// impose constraint on the join.
 				new NV(PipelineJoin.Annotations.CONSTRAINTS,
-						new IConstraint[] { new EQConstant(y,
-								new Constant<String>("Paul")) })//
+						new IConstraint[] { Constraint.wrap(new EQConstant(y,
+								new Constant<String>("Paul"))) })//
 		);
 
         final PipelineOp query = new SliceOp(new BOp[] { joinOp },
@@ -1138,6 +1155,7 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         })//
         );
 
@@ -1593,7 +1611,7 @@ public class TestQueryEngine extends TestCase2 {
 				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op),//
 				// constraint x == z
 				new NV(PipelineJoin.Annotations.CONSTRAINTS,
-						new IConstraint[] { new EQ(x, z) }),
+						new IConstraint[] { Constraint.wrap(new EQ(x, z)) }),
 				// join is optional.
 				// optional target is the same as the default target.
 				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
@@ -1604,6 +1622,7 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(BOp.Annotations.BOP_ID, sliceId),//
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                         }));
 
         final PipelineOp query = sliceOp;
@@ -1751,7 +1770,7 @@ public class TestQueryEngine extends TestCase2 {
         int joinId1 = 2;
         int joinId2 = 3;
         
-        IConstraint condition = new EQConstant(Var.var("x"), new Constant<String>("Mary"));
+        IConstraint condition = Constraint.wrap(new EQConstant(Var.var("x"), new Constant<String>("Mary")));
         IRunningQuery runningQuery = initQueryWithConditionalRoutingOp(condition, startId, joinId1, joinId2);
 
         // verify solutions.
@@ -1833,7 +1852,7 @@ public class TestQueryEngine extends TestCase2 {
         int joinId2 = 3;
         
         // 'x' is actually bound to "Mary" so this condition will be false.
-        IConstraint condition = new EQConstant(Var.var("x"), new Constant<String>("Fred"));
+        IConstraint condition = Constraint.wrap(new EQConstant(Var.var("x"), new Constant<String>("Fred")));
         
         IRunningQuery runningQuery = initQueryWithConditionalRoutingOp(condition, startId, joinId1, joinId2);
 
@@ -1973,6 +1992,7 @@ public class TestQueryEngine extends TestCase2 {
                                 new NV(BOp.Annotations.BOP_ID, sliceId),//
                                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                         BOpEvaluationContext.CONTROLLER),//
+                                new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                                 }));
 
         final PipelineOp query = sliceOp;

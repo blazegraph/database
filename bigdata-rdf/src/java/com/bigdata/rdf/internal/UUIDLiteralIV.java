@@ -27,9 +27,11 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.UUID;
 
+import org.openrdf.model.ValueFactory;
+
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
  * Implementation for inline {@link UUID}s (there is no corresponding XML
@@ -61,8 +63,8 @@ public class UUIDLiteralIV<V extends BigdataLiteral> extends
     }
 
     @SuppressWarnings("unchecked")
-    public V asValue(final BigdataValueFactory f, 
-            final ILexiconConfiguration config) {
+    public V asValue(final LexiconRelation lex) {
+    	final ValueFactory f = lex.getValueFactory();
         final V v = (V) f.createLiteral(value.toString(), //
                 f.createURI(DTE.UUID.getDatatype()));
         v.setIV(this);

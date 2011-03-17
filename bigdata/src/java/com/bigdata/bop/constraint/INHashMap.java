@@ -66,11 +66,11 @@ import com.bigdata.bop.NV;
 public class INHashMap<T> extends INConstraint<T> {
 
     /**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
+	 * 
+	 */
+	private static final long serialVersionUID = 8032412126003678642L;
 
-    /**
+	/**
      * The variable (cached).
      * <p>
      * Note: This cache is not serialized and is compiled on demand when the
@@ -136,7 +136,7 @@ public class INHashMap<T> extends INConstraint<T> {
 
     }
 
-    public boolean accept(final IBindingSet bindingSet) {
+    public Boolean get(final IBindingSet bindingSet) {
 
         if (var == null) {
 

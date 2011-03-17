@@ -90,7 +90,7 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
         this.label = label;
         
         // force to lowercase (Sesame does this too).
-        this.language = (language != null ? language.toLowerCase() : null);
+        this.language = (language != null ? language.toLowerCase().intern() : null);
 //        this.language = language;
         
         this.datatype = datatype;

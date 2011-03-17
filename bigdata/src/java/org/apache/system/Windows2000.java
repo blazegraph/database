@@ -19,6 +19,7 @@
 package org.apache.system;
 
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 
 /**
@@ -38,21 +39,40 @@ public final class Windows2000 implements CPUParser
         int procs = 1;
         String info = "";
 
-        try
-        {
-            Runtime rt = Runtime.getRuntime();
-            Process proc = rt.exec( "cmd.exe /C echo %NUMBER_OF_PROCESSORS%" );
-            BufferedReader reader = new BufferedReader( new InputStreamReader(
-                proc.getInputStream() ) );
-            String numProcs = reader.readLine();
-
-            proc = rt.exec( "cmd.exe /C echo %PROCESSOR_IDENTIFIER%" );
-            reader = new BufferedReader( new InputStreamReader( proc.getInputStream() ) );
-            info = reader.readLine();
-
-            procs = Integer.parseInt( numProcs );
+        try {
+            final Runtime rt = Runtime.getRuntime();
+            {
+                final Process proc = rt
+                        .exec("cmd.exe /C echo %NUMBER_OF_PROCESSORS%");
+                final InputStream is = proc.getInputStream();
+                BufferedReader reader = null;
+                try {
+                    reader = new BufferedReader(new InputStreamReader(is));
+                    final String numProcs = reader.readLine();
+                    if (numProcs != null)
+                        procs = Integer.parseInt(numProcs);
+                } finally {
+                    if (reader != null)
+                        reader.close();
+                    is.close();
+                }
+            }
+            {
+                final Process proc = rt
+                        .exec("cmd.exe /C echo %PROCESSOR_IDENTIFIER%");
+                final InputStream is = proc.getInputStream();
+                BufferedReader reader = null;
+                try {
+                    reader = new BufferedReader(new InputStreamReader(is));
+                    info = reader.readLine();
+                } finally {
+                    if (reader != null)
+                        reader.close();
+                    is.close();
+                }
+            }
         }
-        catch( Exception e )
+        catch( Throwable e )
         {
         }
 
@@ -63,20 +83,21 @@ public final class Windows2000 implements CPUParser
     /**
      * Return the number of processors available on the machine
      */
-    public int numProcessors()
+    final public int numProcessors()
     {
         return m_processors;
     }
 
     /**
-     * Return the cpu info for the processors (assuming symetric multiprocessing
+     * Return the cpu info for the processors (assuming symmetric multiprocessing
      * which means that all CPUs are identical).  The format is:
      *
      * ${arch} family ${family} Model ${model} Stepping ${stepping}, ${identifier}
      */
-    public String cpuInfo()
+    final public String cpuInfo()
     {
         return m_cpuInfo;
     }
+
 }
 

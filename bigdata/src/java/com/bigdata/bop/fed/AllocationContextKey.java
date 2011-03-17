@@ -12,7 +12,7 @@ import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
  * 
  * @see IAllocationContext
  */
-abstract class AllocationContextKey {
+public abstract class AllocationContextKey {
 
     /**
      * Must be overridden. The queryId must be a part of each hashCode() in

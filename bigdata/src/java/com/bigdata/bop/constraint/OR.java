@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -26,29 +26,35 @@ package com.bigdata.bop.constraint;
 
 import java.util.Map;
 
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstraint;
 
 /**
  * Imposes the constraint <code>x OR y</code>.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class OR extends BOpConstraint {
+public class OR extends BOpBase implements BooleanValueExpression {
 
     /**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
+	 * 
+	 */
+	private static final long serialVersionUID = 5066076800100837774L;
 
-    /**
+	public OR(final BooleanValueExpression x, final BooleanValueExpression y) {
+
+        this(new BOp[] { x, y }, null/*annocations*/);
+
+    }
+
+	/**
      * Required deep copy constructor.
      */
-    public OR(final BOp[] args, final Map<String, Object> annotations) {
-        super(args, annotations);
+    public OR(final BOp[] args, final Map<String, Object> anns) {
+    	super(args, anns);
+        
+        if (args.length != 2 || args[0] == null || args[1] == null)
+            throw new IllegalArgumentException();
+
     }
 
     /**
@@ -58,19 +64,14 @@ public class OR extends BOpConstraint {
         super(op);
     }
 
-    public OR(final IConstraint x, final IConstraint y) {
-
-        super(new BOp[] { x, y }, null/*annocations*/);
-
-        if (x == null || y == null)
-            throw new IllegalArgumentException();
-
+    @Override
+    public BooleanValueExpression get(final int i) {
+    	return (BooleanValueExpression) super.get(i);
     }
+    
+    public Boolean get(final IBindingSet s) {
 
-    public boolean accept(final IBindingSet s) {
-
-        return ((IConstraint) get(0)).accept(s)
-                || ((IConstraint) get(1)).accept(s);
+        return get(0).get(s) || get(1).get(s);
 
     }
     

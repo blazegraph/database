@@ -54,7 +54,6 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.ResourceService;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -326,10 +325,17 @@ public class FederatedQueryEngine extends QueryEngine {
      */
     private class MaterializeMessageTask implements Runnable {
 
-        private final IChunkMessage<?> msg;
+        private final IChunkMessage<IBindingSet> msg;
 
-        public MaterializeMessageTask(final IChunkMessage<?> msg) {
-            this.msg = msg;
+        private final FederatedRunningQuery q;
+        
+        public MaterializeMessageTask(final IChunkMessage<IBindingSet> msg) {
+            
+        	this.msg = msg;
+            
+            // lookup query by id.
+            q = getRunningQuery(msg.getQueryId());
+        
         }
 
         public void run() {
@@ -341,13 +347,18 @@ public class FederatedQueryEngine extends QueryEngine {
                 }
                 if (log.isDebugEnabled())
                     log.debug("accepted: " + msg);
-                FederatedQueryEngine.this.acceptChunk((IChunkMessage) msg);
-            } catch (Throwable t) {
-                if (InnerCause.isInnerCause(t, InterruptedException.class)) {
-                    log.warn("Interrupted.");
-                    return;
-                }
-                throw new RuntimeException(t);
+                FederatedQueryEngine.this.acceptChunk(msg);
+			} catch (Throwable t) {
+				/*
+				 * Note: Since no one is watching the Future for this task, an
+				 * error here needs to cause the query to abort.
+				 */
+				q.halt(t);
+//                if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+//                    log.warn("Interrupted.");
+//                    return;
+//                }
+//                throw new RuntimeException(t);
             }
         }
 

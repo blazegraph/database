@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop;
 
 import java.io.Serializable;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -71,11 +72,20 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
      * @return The argument.
      */
     BOp get(int index);
+
+	/**
+	 * The operator's arguments as an unmodified list.
+	 * 
+	 * @todo Consider deprecating since this is much less efficient than
+	 *       {@link #argIterator()}.
+	 */
+    List<BOp> args();
     
     /**
-     * The operator's arguments.
+     * An iterator visiting the operator's arguments. The iterator does
+     * not support removal. (This is more efficient than #args()).
      */
-    List<BOp> args();
+    Iterator<BOp> argIterator();
 
     /** A shallow copy of the operator's arguments. */
     BOp[] toArray();
@@ -216,10 +226,13 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
 //     * @return <code>true</code> if all arguments and annotations are the same.
 //     */
 //    boolean sameData(final BOp o);
-    
-    /**
-     * Interface declaring well known annotations.
-     */
+
+	/**
+	 * Interface declaring well known annotations.
+	 * <p>
+	 * Note: Annotation names should be {@link String#intern() interned} in
+	 * order to avoid having duplicate values for those strings on the heap.
+	 */
     public interface Annotations {
 
         /**
@@ -228,7 +241,7 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
          * identifier for the {@link BOp} within the context of its owning
          * query.
          */
-        String BOP_ID = BOp.class.getName() + ".bopId";
+        String BOP_ID = (BOp.class.getName() + ".bopId").intern();
 
         /**
          * The timeout for the operator evaluation (milliseconds).
@@ -243,7 +256,7 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
          *       be interpreted with respect to the time when the query began to
          *       execute.
          */
-        String TIMEOUT = BOp.class.getName() + ".timeout";
+        String TIMEOUT = (BOp.class.getName() + ".timeout").intern();
 
         /**
          * The default timeout for operator evaluation.
@@ -256,7 +269,7 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
          * 
          * @see BOpEvaluationContext
          */
-        String EVALUATION_CONTEXT = BOp.class.getName() + ".evaluationContext";
+        String EVALUATION_CONTEXT = (BOp.class.getName() + ".evaluationContext").intern();
 
         BOpEvaluationContext DEFAULT_EVALUATION_CONTEXT = BOpEvaluationContext.ANY;
 
@@ -270,7 +283,7 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
          * 
          * @see BOp#isController()
          */
-        String CONTROLLER = BOp.class.getName()+".controller";
+        String CONTROLLER = (BOp.class.getName()+".controller").intern();
         
         boolean DEFAULT_CONTROLLER = false;
         

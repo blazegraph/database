@@ -42,8 +42,7 @@ import com.bigdata.bop.PipelineOp;
  * 
  * Will run the subqueries <i>a</i>, <i>b</i>, and <i>c</i> in parallel for each
  * source {@link IBindingSet}. The output of those subqueries will be routed to
- * the UNION operator (their parent) unless the subqueries explicitly override
- * this behavior using {@link PipelineOp.Annotations#SINK_REF}.
+ * the UNION operator (their parent).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

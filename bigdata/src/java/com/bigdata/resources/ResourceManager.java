@@ -42,7 +42,6 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
@@ -135,17 +134,17 @@ abstract public class ResourceManager extends OverflowManager implements
         
     }
 
-    /**
-     * <strong>WARNING: The {@link DataService} transfers all of the children
-     * from this object into the hierarchy reported by
-     * {@link AbstractFederation#getServiceCounterSet()} and this object will be
-     * empty thereafter.</strong>
-     */
-    synchronized public CounterSet getCounters() {
+//    /**
+//     * <strong>WARNING: The {@link DataService} transfers all of the children
+//     * from this object into the hierarchy reported by
+//     * {@link AbstractFederation#getServiceCounterSet()} and this object will be
+//     * empty thereafter.</strong>
+//     */
+    /*synchronized*/ public CounterSet getCounters() {
         
-        if (root == null) {
+//        if (root == null) {
 
-            root = new CounterSet();
+        final CounterSet root = new CounterSet();
 
             // ResourceManager
             {
@@ -332,8 +331,8 @@ abstract public class ResourceManager extends OverflowManager implements
                 final CounterSet tmp = root
                         .makePath(IResourceManagerCounters.IndexManager);
 
-                // save a reference.
-                indexManagerRoot = tmp;
+//                // save a reference.
+//                indexManagerRoot = tmp;
                 
                 tmp.addCounter(IIndexManagerCounters.StaleLocatorCacheCapacity,
                         new Instrument<Integer>() {
@@ -435,6 +434,10 @@ abstract public class ResourceManager extends OverflowManager implements
 //                                setValue(getIndexSegmentOpenLeafByteCount());
 //                            }
 //                        });
+
+                // attach the index partition counters.
+                tmp.makePath(IIndexManagerCounters.Indices).attach(
+                        getIndexCounters());
 
             }
 
@@ -641,29 +644,29 @@ abstract public class ResourceManager extends OverflowManager implements
                 
             }
 
-        }
+//        }
 
         return root;
 
     }
 
-    private CounterSet root;
+//    private CounterSet root;
 
-    /**
-     * The counter set that corresponds to the {@link IndexManager}.
-     */
-    public CounterSet getIndexManagerCounters() {
-
-        if (indexManagerRoot == null) {
-            
-            getCounters();
-            
-        }
-        
-        return indexManagerRoot;
-        
-    }
-    private CounterSet indexManagerRoot;
+//    /**
+//     * The counter set that corresponds to the {@link IndexManager}.
+//     */
+//    public CounterSet getIndexManagerCounters() {
+//
+//        if (indexManagerRoot == null) {
+//            
+//            getCounters();
+//            
+//        }
+//        
+//        return indexManagerRoot;
+//        
+//    }
+//    private CounterSet indexManagerRoot;
         
     /**
      * {@link ResourceManager} options.

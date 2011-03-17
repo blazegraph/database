@@ -27,10 +27,8 @@
 
 package com.bigdata.concurrent;
 
-import static com.bigdata.concurrent.NonBlockingLockManager.RunState.Halted;
 import static com.bigdata.concurrent.NonBlockingLockManager.RunState.Running;
 import static com.bigdata.concurrent.NonBlockingLockManager.RunState.Shutdown;
-import static com.bigdata.concurrent.NonBlockingLockManager.RunState.ShutdownNow;
 import static com.bigdata.concurrent.NonBlockingLockManager.RunState.Starting;
 
 import java.lang.ref.WeakReference;
@@ -769,7 +767,7 @@ public class NonBlockingLockManager</* T, */R extends Comparable<R>> {
      * @param <T>
      *            The generic type of the outcome for the {@link Future}.
      */
-    protected class LockFutureTask<T> extends FutureTask<T> {
+    protected class LockFutureTask<T> extends FutureTaskMon<T> {
 
         private final R[] resource;
 

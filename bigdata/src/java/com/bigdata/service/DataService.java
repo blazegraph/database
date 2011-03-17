@@ -442,116 +442,116 @@ abstract public class DataService extends AbstractService
             
         }
         
-        /**
-         * Dynamically detach and attach the counters for the named indices
-         * underneath of the {@link IndexManager}.
-         * <p>
-         * Note: This method limits the frequency of update to no more than once
-         * every 5 seconds.
-         * <p>
-         * Note: {@link OverflowManager#overflow()} is responsible for
-         * reattaching the counters for the live {@link ManagedJournal} during
-         * synchronous overflow.
-         */
-        @Override
-        synchronized public void reattachDynamicCounters() {
+//        /**
+//         * Dynamically detach and attach the counters for the named indices
+//         * underneath of the {@link IndexManager}.
+//         * <p>
+//         * Note: This method limits the frequency of update to no more than once
+//         * every 5 seconds.
+//         * <p>
+//         * Note: {@link OverflowManager#overflow()} is responsible for
+//         * reattaching the counters for the live {@link ManagedJournal} during
+//         * synchronous overflow.
+//         */
+//        @Override
+//        synchronized public void reattachDynamicCounters() {
+//
+//            final long now = System.currentTimeMillis();
+//
+//            final long elapsed = now - lastReattachMillis;
+//
+//            if (dataService.isOpen() && dataService.resourceManager.isRunning()
+//                    && elapsed > 5000/* ms */) {
+//
+//            	// inherit base class behavior
+//            	super.reattachDynamicCounters();
+//            	
+//                // The service's counter set hierarchy.
+//                final CounterSet serviceRoot = dataService.getFederation()
+//                        .getServiceCounterSet();
+//
+////                // The lock manager
+////                {
+////                    
+////                    // the lock manager is a direct child of this node.
+////                    final CounterSet tmp = (CounterSet) serviceRoot
+////                            .makePath(IDataServiceCounters.concurrencyManager
+////                                    + ICounterSet.pathSeparator
+////                                    + IConcurrencyManagerCounters.writeService);
+////
+////                    synchronized (tmp) {
+////
+////                        /*
+////                         * Note: We detach and then attach since that wipes out
+////                         * any counter set nodes for queues which no longer
+////                         * exist. Otherwise they will build up forever.
+////                         */
+////
+////                        // detach the old counters.
+////                        tmp.detach(IConcurrencyManagerCounters.LockManager);
+////
+////                        // attach the the new counters.
+////                        ((CounterSet) tmp
+////                                .makePath(IConcurrencyManagerCounters.LockManager))
+////                                .attach(dataService.concurrencyManager
+////                                        .getWriteService().getLockManager()
+////                                        .getCounters());
+////
+////                    }
+////
+////                }
+//                
+//                // The live indices.
+//                {
+//                
+//                    /*
+//                     * The counters for the index manager within the service's
+//                     * counter hierarchy.
+//                     * 
+//                     * Note: The indices are a direct child of this node.
+//                     */
+//                    final CounterSet tmp = (CounterSet) serviceRoot
+//                            .getPath(IDataServiceCounters.resourceManager
+//                                    + ICounterSet.pathSeparator
+//                                    + IResourceManagerCounters.IndexManager);
+//
+//                    synchronized (tmp) {
+//
+//                        /*
+//                         * Note: We detach and then attach since that wipes out
+//                         * any counter set nodes for index partitions which no
+//                         * longer exist. Otherwise they will build up forever.
+//                         */
+//                        final boolean exists = tmp
+//                                .getPath(IIndexManagerCounters.Indices) != null;
+//
+//                        // detach the index partition counters.
+//                        tmp.detach(IIndexManagerCounters.Indices);
+//
+//                        // attach the current index partition counters.
+//                        ((CounterSet) tmp
+//                                .makePath(IIndexManagerCounters.Indices))
+//                                .attach(dataService.resourceManager
+//                                        .getIndexCounters());
+//
+//                        if (log.isInfoEnabled())
+//                            log
+//                                    .info("Attached index partition counters: preexisting="
+//                                            + exists
+//                                            + ", path="
+//                                            + tmp.getPath());
+//
+//                    }
+//
+//                }
+//
+//                lastReattachMillis = now;
+//
+//            }
+//
+//        }
 
-            final long now = System.currentTimeMillis();
-
-            final long elapsed = now - lastReattachMillis;
-
-            if (dataService.isOpen() && dataService.resourceManager.isRunning()
-                    && elapsed > 5000/* ms */) {
-
-            	// inherit base class behavior
-            	super.reattachDynamicCounters();
-            	
-                // The service's counter set hierarchy.
-                final CounterSet serviceRoot = dataService.getFederation()
-                        .getServiceCounterSet();
-
-                // The lock manager
-                {
-                    
-                    // the lock manager is a direct child of this node.
-                    final CounterSet tmp = (CounterSet) serviceRoot
-                            .makePath(IDataServiceCounters.concurrencyManager
-                                    + ICounterSet.pathSeparator
-                                    + IConcurrencyManagerCounters.writeService);
-
-                    synchronized (tmp) {
-
-                        /*
-                         * Note: We detach and then attach since that wipes out
-                         * any counter set nodes for queues which no longer
-                         * exist. Otherwise they will build up forever.
-                         */
-
-                        // detach the old counters.
-                        tmp.detach(IConcurrencyManagerCounters.LockManager);
-
-                        // attach the the new counters.
-                        ((CounterSet) tmp
-                                .makePath(IConcurrencyManagerCounters.LockManager))
-                                .attach(dataService.concurrencyManager
-                                        .getWriteService().getLockManager()
-                                        .getCounters());
-
-                    }
-
-                }
-                
-                // The live indices.
-                {
-                
-                    /*
-                     * The counters for the index manager within the service's
-                     * counter hierarchy.
-                     * 
-                     * Note: The indices are a direct child of this node.
-                     */
-                    final CounterSet tmp = (CounterSet) serviceRoot
-                            .getPath(IDataServiceCounters.resourceManager
-                                    + ICounterSet.pathSeparator
-                                    + IResourceManagerCounters.IndexManager);
-
-                    synchronized (tmp) {
-
-                        /*
-                         * Note: We detach and then attach since that wipes out
-                         * any counter set nodes for index partitions which no
-                         * longer exist. Otherwise they will build up forever.
-                         */
-                        final boolean exists = tmp
-                                .getPath(IIndexManagerCounters.Indices) != null;
-
-                        // detach the index partition counters.
-                        tmp.detach(IIndexManagerCounters.Indices);
-
-                        // attach the current index partition counters.
-                        ((CounterSet) tmp
-                                .makePath(IIndexManagerCounters.Indices))
-                                .attach(dataService.resourceManager
-                                        .getIndexCounters());
-
-                        if (log.isInfoEnabled())
-                            log
-                                    .info("Attached index partition counters: preexisting="
-                                            + exists
-                                            + ", path="
-                                            + tmp.getPath());
-
-                    }
-
-                }
-
-                lastReattachMillis = now;
-
-            }
-
-        }
-
-        private long lastReattachMillis = 0L;
+//        private long lastReattachMillis = 0L;
 
         public boolean isServiceReady() {
             
@@ -628,6 +628,9 @@ abstract public class DataService extends AbstractService
 
             /*
              * Service specific counters.
+             * 
+             * FIXME These may no longer be properly attached! See 
+             * IFederationDelegate#reattachDynamicCounters().
              */
 
             final CounterSet serviceRoot = dataService.getFederation()

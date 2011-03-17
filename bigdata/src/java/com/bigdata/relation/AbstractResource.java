@@ -47,7 +47,6 @@ import com.bigdata.config.LongValidator;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.IResourceLockService;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.rules.FastClosure;
 import com.bigdata.rdf.rules.FullClosure;
 import com.bigdata.rdf.rules.RuleFastClosure5;
@@ -84,6 +83,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
     final private String containerNamespace;
 
     final private long timestamp;
+    final private Long commitTime;
     
     final private Properties properties;
     
@@ -182,23 +182,6 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
         
     }
 
-//    /**
-//     * When <code>true</code> the {@link NestedSubqueryWithJoinThreadsTask} is
-//     * applied. Otherwise the {@link JoinMasterTask} is applied.
-//     * 
-//     * @see Options#NESTED_SUBQUERY
-//     * 
-//     * @deprecated by {@link BOp} annotations and the pipeline join, which
-//     *             always does better than the older nested subquery evaluation
-//     *             logic.
-//     */
-//    public boolean isNestedSubquery() {
-//
-////        return false;
-//        return nestedSubquery;
-//        
-//    }
-    
     /**
      * Options for locatable resources.
      * 
@@ -377,42 +360,6 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * @deprecated by {@link BOp} annotations.
          */
         String DEFAULT_MAX_PARALLEL_SUBQUERIES = "5";
-
-//        /**
-//         * Boolean option controls the JOIN evaluation strategy. When
-//         * <code>true</code>, {@link NestedSubqueryWithJoinThreadsTask} is used
-//         * to compute joins. When <code>false</code>, {@link JoinMasterTask} is
-//         * used instead (aka pipeline joins).
-//         * <p>
-//         * Note: The default depends on the deployment mode. Nested subquery
-//         * joins are somewhat faster for local data (temporary stores, journals,
-//         * and a federation that does not support scale-out). However, pipeline
-//         * joins are MUCH faster for scale-out so they are used by default
-//         * whenever {@link IBigdataFederation#isScaleOut()} reports
-//         * <code>true</code>.
-//         * <p>
-//         * Note: Cold query performance for complex high volume queries appears
-//         * to be better for the pipeline join, so it may make sense to use the
-//         * pipeline join even for local data.
-//         * 
-//         * @deprecated The {@link NestedSubqueryWithJoinThreadsTask} is much
-//         *             slower than the pipeline join algorithm, even for a
-//         *             single machine.
-//         */
-//        String NESTED_SUBQUERY = DefaultRuleTaskFactory.class.getName()
-//                + ".nestedSubquery";
-        
-//        /** 
-//         * @todo option to specify the class that will serve as the
-//         *       {@link IRuleTaskFactory} - basically, this is how you choose
-//         *       the join strategy. however, {@link DefaultRuleTaskFactory}
-//         *       needs to be refactored in order to make this choice by
-//         *       {@link Class} rather than by the object's state.  Also note
-//         *       that the pipeline join may be better off with maxParallel=0.
-//         */
-//        String RULE_TASK_FACTORY_CLASS = "ruleTaskFactoryClass";
-//
-//        String DEFAULT_RULE_TASK_FACTORY_CLASS = DefaultRuleTaskFactory.class.getName();
         
     }
     
@@ -441,12 +388,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
         // Note: Bound before we lookup property values!
         this.namespace = namespace;
 
-        {
-            String val = properties.getProperty(RelationSchema.CONTAINER);
-
-            this.containerNamespace = val;
-
-        }
+        this.containerNamespace = properties.getProperty(RelationSchema.CONTAINER);
 
         this.timestamp = timestamp;
 
@@ -464,6 +406,12 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
 
         }
 
+        /*
+         * Resolve the commit time from which this view was materialized (if
+         * known and otherwise null).
+         */
+        commitTime = (Long)properties.get(RelationSchema.COMMIT_TIME);
+
         forceSerialExecution = Boolean.parseBoolean(getProperty(
                 Options.FORCE_SERIAL_EXECUTION,
                 Options.DEFAULT_FORCE_SERIAL_EXECUTION));
@@ -471,17 +419,6 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
         maxParallelSubqueries = getProperty(Options.MAX_PARALLEL_SUBQUERIES,
                 Options.DEFAULT_MAX_PARALLEL_SUBQUERIES,
                 IntegerValidator.GTE_ZERO);
-
-        /*
-         * Note: The pipeline join is flat out better all around.
-         */
-//        final boolean pipelineIsBetter = (indexManager instanceof IBigdataFederation && ((IBigdataFederation) indexManager)
-//                .isScaleOut());
-//        
-//        nestedSubquery = Boolean.parseBoolean(getProperty(
-//                Options.NESTED_SUBQUERY, "false"));
-//        Boolean
-//                        .toString(!pipelineIsBetter)));
 
         chunkOfChunksCapacity = getProperty(Options.CHUNK_OF_CHUNKS_CAPACITY,
                 Options.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY,
@@ -558,14 +495,46 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
     }
 
     /**
-     * Return an object wrapping the properties specified to the ctor.
+     * The commit time from which a read-only view was materialized (if known)
+     * and otherwise <code>null</code>.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/266
+     */
+    protected Long getCommitTime() {
+        
+        return commitTime;
+        
+    }
+
+    /**
+     * Wrap and return the properties specified to the ctor. Wrapping the
+     * {@link Properties} object prevents inadvertent side-effects.
      */
     public final Properties getProperties() {
-        
+
         return new Properties(properties);
         
     }
 
+    /**
+     * Return the {@link Properties} object without wrapping it. This method can
+     * be used in those cases where you need to access non-String property
+     * values. The caller is responsible for avoiding mutation to the returned
+     * Properties object.
+     * <p>
+     * Note: This explicitly does NOT wrap the properties. Doing so makes it
+     * impossible to access the default properties using Hashtable#get(), which
+     * in turn means that we can not access non-String objects which have been
+     * materialized from the GRS in the {@link Properties}. This does introduce
+     * some potential for side-effects between read-only instances of the same
+     * resource view which share the same properties object.
+     */
+    protected final Properties getBareProperties() {
+
+        return properties;
+
+    }
+    
     /**
      * Return the object used to locate indices, relations, and relation
      * containers and to execute operations on those resources.
@@ -691,12 +660,12 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
         }
     
         // Write the map on the row store.
-        final Map afterMap = indexManager.getGlobalRowStore().write(
-                RelationSchema.INSTANCE, map);
-        
+        final Map<String, Object> afterMap = indexManager.getGlobalRowStore()
+                .write(RelationSchema.INSTANCE, map);
+
         if(log.isDebugEnabled()) {
             
-            log.debug("Properties after write: "+afterMap);
+            log.debug("Properties after write: " + afterMap);
             
         }
         
@@ -792,5 +761,22 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
                 name, defaultValue, validator);
 
     }
+
+//    /**
+//     * Sets the property on the underlying properties object but DOES NOT set
+//     * the property on the global row store (GRS). This method may be used when
+//     * a resource is newly created in order to cache objects which are persisted
+//     * on the GRS.
+//     * 
+//     * @param name
+//     *            The property name.
+//     * @param value
+//     *            The property value.
+//     */
+//    protected void setProperty(final String name, final Object value) {
+//
+//        properties.put(name, value);
+//
+//    }
 
 }

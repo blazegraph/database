@@ -3,6 +3,8 @@ package com.bigdata.relation.rule.eval.pipeline;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
@@ -487,6 +489,23 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
             return dataService.getFederation().getTempStore();
 
         }
+
+    	public ScheduledFuture<?> addScheduledTask(Runnable task,
+    			long initialDelay, long delay, TimeUnit unit) {
+    		return dataService.getFederation().addScheduledTask(task, initialDelay, delay, unit);
+    	}
+
+    	public boolean getCollectPlatformStatistics() {
+    		return dataService.getFederation().getCollectPlatformStatistics();
+    	}
+
+    	public boolean getCollectQueueStatistics() {
+    		return dataService.getFederation().getCollectQueueStatistics();
+    	}
+
+    	public int getHttpdPort() {
+    		return dataService.getFederation().getHttpdPort();
+    	}
 
     }
 

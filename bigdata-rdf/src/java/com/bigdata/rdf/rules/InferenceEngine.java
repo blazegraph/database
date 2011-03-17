@@ -27,6 +27,7 @@ import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlanFactory2;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.RdfsAxioms;
@@ -40,7 +41,6 @@ import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.eval.ActionEnum;
-import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 

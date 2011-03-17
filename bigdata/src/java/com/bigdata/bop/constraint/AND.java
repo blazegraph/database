@@ -26,26 +26,35 @@ package com.bigdata.bop.constraint;
 
 import java.util.Map;
 
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstraint;
 
 /**
  * Imposes the constraint <code>x AND y</code>.
  */
-public class AND extends BOpConstraint {
+public class AND extends BOpBase implements BooleanValueExpression {
 
     /**
 	 * 
 	 */
 	private static final long serialVersionUID = -8146965892831895463L;
 
+    public AND(final BooleanValueExpression x, final BooleanValueExpression y) {
+
+        this(new BOp[] { x, y }, null/*annocations*/);
+
+    }
+
 	/**
      * Required deep copy constructor.
      */
-    public AND(final BOp[] args, final Map<String, Object> annotations) {
-        super(args, annotations);
+    public AND(final BOp[] args, final Map<String, Object> anns) {
+    	super(args, anns);
+        
+        if (args.length != 2 || args[0] == null || args[1] == null)
+            throw new IllegalArgumentException();
+
     }
 
     /**
@@ -55,19 +64,14 @@ public class AND extends BOpConstraint {
         super(op);
     }
 
-    public AND(final IConstraint x, final IConstraint y) {
-
-        super(new BOp[] { x, y }, null/*annocations*/);
-
-        if (x == null || y == null)
-            throw new IllegalArgumentException();
-
+    @Override
+    public BooleanValueExpression get(final int i) {
+    	return (BooleanValueExpression) super.get(i);
     }
+    
+    public Boolean get(final IBindingSet s) {
 
-    public boolean accept(final IBindingSet s) {
-
-        return ((IConstraint) get(0)).accept(s)
-                && ((IConstraint) get(1)).accept(s);
+        return get(0).get(s) && get(1).get(s);
 
     }
     

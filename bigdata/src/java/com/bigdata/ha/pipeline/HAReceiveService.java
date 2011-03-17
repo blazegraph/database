@@ -749,8 +749,11 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
                      * changed, then the ReadTask is interrupted using its
                      * Future and the WriteCacheService will handle the error by
                      * retransmitting the current cache block.
+                     * 
+                     * The rdlen is checked for non zero to avoid an
+                     * IllegalArgumentException. 
                      */
-                    if (addrNext != null) {
+                    if (rdlen != 0 && addrNext != null) {
                         if (log.isTraceEnabled())
                             log
                                     .trace("Incremental send of " + rdlen

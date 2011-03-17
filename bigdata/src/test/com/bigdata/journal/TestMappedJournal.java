@@ -100,18 +100,27 @@ public class TestMappedJournal extends AbstractJournalTestCase {
 
     public Properties getProperties() {
 
-        Properties properties = super.getProperties();
+        final Properties properties = super.getProperties();
 
-        properties.setProperty(Options.DELETE_ON_EXIT,"true");
+        properties.setProperty(Journal.Options.COLLECT_PLATFORM_STATISTICS,
+                "false");
 
-        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+        properties.setProperty(Journal.Options.COLLECT_QUEUE_STATISTICS,
+                "false");
 
-        properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped.toString());
+        properties.setProperty(Journal.Options.HTTPD_PORT, "-1"/* none */);
+
+        properties.setProperty(Options.DELETE_ON_EXIT, "true");
+
+        properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped
+                .toString());
 
         return properties;
 
     }
-    
+
     /**
      * Verify normal operation and basic assumptions when creating a new journal
      * using {@link BufferMode#Mapped}.

@@ -99,7 +99,15 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
     static public <E> String getFQN(final IRelation<E> relation,
             final IKeyOrder<? extends E> keyOrder) {
 
-        return relation.getNamespace() + "." + keyOrder.getIndexName();
+		/*
+		 * TODO We wind up calling this a lot. intern() might help reduce the
+		 * heap requirements while the returned value is being held, but it is
+		 * not reducing the heap pressure caused by this string concatenation.
+		 * To do that we would have to search a cache using the component
+		 * elements [namespace] and [keyOrder].
+		 */
+		return (relation.getNamespace() + "." + keyOrder.getIndexName())
+				.intern();
 
     }
 

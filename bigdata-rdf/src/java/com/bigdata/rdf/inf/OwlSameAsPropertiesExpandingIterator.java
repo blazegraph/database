@@ -5,6 +5,7 @@ import java.util.Arrays;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -13,7 +14,11 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.constraint.BOpConstraint;
+import com.bigdata.bop.constraint.BooleanValueExpression;
+import com.bigdata.bop.constraint.Constraint;
+import com.bigdata.bop.joinGraph.IEvaluationPlan;
+import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
+import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlanFactory2;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.internal.IV;
@@ -25,14 +30,11 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IAccessPathExpander;
+import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.ActionEnum;
-import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
-import com.bigdata.relation.rule.eval.IEvaluationPlan;
-import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ISolution;
@@ -119,8 +121,8 @@ public class OwlSameAsPropertiesExpandingIterator implements
                         new SPOPredicate(SPO, _sameS, _p, _sameO) },
                         QueryOptions.DISTINCT, // distinct
                         // constraints on the rule.
-                        new IConstraint[] { new RejectSameAsSelf(head.s(), head
-                                .p(), head.o()) });
+                        new IConstraint[] { Constraint.wrap(new RejectSameAsSelf(head.s(), head
+                                .p(), head.o())) });
         runQuery(rule);
     }
 
@@ -151,8 +153,8 @@ public class OwlSameAsPropertiesExpandingIterator implements
                                 sameAsSelfExpander) },
                         QueryOptions.DISTINCT, // distinct
                         // constraints on the rule.
-                        new IConstraint[] { new RejectSameAsSelf(head.s(), head
-                                .p(), head.o()) });
+                        new IConstraint[] { Constraint.wrap(new RejectSameAsSelf(head.s(), head
+                                .p(), head.o())) });
         runQuery(rule);
     }
 
@@ -183,8 +185,8 @@ public class OwlSameAsPropertiesExpandingIterator implements
                                 sameAsSelfExpander) }, 
                         QueryOptions.DISTINCT, // distinct
                         // constraints on the rule.
-                        new IConstraint[] { new RejectSameAsSelf(head.s(), head
-                                .p(), head.o()) });
+                        new IConstraint[] { Constraint.wrap(new RejectSameAsSelf(head.s(), head
+                                .p(), head.o())) });
         runQuery(rule);
     }
 
@@ -215,8 +217,8 @@ public class OwlSameAsPropertiesExpandingIterator implements
                         new SPOPredicate(SPO, _s, _p, _o) }, 
                         QueryOptions.DISTINCT, // distinct
                         // constraints on the rule.
-                        new IConstraint[] { new RejectSameAsSelf(head.s(), head
-                                .p(), head.o()) });
+                        new IConstraint[] { Constraint.wrap(new RejectSameAsSelf(head.s(), head
+                                .p(), head.o())) });
         runQuery(rule);
     }
 
@@ -495,9 +497,14 @@ public class OwlSameAsPropertiesExpandingIterator implements
         }
     };
 
-    private class RejectSameAsSelf extends BOpConstraint {
+    private class RejectSameAsSelf extends BOpBase implements BooleanValueExpression {
 
-        public RejectSameAsSelf(final IVariableOrConstant<IV> _s,
+        /**
+		 * 
+		 */
+		private static final long serialVersionUID = -7877904606067597254L;
+
+		public RejectSameAsSelf(final IVariableOrConstant<IV> _s,
                 final IVariableOrConstant<IV> _p,
                 final IVariableOrConstant<IV> _o) {
 
@@ -505,7 +512,7 @@ public class OwlSameAsPropertiesExpandingIterator implements
             
         }
 
-        public boolean accept(final IBindingSet bindings) {
+        public Boolean get(final IBindingSet bindings) {
             final IV sVal = getValue((IVariableOrConstant)get(0/*_s*/), bindings);
             final IV pVal = getValue((IVariableOrConstant)get(1/*_p*/), bindings);
             final IV oVal = getValue((IVariableOrConstant)get(2/*_o*/), bindings);

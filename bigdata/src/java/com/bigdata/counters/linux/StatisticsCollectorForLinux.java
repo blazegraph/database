@@ -68,13 +68,25 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
         super.start();
         
         if (sar1 != null)
-            sar1.start();
+			try {
+				sar1.start();
+			} catch (Throwable t) {
+				log.error(t, t);
+			}
 
         if (vmstat != null)
-            vmstat.start();
+			try {
+				vmstat.start();
+			} catch (Throwable t) {
+				log.error(t, t);
+			}
         
         if (pidstat != null)
-            pidstat.start();
+			try {
+				pidstat.start();
+			} catch (Throwable t) {
+				log.error(t, t);
+			}
 
     }
 
@@ -86,23 +98,36 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
         super.stop();
 
         if (sar1 != null)
-            sar1.stop();
+			try {
+				sar1.stop();
+			} catch (Throwable t) {
+				log.error(t, t);
+			}
 
         if (vmstat != null)
-            vmstat.stop();
+			try {
+				vmstat.stop();
+			} catch (Throwable t) {
+				log.error(t, t);
+			}
 
         if (pidstat != null)
-            pidstat.stop();
+			try {
+				pidstat.stop();
+			} catch (Throwable t) {
+				log.error(t, t);
+			}
 
     }
     
-    private boolean countersAdded = false;
+//    private boolean countersAdded = false;
     
-    synchronized public CounterSet getCounters() {
+    @Override
+    /*synchronized*/ public CounterSet getCounters() {
         
         final CounterSet root = super.getCounters();
         
-        if( ! countersAdded ) {
+//        if( ! countersAdded ) {
 
             if (sar1 != null) {
              
@@ -141,9 +166,9 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
 
             }
             
-            countersAdded = true;
-            
-        }
+//            countersAdded = true;
+//            
+//        }
         
         return root;
         

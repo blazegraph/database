@@ -1,6 +1,7 @@
 package com.bigdata.rdf.internal;
 
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
@@ -81,10 +82,10 @@ public class ExtensionIV<V extends BigdataLiteral>
      * Defer to the {@link ILexiconConfiguration} which has specific knowledge
      * of how to generate an RDF value from this general purpose extension IV.
      */
-    @SuppressWarnings("unchecked")
-    public V asValue(final BigdataValueFactory f, 
-            final ILexiconConfiguration config)
-            throws UnsupportedOperationException {
+    @SuppressWarnings({"unchecked","rawtypes"})
+    public V asValue(final LexiconRelation lex) {
+    	final BigdataValueFactory f = lex.getValueFactory();
+    	final ILexiconConfiguration config = lex.getLexiconConfiguration();
         return (V) config.asValue(this, f);
     }
     

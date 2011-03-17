@@ -35,7 +35,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
@@ -349,7 +348,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
                 continue;
             }
 
-            tmp.set(i, val.clone());
+            tmp._set(i, val.clone());
             
 //            modified = true;
 
@@ -414,6 +413,16 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
         final Predicate<E> tmp = this.clone();
 
         tmp._setProperty(Annotations.TIMESTAMP, timestamp);
+
+        return tmp;
+
+    }
+
+    public Predicate<E> setArg(final int index, final IVariableOrConstant arg) {
+
+        final Predicate<E> tmp = this.clone();
+
+        tmp._set(index, arg);
 
         return tmp;
 

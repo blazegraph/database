@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.solutions;
 
+import java.util.concurrent.FutureTask;
+
 import junit.framework.TestCase2;
 
 import com.bigdata.bop.BOp;
@@ -41,6 +43,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -52,6 +55,8 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME This needs to test for computed expressions as well.
  */
 public class TestMemorySortOp extends TestCase2 {
 
@@ -68,31 +73,34 @@ public class TestMemorySortOp extends TestCase2 {
         super ( name ) ;
     }
 
-    public void testEval ()
+    public void testEval () 
     {
-        IVariable<?> x = Var.var ( "x" ) ;
-        IVariable<?> y = Var.var ( "y" ) ;
-        IConstant<String> a = new Constant<String> ( "a" ) ;
-        IConstant<String> b = new Constant<String> ( "b" ) ;
-        IConstant<String> c = new Constant<String> ( "c" ) ;
-        IConstant<String> d = new Constant<String> ( "d" ) ;
-        IConstant<String> e = new Constant<String> ( "e" ) ;
+    	final IVariable<?> x = Var.var ( "x" ) ;
+    	final IVariable<?> y = Var.var ( "y" ) ;
+    	final IConstant<String> a = new Constant<String> ( "a" ) ;
+    	final IConstant<String> b = new Constant<String> ( "b" ) ;
+    	final IConstant<String> c = new Constant<String> ( "c" ) ;
+    	final IConstant<String> d = new Constant<String> ( "d" ) ;
+    	final IConstant<String> e = new Constant<String> ( "e" ) ;
 
-        ISortOrder<?> sors [] = new ISortOrder [] { new SortOrder ( x, true ), new SortOrder ( y, false ) } ;
+    	final ISortOrder<?> sors [] = new ISortOrder [] { new SortOrder ( x, true ), new SortOrder ( y, false ) } ;
 
-        SortOp query = new MemorySortOp(new BOp[] {}, NV.asMap(new NV[] {
-                new NV(MemorySortOp.Annotations.BOP_ID, 1),
-                new NV(MemorySortOp.Annotations.COMPARATOR,
-                        new StringComparatorOp(sors)),
-                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
-                        BOpEvaluationContext.CONTROLLER),//
-                        }//
-        ));
+    	final int sortOpId = 1;
+    	
+		final SortOp query = new MemorySortOp(new BOp[] {}, NV.asMap(new NV[] {
+				new NV(MemorySortOp.Annotations.BOP_ID, sortOpId),
+				new NV(MemorySortOp.Annotations.COMPARATOR,
+						new StringComparatorOp(sors)),
+				new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+						BOpEvaluationContext.CONTROLLER),//
+				new NV(MemorySortOp.Annotations.PIPELINED, false),//
+				new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
+		}));
 
         //
         // the test data
         //
-        IBindingSet data [] = new IBindingSet []
+    	final IBindingSet data [] = new IBindingSet []
         {
               new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, a } )
             , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, e } )
@@ -109,7 +117,7 @@ public class TestMemorySortOp extends TestCase2 {
         //
         // the expected solutions
         //
-        IBindingSet expected [] = new IBindingSet []
+    	final IBindingSet expected [] = new IBindingSet []
         {
               new ArrayBindingSet ( new IVariable<?> [] { y },    new IConstant [] { a }    )
             , new ArrayBindingSet ( new IVariable<?> [] {},       new IConstant [] {}       )
@@ -123,25 +131,57 @@ public class TestMemorySortOp extends TestCase2 {
             , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, a } )
         } ;
 
-        BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats () ;
 
-        IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]> ( new IBindingSet [][] { data } ) ;
+        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]> ( new IBindingSet [][] { data } ) ;
 
-        IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
+        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
 
-        BOpContext<IBindingSet> context = new BOpContext<IBindingSet> ( new MockRunningQuery ( null/* fed */
-                                                                                             , null/* indexManager */
-                                                                                             )
-                                                                      , -1/* partitionId */
-                                                                      , stats
-                                                                      , source
-                                                                      , sink
-                                                                      , null/* sink2 */
-                                                                      ) ;
+		final IRunningQuery runningQuery = new MockRunningQuery(null/* fed */
+		, null/* indexManager */
+		);
+//		{
+//			/**
+//			 * Override method not supported by the MockRunningQuery to return
+//			 * true, indicating that no more solutions will be presented to the
+//			 * MemorySortOp.
+//			 */
+//			@Override
+//			public boolean isLastInvocation(final int bopId,final int nconsumed) {
+//				if (bopId == sortOpId) {
+//					return true;
+//				}
+//				return super.isLastInvocation(bopId,nconsumed);
+//			}
+//		};
+		final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+				runningQuery, -1/* partitionId */
+				, stats, source, sink, null/* sink2 */
+		);
 
-        query.eval ( context ).run () ;
+		final FutureTask<Void> ft = query.eval(context);
+		// Run the query.
+		{
+			final Thread t = new Thread() {
+				public void run() {
+					ft.run();
+				}
+			};
+			t.setDaemon(true);
+			t.start();
+		}
 
-        TestQueryEngine.assertSameSolutions ( expected, sink.iterator () ) ;
+		try {
+			// Check the solutions.
+			TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+		} finally {
+			/* Always wait for the future afterwards and test it for errors. */
+			try {
+				ft.get();
+			} catch (Throwable ex) {
+				log.error("Evaluation failed: " + ex, ex);
+			}
+		}
 
         assertEquals ( 1, stats.chunksIn.get () ) ;
         assertEquals ( 10, stats.unitsIn.get () ) ;
@@ -155,7 +195,11 @@ public class TestMemorySortOp extends TestCase2 {
     @SuppressWarnings("serial")
     static private class StringComparatorOp extends ComparatorOp
     {
-        public StringComparatorOp ( ISortOrder<?> sors [] )
+    	
+    	/** The sort order. */
+        final private ISortOrder<?> [] _sors;
+
+        public StringComparatorOp ( final ISortOrder<?> sors [] )
         {
             super ( new BOp [] {}, NV.asMap ( new NV [] { new NV ( ComparatorOp.Annotations.ORDER, sors ) } ) ) ;
             _sors = sors ;
@@ -176,8 +220,8 @@ public class TestMemorySortOp extends TestCase2 {
         {
             int compare = 0 ;
 
-            IConstant<?> lhsv = lhs.get ( sor.getVariable () ) ;
-            IConstant<?> rhsv = rhs.get ( sor.getVariable () ) ;
+            final IConstant<?> lhsv = lhs.get ( sor.getVariable () ) ;
+            final IConstant<?> rhsv = rhs.get ( sor.getVariable () ) ;
 
             if ( null == lhsv && null == rhsv )
                 return 0 ;
@@ -191,6 +235,6 @@ public class TestMemorySortOp extends TestCase2 {
             return compare * ( sor.isAscending () ? 1 : -1 ) ;
         }
         
-        private ISortOrder<?> [] _sors = null ;
     }
+
 }

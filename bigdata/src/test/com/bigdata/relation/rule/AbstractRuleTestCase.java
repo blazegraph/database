@@ -30,15 +30,14 @@ package com.bigdata.relation.rule;
 import java.util.Map;
 
 import junit.framework.TestCase2;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.VTE;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
@@ -102,7 +101,7 @@ abstract public class AbstractRuleTestCase extends TestCase2 {
                             new P(relation, var("v"), rdfType, var("u")) //
                     },//
                     new IConstraint[] {
-                            new NE(var("u"),var("x"))
+            			Constraint.wrap(new NE(var("u"),var("x")))
                         }
             );
             

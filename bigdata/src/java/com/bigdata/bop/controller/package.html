@@ -1,31 +1,13 @@
 <html>
 <head>
-<title>adaptive query optimization</title>
+<title>Controller operators (subquery, union, steps, etc).</title>
 </head>
 <body>
 
 <p>
 
-    This package provides an adaptive query optimization facility.
-    Adaptive query optimization interleaves the execution of join
-    paths in a query with the sampling of join paths in order to
-    dynamically select join paths providing an efficient execution
-    plan for the query.  Fast and accurate cardinality estimates are
-    available based on range counts are used to decide which joins to
-    execute first.  Without accurate knowledge of detailed correlation
-    in joins, estimation error rapidly sets in as variable bindings
-    are propagated.  Adaptive query optimization iteratively executes
-    the join path identified as having lowest cost.  This execution
-    phase is followed by a breadth first sampling of unexecuted join
-    paths.  Join paths whose costs are dominated by a better solution
-    are elimated.  Sampling of longer and longer join paths continues
-    until one join path is found to have the lowest cost, at which
-    point it is executed.  This approach is similar to the one
-    described in <a href="http://doi.acm.org/10.1145/1559845.1559910"
-    >ROX : Run-time Optimization of XQueries </a>, by Kader and Boncz
-    (2009) (<a
-    href="http://homepages.cwi.nl/~boncz/Thursday_Afternoon_ROX.pdf"
-    >presentation </a>).
+    This package provides operators for subquery, including UNION, STEPS,
+    and STAR (transitive closure).
     
 </p>
 

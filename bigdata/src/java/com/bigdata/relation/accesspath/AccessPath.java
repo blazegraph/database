@@ -280,8 +280,6 @@ public class AccessPath<R> implements IAccessPath<R> {
      * @param indexManager
      *            Access to the indices, resource locators, executor service,
      *            etc.
-     * @param timestamp
-     *            The timestamp of the index view.
      * @param predicate
      *            The constraints on the access path.
      * @param keyOrder

@@ -1420,6 +1420,9 @@ ${postInstallMessage}</echo>
       <!-- around if the JVM is killed. That pid file needs to be cleaned   -->
       <!-- up before we can start a new instance.                           -->
       <antcall target="stopZookeeper" />
+      <antcall target="stopLookup" />
+      <antcall target="stopHttpd" />
+      
       <antcall target="startZookeeper" />
       <antcall target="startHttpd" />
       <antcall target="startLookup" />
@@ -1507,11 +1510,13 @@ ${postInstallMessage}</echo>
 	<!-- Note: It appears to be necessary to spawn the script which starts -->
 	<!-- zookeeper under some OS platforms (for example, Centos 5.4) even  -->
 	<!-- though it will start without being spawned under others (OSX).    -->
+	<!-- However, this change appears to result in zookeeper not running   -->
+	<!-- so I have backed it out for now.                                  -->
     <target name="startZookeeper">
     	<echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
         <echo>bin/zkServer.sh start
 </echo>
-    	<exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" spawn="true">
+    	<exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true">
     		<arg value="start"/>
 		</exec>
     </target>
@@ -1701,29 +1706,27 @@ ${postInstallMessage}</echo>
         <test name="com.bigdata.striterator.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.counters.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rawstore.TestAll" todir="${test.results.dir}" unless="testName" />
-
         <test name="com.bigdata.btree.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.concurrent.TestAll" todir="${test.results.dir}" unless="testName" />
-
       	<test name="com.bigdata.quorum.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.ha.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.io.writecache.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.journal.TestAll" todir="${test.results.dir}" unless="testName" />
-<!-- To run only specific test suites.
-        <test name="com.bigdata.journal.TestWORMStrategy" todir="${test.results.dir}" unless="testName" />
-        <test name="com.bigdata.rwstore.TestRWJournal" todir="${test.results.dir}" unless="testName" />
-        -->
       	<!-- Performance of this test suite has regressed and needs to be investigated.
-      	        <test name="com.bigdata.journal.ha.TestAll" todir="${test.results.dir}" unless="testName" />
+ 	    <test name="com.bigdata.journal.ha.TestAll" todir="${test.results.dir}" unless="testName" />
       	-->
-<!-- end of specific journal test suite runs. -->
-
         <test name="com.bigdata.resources.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.relation.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.bop.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.relation.rule.eval.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.mdi.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.service.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.bop.fed.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.sparse.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.search.TestAll" todir="${test.results.dir}" unless="testName" />
-        <test name="com.bigdata.relation.TestAll" todir="${test.results.dir}" unless="testName" />
+        <!-- not suppported yet.
+        <test name="com.bigdata.bfs.TestAll" todir="${test.results.dir}" unless="testName" />
+        -->
 
         <!-- See https://sourceforge.net/apps/trac/bigdata/ticket/53 -->
         <test name="com.bigdata.jini.TestAll" todir="${test.results.dir}" unless="testName" />
@@ -1746,6 +1749,9 @@ ${postInstallMessage}</echo>
         </fileset>
         <report format="frames" todir="${test.results.dir}/report" />
       </junitreport>
+
+      <!-- Archive the generated HTML report. -->
+      <tar destfile="${test.results.dir}/report.tgz" basedir="${test.results.dir}/report" compression="gzip"/>
 
     </target>
 

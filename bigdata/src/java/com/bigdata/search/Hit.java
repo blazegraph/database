@@ -9,22 +9,10 @@ import org.apache.log4j.Logger;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo add integer rank?
  */
 public class Hit implements IHit, Comparable<Hit>{
 
     final private static transient Logger log = Logger.getLogger(Hit.class);
-
-//    /**
-//     * True iff the {@link #log} level is INFO or less.
-//     */
-//    final protected static boolean INFO = log.isInfoEnabled();
-//
-//    /**
-//     * True iff the {@link #log} level is DEBUG or less.
-//     */
-//    final protected static boolean DEBUG = log.isDebugEnabled();
    
     /** note: defaults to an illegal value. */
     private long docId = -1;
@@ -47,7 +35,7 @@ public class Hit implements IHit, Comparable<Hit>{
 
     }
     
-    void setDocId(final long docId) {
+    synchronized void setDocId(final long docId) {
         
         this.docId = docId;
 
@@ -56,19 +44,19 @@ public class Hit implements IHit, Comparable<Hit>{
     /**
      * The #of terms for which a hit was reported for this document.
      */
-    public int getTermCount() {
+    synchronized public int getTermCount() {
         
         return nterms;
         
     }
     
-    public double getCosine() {
+    synchronized public double getCosine() {
         
         return cosine;
 
     }
 
-    public long getDocId() {
+    synchronized public long getDocId() {
      
         return docId;
         
@@ -79,9 +67,13 @@ public class Hit implements IHit, Comparable<Hit>{
      */
     public void add(final String term, final double weight) {
         
-        cosine += weight;
+        synchronized (this) {
 
-        nterms ++;
+            cosine += weight;
+
+            nterms++;
+
+        }
 
         if(log.isDebugEnabled()) {
         

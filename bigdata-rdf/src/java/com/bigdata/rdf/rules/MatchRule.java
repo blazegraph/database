@@ -11,6 +11,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -59,7 +60,7 @@ public class MatchRule extends Rule<SPO> {
                                 .getConstant(RDFS.SUBCLASSOF), cls) //
                 },
             new IConstraint[] {
-                new INBinarySearch(var("p"), preds) // p IN preds
+    			Constraint.wrap(new INBinarySearch(var("p"), preds)) // p IN preds
                 });
 
     }

@@ -1,12 +1,12 @@
 package com.bigdata.util.httpd;
 
-import java.io.BufferedReader;
+import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
@@ -14,25 +14,25 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
-import java.util.Collection;
 import java.util.Date;
-import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Properties;
 import java.util.StringTokenizer;
 import java.util.TimeZone;
+import java.util.TreeMap;
 import java.util.Vector;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.CognitiveWeb.util.CaseInsensitiveStringComparator;
 import org.apache.log4j.Logger;
 
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -50,24 +50,24 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * <b>Features + limitations: </b>
  * <ul>
  * 
- * <li> Only one Java file </li>
- * <li> Java 1.1 compatible </li>
- * <li> Released as open source, Modified BSD license </li>
- * <li> No fixed config files, logging, authorization etc. (Implement yourself
- * if you need them.) </li>
- * <li> Supports parameter parsing of GET and POST methods </li>
- * <li> Supports both dynamic content and file serving </li>
- * <li> Never caches anything </li>
- * <li> Doesn't limit bandwidth, request time or simultaneous connections </li>
- * <li> Default code serves files and shows all HTTP parameters and headers</li>
- * <li> File server supports directory listing, index.html and index.htm </li>
- * <li> File server does the 301 redirection trick for directories without '/'</li>
- * <li> File server supports simple skipping for files (continue download) </li>
- * <li> File server uses current directory as a web root </li>
- * <li> File server serves also very long files without memory overhead </li>
- * <li> Contains a built-in list of most common mime types </li>
- * <li> All header names are converted lowercase so they don't vary between
- * browsers/clients </li>
+ * <li>Only one Java file</li>
+ * <li>Java 1.1 compatible</li>
+ * <li>Released as open source, Modified BSD license</li>
+ * <li>No fixed config files, logging, authorization etc. (Implement yourself if
+ * you need them.)</li>
+ * <li>Supports parameter parsing of GET and POST methods</li>
+ * <li>Supports both dynamic content and file serving</li>
+ * <li>Never caches anything</li>
+ * <li>Doesn't limit bandwidth, request time or simultaneous connections</li>
+ * <li>Default code serves files and shows all HTTP parameters and headers</li>
+ * <li>File server supports directory listing, index.html and index.htm</li>
+ * <li>File server does the 301 redirection trick for directories without '/'</li>
+ * <li>File server supports simple skipping for files (continue download)</li>
+ * <li>File server uses current directory as a web root</li>
+ * <li>File server serves also very long files without memory overhead</li>
+ * <li>Contains a built-in list of most common mime types</li>
+ * <li>All header names are converted lowercase so they don't vary between
+ * browsers/clients</li>
  * 
  * </ul>
  * 
@@ -75,22 +75,56 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * <b>Ways to use: </b>
  * <ul>
  * 
- * <li> Run as a standalone app, serves files from current directory and shows
+ * <li>Run as a standalone app, serves files from current directory and shows
  * requests</li>
- * <li> Subclass serve() and embed to your own program </li>
- * <li> Call serveFile() from serve() with your own base directory </li>
+ * <li>Subclass serve() and embed to your own program</li>
+ * <li>Call serveFile() from serve() with your own base directory</li>
  * 
  * </ul>
  * 
- * See the end of the source file for distribution license (Modified BSD
- * licence)
+ * <h3>License (Modified BSD license)</h3>
+ * 
+ * <pre>
+ * Copyright (C) 2001,2005 by Jarno Elonen <elonen@iki.fi>
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 
+ * Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer. Redistributions in
+ * binary form must reproduce the above copyright notice, this list of
+ * conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution. The name of the author may not
+ * be used to endorse or promote products derived from this software without
+ * specific prior written permission. 
+ *  
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * </pre>
  * 
  * @version $Id$
  */
 public class NanoHTTPD implements IServiceShutdown
 {
-    
-    final static public Logger log = Logger.getLogger(NanoHTTPD.class);
+
+    /**
+     * Log levels:
+     * <ul>
+     * <li>INFO is request/response and life cycle events.</li>
+     * <li>DEBUG is headers and such</li>
+     * <li>TRACE is gruesome detail</li>
+     * </ul>
+     */
+    final static private Logger log = Logger.getLogger(NanoHTTPD.class);
 
     /** The server socket. */
     private final ServerSocket ss;
@@ -98,81 +132,112 @@ public class NanoHTTPD implements IServiceShutdown
     /** True once opened and until closed. */
     private volatile boolean open = false;
 
+    /**
+     * EOL as used in an HTTPD header. 
+     */
+    private static final String EOL = "\r\n";
+
+    /**
+     * <code>UTF-8</code>
+     */
+    public static final String UTF8 = "UTF-8";
+    
+    /*
+     * Various method names.
+     */
+    public static final String GET = "GET";
+
+    public static final String PUT = "PUT";
+
+    public static final String POST = "POST";
+
+    public static final String DELETE = "DELETE";
+    
+    /*
+     * Various error messages.
+     */
+    
+    protected static final String ERR_BAD_REQUEST = "BAD REQUEST: Syntax error. Usage: GET /example/file.html";
+    
+    /*
+     * Various well known headers.
+     */
+    
+    public static final String CONTENT_LENGTH = "Content-Length";
+
+    public static final String CONTENT_TYPE = "Content-Type";
+
+    public static final String DATE = "Date";
+
+    /**
+     * The name of the default character set encoding for HTTP which is
+     * <code>ISO-8859-1</code>. The character set of an HTTP entity is indicated
+     * by the <code>charset</code> parameter on the HTTP
+     * <code>Content-Type</code> header. This default MUST be applied when the
+     * <code>charset</code> parameter is not specified.
+     */
+    static public final String httpDefaultCharacterEncoding = "ISO-8859-1";
+
 	// ==================================================
 	// API parts
 	// ==================================================
 
-	/**
-     * Override this to customize the server.
-     * <p>
-     * 
-     * (By default, this delegates to serveFile() and allows directory listing.)
-     * 
-     * @param uri
-     *            Percent-decoded URI without parameters, for example
-     *            "/index.cgi"
-     * @param method
-     *            "GET", "POST" etc.
-     * @param parms
-     *            Parsed, percent decoded parameters from URI and, in case of
-     *            POST, data. The keys are the parameter names. Each value is a
-     *            {@link Collection} of {@link String}s containing the bindings
-     *            for the named parameter. The order of the URL parameters is
-     *            preserved.
-     * @param header
-     *            Header entries, percent decoded
+    /**
+     * Override this to customize the server. (By default, this delegates to
+     * serveFile() and allows directory listing.)
      * 
      * @return HTTP response, see class Response for details
      */
-	public Response serve(final String uri, final String method,
-            final Properties header,
-            final LinkedHashMap<String, Vector<String>> parms) {
-        
-        if (log.isInfoEnabled())
-            log.info(method + " '" + uri + "' ");
+    protected Response serve(final Request req) {
+
+        if (log.isDebugEnabled())
+            log.debug(req.method + " '" + req.uri + "' ");
 
         if (log.isDebugEnabled()) {
             {
-                Enumeration e = header.propertyNames();
-                while (e.hasMoreElements()) {
-                    String value = (String) e.nextElement();
-                    log.debug("  HDR: '" + value + "' = '"
-                            + header.getProperty(value) + "'");
+                for (Map.Entry<String, String> e : req.headers.entrySet()) {
+                    log.debug("  HDR: '" + e.getKey() + "' = '" + e.getValue()
+                            + "'");
                 }
             }
             {
-                Iterator e = parms.keySet().iterator();
-                while (e.hasNext()) {
-                    String value = (String) e.next();
-                    log.debug("  PRM: '" + value + "' = '"
-                            + parms.get(value) + "'");
+                final Iterator<Map.Entry<String, Vector<String>>> itr = req.params
+                        .entrySet().iterator();
+                while (itr.hasNext()) {
+                    final Map.Entry<String, Vector<String>> e = itr.next();
+                    log.debug("  PRM: '" + e.getKey() + "' = '" + e.getValue()
+                            + "'");
                 }
             }
         }
 
-		return serveFile( uri, header, new File("."), true );
-	}
+        return serveFile(req.uri, req.headers, new File("."), true);
+        
+    }
 
 	/**
 	 * HTTP response.
 	 * Return one of these from serve().
 	 */
-	public class Response
+	static public class Response
 	{
 		/**
 		 * Default constructor: response = HTTP_OK, data = mime = 'null'
 		 */
 		public Response()
 		{
-			this.status = HTTP_OK;
+            this.status = HTTP_OK;
+            this.mimeType = null;
+            this.data = null;
 		}
 
 		/**
 		 * Basic constructor.
 		 */
-		public Response( String status, String mimeType, InputStream data )
-		{
-			this.status = status;
+        public Response(final String status, final String mimeType,
+                final InputStream data)
+        {
+        	this.status = status;
 			this.mimeType = mimeType;
 			this.data = data;
 		}
@@ -181,7 +246,8 @@ public class NanoHTTPD implements IServiceShutdown
 		 * Convenience method that makes an InputStream out of
 		 * given text.
 		 */
-		public Response( String status, String mimeType, String txt )
+        public Response(final String status, final String mimeType,
+                final String txt)
 		{
 			this.status = status;
 			this.mimeType = mimeType;
@@ -189,34 +255,45 @@ public class NanoHTTPD implements IServiceShutdown
                     : txt.getBytes());
         }
 
-		/**
-		 * Adds given line to the header.
-		 */
-		public void addHeader( String name, String value )
-		{
-			header.put( name, value );
-		}
+        /**
+         * Adds given line to the header.
+         * 
+         * TODO This does not let you specify multiple values for a header.
+         */
+        public void addHeader(final String name, final String value) {
+            
+            if (header == null) {
+                
+                header = new TreeMap<String, String>(
+                        new CaseInsensitiveStringComparator());
+                
+            }
+            
+            header.put(name, value);
+            
+        }
 
 		/**
 		 * HTTP status code after processing, e.g. "200 OK", HTTP_OK
 		 */
-		public String status;
+		final String status;
 
 		/**
 		 * MIME type of content, e.g. "text/html"
 		 */
-		public String mimeType;
+		final String mimeType;
 
 		/**
 		 * Data of the response, may be null.
 		 */
-		public InputStream data;
+		final InputStream data;
 
-		/**
-		 * Headers for the HTTP response. Use addHeader()
-		 * to add lines.
-		 */
-		public Properties header = new Properties();
+        /**
+         * Headers for the HTTP response. Use addHeader() to add lines. Lazily
+         * allocated.
+         */
+        Map<String,String> header = null;
+		
 	}
 
 	/**
@@ -240,7 +317,12 @@ public class NanoHTTPD implements IServiceShutdown
 		MIME_TEXT_HTML = "text/html",
 		MIME_DEFAULT_BINARY = "application/octet-stream",
         MIME_APPLICATION_XML = "application/xml",
-        MIME_TEXT_JAVASCRIPT = "text/javascript";
+        MIME_TEXT_JAVASCRIPT = "text/javascript",
+        /**
+         * The traditional encoding of URL query parameters within a POST
+         * message body.
+         */
+        MIME_APPLICATION_URL_ENCODED = "application/x-www-form-urlencoded";
 
 	// ==================================================
 	// Socket & server code
@@ -255,10 +337,9 @@ public class NanoHTTPD implements IServiceShutdown
      *            The port. If <code>0</code> the the server will start on a
      *            random port. The actual port is available from #getPort().
      */
-	public NanoHTTPD( int port ) throws IOException
-	{
-        
-        if(port != 0 ) {
+    public NanoHTTPD(int port) throws IOException {
+
+        if (port != 0) {
 
             /*
              * Use the specified port.
@@ -266,9 +347,9 @@ public class NanoHTTPD implements IServiceShutdown
             myTcpPort = port;
 
             ss = new ServerSocket(myTcpPort);
-            
+
         } else {
-            
+
             /*
              * Use any open port.
              */
@@ -279,9 +360,11 @@ public class NanoHTTPD implements IServiceShutdown
         }
         
         if (log.isInfoEnabled())
-            log.info("Running on port=" + port);
+            log.info("Running on port=" + myTcpPort);
 
-        // @todo parameter and configuration of same.
+        /*
+         * FIXME parameter and configuration of same and per-instance buffers.
+         */
         final int requestServicePoolSize = 0;
 
         if (requestServicePoolSize == 0) {
@@ -301,12 +384,13 @@ public class NanoHTTPD implements IServiceShutdown
         /*
          * Begin accepting connections.
          */
+
+        open = true;
+
         acceptService.submit(new Runnable() {
             
             public void run() {
             
-                open = true;
-                
                 try {
                 
                     while (open) {
@@ -330,7 +414,7 @@ public class NanoHTTPD implements IServiceShutdown
 
                     }
 
-                    log.error(ioe);
+                    log.error(ioe, ioe);
                     
                 }
                 
@@ -354,19 +438,13 @@ public class NanoHTTPD implements IServiceShutdown
     private final ExecutorService requestService;
 
     public boolean isOpen() {
-
         return open;
-        //        return !acceptService.isShutdown() && !requestService.isShutdown() && !ss.isClosed();
-
     }
 
     synchronized public void shutdown() {
     
-        if(!isOpen()) {
-            
-            log.warn("Not running");
-            
-        }
+        if(!open)
+            return;
         
         if (log.isInfoEnabled())
             log.info("");
@@ -386,35 +464,22 @@ public class NanoHTTPD implements IServiceShutdown
 
         final TimeUnit unit = TimeUnit.MILLISECONDS;
 
-        acceptService.shutdown();
+        /*
+         * Note: Use abrupt shutdown for the acceptService. It will be blocked
+         * waiting on a socket and therefore will not notice if we set [open :=
+         * false].
+         */
+        open = false; // Note: Runnable will terminate when open == false.
+        acceptService.shutdownNow(); // Abrupt shutdown of acceptService.
         
         requestService.shutdown();
 
         try {
 
             if (log.isInfoEnabled())
-                log.info("Awaiting accept service termination");
-            
-            long elapsed = System.currentTimeMillis() - begin;
-            
-            if (!acceptService.awaitTermination(shutdownTimeout - elapsed, unit)) {
-                
-                log.warn("Accept service termination: timeout");
-                
-            }
-
-        } catch(InterruptedException ex) {
-            
-            log.warn("Interrupted awaiting accept service termination.", ex);
-            
-        }
-
-        try {
-
-            if (log.isInfoEnabled())
                 log.info("Awaiting request service termination");
             
-            long elapsed = System.currentTimeMillis() - begin;
+            final long elapsed = System.currentTimeMillis() - begin;
             
             if (!requestService.awaitTermination(shutdownTimeout - elapsed, unit)) {
                 
@@ -428,16 +493,13 @@ public class NanoHTTPD implements IServiceShutdown
             
         }
         
-        // Note: Runnable will terminate when open == false.
-        open = false;
-        
         try {
             
             ss.close();
             
         } catch (IOException e) {
             
-            log.warn(e);
+            log.warn(e, e);
             
         }
         
@@ -445,29 +507,26 @@ public class NanoHTTPD implements IServiceShutdown
 
     synchronized public void shutdownNow() {
 
-        if(!isOpen()) {
-            
-            log.warn("Not running");
-            
-        }
+        if(!open)
+            return;
 
         if (log.isInfoEnabled())
             log.info("");
+
+        // Note: Runnable will terminate when open == false.
+        open = false;
 
         acceptService.shutdownNow();
 
         requestService.shutdownNow();
         
-        // Note: Runnable will terminate when open == false.
-        open = false;
-
         try {
             
             ss.close();
             
         } catch (IOException e) {
             
-            log.warn(e);
+            log.warn(e, e);
             
         }
         
@@ -476,259 +535,350 @@ public class NanoHTTPD implements IServiceShutdown
     /**
 	 * Starts as a standalone file server and waits for Enter.
 	 */
-	public static void main( String[] args )
+	public static void main( final String[] args )
 	{
 		System.out.println( "NanoHTTPD 1.1 (C) 2001,2005-2007 Jarno Elonen\n" +
-							"(Command line options: [port] [--licence])\n" );
+							"(Command line options: [port])\n" );
 
 		// Show licence if requested
-		int lopt = -1;
-		for ( int i=0; i<args.length; ++i )
-		if ( args[i].toLowerCase().endsWith( "licence" ))
-		{
-			lopt = i;
-			System.out.println( LICENCE + "\n" );
-		}
+//		final int lopt = -1;
+//		for ( int i=0; i<args.length; ++i )
+//		if ( args[i].toLowerCase().endsWith( "licence" ))
+//		{
+//			lopt = i;
+//			System.out.println( LICENCE + "\n" );
+//		}
 
 		// Change port if requested
 		int port = 80;
-		if ( args.length > 0 && lopt != 0 )
+		if ( args.length > 0 ) //&& lopt != 0 )
 			port = Integer.parseInt( args[0] );
 
-		if ( args.length > 1 &&
-			 args[1].toLowerCase().endsWith( "licence" ))
-				System.out.println( LICENCE + "\n" );
+//		if ( args.length > 1 &&
+//			 args[1].toLowerCase().endsWith( "licence" ))
+//				System.out.println( LICENCE + "\n" );
 
-		NanoHTTPD nh = null;
+//		NanoHTTPD nh = null;
 		try
 		{
-			nh = new NanoHTTPD( port );
-		}
+            /* nh = */new NanoHTTPD(port);
+        }
 		catch( IOException ioe )
 		{
 			System.err.println( "Couldn't start server:\n" + ioe );
 			System.exit( -1 );
 		}
-		nh.myFileDir = new File("");
+//		nh.myFileDir = new File("");
 
 		System.out.println( "Now serving files in port " + port + " from \"" +
 							new File("").getAbsolutePath() + "\"" );
+
 		System.out.println( "Hit Enter to stop.\n" );
 
 		try { System.in.read(); } catch( Throwable t ) {};
 	}
 
-	/**
-	 * Handles one session, i.e. parses the HTTP request
-	 * and returns the response.
-	 */
+    /**
+     * Handles one session, i.e. parses the HTTP request and returns the
+     * response.
+     * 
+     * @see http://www.w3.org/Protocols/rfc2616/rfc2616.html
+     */
 	private class HTTPSession implements Runnable
 	{
 
         final private Socket mySocket;
         
-		public HTTPSession(Socket s) {
+		public HTTPSession(final Socket s) {
 
             mySocket = s;
 
         }
 
-		public void run()
-		{
-            
+        public void run() {
+
             if (log.isInfoEnabled())
                 log.info("Handling request: localPort="
                         + mySocket.getLocalPort());
-            
+
             InputStream is = null;
-			try
-			{
+            try {
                 is = mySocket.getInputStream();
-				if ( is == null) return;
-				final BufferedReader in = new BufferedReader( new InputStreamReader( is ));
+                if (is == null)
+                    return; // Should never happen...
 
-                // Read the request line
-                final String requestLine = in.readLine();
-                if (requestLine == null)
-                    sendError(HTTP_BADREQUEST, "BAD REQUEST: Syntax error. Usage: GET /example/file.html");
+                /*
+                 * Parse the request.
+                 * 
+                 * FIXME Buffer reuse and sizing.
+                 */
+                final int bufSize = Bytes.kilobyte32 * 1;
+                final Request req = parseRequest(new BufferedInputStream(is,
+                        bufSize));
 
-                // Tokenize the request line.
-                final StringTokenizer st = new StringTokenizer( requestLine );
-                if ( !st.hasMoreTokens())
-                    sendError( HTTP_BADREQUEST, "BAD REQUEST: Syntax error. Usage: GET /example/file.html" );
-
-				final String method = st.nextToken();
-
-				if ( !st.hasMoreTokens())
-					sendError( HTTP_BADREQUEST, "BAD REQUEST: Missing URI. Usage: GET /example/file.html" );
-
-//                final String uri = decodePercent( st.nextToken());
-                String uri = st.nextToken();
-
-				// Decode parameters from the URI (LinkedHashMap preserves their ordering).
-                final LinkedHashMap<String, Vector<String>> parms = new LinkedHashMap<String, Vector<String>>();
-				final int qmi = uri.indexOf( '?' );
-				if ( qmi != -1 )
-				{
-					decodeParms( uri.substring( qmi+1 ), parms );
-					uri = decodePercent( uri.substring( 0, qmi ));
-				} else {
-                    uri = decodePercent( uri );
-                }
-
-				// If there's another token, it's protocol version,
-				// followed by HTTP headers. Ignore version but parse headers.
-				// NOTE: this now forces header names uppercase since they are
-				// case insensitive and vary by client.
-				final Properties header = new Properties();
-				if ( st.hasMoreTokens())
-				{
-					String line = in.readLine();
-					while ( line.trim().length() > 0 )
-					{
-						final int p = line.indexOf( ':' );
-						header.put( line.substring(0,p).trim().toLowerCase(), line.substring(p+1).trim());
-						line = in.readLine();
-					}
-				}
-
-				// If the method is POST, there may be parameters
-				// in data section, too, read it:
-				if ( method.equalsIgnoreCase( "POST" ))
-				{
-					long size = 0x7FFFFFFFFFFFFFFFl;
-					String contentLength = header.getProperty("content-length");
-					if (contentLength != null)
-					{
-						try { size = Integer.parseInt(contentLength); }
-						catch (NumberFormatException ex) {}
-					}
-					String postLine = "";
-					char buf[] = new char[512];
-					int read = in.read(buf);
-					while ( read >= 0 && size > 0 && !postLine.endsWith("\r\n") )
-					{
-						size -= read;
-						postLine += String.valueOf(buf, 0, read);
-						if ( size > 0 )
-							read = in.read(buf);
-					}
-					postLine = postLine.trim();
-					decodeParms( postLine, parms );
-				}
-
-				// Ok, now do the serve()
+                // Ok, now do the serve()
                 try {
-                    final Response r = serve( uri, method, header, parms );
-                    if ( r == null )
-                        sendError( HTTP_INTERNALERROR, "SERVER INTERNAL ERROR: Serve() returned a null response." );
+                    final Response r = serve(req);
+                    if (r == null)
+                        sendError(HTTP_INTERNALERROR,
+                                "SERVER INTERNAL ERROR: Serve() returned a null response.");
                     else
-                        sendResponse( r.status, r.mimeType, r.header, r.data );
-                } catch(Exception ex) {
-                    log.warn(ex.getMessage(),ex);
-                    sendError( HTTP_INTERNALERROR, ex.getMessage() );
+                        sendResponse(r.status, r.mimeType, r.header, r.data);
+                } catch (Exception ex) {
+                    log.warn(ex.getMessage(), ex);
+                    sendError(HTTP_INTERNALERROR, ex.getMessage());
                     return;
                 }
-			}
-            catch ( InterruptedException ie )
-            {
+
+            } catch (InterruptedException ie) {
                 // Thrown by sendError, ignore and exit the thread.
-            }
-            catch(Throwable t) {
-                try
-                {
-                    log.error(t.getMessage(),t);
-                    sendError( HTTP_INTERNALERROR, "SERVER INTERNAL ERROR: " + t.getMessage());
-                }
-                catch ( Throwable t2 ) {
+            } catch (Throwable t) {
+                try {
+                    log.error(t.getMessage(), t);
+                    sendError(HTTP_INTERNALERROR, "SERVER INTERNAL ERROR: "
+                            + t.getMessage());
+                } catch (Throwable t2) {
                     // ignore.
                 }
-            }
-            finally {
+            } finally {
                 if (is != null) {
                     try {
                         is.close();
-                    } catch (IOException ex) {/*ignore*/
-                    }                    
+                    } catch (IOException ex) {/* ignore */
+                    }
                 }
             }
-            
+
         }
 
-		/**
-		 * Decodes the percent encoding scheme. <br/>
-		 * For example: "an+example%20string" -> "an example string"
-		 */
-		private String decodePercent( final String str ) throws InterruptedException
-		{
-			try
-			{
-                return URLDecoder.decode(str, "utf-8");
-//				final StringBuffer sb = new StringBuffer();
-//                for( int i=0; i<str.length(); i++ )
-//				{
-//				    char c = str.charAt( i );
-//				    switch ( c )
-//					{
-//				        case '+':
-//				            sb.append( ' ' );
-//				            break;
-//				        case '%':
-//			                sb.append((char)Integer.parseInt( str.substring(i+1,i+3), 16 ));
-//				            i += 2;
-//				            break;
-//				        default:
-//				            sb.append( c );
-//				            break;
-//				    }
-//				}
-//				return new String( sb.toString().getBytes());
-			}
-			catch( Exception e )
-			{
-                log.warn(e.getMessage()+" for input : ["+str+"]",e);
-				sendError( HTTP_BADREQUEST, "BAD REQUEST: Bad percent-encoding." );
-				return null;
-			}
-		}
-
-		/**
-         * Decodes parameters in percent-encoded URI-format ( e.g.
-         * "name=Jack%20Daniels&pass=Single%20Malt" ) and adds them to given
-         * Properties as a {@link Vector} of {@link String}s.
+        /**
+         * Parse the request, delegate the formulation of the response, and
+         * finally send the response to the client.
+         * 
+         * @param bis
+         *            The input stream from which the request may be read.
+         * 
+         * @return The request.
+         * 
+         * @throws InterruptedException
+         * @throws IOException
          */
-		private void decodeParms( final String parms, Map<String,Vector<String>> p )
-			throws InterruptedException
-		{
-			if ( parms == null )
-				return;
+        private Request parseRequest(final BufferedInputStream bis)
+                throws InterruptedException, IOException {
 
-			final StringTokenizer st = new StringTokenizer( parms, "&" );
-			while ( st.hasMoreTokens())
-			{
-				final String e = st.nextToken();
-				final int sep = e.indexOf( '=' );
-				if (sep != -1) {
-                    final String name = decodePercent(e.substring(0, sep)).trim();
-                    final String val = decodePercent(e.substring(sep + 1));
-                    Vector<String> vals = p.get(name);
-                    if(vals==null) {
-                        vals = new Vector<String>();
-                        p.put(name,vals);
-                    }
-                    vals.add(val);
+            final String method;
+            final String uri;
+            
+            // Note: The Map comparator folds case for header names!
+            final Map<String, String> headers = new TreeMap<String, String>(
+                    new CaseInsensitiveStringComparator());
+
+            final LinkedHashMap<String, Vector<String>> params = new LinkedHashMap<String, Vector<String>>();
+
+            /*
+             * Tokenize the request line.
+             * 
+             * Request-Line = Method SP Request-URI SP HTTP-Version CRLF
+             * 
+             * HTTP-Version   = "HTTP" "/" 1*DIGIT "." 1*DIGIT
+             */
+            {
+
+                // Read the request line
+                final String requestLine = readLine(bis);
+
+                if (requestLine == null)
+                    sendError(HTTP_BADREQUEST, ERR_BAD_REQUEST);
+
+                final StringTokenizer st = new StringTokenizer(requestLine);
+
+                if (!st.hasMoreTokens())
+                    sendError(HTTP_BADREQUEST, ERR_BAD_REQUEST);
+
+                method = st.nextToken();
+
+                if (!st.hasMoreTokens()) {
+                    // Missing URI
+                    sendError(HTTP_BADREQUEST, ERR_BAD_REQUEST);
                 }
-			}
+
+                /*
+                 * TODO Save off the full requestURI for the Request object vs
+                 * provide for reconstruction?
+                 */
+                
+                // uri = decodePercent( st.nextToken());
+
+                final String requestURI = st.nextToken();
+                
+                String uriString = requestURI;
+
+                /*
+                 * Decode parameters from the URI (LinkedHashMap preserves their
+                 * ordering). This gives us just the "file" as a side-effect.
+                 */
+                final int qmi = uriString.indexOf('?');
+
+                if (qmi != -1) {
+
+                    decodeParams(uriString.substring(qmi + 1), params);
+
+                    uriString = decodePercent(uriString.substring(0, qmi));
+
+                } else {
+
+                    uriString = decodePercent(uriString);
+
+                }
+
+                uri = uriString;
+
+                /*
+                 * The protocol version. 
+                 */
+                
+                final String version = st.nextToken();
+
+                if (log.isDebugEnabled()) {
+                    log.debug("method=" + method + ", requestURI=["
+                            + requestURI + "], version=" + version);
+                }
+
+                /*
+                 * The headers will follow starting with the next line.
+                 */
+                
+            }
+
+            /*
+             * Parse headers.
+             * 
+             * Note: The headers terminate with a line consisting of a bare
+             * (CRLF). Since readLine() strips the trailing CRLF, this loop will
+             * terminate when it observes that bare CRLF sequence.
+             */
+            {
+                String line = readLine(bis);
+                while (line != null && line.length() > 0) {
+                    final int p = line.indexOf(':');
+                    final String name = line.substring(0, p).trim();
+                    final String value = line.substring(p + 1).trim();
+                    headers.put(name, value);
+                    if (log.isDebugEnabled())
+                        log.debug("name=[" + name + "], value=[" + value + "]");
+                    line = readLine(bis);
+                }
+            }
+
+            final String contentType = headers.get(CONTENT_TYPE);
+
+            if (MIME_APPLICATION_URL_ENCODED.equals(contentType)) {
+                /*
+                 * Decode url encoded parameters in the request body.
+                 */
+                long size = 0x7FFFFFFFFFFFFFFFl;
+                final String contentLength = headers.get(CONTENT_LENGTH);
+                if (contentLength != null) {
+                    try {
+                        size = Integer.parseInt(contentLength);
+                    } catch (NumberFormatException ex) {
+                    }
+                }
+                if (size > 0) {
+                    // Read until the end of the input stream.
+                    String s;
+                    while ((s = readLine(bis)) != null) {
+                        decodeParams(s, params);
+                    }
+                }
+            } else {
+                /*
+                 * Otherwise the service is responsible for reading the request
+                 * body directly from the input stream and the input stream is
+                 * currently positioned on the request body (if any).
+                 */
+            }
+
+            return new Request(uri, method, headers, params, bis);
+
 		}
+
+        /**
+         * Reads and returns everything up to the next CRLF sequence. The CRLF
+         * sequence is consumed, but not returned. Bytes are converted to
+         * characters
+         * 
+         * @param is
+         *            The input stream.
+         * 
+         * @return The data read, converted to a {@link String} -or-
+         *         <code>null</code> iff the end of the input was reached 
+         *         while the buffer was empty.
+         */
+        private String readLine(final InputStream is) throws IOException {
+
+            _baos.reset(); // reset the buffer - it is reused for each line.
+            int lastChar = -1;
+            int thisChar; 
+            int nread = 0; // #of bytes read.
+            while ((thisChar = is.read()) != -1) {
+
+                nread++;
+
+                _baos.write(thisChar);
+                
+                if (lastChar == '\r' && thisChar == '\n') {
+
+                    nread -= 2;
+
+                    /*
+                     * Convert everything up to the CRLF into a String.
+                     * 
+                     * TODO This should explicitly use the appropriate encoding
+                     * for HTTP headers and the HTTP request line. What is that?
+                     */
+                    final String s = new String(_baos.toByteArray(),
+                            0/* off */, nread /* len */, UTF8);
+
+                    if (log.isTraceEnabled())
+                        log.trace("[" + s + "]");
+                    
+                    return s;
+
+                }
+
+                lastChar = thisChar;
+
+            }
+
+            if (thisChar == -1 && nread == 0) {
+                // Nothing available.
+                if (log.isTraceEnabled())
+                    log.trace("EOF");
+                return null;
+            }
+
+            /*
+             * The end of the stream was encountered after we had already read
+             * some bytes and before we encountered the CRLF sequence. This is
+             * an error since the protocol should always terminate the "lines"
+             * we are reading with a CRLF sequence.
+             */
+            throw new IOException("End of input stream?");
+
+		}
+        // buffer reused by readLine() across calls.
+        private final ByteArrayOutputStream _baos = new ByteArrayOutputStream(256);
 
 		/**
          * Returns an error message as a HTTP response and throws
          * {@link InterruptedException} to stop further request processing.
          */
-		private void sendError( String status, String msg ) throws InterruptedException
-		{
+        private void sendError(final String status, final String msg)
+                throws InterruptedException {
 			
-            sendResponse( status, MIME_TEXT_PLAIN, null, new ByteArrayInputStream( msg.getBytes()));
+            sendResponse(status, MIME_TEXT_PLAIN, null,
+                    new ByteArrayInputStream(msg.getBytes()));
 			
             throw new InterruptedException();
             
@@ -737,16 +887,13 @@ public class NanoHTTPD implements IServiceShutdown
 		/**
 		 * Sends given response to the socket.
 		 */
-		private void sendResponse( String status, String mime, Properties header, InputStream data )
-		{
+        private void sendResponse(final String status, final String mime,
+                final Map<String,String> header, final InputStream data)
+        {
 			try
 			{
 				if ( status == null )
 					throw new Error( "sendResponse(): Status can't be null." );
-
-				OutputStream out = mySocket.getOutputStream();
-				PrintWriter pw = new PrintWriter( out );
-				pw.print("HTTP/1.0 " + status + " \r\n");
 
                 if (log.isInfoEnabled()) { // optionally log the status and content type.
                     log.info("status: [HTTP/1.0 " + status
@@ -755,84 +902,275 @@ public class NanoHTTPD implements IServiceShutdown
                                     + "]")//
                     );
                 }
-                
-				if ( mime != null )
-					pw.print("Content-Type: " + mime + "\r\n");
 
-				if ( header == null || header.getProperty( "Date" ) == null )
-					pw.print( "Date: " + gmtFrmt.format( new Date()) + "\r\n");
+				final OutputStream out = mySocket.getOutputStream();
+				final PrintWriter pw = new PrintWriter( out );
+                pw.print("HTTP/1.0 ");
+                pw.print(status);
+                pw.print(" ");
+                pw.print(EOL);
 
-				if ( header != null )
-				{
-					Enumeration e = header.keys();
-					while ( e.hasMoreElements())
-					{
-						String key = (String)e.nextElement();
-						String value = header.getProperty( key );
-						pw.print( key + ": " + value + "\r\n");
-					}
-				}
+                if (mime != null) {
+                    pw.print(CONTENT_TYPE);
+                    pw.print(": ");
+                    pw.print(mime);
+                    pw.print(EOL);
+                }
 
-				pw.print("\r\n");
+                if (header == null || header.get(DATE) == null) {
+                    pw.print(DATE);
+                    pw.print(": ");
+                    pw.print(gmtFrmt.format(new Date()));
+                    pw.print(EOL);
+                }
+
+                if (header != null) {
+                    for (Map.Entry<String, String> e : header.entrySet()) {
+                        final String key = (String) e.getKey();
+                        final String value = e.getValue();
+                        pw.print(key);
+                        pw.print(": ");
+                        pw.print(value);
+                        pw.print(EOL);
+                    }
+                }
+
+				pw.print(EOL);
 				pw.flush();
 
-				if ( data != null )
-				{
-					byte[] buff = new byte[2048];
-					while (true)
-					{
-						int read = data.read( buff, 0, 2048 );
-						if (read <= 0)
-							break;
-						out.write( buff, 0, read );
+                if (data != null) {
+//				    if(log.isDebugEnabled())
+//				        log.debug("Sending data.");
+				    // FIXME reuse buffer and size to fit socket output stream.
+                    final byte[] buff = new byte[2048];
+                    while (true) {
+                        final int read = data.read(buff, 0, buff.length);
+                        if (read <= 0)
+                            break;
+//                        if (log.isTraceEnabled())
+//                            log.trace("Sending " + read + " bytes.");
+                        out.write(buff, 0, read);
 					}
 				}
 				out.flush();
 				out.close();
-				if ( data != null )
-					data.close();
+//                if(log.isTraceEnabled())
+//                    log.trace("Response done.");
 			}
 			catch( IOException ioe )
 			{
 				// Couldn't write? No can do.
 				try { mySocket.close(); } catch( Throwable t ) {}
-				// Close input stream - producer should notice and abort.
-				try {data.close();} catch(Throwable t) {};
+                log.error(ioe, ioe);
+			} finally {
+                if ( data != null ) {
+                    /*
+                     * Close input stream. Producer should notice and abort if
+                     * running.
+                     */
+                    try {data.close();} catch(Throwable t) {}
+                }
 			}
 		}
 	};
 
 	/**
+	 * A http request. 
+	 */
+    public static class Request {
+
+        /**
+         * Percent-decoded URI without parameters, for example "/index.cgi"
+         */
+        final public String uri;
+
+        /** "GET", "POST" etc. */
+        final public String method;
+
+        /**
+         * Header entries, percent decoded and forced to <strong>lower
+         * case</strong>.
+         */
+        final public Map<String, String> headers;
+
+        /**
+         * Parsed, percent decoded parameters from URI and, in case of a POST
+         * request body using {@value NanoHTTPD#MIME_APPLICATION_URL_ENCODED},
+         * data. The keys are the parameter names. Each value is an ordered
+         * collection of {@link String}s containing the bindings for the named
+         * parameter. The order of the URL parameters is preserved by the
+         * {@link LinkedHashMap}. The order of the bindings for each parameter
+         * is preserved by the {@link Vector}.
+         */
+        final public LinkedHashMap<String, Vector<String>> params;
+
+        /**
+         * The input stream. A {@value NanoHTTPD#MIME_APPLICATION_URL_ENCODED}
+         * request body will have already been decoded into {@link #params}.
+         * Otherwise, this argument may be used to read the request body. The
+         * input stream will be closed regardless by the caller.
+         */
+        final private InputStream is;
+
+        /**
+         * The input stream. A {@value NanoHTTPD#MIME_APPLICATION_URL_ENCODED}
+         * request body will have already been decoded into {@link #params}.
+         * Otherwise, this argument may be used to read the request body. The
+         * input stream will be closed regardless by the caller.
+         */
+        public InputStream getInputStream() {
+            
+            return is;
+            
+        }
+        
+        /**
+         * @param uri
+         *            Percent-decoded URI without parameters, for example
+         *            "/index.cgi"
+         * @param method
+         *            "GET", "POST" etc.
+         * @param params
+         *            Parsed, percent decoded parameters from URI and, in case
+         *            of a POST request body using
+         *            {@value NanoHTTPD#MIME_APPLICATION_URL_ENCODED}, data. The
+         *            keys are the parameter names. Each value is an ordered
+         *            collection of {@link String}s containing the bindings for
+         *            the named parameter. The order of the URL parameters is
+         *            preserved by the {@link LinkedHashMap}. The order of the
+         *            bindings for each parameter is preserved by the
+         *            {@link Vector}.
+         * @param headers
+         *            Header entries, percent decoded and forced to
+         *            <strong>lower case</strong>.
+         * @param is
+         *            The input stream. A
+         *            {@value NanoHTTPD#MIME_APPLICATION_URL_ENCODED} request
+         *            body will have already been decoded into <i>params</i>.
+         *            Otherwise, this argument may be used to read the request
+         *            body. The input stream will be closed regardless by the
+         *            caller.
+         */
+        private Request(final String uri, final String method,
+                final Map<String,String> headers,
+                final LinkedHashMap<String, Vector<String>> params,
+                final InputStream is) {
+            this.uri = uri;
+            this.method = method;
+            this.headers = headers;
+            this.params = params;
+            this.is = is;
+        }
+
+        /**
+         * Return the length of the request body if known and <code>-1</code>
+         * otherwise.
+         */
+        public int getContentLength() {
+
+            final String s = headers.get(CONTENT_LENGTH);
+            
+            if(s == null)
+                return -1;
+            
+            return Long.valueOf(s).intValue();
+            
+        }
+
+        /**
+         * Return the <code>Content-Type</code> header -or- <code>null</code> if
+         * that header was not present in the request.
+         */
+        public String getContentType() {
+
+            return headers.get(CONTENT_TYPE);
+            
+        }
+
+        /**
+         * Return the request body.
+         * 
+         * @return
+         * @throws IOException
+         *             a variety of reasons, including if it has already been
+         *             read.
+         */
+        public byte[] getBinaryContent() throws IOException {
+
+            final int contentLength = getContentLength();
+
+            if (log.isDebugEnabled())
+                log.debug("contentLength=" + contentLength
+                        + " : reading request body...");
+
+            final ByteArrayOutputStream baos = contentLength == -1 ? new ByteArrayOutputStream()
+                    : new ByteArrayOutputStream(contentLength);
+
+            int ch;
+            int len = 0;
+            while ((ch = is.read()) != -1) {
+                if (log.isTraceEnabled())
+                    log.trace("Read ch=" + ch + ", len=" + len
+                            + ", contentLength=" + contentLength);
+                baos.write(ch);
+                len++;
+                if (contentLength != -1 && len == contentLength)
+                    break;
+            }
+
+            return baos.toByteArray();
+
+        }
+        
+        public String getStringContent() throws IOException {
+
+            final String s = headers.get(CONTENT_TYPE);
+
+            final MIMEType mt = new MIMEType(s);
+
+            final byte[] b = getBinaryContent();
+
+            String charset = mt.getParamValue("charset");
+
+            if (charset == null)
+                charset = httpDefaultCharacterEncoding;
+
+            return new String(b, charset);
+
+        }
+        
+	} // class Request
+	
+	/**
 	 * URL-encodes everything between "/"-characters.
 	 * Encodes spaces as '%20' instead of '+'.
 	 */
-	private String encodeUri( String uri )
+	static private String encodeUri( final String uri )
 	{
-		String newUri = "";
-		StringTokenizer st = new StringTokenizer( uri, "/ ", true );
+        final StringTokenizer st = new StringTokenizer(uri, "/ ", true);
+        final StringBuilder newUri = new StringBuilder("");
 		while ( st.hasMoreTokens())
 		{
-			String tok = st.nextToken();
+			final String tok = st.nextToken();
 			if ( tok.equals( "/" ))
-				newUri += "/";
+				newUri.append("/");
 			else if ( tok.equals( " " ))
-				newUri += "%20";
+				newUri.append("%20");
 			else
 			{
 //				newUri += URLEncoder.encode( tok );
 				// For Java 1.4 you'll want to use this instead:
 				 try {
-                    newUri += URLEncoder.encode(tok, "UTF-8");
+                    newUri.append(URLEncoder.encode(tok, UTF8));
                 } catch (UnsupportedEncodingException uee) {
                     throw new RuntimeException(uee);
                 }
 			}
 		}
-		return newUri;
+		return newUri.toString();
 	}
 
-	private int myTcpPort;
-	File myFileDir;
+//	private File myFileDir;
 
     /**
      * The port on which the service was started.
@@ -842,6 +1180,7 @@ public class NanoHTTPD implements IServiceShutdown
         return myTcpPort;
         
     }
+    final private int myTcpPort;
     
 	// ==================================================
 	// File server code
@@ -850,10 +1189,12 @@ public class NanoHTTPD implements IServiceShutdown
 	/**
 	 * Serves file from homeDir and its' subdirectories (only).
 	 * Uses only URI, ignores all headers and HTTP parameters.
+	 * 
+	 * TODO This uses += for string append which is not efficient.
 	 */
-	public Response serveFile( String uri, Properties header, File homeDir,
-							   boolean allowDirectoryListing )
-	{
+    protected Response serveFile(String uri, final Map<String,String> header,
+            final File homeDir, final boolean allowDirectoryListing) {
+        
 		// Make sure we won't die of an exception later
 		if ( !homeDir.isDirectory())
 			return new Response( HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
@@ -898,21 +1239,21 @@ public class NanoHTTPD implements IServiceShutdown
 			// No index file, list the directory
 			else if ( allowDirectoryListing )
 			{
-				String[] files = f.list();
+				final String[] files = f.list();
 				String msg = "<html><body><h1>Directory " + uri + "</h1><br/>";
 
 				if ( uri.length() > 1 )
 				{
-					String u = uri.substring( 0, uri.length()-1 );
-					int slash = u.lastIndexOf( '/' );
+					final String u = uri.substring( 0, uri.length()-1 );
+					final int slash = u.lastIndexOf( '/' );
 					if ( slash >= 0 && slash  < u.length())
 						msg += "<b><a href=\"" + uri.substring(0, slash+1) + "\">..</a></b><br/>";
 				}
 
 				for ( int i=0; i<files.length; ++i )
 				{
-					File curFile = new File( f, files[i] );
-					boolean dir = curFile.isDirectory();
+				    final File curFile = new File( f, files[i] );
+					final boolean dir = curFile.isDirectory();
 					if ( dir )
 					{
 						msg += "<b>";
@@ -952,15 +1293,16 @@ public class NanoHTTPD implements IServiceShutdown
 		{
 			// Get MIME type from file name extension, if possible
 			String mime = null;
-			int dot = f.getCanonicalPath().lastIndexOf( '.' );
+			final int dot = f.getCanonicalPath().lastIndexOf( '.' );
 			if ( dot >= 0 )
-				mime = (String)theMimeTypes.get( f.getCanonicalPath().substring( dot + 1 ).toLowerCase());
-			if ( mime == null )
+                mime = (String) theMimeTypes.get(f.getCanonicalPath()
+                        .substring(dot + 1).toLowerCase());
+            if (mime == null )
 				mime = MIME_DEFAULT_BINARY;
 
 			// Support (simple) skipping:
 			long startFrom = 0;
-			String range = header.getProperty( "Range" );
+			String range = header.get( "Range" );
 			if ( range != null )
 			{
 				if ( range.startsWith( "bytes=" ))
@@ -976,9 +1318,9 @@ public class NanoHTTPD implements IServiceShutdown
 				}
 			}
 
-			FileInputStream fis = new FileInputStream( f );
+			final FileInputStream fis = new FileInputStream( f );
 			fis.skip( startFrom );
-			Response r = new Response( HTTP_OK, mime, fis );
+			final Response r = new Response( HTTP_OK, mime, fis );
 			r.addHeader( "Content-length", "" + (f.length() - startFrom));
 			r.addHeader( "Content-range", "" + startFrom + "-" +
 						(f.length()-1) + "/" + f.length());
@@ -995,35 +1337,51 @@ public class NanoHTTPD implements IServiceShutdown
      * "name=Jack%20Daniels&pass=Single%20Malt" ) and adds them to a {@link Map}
      * .
      * 
-     * @return A map of the parsed, percent decoded parameters from URI and. The
-     *         keys are the parameter names. Each value is a {@link Vector} of
-     *         {@link String}s containing the bindings for the named parameter.
-     *         The order of the URL parameters is preserved by the insertion
-     *         order of the {@link LinkedHashMap} and the elements of the
-     *         {@link Vector} values.
+     * @param parms
+     *            The URL query parameters.
+     * @param p
+     *            A map of the parsed, percent decoded parameters (required).
+     *            The keys are the parameter names. Each value is a
+     *            {@link Vector} of {@link String}s containing the bindings for
+     *            the named parameter. The order of the URL parameters is
+     *            preserved by the insertion order of the {@link LinkedHashMap}
+     *            and the elements of the {@link Vector} values.
+     * 
+     * @return The caller's map.
      * 
      * @throws UnsupportedEncodingException
      */
-    static public LinkedHashMap<String,Vector<String>> decodeParms( final String parms )
-        throws UnsupportedEncodingException
-    {
+    static public LinkedHashMap<String, Vector<String>> decodeParams(
+            final String parms, final LinkedHashMap<String, Vector<String>> p)
+            throws UnsupportedEncodingException {
+
+        if (parms == null)
+            throw new IllegalArgumentException();
         
-        final LinkedHashMap<String, Vector<String>> p = new LinkedHashMap<String, Vector<String>>();
+        if (p == null)
+            throw new IllegalArgumentException();
 
         final StringTokenizer st = new StringTokenizer(parms, "&");
         while (st.hasMoreTokens()) {
             final String e = st.nextToken();
             final int sep = e.indexOf('=');
+            final String name, val;
             if (sep != -1) {
-                final String name = _decodePercent(e.substring(0, sep)).trim();
-                final String val = _decodePercent(e.substring(sep + 1));
-                Vector<String> vals = p.get(name);
-                if (vals == null) {
-                    vals = new Vector<String>();
-                    p.put(name, vals);
-                }
-                vals.add(val);
+                name = decodePercent(e.substring(0, sep)).trim();
+                val = decodePercent(e.substring(sep + 1));
+            } else {
+                name = decodePercent(e).trim();
+                val = null;
             }
+            if (log.isDebugEnabled())
+                log.debug(name + ": " + val);
+            Vector<String> vals = p.get(name);
+            if (vals == null) {
+                vals = new Vector<String>();
+                p.put(name, vals);
+            }
+            if (val != null)
+                vals.add(val);
         }
 
         return p;
@@ -1036,12 +1394,50 @@ public class NanoHTTPD implements IServiceShutdown
      * 
      * @throws UnsupportedEncodingException
      */
-    static private String _decodePercent( final String str ) throws UnsupportedEncodingException 
-    {
-        return URLDecoder.decode(str, "utf-8");
+    static private String decodePercent(final String str)
+            throws UnsupportedEncodingException {
+
+        return URLDecoder.decode(str, UTF8);
+        
     }
 
-	/**
+    /**
+     * Construct a percent encoded representation of the URL query parameters.
+     * 
+     * @param expected
+     *            The parameters.
+     * 
+     * @return The encoded representation.
+     * 
+     * @throws UnsupportedEncodingException
+     */
+    static public StringBuilder encodeParams(
+            final LinkedHashMap<String, Vector<String>> expected)
+            throws UnsupportedEncodingException {
+
+        final StringBuilder sb = new StringBuilder();
+
+        boolean first = true;
+        for (Map.Entry<String, Vector<String>> e : expected.entrySet()) {
+            final String k = e.getKey();
+            final Vector<String> vec = e.getValue();
+            for (String v : vec) {
+                if (first) {
+                    first = false;
+                } else {
+                    sb.append("&");
+                }
+                sb.append(URLEncoder.encode(k, UTF8));
+                sb.append("=");
+                sb.append(URLEncoder.encode(v, UTF8));
+            }
+        }
+
+        return sb;
+
+    }
+
+    /**
 	 * Hashtable mapping (String)FILENAME_EXTENSION -> (String)MIME_TYPE
 	 */
 	private static Hashtable<String,String> theMimeTypes = new Hashtable<String, String>();
@@ -1078,33 +1474,38 @@ public class NanoHTTPD implements IServiceShutdown
 		gmtFrmt.setTimeZone(TimeZone.getTimeZone("GMT"));
 	}
 
-	/**
-	 * The distribution license
-	 */
-	private static final String LICENCE =
-		"Copyright (C) 2001,2005 by Jarno Elonen <elonen@iki.fi>\n"+
-		"\n"+
-		"Redistribution and use in source and binary forms, with or without\n"+
-		"modification, are permitted provided that the following conditions\n"+
-		"are met:\n"+
-		"\n"+
-		"Redistributions of source code must retain the above copyright notice,\n"+
-		"this list of conditions and the following disclaimer. Redistributions in\n"+
-		"binary form must reproduce the above copyright notice, this list of\n"+
-		"conditions and the following disclaimer in the documentation and/or other\n"+
-		"materials provided with the distribution. The name of the author may not\n"+
-		"be used to endorse or promote products derived from this software without\n"+
-		"specific prior written permission. \n"+
-		" \n"+
-		"THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR\n"+
-		"IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES\n"+
-		"OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.\n"+
-		"IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,\n"+
-		"INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT\n"+
-		"NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,\n"+
-		"DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY\n"+
-		"THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT\n"+
-		"(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE\n"+
-		"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.";
+    /*
+     * Note: This is the original distribution license text. I've taken it out
+     * of the code and moved it into a comment block on the class javadoc in
+     * order to reduce the size of the compiled class file.
+     */
+//	/**
+//	 * The distribution license
+//	 */
+//	private static final String LICENCE =
+//		"Copyright (C) 2001,2005 by Jarno Elonen <elonen@iki.fi>\n"+
+//		"\n"+
+//		"Redistribution and use in source and binary forms, with or without\n"+
+//		"modification, are permitted provided that the following conditions\n"+
+//		"are met:\n"+
+//		"\n"+
+//		"Redistributions of source code must retain the above copyright notice,\n"+
+//		"this list of conditions and the following disclaimer. Redistributions in\n"+
+//		"binary form must reproduce the above copyright notice, this list of\n"+
+//		"conditions and the following disclaimer in the documentation and/or other\n"+
+//		"materials provided with the distribution. The name of the author may not\n"+
+//		"be used to endorse or promote products derived from this software without\n"+
+//		"specific prior written permission. \n"+
+//		" \n"+
+//		"THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR\n"+
+//		"IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES\n"+
+//		"OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.\n"+
+//		"IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,\n"+
+//		"INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT\n"+
+//		"NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,\n"+
+//		"DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY\n"+
+//		"THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT\n"+
+//		"(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE\n"+
+//		"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.";
 
 }

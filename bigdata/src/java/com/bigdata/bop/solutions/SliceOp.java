@@ -88,7 +88,7 @@ public class SliceOp extends PipelineOp {
         /**
          * The first solution to be returned to the caller (origin ZERO).
          */
-        String OFFSET = SliceOp.class.getName() + ".offset";
+        String OFFSET = (SliceOp.class.getName() + ".offset").intern();
 
         long DEFAULT_OFFSET = 0L;
 
@@ -96,7 +96,7 @@ public class SliceOp extends PipelineOp {
          * The maximum #of solutions to be returned to the caller (default is
          * all).
          */
-        String LIMIT = SliceOp.class.getName() + ".limit";
+        String LIMIT = (SliceOp.class.getName() + ".limit").intern();
 
         /**
          * A value of {@link Long#MAX_VALUE} is used to indicate that there is
@@ -141,6 +141,10 @@ public class SliceOp extends PipelineOp {
                             + getEvaluationContext());
         }
 
+		if (!isSharedState())
+			throw new UnsupportedOperationException(Annotations.SHARED_STATE
+					+ "=" + isSharedState());
+                
     }
 
     /**
@@ -161,19 +165,19 @@ public class SliceOp extends PipelineOp {
         
     }
 
-    /**
-     * Overridden to return <code>true</code> since the correct decision
-     * semantics for the slice depend on concurrent invocations for the same
-     * query having the same {@link SliceStats} object.
-     * <p>
-     * {@inheritDoc}
-     */
-    @Override
-    final public boolean isSharedState() {
-        
-        return true;
-        
-    }
+//    /**
+//     * Overridden to return <code>true</code> since the correct decision
+//     * semantics for the slice depend on concurrent invocations for the same
+//     * query having the same {@link SliceStats} object.
+//     * <p>
+//     * {@inheritDoc}
+//     */
+//    @Override
+//    final public boolean isSharedState() {
+//        
+//        return true;
+//        
+//    }
     
     /**
      * Extends {@link BOpStats} to capture the state of the {@link SliceOp}.
