@@ -158,7 +158,7 @@ public interface BD {
      * <p>
      * <pre>
      * 
-     * select ?s ?rank
+     * select ?s
      * where {
      *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
      *   ?s bd:maxHits "5"^^xsd:int .
@@ -174,7 +174,7 @@ public interface BD {
      * <p>
      * <pre>
      * 
-     * select ?s ?matched
+     * select ?s
      * where {
      *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
      *   ?s bd:minRelevance "0.5"^^xsd:double .
@@ -183,6 +183,22 @@ public interface BD {
      * </pre>
      */
     final URI MIN_RELEVANCE = new URIImpl(SEARCH_NAMESPACE+"minRelevance");
+
+    /**
+     * Magic predicate used to query for free text search metadata.  Use 
+     * in conjunction with {@link #SEARCH} as follows:
+     * <p>
+     * <pre>
+     * 
+     * select ?s
+     * where {
+     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bd:matchAllTerms "true" .
+     * }
+     * 
+     * </pre>
+     */
+    final URI MATCH_ALL_TERMS = new URIImpl(SEARCH_NAMESPACE+"matchAllTerms");
 
     /**
      * Sesame has the notion of a "null" graph. Any time you insert a statement

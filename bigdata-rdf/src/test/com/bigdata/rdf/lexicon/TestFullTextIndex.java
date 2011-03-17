@@ -133,7 +133,9 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
         final Hiterator hitr = store.getLexiconRelation().getSearchEngine()
                 .search(query, languageCode, false/* prefixMatch */, minCosine,
-                        Integer.MAX_VALUE/* maxRank */, 2L/* timeout */,
+                        Integer.MAX_VALUE/* maxRank */,
+                        false/* matchAllTerms */,
+                        2L/* timeout */,
                         TimeUnit.SECONDS);
 
         // assertEquals("#hits", (long) expected.length, itr.size());

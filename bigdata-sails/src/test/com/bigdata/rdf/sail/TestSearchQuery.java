@@ -798,6 +798,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             false, // prefixMatch
                             0d, // minCosine
                             10000, // maxRank (=maxResults + 1)
+                            false, // matchAllTerms
                             1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -859,6 +860,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             false, // prefixMatch
                             0d, // minCosine
                             maxHits+1, // maxRank (=maxResults + 1)
+                            false, // matchAllTerms
                             1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -920,6 +922,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             false, // prefixMatch
                             minRelevance, // minCosine
                             10000, // maxRank (=maxResults + 1)
+                            false, // matchAllTerms
                             1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -985,6 +988,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             false, // prefixMatch
                             minRelevance, // minCosine
                             10000, // maxRank (=maxResults + 1)
+                            false, // matchAllTerms
                             1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1052,6 +1056,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             true, // prefixMatch
                             minRelevance, // minCosine
                             10000, // maxRank (=maxResults + 1)
+                            false, // matchAllTerms
                             1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1117,6 +1122,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             true, // prefixMatch
                             minRelevance, // minCosine
                             10000, // maxRank (=maxResults + 1)
+                            false, // matchAllTerms
                             1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1139,6 +1145,66 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
             }
 
+            { // match all terms
+            	
+            	final String searchQuery = "how now brown cow";
+            	final double minRelevance = 0.0d;
+            	
+                final String query = 
+                    "select ?s ?o " + 
+                    "where " +
+                    "{ " +
+                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?o <"+BD.MATCH_ALL_TERMS+"> \"true\" . " +
+                    "}";
+                
+                log.info("\n"+query);
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                int i = 0;
+                while (result.hasNext()) {
+                	log.info(i++ + ": " + result.next().toString());
+                }
+//                assertTrue("wrong # of results: " + i, i == 1);
+                
+                result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            true, // prefixMatch
+                            minRelevance, // minCosine
+                            10000, // maxRank (=maxResults + 1)
+                            true, // matchAllTerms
+                            1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = new TermId(VTE.LITERAL, hit.getDocId());
+                	final URI s = uris.get(id);
+                	final Literal o = literals.get(id);
+                    final BindingSet bs = createBindingSet(
+                    		new BindingImpl("s", s),
+                    		new BindingImpl("o", o));
+                    log.info(bs);
+                    answer.add(bs);
+                }
+                
+                compare(result, answer);
+
+            }
+
         } finally {
             cxn.close();
         }
@@ -1147,5 +1213,62 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
         }
         
     }
+    
+    /*
+
+prefix BIGDATA_QUERY_HINTS: <http://www.bigdata.com/queryHints#com.bigdata.rdf.sail.QueryHints.optimizer=None>
+prefix xsd: <http://www.w3.org/2001/XMLSchema#> 
+select distinct ?target0  
+where { 
+  ?obj0 <http://www.bigdata.com/rdf/search#search> "stainless" .
+  ?target0 ?p0 ?obj0 .
+  ?obj1 <http://www.bigdata.com/rdf/search#search> "innovations" .
+  ?target1 ?p1 ?obj1 .
+  ?obj2 <http://www.bigdata.com/rdf/search#search> "cabin" .
+  ?target2 ?p2 ?obj2 .
+  filter(?target0 = ?target1 && ?target1 = ?target2) .
+}  
+		     
+  FILTER (?category = <http://www.ms2w.com/ontologies/autocad/AutoCADBlock>  || ?category = <http://www.ms2w.com/ontologies/autocad/AutoCADBlockAttribute>  || ?category = <http://www.ms2w.com/ontologies/autocad/AutoCADBlockReference>  || ?category = <http://www.ms2w.com/ontologies/autocad/AutoCADFile>  || ?category = <http://www.ms2w.com/ontologies/autocad/AutoCADTable>  || ?category = <http://www.ms2w.com/ontologies/autocad/AutoCADTitleBlock>  || ?category = <http://www.ms2w.com/ontologies/file/Directory>  || ?category = <http://www.ms2w.com/ontologies/file/File>  || ?category = <http://www.ms2w.com/ontologies/pdffile/PdfAnnotation>  || ?category = <http://www.ms2w.com/ontologies/pdffile/PdfFile>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentAssembly>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmTableTypeBOM>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/Component>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/Configuration>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentDrawing>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypeIndented>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentPart>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypePartsOnly>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmTableTypeRevision>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmToolboxCopiedPart>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmToolboxStandardPart>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypeTopLevelOnly> ) . 
+
+prefix BIGDATA_QUERY_HINTS: <http://www.bigdata.com/queryHints#com.bigdata.rdf.sail.QueryHints.optimizer=None>
+prefix xsd: <http://www.w3.org/2001/XMLSchema#> 
+select distinct ?target  
+where { 
+  ?obj0 <http://www.bigdata.com/rdf/search#search> "stainless" . 
+  ?obj0 <http://www.bigdata.com/rdf/search#relevance> ?score0 . 
+  ?target ?p0 ?obj0 .  
+  ?target <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?category0 . 
+  {	
+    ?obj1 <http://www.bigdata.com/rdf/search#search> "innovations" . 
+    ?obj1 <http://www.bigdata.com/rdf/search#relevance> ?score1 . 
+    ?target ?p1 ?obj1 .  
+    ?target <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?category1 . 
+  }
+  {
+    ?obj2 <http://www.bigdata.com/rdf/search#search> "cabin" . 
+    ?obj2 <http://www.bigdata.com/rdf/search#relevance> ?score2 . 
+    ?target ?p2 ?obj2 .  
+    ?target <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?category2 . 
+  }
+}  
+ORDER BY DESC(?score2) DESC(?score1) DESC(?score0)  
+LIMIT 10 OFFSET 0
+
+  ?target <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?category0 . 
+  
+  ?target <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?category1 . 
+  
+  ?target <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?category2 . 
+
+  FILTER (?category0 = ... ) . 
+  FILTER (?category1 = ... ) . 
+  FILTER (?category2 = ... ) . 
+
+		  FILTER (?category = <http://www.ms2w.com/ontologies/autocad/AutoCADBlock>  || ?category = <http://www.ms2w.com/ontologies/autocad/AutoCADBlockAttribute>  || ?category = <http://www.ms2w.com/ontologies/autocad/AutoCADBlockReference>  || ?category = <http://www.ms2w.com/ontologies/autocad/AutoCADFile>  || ?category = <http://www.ms2w.com/ontologies/autocad/AutoCADTable>  || ?category = <http://www.ms2w.com/ontologies/autocad/AutoCADTitleBlock>  || ?category = <http://www.ms2w.com/ontologies/file/Directory>  || ?category = <http://www.ms2w.com/ontologies/file/File>  || ?category = <http://www.ms2w.com/ontologies/pdffile/PdfAnnotation>  || ?category = <http://www.ms2w.com/ontologies/pdffile/PdfFile>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentAssembly>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmTableTypeBOM>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/Component>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/Configuration>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentDrawing>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypeIndented>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentPart>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypePartsOnly>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmTableTypeRevision>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmToolboxCopiedPart>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmToolboxStandardPart>  || ?category = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypeTopLevelOnly> ) . 
+		  FILTER (?category0 = <http://www.ms2w.com/ontologies/autocad/AutoCADBlock>  || ?category0 = <http://www.ms2w.com/ontologies/autocad/AutoCADBlockAttribute>  || ?category0 = <http://www.ms2w.com/ontologies/autocad/AutoCADBlockReference>  || ?category0 = <http://www.ms2w.com/ontologies/autocad/AutoCADFile>  || ?category0 = <http://www.ms2w.com/ontologies/autocad/AutoCADTable>  || ?category0 = <http://www.ms2w.com/ontologies/autocad/AutoCADTitleBlock>  || ?category0 = <http://www.ms2w.com/ontologies/file/Directory>  || ?category0 = <http://www.ms2w.com/ontologies/file/File>  || ?category0 = <http://www.ms2w.com/ontologies/pdffile/PdfAnnotation>  || ?category0 = <http://www.ms2w.com/ontologies/pdffile/PdfFile>  || ?category0 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentAssembly>  || ?category0 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmTableTypeBOM>  || ?category0 = <http://www.ms2w.com/ontologies/solidworks/20091023/Component>  || ?category0 = <http://www.ms2w.com/ontologies/solidworks/20091023/Configuration>  || ?category0 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentDrawing>  || ?category0 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypeIndented>  || ?category0 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentPart>  || ?category0 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypePartsOnly>  || ?category0 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmTableTypeRevision>  || ?category0 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmToolboxCopiedPart>  || ?category0 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmToolboxStandardPart>  || ?category0 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypeTopLevelOnly> ) . 
+		  FILTER (?category1 = <http://www.ms2w.com/ontologies/autocad/AutoCADBlock>  || ?category1 = <http://www.ms2w.com/ontologies/autocad/AutoCADBlockAttribute>  || ?category1 = <http://www.ms2w.com/ontologies/autocad/AutoCADBlockReference>  || ?category1 = <http://www.ms2w.com/ontologies/autocad/AutoCADFile>  || ?category1 = <http://www.ms2w.com/ontologies/autocad/AutoCADTable>  || ?category1 = <http://www.ms2w.com/ontologies/autocad/AutoCADTitleBlock>  || ?category1 = <http://www.ms2w.com/ontologies/file/Directory>  || ?category1 = <http://www.ms2w.com/ontologies/file/File>  || ?category1 = <http://www.ms2w.com/ontologies/pdffile/PdfAnnotation>  || ?category1 = <http://www.ms2w.com/ontologies/pdffile/PdfFile>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentAssembly>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmTableTypeBOM>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/Component>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/Configuration>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentDrawing>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypeIndented>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentPart>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypePartsOnly>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmTableTypeRevision>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmToolboxCopiedPart>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmToolboxStandardPart>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypeTopLevelOnly> ) . 
+		  FILTER (?category2 = <http://www.ms2w.com/ontologies/autocad/AutoCADBlock>  || ?category2 = <http://www.ms2w.com/ontologies/autocad/AutoCADBlockAttribute>  || ?category2 = <http://www.ms2w.com/ontologies/autocad/AutoCADBlockReference>  || ?category2 = <http://www.ms2w.com/ontologies/autocad/AutoCADFile>  || ?category2 = <http://www.ms2w.com/ontologies/autocad/AutoCADTable>  || ?category2 = <http://www.ms2w.com/ontologies/autocad/AutoCADTitleBlock>  || ?category2 = <http://www.ms2w.com/ontologies/file/Directory>  || ?category2 = <http://www.ms2w.com/ontologies/file/File>  || ?category2 = <http://www.ms2w.com/ontologies/pdffile/PdfAnnotation>  || ?category2 = <http://www.ms2w.com/ontologies/pdffile/PdfFile>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentAssembly>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmTableTypeBOM>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/Component>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/Configuration>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentDrawing>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypeIndented>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentPart>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypePartsOnly>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmTableTypeRevision>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmToolboxCopiedPart>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmToolboxStandardPart>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypeTopLevelOnly> ) . 
+	*/
     
 }
