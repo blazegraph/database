@@ -29,7 +29,9 @@ package com.bigdata.journal;
 
 import java.io.File;
 import java.util.Date;
+import java.util.Map;
 import java.util.Properties;
+import java.util.TreeMap;
 
 import org.apache.log4j.Logger;
 
@@ -37,6 +39,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.DumpIndex;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.DumpIndex.PageStats;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.InnerCause;
 
@@ -260,10 +263,10 @@ public class DumpJournal {
 
                 System.out.println("Historical commit points follow in temporal sequence (first to last):");
                 
-                CommitRecordIndex commitRecordIndex = journal.getCommitRecordIndex();
+                final CommitRecordIndex commitRecordIndex = journal.getCommitRecordIndex();
 //                CommitRecordIndex commitRecordIndex = journal._commitRecordIndex;
                 
-                ITupleIterator<CommitRecordIndex.Entry> itr = commitRecordIndex.rangeIterator();
+                final ITupleIterator<CommitRecordIndex.Entry> itr = commitRecordIndex.rangeIterator();
                 
                 while(itr.hasNext()) {
                     
@@ -311,14 +314,17 @@ public class DumpJournal {
      * @param journal
      * @param commitRecord
      */
-    private static void dumpNamedIndicesMetadata(AbstractJournal journal,
-            ICommitRecord commitRecord, boolean dumpPages, boolean dumpIndices, boolean showTuples) {
+	private static void dumpNamedIndicesMetadata(AbstractJournal journal,
+			ICommitRecord commitRecord, boolean dumpPages, boolean dumpIndices, boolean showTuples) {
 
         // view as of that commit record.
         final IIndex name2Addr = journal.getName2Addr(commitRecord.getTimestamp());
 
         final ITupleIterator itr = name2Addr.rangeIterator(null,null);
-
+        
+		final Map<String, PageStats> pageStats = dumpPages ? new TreeMap<String, PageStats>()
+				: null;
+		
         while (itr.hasNext()) {
 
             // a registered index.
@@ -362,14 +368,100 @@ public class DumpJournal {
             // show metadata record.
             System.out.println("\t" + ndx.getIndexMetadata());
 
-            if (dumpPages)
-				DumpIndex.dumpPages(ndx, false/* dumpNodeState */);
+			if (pageStats != null) {
+				
+				final PageStats stats = DumpIndex
+						.dumpPages(ndx, false/* dumpNodeState */);
+
+				System.out.println("\t" + stats);
+
+				pageStats.put(entry.name, stats);
+
+			}
 
             if (dumpIndices)
                 DumpIndex.dumpIndex(ndx, showTuples);
 
         }
+
+		if (pageStats != null) {
+
+			/*
+			 * TODO If we kept the BTree counters for the #of bytes written per
+			 * node and per leaf up to date when nodes and leaves were recycled
+			 * then we could generate this table very quickly. As it stands, we
+			 * have to actually scan the pages in the index.
+			 */
+			System.out.print("name");
+			System.out.print('\t');
+			System.out.print("m");
+			System.out.print('\t');
+			System.out.print("height");
+			System.out.print('\t');
+			System.out.print("nnodes");
+			System.out.print('\t');
+			System.out.print("nleaves");
+			System.out.print('\t');
+			System.out.print("nodeBytes");
+			System.out.print('\t');
+			System.out.print("leafBytes");
+			System.out.print('\t');
+			System.out.print("totalBytes");
+			System.out.print('\t');
+			System.out.print("avgNodeBytes");
+			System.out.print('\t');
+			System.out.print("avgLeafBytes");
+			System.out.print('\t');
+			System.out.print("minNodeBytes");
+			System.out.print('\t');
+			System.out.print("maxNodeBytes");
+			System.out.print('\t');
+			System.out.print("minLeafBytes");
+			System.out.print('\t');
+			System.out.print("maxLeafBytes");
+			System.out.print('\n');
+
+			for(Map.Entry<String,PageStats> e : pageStats.entrySet()) {
+
+				final String name = e.getKey();
+				
+				final PageStats stats = e.getValue();
+
+				final BTree ndx = (BTree) journal.getIndex(name, commitRecord);
+				
+				System.out.print(name);
+				System.out.print('\t');
+				System.out.print(ndx.getBranchingFactor());
+				System.out.print('\t');
+				System.out.print(ndx.getHeight());
+				System.out.print('\t');
+				System.out.print(ndx.getNodeCount());
+				System.out.print('\t');
+				System.out.print(ndx.getLeafCount());
+				System.out.print('\t');
+				System.out.print(stats.nodeBytes);
+				System.out.print('\t');
+				System.out.print(stats.leafBytes);
+				System.out.print('\t');
+				System.out.print(stats.getTotalBytes());
+				System.out.print('\t');
+				System.out.print(stats.getBytesPerNode());
+				System.out.print('\t');
+				System.out.print(stats.getBytesPerLeaf());
+				System.out.print('\t');
+				System.out.print(stats.minNodeBytes);
+				System.out.print('\t');
+				System.out.print(stats.maxNodeBytes);
+				System.out.print('\t');
+				System.out.print(stats.minLeafBytes);
+				System.out.print('\t');
+				System.out.print(stats.maxLeafBytes);
+				System.out.print('\n');
+				
+			}
+
+        }
         
-    }
+    } // dumpNamedIndicesMetadata
 
 }
