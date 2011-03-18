@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.keys;
 
+import com.bigdata.btree.BytesUtil;
+
 /**
  * Utility methods for computing the successor of a value for various data
  * types.
@@ -487,6 +489,8 @@ public class SuccessorUtil {
      *             If all bytes overflow.
      * @throws NoSuccessorException
      *             If the byte[] has zero length.
+     * 
+     * @see BytesUtil#successor(byte[])
      */
     static public byte[] successor(final byte[] b) {
         
@@ -512,6 +516,8 @@ public class SuccessorUtil {
      *             If all bytes overflow.
      * @throws NoSuccessorException
      *             If the byte[] has zero length.
+     * 
+     * @see BytesUtil#successor(byte[])
      * 
      * @todo unit tests when offset is non-zero.
      */
