@@ -1747,6 +1747,11 @@ public class KeyBuilder implements IKeyBuilder {
             CollatorEnum collatorChoice, Locale locale, Object strength,
             DecompositionEnum mode) {
 
+        if (log.isInfoEnabled())
+            log.info("capacity=" + capacity + ",collector=" + collatorChoice
+                    + ",locale=" + locale + ",strength=" + strength
+                    + ",decomposition=" + mode);
+
         if (collatorChoice == CollatorEnum.ASCII) {
 
             /*
