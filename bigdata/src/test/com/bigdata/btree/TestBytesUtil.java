@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.util.Arrays;
+
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -851,6 +853,156 @@ public class TestBytesUtil extends TestCase2 {
             assertEquals("get(" + bitIndex + ")", false, BytesUtil.getBit(buf,
                     bitIndex));
 
+        }
+
+    }
+
+    /**
+     * Unit test for {@link BytesUtil#toString(byte[])} based on known good
+     * data.
+     */
+    public void test_toString() {
+        
+        final byte[] a = new byte[] { 0, 1, 2, 3, 4, 126, 127, -1, -2, -3, -4,
+                -126, -127, -128 };
+        
+        final String s = BytesUtil.toString(a);
+        
+        System.err.println(s);
+        
+        final String expected = "[0, 1, 2, 3, 4, 126, 127, 255, 254, 253, 252, 130, 129, 128]";
+//        final String expected = "[-128, -127, -126, -125, -124, -2, -1, 127, 126, 125, 124, 2, 1, 0]";
+
+        assertEquals(expected, s);
+        
+    }
+
+    /**
+     * This does some order checking, but it also provides a visual check on
+     * {@link BytesUtil#toString(byte[])}. The "Unsigned" representation should
+     * be strictly ascending from <code>[0]</code> through <code>255</code>.
+     * 
+     * @todo verify that using direct parse.
+     */
+    public void test_order() {
+
+        byte[] a = new byte[1];
+
+        byte[] last = new byte[1];
+
+        for (int i = Byte.MIN_VALUE; i <= Byte.MAX_VALUE; i++) {
+
+            // generate next array value
+            a[0] = KeyBuilder.encodeByte(i);
+
+            System.err.println("S: " + Arrays.toString(a) + " => U:"
+                    + BytesUtil.toString(a));
+
+            if (i > 0) {
+
+                // ordering test
+                assertTrue(BytesUtil.compareBytes(last, a) < 0);
+
+                // ordering test
+                assertTrue(BytesUtil.UnsignedByteArrayComparator.INSTANCE
+                        .compare(last, a) < 0);
+
+            }
+
+            // note the last array value (it's just one byte).
+            last[0] = a[0];
+
+        }
+
+        System.err.println("S: " + Arrays.toString(a) + " => U:"
+                + BytesUtil.toString(a));
+
+    }
+    
+    /**
+     * Unit test for {@link BytesUtil#fromString(String)} based on known good
+     * data.
+     */
+    public void test_fromString() {
+
+        final byte[] expected = new byte[] { 0, 1, 2, 3, 4, 126, 127, -1, -2, -3, -4, -126, -127, -128 };
+        
+//        final byte[] expected = new byte[] {-128, -127, -126, -125, -124, -2, -1, 127, 126, 125, 124, 2, 1, 0};
+        
+        final String s = "[0, 1, 2, 3, 4, 126, 127, 255, 254, 253, 252, 130, 129, 128]";
+
+        //        '0'(0)[-128]'1'(1)[-127]'2'(2)[-126]'3'(3)[-125]'4'(4)[-124]'126'(126)[-2]'127'(127)[-1]'255'(255)[127]'254'(254)[126]'253'(253)[125]'252'(252)[124]'130'(130)[2]'129'(129)[1]'128'(128)[0]
+
+        final byte[] actual = BytesUtil.fromString(s);
+
+        assertEquals(expected, actual);
+
+    }
+
+    /**
+     * Unit test for {@link BytesUtil#fromString(String)} when given an empty
+     * array as input together with legal whitespace variants of an empty array.
+     */
+    public void test_fromString_emptyArray() {
+
+        final byte[] expected = new byte[] {};
+
+        assertEquals(expected,BytesUtil.fromString("[]"));
+        assertEquals(expected,BytesUtil.fromString("[ ]"));
+        assertEquals(expected,BytesUtil.fromString(" [] "));
+        assertEquals(expected,BytesUtil.fromString(" [ ] "));
+        assertEquals(expected,BytesUtil.fromString(" [ ] "));
+
+    }
+
+    /**
+     * Unit test for {@link BytesUtil#fromString(String)} with a
+     * <code>null</code> argument.
+     */
+    public void test_fromString_correctRejection_null() {
+
+        try {
+            BytesUtil.fromString(null);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException t) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + t);
+        }
+
+    }
+
+    /**
+     * Correct rejection test for {@link BytesUtil#fromString(String)} when the
+     * data contains values which lie outside of the range of an
+     * <code>unsigned byte</code>.
+     */
+    public void test_fromString_correctRejection_badRange() {
+
+        // outside of range [0:255]
+        try {
+            BytesUtil.fromString("[256]");
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException t) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + t);
+        }
+
+        // outside of range [0:255]
+        try {
+            BytesUtil.fromString("[-1]");
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException t) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + t);
+        }
+
+        // not an integer
+        try {
+            BytesUtil.fromString("[1a]");
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException t) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + t);
         }
 
     }
