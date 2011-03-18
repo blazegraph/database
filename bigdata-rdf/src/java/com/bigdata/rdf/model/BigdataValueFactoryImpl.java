@@ -61,11 +61,21 @@ import com.bigdata.util.CanonicalFactory;
  */
 public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
+	private final String namespace;
+	
+	public String getNamespace() {
+		
+		return namespace;
+		
+	}
+	
     /**
      * WARNING: Use {@link #getInstance(String)} NOT this constructor.
      */
-    private BigdataValueFactoryImpl() {
+    private BigdataValueFactoryImpl(final String namespace) {
 
+    	this.namespace = namespace;
+    	
     	xsdMap = getXSDMap();
         
     }
@@ -80,12 +90,12 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 	 * instance and that all {@link BigdataValueImpl}s for that instance had
 	 * become weakly reachable or been swept).
 	 */
-    private static CanonicalFactory<String/* namespace */, BigdataValueFactoryImpl,Void/*State*/> cache = new CanonicalFactory<String, BigdataValueFactoryImpl,Void>(
+    private static CanonicalFactory<String/* namespace */, BigdataValueFactoryImpl,String/*State*/> cache = new CanonicalFactory<String, BigdataValueFactoryImpl,String>(
             1/* capacity */) {
 				@Override
 				protected BigdataValueFactoryImpl newInstance(
-						final String key, final Void ignored) {
-						return new BigdataValueFactoryImpl();
+						final String key, final String namespace) {
+						return new BigdataValueFactoryImpl(namespace);
 				}
     };
 //    private static WeakValueCache<String/* namespace */, BigdataValueFactoryImpl> cache = new WeakValueCache<String, BigdataValueFactoryImpl>(
@@ -106,7 +116,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 	 */
 	public static BigdataValueFactory/* Impl */getInstance(final String namespace) {
 
-		return cache.getInstance(namespace, null/*state*/);
+		return cache.getInstance(namespace, namespace/*state*/);
 		
 	}
 	

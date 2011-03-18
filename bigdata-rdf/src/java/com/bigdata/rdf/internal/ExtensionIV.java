@@ -77,16 +77,28 @@ public class ExtensionIV<V extends BigdataLiteral>
     public int byteLength() {
         return delegate.byteLength() + Bytes.SIZEOF_LONG;
     }
-    
-    /**
-     * Defer to the {@link ILexiconConfiguration} which has specific knowledge
-     * of how to generate an RDF value from this general purpose extension IV.
-     */
-    @SuppressWarnings({"unchecked","rawtypes"})
-    public V asValue(final LexiconRelation lex) {
-    	final BigdataValueFactory f = lex.getValueFactory();
-    	final ILexiconConfiguration config = lex.getLexiconConfiguration();
-        return (V) config.asValue(this, f);
+
+	/**
+	 * Defer to the {@link ILexiconConfiguration} which has specific knowledge
+	 * of how to generate an RDF value from this general purpose extension IV.
+	 */
+	@SuppressWarnings( { "unchecked", "rawtypes" })
+	public V asValue(final LexiconRelation lex) {
+
+		V v = getValueCache();
+		
+		if (v != null) {
+			
+			final BigdataValueFactory f = lex.getValueFactory();
+			
+			final ILexiconConfiguration config = lex.getLexiconConfiguration();
+			
+			v = setValue((V) config.asValue(this, f));
+			
+		}
+
+		return v;
+		
     }
     
 }

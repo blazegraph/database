@@ -86,6 +86,9 @@ public class TestAll extends TestCase {
         // test suite for inlining
         suite.addTestSuite(TestInlining.class);
 
+        // test suite for the IV cache, including serialization of cached vals.
+        suite.addTestSuite(TestIVCache.class);
+        
         return suite;
         
     }

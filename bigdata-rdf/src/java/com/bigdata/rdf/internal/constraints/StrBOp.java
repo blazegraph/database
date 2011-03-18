@@ -30,7 +30,6 @@ import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
@@ -41,7 +40,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Imposes the constraint <code>isURI(x)</code>.
+ * Convert the {@link IV} to a <code>xsd:string</code>.
  */
 public class StrBOp extends IVValueExpression<IV> {
 

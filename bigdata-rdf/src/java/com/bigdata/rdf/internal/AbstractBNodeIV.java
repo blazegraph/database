@@ -56,11 +56,24 @@ abstract public class AbstractBNodeIV<V extends BigdataBNode, T> extends
 
     }
 
-    public V asValue(final LexiconRelation lex) {
-    	final ValueFactory f = lex.getValueFactory();
-        final V bnode = (V) f.createBNode(stringValue());
-        bnode.setIV(this);
-        return bnode;
+	public V asValue(final LexiconRelation lex) {
+		
+		V bnode = getValueCache();
+		
+		if (bnode == null) {
+		
+			final ValueFactory f = lex.getValueFactory();
+			
+			bnode = (V) f.createBNode(stringValue());
+			
+			bnode.setIV(this);
+			
+			setValue(bnode);
+
+		}
+	
+		return bnode;
+		
     }
 
 }

@@ -67,9 +67,21 @@ public class XSDBooleanIV<V extends BigdataLiteral> extends
 
     @SuppressWarnings("unchecked")
     public V asValue(final LexiconRelation lex) {
-        final V v = (V) lex.getValueFactory().createLiteral(value);
-        v.setIV(this);
-        return v;
+
+    	V v = getValueCache();
+    	
+    	if( v == null) {
+    		
+    		v = (V) lex.getValueFactory().createLiteral(value);
+    		
+    		v.setIV(this);
+    		
+    		setValue(v);
+    		
+    	}
+
+    	return v;
+    	
     }
 
     @Override
