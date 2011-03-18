@@ -215,7 +215,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
 
         if(log.isDebugEnabled()) {
             
-            log.debug("name=" + key + ",val=" + val);
+            log.debug(key + "=" + val);
             
         }
         
