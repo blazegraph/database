@@ -61,20 +61,23 @@ public class XSDIntegerIV<V extends BigdataLiteral> extends
         
     }
 
-    @SuppressWarnings("unchecked")
-    public V asValue(final LexiconRelation lex) {
-    	final BigdataValueFactory f = lex.getValueFactory();
-        // @todo factory should cache the XSD URIs.
-        final V v = (V) f.createLiteral(value.toString(),//
-                f.createURI(DTE.XSDInteger.getDatatype()));
-        v.setIV(this);
-        return v;
-    }
+	@SuppressWarnings("unchecked")
+	public V asValue(final LexiconRelation lex) {
+		V v = getValueCache();
+		if (v == null) {
+			final BigdataValueFactory f = lex.getValueFactory();
+			v = (V) f.createLiteral(value.toString(),//
+					f.createURI(DTE.XSDInteger.getDatatype()));
+			v.setIV(this);
+			setValue(v);
+		}
+		return v;
+	}
 
-    @Override
-    final public long longValue() {
-        return value.longValue();
-    }
+	@Override
+	final public long longValue() {
+		return value.longValue();
+	}
 
     @Override
     public boolean booleanValue() {

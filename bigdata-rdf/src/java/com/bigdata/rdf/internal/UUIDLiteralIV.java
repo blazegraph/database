@@ -62,13 +62,26 @@ public class UUIDLiteralIV<V extends BigdataLiteral> extends
         return value;
     }
 
-    @SuppressWarnings("unchecked")
-    public V asValue(final LexiconRelation lex) {
-    	final ValueFactory f = lex.getValueFactory();
-        final V v = (V) f.createLiteral(value.toString(), //
-                f.createURI(DTE.UUID.getDatatype()));
-        v.setIV(this);
-        return v;
+	@SuppressWarnings("unchecked")
+	public V asValue(final LexiconRelation lex) {
+	
+		V v = getValueCache();
+		
+		if (v == null) {
+			
+			final ValueFactory f = lex.getValueFactory();
+			
+			v = (V) f.createLiteral(value.toString(), //
+					f.createURI(DTE.UUID.getDatatype()));
+			
+			v.setIV(this);
+			
+			setValue(v);
+			
+		}
+
+		return v;
+		
     }
 
     @Override

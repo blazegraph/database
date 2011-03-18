@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal;
 
-import org.apache.log4j.Logger;
+import java.io.IOException;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rawstore.Bytes;
@@ -44,7 +44,7 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
      */
     private static final long serialVersionUID = 4309045651680610931L;
     
-    protected static final Logger log = Logger.getLogger(TermId.class);
+//    private static final Logger log = Logger.getLogger(TermId.class);
     
     /**
      * Value used for a "NULL" term identifier.
@@ -81,7 +81,7 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
 
         /*
          * Note: XSDBoolean happens to be assigned the code value of 0, which is
-         * the value we we want when the data type enumeration will be ignored.
+         * the value we want when the data type enumeration will be ignored.
          */
         super(vte, false/* inline */, false/* extension */, DTE.XSDBoolean);
 
@@ -104,10 +104,25 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
     }
 
     /**
+     * Callers must explicitly populate the value cache for a {@link TermId}.
+     * <p>
      * {@inheritDoc}
      */
-    final public V asValue(final LexiconRelation lex) 
-    		throws UnsupportedOperationException {
+    @Override
+    final public V setValue(V v) {
+    	
+    	return super.setValue(v);
+    	
+    }
+    
+    /**
+     * Operation is not supported. You MUST explicitly set the value cache. 
+     * 
+     * {@inheritDoc}
+     * 
+     * @see #setValue(BigdataValue)
+     */
+    final public V asValue(final LexiconRelation lex) {
     	throw new UnsupportedOperationException();
 //		/*
 //		 * Delegates to {@link LexiconRelation#getTerm(IV)}, which is an
@@ -198,6 +213,35 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
         return keyBuilder;
         
     }
-    
+
+	/**
+	 * Override default serialization to send the cached {@link BigdataValue}.
+	 */
+	private void writeObject(java.io.ObjectOutputStream out) throws IOException {
+
+		out.defaultWriteObject();
+		
+		out.writeObject(getValueCache());
+
+	}
+
+	/**
+	 * Override default serialization to recover the cached {@link BigdataValue}
+	 * .
+	 */
+	@SuppressWarnings("unchecked")
+	private void readObject(java.io.ObjectInputStream in) throws IOException,
+			ClassNotFoundException {
+
+		in.defaultReadObject();
+
+		final V v = (V) in.readObject();
+
+		if (v != null) {
+			// set the value cache.
+			setValue(v);
+		}
+		
+	}
 
 }

@@ -57,11 +57,24 @@ public class XSDByteIV<V extends BigdataLiteral> extends
     }
 
     @SuppressWarnings("unchecked")
-    public V asValue(final LexiconRelation lex) {
-    	final BigdataValueFactory f = lex.getValueFactory();
-        final V v = (V) f.createLiteral(value);
-        v.setIV(this);
-        return v;
+	public V asValue(final LexiconRelation lex) {
+		
+    	V v = getValueCache();
+		
+    	if (v == null) {
+    		
+			final BigdataValueFactory f = lex.getValueFactory();
+			
+			v = (V) f.createLiteral(value);
+			
+			v.setIV(this);
+			
+			setValue(v);
+			
+		}
+
+    	return v;
+    	
     }
 
     @Override

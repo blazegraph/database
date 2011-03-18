@@ -635,5 +635,54 @@ public abstract class AbstractIV<V extends BigdataValue, T>
     protected TermId getExtensionDatatype() {
         return null;
     }
-    
+
+    /*
+     * Value cache (transient).
+     * 
+     * Note: TermId overrides serialization to make this non-transient.
+     */
+
+	private volatile transient V cache = null;
+
+	final public V getValue() {
+
+		final V v = cache;
+
+		if (v == null)
+			throw new NotMaterializedException(toString());
+
+		return v;
+
+	}
+
+	/**
+	 * Set the {@link BigdataValue} on the cache.
+	 * 
+	 * @param v
+	 *            The {@link BigdataValue}.
+	 *            
+	 * @return The argument.
+	 */
+	protected V setValue(final V v) {
+
+		return (this.cache = v);
+		
+	}
+
+	/**
+	 * Return the cached {@link BigdataValue} or -<code>null</code> if it is not
+	 * cached.
+	 */
+	final V getValueCache() {
+		
+		return cache;
+		
+	}
+	
+	final public void dropValue() {
+		
+		this.cache = null;
+		
+	}
+	
 }

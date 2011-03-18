@@ -63,6 +63,13 @@ import com.bigdata.rdf.store.TempTripleStore;
  * @version $Id$
  */
 public interface BigdataValue extends Value {//, Comparable<BigdataValue> {
+
+	/**
+	 * Return the factory which produced this object. This is guaranteed to be a
+	 * singleton (there will only be one {@link BigdataValueFactory} instance
+	 * for on a given JVM for all {@link BigdataValue}s associated with a given
+	 * lexicon relation namespace).
+	 */
     public BigdataValueFactory getValueFactory();
     
     /**
