@@ -38,11 +38,16 @@ import com.ibm.icu.text.RuleBasedCollator;
 
 /**
  * This is a unit test for a possible ICU portability bug.
+ * <p>
+ * Note: This issue has been resolved. The problem was that someone had
+ * substituted a difference version of ICU on the classpath in the deployed
+ * system.
  * 
  * @see https://sourceforge.net/apps/trac/bigdata/ticket/193
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestICUPortabilityBug.java 4313 2011-03-18 13:16:31Z
+ *          thompsonbry $
  */
 public class TestICUPortabilityBug extends TestCase {
 
