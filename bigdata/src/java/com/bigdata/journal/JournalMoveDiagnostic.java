@@ -52,6 +52,7 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
@@ -63,13 +64,18 @@ import com.bigdata.rdf.vocab.NoVocabulary;
  * to be run on both the source machine and the target machine. It reports back
  * specific key values from the {@link Name2Addr} index, metadata about the
  * Unicode collation rules in use for that index, and metadata about the
- * {@link Locale} as self-reported by the JVM.  These information are intended
+ * {@link Locale} as self-reported by the JVM. These information are intended
  * for analysis in support of a trouble ticket.
+ * <p>
+ * Note: This issue was resolved. The underlying problem was that someone had
+ * substituted a different ICU dependency (v4.4.1, which is not even a stable
+ * release as opposed to v3.6, which is what we distributed).
  * 
  * @see https://sourceforge.net/apps/trac/bigdata/ticket/193
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: JournalMoveDiagnostic.java 4294 2011-03-14 15:29:50Z
+ *          thompsonbry $
  */
 public class JournalMoveDiagnostic {
 
@@ -92,22 +98,44 @@ public class JournalMoveDiagnostic {
         
         if (args.length == 0) {
 
-            System.err
-                    .println("usage: <filename> (indexName)*");
+            System.err.println("usage: <filename> (indexName)*");
 
             System.exit(1);
-            
+
         }
 
         final File journalFile = new File(args[0]);
+
+        if (Boolean.valueOf(System.getProperty(
+                "com.bigdata.journal.JournalMoveDiagnostic.deleteFirst",
+                "false"))) {
+
+            if (journalFile.exists()) {
+
+                System.out.println("\n\nDELETING OLD JOURNAL: " + journalFile);
+
+                if (!journalFile.delete()) {
+
+                    System.err.println("Could not delete old journal: "
+                            + journalFile);
+
+                }
+
+            }
+
+        }
         
         if (!journalFile.exists()) {
 
             System.out.println("\n\nCREATING NEW JOURNAL "+journalFile);
             
             final Properties properties = new Properties();
-            
+
+            // use the named file.
             properties.setProperty(Options.FILE, journalFile.toString());
+            
+            // use a small initial journal size to keep down the artifact size.
+            properties.setProperty(Options.INITIAL_EXTENT,""+(Bytes.megabyte32*1));
             
             // triples only w/o inference.
             properties.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
