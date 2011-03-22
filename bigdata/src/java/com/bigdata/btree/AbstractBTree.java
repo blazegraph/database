@@ -74,6 +74,7 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.compression.IRecordCompressorFactory;
 import com.bigdata.journal.AbstractTask;
@@ -2871,7 +2872,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                     // Note: this iterator supports traversal with concurrent
                     // modification.
                     src = new MutableBTreeTupleCursor(((BTree) this),
-                            new Tuple(this, flags), fromKey, toKey);
+                            tuple, fromKey, toKey);
 
                 }
 
@@ -4038,5 +4039,124 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //    }
 //    
 //    private long timestamp = System.nanoTime();
-    
+
+	/**
+	 * Encode a raw record address into a byte[] suitable for storing in the
+	 * value associated with a tuple and decoding using
+	 * {@link #decodeRecordAddr(byte[])}
+	 * 
+	 * @param recordAddrBuf
+	 *            The buffer that will be used to format the record address.
+	 * @param addr
+	 *            The raw record address.
+	 * 
+	 * @return A newly allocated byte[] which encodes that address.
+	 */
+	static public byte[] encodeRecordAddr(final ByteArrayBuffer recordAddrBuf,
+			final long addr) {
+
+		recordAddrBuf.reset().putLong(addr);
+
+		return recordAddrBuf.toByteArray();
+
+	}
+
+    /**
+     * Decodes a signed long value as encoded by {@link #append(long)}.
+     * 
+     * @param buf
+     *            The buffer containing the encoded record address.
+     *            
+     * @return The signed long value.
+     */
+    static public long decodeRecordAddr(final byte[] buf) {
+
+        long v = 0L;
+        
+        // big-endian.
+        v += (0xffL & buf[0]) << 56;
+        v += (0xffL & buf[1]) << 48;
+        v += (0xffL & buf[2]) << 40;
+        v += (0xffL & buf[3]) << 32;
+        v += (0xffL & buf[4]) << 24;
+        v += (0xffL & buf[5]) << 16;
+        v += (0xffL & buf[6]) <<  8;
+        v += (0xffL & buf[7]) <<  0;
+
+        return v;
+        
+    }
+
+	/**
+	 * The maximum length of a <code>byte[]</code> value stored within a leaf
+	 * for this {@link BTree}. This value only applies when raw record support
+	 * has been enabled for the {@link BTree}. Values greater than this in
+	 * length will be written as raw records on the backing persistence store.
+	 * 
+	 * @return The maximum size of an inline <code>byte[]</code> value before it
+	 *         is promoted to a raw record.
+	 */
+    int getMaxRecLen() {
+    	
+    	return metadata.getMaxRecLen();
+    	
+    }
+
+	/**
+	 * Read the raw record from the backing store.
+	 * <p>
+	 * Note: This does not cache the record. In general, the file system cache
+	 * should do a good job here.
+	 * 
+	 * @param addr
+	 *            The record address.
+	 * 
+	 * @return The data.
+	 * 
+	 * @todo performance counters for raw records read.
+	 * 
+	 * FIXME Add raw record compression.
+	 */
+	ByteBuffer readRawRecord(final long addr) {
+
+		// read from the backing store.
+		return getStore().read(addr);
+
+	}
+
+	/**
+	 * Write a raw record on the backing store.
+	 * 
+	 * @param b
+	 *            The data.
+	 *            
+	 * @return The address at which the data was written.
+	 * 
+	 * FIXME Add raw record compression.
+	 */
+	long writeRawRecord(final byte[] b) {
+
+		if(isReadOnly())
+			throw new IllegalStateException(ERROR_READ_ONLY);
+		
+		// write the value on the backing store.
+		return getStore().write(ByteBuffer.wrap(b));
+		
+    }
+
+	/**
+	 * Delete a raw record from the backing store.
+	 * 
+	 * @param addr
+	 *            The address of the record.
+	 */
+	void deleteRawRecord(final long addr) {
+		
+		if(isReadOnly())
+			throw new IllegalStateException(ERROR_READ_ONLY);
+
+		getStore().delete(addr);
+		
+	}
+	
 }

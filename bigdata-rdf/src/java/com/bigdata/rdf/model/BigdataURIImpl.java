@@ -148,7 +148,16 @@ public class BigdataURIImpl extends BigdataResourceImpl implements BigdataURI {
         if (o == null)
             return false;
         
-        return uriString.equals(o.stringValue());
+		if ((o instanceof BigdataValue) //
+				&& getIV() != null//
+				&& ((BigdataValue) o).getIV() != null//
+				&& ((BigdataValue) o).getValueFactory() == getValueFactory()) {
+
+			return getIV().equals(((BigdataValue) o).getIV());
+
+        }
+
+		return uriString.equals(o.stringValue());
 
     }
 

@@ -55,6 +55,7 @@ import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.IDataService;
 
 /**
@@ -80,11 +81,11 @@ public class ResultSet implements ILeafData, Externalizable {
      */
     private static final long serialVersionUID = 1334143885190084268L;
 
-    protected transient static final Logger log = Logger.getLogger(ResultSet.class);
+    private transient static final Logger log = Logger.getLogger(ResultSet.class);
 
-    protected transient static final boolean INFO = log.isInfoEnabled();
-
-    protected transient static final boolean DEBUG = log.isDebugEnabled();
+//    protected transient static final boolean INFO = log.isInfoEnabled();
+//
+//    protected transient static final boolean DEBUG = log.isDebugEnabled();
 
     /** true iff keys were requested. */
     private boolean sendKeys;
@@ -369,7 +370,7 @@ public class ResultSet implements ILeafData, Externalizable {
         // @todo byte[] presumes #sources in view <= 127, which it SHOULD be (not checked).
         sourceIndices = sources.length > 1 ? new byte[limit] : null;
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
             log.info("limit=" + limit + ", sendKeys=" + sendKeys
                     + ", sendVals=" + sendVals + ", deleteMarkers="
                     + (deleteMarkers != null ? true : false) + ", timestamps="
@@ -395,7 +396,7 @@ public class ResultSet implements ILeafData, Externalizable {
         if (limit < 0)
             limit = -limit;
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
             log.info("resizing buffers: ntuples=" + ntuples + ", new limit="
                     + limit);
@@ -504,7 +505,7 @@ public class ResultSet implements ILeafData, Externalizable {
         
         this.lastKey = lastKey;
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("ntuples=" + ntuples + ", exhausted=" + exhausted
                     + ", sendKeys=" + sendKeys + ", sendVals=" + sendVals
                     + ", deleteMarkers="
@@ -1261,6 +1262,27 @@ public class ResultSet implements ILeafData, Externalizable {
         return maximumVersionTimestamp;
         
     }
+
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * Note: This implementation always returns {@link IRawStore#NULL} since raw
+	 * records have already been materialized.
+	 */
+	final public long getRawRecord(int index) {
+		return IRawStore.NULL;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * Note: This implementation always returns <code>false</code> since raw
+	 * records have already been materialized and therefore can not be reported
+	 * by {@link #getRawRecord(int)} using this class.
+	 */
+	final public boolean hasRawRecords() {
+		return false;
+	}
 
 //    /**
 //     * FIXME Remove. This is for debugging.

@@ -28,13 +28,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-import com.bigdata.btree.data.ILeafData;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.IBlock;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * Abstract base class with much of the functionality of {@link ITuple}.
@@ -325,21 +326,22 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
         throw new UnsupportedOperationException();
         
     }
-    
-    /**
-     * Copy data and metadata for the index entry from the {@link Leaf} into the
-     * {@link Tuple} and increment the counter of the #of visited entries.
-     * 
-     * @param index
-     *            The index entry.
-     * @param leaf
-     *            The leaf.
-     * 
-     * @todo The various copy methods should also set the [sourceIndex] property
-     *       and {@link ITuple#getSourceIndex()} should be implemented by this
-     *       class (or maybe add a setSourceIndex() to be more flexible).
-     */
-    public void copy(final int index, final ILeafData leaf) {
+
+	/**
+	 * Copy data and metadata for the index entry from the {@link Leaf} into the
+	 * {@link Tuple} and increment the counter of the #of visited entries.
+	 * 
+	 * @param index
+	 *            The index entry.
+	 * @param leaf
+	 *            The leaf. If a raw record must be materialized, it will be
+	 *            read from the backing store for the {@link Leaf}.
+	 * 
+	 * @todo The various copy methods should also set the [sourceIndex] property
+	 *       and {@link ITuple#getSourceIndex()} should be implemented by this
+	 *       class (or maybe add a setSourceIndex() to be more flexible).
+	 */
+    public void copy(final int index, final Leaf leaf) {
         
         nvisited++;
         
@@ -369,11 +371,36 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
             if (!versionDeleted) {
              
                 isNull = leaf.getValues().isNull(index);
-                
-                if(!isNull) {
 
-                    leaf.getValues().copy(index, vbuf);
-                    
+				if (!isNull) {
+
+					if (leaf.hasRawRecords()) {
+
+						final long addr = leaf.getRawRecord(index);
+
+						if (addr == IRawStore.NULL) {
+
+							// copy out of the leaf.
+							leaf.getValues().copy(index, vbuf);
+
+						} else {
+
+							// materialize from the backing store.
+							final ByteBuffer tmp = leaf.btree
+									.readRawRecord(addr);
+
+							// and copy into the value buffer.
+							vbuf.copy(tmp);
+
+						}
+						
+					} else {
+
+						// copy out of the leaf.
+						leaf.getValues().copy(index, vbuf);
+
+					}
+
                 }
                 
             }

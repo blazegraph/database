@@ -23,7 +23,8 @@ abstract public class AbstractHashBucketDataRecordTestCase extends
 	}
 
 	protected ILeafData mockLeafFactory(final IRaba keys, final IRaba vals,
-			final boolean[] deleteMarkers, final long[] versionTimestamps) {
+			final boolean[] deleteMarkers, final long[] versionTimestamps,
+			final boolean[] rawRecords) {
 
 		/*
 		 * Note: This computes the MSB prefix and the hash codes using the
@@ -42,7 +43,7 @@ abstract public class AbstractHashBucketDataRecordTestCase extends
 		}
 
 		return new MockBucketData(keys, vals, deleteMarkers, versionTimestamps,
-				lengthMSB, hashCodes);
+				rawRecords, lengthMSB, hashCodes);
 
 	}
 

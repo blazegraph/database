@@ -35,19 +35,18 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.ICodedRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
-import com.bigdata.htree.data.IBucketData;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * Default implementation for immutable {@link ILeafData} records.
@@ -192,16 +191,20 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
         short flags = 0;
         final boolean hasDeleteMarkers = leaf.hasDeleteMarkers();
         final boolean hasVersionTimestamps = leaf.hasVersionTimestamps();
-        final boolean hasHashKeys = leaf instanceof IBucketData; // @todo add hasHashKeys() method?
+        final boolean hasRawRecords = leaf.hasRawRecords();
+//        final boolean hasHashKeys = leaf instanceof IBucketData; // @todo add hasHashKeys() method?
         if (hasDeleteMarkers) {
             flags |= AbstractReadOnlyNodeData.FLAG_DELETE_MARKERS;
         }
         if (hasVersionTimestamps) {
             flags |= AbstractReadOnlyNodeData.FLAG_VERSION_TIMESTAMPS;
         }
-        if(hasHashKeys) {
-        	flags |= AbstractReadOnlyNodeData.FLAG_HASH_KEYS;
+        if (hasRawRecords) {
+            flags |= AbstractReadOnlyNodeData.FLAG_RAW_RECORDS;
         }
+//        if(hasHashKeys) {
+//        	flags |= AbstractReadOnlyNodeData.FLAG_HASH_KEYS;
+//        }
 
         buf.putShort(flags);
         
@@ -348,87 +351,118 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 
         }
 
-        // hash codes of the keys (MSB prefix plus LSB coded).
-//      final int O_hashKeys;
-      if (hasHashKeys) {
+        // raw records (bit coded).
+//      final int O_rawRecords
+      if (hasRawRecords) {
 
-    	  // The bit length of the hash values.
-    	  final int hashBitLength = 32;//((IBucketData)leaf).getHashBitLength();
+//          O_rawRecords = buf.pos();
 
-    	  // The bit length of the shared MSB prefix.
-    	  final int lengthMSB = ((IBucketData)leaf).getLengthMSB();
+          for (int i = 0; i < nkeys;) {
 
-    	  // The bit length of the LSB which differ for each hash value.
-    	  final int lengthLSB = hashBitLength - lengthMSB;
-    	  
-//    	  buf.putShort((short) hashBitLength);
-    	  
-    	  buf.putShort((short) lengthMSB);
-    	  
-//          O_hashKeys = buf.pos();
+              byte bits = 0;
+              
+              for (int j = 0; j < 8 && i < nkeys; j++, i++) {
 
-			if (nkeys > 0) {
+					if (leaf.getRawRecord(i) != IRawStore.NULL) {
 
-				final int byteLength = BytesUtil
-						.bitFlagByteLength((lengthMSB + (nkeys * lengthLSB))/* nbits */);
+                      // Note: bit order is per BitInputStream & BytesUtil!
+                      bits |= 1 << (7 - j);
+                          
+                  }
+                  
+              }
 
-				final byte[] a = new byte[byteLength];
+              buf.putByte(bits);
 
-				final OutputBitStream obs = new OutputBitStream(a);
-
-				try {
-
-					// The hash of the first key.
-					int h = ((IBucketData) leaf).getHash(0/* index */);
-
-					// Drop off the LSB bits, leaving the MSB bits in the LSB position.
-					h = h >>> lengthLSB;
-
-//					// Reverse bits to since obs writes the LSB of the int.
-//					h = Integer.reverse(h);
-					
-					// The MSB prefix.
-					obs.writeInt(h, lengthMSB/* MSB bits */);
-
-					// The LSB of the hash of each key.
-					for (int i = 0; i < nkeys; i++) {
-
-						// The hash of this key.
-						h = ((IBucketData)leaf).getHash(i);
-						
-						// Drop off the MSB bits.
-						h = h >>> lengthMSB;
-						
-//						// Reverse bits since obs writes the LSB of the int.
-//						h = Integer.reverse(h);
-
-						// The LSB.
-						obs.writeInt(h, lengthLSB);
-
-					}
-
-					// copy onto the buffer.
-					buf.put(a);
-
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-					// Note: close is not necessary if flushed and backed by
-					// byte[].
-					// } finally {
-					// try {
-					// obs.close();
-					// } catch (IOException e) {
-					// log.error(e);
-					// }
-				}
-
-			}
+          }
 
 //      } else {
 //      
-//          O_hashKeys = -1;
+//          O_deleteMarkers = -1;
           
       }
+      
+  // hash codes of the keys (MSB prefix plus LSB coded).
+//      final int O_hashKeys;
+//      if (hasHashKeys) {
+//
+//    	  // The bit length of the hash values.
+//    	  final int hashBitLength = 32;//((IBucketData)leaf).getHashBitLength();
+//
+//    	  // The bit length of the shared MSB prefix.
+//    	  final int lengthMSB = ((IBucketData)leaf).getLengthMSB();
+//
+//    	  // The bit length of the LSB which differ for each hash value.
+//    	  final int lengthLSB = hashBitLength - lengthMSB;
+//    	  
+////    	  buf.putShort((short) hashBitLength);
+//    	  
+//    	  buf.putShort((short) lengthMSB);
+//    	  
+////          O_hashKeys = buf.pos();
+//
+//			if (nkeys > 0) {
+//
+//				final int byteLength = BytesUtil
+//						.bitFlagByteLength((lengthMSB + (nkeys * lengthLSB))/* nbits */);
+//
+//				final byte[] a = new byte[byteLength];
+//
+//				final OutputBitStream obs = new OutputBitStream(a);
+//
+//				try {
+//
+//					// The hash of the first key.
+//					int h = ((IBucketData) leaf).getHash(0/* index */);
+//
+//					// Drop off the LSB bits, leaving the MSB bits in the LSB position.
+//					h = h >>> lengthLSB;
+//
+////					// Reverse bits to since obs writes the LSB of the int.
+////					h = Integer.reverse(h);
+//					
+//					// The MSB prefix.
+//					obs.writeInt(h, lengthMSB/* MSB bits */);
+//
+//					// The LSB of the hash of each key.
+//					for (int i = 0; i < nkeys; i++) {
+//
+//						// The hash of this key.
+//						h = ((IBucketData)leaf).getHash(i);
+//						
+//						// Drop off the MSB bits.
+//						h = h >>> lengthMSB;
+//						
+////						// Reverse bits since obs writes the LSB of the int.
+////						h = Integer.reverse(h);
+//
+//						// The LSB.
+//						obs.writeInt(h, lengthLSB);
+//
+//					}
+//
+//					// copy onto the buffer.
+//					buf.put(a);
+//
+//				} catch (IOException e) {
+//					throw new RuntimeException(e);
+//					// Note: close is not necessary if flushed and backed by
+//					// byte[].
+//					// } finally {
+//					// try {
+//					// obs.close();
+//					// } catch (IOException e) {
+//					// log.error(e);
+//					// }
+//				}
+//
+//			}
+//
+////      } else {
+////      
+////          O_hashKeys = -1;
+//          
+//      }
       
         // Slice containing the coded leaf.
         final AbstractFixedByteArrayBuffer slice = buf.slice(//
@@ -461,31 +495,31 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 	 * Note: The leading byte of the record format codes for a leaf, a
 	 * double-linked leaf or a node in a manner which is compatible with
 	 * {@link ReadOnlyNodeData}.
-	 * <p>
-	 * The {@link DefaultLeafCoder} automatically maintains hash values for keys
-	 * for an {@link IBucketData} record. The hash values of the keys in the
-	 * bucket will have a shared prefix (the MSB hash prefix) which corresponds
-	 * to the globalDepth of the path through the hash tree leading to this
-	 * bucket less the localDepth of this bucket. It is therefore possible to
-	 * store only the LSB bits of the hash values in the page and reconstruct
-	 * the hash values using the MSB bits from the path through the hash tree.
-	 * In order to be able to reconstruct the full hash code key based solely on
-	 * local information, the MSB bits can be written out once and the LSB bits
-	 * can be written out once per tuple. Testing the hash value of a key may
-	 * then be done considering only the LSB bits of the hash value. This
-	 * storage scheme also has the advantage that the hash value is not
-	 * restricted to an int32 and is therefore compatible with the use of
-	 * cryptographic hash functions. (If hash values are stored in a B+Tree leaf
-	 * they will not shared this prefix property and can not be compressed in
-	 * this manner).
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
 	 * @version $Id: DefaultLeafCoder.java 3991 2010-12-03 18:48:02Z thompsonbry
 	 *          $
 	 */
-    static private class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
-            implements ILeafData, IBucketData {
+//	 * <p>
+//	 * The {@link DefaultLeafCoder} automatically maintains hash values for keys
+//	 * for an {@link IBucketData} record. The hash values of the keys in the
+//	 * bucket will have a shared prefix (the MSB hash prefix) which corresponds
+//	 * to the globalDepth of the path through the hash tree leading to this
+//	 * bucket less the localDepth of this bucket. It is therefore possible to
+//	 * store only the LSB bits of the hash values in the page and reconstruct
+//	 * the hash values using the MSB bits from the path through the hash tree.
+//	 * In order to be able to reconstruct the full hash code key based solely on
+//	 * local information, the MSB bits can be written out once and the LSB bits
+//	 * can be written out once per tuple. Testing the hash value of a key may
+//	 * then be done considering only the LSB bits of the hash value. This
+//	 * storage scheme also has the advantage that the hash value is not
+//	 * restricted to an int32 and is therefore compatible with the use of
+//	 * cryptographic hash functions. (If hash values are stored in a B+Tree leaf
+//	 * they will not shared this prefix property and can not be compressed in
+//	 * this manner).
+	 static private class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
+            implements ILeafData {//, IBucketData {
 
         /** The backing buffer. */
         private final AbstractFixedByteArrayBuffer b;
@@ -520,23 +554,30 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
         private final int versionTimestampBits;
 
 		/**
-		 * Offset of the int32 hash values in the buffer encoding hash value of
-		 * the tuple keys -or- <code>-1</code> if the leaf does not report those
-		 * data.
+		 * Offset of the bit flags in the buffer encoding the presence of tuples
+		 * with raw records -or- <code>-1</code> if the leaf does not report
+		 * those data.
 		 */
-        private final int O_hashKeys;
-
-		/**
-		 * The #of bits used to code the hash keys -or- ZERO (0) if they are not
-		 * present. (The length of the MSB hash prefix is 32-lengthLSB.)
-		 */
-        private final int lengthLSB;
+        private final int O_rawRecords;
         
-		/**
-		 * The MSB hash prefix shared by all hash codes on this page -or- ZERO
-		 * (0) if hash codes are not present in the page.
-		 */
-        private final int hashMSB;
+//		/**
+//		 * Offset of the int32 hash values in the buffer encoding hash value of
+//		 * the tuple keys -or- <code>-1</code> if the leaf does not report those
+//		 * data.
+//		 */
+//        private final int O_hashKeys;
+
+//		/**
+//		 * The #of bits used to code the hash keys -or- ZERO (0) if they are not
+//		 * present. (The length of the MSB hash prefix is 32-lengthLSB.)
+//		 */
+//        private final int lengthLSB;
+//        
+//		/**
+//		 * The MSB hash prefix shared by all hash codes on this page -or- ZERO
+//		 * (0) if hash codes are not present in the page.
+//		 */
+//        private final int hashMSB;
         
         public final AbstractFixedByteArrayBuffer data() {
 
@@ -600,7 +641,8 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
             pos += SIZEOF_FLAGS;
             final boolean hasVersionTimestamps = ((flags & FLAG_VERSION_TIMESTAMPS) != 0);
             final boolean hasDeleteMarkers = ((flags & FLAG_DELETE_MARKERS) != 0);
-			final boolean hasHashKeys = ((flags & FLAG_HASH_KEYS) != 0);
+            final boolean hasRawRecords = ((flags & FLAG_RAW_RECORDS) != 0);
+//			final boolean hasHashKeys = ((flags & FLAG_HASH_KEYS) != 0);
 
             this.nkeys = buf.getInt(pos);
             pos += SIZEOF_NKEYS;
@@ -655,48 +697,62 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
                 
             }
 
-            if(hasHashKeys) {
+            // raw record flags
+            if (hasRawRecords) {
+                
+                O_rawRecords = pos;
 
-				final int lengthMSB = buf.getShort(pos);
-				pos += 2;
-
-				lengthLSB = 32 /* hashBitLength */- lengthMSB;
-
-				/*
-				 * The byte offset to the start of the bit coded hash keys. The
-				 * first bit coded value is the MSB prefix. You need to skip
-				 * over that when indexing into the LSB array.
-				 */
-				O_hashKeys = pos;
-
-				final int byteLength = BytesUtil
-						.bitFlagByteLength((lengthMSB + (nkeys * lengthLSB))/* nbits */);
-
-				if (nkeys > 0) {
-					
-					final InputBitStream ibs = buf.slice(pos, byteLength)
-							.getInputBitStream();
-
-					try {
-						hashMSB = ibs.readInt(lengthMSB);
-					} catch (IOException ex) {
-						// Note: should not be thrown.
-						throw new RuntimeException(ex);
-					}
-					
-				} else {
-					
-					hashMSB = 0;
-					
-				}
-            	
+                // advance past the bit flags.
+                pos += BytesUtil.bitFlagByteLength(nkeys);// bit coded.
+                
             } else {
-            	
-            	O_hashKeys = -1;
-            	lengthLSB = 0;
-            	hashMSB = 0;
-            	
+                
+                O_rawRecords = -1;
+                
             }
+            
+//            if(hasHashKeys) {
+//
+//				final int lengthMSB = buf.getShort(pos);
+//				pos += 2;
+//
+//				lengthLSB = 32 /* hashBitLength */- lengthMSB;
+//
+//				/*
+//				 * The byte offset to the start of the bit coded hash keys. The
+//				 * first bit coded value is the MSB prefix. You need to skip
+//				 * over that when indexing into the LSB array.
+//				 */
+//				O_hashKeys = pos;
+//
+//				final int byteLength = BytesUtil
+//						.bitFlagByteLength((lengthMSB + (nkeys * lengthLSB))/* nbits */);
+//
+//				if (nkeys > 0) {
+//					
+//					final InputBitStream ibs = buf.slice(pos, byteLength)
+//							.getInputBitStream();
+//
+//					try {
+//						hashMSB = ibs.readInt(lengthMSB);
+//					} catch (IOException ex) {
+//						// Note: should not be thrown.
+//						throw new RuntimeException(ex);
+//					}
+//					
+//				} else {
+//					
+//					hashMSB = 0;
+//					
+//				}
+//            	
+//            } else {
+//            	
+//            	O_hashKeys = -1;
+//            	lengthLSB = 0;
+//            	hashMSB = 0;
+//            	
+//            }
             
             // save reference to buffer
             this.b = buf;
@@ -759,7 +815,8 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
             pos += SIZEOF_FLAGS;
             final boolean hasVersionTimestamps = ((flags & FLAG_VERSION_TIMESTAMPS) != 0);
             final boolean hasDeleteMarkers = ((flags & FLAG_DELETE_MARKERS) != 0);
-			final boolean hasHashKeys = ((flags & FLAG_HASH_KEYS) != 0);
+            final boolean hasRawRecords = ((flags & FLAG_RAW_RECORDS) != 0);
+//			final boolean hasHashKeys = ((flags & FLAG_HASH_KEYS) != 0);
 
             this.nkeys = buf.getInt(pos);
             pos += SIZEOF_NKEYS;
@@ -814,48 +871,62 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
                 
             }
 
-            if(hasHashKeys) {
+            // raw record markers
+            if (hasRawRecords) {
+                
+                O_rawRecords = pos;
 
-				final int lengthMSB = buf.getShort(pos);
-				pos += 2;
-
-				lengthLSB = 32 /* hashBitLength */- lengthMSB;
-
-				/*
-				 * The byte offset to the start of the bit coded hash keys. The
-				 * first bit coded value is the MSB prefix. You need to skip
-				 * over that when indexing into the LSB array.
-				 */
-				O_hashKeys = pos;
-
-				final int byteLength = BytesUtil
-						.bitFlagByteLength((lengthMSB + (nkeys * lengthLSB))/* nbits */);
-
-				if (nkeys > 0) {
-					
-					final InputBitStream ibs = buf.slice(pos, byteLength)
-							.getInputBitStream();
-
-					try {
-						hashMSB = ibs.readInt(lengthMSB);
-					} catch (IOException ex) {
-						// Note: should not be thrown.
-						throw new RuntimeException(ex);
-					}
-					
-				} else {
-					
-					hashMSB = 0;
-					
-				}
-            	
+                // advance past the bit flags.
+                pos += BytesUtil.bitFlagByteLength(nkeys);// bit coded.
+                
             } else {
-            	
-            	O_hashKeys = -1;
-            	lengthLSB = 0;
-            	hashMSB = 0;
-            	
+                
+                O_rawRecords = -1;
+                
             }
+
+//            if(hasHashKeys) {
+//
+//				final int lengthMSB = buf.getShort(pos);
+//				pos += 2;
+//
+//				lengthLSB = 32 /* hashBitLength */- lengthMSB;
+//
+//				/*
+//				 * The byte offset to the start of the bit coded hash keys. The
+//				 * first bit coded value is the MSB prefix. You need to skip
+//				 * over that when indexing into the LSB array.
+//				 */
+//				O_hashKeys = pos;
+//
+//				final int byteLength = BytesUtil
+//						.bitFlagByteLength((lengthMSB + (nkeys * lengthLSB))/* nbits */);
+//
+//				if (nkeys > 0) {
+//					
+//					final InputBitStream ibs = buf.slice(pos, byteLength)
+//							.getInputBitStream();
+//
+//					try {
+//						hashMSB = ibs.readInt(lengthMSB);
+//					} catch (IOException ex) {
+//						// Note: should not be thrown.
+//						throw new RuntimeException(ex);
+//					}
+//					
+//				} else {
+//					
+//					hashMSB = 0;
+//					
+//				}
+//            	
+//            } else {
+//            	
+//            	O_hashKeys = -1;
+//            	lengthLSB = 0;
+//            	hashMSB = 0;
+//            	
+//            }
 
             // save reference to buffer
             this.b = buf;
@@ -928,11 +999,17 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
             
         }
 
-        final public boolean hasHashKeys() {
+        final public boolean hasRawRecords() {
 
-            return (flags & FLAG_HASH_KEYS) != 0;
+            return (flags & FLAG_RAW_RECORDS) != 0;
             
         }
+
+//        final public boolean hasHashKeys() {
+//
+//            return (flags & FLAG_HASH_KEYS) != 0;
+//            
+//        }
 
         public long getMinimumVersionTimestamp() {
 
@@ -996,147 +1073,164 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 
         }
 
-        final public int getLengthMSB() {
-        	
+        final public long getRawRecord(final int index) {
 
-			if (!hasHashKeys())
-				throw new UnsupportedOperationException();
+            if (!hasRawRecords())
+                throw new UnsupportedOperationException();
 
-			final int lengthMSB = 32/* hashBitLength */- lengthLSB;
+			final boolean flag = b.getBit((O_rawRecords << 3) + index);
 
-			return lengthMSB;
-        	
+			if (!flag)
+				return IRawStore.NULL;
+
+			/*
+			 * @todo This could be optimized to decode without materializing the
+			 * byte[8] array which represents the long addr.
+			 */
+			return AbstractBTree.decodeRecordAddr(vals.get(index));
+			
         }
+
+//        final public int getLengthMSB() {
+//        	
+//			if (!hasHashKeys())
+//				throw new UnsupportedOperationException();
+//
+//			final int lengthMSB = 32/* hashBitLength */- lengthLSB;
+//
+//			return lengthMSB;
+//        	
+//        }
         
-		final public int getHash(final int index) {
+//		final public int getHash(final int index) {
+//
+//            if (index < 0 || index >= nkeys)
+//                throw new IllegalArgumentException();
+//            
+//			if (!hasHashKeys())
+//				throw new UnsupportedOperationException();
+//
+//			final int lengthMSB = 32/* hashBitLength */- lengthLSB;
+//
+//			final int byteLength = BytesUtil.bitFlagByteLength(lengthMSB
+//					+ (nkeys * lengthLSB)/* nbits */);
+//
+//			final InputBitStream ibs = b.slice(O_hashKeys, byteLength)
+//					.getInputBitStream();
+//
+//			try {
+//
+//				final long position = lengthMSB + index * lengthLSB;
+//
+//				ibs.position(position);
+//				
+//				int h = ibs.readInt(lengthLSB);
+//				
+//				h |= hashMSB;
+//        		
+//				return h;
+//				
+//        	} catch(IOException ex) {
+//        		
+//        		throw new RuntimeException(ex);
+//        		
+//        	}
+//        	
+//        }
+//
+//		public Iterator<Integer> hashIterator(final int h) {
+//			
+//			return new HashMatchIterator(h);
+//			
+//		}
 
-            if (index < 0 || index >= nkeys)
-                throw new IllegalArgumentException();
-            
-			if (!hasHashKeys())
-				throw new UnsupportedOperationException();
-
-			final int lengthMSB = 32/* hashBitLength */- lengthLSB;
-
-			final int byteLength = BytesUtil.bitFlagByteLength(lengthMSB
-					+ (nkeys * lengthLSB)/* nbits */);
-
-			final InputBitStream ibs = b.slice(O_hashKeys, byteLength)
-					.getInputBitStream();
-
-			try {
-
-				final long position = lengthMSB + index * lengthLSB;
-
-				ibs.position(position);
-				
-				int h = ibs.readInt(lengthLSB);
-				
-				h |= hashMSB;
-        		
-				return h;
-				
-        	} catch(IOException ex) {
-        		
-        		throw new RuntimeException(ex);
-        		
-        	}
-        	
-        }
-
-		public Iterator<Integer> hashIterator(final int h) {
-			
-			return new HashMatchIterator(h);
-			
-		}
-
-		/**
-		 * Visits the index of each bucket entry having a matching hash code.
-		 * 
-		 * @todo a trie over the hash entries would provide much faster search.
-		 */
-		private class HashMatchIterator implements Iterator<Integer> {
-			
-			private final int h;
-			private final int lengthMSB;
-			private final InputBitStream ibs;
-			private int currentIndex = 0;
-			private Integer nextResult = null;
-
-			private HashMatchIterator(final int h) {
-
-				this.h = h;
-				
-				lengthMSB = 32/* hashBitLength */- lengthLSB;
-
-				final int byteLength = BytesUtil.bitFlagByteLength(lengthMSB
-						+ (nkeys * lengthLSB)/* nbits */);
-
-				ibs = b.slice(O_hashKeys, byteLength)
-						.getInputBitStream();
-
-			}
-
-			public boolean hasNext() {
-
-				final int n = getKeyCount();
-
-				while (nextResult == null && currentIndex < n) {
-
-					final int index = currentIndex++;
-					
-					int h1;
-					try {
-
-						// We do not need to re-position the ibs.
-//						final long position = lengthMSB + currentIndex
-//								* lengthLSB;
-//						ibs.position(position);
-
-						h1 = ibs.readInt(lengthLSB);
-
-						h1 |= hashMSB;
-
-					} catch (IOException ex) {
-
-						throw new RuntimeException(ex);
-
-					}
-
-					if (h1 == h) {
-
-						nextResult = Integer.valueOf(index);
-
-						break;
-
-					}
-					
-				}
-
-				return nextResult != null;
-				
-			}
-
-			public Integer next() {
-				
-				if (!hasNext())
-					throw new NoSuchElementException();
-				
-				final Integer tmp = nextResult;
-				
-				nextResult = null;
-				
-				return tmp;
-				
-			}
-
-			public void remove() {
-				
-				throw new UnsupportedOperationException();
-				
-			}
-
-		}
+//		/**
+//		 * Visits the index of each bucket entry having a matching hash code.
+//		 * 
+//		 * @todo a trie over the hash entries would provide much faster search.
+//		 */
+//		private class HashMatchIterator implements Iterator<Integer> {
+//			
+//			private final int h;
+//			private final int lengthMSB;
+//			private final InputBitStream ibs;
+//			private int currentIndex = 0;
+//			private Integer nextResult = null;
+//
+//			private HashMatchIterator(final int h) {
+//
+//				this.h = h;
+//				
+//				lengthMSB = 32/* hashBitLength */- lengthLSB;
+//
+//				final int byteLength = BytesUtil.bitFlagByteLength(lengthMSB
+//						+ (nkeys * lengthLSB)/* nbits */);
+//
+//				ibs = b.slice(O_hashKeys, byteLength)
+//						.getInputBitStream();
+//
+//			}
+//
+//			public boolean hasNext() {
+//
+//				final int n = getKeyCount();
+//
+//				while (nextResult == null && currentIndex < n) {
+//
+//					final int index = currentIndex++;
+//					
+//					int h1;
+//					try {
+//
+//						// We do not need to re-position the ibs.
+////						final long position = lengthMSB + currentIndex
+////								* lengthLSB;
+////						ibs.position(position);
+//
+//						h1 = ibs.readInt(lengthLSB);
+//
+//						h1 |= hashMSB;
+//
+//					} catch (IOException ex) {
+//
+//						throw new RuntimeException(ex);
+//
+//					}
+//
+//					if (h1 == h) {
+//
+//						nextResult = Integer.valueOf(index);
+//
+//						break;
+//
+//					}
+//					
+//				}
+//
+//				return nextResult != null;
+//				
+//			}
+//
+//			public Integer next() {
+//				
+//				if (!hasNext())
+//					throw new NoSuchElementException();
+//				
+//				final Integer tmp = nextResult;
+//				
+//				nextResult = null;
+//				
+//				return tmp;
+//				
+//			}
+//
+//			public void remove() {
+//				
+//				throw new UnsupportedOperationException();
+//				
+//			}
+//
+//		}
 
 		final public IRaba getKeys() {
             
@@ -1309,25 +1403,43 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 
         }
 
-        if (leaf instanceof IBucketData) {
+        if (leaf.hasRawRecords()) {
 
-        	final IBucketData d = (IBucketData)leaf;
-        	
-			sb.append(",\nhashCodes={lengthMSB=" + d.getLengthMSB()
-					+ ",tuples=[");
+            sb.append(",\nrawRecords=[");
 
             for (int i = 0; i < nkeys; i++) {
 
                 if (i > 0)
                     sb.append(", ");
 
-                sb.append(d.getHash(i));
+                sb.append(leaf.getRawRecord(i));
 
             }
 
             sb.append("]");
 
         }
+
+
+//        if (leaf instanceof IBucketData) {
+//
+//        	final IBucketData d = (IBucketData)leaf;
+//        	
+//			sb.append(",\nhashCodes={lengthMSB=" + d.getLengthMSB()
+//					+ ",tuples=[");
+//
+//            for (int i = 0; i < nkeys; i++) {
+//
+//                if (i > 0)
+//                    sb.append(", ");
+//
+//                sb.append(d.getHash(i));
+//
+//            }
+//
+//            sb.append("]");
+//
+//        }
 
         return sb;
 

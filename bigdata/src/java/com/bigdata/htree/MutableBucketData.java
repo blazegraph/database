@@ -45,6 +45,13 @@ import com.bigdata.rawstore.Bytes;
  * and defines methods for a variety of mutations on the {@link IBucketData}
  * record which operate by direct manipulation of the Java objects.
  * <p>
+ * Note: The primary differences between maintaining a bucket and maintaining a
+ * B+Tree leaf are that: (a) tuples in the bucket do not have an intrinsic
+ * order; (b) tuples with the same key are permitted; and (c) overflow pages
+ * must be provided for when the #of duplicates in a bucket exceeds the capacity
+ * of the bucket (this can be done by conversion of the bucket to a blob record
+ * or by chaining the bucket).
+ * <p>
  * Note: package private fields are used so that they may be directly accessed
  * by the {@link HashBucket} class.
  * 
@@ -276,6 +283,16 @@ public class MutableBucketData implements IBucketData {
 	}
 
 	public boolean isReadOnly() {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	public long getRawRecord(int index) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public boolean hasRawRecords() {
 		// TODO Auto-generated method stub
 		return false;
 	}

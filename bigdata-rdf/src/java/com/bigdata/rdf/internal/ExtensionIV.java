@@ -87,14 +87,16 @@ public class ExtensionIV<V extends BigdataLiteral>
 
 		V v = getValueCache();
 		
-		if (v != null) {
+		if (v == null) {
 			
 			final BigdataValueFactory f = lex.getValueFactory();
 			
 			final ILexiconConfiguration config = lex.getLexiconConfiguration();
-			
+
 			v = setValue((V) config.asValue(this, f));
-			
+
+			v.setIV(this);
+
 		}
 
 		return v;

@@ -27,19 +27,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import java.util.Properties;
+import java.io.File;
+import java.nio.ByteBuffer;
 import java.util.UUID;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Journal;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.TestRestartSafe;
+import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
-import com.bigdata.rwstore.RWStore;
 
 /**
  * Test suite for {@link BTree#removeAll()}.
@@ -169,5 +170,153 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
         }
         
     }
+
+	/**
+	 * Unit test for {@link BTree#removeAll()} which verifies that the tuples
+	 * are actually deleted one-by-one and the backing raw records released if
+	 * the index supports raw records.
+	 */
+    public void test_removeAll_rawRecords() {
+    	
+        final MyRawStore store = new MyRawStore(new SimpleMemoryRawStore());
+
+        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+
+        metadata.setBranchingFactor(10);
+        metadata.setRawRecords(true);
+        metadata.setMaxRecLen(64);
+
+		final BTree btree = BTree.create(store, metadata);
+
+		assertEquals(64, btree.getMaxRecLen());
+
+		assertTrue(((ILeafData) btree.getRoot()).hasRawRecords());
+
+		btree.insert(new byte[] { 1 }, new byte[] { 1 });
+		btree.insert(new byte[] { 2 }, new byte[btree.getMaxRecLen() + 1]);
+		btree.insert(new byte[] { 3 }, new byte[] { 3 });
+
+		final Leaf root = (Leaf)btree.getRoot();
+		
+		assertTrue(root.getRawRecord(0) == IRawStore.NULL);
+		
+		assertTrue(root.getRawRecord(1) != IRawStore.NULL);
+		
+		assertTrue(root.getRawRecord(2) == IRawStore.NULL);
+		
+		store.expectDelete = root.getRawRecord(1);
+
+		btree.removeAll();
+		
+		// verify that the raw record was deleted.
+		assertEquals(IRawStore.NULL,store.expectDelete);
+    	
+    }
+    
+    /**
+	 * Helper class is used to watch for deletes of raw records from the backing
+	 * store.
+	 * 
+	 * @author thompsonbry
+	 */
+	private static class MyRawStore implements IRawStore {
+		
+		final IRawStore delegate;
+		
+		long expectDelete = IRawStore.NULL;
+
+		public MyRawStore(final IRawStore delegate) {
+			this.delegate = delegate;
+		}
+
+		public void close() {
+			delegate.close();
+		}
+
+		public void delete(long addr) {
+			if (expectDelete != IRawStore.NULL) {
+				assertEquals(expectDelete, addr);
+				expectDelete = IRawStore.NULL;
+			}
+			delegate.delete(addr);
+		}
+
+		public void deleteResources() {
+			delegate.deleteResources();
+		}
+
+		public void destroy() {
+			delegate.destroy();
+		}
+
+		public void force(boolean metadata) {
+			delegate.force(metadata);
+		}
+
+		public int getByteCount(long addr) {
+			return delegate.getByteCount(addr);
+		}
+
+		public CounterSet getCounters() {
+			return delegate.getCounters();
+		}
+
+		public File getFile() {
+			return delegate.getFile();
+		}
+
+		public long getOffset(long addr) {
+			return delegate.getOffset(addr);
+		}
+
+		public IResourceMetadata getResourceMetadata() {
+			return delegate.getResourceMetadata();
+		}
+
+		public UUID getUUID() {
+			return delegate.getUUID();
+		}
+
+		public boolean isFullyBuffered() {
+			return delegate.isFullyBuffered();
+		}
+
+		public boolean isOpen() {
+			return delegate.isOpen();
+		}
+
+		public boolean isReadOnly() {
+			return delegate.isReadOnly();
+		}
+
+		public boolean isStable() {
+			return delegate.isStable();
+		}
+
+		public ByteBuffer read(long addr) {
+			return delegate.read(addr);
+		}
+
+		public long size() {
+			return delegate.size();
+		}
+
+		public long toAddr(int nbytes, long offset) {
+			return delegate.toAddr(nbytes, offset);
+		}
+
+		public String toString(long addr) {
+			return delegate.toString(addr);
+		}
+
+		public long write(ByteBuffer data, long oldAddr) {
+			return delegate.write(data, oldAddr);
+		}
+
+		public long write(ByteBuffer data) {
+			return delegate.write(data);
+		}
+
+	}
 
 }

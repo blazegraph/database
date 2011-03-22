@@ -1101,18 +1101,36 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
         if (DEBUG)
             log.debug("key="+BytesUtil.toString(key));
+
+		/*
+		 * Remove the last visited tuple.
+		 * 
+		 * Note: this will cause the tuples in the current leaf to have a gap
+		 * (at least logically) and the remaining tuples will be moved down to
+		 * cover that gap. This means that the [index] for the cursor position
+		 * needs to be corrected. That is handled when the cursor position's
+		 * listener notices the mutation event.
+		 * 
+		 * Note: This uses the [tuple] on the iterator. This is an optimization
+		 * for REMOVEALL. The [tuple] on the iterator will not have the KEYS or
+		 * VALUES flags set when REMOVEALL is specified for the iterator. That
+		 * means that we will not materialize those keys or values. This reduces
+		 * heap churn and also prevents disk hits when the value is a raw
+		 * record.
+		 */
         
-        /*
-         * Remove the last visited tuple.
-         * 
-         * Note: this will cause the tuples in the current leaf to have a gap
-         * (at least logically) and the remaining tuples will be moved down to
-         * cover that gap. This means that the [index] for the cursor position
-         * needs to be corrected.  That is handled when the cursor position's
-         * listener notices the mutation event.
-         */
+        if (btree.getIndexMetadata().getDeleteMarkers()) {
+
+            // set the delete marker.
+            btree.insert(key, null/* val */, true/* delete */,
+                    btree.getRevisionTimestamp(), tuple);
+            
+        } else {
         
-        btree.remove(key);
+            // remove the tuple.
+        	btree.remove(key, tuple);
+            
+        }
         
     }
 
@@ -1487,7 +1505,8 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
                 
             }
             
-            tuple.copy(index, leafCursor.leaf()); // Note: increments [tuple.nvisited] !!!
+            // Note: increments [tuple.nvisited] !!!
+            tuple.copy(index, leafCursor.leaf());
 
             if(DEBUG) {
                 

@@ -34,6 +34,7 @@ import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.MutableValueBuffer;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * Implementation maintains Java objects corresponding to the persistent data
@@ -106,20 +107,33 @@ public class MutableLeafData implements ILeafData {
      */
     long minimumVersionTimestamp;
     long maximumVersionTimestamp;
-    
-    /**
-     * Create an empty data record with internal arrays dimensioned for the
-     * specified branching factor.
+
+	/**
+	 * Bit markers indicating whether the value associated with the tuple is a
+	 * raw record or an inline byte[] stored within {@link #getValues() values
+	 * raba}.
      * 
-     * @param branchingFactor
-     *            The branching factor for the owning B+Tree.
-     * @param hasVersionTimestamps
-     *            <code>true</code> iff version timestamps will be maintained.
-     * @param hasDeleteMarkers
-     *            <code>true</code> iff delete markers will be maintained.
-     */
+     * @todo {@link BitVector}? The code in {@link Leaf} which makes changes to
+     *       this array would have to be updated.
+	 */
+    final boolean[] rawRecords;
+
+	/**
+	 * Create an empty data record with internal arrays dimensioned for the
+	 * specified branching factor.
+	 * 
+	 * @param branchingFactor
+	 *            The branching factor for the owning B+Tree.
+	 * @param hasVersionTimestamps
+	 *            <code>true</code> iff version timestamps will be maintained.
+	 * @param hasDeleteMarkers
+	 *            <code>true</code> iff delete markers will be maintained.
+	 * @param hasRawRecords
+	 *            <code>true</code> iff raw record markers will be maintained.
+	 */
     public MutableLeafData(final int branchingFactor,
-            final boolean hasVersionTimestamps, final boolean hasDeleteMarkers) {
+            final boolean hasVersionTimestamps, final boolean hasDeleteMarkers,
+            final boolean hasRawRecords) {
 
         keys = new MutableKeyBuffer(branchingFactor + 1);
 
@@ -134,6 +148,8 @@ public class MutableLeafData implements ILeafData {
         
         deleteMarkers = (hasDeleteMarkers ? new boolean[branchingFactor + 1]
                 : null);
+        
+		rawRecords = (hasRawRecords ? new boolean[branchingFactor + 1] : null);
 
     }
 
@@ -155,7 +171,10 @@ public class MutableLeafData implements ILeafData {
                 : null);
 
         deleteMarkers = (src.hasDeleteMarkers() ? new boolean[branchingFactor + 1]
-                : null);
+                                                              : null);
+
+		rawRecords = (src.hasRawRecords() ? new boolean[branchingFactor + 1]
+				: null);
 
         final int nkeys = keys.size();
         
@@ -177,7 +196,6 @@ public class MutableLeafData implements ILeafData {
 
             maximumVersionTimestamp = Long.MIN_VALUE;
 
-
         }
         
         if (deleteMarkers != null) {
@@ -185,6 +203,16 @@ public class MutableLeafData implements ILeafData {
             for (int i = 0; i < nkeys; i++) {
 
                 deleteMarkers[i] = src.getDeleteMarker(i);
+                
+            }
+            
+        }
+
+        if (rawRecords != null) {
+
+            for (int i = 0; i < nkeys; i++) {
+
+				rawRecords[i] = src.getRawRecord(i) != IRawStore.NULL;
                 
             }
             
@@ -206,9 +234,9 @@ public class MutableLeafData implements ILeafData {
      *            An array of the delete markers (iff the version metadata is
      *            being maintained).
      */
-    public MutableLeafData(final MutableKeyBuffer keys,
+    MutableLeafData(final MutableKeyBuffer keys,
             final MutableValueBuffer values, final long[] versionTimestamps,
-            final boolean[] deleteMarkers) {
+            final boolean[] deleteMarkers, final boolean[] rawRecords) {
         
         assert keys != null;
         assert values != null;
@@ -219,11 +247,15 @@ public class MutableLeafData implements ILeafData {
         if (deleteMarkers != null) {
             assert deleteMarkers.length == keys.capacity();
         }
+        if (rawRecords != null) {
+            assert rawRecords.length == keys.capacity();
+        }
 
         this.keys = keys;
         this.vals = values;
         this.versionTimestamps = versionTimestamps;
         this.deleteMarkers = deleteMarkers;
+        this.rawRecords = rawRecords;
 
         if (versionTimestamps != null)
             recalcMinMaxVersionTimestamp();
@@ -313,6 +345,24 @@ public class MutableLeafData implements ILeafData {
 
     }
 
+    public final long getRawRecord(final int index) {
+
+        if (rawRecords == null)
+            throw new UnsupportedOperationException();
+
+        assert rangeCheckTupleIndex(index);
+
+		if (!rawRecords[index])
+			return IRawStore.NULL;
+
+		final byte[] val = vals.get(index);
+		
+		final long addr = AbstractBTree.decodeRecordAddr(val);
+		
+		return addr;
+		
+    }
+
     final public IRaba getValues() {
         
         return vals;
@@ -346,6 +396,12 @@ public class MutableLeafData implements ILeafData {
     final public int getValueCount() {
         
         return vals.size();
+        
+    }
+    
+    final public boolean hasRawRecords() {
+        
+        return rawRecords != null; 
         
     }
     

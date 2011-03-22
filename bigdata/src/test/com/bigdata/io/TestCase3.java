@@ -155,4 +155,41 @@ public class TestCase3 extends TestCase2 {
 
     }
 
+	/**
+	 * Return the data in the buffer.
+	 */
+	public static byte[] getBytes(ByteBuffer buf) {
+
+		if (buf.hasArray() && buf.arrayOffset() == 0 && buf.position() == 0
+				&& buf.limit() == buf.capacity()) {
+
+			/*
+			 * Return the backing array.
+			 */
+
+			return buf.array();
+
+		}
+
+		/*
+		 * Copy the expected data into a byte[] using a read-only view on the
+		 * buffer so that we do not mess with its position, mark, or limit.
+		 */
+		final byte[] a;
+		{
+
+			buf = buf.asReadOnlyBuffer();
+
+			final int len = buf.remaining();
+
+			a = new byte[len];
+
+			buf.get(a);
+
+		}
+
+		return a;
+
+	}
+
 }

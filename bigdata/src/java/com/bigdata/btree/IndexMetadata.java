@@ -39,6 +39,7 @@ import org.CognitiveWeb.extser.LongPacker;
 import org.apache.log4j.Logger;
 
 import com.bigdata.LRUNexus;
+import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.isolation.IConflictResolver;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
@@ -321,6 +322,20 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 + ".bloomFilter").intern();
         
         String DEFAULT_BLOOM_FILTER = "false";
+
+		/**
+		 * When raw record support is enabled for the index, this is the maximum
+		 * length of an index value which will be stored within a leaf before it
+		 * is automatically promoted to a raw record reference on the backing
+		 * store (default {@value #DEFAULT_MAX_REC_LEN}).
+		 * 
+		 * @see IndexMetadata#getRawRecords()
+		 * @see IndexMetadata#getMaxRecLen()
+		 */
+		String MAX_REC_LEN = (com.bigdata.btree.BTree.class.getPackage()
+				.getName() + ".maxRecLen").intern();
+
+		String DEFAULT_MAX_REC_LEN = "256";
         
         /**
          * The name of an optional property whose value identifies the data
@@ -1060,6 +1075,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private boolean deleteMarkers;
     private boolean versionTimestamps;
     private boolean versionTimestampFilters;
+    private boolean rawRecords;
+    private short maxRecLen;
     private BloomFilterFactory bloomFilterFactory;
     private IOverflowHandler overflowHandler;
 //    private ISplitHandler splitHandler;
@@ -1133,33 +1150,42 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         return branchingFactor;
         
     }
-    
-    /**
-     * The branching factor used when building an {@link IndexSegment} (default
-     * is 4096). Index segments are read-only B+Tree resources. The are built
-     * using a bulk index build procedure and typically have a much higher
-     * branching factor than the corresponding mutable index on the journal.
-     * <p>
-     * Note: the value of this property will determine the branching factor of
-     * the {@link IndexSegment}. When the {@link IndexSegment} is built, it
-     * will be given a {@link #clone()} of this {@link IndexMetadata} and the
-     * actual branching factor for the {@link IndexSegment} be set on the
-     * {@link #getBranchingFactor()} at that time.
-     * <p>
-     * Note: a branching factor of 256 for an index segment and split limits of
-     * (1M,5M) imply an average B+Tree height of 1.5 to 1.8. With a 10ms seek
-     * time and NO CACHE that is between 15 and 18ms average seek time.
-     * <p>
-     * Note: a branching factor of 512 for an index segment and split limits of
-     * (1M,5M) imply an average B+Tree height of 1.2 to 1.5. With a 10ms seek
-     * time and NO CACHE that is between 12 and 15ms average seek time.
-     * <p>
-     * Note: the actual size of the index segment of course depends heavily on
-     * (a) whether or now block references are being stored since the referenced
-     * blocks are also stored in the index segment; (b) the size of the keys and
-     * values stored in the index; and (c) the key, value, and record
-     * compression options in use.
-     */
+
+	/**
+	 * The branching factor used when building an {@link IndexSegment} (default
+	 * is 4096). Index segments are read-only B+Tree resources. The are built
+	 * using a bulk index build procedure and typically have a much higher
+	 * branching factor than the corresponding mutable index on the journal.
+	 * There are two reasons why it makes sense to use a larger branching factor
+	 * for an index segment. First, the WORM Journal is used to buffer writes in
+	 * scale-out and IO on an index on the WORM Journal is driven by node and
+	 * leaf revisions so the index often uses a smaller branching factor on the
+	 * WORM. Second, the index segment is laid out in total key order in the
+	 * file and each node and leaf is a contiguous sequences of bytes on the
+	 * disk (like the WORM, but unlike the RWStore). Since most of the latency
+	 * of the disk is the seek, reading larger leaves from an index segment is
+	 * efficient.
+	 * <p>
+	 * Note: the value of this property will determine the branching factor of
+	 * the {@link IndexSegment}. When the {@link IndexSegment} is built, it will
+	 * be given a {@link #clone()} of this {@link IndexMetadata} and the actual
+	 * branching factor for the {@link IndexSegment} be set on the
+	 * {@link #getBranchingFactor()} at that time.
+	 * <p>
+	 * Note: a branching factor of 256 for an index segment and split limits of
+	 * (1M,5M) imply an average B+Tree height of 1.5 to 1.8. With a 10ms seek
+	 * time and NO CACHE that is between 15 and 18ms average seek time.
+	 * <p>
+	 * Note: a branching factor of 512 for an index segment and split limits of
+	 * (1M,5M) imply an average B+Tree height of 1.2 to 1.5. With a 10ms seek
+	 * time and NO CACHE that is between 12 and 15ms average seek time.
+	 * <p>
+	 * Note: the actual size of the index segment of course depends heavily on
+	 * (a) whether or now block references are being stored since the referenced
+	 * blocks are also stored in the index segment; (b) the size of the keys and
+	 * values stored in the index; and (c) the key, value, and record
+	 * compression options in use.
+	 */
     public final int getIndexSegmentBranchingFactor() {
 
         return indexSegmentBranchingFactor;
@@ -1455,7 +1481,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         this.deleteMarkers = deleteMarkers;
         
     }
-
+    
     /**
      * When <code>true</code> the index will maintain a per-index entry revision
      * timestamp. The primary use of this is in support of transactional
@@ -1547,7 +1573,73 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    public void setPartitionMetadata(final LocalPartitionMetadata pmd) {
+	/**
+	 * When <code>true</code> the index transparently promote large
+	 * <code>byte[]</code> values associated with a key to raw records on the
+	 * backing store. This feature is disabled by default. Indices which do use
+	 * large records should enable this option in order to reduce their IO churn
+	 * and disk footprint.
+	 * 
+	 * @see #getMaxRecLen()
+	 */
+    public final boolean getRawRecords() {return rawRecords;}
+
+	/**
+	 * (Dis|En)able automatic promotion of index <code>byte[]</code> values
+	 * larger than a configured byte length out of the index leaf and into raw
+	 * records on the backing persistence store. This option can significicantly
+	 * reduce the IO churn for indices which do make use of large values.
+	 * However, the leaves will occupy slightly more space (~ 1 bit per tuple)
+	 * if this option is enabled and none of the values stored in the index
+	 * exceed the configured maximum value length. {@link IRabaCoder}s which
+	 * rely on a uniform value length generally already use small values and
+	 * should typically turn this feature off in order to make the leaf as
+	 * compact as possible.
+	 * 
+	 * @param rawRecords
+	 *            <code>true</code> if the feature is to be enabled.
+	 * 
+	 * @see #setMaxRecLen(int)
+	 */
+    public final void setRawRecords(final boolean rawRecords) {
+
+        this.rawRecords = rawRecords;
+        
+    }
+
+	/**
+	 * When {@link #getRawRecords()} returns <code>true</code>, this method
+	 * returns the maximum byte length of a <code>byte[]</code> value which may
+	 * be stored in a B+Tree leaf (default {@link Options#MAX_REC_LEN}. Values
+	 * larger than this will be automatically converted into raw record
+	 * references.
+	 */
+	public final int getMaxRecLen() {return maxRecLen;}
+
+	/**
+	 * Set the maximum length of a <code>byte[]</code> value in a leaf of the
+	 * index.
+	 * 
+	 * @param maxRecLen
+	 *            The maximum length of a <code>byte[]</code> value in a leaf of
+	 *            the index.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if the argument is non-positive or greater than
+	 *             {@link Short#MAX_VALUE}
+	 * 
+	 * @see #setRawRecords(boolean)
+	 */
+	public final void setMaxRecLen(final int maxRecLen) {
+
+		if (maxRecLen <= 0 || maxRecLen > Short.MAX_VALUE)
+			throw new IllegalArgumentException();
+		
+		this.maxRecLen = (short) maxRecLen;
+		
+	}
+    
+	public void setPartitionMetadata(final LocalPartitionMetadata pmd) {
         
         this.pmd = pmd;
         
@@ -2106,6 +2198,23 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         this.versionTimestampFilters = false;
 
+		/*
+		 * Default to false for new indices. This follows the same principle of
+		 * requiring people to opt in for special features. Many indices tend to
+		 * always use small records and this option represents overhead for such
+		 * indices. Indices which do use large records should enable this option
+		 * in order to reduce their IO churn and disk footprint.
+		 */
+        this.rawRecords = false;
+        
+		this.maxRecLen = Short.parseShort(getProperty(indexManager,
+				properties, namespace, Options.MAX_REC_LEN,
+				Options.DEFAULT_MAX_REC_LEN));
+
+		// Note: May be used to force testing with raw records.
+//		this.rawRecords = true;
+//		this.maxRecLen = 1;
+
         // optional bloom filter setup.
         final boolean bloomFilter = Boolean.parseBoolean(getProperty(
                 indexManager, properties, namespace, Options.BLOOM_FILTER,
@@ -2355,6 +2464,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         sb.append(", versionTimestamps=" + versionTimestamps);
         sb.append(", versionTimestampFilters=" + versionTimestampFilters);
         sb.append(", isolatable=" + isIsolatable());
+        sb.append(", rawRecords=" + rawRecords);
         sb.append(", bloomFilterFactory=" + (bloomFilterFactory == null ? "N/A"
                 : bloomFilterFactory.toString())); 
         sb.append(", overflowHandler="
@@ -2380,6 +2490,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * The initial version.
      */
     private static transient final int VERSION0 = 0x0;
+
+	/**
+	 * This version adds support for {@link ILeafData#getRawRecord(int)} and
+	 * {@link IndexMetadata#getRawRecords()} will report <code>false</code> for
+	 * earlier versions and {@link IndexMetadata#getMaxRecLen()} will report
+	 * {@link Options#DEFAULT_MAX_REC_LEN}.
+	 */
+    private static transient final int VERSION1 = 0x1;
 
 //    /**
 //     * This version introduced the {@link #asynchronousIndexWriteConfiguration}.
@@ -2460,7 +2578,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     /**
      * The version that will be serialized by this class.
      */
-    private static transient final int CURRENT_VERSION = VERSION0;
+    private static transient final int CURRENT_VERSION = VERSION1;
 //    private static transient final int CURRENT_VERSION = VERSION10;
     
     /**
@@ -2473,7 +2591,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         switch (version) {
         case VERSION0:
-//        case VERSION1:
+        case VERSION1:
 //        case VERSION2:
 //        case VERSION3:
 //        case VERSION4:
@@ -2555,6 +2673,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 //        }
         
         deleteMarkers = in.readBoolean();
+
+		if (version >= VERSION1) {
+			rawRecords = in.readBoolean();
+			maxRecLen = in.readShort();
+		} else {
+			rawRecords = false;
+			maxRecLen = Short.parseShort(Options.DEFAULT_MAX_REC_LEN);
+		}
         
         versionTimestamps = in.readBoolean();
 
@@ -2773,6 +2899,11 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 //        }
 
         out.writeBoolean(deleteMarkers);
+        
+		if (version >= VERSION1) {
+			out.writeBoolean(rawRecords);
+			out.writeShort(maxRecLen);
+		}
         
         out.writeBoolean(versionTimestamps);
         
