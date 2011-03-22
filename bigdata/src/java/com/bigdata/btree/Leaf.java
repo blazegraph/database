@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.PrintStream;
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.WeakHashMap;
 
@@ -41,6 +42,7 @@ import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.MutableValueBuffer;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.journal.ITransactionService;
+import com.bigdata.rawstore.IRawStore;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.SingleValueIterator;
@@ -198,9 +200,70 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         
     }
 
+	/**
+	 * Convenience method returns the byte[] for the given index in the leaf. If
+	 * the tuple at that index is a raw record, then the record is read from the
+	 * backing store. More efficient operations should be performed when copying
+	 * the value into a tuple.
+	 * 
+	 * @param leaf
+	 *            The leaf.
+	 * @param index
+	 *            The index in the leaf.
+	 * 
+	 * @return The data.
+	 * 
+	 * @see AbstractTuple#copy(int, Leaf)
+	 */
+    public byte[] getValue(final int index) {
+    	
+		if (!hasRawRecords()) {
+		
+			return getValues().get(index);
+			
+		}
+		
+		final long addr = getRawRecord(index);
+		
+		if( addr == IRawStore.NULL) {
+
+			return getValues().get(index);
+
+		}
+		
+		final ByteBuffer tmp = btree.readRawRecord(addr);
+		
+		if (tmp.hasArray() && tmp.arrayOffset() == 0 && tmp.position() == 0
+				&& tmp.limit() == tmp.capacity()) {
+			/*
+			 * Return the backing array.
+			 */
+			return tmp.array();
+		}
+
+		/*
+		 * Copy the data into a byte[].
+		 */
+
+		final int len = tmp.remaining();
+
+		final byte[] a = new byte[len];
+
+		tmp.get(a);
+
+		return a;
+
+    }
+    
     final public long getVersionTimestamp(final int index) {
         
         return data.getVersionTimestamp(index);
+        
+    }
+
+    final public long getRawRecord(final int index) {
+        
+        return data.getRawRecord(index);
         
     }
 
@@ -226,6 +289,12 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
         return data.getMaximumVersionTimestamp();
 
+    }
+
+    final public boolean hasRawRecords() {
+        
+        return data.hasRawRecords();
+        
     }
 
     final public boolean isDoubleLinked() {
@@ -303,7 +372,9 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         data = new MutableLeafData(//
                 btree.branchingFactor, //
                 md.getVersionTimestamps(),//
-                md.getDeleteMarkers());
+                md.getDeleteMarkers(),//
+                md.getRawRecords()//
+                );
 
 //        final int branchingFactor = btree.branchingFactor;
 //        
@@ -536,9 +607,55 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
             // Tunnel through to the mutable object.
             final MutableLeafData data = (MutableLeafData) this.data;
-            
-            // update the entry on the leaf.
-            data.vals.values[entryIndex] = newval;
+
+			/*
+			 * Update the entry on the leaf.
+			 */
+			if (hasRawRecords()) {
+
+				/*
+				 * Note: If the old value was a raw record, we need to delete
+				 * that raw record now.
+				 * 
+				 * Note: If the new value will be a raw record, we need to write
+				 * that raw record onto the store now and save its address into
+				 * the values[] raba.
+				 */
+				final long oaddr = getRawRecord(entryIndex);
+
+				if(oaddr != IRawStore.NULL) {
+					
+					btree.getStore().delete(oaddr);
+					
+				}
+				
+				final long maxRecLen = btree.getMaxRecLen();
+				
+				if (newval != null && newval.length > maxRecLen) {
+
+					// write the value on the backing store.
+					final long naddr = btree.writeRawRecord(newval);
+
+					// save its address in the values raba.
+					data.vals.values[entryIndex] = ((BTree) btree)
+							.encodeRecordAddr(naddr);
+					
+					// flag as a raw record.
+					data.rawRecords[entryIndex] = true;
+
+				} else {
+					
+					data.vals.values[entryIndex] = newval;
+				
+					data.rawRecords[entryIndex] = false;
+					
+				}
+				
+			} else {
+
+				data.vals.values[entryIndex] = newval;
+				
+			}
 
             if (data.deleteMarkers != null) {
 
@@ -637,7 +754,23 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             final MutableValueBuffer vals = data.vals;
 //            copyKey(entryIndex, searchKeys, tupleIndex);
             keys.keys[entryIndex] = searchKey; // note: presumes caller does not reuse the searchKeys!
-            vals.values[entryIndex] = newval;
+			if (hasRawRecords()) {
+				final long maxRecLen = btree.getMaxRecLen();
+				if (newval != null && newval.length > maxRecLen) {
+					// write the value on the backing store.
+					final long naddr = btree.writeRawRecord(newval);
+					// save its address in the values raba.
+					data.vals.values[entryIndex] = ((BTree) btree)
+							.encodeRecordAddr(naddr);
+					// flag as a raw record.
+					data.rawRecords[entryIndex] = true;
+				} else {
+					data.vals.values[entryIndex] = newval;
+					data.rawRecords[entryIndex] = false;
+				}
+            } else {
+            	vals.values[entryIndex] = newval;
+            }
             if (data.deleteMarkers != null) {
                 if (delete) {
                     // Inserting a deleted tuple.
@@ -895,6 +1028,10 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             if (data.versionTimestamps != null) {
                 sdata.versionTimestamps[j] = data.versionTimestamps[i];
             }
+
+            if (data.rawRecords != null) {
+                sdata.rawRecords[j] = data.rawRecords[i];
+            }
             
             // clear out the old keys and values.
             data.keys.keys[i] = null;
@@ -903,7 +1040,9 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                 data.deleteMarkers[i] = false;
             if (data.versionTimestamps != null)
                 data.versionTimestamps[i] = 0L;
-
+            if (data.rawRecords != null)
+                data.rawRecords[i] = false;
+            
             // one less key here.
             /* nkeys--; */
             data.keys.nkeys--;
@@ -1113,6 +1252,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                         || t == sdata.maximumVersionTimestamp)
                     updateMinMaxVersionTimestampOnSibling = true;
             }
+            if (data.rawRecords != null)
+                data.rawRecords[nkeys] = sdata.rawRecords[0];
 
             // copy down the keys on the right sibling to cover up the hole.
             System.arraycopy(skeys.keys, 1, skeys.keys, 0, snkeys-1);
@@ -1121,6 +1262,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                 System.arraycopy(sdata.deleteMarkers, 1, sdata.deleteMarkers, 0, snkeys-1);
             if(data.versionTimestamps!=null)
                 System.arraycopy(sdata.versionTimestamps, 1, sdata.versionTimestamps, 0, snkeys-1);
+            if(data.rawRecords !=null)
+                System.arraycopy(sdata.rawRecords, 1, sdata.rawRecords, 0, snkeys-1);
 
             // erase exposed key/value on rightSibling that is no longer defined.
             skeys.keys[snkeys-1] = null;
@@ -1129,6 +1272,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                 sdata.deleteMarkers[snkeys - 1] = false;
             if (data.versionTimestamps != null)
                 sdata.versionTimestamps[snkeys - 1] = 0L;
+            if (data.rawRecords != null)
+                sdata.rawRecords[snkeys - 1] = false;
 
             /*s.nkeys--;*/ skeys.nkeys--; svals.nvalues--;
             /*this.nkeys++;*/keys.nkeys++; vals.nvalues++;
@@ -1168,6 +1313,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                 System.arraycopy(data.deleteMarkers, 0, data.deleteMarkers, 1, nkeys);
             if(data.versionTimestamps!=null)
                 System.arraycopy(data.versionTimestamps, 0, data.versionTimestamps, 1, nkeys);
+            if(data.rawRecords!=null)
+                System.arraycopy(data.rawRecords, 0, data.rawRecords, 1, nkeys);
             
             // move the last key/value from the leftSibling to this leaf (copy, then clear).
             // copy.
@@ -1190,6 +1337,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                         || t == sdata.maximumVersionTimestamp)
                     updateMinMaxVersionTimestampOnSibling = true;
             }
+			if (data.rawRecords != null)
+				data.rawRecords[0] = sdata.rawRecords[snkeys - 1];
             // clear
             skeys.keys[snkeys-1] = null;
             svals.values[snkeys-1] = null;
@@ -1197,6 +1346,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                 sdata.deleteMarkers[snkeys - 1] = false;
             if (data.versionTimestamps != null)
                 sdata.versionTimestamps[snkeys - 1] = 0L;
+            if (data.rawRecords != null)
+                sdata.rawRecords[snkeys - 1] = false;
             /*s.nkeys--;*/ skeys.nkeys--; svals.nvalues--;
             /*this.nkeys++;*/ keys.nkeys++; vals.nvalues++;
             
@@ -1328,6 +1479,11 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                     data.maximumVersionTimestamp = sdata.maximumVersionTimestamp;
             }
             
+            if (data.rawRecords != null) {
+                System.arraycopy(sdata.rawRecords, 0, data.rawRecords,
+                        nkeys, snkeys);
+            }
+            
             /* 
              * Adjust the #of keys in this leaf.
              */
@@ -1379,6 +1535,10 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                 System.arraycopy(data.versionTimestamps, 0,
                         data.versionTimestamps, snkeys, nkeys);
             }
+            if (data.rawRecords != null) {
+                System.arraycopy(data.rawRecords, 0, data.rawRecords,
+                        snkeys, nkeys);
+            }
             
             // copy keys and values from the sibling to index 0 of this leaf.
             System.arraycopy(sdata.keys.keys, 0, data.keys.keys, 0, snkeys);
@@ -1394,6 +1554,10 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                     data.minimumVersionTimestamp = sdata.minimumVersionTimestamp;
                 if (sdata.maximumVersionTimestamp > data.maximumVersionTimestamp)
                     data.maximumVersionTimestamp = sdata.maximumVersionTimestamp;
+            }
+            if (data.rawRecords != null) {
+                System.arraycopy(sdata.rawRecords, 0, data.rawRecords, 0,
+                        snkeys);
             }
             
 //            this.nkeys += s.nkeys;
@@ -1459,6 +1623,13 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             
         }
         
+        if (data.rawRecords != null) {
+
+            System.arraycopy(data.rawRecords, entryIndex,
+                    data.rawRecords, entryIndex + 1, count);
+
+        }
+
         /*
          * Clear the entry at the index. This is partly a paranoia check and
          * partly critical. Some per-key elements MUST be cleared and it is much
@@ -1478,6 +1649,10 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             data.versionTimestamps[entryIndex] = 0L;
             // Note: caller MUST update min/max if they are invalidated!
         }
+     
+		if (data.rawRecords != null) {
+			data.rawRecords[entryIndex] = false;
+		}
         
     }
 
@@ -1546,7 +1721,28 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             
             throw new UnsupportedOperationException();
             
-        }
+		}
+
+		/*
+		 * If the tuple was associated with a raw record address, then delete
+		 * the raw record from the backing store.
+		 * 
+		 * Note: The general copy-on-write contract of the B+Tree combined with
+		 * the semantics of the WORM, RW, and scale-out persistence layers will
+		 * ensure the actual delete of the raw record is deferred until the
+		 * commit point from which the tuple was deleted is no longer visible.
+		 */
+		if (data.hasRawRecords()) {
+
+			final long addr = data.getRawRecord(entryIndex);
+
+			if (addr != IRawStore.NULL) {
+
+				btree.deleteRawRecord(addr);
+
+			}
+
+		}
         
 // if (INFO) {
 // log.info("this="+this+", key="+key+", value="+entry+", index="+entryIndex);
@@ -1613,6 +1809,13 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
                 }
     
+				if (data.rawRecords != null) {
+
+					System.arraycopy(data.rawRecords, entryIndex + 1,
+							data.rawRecords, entryIndex, length);
+
+                }
+    
             }
     
             /* 
@@ -1622,6 +1825,9 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             vals.values[nkeys - 1] = null;
             if (data.versionTimestamps != null) {
                 data.versionTimestamps[nkeys - 1] = 0L;
+            }
+            if (data.rawRecords != null) {
+                data.rawRecords[nkeys - 1] = false;
             }
     
             // One less key in the leaf.

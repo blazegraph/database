@@ -2371,7 +2371,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
                 if (btree.debug)
                     lastChild.assertInvariants();
 
-                if (INFO) {
+				if (log.isInfoEnabled()) {
                     log.info("replacing root: root=" + btree.root + ", node="
                             + this + ", lastChild=" + lastChild);
                     // System.err.println("root");

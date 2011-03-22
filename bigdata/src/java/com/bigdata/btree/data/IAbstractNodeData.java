@@ -105,7 +105,8 @@ public interface IAbstractNodeData extends IDataRecordAccess {
      * Return the #of keys in the node or leaf. A node has <code>nkeys+1</code>
      * children. A leaf has <code>nkeys</code> keys and values. The maximum #of
      * keys for a node is one less than the branching factor of the B+Tree. The
-     * maximum #of keys for a leaf is the branching factor of the B+Tree.
+     * maximum #of keys for a leaf is the branching factor of the B+Tree. For a
+     * hash bucket, this is the #of entries in the bucket.
      * 
      * @return The #of defined keys.
      */

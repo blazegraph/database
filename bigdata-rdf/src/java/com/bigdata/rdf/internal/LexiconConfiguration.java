@@ -93,8 +93,15 @@ public class LexiconConfiguration<V extends BigdataValue>
     }
 
     public V asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
-        final TermId datatype = iv.getExtensionDatatype();
-        return (V) termIds.get(datatype).asValue(iv, vf);
+        
+    	// The TermId for the ExtensionIV.
+    	final TermId datatype = iv.getExtensionDatatype();
+    	
+    	// Find the IExtension from the datatype IV.
+    	final IExtension ext = termIds.get(datatype);
+    	
+        return (V) ext.asValue(iv, vf);
+        
     }
 
     public IV createInlineIV(final Value value) {

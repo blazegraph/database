@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.htree.data;
 
-import com.bigdata.btree.data.AbstractLeafDataRecordTestCase;
 import com.bigdata.btree.data.DefaultLeafCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 
@@ -37,7 +36,8 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestBucketDataRecord_Simple_Simple extends AbstractLeafDataRecordTestCase {
+public class TestBucketDataRecord_Simple_Simple extends
+		AbstractHashBucketDataRecordTestCase {
 
     /**
      * 

@@ -982,8 +982,12 @@ public class IndexSegmentStore extends AbstractRawStore {
 
         } else {
 
-            // A leaf.
+			/*
+			 * Read a leaf, a blob, or some other raw allocation on the
+			 * IndexSegmentStore.
+			 */
             
+        	// @todo over estimates leaves read since can be blob, etc. as well.
             counters.leavesReadFromDisk++;
 
             // The data need to be read from the file.

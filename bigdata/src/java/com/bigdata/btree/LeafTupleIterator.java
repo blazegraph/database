@@ -28,8 +28,6 @@ package com.bigdata.btree;
 
 import java.util.NoSuchElementException;
 
-import com.bigdata.btree.data.ILeafData;
-
 /**
  * Visits the values of a {@link Leaf} in the external key ordering. There is
  * exactly one value per key for a leaf node.
@@ -39,7 +37,7 @@ import com.bigdata.btree.data.ILeafData;
  */
 public class LeafTupleIterator<E> implements ITupleIterator<E> {
 
-    private final ILeafData leaf;
+    private final Leaf leaf;
 
     private final AbstractTuple<E> tuple;
     
@@ -61,13 +59,13 @@ public class LeafTupleIterator<E> implements ITupleIterator<E> {
     
     private final boolean visitDeleted;
     
-    public LeafTupleIterator(final Leaf leaf) {
+    public LeafTupleIterator(Leaf leaf) {
 
         this(leaf, new Tuple<E>(leaf.btree, IRangeQuery.DEFAULT), null, null);
 
     }
 
-    public LeafTupleIterator(final ILeafData leaf, final AbstractTuple<E> tuple) {
+    public LeafTupleIterator(final Leaf leaf, final AbstractTuple<E> tuple) {
 
         this(leaf, tuple, null, null);
 
@@ -93,7 +91,7 @@ public class LeafTupleIterator<E> implements ITupleIterator<E> {
      * @exception IllegalArgumentException
      *                if fromKey is given and is greater than toKey.
      */
-    public LeafTupleIterator(final ILeafData leaf, final AbstractTuple<E> tuple,
+    public LeafTupleIterator(final Leaf leaf, final AbstractTuple<E> tuple,
             final byte[] fromKey, final byte[] toKey) {
 
         assert leaf != null;

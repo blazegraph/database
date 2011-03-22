@@ -26,8 +26,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.htree.data;
 
+import java.security.MessageDigest;
 import java.util.Iterator;
 
+import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.data.ILeafData;
 
 /**
@@ -56,8 +59,10 @@ public interface IBucketData extends ILeafData {
 //	int getLocalDepth();
 
 	/**
-	 * Return the #of entries in the hash bucket (all keys, not just the
-	 * distinct keys).
+	 * {@inheritDoc}
+	 * <p>
+	 * For clarification, this returns the #of entries in the hash bucket (not
+	 * just the number of distinct keys).
 	 */
 	int getKeyCount();
 	
@@ -72,7 +77,21 @@ public interface IBucketData extends ILeafData {
 	 * 
 	 * @param index
 	 *            The index of the key.
+	 * 
 	 * @return The hash value of that key.
+	 * 
+	 * @deprecated This is just the int32 key for that tuple. It should be
+	 *             generalized as a byte[]. This will require us to generalize
+	 *             the handle of the LSB and MSB bits as well, all of which must
+	 *             be efficient and compact. For a {@link HTree}, we need to
+	 *             declare the bits length the key. That might be part of the
+	 *             {@link Checkpoint} or the {@link HTree}'s
+	 *             {@link IndexMetadata}. {@link HTree} should be usable with
+	 *             int32 hash codes, int64, and {@link MessageDigest} based hash
+	 *             codes, which are 20+ bytes as well as with a fixed prefix of
+	 *             a {@link MessageDigest} for shorter keys which still have
+	 *             strongly random distributions, plus order-preserving hash
+	 *             codes.
 	 */
 	int getHash(int index);
 
@@ -96,6 +115,12 @@ public interface IBucketData extends ILeafData {
 	 *       the [int] index without autoboxing. If this method signature is
 	 *       modified to return that interface then the implementation can avoid
 	 *       autoboxing.
+	 * 
+	 * @deprecated Since hash codes will be unsigned byte[] keys, this will have
+	 *             to be visit a read-only byte[] slice or a copy of the byte[]
+	 *             key. We already have methods for this. Those methods (and the
+	 *             leaf coder) might be more compact, e.g., for int32 keys,
+	 *             since we code a (short) fixed length key in more simply.
 	 */
 	Iterator<Integer> hashIterator(int h);
 	
