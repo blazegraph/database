@@ -26,6 +26,8 @@ package com.bigdata.btree;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.btree.AbstractBTree.IBTreeCounters;
+import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
@@ -128,12 +130,12 @@ final public class BTreeCounters implements Cloneable {
         ninserts.addAndGet(o.ninserts.get());
         nremoves.addAndGet(o.nremoves.get());
         // ILinearList
-        nindexOf.addAndGet(o.nindexOf.get()); // Note: also does key search.
-        ngetKey.addAndGet(o.ngetKey.get());
-        ngetValue.addAndGet(o.ngetValue.get());
+        nindexOf.add(o.nindexOf.get()); // Note: also does key search.
+        ngetKey.add(o.ngetKey.get());
+        ngetValue.add(o.ngetValue.get());
 //        // IRangeQuery
-//        nrangeCount.addAndGet(o.nrangeCount.get());
-//        nrangeIterator.addAndGet(o.nrangeIterator.get());
+        nrangeCount.add(o.nrangeCount.get());
+        nrangeIterator.add(o.nrangeIterator.get());
         // Structural mutation.
         rootsSplit += o.rootsSplit;
         rootsJoined += o.rootsJoined;
@@ -189,12 +191,12 @@ final public class BTreeCounters implements Cloneable {
         t.ninserts.addAndGet(-o.ninserts.get());
         t.nremoves.addAndGet(-o.nremoves.get());
         // ILinearList
-        t.nindexOf.addAndGet(-o.nindexOf.get()); // Note: also does key search.
-        t.ngetKey.addAndGet(-o.ngetKey.get());
-        t.ngetValue.addAndGet(-o.ngetValue.get());
+        t.nindexOf.add(-o.nindexOf.get()); // Note: also does key search.
+        t.ngetKey.add(-o.ngetKey.get());
+        t.ngetValue.add(-o.ngetValue.get());
 //        // IRangeQuery
-//        t.nrangeCount.addAndGet(-o.nrangeCount.get());
-//        t.nrangeIterator.addAndGet(-o.nrangeIterator.get());
+        t.nrangeCount.add(-o.nrangeCount.get());
+        t.nrangeIterator.add(-o.nrangeIterator.get());
         // Structural mutation.
         t.rootsSplit -= o.rootsSplit;
         t.rootsJoined -= o.rootsJoined;
@@ -242,9 +244,9 @@ final public class BTreeCounters implements Cloneable {
     public final AtomicLong ninserts = new AtomicLong();
     public final AtomicLong nremoves = new AtomicLong();
     // ILinearList
-    public final AtomicLong nindexOf = new AtomicLong();
-    public final AtomicLong ngetKey = new AtomicLong();
-    public final AtomicLong ngetValue = new AtomicLong();
+    public final CAT nindexOf = new CAT();
+    public final CAT ngetKey = new CAT();
+    public final CAT ngetValue = new CAT();
 
     /*
      * Note: These counters are hot spots with concurrent readers and do not
@@ -252,8 +254,8 @@ final public class BTreeCounters implements Cloneable {
      * 1/26/2010.
      */
     // IRangeQuery
-//    public final AtomicLong nrangeCount = new AtomicLong();
-//    public final AtomicLong nrangeIterator = new AtomicLong();
+    public final CAT nrangeCount = new CAT();
+    public final CAT nrangeIterator = new CAT();
     // Structural change (single-threaded, so plain variables are Ok).
     public int rootsSplit = 0;
     public int rootsJoined = 0;
@@ -480,7 +482,7 @@ final public class BTreeCounters implements Cloneable {
              */
             {
                 
-                final CounterSet tmp = counterSet.makePath("keySearch");
+                final CounterSet tmp = counterSet.makePath(IBTreeCounters.KeySearch);
 
 //                Note: This is a hotspot since it is used by concurrent readers.
 //                tmp.addCounter("find", new Instrument<Long>() {
@@ -508,7 +510,7 @@ final public class BTreeCounters implements Cloneable {
              */
             {
                 
-                final CounterSet tmp = counterSet.makePath("linearList");
+                final CounterSet tmp = counterSet.makePath(IBTreeCounters.LinearList);
 
                 tmp.addCounter("indexOf", new Instrument<Long>() {
                     protected void sample() {
@@ -530,32 +532,32 @@ final public class BTreeCounters implements Cloneable {
                 
             }
             
-//            /*
-//             * IRangeQuery
-//             * 
-//             * @todo Instrument the IRangeQuery API for times (must aggregate
-//             * across hasNext() and next()). Note that rangeCount and rangeCopy
-//             * both depend on rangeIterator so that is the only one for which we
-//             * really need timing data. The iterator should report the
-//             * cumulative service time when it is finalized.
-//             */
-//            {
-//                
-//                final CounterSet tmp = counterSet.makePath("rangeQuery");
-//
-//                tmp.addCounter("rangeCount", new Instrument<Long>() {
-//                    protected void sample() {
-//                        setValue(nrangeCount.get());
-//                    }
-//                });
-//                
-//                tmp.addCounter("rangeIterator", new Instrument<Long>() {
-//                    protected void sample() {
-//                        setValue(nrangeIterator.get());
-//                    }
-//                });
-//                
-//            }
+            /*
+             * IRangeQuery
+             * 
+             * @todo Instrument the IRangeQuery API for times (must aggregate
+             * across hasNext() and next()). Note that rangeCount and rangeCopy
+             * both depend on rangeIterator so that is the only one for which we
+             * really need timing data. The iterator should report the
+             * cumulative service time when it is finalized.
+             */
+            {
+                
+                final CounterSet tmp = counterSet.makePath(IBTreeCounters.RangeQuery);
+
+                tmp.addCounter("rangeCount", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(nrangeCount.get());
+                    }
+                });
+                
+                tmp.addCounter("rangeIterator", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(nrangeIterator.get());
+                    }
+                });
+                
+            }
             
             /*
              * Structural mutation statistics.
@@ -565,7 +567,7 @@ final public class BTreeCounters implements Cloneable {
              */
             {
                
-                final CounterSet tmp = counterSet.makePath("structure");
+                final CounterSet tmp = counterSet.makePath(IBTreeCounters.Structure);
                 
                 tmp.addCounter("rootSplit", new Instrument<Integer>() {
                     protected void sample() {
@@ -634,7 +636,7 @@ final public class BTreeCounters implements Cloneable {
              */
             {
                 
-                final CounterSet tmp = counterSet.makePath("tuples");
+                final CounterSet tmp = counterSet.makePath(IBTreeCounters.Tuples);
 
                 tmp.addCounter("insertValue", new Instrument<Long>() {
                     protected void sample() {
@@ -671,7 +673,7 @@ final public class BTreeCounters implements Cloneable {
              */
             {
 
-                final CounterSet tmp = counterSet.makePath("IO");
+                final CounterSet tmp = counterSet.makePath(IBTreeCounters.IO);
 
                 /*
                  * nodes/leaves read/written

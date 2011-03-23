@@ -219,8 +219,8 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
 
         sb.append(getClass().getName()+"{");
         sb.append(", keyBuilderFactory="+delegateKeyBuilderFactory);
-        sb.append(", leafKeysCoder=" + leafKeysCoder.getClass().getName());
-        sb.append(", leafValuesCoder=" + leafValsCoder.getClass().getName());
+        sb.append(", leafKeysCoder=" + leafKeysCoder);//.getClass().getName());
+        sb.append(", leafValuesCoder=" + leafValsCoder);//.getClass().getName());
         sb.append("}");
         
         return sb.toString();

@@ -625,7 +625,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
 				if(oaddr != IRawStore.NULL) {
 					
-					btree.getStore().delete(oaddr);
+					btree.deleteRawRecord(oaddr);
 					
 				}
 				

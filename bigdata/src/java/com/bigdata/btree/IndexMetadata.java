@@ -1622,17 +1622,18 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 	 * 
 	 * @param maxRecLen
 	 *            The maximum length of a <code>byte[]</code> value in a leaf of
-	 *            the index.
+	 *            the index. A value of ZERO (0) may be used to force all values
+	 *            into raw records.
 	 * 
 	 * @throws IllegalArgumentException
-	 *             if the argument is non-positive or greater than
+	 *             if the argument is negative or greater than
 	 *             {@link Short#MAX_VALUE}
 	 * 
 	 * @see #setRawRecords(boolean)
 	 */
 	public final void setMaxRecLen(final int maxRecLen) {
 
-		if (maxRecLen <= 0 || maxRecLen > Short.MAX_VALUE)
+		if (maxRecLen < 0 || maxRecLen > Short.MAX_VALUE)
 			throw new IllegalArgumentException();
 		
 		this.maxRecLen = (short) maxRecLen;
@@ -2452,7 +2453,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         sb.append(", class=" + btreeClassName);
         sb.append(", checkpointClass=" + checkpointClassName);
 //        sb.append(", childAddrSerializer=" + addrSer.getClass().getName());
-        sb.append(", nodeKeysCoder=" + nodeKeysCoder.getClass().getName());
+        sb.append(", nodeKeysCoder=" + nodeKeysCoder);//.getClass().getName());
         sb.append(", btreeRecordCompressorFactory="
                 + (btreeRecordCompressorFactory == null ? "N/A"
                         : btreeRecordCompressorFactory));
