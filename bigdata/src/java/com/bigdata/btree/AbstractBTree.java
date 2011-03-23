@@ -826,6 +826,23 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 			tmp.addCounter("%totalUtilization", new OneShotInstrument<Integer>(r
 					.getTotalUtilization())); // / 100d
 
+			/*
+			 * Compute the average bytes per tuple. This requires access to the
+			 * current entry count, so we have to do this as a OneShot counter
+			 * to avoid dragging in the B+Tree reference.
+			 */
+
+			final int entryCount = getEntryCount();
+
+			final long bytes = btreeCounters.bytesOnStore_nodesAndLeaves.get()
+					+ btreeCounters.bytesOnStore_rawRecords.get();
+			
+			final double bytesPerTuple = entryCount == 0 ? 0d
+					: (bytes / entryCount);
+
+			tmp.addCounter("bytesPerTuple", new OneShotInstrument<Double>(
+					bytesPerTuple));
+
 		}
 
 		/*
@@ -3686,9 +3703,13 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             	oldAddr = 0;
             }
 
+            final int nbytes = store.getByteCount(addr);
+            
             btreeCounters.writeNanos += System.nanoTime() - begin;
     
-            btreeCounters.bytesWritten += store.getByteCount(addr);
+            btreeCounters.bytesWritten += nbytes;
+
+    		btreeCounters.bytesOnStore_nodesAndLeaves.addAndGet(nbytes);
 
         }
 
@@ -3705,7 +3726,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                 // remove from cache.
             	storeCache.remove(oldAddr);
             }
-        	store.delete(oldAddr);
+			deleteNodeOrLeaf(oldAddr);//, node instanceof Node);
         }
 
         node.setDirty(false);
@@ -4126,7 +4147,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 			throw new IllegalStateException(ERROR_READ_ONLY);
 		
 		// write the value on the backing store.
-		return getStore().write(ByteBuffer.wrap(b));
+		final long addr = getStore().write(ByteBuffer.wrap(b));
+		
+		btreeCounters.bytesOnStore_rawRecords.addAndGet(b.length);
+
+		return addr;
 		
     }
 
@@ -4143,6 +4168,33 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
 		getStore().delete(addr);
 		
+		final int nbytes = getStore().getByteCount(addr);
+		
+		btreeCounters.bytesOnStore_rawRecords.addAndGet(-nbytes);
+		
 	}
-	
+
+	/**
+	 * Delete a node or leaf from the backing store, updating various
+	 * performance counters.
+	 * 
+	 * @param addr
+	 *            The address of the node or leaf.
+	 */
+	void deleteNodeOrLeaf(final long addr) {
+
+		if(addr == IRawStore.NULL)
+			throw new IllegalArgumentException();
+		
+		if (isReadOnly())
+			throw new IllegalStateException(ERROR_READ_ONLY);
+
+		getStore().delete(addr);
+
+		final int nbytes = getStore().getByteCount(addr);
+
+		btreeCounters.bytesOnStore_nodesAndLeaves.addAndGet(-nbytes);
+
+	}
+
 }
