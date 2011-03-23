@@ -869,7 +869,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
                     btree.storeCache.remove(oldChildAddr);
                 }
                 // free the oldChildAddr if the Strategy supports it
-                btree.store.delete(oldChildAddr);
+                btree.deleteNodeOrLeaf(oldChildAddr);
                 // System.out.println("Deleting " + oldChildAddr);
 
                 // Stash reference to the new child.

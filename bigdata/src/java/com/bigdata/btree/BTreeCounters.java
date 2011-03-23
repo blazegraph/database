@@ -337,8 +337,30 @@ final public class BTreeCounters implements Cloneable {
     public int leavesWritten = 0;
     public long bytesWritten = 0L;
     public long writeNanos = 0;
-    public long serializeNanos = 0;
-    
+	public long serializeNanos = 0;
+
+	/**
+	 * The #of bytes in the unisolated view of the index which are being used to
+	 * store raw records.
+	 * 
+	 * @todo not correctly tracked in scale-out (overflow handling).
+	 */
+    public final AtomicLong bytesOnStore_rawRecords = new AtomicLong();
+
+	/**
+	 * The #of bytes in node and leaf) records on the backing store for the
+	 * unisolated view of the index. This value grows and shrinks as nodes
+	 * (leaves) are added to and removed from the index. The actual space
+	 * occupied by the index on the backing store depends on whether and when
+	 * persistence store reclaims the storage associated with deleted nodes and
+	 * leaves.
+	 * 
+	 * @todo break out for nodes and leaves separately.
+	 * 
+	 * @todo not correctly tracked in scale-out (overflow handling).
+	 */
+	public AtomicLong bytesOnStore_nodesAndLeaves = new AtomicLong();
+
     /**
      * Return a score whose increasing value is correlated with the amount of
      * read/write activity on an index as reflected in these
@@ -676,6 +698,28 @@ final public class BTreeCounters implements Cloneable {
                 final CounterSet tmp = counterSet.makePath(IBTreeCounters.IO);
 
                 /*
+                 * bytes on store.
+                 */
+				tmp.addCounter("bytesOnStoreNodesAndLeaves", new Instrument<Long>() {
+					protected void sample() {
+						setValue(bytesOnStore_nodesAndLeaves.get());
+					}
+				});
+				
+				tmp.addCounter("bytesOnStoreRawRecords", new Instrument<Long>() {
+					protected void sample() {
+						setValue(bytesOnStore_rawRecords.get());
+					}
+				});
+
+				tmp.addCounter("bytesOnStoreTotal", new Instrument<Long>() {
+					protected void sample() {
+						setValue(bytesOnStore_nodesAndLeaves.get()
+								+ bytesOnStore_rawRecords.get());
+					}
+				});
+
+                /*
                  * nodes/leaves read/written
                  */
 
@@ -706,6 +750,7 @@ final public class BTreeCounters implements Cloneable {
                 /*
                  * store reads (bytes)
                  */
+
                 tmp.addCounter("bytesRead", new Instrument<Long>() {
                     protected void sample() {
                         setValue(bytesRead.get());

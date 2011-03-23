@@ -1248,7 +1248,7 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
                     if(childAddr != 0L) {
 
                         // delete persistent child.
-                        getStore().delete(childAddr);
+                        deleteNodeOrLeaf(childAddr);
                         
                     }
                     
@@ -1256,13 +1256,16 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
                 
             }
 
-            // delete root iff persistent.
-            if (getRoot().getIdentity() != 0L) {
-             
-                getStore().delete(getRoot().getIdentity());
-                
+            final long raddr = getRoot().getIdentity();
+			
+            if (raddr != IRawStore.NULL) {
+
+                // delete root iff persistent.
+				deleteNodeOrLeaf(raddr);
+
             }
             
+            // @todo update bytesOnStore to ZERO.
             replaceRootWithEmptyLeaf();
 
         } else if (getIndexMetadata().getDeleteMarkers()
