@@ -15,7 +15,6 @@ import java.util.zip.GZIPInputStream;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
-import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
@@ -28,19 +27,81 @@ import com.bigdata.Banner;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
+import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
  * Utility class to parse some RDF resource(s) and count hash collisions using a
  * variety of hash codes.
+ * 
+ * TODO order preserving hash codes could be interesting here. Look at 32 and 64
+ * bit variants of the math and at generalized order preserving hash codes. With
+ * order preserving hash codes, it makes sense to insert all Unicode terms into
+ * TERM2ID such that we have
+ * 
+ * TODO benchmark the load time with different hash codes. the cost of the hash
+ * computation and the randomness of the distribution will both play a role. The
+ * B+Tree will need to be setup with a sufficient [writeRetentionQueue] and we
+ * will need to specify [-server -Xmx1G].
+ * 
+ * SHA-256 - no collisions on BSBM 200M. 30G file. time?
+ * 
+ * 32-bit hash codes. #collisions=1544132 Elapsed: 16656445ms Journal size:
+ * 23841341440 bytes (23G)
+ * 
+ * Now limiting the size of values in a leaf and also increasing the branching
+ * factor to 512 (was 32). [The current run is scanning after the initial
+ * insert, which involves a little wasted effort. It was also without the -server
+ * -Xmx, and write retention queue parameters].
+ * 
+ * TODO Do not bother comparing time until I have moved the large records out of
+ * line (blob references). This should be automatic, but that interacts with how
+ * we code values and leaves and might be tricky to make automatic for all
+ * coders.
+ * 
+ * TODO Try with only N bytes worth of the SHA hash code, leaving some bits left
+ * over for partitioning URIs, Literals, and BNodes (for told bnode mode) and
+ * for a counter to break ties when there is a hash collision. We should wind up
+ * with an 8-12 byte termId which is collision proof and very well distributed.
+ * 
+ * TODO Add bit flags at the front for {BLOB, URI, Literal, BNode} (BLOB being
+ * the odd one out). If we move BLOBs out of the key range of other plain
+ * literals, or literals of a given language code or datatype, then we can not
+ * do an ordered scan of the literals anymore which is inclusive of the blobs.
+ * There is a similar consequence of moving small literals into the statement
+ * index.
+ * <p>
+ * If we inline small unicode values (<32 bytes) and reserve the TERM2ID index
+ * for large(r) values then we can approach a situation in which it serves
+ * solely for blobs but with a tradeoff in size (of the statement indices)
+ * versus indirection.
+ * <p>
+ * Large value promotion does not really let us handle large blobs
+ * (multi-megabytes) in s/o as a 50 4M blobs would fill up a shard. There, I
+ * think that we need to give the control over to the application and require it
+ * to write on a shared resource (shared file system, S3, etc). The value
+ * inserted into the index would then be just the pathname in the shared file
+ * system or the URL of the S3 resource. This breaks the ACID decision boundary
+ * though as the application has no means available to atomically decide that
+ * the resource does not exist and hence create it. Even using a conditional
+ * E-Tag on S3 would not work since it would have to have an index over the S3
+ * entities to detect a write-write conflict for the same data under different
+ * URLs.
  * 
  * @author thompsonbry
  */
@@ -51,7 +112,22 @@ public class HashCollisionUtility {
 
 	private final BTree[] indices;
 
+	private final BigdataValueFactory vf;
+
+	private final LexiconConfiguration<BigdataValue> conf;
+	
 	private final StatementHandler stmtHandler;
+	
+	/** 
+	 * The size of the hash collision set for the RDF Value with the most
+	 * hash collisions observed to date.
+	 */
+	private final AtomicLong maxCollisions = new AtomicLong();
+	
+	/**
+	 * The #of distinct RDF {@link Value}s inserted into the index.
+	 */
+	private final AtomicLong ninserted = new AtomicLong();
 	
 ////	private interface IHashCode {
 ////		void hashCode(IKeyBuilder keyBuilder,Object o);
@@ -110,6 +186,15 @@ public class HashCollisionUtility {
 			
 			// set the maximum length of a byte[] value in a leaf.
 			md.setMaxRecLen(256);
+
+			/*
+			 * increase the branching factor since leaf size is smaller w/o
+			 * large records.
+			 */
+			md.setBranchingFactor(512);
+			
+			// Note: You need to give sufficient heap for this option!
+			md.setWriteRetentionQueueCapacity(8000);
 			
 			ndx = jnl.registerIndex(name, md);
 			
@@ -117,6 +202,35 @@ public class HashCollisionUtility {
 		
 		indices = new BTree[] { ndx };
 
+		vf = BigdataValueFactoryImpl.getInstance("test");
+		
+		// factory does not support any extensions.
+		final IExtensionFactory xFactory = new IExtensionFactory() {
+
+			public void init(LexiconRelation lex) {
+				// NOP
+			}
+
+			@SuppressWarnings("unchecked")
+			public IExtension[] getExtensions() {
+				return new IExtension[] {};
+			}
+		};
+
+		/*
+		 * Note: This inlines everything *except* xsd:dateTime, which
+		 * substantially reduces the data we will put into the index.
+		 * 
+		 * @todo Do a special IExtension implementation to handle xsd:dateTime
+		 * since the DateTimeExtension uses the LexiconRelation to do its work.
+		 */
+		conf = new LexiconConfiguration<BigdataValue>(
+				true, // inlineLiterals
+				true, // inlineBNodes
+				false, // inlineDateTimes
+				xFactory // extension factory
+				);
+		
 		stmtHandler = new StatementHandler();
 		
 	}
@@ -185,7 +299,7 @@ public class HashCollisionUtility {
 
 		final RDFParser rdfParser = rdfParserFactory.getParser();
 
-		rdfParser.setValueFactory(new ValueFactoryImpl());
+		rdfParser.setValueFactory(vf);
 
 		rdfParser.setVerifyData(false);
 
@@ -296,7 +410,7 @@ public class HashCollisionUtility {
 
 		}
 
-		private byte[] buildKey(Value r, byte[] val) {
+		private IKeyBuilder buildKey(Value r, byte[] val) {
 
 			if (true) {
 
@@ -307,65 +421,22 @@ public class HashCollisionUtility {
 				
 				final int hashCode = r.hashCode();
 
-				return keyBuilder.reset().append(hashCode).getKey();
+				return keyBuilder.reset().append(hashCode);
 				
 			} else {
-				
+
 				/*
 				 * Message digest of the serialized representation of the RDF
 				 * Value.
+				 * 
+				 * TODO There are methods to copy out the digest (hash code)
+				 * without memory allocations. getDigestLength() and
+				 * getDigest(out,start,len).
 				 */
-				
-				// Note: d.digest(byte[]) already calls reset() so this is redundant.
-//				d.reset();
 				
 				final byte[] hashCode = d.digest(val);
 
-				/*
-				 * SHA-256 - no collisions on BSBM 200M. 30G file. time?
-				 * 
-				 * 32-bit hash codes. #collisions=1544132 Elapsed: 16656445ms
-				 * Journal size: 23841341440 bytes (23G)
-				 * 
-				 * @todo Do not bother comparing time until I have moved the
-				 * large records out of line (blob references). This should be
-				 * automatic, but that interacts with how we code values and
-				 * leaves and might be tricky to make automatic for all coders.
-				 * 
-				 * @todo We should COUNT the collisions for a given tuple and
-				 * then report on the distribution of #of collisions per tuple.
-				 * Even considering the worst case (max collisions per tuple)
-				 * will tell us whether or not a counter could have been used to
-				 * differentiate the hash codes. In fact, the easiest way to do
-				 * this is to simply introduce an N-bit counter into the key.
-				 * Not only does this mirror the target index structure, but the
-				 * distribution can then be obtained by a post-factor traversal
-				 * of the index in which we only report on tuples where the
-				 * counter is non-zero. If the counter exceeds the bits
-				 * available then we have a load error for that tuple (we could
-				 * always use a BigInteger in the key to avoid this problem).
-				 * 
-				 * @todo now try with only N bytes worth of the SHA hash code,
-				 * leaving some bits left over for partitioning URIs, Literals,
-				 * and BNodes (for told bnode mode) and for a counter to break
-				 * ties when there is a hash collision. We should wind up with
-				 * an 8-12 byte termId which is collision proof and very well
-				 * distributed.
-				 * 
-				 * @todo if we inline small unicode values (<32 bytes) and
-				 * reserve the TERM2ID index for large(r) values then we can
-				 * approach a situation in which it serves solely for blobs but
-				 * with a tradeoff in size (of the statement indices) versus
-				 * indirection.
-				 * 
-				 * @todo benchmark the load time with different hash codes. the
-				 * cost of the hash computation and the randomness of the
-				 * distribution will both play a role. The B+Tree will need to
-				 * be setup with a sufficient [writeRetentionQueue] and we will
-				 * need to specify [-server -Xmx1G].
-				 */
-				
-				return keyBuilder.reset().append(hashCode).getKey();
+				return keyBuilder.reset().append(hashCode);
 				
 			}
 
@@ -373,6 +444,22 @@ public class HashCollisionUtility {
 
 		private void addValue(final BTree ndx, final AtomicLong c, final Value r) {
 
+			if (conf.createInlineIV(r) != null) {
+
+				/*
+				 * This is something that we would inline into the statement
+				 * indices.
+				 */
+
+				return;
+				
+			}
+
+			/*
+			 * TODO This can not handle very large UTF strings. To do that we
+			 * need to either explore ICU support for that feature or serialize
+			 * the data using "wide" characters (java uses 2-byte characters).
+			 */
 			final byte[] val = SerializerUtil.serialize(r);
 
 			/*
@@ -408,58 +495,136 @@ public class HashCollisionUtility {
 			 * that key range must be compared for equality with the given
 			 * record to decide whether or not the given record already exists
 			 * in the index.
-			 * 
-			 * @todo order preserving hash codes could be interesting here. Look
-			 * at 32 and 64 bit variants of the math and at generalized order
-			 * preserving hash codes. With order preserving hash codes, it makes
-			 * sense to insert all Unicode terms into TERM2ID such that we have
-			 * 
-			 * @todo Regarding blobs, I am going to add the ability to the
-			 * B+Tree to automatically write large tuple values as raw
-			 * journal/shard records. This will be transparent, so it you
-			 * materialize the tuple, you get the byte[] value as well. However,
-			 * such transparent promotion will not really let us handle large
-			 * blobs (multi-megabytes) in s/o as a 50 4M blobs would fill up a
-			 * shard. There, I think that we need to give the control over to
-			 * the application and require it to write on a shared resource
-			 * (shared file system, S3, etc). The value inserted into the index
-			 * would then be just the pathname in the shared file system or the
-			 * URL of the S3 resource.
-			 * 
-			 * This breaks the ACID decision boundary though as the application
-			 * has no means available to atomically decide that the resource
-			 * does not exist and hence create it. Even using a conditional
-			 * E-Tag on S3 would not work since it would have to have an index
-			 * over the S3 entities to detect a write-write conflict for the
-			 * same data under different URLs.
 			 */
-			final byte[] key = buildKey(r, val);
+			
+			final IKeyBuilder keyBuilder = buildKey(r, val);
+			
+			// key strictly LT any full key for the hash code of this val but
+			// strictly GT any key have a hash code LT the hash code of this val.
+			final byte[] fromKey = keyBuilder.getKey();
 
-			byte[] val2 = ndx.lookup(key);
+			// key strictly LT any successor of the hash code of this val.
+			final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-			if (val2 != null) {
+			// fast range count. this tells us how many collisions there are.
+			// this is an exact collision count since we are not deleting tuples
+			// from the TERMS index.
+			final long rangeCount = ndx.rangeCount(fromKey, toKey);
+			
+			if (rangeCount == 0) {
 
-				if (BytesUtil.bytesEqual(val, val2)) {
+				/*
+				 * This is the first time we have observed a Value which
+				 * generates this hash code, so append a [short] ZERO (0) to
+				 * generate the actual key and then insert the Value into the
+				 * index. Since there is nothing in the index for this hash
+				 * code, no collision is possible and we do not need to test the
+				 * index for the value before inserting the value into the
+				 * index.
+				 */
+				final byte[] key = keyBuilder.append((short) rangeCount)
+						.getKey();
 
-					// Already in the index.
-					return;
+				if (ndx.insert(key, val) != null) {
 
+					throw new AssertionError();
+					
 				}
-
-				// Hash collision.
 				
-				c.incrementAndGet();
-
-				log.warn("Collision: hashCode=" + BytesUtil.toString(key)
-						+ ", ncoll=" + c + ", resource=" + r + " with "
-						+ SerializerUtil.deserialize(val2));
+				ninserted.incrementAndGet();
 
 				return;
 				
 			}
+
+			/*
+			 * iterator over that key range
+			 * 
+			 * TODO filter for the value of interest so we can optimize the
+			 * scan by comparing with the value without causing it to be
+			 * materialized. we can also visit something iff the desired tuple
+			 * already exists. if we visit nothing then we know that we have to
+			 * insert a tuple and we know the counter value from the collision
+			 * count.
+			 */
+			final ITupleIterator<?> itr = ndx.rangeIterator(fromKey, toKey,
+					0/* capacity */, IRangeQuery.VALS, null/* filter */);
+
+			boolean found = false;
 			
+			while(itr.hasNext()) {
+				
+				final ITuple<?> tuple = itr.next();
+				
+				if(BytesUtil.bytesEqual(val, tuple.getValue())) {
+					
+					found = true;
+
+					break;
+					
+				}
+				
+			}
+			
+			if(found) {
+				
+				// Already in the index.
+				return;
+
+			}
+
+			/*
+			 * Hash collision.
+			 */
+
+			if (rangeCount >= Short.MAX_VALUE) {
+
+				/*
+				 * Impose a hard limit on the #of hash collisions we will accept
+				 * in this utility.
+				 * 
+				 * @todo We do not need to have a hard limit if we use
+				 * BigInteger for the counter, but the performance will go
+				 * through the floor if we have to scan 32k entries on a hash
+				 * collision!
+				 */
+
+				throw new RuntimeException("Too many hash collisions: ncoll="
+						+ rangeCount);
+
+			}
+
+			if (rangeCount > maxCollisions.get()) {
+
+				// Raise the maximum collision count.
+
+				maxCollisions.set(rangeCount);
+
+				log.warn("MAX COLLISIONS NOW: " + maxCollisions.get());
+
+			}
+			
+			final byte[] key = keyBuilder.append((short) rangeCount).getKey();
+
 			// Insert into the index.
-			ndx.insert(key, val);
+			if (ndx.insert(key, val) != null) {
+
+				throw new AssertionError();
+
+			}
+
+			ninserted.incrementAndGet();
+
+			if (rangeCount > 128) { // arbitrary limit to log @ WARN.
+				log.warn("Collision: hashCode=" + BytesUtil.toString(key)
+						+ ", ninserted=" + ninserted + ", mcoll="
+						+ maxCollisions + ", ncoll=" + rangeCount
+						+ ", resource=" + r);
+			} else if (log.isInfoEnabled())
+				log.info("Collision: hashCode=" + BytesUtil.toString(key)
+						+ ", ninserted=" + ninserted + ", mcoll="
+						+ maxCollisions + ", ncoll=" + rangeCount
+						+ ", resource=" + r);
 
 		}
 		
