@@ -71,7 +71,6 @@ import com.bigdata.cache.RingBuffer;
 import com.bigdata.cache.IGlobalLRU.ILRUCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
-import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.ByteArrayBuffer;
@@ -704,152 +703,139 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //     */
 //    final protected RingBuffer<PO> readRetentionQueue;
 
-    /**
-     * Return some "statistics" about the btree including both the static
-     * {@link CounterSet} and the {@link BTreeCounters}s.
-     * <p>
-     * Note: Since this DOES NOT include the {@link #getDynamicCounterSet()},
-     * holding a reference to the returned {@link ICounterSet} WILL NOT cause
-     * the {@link AbstractBTree} to remain strongly reachable.
-     * 
-     * @see #getStaticCounterSet()
-     * @see #getDynamicCounterSet()
-     * @see BTreeCounters#getCounters()
-     */
+	/**
+	 * Interface declaring namespaces for performance counters collected for a
+	 * B+Tree.
+	 * 
+	 * @see AbstractBTree#getCounters()
+	 */
+    public static interface IBTreeCounters {
+
+		/** Counters for the {@link IBTreeStatistics} interface. */
+    	String Statistics = "Statistics";
+		/** Counters for the {@link AbstractBTree#writeRetentionQueue}. */
+		String WriteRetentionQueue = "WriteRetentionQueue";
+		/** Counters for key search performance. */
+		String KeySearch = "KeySearch";
+		/** Counters for {@link IRangeQuery}. */
+		String RangeQuery = "RangeQuery";
+		/** Counters for the {@link ILinearList} API. */
+		String LinearList = "LinearList";
+		/** Counters for structural modifications. */
+		String Structure = "Structure";
+		/** Counters for tuple-level operations. */
+		String Tuples = "Tuples";
+		/** Counters for IO. */
+		String IO = "IO";
+    
+    }
+
+	/**
+	 * Return some "statistics" about the btree including both the static
+	 * {@link CounterSet} and the {@link BTreeCounters}s.
+	 * <p>
+	 * Note: counters reporting directly on the {@link AbstractBTree} use a
+	 * snapshot mechanism which prevents a hard reference to the
+	 * {@link AbstractBTree} from being attached to the return
+	 * {@link CounterSet} object. One consequence is that these counters will
+	 * not update until the next time you invoke {@link #getCounters()}.
+	 * <p>
+	 * Note: In order to snapshot the counters use {@link OneShotInstrument} to
+	 * prevent the inclusion of an inner class with a reference to the outer
+	 * {@link AbstractBTree} instance.
+	 * 
+	 * @see BTreeCounters#getCounters()
+	 * 
+	 * @todo use same instance of BTreeCounters for all BTree instances in
+	 *       standalone!
+	 * 
+	 * @todo estimate heap requirements for nodes and leaves based on their
+	 *       state (keys, values, and other arrays). report estimated heap
+	 *       consumption here.
+	 */
     public ICounterSet getCounters() {
 
-        final CounterSet counterSet = getStaticCounterSet();
+		final CounterSet counterSet = new CounterSet();
+		{
+			
+			counterSet.addCounter("index UUID", new OneShotInstrument<String>(
+					getIndexMetadata().getIndexUUID().toString()));
 
-        counterSet.attach(btreeCounters.getCounters());
+			counterSet.addCounter("class", new OneShotInstrument<String>(
+					getClass().getName()));
 
-        return counterSet;
+		}
 
-    }
+		/*
+		 * Note: These statistics are reported using a snapshot mechanism which
+		 * prevents a hard reference to the AbstractBTree from being attached to
+		 * the CounterSet object!
+		 */
+		{
 
-// synchronized public ICounterSet getCounters() {
-//
-//        if (counterSet == null) {
-//
-//            counterSet = getStaticCounterSet();
-//
-//            counterSet.attach(btreeCounters.getCounters());
-//    
-//        }
-//        
-//        return counterSet;
-//              
-//    }
-//    private CounterSet counterSet;
-   
-    /**
-     * Return a new {@link CounterSet} containing dynamic counters - <strong>DO
-     * NOT hold onto the returned {@link CounterSet} as it contains implicit
-     * hard references to the {@link AbstractBTree} and will prevent the
-     * {@link AbstractBTree} from being finalized! </strong>
-     * 
-     * @todo factor counter names into interface.
-     */
-    public CounterSet getDynamicCounterSet() {
+			final CounterSet tmp = counterSet
+					.makePath(IBTreeCounters.WriteRetentionQueue);
 
-        final CounterSet counterSet = new CounterSet();
+			tmp.addCounter("Capacity", new OneShotInstrument<Integer>(
+					writeRetentionQueue.capacity()));
 
-        counterSet.addCounter("Write Retention Queue Distinct Count",
-                new Instrument<Long>() {
-                    public void sample() {
-                        setValue((long) ndistinctOnWriteRetentionQueue);
-                    }
-                });
+			tmp.addCounter("Size", new OneShotInstrument<Integer>(
+					writeRetentionQueue.size()));
 
-        counterSet.addCounter("Write Retention Queue Size",
-                new Instrument<Integer>() {
-                    protected void sample() {
-                        setValue(writeRetentionQueue.size());
-                    }
-                });
+			tmp.addCounter("Distinct", new OneShotInstrument<Integer>(
+					ndistinctOnWriteRetentionQueue));
 
-//        counterSet.addCounter("Read Retention Queue Size",
-//                new Instrument<Integer>() {
-//                    protected void sample() {
-//                        setValue(readRetentionQueue == null ? 0
-//                                : readRetentionQueue.size());
-//                    }
-//                });
-
-        /*
-         * @todo report time open?
-         * 
-         * @todo report #of times open?
-         * 
-         * @todo estimate heap requirements for nodes and leaves based on their
-         * state (keys, values, and other arrays). report estimated heap
-         * consumption here.
-         */
-    
-        // the % utilization in [0:1] for the whole tree (nodes + leaves).
-        counterSet.addCounter("% utilization", new Instrument<Double>(){
-            protected void sample() {
-                setValue(getUtilization().getTotalUtilization() / 100d);
-            }
-        });
+        }
         
-        counterSet.addCounter("height", new Instrument<Integer>() {
-            protected void sample() {
-                setValue(getHeight());
-            }
-        });
+		/*
+		 * Note: These statistics are reported using a snapshot mechanism which
+		 * prevents a hard reference to the AbstractBTree from being attached to
+		 * the CounterSet object!
+		 */
+		{
 
-        counterSet.addCounter("#nnodes", new Instrument<Integer>() {
-            protected void sample() {
-                setValue(getNodeCount());
-            }
-        });
+			final CounterSet tmp = counterSet
+					.makePath(IBTreeCounters.Statistics);
 
-        counterSet.addCounter("#nleaves", new Instrument<Integer>() {
-            protected void sample() {
-                setValue(getLeafCount());
-            }
-        });
+			tmp.addCounter("branchingFactor", new OneShotInstrument<Integer>(
+					branchingFactor));
 
-        counterSet.addCounter("#entries", new Instrument<Integer>() {
-            protected void sample() {
-                setValue(getEntryCount());
-            }
-        });
+			tmp.addCounter("height",
+					new OneShotInstrument<Integer>(getHeight()));
 
-        return counterSet;
-        
-    }
-    
-    /**
-     * Returns a new {@link CounterSet} containing <strong>static</strong>
-     * counters. These counters are all {@link OneShotInstrument}s and DO NOT
-     * contain implicit references to the {@link AbstractBTree}. They may be
-     * safely held and will not cause the {@link AbstractBTree} to remain
-     * strongly reachable.
-     */
-    public CounterSet getStaticCounterSet() {
+			tmp.addCounter("nodeCount", new OneShotInstrument<Integer>(
+					getNodeCount()));
 
-        final CounterSet counterSet = new CounterSet();
+			tmp.addCounter("leafCount", new OneShotInstrument<Integer>(
+					getLeafCount()));
 
-        counterSet.addCounter("index UUID", new OneShotInstrument<String>(
-                getIndexMetadata().getIndexUUID().toString()));
+			tmp.addCounter("tupleCount", new OneShotInstrument<Integer>(
+					getEntryCount()));
 
-        counterSet.addCounter("branchingFactor",
-                new OneShotInstrument<Integer>(branchingFactor));
+			final IBTreeUtilizationReport r = getUtilization();
+			
+			// % utilization in [0:100] for nodes
+			tmp.addCounter("%nodeUtilization", new OneShotInstrument<Integer>(r
+					.getNodeUtilization()));
+			
+			// % utilization in [0:100] for leaves
+			tmp.addCounter("%leafUtilization", new OneShotInstrument<Integer>(r
+					.getLeafUtilization()));
 
-        counterSet.addCounter("class", new OneShotInstrument<String>(getClass()
-                .getName()));
+			// % utilization in [0:100] for the whole tree (nodes + leaves).
+			tmp.addCounter("%totalUtilization", new OneShotInstrument<Integer>(r
+					.getTotalUtilization())); // / 100d
 
-        counterSet.addCounter("Write Retention Queue Capacity",
-                new OneShotInstrument<Integer>(writeRetentionQueue.capacity()));
+		}
 
-//        if (readRetentionQueue != null) {
-//
-//            counterSet.addCounter("Read Retention Queue Capacity",
-//                    new OneShotInstrument<Integer>(readRetentionQueue
-//                            .capacity()));
-//
-//        }
+		/*
+		 * Attach detailed performance counters.
+		 * 
+		 * Note: The BTreeCounters object does not have a reference to the
+		 * AbstractBTree. Its counters will update "live" since we do not
+		 * need to snapshot them.
+		 */
+		counterSet.attach(btreeCounters.getCounters());
 
         return counterSet;
 
@@ -2384,7 +2370,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         // conditional range check on the key.
         assert rangeCheck(key, false);
 
-        btreeCounters.nindexOf.incrementAndGet();
+        btreeCounters.nindexOf.increment();
 
         return getRootOrFinger(key).indexOf(key);
 
@@ -2398,7 +2384,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (index >= getEntryCount())
             throw new IndexOutOfBoundsException(ERROR_TOO_LARGE);
 
-        btreeCounters.ngetKey.incrementAndGet();
+        btreeCounters.ngetKey.increment();
 
         return getRoot().keyAt(index);
 
@@ -2425,7 +2411,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (tuple == null || !tuple.getValuesRequested())
             throw new IllegalArgumentException();
 
-        btreeCounters.ngetKey.incrementAndGet();
+        btreeCounters.ngetKey.increment();
 
         getRoot().valueAt(index, tuple);
 
@@ -2536,8 +2522,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-//        // only count the expensive ones.
-//        btreeCounters.nrangeCount.incrementAndGet();
+        // only count the expensive ones.
+        btreeCounters.nrangeCount.increment();
         
         final AbstractNode root = getRoot();
 
@@ -2743,7 +2729,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             final IFilter filter//
             ) {
 
-//        btreeCounters.nrangeIterator.incrementAndGet();
+        btreeCounters.nrangeIterator.increment();
 
         /*
          * Does the iterator declare that it will not write back on the index?

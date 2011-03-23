@@ -2018,42 +2018,43 @@ abstract public class IndexManager extends StoreManager {
      * Per index counters.
      */
 
-    /**
-     * Canonical per-index partition {@link BTreeCounters}. These counters are
-     * set on each {@link AbstractBTree} that is materialized by
-     * {@link #getIndexOnStore(String, long, IRawStore)}. The same
-     * {@link BTreeCounters} object is used for the unisolated, read-committed,
-     * read-historical and isolated views of the index partition and for each
-     * source in the view regardless of whether the source is a mutable
-     * {@link BTree} on the live journal, a read-only {@link BTree} on a
-     * historical journal, or an {@link IndexSegment}.
-     * 
-     * FIXME An {@link IndexSegment} can be used by more than one view of an
-     * index partition. This is not a problem and no double counting,
-     * misassignment of credit, or lost counters will result. However, if an
-     * {@link IndexSegment} is used by different index partitions (which might
-     * well be allowed in a post-split scenario but is not possible for a post-
-     * move or post-join scenario, and those are the three ways in which a new
-     * index partition can be created (other than by registering a new scale-out
-     * index) then the {@link BTreeCounters} will only reflect all activity on
-     * an {@link IndexSegment} in the index partition which last (re-)opened
-     * that {@link IndexSegment}.
-     * 
-     * FIXME Index partitions which have been dropped should be cleared from the
-     * map at overflow unless they have been re-registered since. Use
-     * {@link #getIndexPartitionGone(String)} to figure out if each index
-     * partition has been dropped during synchronous overflow. Then cross check
-     * to verify that it does not still exist.
-     * <p>
-     * Slightly better would be to reset the index counters at the drop (except
-     * that they will immediately disappear) or best yet to always reset the
-     * index counters on add and to clear at overflow if split/moved/deleted or
-     * otherwise gone.
-     * <p>
-     * When a scale-out index is deleted clear out the entries in
-     * {@link #getIndexPartitionGone(String)} so that we do not run into trouble
-     * if the index is re-registered!
-     */
+	/**
+	 * Canonical per-index partition {@link BTreeCounters}. These counters are
+	 * set on each {@link AbstractBTree} that is materialized by
+	 * {@link #getIndexOnStore(String, long, IRawStore)}. The same
+	 * {@link BTreeCounters} object is used for the unisolated, read-committed,
+	 * read-historical and isolated views of the index partition and for each
+	 * source in the view regardless of whether the source is a mutable
+	 * {@link BTree} on the live journal, a read-only {@link BTree} on a
+	 * historical journal, or an {@link IndexSegment}.
+	 * 
+	 * FIXME An {@link IndexSegment} can be used by more than one view of an
+	 * index partition. This is not a problem and no double counting,
+	 * misassignment of credit, or lost counters will result. However, if an
+	 * {@link IndexSegment} is used by different index partitions (which might
+	 * well be allowed in a post-split scenario but is not possible for a post-
+	 * move or post-join scenario, and those are the three ways in which a new
+	 * index partition can be created (other than by registering a new scale-out
+	 * index) then the {@link BTreeCounters} will only reflect all activity on
+	 * an {@link IndexSegment} in the index partition which last (re-)opened
+	 * that {@link IndexSegment}.
+	 * 
+	 * FIXME Index partitions which have been dropped should be cleared from the
+	 * map at overflow unless they have been re-registered since (the map could
+	 * also use the index UUID as the key in case the index is re-registered).
+	 * Use {@link #getIndexPartitionGone(String)} to figure out if each index
+	 * partition has been dropped during synchronous overflow. Then cross check
+	 * to verify that it does not still exist.
+	 * <p>
+	 * Slightly better would be to reset the index counters at the drop (except
+	 * that they will immediately disappear) or best yet to always reset the
+	 * index counters on add and to clear at overflow if split/moved/deleted or
+	 * otherwise gone.
+	 * <p>
+	 * When a scale-out index is deleted clear out the entries in
+	 * {@link #getIndexPartitionGone(String)} so that we do not run into trouble
+	 * if the index is re-registered!
+	 */
     final private ConcurrentHashMap<String/* name */, BTreeCounters> indexCounters = new ConcurrentHashMap<String, BTreeCounters>();
 
     /**
@@ -2064,15 +2065,6 @@ abstract public class IndexManager extends StoreManager {
      */
     private Map<String/*name*/, BTreeCounters> mark = new HashMap<String, BTreeCounters>(); 
 
-    /**
-     * Return the {@link BTreeCounters} for the named index. If none exist, then
-     * a new instance is atomically created and returned to the caller.
-     * 
-     * @param name
-     *            The name of the index.
-     * 
-     * @return The counters for that index and never <code>null</code>.
-     */
     public BTreeCounters getIndexCounters(final String name) {
 
         if (name == null)

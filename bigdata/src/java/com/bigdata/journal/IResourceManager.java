@@ -34,6 +34,7 @@ import java.util.concurrent.Future;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
@@ -296,4 +297,17 @@ public interface IResourceManager extends IServiceShutdown {
 //     */
 //    public UUID[] getDataServiceUUIDs();
 
+	/**
+	 * Return the {@link BTreeCounters} for the named index. If none exist, then
+	 * a new instance is atomically created and returned to the caller. This
+	 * facilitates the reuse of the same {@link BTreeCounters} instance for all
+	 * views of the named index.
+	 * 
+	 * @param name
+	 *            The name of the index.
+	 * 
+	 * @return The counters for that index and never <code>null</code>.
+	 */
+    public BTreeCounters getIndexCounters(final String name);
+    
 }

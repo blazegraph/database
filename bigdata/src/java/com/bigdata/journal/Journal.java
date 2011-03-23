@@ -32,6 +32,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -49,6 +50,7 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
@@ -389,6 +391,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         String concurrencyManager = "Concurrency Manager";
 
         /**
+         * The namespace for the counters pertaining to the named indices.
+         */
+        String indexManager = "Index Manager";
+
+        /**
          * The namespace for the counters pertaining to the {@link ILocalTransactionService}.
          */
         String transactionManager = "Transaction Manager";
@@ -437,10 +444,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         {
 
             final CounterSet tmp = root.makePath("Journal");
-            
-            tmp.attach(super.getCounters());
 
-            tmp.makePath(IJournalCounters.concurrencyManager)
+			tmp.attach(super.getCounters());
+
+			tmp.makePath(IJournalCounters.indexManager).attach(
+					_getName2Addr().getIndexCounters());
+
+			tmp.makePath(IJournalCounters.concurrencyManager)
                     .attach(concurrencyManager.getCounters());
 
             tmp.makePath(IJournalCounters.transactionManager)
@@ -692,6 +702,22 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
+    @Override
+	public void dropIndex(final String name) {
+
+		final BTreeCounters btreeCounters = getIndexCounters(name);
+
+		super.dropIndex(name);
+
+		if (btreeCounters != null) {
+
+			// Conditionally remove the counters for the old index.
+			indexCounters.remove(name, btreeCounters);
+
+		}
+    	
+    }
+    
     /**
      * Note: {@link ITx#READ_COMMITTED} views are given read-committed semantics
      * using a {@link ReadCommittedView}.  This means that they can be cached
@@ -858,6 +884,16 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         }
         
+        /*
+         * Make sure that it is using the canonical counters for that index.
+         * 
+         * Note: AbstractTask also does this for UNISOLATED indices which it
+         * loads by itself as part of providing ACID semantics for add/drop
+         * of indices.
+         */
+
+        ((BTree)tmp).setBTreeCounters(getIndexCounters(name));
+
         return tmp;
 
     }
@@ -1787,4 +1823,60 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 				Options.DEFAULT_HTTPD_PORT));
 	}
 
+    /*
+     * Per index counters.
+     */
+
+	/**
+	 * Canonical per-index {@link BTreeCounters}. These counters are set on each
+	 * {@link AbstractBTree} that is materialized by
+	 * {@link #getIndexOnStore(String, long, IRawStore)}. The same
+	 * {@link BTreeCounters} object is used for the unisolated, read-committed,
+	 * read-historical and isolated views of the index partition and for each
+	 * source in the view regardless of whether the source is a mutable
+	 * {@link BTree} on the live journal, a read-only {@link BTree} on a
+	 * historical journal, or an {@link IndexSegment}.
+	 * 
+	 * FIXME Indices which have been dropped should be cleared from the map (the
+	 * map could also use the index UUID as the key in case the index is
+	 * re-registered).
+	 */
+    final private ConcurrentHashMap<String/* name */, BTreeCounters> indexCounters = new ConcurrentHashMap<String, BTreeCounters>();
+
+    public BTreeCounters getIndexCounters(final String name) {
+
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        // first test for existence.
+        BTreeCounters t = indexCounters.get(name);
+
+        if (t == null) {
+
+            // not found.  create a new instance.
+            t = new BTreeCounters();
+
+            // put iff absent.
+            final BTreeCounters oldval = indexCounters.putIfAbsent(name, t);
+
+            if (oldval != null) {
+
+                // someone else got there first so use their instance.
+                t = oldval;
+
+            } else {
+                
+                if (log.isInfoEnabled())
+                    log.info("New counters: indexPartitionName=" + name);
+                
+            }
+            
+        }
+
+        assert t != null;
+        
+        return t;
+        
+    }
+    
 }
