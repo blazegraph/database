@@ -122,7 +122,7 @@ public class ICUVersionRecord implements Externalizable {
 
     }
 
-    private ICUVersionRecord(//
+    ICUVersionRecord(//
             VersionInfo icuVersion,//
             VersionInfo ucolRuntimeVesion,//
             VersionInfo ucolBuilderVersion,//
@@ -184,8 +184,8 @@ public class ICUVersionRecord implements Externalizable {
 
         final int major = in.readInt();
         final int minor = in.readInt();
-        final int milli = in.readInt();
         final int micro = in.readInt();
+        final int milli = in.readInt();
         
         return VersionInfo.getInstance(major, minor, milli, micro);
         
@@ -246,6 +246,14 @@ public class ICUVersionRecord implements Externalizable {
 
         System.out.println(ICUVersionRecord.newInstance().toString());
 
+        final ICUVersionRecord a = ICUVersionRecord.newInstance();
+        final ICUVersionRecord b = ICUVersionRecord.newInstance();
+        
+        if(!a.equals(b))
+            throw new AssertionError();
+        if(!b.equals(a))
+            throw new AssertionError();
+        
     }
 
 }
