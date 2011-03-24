@@ -154,17 +154,21 @@ final public class BTreeCounters implements Cloneable {
         ntupleUpdateDelete += o.ntupleUpdateDelete;
         ntupleRemove += o.ntupleRemove;
         // IO reads
-        nodesRead.addAndGet(o.nodesRead.get());
-        leavesRead.addAndGet(o.leavesRead.get());
-        bytesRead.addAndGet(o.bytesRead.get());
-        readNanos.addAndGet(o.readNanos.get());
-        deserializeNanos.addAndGet(o.deserializeNanos.get());
+        nodesRead.add(o.nodesRead.get());
+        leavesRead.add(o.leavesRead.get());
+        bytesRead.add(o.bytesRead.get());
+        readNanos.add(o.readNanos.get());
+        deserializeNanos.add(o.deserializeNanos.get());
+        rawRecordsRead.add(o.rawRecordsRead.get());
+        rawRecordsBytesRead.add(o.rawRecordsBytesRead.get());
         // IO writes.
         nodesWritten += o.nodesWritten;
         leavesWritten += o.leavesWritten;
         bytesWritten += o.bytesWritten;
         writeNanos += o.writeNanos;
         serializeNanos += o.serializeNanos;
+        rawRecordsWritten += o.rawRecordsWritten;
+        rawRecordsBytesWritten+= o.rawRecordsBytesWritten;
         
     }
     
@@ -215,17 +219,21 @@ final public class BTreeCounters implements Cloneable {
         t.ntupleUpdateDelete -= o.ntupleUpdateDelete;
         t.ntupleRemove -= o.ntupleRemove;
         // IO reads
-        t.nodesRead.addAndGet(-o.nodesRead.get());
-        t.leavesRead.addAndGet(-o.leavesRead.get());
-        t.bytesRead.addAndGet(-o.bytesRead.get());
-        t.readNanos.addAndGet(-o.readNanos.get());
-        t.deserializeNanos.addAndGet(-o.deserializeNanos.get());
+        t.nodesRead.add(-o.nodesRead.get());
+        t.leavesRead.add(-o.leavesRead.get());
+        t.bytesRead.add(-o.bytesRead.get());
+        t.readNanos.add(-o.readNanos.get());
+        t.deserializeNanos.add(-o.deserializeNanos.get());
+        t.rawRecordsRead.add(-o.rawRecordsRead.get());
+        t.rawRecordsBytesRead.add(-o.rawRecordsBytesRead.get());
         // IO writes.
         t.nodesWritten -= o.nodesWritten;
         t.leavesWritten -= o.leavesWritten;
         t.bytesWritten -= o.bytesWritten;
         t.serializeNanos -= o.serializeNanos;
         t.writeNanos -= o.writeNanos;
+        t.rawRecordsWritten -= o.rawRecordsWritten;
+        t.rawRecordsBytesWritten -= o.rawRecordsBytesWritten;
         
         return t;
         
@@ -302,17 +310,20 @@ final public class BTreeCounters implements Cloneable {
      * transaction's write set and are counted here.
      */
     public long ntupleInsertDelete = 0;
+    
     /**
      * #of pre-existing tuples whose value was updated to a non-deleted value
      * (includes update of a deleted tuple to a non-deleted tuple by overwrite
      * of the tuple).
      */
     public long ntupleUpdateValue = 0;
+
     /**
      * #of pre-existing un-deleted tuples whose delete marker was set (we don't
      * count re-deletes of an already deleted tuple).
      */
     public long ntupleUpdateDelete = 0;
+    
     /**
      * #of pre-existing tuples that were removed from the B+Tree (only non-zero
      * when the B+Tree does not support delete markers).
@@ -326,11 +337,20 @@ final public class BTreeCounters implements Cloneable {
      */
     
     // IO reads (concurrent)
-    public final AtomicInteger nodesRead = new AtomicInteger();
-    public final AtomicInteger leavesRead = new AtomicInteger();
-    public final AtomicLong bytesRead = new AtomicLong();
-    public final AtomicLong readNanos = new AtomicLong();
-    public final AtomicLong deserializeNanos = new AtomicLong();
+    /** #of node read operations. */
+    public final CAT nodesRead = new CAT();
+    /** #of leaf read operations. */
+    public final CAT leavesRead = new CAT();
+    /** Total bytes read for nodes and leaves (but not raw records). */;
+    public final CAT bytesRead = new CAT();
+    /** Read time for nodes and leaves (but not raw records). */
+    public final CAT readNanos = new CAT();
+    /** De-serialization time for nodes and leaves. */
+    public final CAT deserializeNanos = new CAT();
+    /** The #of raw record read operations. */
+    public final CAT rawRecordsRead = new CAT();
+    /** Total bytes read for raw records. */
+    public final CAT rawRecordsBytesRead = new CAT();
 
     // IO writes (single-threaded)
     public int nodesWritten = 0;
@@ -338,7 +358,9 @@ final public class BTreeCounters implements Cloneable {
     public long bytesWritten = 0L;
     public long writeNanos = 0;
 	public long serializeNanos = 0;
-
+	public long rawRecordsWritten = 0;
+	public long rawRecordsBytesWritten = 0;
+	
 	/**
 	 * The #of bytes in the unisolated view of the index which are being used to
 	 * store raw records.
@@ -723,13 +745,13 @@ final public class BTreeCounters implements Cloneable {
                  * nodes/leaves read/written
                  */
 
-                tmp.addCounter("leafReadCount", new Instrument<Integer>() {
+                tmp.addCounter("leafReadCount", new Instrument<Long>() {
                     protected void sample() {
                         setValue(leavesRead.get());
                     }
                 });
 
-                tmp.addCounter("nodeReadCount", new Instrument<Integer>() {
+                tmp.addCounter("nodeReadCount", new Instrument<Long>() {
                     protected void sample() {
                         setValue(nodesRead.get());
                     }
@@ -869,6 +891,30 @@ final public class BTreeCounters implements Cloneable {
                     public void sample() {
                         final double secs = (computeRawWriteScore()/ 1000000000.);
                         setValue(secs);
+                    }
+                });
+
+                /*
+                 * RawRecords
+                 */
+                tmp.addCounter("rawRecordsRead", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(rawRecordsRead.get());
+                    }
+                });
+                tmp.addCounter("rawRecordsBytesRead", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(rawRecordsBytesRead.get());
+                    }
+                });
+                tmp.addCounter("rawRecordsWritten", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(rawRecordsWritten);
+                    }
+                });
+                tmp.addCounter("rawRecordsBytesWritten", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(rawRecordsBytesWritten);
                     }
                 });
                 
