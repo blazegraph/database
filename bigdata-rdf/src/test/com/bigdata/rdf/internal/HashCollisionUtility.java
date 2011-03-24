@@ -5,6 +5,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
+import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -13,9 +15,11 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.zip.Deflater;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -42,13 +46,17 @@ import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
+import com.bigdata.btree.raba.codec.FixedLengthValueRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.io.compression.RecordCompressor;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
@@ -128,6 +136,79 @@ import com.bigdata.rdf.model.BigdataValueSerializer;
  * lex	1024	1	1	474	7913	3371370	3379283	7913	7112	7913	7913	5274	12774
  * </pre>
  * 
+ * BSBM 200M: This is the best time and space so far. using a byte counter
+ * rather than a short.
+ * 
+ * <pre>
+ * Elapsed: 16338357ms
+ * NumStatements: 198808848
+ * NumDistinctVals: 45647082
+ * TotalKeyBytes: 228235410
+ * TotalValBytes: 11292849582
+ * MaxCollisions: 3
+ * TotalCollisions: 244042
+ * Journal size: 16591683584 bytes
+ * </pre>
+ * 
+ * BSBM 200M: Note: I restarted this run after terminating yourkit so the
+ * results should be valid (right?). The main changes are to use stringValue()
+ * to test for dateTime, to use the canonical huffman coder for the leaf keys.
+ * 
+ * <pre>
+ * Elapsed: 20148506ms
+ * NumStatements: 198808848
+ * NumDistinctVals: 45647082
+ * TotalKeyBytes: 228235410
+ * TotalValBytes: 11292849582
+ * MaxCollisions: 3
+ * TotalCollisions: 244042
+ * Journal size: 16591683584 bytes
+ * </pre>
+ * 
+ * BSBM 200M: raw records are compress if they are over 64 bytes long.
+ * 
+ * <pre>
+ * Elapsed: 18757003ms
+ * NumStatements: 198808848
+ * NumDistinctVals: 45647082
+ * TotalKeyBytes: 228235410
+ * TotalValBytes: 7910596818
+ * MaxCollisions: 3
+ * TotalCollisions: 244042
+ * Journal size: 12270108672 bytes
+ * </pre>
+ * 
+ * BSBM 200M: literals LT 64 byte labels are assumed inlined into statement
+ * indices (except datatype URIs).
+ * 
+ * <pre>
+ * Elapsed: 16193915ms
+ * NumStatements: 198808848
+ * NumDistinctVals: 43273381
+ * NumShortLiterals: 2723662
+ * TotalKeyBytes: 216366905
+ * TotalValBytes: 7807037644
+ * MaxCollisions: 3
+ * TotalCollisions: 219542
+ * Journal size: 11083186176 bytes
+ * </pre>
+ * 
+ * BSBM 200M: uris LT 64 byte localNames are assumed inlined into statement
+ * indices (plus datatype literals LT 64 bytes).
+ * 
+ * <pre>
+ * Elapsed: 5699248ms
+ * NumStatements: 198808848
+ * NumDistinctVals: 12198222
+ * NumShortLiterals: 32779032
+ * NumShortURIs: 493520581
+ * TotalKeyBytes: 60991110
+ * TotalValBytes: 4944223808
+ * MaxCollisions: 2
+ * TotalCollisions: 17264
+ * Journal size: 7320764416 bytes
+ * </pre>
+ * 
  * TODO Try with only N bytes worth of the SHA hash code, leaving some bits left
  * over for partitioning URIs, Literals, and BNodes (for told bnode mode) and
  * for a counter to break ties when there is a hash collision. We should wind up
@@ -164,13 +245,113 @@ public class HashCollisionUtility {
 	private final static Logger log = Logger
 			.getLogger(HashCollisionUtility.class);
 
-	private final BTree ndx;
+	/**
+	 * An index mapping {@link URI#getNamespace()} strings onto unique
+	 * identifiers which are then used to shorten the {@link URI}s. The index
+	 * maps <code>namespace : id</code>, where namespace is given by
+	 * {@link URI#getNamespace()} and a {@link URI#getLocalName()} and
+	 * <code>id</code> is a consistently assigned unique identifier for that
+	 * namespace. The remainder of the {@link URI} is returned by
+	 * {@link URI#getLocalName()}. Per that method, there is always a localName.
+	 * The localName can include the last component of the {@link URL} path, the
+	 * anchor, the query string, etc. When the localName is short, the
+	 * {@link URI} can be inlined directly into the statement indices. Factoring
+	 * the {@link URI} into the namespace and the localName provides a great
+	 * reduction in the space required to represent instance data {@link URI}s
+	 * in the database and makes it possible to inline many instance {@link URI}
+	 * s into the statement indices.
+	 * <p>
+	 * Note: Because this is data driven, the namespace index can include keys
+	 * which are prefixes of other keys or otherwise overlap with them. For
+	 * example, <code>http://www.bigdata.com/</code> and
+	 * <code>http://www.bigdata.com#</code> could both be found in the namespace
+	 * index.
+	 * 
+	 * TODO We could actually NOT install <code>rdf:</code>, <code>rdfs:</code>,
+	 * and similar namespaces into this index in order to have a potentially
+	 * shorter coding for them (a single termId).
+	 * 
+	 * TODO We need to use a <code>long</code> ID in scale-out if we permit this
+	 * index to become sharded. If we do not, then we could use an
+	 * <code>int</code> in both standalone and scale-out. The #of URI prefixes
+	 * we encounter could be large if the data represent a web graph, so that is
+	 * a good reason to use a <code>long</code> in scale-out.
+	 * 
+	 * TODO We could also use hash(prefix) as the key. I've only avoided that
+	 * here because it is slightly more complex and the total #of URI prefixes
+	 * that we expect to encounter is so small that it does not seem worthwhile,
+	 * at least, not for this utility. (Actually, there is probably a benefit to
+	 * having the URIs cluster by prefix in this index.)
+	 * 
+	 * TODO We could impose clustering by prefix in the TERMS index and hence in
+	 * the statement indices as well, if we form the key for the TERMS index for
+	 * a URI using the code assigned by this index as a prefix followed by a
+	 * hash value. However, we should automatically get clustering in the
+	 * statement indices for a given prefix when the URI follows the typical
+	 * patterns for an RDF namespace.
+	 * 
+	 * TODO MikeP would like to see the ability to register patterns or prefixes
+	 * which would not participate. For example, all things matching the pattern
+	 * <code>http://www.bigdata.com/foo/TIMESTAMP/bar</code>, where TIMESTAMP is
+	 * something that looks like a timestamp. He things that there could be a
+	 * lot of outlier data which looks like this and it would certainly clutter
+	 * the NAMESPACE index, potentially making the entire thing too large to
+	 * stuff into memory.
+	 */
+	private final BTree namespaceIndex;
 
+	/**
+	 * An index mapping <code>hashCode(Value)+counter : Value</code>. This
+	 * provides a dictionary for RDF {@link Value}s encountered when loading
+	 * {@link Statement}s into the database. The counter provides a simple
+	 * mechanism for reconciling hash collisions.
+	 */
+	private final BTree termsIndex;
+
+	/**
+	 * The maximum length of a {@link URI#getLocalName()} before the {@link URI}
+	 * will no longer be inlined into the statement indices.
+	 * 
+	 * TODO Support URI inlining into the statement indices.
+	 */
+	private final int URI_INLINE_LIMIT = 64;
+
+	/**
+	 * The maximum length of a plain, languageCode, or datatype literal's
+	 * {@link Literal#getLabel()} before the {@link Literal} will no longer be
+	 * inlined into the statement indices.
+	 * <p>
+	 * Note: When inlining a datatype {@link URI} which is non-numeric, the
+	 * {@link URI} of the datatype must also be inlined.
+	 * 
+	 * TODO Support literal inlining into the statement indices.
+	 */
+	private final int LITERAL_INLINE_LIMIT = 64;
+	
 	private final BigdataValueFactory vf;
 
 	private final LexiconConfiguration<BigdataValue> conf;
 	
 	private final StatementHandler stmtHandler;
+
+	/**
+	 * #of statements visited.
+	 */
+	private final AtomicLong nstmts = new AtomicLong();
+
+	/**
+	 * The #of {@link URI}s whose <code>localName</code> was short enough that
+	 * we decided to inline them into the statement indices instead.
+	 */
+	private final AtomicLong nshortURIs = new AtomicLong();
+
+	/**
+	 * The #of {@link Literal}s which were short enough that we decided to
+	 * inline them into the statement indices instead.
+	 */
+	private final AtomicLong nshortLiterals = new AtomicLong();
+	
+//	private final ConcurrentWeakValueCacheWithBatchedUpdates<Value, BigdataValue> valueCache;
 	
 	/** 
 	 * The size of the hash collision set for the RDF Value with the most
@@ -183,6 +364,12 @@ public class HashCollisionUtility {
 	 */
 	private final AtomicLong totalCollisions = new AtomicLong();
 
+//	/**
+//	 * The #of RDF {@link Value}s which were found in the {@link #valueCache},
+//	 * thereby avoiding a lookup against the index.
+//	 */
+//	private final AtomicLong ncached = new AtomicLong();
+	
 	/**
 	 * The #of distinct RDF {@link Value}s inserted into the index.
 	 */
@@ -228,33 +415,79 @@ public class HashCollisionUtility {
 //		
 //	}
 	
-	private HashCollisionUtility(final Journal jnl) {
+	private HashCollisionUtility(final Journal jnl) {		
+
+		this.namespaceIndex = getNamespaceIndex(jnl);
+
+		this.termsIndex = getTermsIndex(jnl);
+
+		vf = BigdataValueFactoryImpl.getInstance("test");
 		
-		final String name = "lex";
-		
-		BTree ndx = jnl.getIndex(name);
-		
+		// factory does not support any extensions.
+		final IExtensionFactory xFactory = new IExtensionFactory() {
+
+			public void init(LexiconRelation lex) {
+				// NOP
+			}
+
+			@SuppressWarnings("unchecked")
+			public IExtension[] getExtensions() {
+				return new IExtension[] {};
+			}
+		};
 
 		/*
-		 * TODO CanonicalHuffmanRabaCoder for U1 drops the average leaf size
+		 * Note: This inlines everything *except* xsd:dateTime, which
+		 * substantially reduces the data we will put into the index.
 		 * 
-		 * @ m=512 from 24k to 16k. Experiment with performance tradeoff
-		 * when compared with gzip of the record.
-		 * 
-		 * No apparent impact for U1 on the leaves or nodes for 32 versus 8
-		 * on the front-coded raba.
-		 * 
-		 * Dropping maxRecLen from 256 to 64 reduces the leaves from 16k to
-		 * 10k. Dropping it to ZERO (0) reduces the leaves to 5k. This
-		 * suggests that we could to much better if we keep all RDF Values
-		 * out of the index. In standalone, we can give people a TermId
-		 * which is the raw record address. However, in scale-out it needs
-		 * to be the key (to locate the shard) and we will resolve the RDF
-		 * Value using the index on the shard.
-		 * 
-		 * Suffix compression would allow us to generalize the counter and
-		 * avoid index space costs when collisions are rare while being able
-		 * to tolerate more collisions (short versus byte).
+		 * @todo Do a special IExtension implementation to handle xsd:dateTime
+		 * since the DateTimeExtension uses the LexiconRelation to do its work.
+		 */
+		conf = new LexiconConfiguration<BigdataValue>(
+				true, // inlineLiterals
+				true, // inlineBNodes
+				false, // inlineDateTimes
+				xFactory // extension factory
+				);
+		
+		final int valBufSize = 100000; // TODO Try 1M.
+
+		stmtHandler = new StatementHandler(valBufSize);
+
+//		valueCache = new ConcurrentWeakValueCacheWithBatchedUpdates<Value, BigdataValue>(
+//				50000 // hard reference queue capacity
+//				);
+		
+	}
+
+	/**
+	 * Return the index in which we store RDF {@link Value}s.
+	 * 
+	 * @param jnl
+	 *            The index manager.
+	 *            
+	 * @return The index.
+	 */
+	/*
+	 * TODO CanonicalHuffmanRabaCoder for U1 drops the average leaf size
+	 * 
+	 * @ m=512 from 24k to 16k. Experiment with performance tradeoff
+	 * when compared with gzip of the record.
+	 * 
+	 * No apparent impact for U1 on the leaves or nodes for 32 versus 8
+	 * on the front-coded raba.
+	 * 
+	 * Dropping maxRecLen from 256 to 64 reduces the leaves from 16k to
+	 * 10k. Dropping it to ZERO (0) reduces the leaves to 5k. This
+	 * suggests that we could to much better if we keep all RDF Values
+	 * out of the index. In standalone, we can give people a TermId
+	 * which is the raw record address. However, in scale-out it needs
+	 * to be the key (to locate the shard) and we will resolve the RDF
+	 * Value using the index on the shard.
+	 * 
+	 * Suffix compression would allow us to generalize the counter and
+	 * avoid index space costs when collisions are rare while being able
+	 * to tolerate more collisions (short versus byte).
 
 U1: m=800, q=8000, ratio=8, maxRecLen=0, 
 Elapsed: 41340ms
@@ -321,12 +554,17 @@ end in a summary.
 TODO The front compression of the keys is not helping out much since the keys
 are so sparse in the hash code space.  It is a Good Thing that the keys are so
 sparse, but this suggests that we should try a different coder for the leaf keys.
-		 */
+	 */
+	private BTree getTermsIndex(final Journal jnl) {
+		
+		final String name = "TERMS";
+		
+		BTree ndx = jnl.getIndex(name);
+
 		final int m = 1024;
 		final int q = 8000;
 		final int ratio = 32;
 		final int maxRecLen = 0;
-		final int valBufSize = 1000000; // TODO Try 1M.
 		if(ndx == null) {
 			
 			final IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
@@ -335,8 +573,15 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			
 			final DefaultTupleSerializer tupleSer = new DefaultTupleSerializer(
 					new DefaultKeyBuilderFactory(new Properties()),//
+					/*
+					 * leaf keys
+					 */
 //					DefaultFrontCodedRabaCoder.INSTANCE,//
 					new FrontCodedRabaCoder(ratio),//
+//					CanonicalHuffmanRabaCoder.INSTANCE,
+					/*
+					 * leaf values
+					 */
 					CanonicalHuffmanRabaCoder.INSTANCE
 //					new SimpleRabaCoder()//
 			);
@@ -362,41 +607,66 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			
 		}
 		
-		this.ndx = ndx;
-
-		vf = BigdataValueFactoryImpl.getInstance("test");
-		
-		// factory does not support any extensions.
-		final IExtensionFactory xFactory = new IExtensionFactory() {
-
-			public void init(LexiconRelation lex) {
-				// NOP
-			}
-
-			@SuppressWarnings("unchecked")
-			public IExtension[] getExtensions() {
-				return new IExtension[] {};
-			}
-		};
-
-		/*
-		 * Note: This inlines everything *except* xsd:dateTime, which
-		 * substantially reduces the data we will put into the index.
-		 * 
-		 * @todo Do a special IExtension implementation to handle xsd:dateTime
-		 * since the DateTimeExtension uses the LexiconRelation to do its work.
-		 */
-		conf = new LexiconConfiguration<BigdataValue>(
-				true, // inlineLiterals
-				true, // inlineBNodes
-				false, // inlineDateTimes
-				xFactory // extension factory
-				);
-		
-		stmtHandler = new StatementHandler(valBufSize);
+		return ndx;
 		
 	}
 
+	/**
+	 * Return the index in which we store URI prefixes.
+	 * 
+	 * @param jnl
+	 *            The index manager.
+	 *            
+	 * @return The index.
+	 */
+	private BTree getNamespaceIndex(final Journal jnl) {
+		
+		final String name = "NAMESPACE";
+		
+		BTree ndx = jnl.getIndex(name);
+
+		final int m = 32;
+		final int q = 500;
+//		final int ratio = 8;
+		final int maxRecLen = 0;
+		if(ndx == null) {
+			
+			final IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+			
+//			md.setNodeKeySerializer(new FrontCodedRabaCoder(ratio));
+			
+			final DefaultTupleSerializer tupleSer = new DefaultTupleSerializer(
+					new DefaultKeyBuilderFactory(new Properties()),//
+					/*
+					 * leaf keys
+					 */
+					DefaultFrontCodedRabaCoder.INSTANCE,//
+//					new FrontCodedRabaCoder(ratio),//
+					/*
+					 * leaf values
+					 */
+					new FixedLengthValueRabaCoder(Bytes.SIZEOF_LONG)
+			);
+			
+			md.setTupleSerializer(tupleSer);
+			
+//			// enable raw record support.
+//			md.setRawRecords(true);
+//			
+//			// set the maximum length of a byte[] value in a leaf.
+//			md.setMaxRecLen(maxRecLen);
+
+			md.setBranchingFactor(m);
+			md.setWriteRetentionQueueCapacity(q);
+			
+			ndx = jnl.registerIndex(name, md);
+			
+		}
+		
+		return ndx;
+		
+	}
+	
 	private void parseFileOrDirectory(final File fileOrDir)
 			throws RDFParseException, RDFHandlerException, IOException, NoSuchAlgorithmException {
 
@@ -518,11 +788,6 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		private int nvalues = 0;
     	
     	/**
-    	 * #of statements visited.
-    	 */
-    	private final AtomicLong nstmts = new AtomicLong();
-
-    	/**
     	 * Used to build the keys.
     	 */
     	private final IKeyBuilder keyBuilder = KeyBuilder.newInstance();
@@ -532,7 +797,16 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 		/** Used to serialize RDF Values as byte[]s. */
     	private final BigdataValueSerializer<Value> valSer = new BigdataValueSerializer<Value>(vf);
-    	
+
+		/**
+		 * Used to (de-)compress the raw values.
+		 * 
+		 * FIXME This is not thread-safe. We will need a pool or thread-local
+		 * instances to support concurrent reads against the TERMS index.
+		 */
+		final RecordCompressor compressor = new RecordCompressor(
+				Deflater.BEST_SPEED);
+		
 		private final MessageDigest d;
 
 		public StatementHandler(final int valueBufSize) {
@@ -583,11 +857,29 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				
 			}
 
+//			{
+//				
+//				final BigdataValue cachedValue = valueCache.get(value);
+//				
+//				if ( cachedValue != null) {
+//
+//					// Cache hit - no need to test the index.
+//					ncached.incrementAndGet();
+//
+//					return;
+//
+//				}
+//			
+//			}
+			
 			if (value instanceof BigdataLiteral) {
 
 				final URI datatype = ((BigdataLiteral) value).getDatatype();
 
-				if (datatype != null && XMLSchema.DATETIME.equals(datatype)) {
+		        // Note: URI.stringValue() is efficient....
+				if (datatype != null
+						&& XMLSchema.DATETIME.stringValue().equals(
+								datatype.stringValue())) {
 
 					// TODO xsd:dateTime should be inlined by the real code....
 					return;
@@ -595,7 +887,54 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				}
 				
 			}
+
+			if (value instanceof BigdataURI) {
+
+				final BigdataURI uri = (BigdataURI) value;
+
+				if (uri.getLocalNameLength() < URI_INLINE_LIMIT) {
+
+					/*
+					 * Ingore URI that will be inlined into the statement
+					 * indices.
+					 * 
+					 * FIXME URIs with short localNames should have their
+					 * namespace registered against the NAMESPACE index and
+					 * should be inlined into the statement indices.
+					 */
+
+					nshortURIs.incrementAndGet();
+
+					return;
+					
+				}
+				
+			}
 			
+			if (value instanceof Literal) {
+
+				final Literal lit = (Literal) value;
+
+				if (//lit.getDatatype() == null &&
+						lit.getLabel().length() < LITERAL_INLINE_LIMIT) {
+
+					/*
+					 * Ignore Literal that will be inlined in the statement
+					 * indices.
+					 * 
+					 * FIXME Literals with short labels should be inlined into
+					 * the statement indices, including languageCode literals
+					 * with short labels and plain literals with short labels.
+					 */
+
+					nshortLiterals.incrementAndGet();
+
+					return;
+
+				}
+
+			}
+
 			if (nvalues == values.length) {
 
 				flush();
@@ -636,7 +975,39 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				 * characters).
 				 */
 //				final byte[] val = SerializerUtil.serialize(r);
-				final byte[] val = valSer.serialize(r, out.reset());
+				byte[] val = valSer.serialize(r, out.reset()); 
+
+				if (compressor != null && val.length > 64) {
+
+					// compress, reusing [out].
+					out.reset();
+					compressor.compress(val, out);
+					
+				}
+				
+				// extract compressed byte[].
+				if (out.pos() < val.length) {
+
+					/*
+					 * Only accept compressed version if it is smaller.
+					 * 
+					 * FIXME In order to differentiate this, we will have to
+					 * mark the record with a header to indicate whether or not
+					 * it is compressed. Without that header we can not
+					 * deserialize a record resolved via its TermId since we
+					 * will not know whether or not it is compressed (actually,
+					 * that could be part of the termId....)
+					 */
+
+					val = out.toByteArray();
+
+//					System.err.println("Compressed: " + r);
+
+				} else {
+					
+//					System.err.println("Will not compress: " + r);
+					
+				}
 
 				/*
 				 * Note: This is an exclusive lower bound (it does not include
@@ -770,7 +1141,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			// fast range count. this tells us how many collisions there are.
 			// this is an exact collision count since we are not deleting tuples
 			// from the TERMS index.
-			final long rangeCount = ndx.rangeCount(fromKey, toKey);
+			final long rangeCount = termsIndex.rangeCount(fromKey, toKey);
 
 			if (rangeCount >= Byte.MAX_VALUE) {
 
@@ -806,7 +1177,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				final byte[] key = keyBuilder.reset().append(fromKey).append(
 						counter).getKey();
 
-				if (ndx.insert(key, val) != null) {
+				if (termsIndex.insert(key, val) != null) {
 
 					throw new AssertionError();
 					
@@ -830,7 +1201,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			 * insert a tuple and we know the counter value from the collision
 			 * count.
 			 */
-			final ITupleIterator<?> itr = ndx.rangeIterator(fromKey, toKey,
+			final ITupleIterator<?> itr = termsIndex.rangeIterator(fromKey, toKey,
 					0/* capacity */, IRangeQuery.VALS, null/* filter */);
 
 			boolean found = false;
@@ -839,7 +1210,19 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				
 				final ITuple<?> tuple = itr.next();
 				
-				if(BytesUtil.bytesEqual(val, tuple.getValue())) {
+				// raw bytes
+				final byte[] tmp = tuple.getValue();
+				
+				if (false) {
+					// decompress
+					final ByteBuffer b = compressor.decompress(tmp);
+					final byte[] c = new byte[b.limit()];
+					b.get(c);
+					System.out.println(valSer.deserialize(c));
+				}
+				
+				// Note: Compares the compressed values ;-)
+				if(BytesUtil.bytesEqual(val, tmp)) {
 					
 					found = true;
 
@@ -874,7 +1257,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 					counter).getKey();
 
 			// Insert into the index.
-			if (ndx.insert(key, val) != null) {
+			if (termsIndex.insert(key, val) != null) {
 
 				throw new AssertionError();
 
@@ -888,17 +1271,24 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 			if (rangeCount > 128) { // arbitrary limit to log @ WARN.
 				log.warn("Collision: hashCode=" + BytesUtil.toString(key)
-						+ ", ninserted=" + ninserted + ", totalCollisions="
-						+ totalCollisions + ", maxCollisions=" + maxCollisions
-						+ ", ncollThisTerm=" + rangeCount + ", resource=" + x.obj);
+						+ ", nstmts="+nstmts
+						+ ", nshortLiterals=" + nshortLiterals
+						+ ", nshortURIs=" + nshortURIs + ", ninserted="
+						+ ninserted + ", totalCollisions=" + totalCollisions
+						+ ", maxCollisions=" + maxCollisions
+						+ ", ncollThisTerm=" + rangeCount + ", resource="
+						+ x.obj);
 			} else if (log.isInfoEnabled())
 				log.info("Collision: hashCode=" + BytesUtil.toString(key)
-						+ ", ninserted=" + ninserted + ", totalCollisions="
-						+ totalCollisions + ", maxCollisions=" + maxCollisions
-						+ ", ncollThisTerm=" + rangeCount + ", resource=" + x.obj);
+						+ ", nstmts="+nstmts
+						+ ", nshortLiterals=" + nshortLiterals
+						+ ", nshortURIs=" + nshortURIs + ", ninserted="
+						+ ninserted + ", totalCollisions=" + totalCollisions
+						+ ", maxCollisions=" + maxCollisions
+						+ ", ncollThisTerm=" + rangeCount + ", resource="
+						+ x.obj);
 
 		}
-		
 	}
 
 	/**
@@ -979,9 +1369,15 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 			if (u != null) {
 
-				System.out.println("NumStatements: " + u.stmtHandler.nstmts);
+				System.out.println("NumStatements: " + u.nstmts);
 
 				System.out.println("NumDistinctVals: " + u.ninserted);
+
+				System.out.println("NumShortLiterals: " + u.nshortLiterals);
+
+				System.out.println("NumShortURIs: " + u.nshortURIs);
+
+//				System.out.println("NumCacheHit: " + u.ncached);
 
 				System.out.println("TotalKeyBytes: " + u.totalKeyBytes);
 				

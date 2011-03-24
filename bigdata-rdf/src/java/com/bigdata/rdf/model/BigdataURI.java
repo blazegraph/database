@@ -57,4 +57,16 @@ import org.openrdf.model.URI;
  */
 public interface BigdataURI extends URI, BigdataResource {
 
+	/**
+	 * Return the length of the value that would be returned by
+	 * {@link URI#getNamespace()}.
+	 */
+	int getNamespaceLength();
+
+	/**
+	 * Return the length of the value that would be returned by
+	 * {@link URI#getLocalName()}.
+	 */
+	int getLocalNameLength();
+
 }
