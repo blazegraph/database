@@ -812,6 +812,17 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 			tmp.addCounter("tupleCount", new OneShotInstrument<Integer>(
 					getEntryCount()));
 
+			/*
+			 * Note: The utilization numbers reported here are a bit misleading.
+			 * They only consider the #of index positions in the node or leaf
+			 * which is full, but do not take into account the manner in which
+			 * the persistence store allocates space to the node or leaf. For
+			 * example, for the WORM we do perfect allocations but retain many
+			 * versions. For the RWStore, we do best-fit allocations but recycle
+			 * old versions. The space efficiency of the persistence store is
+			 * typically the main driver, not the utilization rate as reported
+			 * here.
+			 */
 			final IBTreeUtilizationReport r = getUtilization();
 			
 			// % utilization in [0:100] for nodes
@@ -836,11 +847,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
 			final long bytes = btreeCounters.bytesOnStore_nodesAndLeaves.get()
 					+ btreeCounters.bytesOnStore_rawRecords.get();
-			
-			final double bytesPerTuple = entryCount == 0 ? 0d
-					: (bytes / entryCount);
 
-			tmp.addCounter("bytesPerTuple", new OneShotInstrument<Double>(
+			final int bytesPerTuple = (int) (entryCount == 0 ? 0d
+					: (bytes / entryCount));
+
+			tmp.addCounter("bytesPerTuple", new OneShotInstrument<Integer>(
 					bytesPerTuple));
 
 		}
@@ -3846,11 +3857,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //                    + tmp.limit() + ", byteCount(addr)="
 //                    + store.getByteCount(addr)+", addr="+store.toString(addr);
 
-            btreeCounters.readNanos.addAndGet( System.nanoTime() - begin );
+            btreeCounters.readNanos.add( System.nanoTime() - begin );
             
             final int bytesRead = tmp.limit();
 
-            btreeCounters.bytesRead.addAndGet(bytesRead);
+            btreeCounters.bytesRead.add(bytesRead);
             
         }
 // Note: This is not necessary.  The most likely place to be interrupted is in the IO on the raw store.  It is not worth testing for an interrupt here since we are more liklely to notice one in the raw store and this method is low latency except for the potential IO read.
@@ -3873,15 +3884,15 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                 // decode the record.
                 data = nodeSer.decode(tmp);
 
-                btreeCounters.deserializeNanos.addAndGet(System.nanoTime() - begin);
+                btreeCounters.deserializeNanos.add(System.nanoTime() - begin);
 
                 if (data.isLeaf()) {
 
-                    btreeCounters.leavesRead.incrementAndGet();
+                    btreeCounters.leavesRead.increment();
 
                 } else {
 
-                    btreeCounters.nodesRead.incrementAndGet();
+                    btreeCounters.nodesRead.increment();
 
                 }
 
@@ -4127,7 +4138,14 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 	ByteBuffer readRawRecord(final long addr) {
 
 		// read from the backing store.
-		return getStore().read(addr);
+		final ByteBuffer b = getStore().read(addr);
+
+		final int nbytes = getStore().getByteCount(addr);
+		
+		btreeCounters.rawRecordsRead.increment();
+        btreeCounters.rawRecordsBytesRead.add(nbytes);
+
+		return b;
 
 	}
 
@@ -4149,7 +4167,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 		// write the value on the backing store.
 		final long addr = getStore().write(ByteBuffer.wrap(b));
 		
-		btreeCounters.bytesOnStore_rawRecords.addAndGet(b.length);
+		final int nbytes = b.length;
+		
+		btreeCounters.rawRecordsWritten++;
+		btreeCounters.rawRecordsBytesWritten += nbytes;
+		btreeCounters.bytesOnStore_rawRecords.addAndGet(nbytes);
 
 		return addr;
 		
