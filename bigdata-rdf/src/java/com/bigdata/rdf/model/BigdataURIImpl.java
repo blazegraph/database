@@ -49,7 +49,6 @@ package com.bigdata.rdf.model;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.util.URIUtil;
-import com.bigdata.rdf.internal.IV;
 
 /**
  * A URI. Use {@link BigdataValueFactory} to create instances of this class.
@@ -113,6 +112,30 @@ public class BigdataURIImpl extends BigdataResourceImpl implements BigdataURI {
         return uriString.substring(0, indexOf);
     }
 
+    public int getNamespaceLength() {
+    	
+    	if(indexOf == -1) {
+    	
+    		indexOf = URIUtil.getLocalNameIndex(uriString);
+    		
+    	}
+    	
+    	return indexOf;
+    	
+    }
+
+    public int getLocalNameLength() {
+    	
+    	if(indexOf == -1) {
+        	
+    		indexOf = URIUtil.getLocalNameIndex(uriString);
+    		
+    	}
+    	
+		return uriString.length() - (indexOf + 1);
+    	
+    }
+    
     public String getLocalName() {
         
         if (indexOf == -1) {
