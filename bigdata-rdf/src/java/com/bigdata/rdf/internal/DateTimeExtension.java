@@ -83,6 +83,7 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
         
         final URI dt = lit.getDatatype();
         
+        // Note: URI.stringValue() is efficient....
         if (dt == null || !XSD.DATETIME.stringValue().equals(dt.stringValue()))
             throw new IllegalArgumentException();
         
