@@ -17,10 +17,14 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
@@ -72,6 +76,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
+import com.bigdata.util.concurrent.Latch;
 
 /**
  * Utility class to parse some RDF resource(s) and count hash collisions using a
@@ -220,6 +225,22 @@ import com.bigdata.rdf.model.BigdataValueSerializer;
  * Journal size: 7320764416 bytes
  * </pre>
  * 
+ * BSBM 200M: one parser thread and one indexer thread.
+ * 
+ * <pre>
+ * Elapsed: 3724415ms
+ * NumStatements: 198808848
+ * NumDistinctVals: 12198222
+ * NumShortLiterals: 32779032
+ * NumShortBNodes: 0
+ * NumShortURIs: 493520581
+ * TotalKeyBytes: 60991110
+ * TotalValBytes: 4944223808
+ * MaxCollisions: 2
+ * TotalCollisions: 17264
+ * Journal size: 7320764416 bytes
+ * </pre>
+ * 
  * TODO Try with only N bytes worth of the SHA hash code, leaving some bits left
  * over for partitioning URIs, Literals, and BNodes (for told bnode mode) and
  * for a counter to break ties when there is a hash collision. We should wind up
@@ -325,10 +346,6 @@ public class HashCollisionUtility {
 
 	/**
 	 * Counters for things that we track.
-	 * 
-	 * @author thompsonbry
-	 * 
-	 * TODO Add counters for the #of chunks parser / indexed.
 	 */
 	private static class Counters {
 
@@ -426,6 +443,23 @@ public class HashCollisionUtility {
 //	}
 
 	/**
+	 * Lock used to coordinate {@link #shutdown()} and the {@link #valueQueue}.
+	 */
+	private final ReentrantLock lock = new ReentrantLock();
+	
+	/**
+	 * Latch which is incremented as we accept files to parse and decremented
+	 * once a parser begins to parse that file.
+	 */
+	private final Latch parserQueueLatch = new Latch(lock);
+
+	/**
+	 * Latch which is incremented once we begin to parse a file and decremented
+	 * as the parser task completes.
+	 */
+	private final Latch parserRunLatch = new Latch(lock);
+
+	/**
 	 * Thread pool used to run the parser.
 	 */
 	private final ExecutorService parserService;
@@ -434,7 +468,75 @@ public class HashCollisionUtility {
 	 * Thread pool used to run the parser and indexer.
 	 */
 	private final ExecutorService indexerService;
-	
+
+	/**
+	 * Class hooks the runnable to provide reporting on the outcome of the
+	 * {@link FutureTask}.
+	 */
+	private class ReportingFutureTask<V> extends FutureTask<V> {
+		
+		public final File file;
+		
+		public ReportingFutureTask(final File file, Callable<V> callable) {
+		
+			super(callable);
+			
+			this.file = file;
+			
+			parserQueueLatch.inc();
+			
+		}
+
+		public void run() {
+
+			try {
+			
+				parserRunLatch.inc();
+				parserQueueLatch.dec();
+				super.run();
+				
+				parserRunLatch.dec();
+				
+			} finally {
+				
+				report(this);
+				
+			}
+
+		}
+
+		/**
+		 * Callback is invoked when a {@link ParseFileTask} completes.
+		 * 
+		 * @param task
+		 *            The future for that task.
+		 */
+		protected void report(final ReportingFutureTask<?> task) {
+
+			try {
+
+				task.get();
+
+				if (log.isDebugEnabled())
+					log.debug("Finished parsing: " + task.file
+							+ ", queueLatch=" + parserQueueLatch
+							+ ", runLatch=" + parserRunLatch);
+
+			} catch (ExecutionException ex) {
+
+				log.error(ex, ex);
+
+			} catch (InterruptedException e) {
+
+				// propagate the interrupt.
+				Thread.currentThread().interrupt();
+
+			}
+
+		}
+
+	}
+
 	/**
 	 * A chunk of RDF {@link Value}s from the parser which are ready to be
 	 * inserted into the TERMS index. 
@@ -466,11 +568,6 @@ public class HashCollisionUtility {
 	private BlockingQueue<ValueBuffer> valueQueue;
 
 	/**
-	 * Lock used to coordinate {@link #shutdown()} and the {@link #valueQueue}.
-	 */
-	private final ReentrantLock lock = new ReentrantLock();
-	
-	/**
 	 * Counters for things that we track.
 	 */
 	private final Counters c = new Counters();
@@ -484,26 +581,72 @@ public class HashCollisionUtility {
 	 * will do better when it is given a bigger chunk since it can order the
 	 * data and be more efficient in the index updates.
 	 */
-	final int valBufSize = 100000;// 100000;
+	final int valBufSize = 10000;// 100000;
 
 	/** Capacity of the {@link #valueQueue}. */
-	final int valQueueCapacity = 10;
+	final int valQueueCapacity = 100;
 
 	/**
 	 * Maximum #of chunks to drain from the {@link #valueQueue} in one go. This
 	 * bounds the largest chunk that we will index at one go. You can remove the
 	 * limit by specifying {@link Integer#MAX_VALUE}.
 	 */
-	final int maxDrain = 5;
+	final int maxDrain = 50;
 
+	/**
+	 * The size of the read buffer when reading a file.
+	 */
+	final int fileBufSize = 1024 * 8;// default 8k
+
+	/**
+	 * How many parser threads to use. There can be only one parser per file,
+	 * but you can parse more than one file at a time.
+	 */
+	final int nparserThreads = 2;
+
+	/**
+	 * The size of the work queue for the {@link #parserService}.
+	 * <p>
+	 * Note: This should be large enough that we will not wait around forever if
+	 * the caller is forced to parse a file rather than scan the file system for
+	 * the next file to be parsed. This hack is introduced by the need to handle
+	 * a {@link RejectedExecutionException} from the {@link #parserService}. We
+	 * do that by forcing the parse task to run in the caller's thread. Another
+	 * choice would be for the caller to catch the
+	 * {@link RejectedExecutionException}, wait a bit, and then retry.
+	 */
+	final int parserWorkQueueCapacity = 1000;
+	
 	private HashCollisionUtility(final Journal jnl) {		
 
 		this.namespaceIndex = getNamespaceIndex(jnl);
 
 		this.termsIndex = getTermsIndex(jnl);
 
-		// It is possible to run multiple parsers.
-		this.parserService = Executors.newCachedThreadPool();
+		/*
+		 * Setup the parser thread pool.  If there is an attempt to run more
+		 * threads then 
+		 * 
+		 * Note: The work queue is bounded so that we do not read any too far in
+		 * the file system. The #of threads is bounded so that we do not run too
+		 * many parsers at once. However, running multiple parsers can increase
+		 * throughput as the parser itself caps out at ~ 68k tps.
+		 */
+		{
+			// this.parserService =
+			// Executors.newFixedThreadPool(nparserThreads);
+			final int corePoolSize = nparserThreads;
+			final int maximumPoolSize = nparserThreads;
+			final long keepAliveTime = 60;
+			final TimeUnit unit = TimeUnit.SECONDS;
+			final BlockingQueue<Runnable> workQueue = new LinkedBlockingQueue<Runnable>(
+					parserWorkQueueCapacity);
+//			final BlockingQueue<Runnable> workQueue = new SynchronousQueue<Runnable>();
+			this.parserService = new ThreadPoolExecutor(corePoolSize,
+					maximumPoolSize, keepAliveTime, unit, workQueue,
+					new ThreadPoolExecutor.CallerRunsPolicy()
+			);
+		}
 		
 		// But they all feed the same indexer.
 		this.indexerService = Executors.newSingleThreadExecutor();
@@ -598,23 +741,21 @@ public class HashCollisionUtility {
 	 * @throws Exception
 	 */
 	public void shutdown() throws Exception {
-		log.info("shutting down...");
+		log.debug("shutting down...");
 		lock.lock();
 		try {
+			if (log.isDebugEnabled())
+				log.debug("Waiting on parserQueueLatch: " + parserQueueLatch);
+			parserQueueLatch.await();
 			// no new parsers may start
-			parsing.set(false);
 			parserService.shutdown();
-			/*
-			 * TODO Right now we run the parser synchronously (the main thread
-			 * block and waits on the future of the parser task). If we allow
-			 * more than one parser to run, then we must wait here for all
-			 * running parsers to terminate. That will require a collection of
-			 * the running parser Futures. We will have to wait until all
-			 * Futures in that collection are done before we can drop the poison
-			 * pill onto the valueQueue.
-			 */
+			if (log.isDebugEnabled())
+				log.debug("Waiting on parserRunLatch: " + parserRunLatch);
+			parserRunLatch.await();
+			// no parsers should be running.
+			parsing.set(false);
 			// drop a poison pill on the queue.
-			log.info("Inserting poison pill.");
+			log.debug("Inserting poison pill.");
 			valueQueue.put(poisonPill);
 			if (indexerTask != null) {
 				// wait for the indexer to finish.
@@ -624,7 +765,7 @@ public class HashCollisionUtility {
 		} finally {
 			lock.unlock();
 		}
-		log.info("all done.");
+		log.debug("all done.");
 	}
 
 	/**
@@ -633,7 +774,7 @@ public class HashCollisionUtility {
 	 * @throws Exception
 	 */
 	public void shutdownNow() throws Exception {
-		log.info("shutdownNow");
+		log.debug("shutdownNow");
 		parsing.set(false);
 		parserService.shutdownNow();
 		indexerService.shutdownNow();
@@ -668,15 +809,15 @@ public class HashCollisionUtility {
 				// Drain (non-blocking).
 				final int ndrained = valueQueue.drainTo(coll, maxDrain) + 1;
 
-				if (log.isInfoEnabled())
-					log.info("Drained " + ndrained + " chunks with "
+				if (log.isDebugEnabled())
+					log.debug("Drained " + ndrained + " chunks with "
 							+ valueQueue.size() + " remaining in the queue.");
 
 				// look for and remove the poison pill, noting if it was found.
 				if (coll.remove(poisonPill)) {
 
-					if(log.isInfoEnabled())
-						log.info("Found poison pill.");
+					if(log.isDebugEnabled())
+						log.debug("Found poison pill.");
 						
 					done = true;
 
@@ -689,8 +830,8 @@ public class HashCollisionUtility {
 					// combine the buffers into a single chunk.
 					final ValueBuffer b = combineChunks(coll);
 
-					if (log.isInfoEnabled())
-						log.info("Will index " + coll.size()
+					if (log.isDebugEnabled())
+						log.debug("Will index " + coll.size()
 								+ " chunks having " + b.nvalues + " values.");
 
 					// Now index that chunk.
@@ -700,7 +841,7 @@ public class HashCollisionUtility {
 
 			}
 
-			log.info("done.");
+			log.debug("done.");
 
 			return (Void) null;
 			
@@ -999,24 +1140,13 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		final StatementHandler stmtHandler = new StatementHandler(valBufSize,
 				c, conf, valueQueue, parsing);
 		
-		final FutureTask<Void> ft = new FutureTask<Void>(new ParseFileTask(
-				f, vf, stmtHandler));
+		final FutureTask<Void> ft = new ReportingFutureTask<Void>(
+				f,
+				new ParseFileTask(f, fileBufSize, vf, stmtHandler)
+				);
 
         // run the parser
         parserService.submit(ft);
-
-		/*
-		 * Await the future.
-		 * 
-		 * TODO We could run the parsers asynchronously and on a pool with
-		 * limited parallelism. We would have to change how we monitor for
-		 * errors and the shutdown logic (to wait until all submitted parser
-		 * tasks are done).
-		 */
-        ft.get();
-
-		if (log.isInfoEnabled())
-			log.info("Finished parsing: " + f);
 
 	}
 
@@ -1028,11 +1158,12 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 	private static class ParseFileTask implements Callable<Void> {
 
 		private final File file;
+		private final int fileBufSize;
 		private final BigdataValueFactory vf;
 		private final StatementHandler stmtHandler;
 
-		public ParseFileTask(final File file, final BigdataValueFactory vf,
-				final StatementHandler stmtHandler) {
+		public ParseFileTask(final File file, final int fileBufSize,
+				final BigdataValueFactory vf, final StatementHandler stmtHandler) {
 
 			if (file == null)
 				throw new IllegalArgumentException();
@@ -1041,6 +1172,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				throw new IllegalArgumentException();
 
 			this.file = file;
+			
+			this.fileBufSize = fileBufSize;
 
 			this.vf = vf;
 			
@@ -1068,8 +1201,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			if (format == null)
 				throw new RuntimeException("Unknown format: " + file);
 
-			if (log.isDebugEnabled())
-				log.debug("RDFFormat=" + format);
+			if (log.isTraceEnabled())
+				log.trace("RDFFormat=" + format);
 
 			final RDFParserFactory rdfParserFactory = RDFParserRegistry
 					.getInstance().get(format);
@@ -1093,14 +1226,14 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			 * Run the parser, which will cause statements to be inserted.
 			 */
 
-			if (log.isInfoEnabled())
-				log.info("Parsing: " + file);
+			if (log.isDebugEnabled())
+				log.debug("Parsing: " + file);
 
 			InputStream is = new FileInputStream(file);
 
 			try {
 
-				is = new BufferedInputStream(is);
+				is = new BufferedInputStream(is, fileBufSize);
 
 				final boolean gzip = file.getName().endsWith(".gz");
 
@@ -1190,8 +1323,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 		public void endRDF() {
 
-			if(log.isInfoEnabled())
-				log.info("End of source.");
+			if(log.isTraceEnabled())
+				log.trace("End of source.");
 			
 			try {
 				
@@ -1392,8 +1525,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				throw new IllegalStateException();
 			}
 
-			if (log.isInfoEnabled())
-				log.info("Adding chunk with " + nvalues + " values to queue.");
+			if (log.isDebugEnabled())
+				log.debug("Adding chunk with " + nvalues + " values to queue.");
 
 			// put the buffer on the queue (blocking operation).
 			valueQueue.put(new ValueBuffer(nvalues, values));
@@ -1488,8 +1621,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			
 			final long begin = System.currentTimeMillis();
 			
-			if (log.isInfoEnabled())
-				log.info("Indexing " + vbuf.nvalues);
+			if (log.isDebugEnabled())
+				log.debug("Indexing " + vbuf.nvalues);
 			
 			final int nvalues = vbuf.nvalues;
 			final BigdataValue[] values = vbuf.values;
@@ -1571,11 +1704,11 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			
 			vbuf.clear();
 
-			if (log.isInfoEnabled()) {
+			if (log.isDebugEnabled()) {
 			
 				final long elapsed = System.currentTimeMillis() - begin;
 
-				log.info("Indexed " + vbuf.nvalues + ", elapsed=" + elapsed
+				log.debug("Indexed " + vbuf.nvalues + ", elapsed=" + elapsed
 						+ "ms");
 			
 			}
