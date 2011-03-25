@@ -37,7 +37,7 @@ import org.apache.log4j.Logger;
  */
 public class LatchedExecutor implements Executor {
 
-    protected static final transient Logger log = Logger
+    private static final transient Logger log = Logger
             .getLogger(LatchedExecutor.class);
     
     /**
