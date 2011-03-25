@@ -11,14 +11,24 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.Deflater;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -55,6 +65,7 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -308,78 +319,77 @@ public class HashCollisionUtility {
 	 */
 	private final BTree termsIndex;
 
-	/**
-	 * The maximum length of a {@link URI#getLocalName()} before the {@link URI}
-	 * will no longer be inlined into the statement indices.
-	 * 
-	 * TODO Support URI inlining into the statement indices.
-	 */
-	private final int URI_INLINE_LIMIT = 64;
-
-	/**
-	 * The maximum length of a plain, languageCode, or datatype literal's
-	 * {@link Literal#getLabel()} before the {@link Literal} will no longer be
-	 * inlined into the statement indices.
-	 * <p>
-	 * Note: When inlining a datatype {@link URI} which is non-numeric, the
-	 * {@link URI} of the datatype must also be inlined.
-	 * 
-	 * TODO Support literal inlining into the statement indices.
-	 */
-	private final int LITERAL_INLINE_LIMIT = 64;
+	private final LexiconConfiguration<BigdataValue> conf;
 	
 	private final BigdataValueFactory vf;
 
-	private final LexiconConfiguration<BigdataValue> conf;
-	
-	private final StatementHandler stmtHandler;
-
 	/**
-	 * #of statements visited.
+	 * Counters for things that we track.
+	 * 
+	 * @author thompsonbry
+	 * 
+	 * TODO Add counters for the #of chunks parser / indexed.
 	 */
-	private final AtomicLong nstmts = new AtomicLong();
+	private static class Counters {
 
-	/**
-	 * The #of {@link URI}s whose <code>localName</code> was short enough that
-	 * we decided to inline them into the statement indices instead.
-	 */
-	private final AtomicLong nshortURIs = new AtomicLong();
+		/**
+		 * #of statements visited.
+		 */
+		private final AtomicLong nstmts = new AtomicLong();
 
-	/**
-	 * The #of {@link Literal}s which were short enough that we decided to
-	 * inline them into the statement indices instead.
-	 */
-	private final AtomicLong nshortLiterals = new AtomicLong();
-	
-//	private final ConcurrentWeakValueCacheWithBatchedUpdates<Value, BigdataValue> valueCache;
-	
-	/** 
-	 * The size of the hash collision set for the RDF Value with the most
-	 * hash collisions observed to date.
-	 */
-	private final AtomicLong maxCollisions = new AtomicLong();
+		/**
+		 * The #of {@link URI}s whose <code>localName</code> was short enough
+		 * that we decided to inline them into the statement indices instead.
+		 */
+		private final AtomicLong nshortURIs = new AtomicLong();
 
-	/**
-	 * The total #of hash collisions.
-	 */
-	private final AtomicLong totalCollisions = new AtomicLong();
+		/**
+		 * The #of {@link BNode}s whose <code>ID</code> was short enough that we
+		 * decided to inline them into the statement indices instead (this also
+		 * counts blank nodes which are inlined because they have integer or
+		 * UUID IDs).
+		 */
+		private final AtomicLong nshortBNodes = new AtomicLong();
 
-//	/**
-//	 * The #of RDF {@link Value}s which were found in the {@link #valueCache},
-//	 * thereby avoiding a lookup against the index.
-//	 */
-//	private final AtomicLong ncached = new AtomicLong();
-	
-	/**
-	 * The #of distinct RDF {@link Value}s inserted into the index.
-	 */
-	private final AtomicLong ninserted = new AtomicLong();
-	
-	/** The total #of bytes in the generated B+Tree keys (leaves only). */
-	private final AtomicLong totalKeyBytes = new AtomicLong();
+		/**
+		 * The #of {@link Literal}s which were short enough that we decided to
+		 * inline them into the statement indices instead.
+		 */
+		private final AtomicLong nshortLiterals = new AtomicLong();
 
-	/** The total #of bytes in the serialized RDF Values. */
-	private final AtomicLong totalValBytes = new AtomicLong();
+		// private final ConcurrentWeakValueCacheWithBatchedUpdates<Value,
+		// BigdataValue> valueCache;
+
+		/**
+		 * The size of the hash collision set for the RDF Value with the most
+		 * hash collisions observed to date.
+		 */
+		private final AtomicLong maxCollisions = new AtomicLong();
+
+		/**
+		 * The total #of hash collisions.
+		 */
+		private final AtomicLong totalCollisions = new AtomicLong();
+
+		// /**
+		// * The #of RDF {@link Value}s which were found in the {@link
+		// #valueCache},
+		// * thereby avoiding a lookup against the index.
+		// */
+		// private final AtomicLong ncached = new AtomicLong();
+
+		/**
+		 * The #of distinct RDF {@link Value}s inserted into the index.
+		 */
+		private final AtomicLong ninserted = new AtomicLong();
+
+		/** The total #of bytes in the generated B+Tree keys (leaves only). */
+		private final AtomicLong totalKeyBytes = new AtomicLong();
+
+		/** The total #of bytes in the serialized RDF Values. */
+		private final AtomicLong totalValBytes = new AtomicLong();
+
+	} // class Counters
 	
 ////	private interface IHashCode {
 ////		void hashCode(IKeyBuilder keyBuilder,Object o);
@@ -414,12 +424,93 @@ public class HashCollisionUtility {
 //		}
 //		
 //	}
+
+	/**
+	 * Thread pool used to run the parser.
+	 */
+	private final ExecutorService parserService;
 	
+	/**
+	 * Thread pool used to run the parser and indexer.
+	 */
+	private final ExecutorService indexerService;
+	
+	/**
+	 * A chunk of RDF {@link Value}s from the parser which are ready to be
+	 * inserted into the TERMS index. 
+	 */
+	static private class ValueBuffer {
+
+		private final int nvalues;
+		private final BigdataValue[] values;
+
+		public ValueBuffer(final int nvalues, final BigdataValue[] values) {
+			this.nvalues = nvalues;
+			this.values = values;
+		}
+
+		/** Clear the hard references. */
+		public void clear() {
+			for (int i = 0; i < nvalues; i++) {
+				values[i] = null;
+			}
+//			nvalues = 0;
+		}
+
+	} // class ValueBuffer
+	
+	/**
+	 * Queue used to hand off {@link ValueBuffer}s from the parser to the
+	 * indexer.
+	 */
+	private BlockingQueue<ValueBuffer> valueQueue;
+
+	/**
+	 * Lock used to coordinate {@link #shutdown()} and the {@link #valueQueue}.
+	 */
+	private final ReentrantLock lock = new ReentrantLock();
+	
+	/**
+	 * Counters for things that we track.
+	 */
+	private final Counters c = new Counters();
+
+	/**
+	 * The upper bound on the size of a {@link ValueBuffer} chunk. The size of
+	 * the chunks, the capacity of the queue, and the number of chunks that may
+	 * be combined into a single chunk for the indexer may all be used to adjust
+	 * the parallelism and efficiency of the parsing and indexing. You have to
+	 * be careful not to let too much data onto the Java heap, but the indexer
+	 * will do better when it is given a bigger chunk since it can order the
+	 * data and be more efficient in the index updates.
+	 */
+	final int valBufSize = 100000;// 100000;
+
+	/** Capacity of the {@link #valueQueue}. */
+	final int valQueueCapacity = 10;
+
+	/**
+	 * Maximum #of chunks to drain from the {@link #valueQueue} in one go. This
+	 * bounds the largest chunk that we will index at one go. You can remove the
+	 * limit by specifying {@link Integer#MAX_VALUE}.
+	 */
+	final int maxDrain = 5;
+
 	private HashCollisionUtility(final Journal jnl) {		
 
 		this.namespaceIndex = getNamespaceIndex(jnl);
 
 		this.termsIndex = getTermsIndex(jnl);
+
+		// It is possible to run multiple parsers.
+		this.parserService = Executors.newCachedThreadPool();
+		
+		// But they all feed the same indexer.
+		this.indexerService = Executors.newSingleThreadExecutor();
+
+		// *blocking* queue of ValueBuffers to be indexed
+		this.valueQueue = new LinkedBlockingQueue<ValueBuffer>(
+				valQueueCapacity);// lock);
 
 		vf = BigdataValueFactoryImpl.getInstance("test");
 		
@@ -450,15 +541,215 @@ public class HashCollisionUtility {
 				xFactory // extension factory
 				);
 		
-		final int valBufSize = 100000; // TODO Try 1M.
-
-		stmtHandler = new StatementHandler(valBufSize);
-
 //		valueCache = new ConcurrentWeakValueCacheWithBatchedUpdates<Value, BigdataValue>(
 //				50000 // hard reference queue capacity
 //				);
 		
 	}
+
+	/**
+	 * Start the task which will index data as it is parsed.
+	 */
+	public void start() {
+
+		lock.lock();
+		try {
+
+			if (indexerTask != null)
+				throw new IllegalStateException();
+
+			// start indexer.
+			indexerTask = new FutureTask<Void>(new IndexerMainTask());
+
+			indexerService.submit(indexerTask);
+
+			// allow parsers to run.
+			parsing.set(true);
+			
+		} finally {
+		
+			lock.unlock();
+			
+		}
+
+	}
+	
+	/**
+	 * Future for the task which drains the {@link #valueQueue} and indexes
+	 * the {@link ValueBuffer}s drained from that queue.
+	 */
+	private FutureTask<Void> indexerTask;
+
+	/** Flag is <code>true</code> while parsers are still running. */
+	private final AtomicBoolean parsing = new AtomicBoolean(false);
+
+	/**
+	 * Poison pill used to indicate that no more objects will be placed onto the
+	 * {@link #valueQueue}.
+	 */
+	private final ValueBuffer poisonPill = new ValueBuffer(0,
+			new BigdataValue[0]);
+	
+	/**
+	 * Normal shutdown. Running parsers will complete and their data will be
+	 * indexed, but new parsers will not start. This method will block until
+	 * all data has been indexed.
+	 * 
+	 * @throws Exception
+	 */
+	public void shutdown() throws Exception {
+		log.info("shutting down...");
+		lock.lock();
+		try {
+			// no new parsers may start
+			parsing.set(false);
+			parserService.shutdown();
+			/*
+			 * TODO Right now we run the parser synchronously (the main thread
+			 * block and waits on the future of the parser task). If we allow
+			 * more than one parser to run, then we must wait here for all
+			 * running parsers to terminate. That will require a collection of
+			 * the running parser Futures. We will have to wait until all
+			 * Futures in that collection are done before we can drop the poison
+			 * pill onto the valueQueue.
+			 */
+			// drop a poison pill on the queue.
+			log.info("Inserting poison pill.");
+			valueQueue.put(poisonPill);
+			if (indexerTask != null) {
+				// wait for the indexer to finish.
+				indexerTask.get();
+			}
+			indexerService.shutdown();
+		} finally {
+			lock.unlock();
+		}
+		log.info("all done.");
+	}
+
+	/**
+	 * Immediate shutdown. Running tasks will be canceled.
+	 * 
+	 * @throws Exception
+	 */
+	public void shutdownNow() throws Exception {
+		log.info("shutdownNow");
+		parsing.set(false);
+		parserService.shutdownNow();
+		indexerService.shutdownNow();
+		if (indexerTask != null) {
+			indexerTask.cancel(true/* mayInterruptIfRunning */);
+		}
+	}
+
+	/**
+	 * Task drains the valueQueue and runs an {@link IndexerTask} each time
+	 * something is drained from that queue.
+	 * 
+	 * @author thompsonbry
+	 */
+	private class IndexerMainTask implements Callable<Void> {
+
+		public Void call() throws Exception {
+
+			boolean done = false;
+			
+			while (!done) {
+
+				// Blocking take so we know that there is something ready.
+				final ValueBuffer first = valueQueue.take();
+				
+				// Drain the queue, but keep an eye out for that poison pill.
+				final LinkedList<ValueBuffer> coll = new LinkedList<ValueBuffer>();
+
+				// The element we already took from the queue.
+				coll.add(first);
+				
+				// Drain (non-blocking).
+				final int ndrained = valueQueue.drainTo(coll, maxDrain) + 1;
+
+				if (log.isInfoEnabled())
+					log.info("Drained " + ndrained + " chunks with "
+							+ valueQueue.size() + " remaining in the queue.");
+
+				// look for and remove the poison pill, noting if it was found.
+				if (coll.remove(poisonPill)) {
+
+					if(log.isInfoEnabled())
+						log.info("Found poison pill.");
+						
+					done = true;
+
+					// fall through and index what we already have.
+					
+				}
+
+				if (!coll.isEmpty()) {
+
+					// combine the buffers into a single chunk.
+					final ValueBuffer b = combineChunks(coll);
+
+					if (log.isInfoEnabled())
+						log.info("Will index " + coll.size()
+								+ " chunks having " + b.nvalues + " values.");
+
+					// Now index that chunk.
+					new IndexValueBufferTask(b, termsIndex, vf, c).call();
+
+				}
+
+			}
+
+			log.info("done.");
+
+			return (Void) null;
+			
+		}
+
+		/**
+		 * Combine chunks from the queue into a single chunk.
+		 */
+		private ValueBuffer combineChunks(final LinkedList<ValueBuffer> coll) {
+
+			final ValueBuffer b;
+			
+			if (coll.size() == 1) {
+			
+				// There is only one chunk.
+				b = coll.getFirst();
+				
+			} else {
+				
+				// Combine together into a single chunk.
+				int nvalues = 0;
+				
+				for (ValueBuffer t : coll)
+					nvalues += t.nvalues;
+
+				final BigdataValue[] values = new BigdataValue[nvalues];
+				
+				int off = 0;
+				
+				for (ValueBuffer t : coll) {
+				
+					System
+							.arraycopy(t.values/* src */, 0/* srcPos */,
+									values/* dest */, off/* destPos */,
+									t.nvalues/* length */);
+					
+					off += t.nvalues;
+
+				}
+
+				b = new ValueBuffer(nvalues, values);
+			
+			}
+
+			return b;
+			
+		}
+		
+	} // class IndexerMainTask
 
 	/**
 	 * Return the index in which we store RDF {@link Value}s.
@@ -628,7 +919,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		final int m = 32;
 		final int q = 500;
 //		final int ratio = 8;
-		final int maxRecLen = 0;
+//		final int maxRecLen = 0;
 		if(ndx == null) {
 			
 			final IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
@@ -668,7 +959,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 	}
 	
 	private void parseFileOrDirectory(final File fileOrDir)
-			throws RDFParseException, RDFHandlerException, IOException, NoSuchAlgorithmException {
+			throws Exception {
 
 		if (fileOrDir.isDirectory()) {
 
@@ -705,149 +996,253 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			return;
 		}
 
-		parseFile(f);
-
-	}
-	
-	private void parseFile(final File file) throws IOException,
-			RDFParseException, RDFHandlerException, NoSuchAlgorithmException {
-
-		if (!file.exists())
-			throw new RuntimeException("Not found: " + file);
+		final StatementHandler stmtHandler = new StatementHandler(valBufSize,
+				c, conf, valueQueue, parsing);
 		
-		final RDFFormat format = RDFFormat.forFileName(file.getName());
+		final FutureTask<Void> ft = new FutureTask<Void>(new ParseFileTask(
+				f, vf, stmtHandler));
 
-		if (format == null)
-			throw new RuntimeException("Unknown format: " + file);
-
-		if (log.isDebugEnabled())
-			log.debug("RDFFormat=" + format);
-
-		final RDFParserFactory rdfParserFactory = RDFParserRegistry
-				.getInstance().get(format);
-
-		if (rdfParserFactory == null)
-			throw new RuntimeException("No parser for format: " + format);
-
-		final RDFParser rdfParser = rdfParserFactory.getParser();
-
-		rdfParser.setValueFactory(vf);
-
-		rdfParser.setVerifyData(false);
-
-		rdfParser.setStopAtFirstError(false);
-
-		rdfParser.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
-
-		rdfParser.setRDFHandler(stmtHandler);
+        // run the parser
+        parserService.submit(ft);
 
 		/*
-		 * Run the parser, which will cause statements to be inserted.
+		 * Await the future.
+		 * 
+		 * TODO We could run the parsers asynchronously and on a pool with
+		 * limited parallelism. We would have to change how we monitor for
+		 * errors and the shutdown logic (to wait until all submitted parser
+		 * tasks are done).
 		 */
-		
+        ft.get();
+
 		if (log.isInfoEnabled())
-			log.info("Parsing: " + file);
+			log.info("Finished parsing: " + f);
 
-		InputStream is = new FileInputStream(file);
+	}
 
-		try {
+	/**
+	 * Task parses a single file.
+	 * 
+	 * @author thompsonbry
+	 */
+	private static class ParseFileTask implements Callable<Void> {
 
-			is = new BufferedInputStream(is);
+		private final File file;
+		private final BigdataValueFactory vf;
+		private final StatementHandler stmtHandler;
 
-			final boolean gzip = file.getName().endsWith(".gz");
+		public ParseFileTask(final File file, final BigdataValueFactory vf,
+				final StatementHandler stmtHandler) {
+
+			if (file == null)
+				throw new IllegalArgumentException();
+
+			if (stmtHandler == null)
+				throw new IllegalArgumentException();
+
+			this.file = file;
+
+			this.vf = vf;
 			
-			if (gzip)
-				is = new GZIPInputStream(is);
+			this.stmtHandler = stmtHandler;
+			
+		}
+		
+		public Void call() throws Exception {
 
-			final String baseURI = file.toURI().toString();
+			parseFile(file);
 
-			rdfParser.parse(is, baseURI);
+			return (Void) null;
+			
+		}
 
-		} finally {
+		private void parseFile(final File file) throws IOException,
+				RDFParseException, RDFHandlerException,
+				NoSuchAlgorithmException, InterruptedException {
 
-			is.close();
+			if (!file.exists())
+				throw new RuntimeException("Not found: " + file);
+
+			final RDFFormat format = RDFFormat.forFileName(file.getName());
+
+			if (format == null)
+				throw new RuntimeException("Unknown format: " + file);
+
+			if (log.isDebugEnabled())
+				log.debug("RDFFormat=" + format);
+
+			final RDFParserFactory rdfParserFactory = RDFParserRegistry
+					.getInstance().get(format);
+
+			if (rdfParserFactory == null)
+				throw new RuntimeException("No parser for format: " + format);
+
+			final RDFParser rdfParser = rdfParserFactory.getParser();
+
+			rdfParser.setValueFactory(vf);
+
+			rdfParser.setVerifyData(false);
+
+			rdfParser.setStopAtFirstError(false);
+
+			rdfParser.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+
+			rdfParser.setRDFHandler(stmtHandler);
+
+			/*
+			 * Run the parser, which will cause statements to be inserted.
+			 */
+
+			if (log.isInfoEnabled())
+				log.info("Parsing: " + file);
+
+			InputStream is = new FileInputStream(file);
+
+			try {
+
+				is = new BufferedInputStream(is);
+
+				final boolean gzip = file.getName().endsWith(".gz");
+
+				if (gzip)
+					is = new GZIPInputStream(is);
+
+				final String baseURI = file.toURI().toString();
+
+				// parse the file
+				rdfParser.parse(is, baseURI);
+
+			} finally {
+
+				is.close();
+				
+			}
 
 		}
 
 	}
-
+	
     /**
      * Helper class adds statements to the sail as they are visited by a parser.
      */
-    private class StatementHandler extends RDFHandlerBase {
+    static private class StatementHandler extends RDFHandlerBase {
 
-    	/**
-    	 * Map of distinct values in the buffer.
-    	 */
+		/**
+		 * Map of distinct values in the buffer.
+		 * 
+		 * TODO In addition to enforcing DISTINCT over the Values in the
+		 * ValueBuffer, an LRU/LIRS cache would be nice here so we can reuse the
+		 * frequently resolved (BigdataValue => IV) mappings across buffer
+		 * instances.
+		 * 
+		 * FIXME We need to provide a canonicalizing mapping for blank nodes.
+		 */
     	private final Set<Value> distinctValues = new LinkedHashSet<Value>();
     	
+    	/** The size of the {@link #values} buffer when it is allocated. */
+    	private final int valueBufSize;
+    	
 		/** Buffer for values. */
-		private final Value[] values;
+		private BigdataValue[] values;
 
 		/** #of buffered values. */
 		private int nvalues = 0;
-    	
-    	/**
-    	 * Used to build the keys.
+		
+		/**
+    	 * Various counters that we track.
     	 */
-    	private final IKeyBuilder keyBuilder = KeyBuilder.newInstance();
+    	private final Counters c;
     	
-		/** Used to serialize RDF Values as byte[]s. */
-    	private final DataOutputBuffer out = new DataOutputBuffer();
-
-		/** Used to serialize RDF Values as byte[]s. */
-    	private final BigdataValueSerializer<Value> valSer = new BigdataValueSerializer<Value>(vf);
+    	/** The lexicon configuration. */
+    	private final LexiconConfiguration<BigdataValue> conf;
 
 		/**
-		 * Used to (de-)compress the raw values.
-		 * 
-		 * FIXME This is not thread-safe. We will need a pool or thread-local
-		 * instances to support concurrent reads against the TERMS index.
+		 * Blocking queue to which we add {@link ValueBuffer} instances as they
+		 * are generated by the parser.
 		 */
-		final RecordCompressor compressor = new RecordCompressor(
-				Deflater.BEST_SPEED);
-		
-		private final MessageDigest d;
+    	final BlockingQueue<ValueBuffer> valueQueue;
+    	
+		/**
+		 * <code>true</code> iff the parser is permitted to run and
+		 * <code>false</code> if the parser should terminate.
+		 */
+    	final AtomicBoolean parsing;
+    	
+		public StatementHandler(final int valueBufSize,
+				final Counters c,
+				final LexiconConfiguration<BigdataValue> conf,
+				final BlockingQueue<ValueBuffer> valueQueue,
+				final AtomicBoolean parsing) {
+			
+			this.valueBufSize = valueBufSize;
+			
+			this.values = null;
 
-		public StatementHandler(final int valueBufSize) {
-        	
-			values = new Value[valueBufSize];
+			this.c = c;
+			
+			this.conf = conf;
+
+			this.valueQueue = valueQueue;
+			
+			this.parsing = parsing;
+			
+		}
+
+		public void endRDF() {
+
+			if(log.isInfoEnabled())
+				log.info("End of source.");
 			
 			try {
-			
-				d = MessageDigest.getInstance("SHA-256"); // 256 bits (32 bytes)
 				
-			} catch (NoSuchAlgorithmException e) {
+				flush();
+				
+			} catch (InterruptedException e) {
 				
 				throw new RuntimeException(e);
 				
 			}
-
+			
 		}
-
+		
 		public void handleStatement(final Statement stmt)
 				throws RDFHandlerException {
 
-			bufferValue(stmt.getSubject());
-
-			bufferValue(stmt.getPredicate());
-
-			bufferValue(stmt.getObject());
-
-			if (stmt.getContext() != null) {
-
-				bufferValue(stmt.getContext());
-
+			if (!parsing.get()) {
+				// Either shutdown or never started.
+				throw new IllegalStateException();
 			}
 
-			nstmts.incrementAndGet();
+			try {
+
+				bufferValue((BigdataValue) stmt.getSubject());
+
+				bufferValue((BigdataValue) stmt.getPredicate());
+
+				bufferValue((BigdataValue) stmt.getObject());
+
+				if (stmt.getContext() != null) {
+
+					bufferValue((BigdataValue) stmt.getContext());
+
+				}
+
+			} catch (InterruptedException ex) {
+				
+				// Interrupted while blocked on the valueQueue
+				throw new RDFHandlerException(ex);
+				
+			}
+
+			c.nstmts.incrementAndGet();
 
 		}
 
-		private void bufferValue(final Value value) {
+		private void bufferValue(final BigdataValue value)
+				throws InterruptedException {
 
 			if (conf.createInlineIV(value) != null) {
-				
+
 				/*
 				 * This is something that we would inline into the statement
 				 * indices.
@@ -888,11 +1283,37 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				
 			}
 
+			if (value instanceof BigdataBNode) {
+
+				final BigdataBNode bnode = (BigdataBNode) value;
+
+				if (bnode.getID().length() < conf.BNODE_INLINE_LIMIT) {
+
+					/*
+					 * Ignore blank nodes that will be inlined into the
+					 * statement indices.
+					 * 
+					 * FIXME This should also ignore bnodes whose IDs are
+					 * integers or UUIDs, both of which we will inline *unless*
+					 * we are in a told bnodes mode.
+					 */
+					
+					c.nshortBNodes.incrementAndGet();
+					
+					return;
+					
+				}
+				
+				// TODO xsd:dateTime should be inlined by the real code....
+				return;
+				
+			}
+			
 			if (value instanceof BigdataURI) {
 
 				final BigdataURI uri = (BigdataURI) value;
 
-				if (uri.getLocalNameLength() < URI_INLINE_LIMIT) {
+				if (uri.getLocalNameLength() < conf.URI_INLINE_LIMIT) {
 
 					/*
 					 * Ingore URI that will be inlined into the statement
@@ -903,7 +1324,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 					 * should be inlined into the statement indices.
 					 */
 
-					nshortURIs.incrementAndGet();
+					c.nshortURIs.incrementAndGet();
 
 					return;
 					
@@ -916,7 +1337,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				final Literal lit = (Literal) value;
 
 				if (//lit.getDatatype() == null &&
-						lit.getLabel().length() < LITERAL_INLINE_LIMIT) {
+						lit.getLabel().length() < conf.LITERAL_INLINE_LIMIT) {
 
 					/*
 					 * Ignore Literal that will be inlined in the statement
@@ -927,7 +1348,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 					 * with short labels and plain literals with short labels.
 					 */
 
-					nshortLiterals.incrementAndGet();
+					c.nshortLiterals.incrementAndGet();
 
 					return;
 
@@ -935,10 +1356,17 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 			}
 
-			if (nvalues == values.length) {
+			if (values != null && nvalues == values.length) {
 
 				flush();
 				
+			}
+			
+			if (values == null) {
+
+				// Lazy allocation of the buffer.
+				values = new BigdataValue[valueBufSize];
+
 			}
 			
 			if (nvalues < values.length) {
@@ -954,25 +1382,129 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			
 		}
 
-		protected void flush() {
+		void flush() throws InterruptedException {
 
 			if (nvalues == 0)
 				return;
 
+			if (!parsing.get()) {
+				// Either shutdown or never started.
+				throw new IllegalStateException();
+			}
+
 			if (log.isInfoEnabled())
-				log.info("Flushing " + nvalues + " values");
+				log.info("Adding chunk with " + nvalues + " values to queue.");
+
+			// put the buffer on the queue (blocking operation).
+			valueQueue.put(new ValueBuffer(nvalues, values));
+
+			// clear reference since we just handed off the data.
+			values = null;
+			nvalues = 0;
+
+			// clear distinct value set so it does not build for ever.
+			distinctValues.clear();
+			
+		}
+		
+	} // class StatementHandler
+    
+    /**
+     * Index a {@link ValueBuffer}.
+     */
+    private static class IndexValueBufferTask implements Callable<Void> {
+
+    	/**
+    	 * The data to be indexed.
+    	 */
+		private final ValueBuffer vbuf;
+		
+		/**
+		 * The index to write on.
+		 */
+		private final BTree termsIndex;
+
+		/** Counters for things that we track. */
+		private final Counters c;
+		
+		/**
+    	 * Used to build the keys.
+    	 */
+    	private final IKeyBuilder keyBuilder = KeyBuilder.newInstance();
+    	
+		/** Used to serialize RDF Values as byte[]s. */
+    	private final DataOutputBuffer out = new DataOutputBuffer();
+
+		/** Used to serialize RDF Values as byte[]s. */
+    	private final BigdataValueSerializer<BigdataValue> valSer;
+
+		/**
+		 * Used to (de-)compress the raw values.
+		 * <p>
+		 * Note: This is not thread-safe, even for decompression. You need a
+		 * pool or thread-local instance to support concurrent reads against the
+		 * TERMS index.
+		 */
+		private final RecordCompressor compressor = new RecordCompressor(
+				Deflater.BEST_SPEED);
+
+		private final MessageDigest d;
+
+		public IndexValueBufferTask(final ValueBuffer vbuf,
+				final BTree termsIndex, final BigdataValueFactory vf,
+				final Counters c
+				) {
+
+			if(vbuf == null)
+				throw new IllegalArgumentException();
+			
+			if(termsIndex== null)
+				throw new IllegalArgumentException();
+
+			if(vf == null)
+				throw new IllegalArgumentException();
+			
+			if(c == null)
+				throw new IllegalArgumentException();
+			
+			this.vbuf = vbuf;
+			this.termsIndex = termsIndex;
+			this.valSer = vf.getValueSerializer();
+			this.c = c;
+			
+			try {
+
+				d = MessageDigest.getInstance("SHA-256"); // 256 bits (32 bytes)
+
+			} catch (NoSuchAlgorithmException e) {
+
+				throw new RuntimeException(e);
+
+			}
+
+    	}
+		
+		public Void call() throws Exception {
+			
+			final long begin = System.currentTimeMillis();
+			
+			if (log.isInfoEnabled())
+				log.info("Indexing " + vbuf.nvalues);
+			
+			final int nvalues = vbuf.nvalues;
+			final BigdataValue[] values = vbuf.values;
 			
 			final KVO<Value>[] a = new KVO[nvalues];
 
 			for (int i = 0; i < nvalues; i++) {
 
-				final Value r = values[i];
+				final BigdataValue r = values[i];
 				
 				/*
 				 * TODO This can not handle very large UTF strings. To do that
 				 * we need to either explore ICU support for that feature or
 				 * serialize the data using "wide" characters (java uses 2-byte
-				 * characters).
+				 * characters). [Use ICU binary Unicode compression plus gzip.]
 				 */
 //				final byte[] val = SerializerUtil.serialize(r);
 				byte[] val = valSer.serialize(r, out.reset()); 
@@ -1037,27 +1569,21 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				
 			}
 			
-			reset();
+			vbuf.clear();
 
-		}
-
-		private void reset() {
+			if (log.isInfoEnabled()) {
 			
-			// clear distinct value set.
-			distinctValues.clear();
-			
-			for (int i = 0; i < nvalues; i++) {
+				final long elapsed = System.currentTimeMillis() - begin;
 
-				// clear references from the buffer.
-				values[i] = null;
-				
+				log.info("Indexed " + vbuf.nvalues + ", elapsed=" + elapsed
+						+ "ms");
+			
 			}
 
-			// reset buffer counter.
-			nvalues = 0;
+			return (Void) null;
 
 		}
-		
+
 		private IKeyBuilder buildKey(final Value r, final byte[] val) {
 
 			if (true) {
@@ -1183,9 +1709,9 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 					
 				}
 				
-				ninserted.incrementAndGet();
-				totalKeyBytes.addAndGet(key.length);
-				totalValBytes.addAndGet(val.length);
+				c.ninserted.incrementAndGet();
+				c.totalKeyBytes.addAndGet(key.length);
+				c.totalValBytes.addAndGet(val.length);
 
 				return;
 				
@@ -1243,13 +1769,13 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			 * Hash collision.
 			 */
 
-			if (rangeCount > maxCollisions.get()) {
+			if (rangeCount > c.maxCollisions.get()) {
 
 				// Raise the maximum collision count.
 
-				maxCollisions.set(rangeCount);
+				c.maxCollisions.set(rangeCount);
 
-				log.warn("MAX COLLISIONS NOW: " + maxCollisions.get());
+				log.warn("MAX COLLISIONS NOW: " + c.maxCollisions.get());
 
 			}
 			
@@ -1263,33 +1789,34 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 			}
 
-			ninserted.incrementAndGet();
-			totalKeyBytes.addAndGet(key.length);
-			totalValBytes.addAndGet(val.length);
+			c.ninserted.incrementAndGet();
+			c.totalKeyBytes.addAndGet(key.length);
+			c.totalValBytes.addAndGet(val.length);
 			
-			totalCollisions.incrementAndGet();
+			c.totalCollisions.incrementAndGet();
 
 			if (rangeCount > 128) { // arbitrary limit to log @ WARN.
 				log.warn("Collision: hashCode=" + BytesUtil.toString(key)
-						+ ", nstmts="+nstmts
-						+ ", nshortLiterals=" + nshortLiterals
-						+ ", nshortURIs=" + nshortURIs + ", ninserted="
-						+ ninserted + ", totalCollisions=" + totalCollisions
-						+ ", maxCollisions=" + maxCollisions
+						+ ", nstmts="+c.nstmts
+						+ ", nshortLiterals=" + c.nshortLiterals
+						+ ", nshortURIs=" + c.nshortURIs + ", ninserted="
+						+ c.ninserted + ", totalCollisions=" + c.totalCollisions
+						+ ", maxCollisions=" + c.maxCollisions
 						+ ", ncollThisTerm=" + rangeCount + ", resource="
 						+ x.obj);
 			} else if (log.isInfoEnabled())
 				log.info("Collision: hashCode=" + BytesUtil.toString(key)
-						+ ", nstmts="+nstmts
-						+ ", nshortLiterals=" + nshortLiterals
-						+ ", nshortURIs=" + nshortURIs + ", ninserted="
-						+ ninserted + ", totalCollisions=" + totalCollisions
-						+ ", maxCollisions=" + maxCollisions
+						+ ", nstmts="+c.nstmts
+						+ ", nshortLiterals=" + c.nshortLiterals
+						+ ", nshortURIs=" + c.nshortURIs + ", ninserted="
+						+ c.ninserted + ", totalCollisions=" + c.totalCollisions
+						+ ", maxCollisions=" + c.maxCollisions
 						+ ", ncollThisTerm=" + rangeCount + ", resource="
 						+ x.obj);
 
 		}
-	}
+
+    } // class IndexValueBufferTask
 
 	/**
 	 * Parse files, inserting {@link Value}s into indices and counting hash
@@ -1303,8 +1830,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 	 * @throws RDFParseException
 	 * @throws NoSuchAlgorithmException 
 	 */
-	public static void main(final String[] args) throws RDFParseException,
-			RDFHandlerException, IOException, NoSuchAlgorithmException {
+	public static void main(final String[] args) throws Exception {
 
 		Banner.banner();
 		
@@ -1348,17 +1874,28 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 			u = new HashCollisionUtility(jnl);
 
+			u.start();
+			
 			for (String filename : args) {
 
 				u.parseFileOrDirectory(new File(filename));
 				
 			}
 
-			// flush anything left in the buffer.
-			u.stmtHandler.flush();
-			
+//			// flush anything left in the buffer.
+//			u.stmtHandler.flush();
+
+			// shutdown and block until all data is indexed.
+			u.shutdown();
+
 			jnl.commit();
 			
+		} catch (Throwable t) {
+
+			u.shutdownNow();
+
+			throw new RuntimeException(t);
+
 		} finally {
 			
 			jnl.close();
@@ -1369,23 +1906,25 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 			if (u != null) {
 
-				System.out.println("NumStatements: " + u.nstmts);
+				System.out.println("NumStatements: " + u.c.nstmts);
 
-				System.out.println("NumDistinctVals: " + u.ninserted);
+				System.out.println("NumDistinctVals: " + u.c.ninserted);
 
-				System.out.println("NumShortLiterals: " + u.nshortLiterals);
+				System.out.println("NumShortLiterals: " + u.c.nshortLiterals);
 
-				System.out.println("NumShortURIs: " + u.nshortURIs);
+				System.out.println("NumShortBNodes: " + u.c.nshortBNodes);
+
+				System.out.println("NumShortURIs: " + u.c.nshortURIs);
 
 //				System.out.println("NumCacheHit: " + u.ncached);
 
-				System.out.println("TotalKeyBytes: " + u.totalKeyBytes);
+				System.out.println("TotalKeyBytes: " + u.c.totalKeyBytes);
 				
-				System.out.println("TotalValBytes: " + u.totalValBytes);
+				System.out.println("TotalValBytes: " + u.c.totalValBytes);
 
-				System.out.println("MaxCollisions: " + u.maxCollisions);
+				System.out.println("MaxCollisions: " + u.c.maxCollisions);
 
-				System.out.println("TotalCollisions: " + u.totalCollisions);
+				System.out.println("TotalCollisions: " + u.c.totalCollisions);
 
 			}
 			
