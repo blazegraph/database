@@ -54,10 +54,17 @@ public interface IMemoryManager {
 	 * @param data
 	 *            The data will be copied to the backing resource
 	 * 
-	 * @return the address to be passed to the get method to retrieve the data
+	 * @return the address to be passed to the get method to retrieve the data.
 	 * 
 	 * @throws IllegalArgumentException
 	 *             if the argument is <code>null</code>.
+	 * 
+	 * @see #get(long)
+	 */
+	public long allocate(ByteBuffer data, boolean blocks);
+
+	/**
+	 * Blocking version of {@link #allocate(ByteBuffer, boolean)}.
 	 */
 	public long allocate(ByteBuffer data);
 
@@ -67,8 +74,19 @@ public interface IMemoryManager {
 	 * 
 	 * @param nbytes
 	 *            The size of the allocation.
+	 * @param blocks
+	 *            When <code>true</code> the method will block until the
+	 *            allocation request can be satisfied. When <code>false</code> a
+	 *            {@link MemoryManagerOutOfMemory} will be thrown.
 	 * 
-	 * @return an address that will return a ByteBuffer[] using get
+	 * @return The address of the allocation.
+	 * 
+	 * @see #get(long)
+	 */
+	public long allocate(int nbytes, boolean blocks);
+
+	/**
+	 * Blocking version of {@link #allocate(int)}.
 	 */
 	public long allocate(int nbytes);
 
@@ -100,8 +118,7 @@ public interface IMemoryManager {
 	 * be reallocated by another {@link DirectBufferPool} consumer.
 	 * 
 	 * @param addr
-	 *            An address previously returned by
-	 *            {@link #allocate(ByteBuffer)} or {@link #allocate(int)}.
+	 *            An previously allocated address.
 	 * 
 	 * @return array of ByteBuffers
 	 */
