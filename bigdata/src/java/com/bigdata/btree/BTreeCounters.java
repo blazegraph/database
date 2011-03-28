@@ -381,7 +381,7 @@ final public class BTreeCounters implements Cloneable {
 	 * 
 	 * @todo not correctly tracked in scale-out (overflow handling).
 	 */
-	public AtomicLong bytesOnStore_nodesAndLeaves = new AtomicLong();
+	public final AtomicLong bytesOnStore_nodesAndLeaves = new AtomicLong();
 
     /**
      * Return a score whose increasing value is correlated with the amount of

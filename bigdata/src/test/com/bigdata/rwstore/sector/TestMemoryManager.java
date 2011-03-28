@@ -19,11 +19,28 @@ import junit.framework.TestCase;
 public class TestMemoryManager extends TestCase {
 
 	final int sectorSize = 10 * 1024 * 1024; // 10M
-	MemoryManager manager =  null;
 	
-	final char[] c_testData = genTestData();
+	private MemoryManager manager =  null;
 	
-	char[] genTestData() {
+	private char[] c_testData;
+	
+	private Random r;
+
+	protected void setUp() throws Exception {
+		r = new Random();
+		manager = new MemoryManager(DirectBufferPool.INSTANCE, 10);
+		c_testData = genTestData();
+	}
+
+	protected void tearDown() throws Exception {
+		manager.clear();
+		r = null;
+		manager = null;
+		c_testData = null;
+		super.tearDown();
+	}
+	
+	private char[] genTestData() {
 		String src = "The quick brown fox jumped over the lazy dog";
 		
 		StringBuffer buf = new StringBuffer();
@@ -33,14 +50,12 @@ public class TestMemoryManager extends TestCase {
 		return buf.toString().toCharArray();
 	}
 
-	Random r = new Random();
 	private String genString(int min, int i) {
 		return new String(c_testData, 0, min + r.nextInt(i-min));
 		// return new String(c_testData, 0, i - 20);
 	}
 	
 	public void testSimpleAllocations() {
-		installMemoryManager();
 		
 		String helloWorld = "Hello World";
 		
@@ -49,10 +64,6 @@ public class TestMemoryManager extends TestCase {
 		String retstr = getString(saddr);
 		
 		assertTrue(helloWorld.equals(retstr));
-	}
-	
-	private void installMemoryManager() {
-		manager =  new MemoryManager(DirectBufferPool.INSTANCE, 10);
 	}
 
 	/**
@@ -73,15 +84,16 @@ public class TestMemoryManager extends TestCase {
 	}
 	
 	public void testStressAllocations() {
-		installMemoryManager();
 		
 		for (int i = 0; i < 20; i++) {
-			doStressAllocations(manager, true, 50000, 5 + r.nextInt(5000));	
+
+			doStressAllocations(manager, true, 50000, 5 + r.nextInt(5000));
+			
 		}
+		
 	}
 	
 	public void testSimpleBlob() {
-		installMemoryManager();
 		
 		String blob =  new String(c_testData, 0, 11000);
 
@@ -90,10 +102,10 @@ public class TestMemoryManager extends TestCase {
 		String retstr = getString(saddr);
 		
 		assertTrue(blob.equals(retstr));
+		
 	}
 	
 	public void testAllocationContexts() {
-		installMemoryManager();
 		
 		IMemoryManager context = manager.createAllocationContext();
 		for (int i = 0; i < 500; i++) {
@@ -103,7 +115,6 @@ public class TestMemoryManager extends TestCase {
 	}
 	
 	public void testStressConcurrent() throws InterruptedException {
-		installMemoryManager();
 		
 		final int nclients = 20;
 		

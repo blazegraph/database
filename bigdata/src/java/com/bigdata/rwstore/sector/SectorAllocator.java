@@ -31,11 +31,9 @@ import java.util.ArrayList;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rwstore.FixedOutputStream;
 import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.IWriteCacheManager;
-import com.bigdata.rwstore.RWWriteCacheService;
 
 /**
  * The SectorAllocator is designed as an alternative the the standard RWStore
@@ -82,9 +80,9 @@ import com.bigdata.rwstore.RWWriteCacheService;
  * @author Martyn Cutcher
  *
  */
-public class SectorAllocator implements Comparable {
-    protected static final Logger log = Logger
-    .getLogger(SectorAllocator.class);
+public class SectorAllocator implements Comparable<SectorAllocator> {
+    
+	private static final Logger log = Logger.getLogger(SectorAllocator.class);
 
     static final int getBitMask(int bits) {
 		int ret = 0;
@@ -612,10 +610,12 @@ public class SectorAllocator implements Comparable {
 		throw new IllegalArgumentException("Size does not fit in a slot");
 	}
 
-	public int compareTo(Object other) {
+	public int compareTo(final SectorAllocator other) {
+		
 		final int oindex = ((SectorAllocator) other).m_index;
 		
 		return m_index < oindex ? -1 : (m_index > oindex ? 1 : 0);
+		
 	}
 
 	public int getIndex() {
