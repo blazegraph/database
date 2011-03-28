@@ -89,10 +89,17 @@ public class AllocationContext implements IMemoryManager {
 	synchronized
 	public long allocate(final ByteBuffer data) {
 
+		return allocate(data, true/* blocks */);
+
+	}
+	
+	synchronized
+	public long allocate(final ByteBuffer data, final boolean blocks) {
+
 		if (data == null)
 			throw new IllegalArgumentException();
 		
-		final long addr = allocate(data.remaining());
+		final long addr = allocate(data.remaining(), blocks);
 		
 		final ByteBuffer[] bufs = get(addr);
 
@@ -104,13 +111,20 @@ public class AllocationContext implements IMemoryManager {
 		return addr;
 	}
 
+	synchronized
+	public long allocate(final int nbytes) {
+
+		return allocate(nbytes, true/*blocks*/);
+
+	}
+	
 	/*
 	 * Core impl.
 	 */
 	synchronized
-	public long allocate(final int nbytes) {
-
-		final long addr = m_parent.allocate(nbytes);
+	public long allocate(final int nbytes, final boolean blocks) {
+		
+		final long addr = m_parent.allocate(nbytes, blocks);
 		
 		final int rwaddr = MemoryManager.getAllocationAddress(addr);
 //		final int size = getAllocationSize(addr);
