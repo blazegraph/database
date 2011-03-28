@@ -25,7 +25,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rwstore.sector;
 
 import java.nio.ByteBuffer;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * The {@link AllocationContext} is used to maintain a handle on allocations
@@ -52,15 +53,35 @@ import java.util.HashSet;
  */
 public class AllocationContext implements IMemoryManager {
 	
+	private final MemoryManager m_root;
 	private final IMemoryManager m_parent;
+
+	/**
+	 * All addresses allocated either directly by this {@link AllocationContext}
+	 * or recursively by any {@link AllocationContext} created within this
+	 * {@link AllocationContext}.
+	 */
+	private final LinkedHashSet<Long> m_addresses = new LinkedHashSet<Long>();
 	
-	private HashSet<Long> m_addresses = new HashSet<Long>();
+	private final AtomicLong m_userBytes = new AtomicLong();
+	private final AtomicLong m_slotBytes = new AtomicLong();
+
+	public AllocationContext(final MemoryManager root) {
+		
+		if(root == null)
+			throw new IllegalArgumentException();
+		
+		m_root = root;
+		m_parent = root;
+
+	}
 	
-	public AllocationContext(final IMemoryManager parent) {
+	public AllocationContext(final AllocationContext parent) {
 
 		if(parent == null)
 			throw new IllegalArgumentException();
 		
+		m_root = parent.m_root;
 		m_parent = parent;
 		
 	}
@@ -71,19 +92,34 @@ public class AllocationContext implements IMemoryManager {
 		if (data == null)
 			throw new IllegalArgumentException();
 		
-		final long addr = m_parent.allocate(data);
+		final long addr = allocate(data.remaining());
 		
+		final ByteBuffer[] bufs = get(addr);
+
+		MemoryManager.copyData(data, bufs);
+	
 		// getSectorAllocation(addr).allocate(addr);		
 		m_addresses.add(Long.valueOf(addr));
 		
 		return addr;
 	}
 
+	/*
+	 * Core impl.
+	 */
 	synchronized
 	public long allocate(final int nbytes) {
 
 		final long addr = m_parent.allocate(nbytes);
 		
+		final int rwaddr = MemoryManager.getAllocationAddress(addr);
+//		final int size = getAllocationSize(addr);
+		final SectorAllocator sector = m_root.getSector(rwaddr);
+
+		m_userBytes.addAndGet(nbytes);
+		m_slotBytes.addAndGet(sector.getPhysicalSize(SectorAllocator
+				.getSectorOffset(rwaddr)));
+
 		// getSectorAllocation(addr).allocate(addr);		
 		m_addresses.add(Long.valueOf(addr));
 		
@@ -101,15 +137,24 @@ public class AllocationContext implements IMemoryManager {
 
 	synchronized
 	public void free(final long addr) {
-		// getSectorAllocation(addr).free(addr);
-		m_addresses.remove(Long.valueOf(addr));
+
+		final int rwaddr = MemoryManager.getAllocationAddress(addr);
+		final int size = MemoryManager.getAllocationSize(addr);
+		final int offset = SectorAllocator.getSectorOffset(rwaddr);
+		
+		final SectorAllocator sector = m_root.getSector(rwaddr);
 		
 		m_parent.free(addr);
+		
+		m_addresses.remove(Long.valueOf(addr));
+		
+		m_userBytes.addAndGet(-size);
+		m_slotBytes.addAndGet(-sector.getPhysicalSize(offset));
+
 	}
 
-	synchronized
 	public ByteBuffer[] get(final long addr) {
-		return m_parent.get(addr);
+		return m_root.get(addr);
 	}
 
 	public IMemoryManager createAllocationContext() {
@@ -117,7 +162,15 @@ public class AllocationContext implements IMemoryManager {
 	}
 
 	public int allocationSize(final long addr) {
-		return m_parent.allocationSize(addr);
+		return m_root.allocationSize(addr);
+	}
+
+	public long getSlotBytes() {
+		return m_slotBytes.get();
+	}
+
+	public long getUserBytes() {
+		return m_userBytes.get();
 	}
 
 //	private SectorAllocation m_head = null;
