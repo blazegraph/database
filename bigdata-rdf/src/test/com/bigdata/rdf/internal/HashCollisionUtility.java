@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.ByteBuffer;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -56,7 +55,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KVO;
+import com.bigdata.btree.keys.KV;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
@@ -64,6 +63,7 @@ import com.bigdata.btree.raba.codec.FixedLengthValueRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.compression.RecordCompressor;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
@@ -76,6 +76,8 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
+import com.bigdata.rwstore.sector.IMemoryManager;
+import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.util.concurrent.Latch;
 
 /**
@@ -85,13 +87,15 @@ import com.bigdata.util.concurrent.Latch;
  * TODO Various data sets:
  * 
  * <pre>
+ * /nas/data/lubm/U1/data/University0/
  * /nas/data/bsbm/bsbm_2785/dataset.nt.gz
  * /nas/data/bsbm/bsbm_566496/dataset.nt.gz
- * /nas/data/lubm/U1/data/University0/
+ * /data/bsbm3_200m_1MSplits
  * 
  * 8B triple bioinformatics data set.
  * 
  * BTC data (some very large literals, also fix nxparser to not drop/truncate)
+ * 
  * </pre>
  * 
  * TODO order preserving hash codes could be interesting here. Look at 32 and 64
@@ -238,6 +242,66 @@ import com.bigdata.util.concurrent.Latch;
  * TotalValBytes: 4944223808
  * MaxCollisions: 2
  * TotalCollisions: 17264
+ * Journal size: 7320764416 bytes
+ * </pre>
+ * 
+ * GC OH problem trying to run multiple parsers against BSBM 200M when split
+ * into 200 files.
+ * 
+ * <pre>
+ * valBufSize := 10000
+ *     valQueueCapacity = 100
+ *     maxDrain := 50
+ *     nparserThreads := 2
+ *     parserWorkQueue := 1000
+ * </pre>
+ * 
+ * BSBM 200M - this is 3x longer. This run did not have the GC OH problem, but
+ * GC had frequent 10% spikes, which is a lot in comparison to our best run.
+ * 
+ * <pre>
+ *     valBufSize := 1000
+ *     valQueueCapacity = 10
+ *     maxDrain := 5
+ *     nparserThreads := 4
+ *     parserWorkQueue := 100
+ * 
+ * Elapsed: 9589520ms
+ * NumStatements: 198805837
+ * NumDistinctVals: 12202052
+ * NumShortLiterals: 32776100
+ * NumShortBNodes: 0
+ * NumShortURIs: 493514954
+ * TotalKeyBytes: 61010260
+ * TotalValBytes: 4945278396
+ * MaxCollisions: 2
+ * TotalCollisions: 17260
+ * Journal size: 7320764416 bytes
+ * </pre>
+ * 
+ * BSBM 200M: split in 200 files.  69m versus best time so far of 62m. There is
+ * only one thread in the pool, but the caller runs policy means that we are 
+ * actually running two parsers.  So, this is not really the same as the best
+ * run, which was one parser running in the main thread with the indexer running
+ * in another thread.
+ * 
+ * <pre>
+ * 	   valBufSize := 10000
+ *     valQueueCapacity = 10
+ *     maxDrain := 5
+ *     nparserThreads := 1
+ *     parserWorkQueue := 100
+ * 
+ * Elapsed: 4119775ms
+ * NumStatements: 198805837
+ * NumDistinctVals: 12202052
+ * NumShortLiterals: 32776100
+ * NumShortBNodes: 0
+ * NumShortURIs: 493514954
+ * TotalKeyBytes: 61010260
+ * TotalValBytes: 4945278396
+ * MaxCollisions: 2
+ * TotalCollisions: 17260
  * Journal size: 7320764416 bytes
  * </pre>
  * 
@@ -544,17 +608,17 @@ public class HashCollisionUtility {
 	static private class ValueBuffer {
 
 		private final int nvalues;
-		private final BigdataValue[] values;
+		private final KV[] data;
 
-		public ValueBuffer(final int nvalues, final BigdataValue[] values) {
+		public ValueBuffer(final int nvalues, final KV[] data) {
 			this.nvalues = nvalues;
-			this.values = values;
+			this.data = data;
 		}
 
 		/** Clear the hard references. */
 		public void clear() {
 			for (int i = 0; i < nvalues; i++) {
-				values[i] = null;
+				data[i] = null;
 			}
 //			nvalues = 0;
 		}
@@ -584,14 +648,14 @@ public class HashCollisionUtility {
 	final int valBufSize = 10000;// 100000;
 
 	/** Capacity of the {@link #valueQueue}. */
-	final int valQueueCapacity = 100;
+	final int valQueueCapacity = 10;
 
 	/**
 	 * Maximum #of chunks to drain from the {@link #valueQueue} in one go. This
 	 * bounds the largest chunk that we will index at one go. You can remove the
 	 * limit by specifying {@link Integer#MAX_VALUE}.
 	 */
-	final int maxDrain = 50;
+	final int maxDrain = 5;
 
 	/**
 	 * The size of the read buffer when reading a file.
@@ -602,7 +666,7 @@ public class HashCollisionUtility {
 	 * How many parser threads to use. There can be only one parser per file,
 	 * but you can parse more than one file at a time.
 	 */
-	final int nparserThreads = 2;
+	final int nparserThreads = 1;
 
 	/**
 	 * The size of the work queue for the {@link #parserService}.
@@ -615,7 +679,23 @@ public class HashCollisionUtility {
 	 * choice would be for the caller to catch the
 	 * {@link RejectedExecutionException}, wait a bit, and then retry.
 	 */
-	final int parserWorkQueueCapacity = 1000;
+	final int parserWorkQueueCapacity = 100;
+
+	/**
+	 * A direct memory heap used to buffer RDF {@link Value}s which will be
+	 * inserted into the TERMS index. A distinct child {@link IMemoryManager}
+	 * context is created by the {@link StatementHandler} each time it needs to
+	 * buffer data. The {@link StatementHandler} monitors the size of the
+	 * allocation context to decide when it is "big enough" to be transferred
+	 * onto the {@link #valueQueue}. The indexer eventually obtains the context
+	 * from the {@link #valueQueue}. Once the indexer is done with a context, it
+	 * {@link IMemoryManager#clear() clears} the context. The total memory
+	 * across the allocation contexts is released back to the
+	 * {@link DirectBufferPool} in {@link #shutdown()} and
+	 * {@link #shutdownNow()} and no later than when the {@link #mmgr} is
+	 * finalized.
+	 */
+	final IMemoryManager mmgr;
 	
 	private HashCollisionUtility(final Journal jnl) {		
 
@@ -688,6 +768,8 @@ public class HashCollisionUtility {
 //				50000 // hard reference queue capacity
 //				);
 		
+		mmgr = new MemoryManager(DirectBufferPool.INSTANCE, 100/*sectors*/);
+
 	}
 
 	/**
@@ -730,9 +812,8 @@ public class HashCollisionUtility {
 	 * Poison pill used to indicate that no more objects will be placed onto the
 	 * {@link #valueQueue}.
 	 */
-	private final ValueBuffer poisonPill = new ValueBuffer(0,
-			new BigdataValue[0]);
-	
+	private final ValueBuffer poisonPill = new ValueBuffer(0, new KV[0]);
+
 	/**
 	 * Normal shutdown. Running parsers will complete and their data will be
 	 * indexed, but new parsers will not start. This method will block until
@@ -762,6 +843,9 @@ public class HashCollisionUtility {
 				indexerTask.get();
 			}
 			indexerService.shutdown();
+			if (mmgr != null) {
+				mmgr.clear();
+			}
 		} finally {
 			lock.unlock();
 		}
@@ -780,6 +864,9 @@ public class HashCollisionUtility {
 		indexerService.shutdownNow();
 		if (indexerTask != null) {
 			indexerTask.cancel(true/* mayInterruptIfRunning */);
+		}
+		if (mmgr != null) {
+			mmgr.clear();
 		}
 	}
 
@@ -860,24 +947,24 @@ public class HashCollisionUtility {
 				b = coll.getFirst();
 				
 			} else {
-				
+
 				// Combine together into a single chunk.
 				int nvalues = 0;
-				
+
 				for (ValueBuffer t : coll)
 					nvalues += t.nvalues;
 
-				final BigdataValue[] values = new BigdataValue[nvalues];
-				
+				final KV[] values = new KV[nvalues];
+
 				int off = 0;
-				
+
 				for (ValueBuffer t : coll) {
-				
+
 					System
-							.arraycopy(t.values/* src */, 0/* srcPos */,
+							.arraycopy(t.data/* src */, 0/* srcPos */,
 									values/* dest */, off/* destPos */,
 									t.nvalues/* length */);
-					
+
 					off += t.nvalues;
 
 				}
@@ -1099,8 +1186,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		
 	}
 	
-	private void parseFileOrDirectory(final File fileOrDir)
-			throws Exception {
+	private void parseFileOrDirectory(final File fileOrDir,
+			final RDFFormat fallback) throws Exception {
 
 		if (fileOrDir.isDirectory()) {
 
@@ -1110,7 +1197,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 				final File f = files[i];
 
-				parseFileOrDirectory(f);
+				parseFileOrDirectory(f, fallback);
 				
             }
          
@@ -1121,16 +1208,18 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		final File f = fileOrDir;
 		
 		final String n = f.getName();
-		
-        RDFFormat fmt = RDFFormat.forFileName(n);
 
-        if (fmt == null && n.endsWith(".zip")) {
-            fmt = RDFFormat.forFileName(n.substring(0, n.length() - 4));
-        }
+		RDFFormat fmt = RDFFormat.forFileName(n, fallback);
 
-        if (fmt == null && n.endsWith(".gz")) {
-            fmt = RDFFormat.forFileName(n.substring(0, n.length() - 3));
-        }
+		if (fmt == null && n.endsWith(".zip")) {
+			fmt = RDFFormat.forFileName(n.substring(0, n.length() - 4),
+					fallback);
+		}
+
+		if (fmt == null && n.endsWith(".gz")) {
+			fmt = RDFFormat.forFileName(n.substring(0, n.length() - 3),
+					fallback);
+		}
 
         if (fmt == null) {
 			log.warn("Ignoring: " + f);
@@ -1138,11 +1227,11 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		}
 
 		final StatementHandler stmtHandler = new StatementHandler(valBufSize,
-				c, conf, valueQueue, parsing);
+				c, conf, vf, valueQueue, parsing);
 		
 		final FutureTask<Void> ft = new ReportingFutureTask<Void>(
 				f,
-				new ParseFileTask(f, fileBufSize, vf, stmtHandler)
+				new ParseFileTask(f, fallback, fileBufSize, vf, stmtHandler)
 				);
 
         // run the parser
@@ -1158,12 +1247,14 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 	private static class ParseFileTask implements Callable<Void> {
 
 		private final File file;
+		private final RDFFormat fallback;
 		private final int fileBufSize;
 		private final BigdataValueFactory vf;
 		private final StatementHandler stmtHandler;
 
-		public ParseFileTask(final File file, final int fileBufSize,
-				final BigdataValueFactory vf, final StatementHandler stmtHandler) {
+		public ParseFileTask(final File file, final RDFFormat fallback,
+				final int fileBufSize, final BigdataValueFactory vf,
+				final StatementHandler stmtHandler) {
 
 			if (file == null)
 				throw new IllegalArgumentException();
@@ -1172,6 +1263,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				throw new IllegalArgumentException();
 
 			this.file = file;
+			
+			this.fallback = fallback;
 			
 			this.fileBufSize = fileBufSize;
 
@@ -1196,7 +1289,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			if (!file.exists())
 				throw new RuntimeException("Not found: " + file);
 
-			final RDFFormat format = RDFFormat.forFileName(file.getName());
+			final RDFFormat format = RDFFormat.forFileName(file.getName(),fallback);
 
 			if (format == null)
 				throw new RuntimeException("Unknown format: " + file);
@@ -1269,14 +1362,27 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		 * instances.
 		 * 
 		 * FIXME We need to provide a canonicalizing mapping for blank nodes.
+		 * 
+		 * FIXME This needs to evolve into a map from the byte[]:key to the
+		 * long:addr of the record. The map can not be used directly since all
+		 * addrs are distinct, but we are concerned about distinct Values. This
+		 * means that we will have to materialize the byte[] serialized form of
+		 * the Value from the memstore in case of a collision. (Another approach
+		 * is to not bother here with enforcing distinct on the large literals
+		 * and URIs. Since we are inlining all small things into the statement
+		 * indices, only large stuff will be buffered here and the TERMS index
+		 * can sort out whether or not there is a hash collision.)
+		 * 
+		 * FIXME The key should also include the URI,Literal,BNode, etc. prefix
+		 * bits (or is this necessary any more?).
 		 */
-    	private final Set<Value> distinctValues = new LinkedHashSet<Value>();
+    	private final Set<byte[]> distinctValues = new LinkedHashSet<byte[]>();
     	
     	/** The size of the {@link #values} buffer when it is allocated. */
     	private final int valueBufSize;
     	
-		/** Buffer for values. */
-		private BigdataValue[] values;
+		/** Buffer for (serialized) RDF Values. */
+		private KV[] values;
 
 		/** #of buffered values. */
 		private int nvalues = 0;
@@ -1301,9 +1407,32 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		 */
     	final AtomicBoolean parsing;
     	
-		public StatementHandler(final int valueBufSize,
+		/**
+    	 * Used to build the keys (just a hash code).
+    	 */
+    	private final IKeyBuilder keyBuilder = KeyBuilder.newInstance();
+    	
+		/** Used to serialize RDF Values as byte[]s. */
+    	private final DataOutputBuffer out = new DataOutputBuffer();
+
+		/** Used to serialize RDF Values as byte[]s. */
+    	private final BigdataValueSerializer<BigdataValue> valSer;
+
+    	/**
+		 * Used to (de-)compress the raw values.
+		 * <p>
+		 * Note: This is not thread-safe, even for decompression. You need a
+		 * pool or thread-local instance to support concurrent reads against the
+		 * TERMS index.
+		 */
+		private final RecordCompressor compressor = new RecordCompressor(
+				Deflater.BEST_SPEED);
+		
+		public StatementHandler(//
+    			final int valueBufSize,
 				final Counters c,
 				final LexiconConfiguration<BigdataValue> conf,
+				final BigdataValueFactory vf,
 				final BlockingQueue<ValueBuffer> valueQueue,
 				final AtomicBoolean parsing) {
 			
@@ -1319,7 +1448,9 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			
 			this.parsing = parsing;
 			
-		}
+			this.valSer = vf.getValueSerializer();
+
+    	}
 
 		public void endRDF() {
 
@@ -1371,9 +1502,37 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 		}
 
-		private void bufferValue(final BigdataValue value)
-				throws InterruptedException {
-
+		/**
+		 * Return <code>true</code> if the RDF {@link Value} should be inlined
+		 * into the statement indices. Such {@link Value}s will not be stored
+		 * into the TERMS index.
+		 * 
+		 * @param value
+		 *            The RDF {@link Value}.
+		 * 
+		 * @return <code>true</code> if the value will be inlined into the
+		 *         statement indices.
+		 * 
+		 *         TODO Move to {@link LexiconConfiguration}.
+		 *         <p>
+		 *         Consider dividing the work up between createIV(), which
+		 *         actually constructs the IV, and isInlineValue(), which simply
+		 *         understands whether or not the value can be represented
+		 *         inline within the statement indices. The only reason to
+		 *         create this division is so that we do not create the IV twice
+		 *         (once to see if we can and then once to create the statement
+		 *         index keys).
+		 *         <p>
+		 *         -URIs with short localNames should have their namespace
+		 *         registered against the NAMESPACE index and should be inlined
+		 *         into the statement indices.
+		 *         <p>
+		 *         - Literals with short labels should be inlined into the
+		 *         statement indices, including languageCode literals with short
+		 *         labels and plain literals with short labels.
+		 */
+		private boolean isInlineValue(final BigdataValue value) {
+			
 			if (conf.createInlineIV(value) != null) {
 
 				/*
@@ -1381,7 +1540,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				 * indices.
 				 */
 
-				return;
+				return true;
 				
 			}
 
@@ -1394,54 +1553,12 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 //					// Cache hit - no need to test the index.
 //					ncached.incrementAndGet();
 //
-//					return;
+//					return true;
 //
 //				}
 //			
 //			}
-			
-			if (value instanceof BigdataLiteral) {
 
-				final URI datatype = ((BigdataLiteral) value).getDatatype();
-
-		        // Note: URI.stringValue() is efficient....
-				if (datatype != null
-						&& XMLSchema.DATETIME.stringValue().equals(
-								datatype.stringValue())) {
-
-					// TODO xsd:dateTime should be inlined by the real code....
-					return;
-					
-				}
-				
-			}
-
-			if (value instanceof BigdataBNode) {
-
-				final BigdataBNode bnode = (BigdataBNode) value;
-
-				if (bnode.getID().length() < conf.BNODE_INLINE_LIMIT) {
-
-					/*
-					 * Ignore blank nodes that will be inlined into the
-					 * statement indices.
-					 * 
-					 * FIXME This should also ignore bnodes whose IDs are
-					 * integers or UUIDs, both of which we will inline *unless*
-					 * we are in a told bnodes mode.
-					 */
-					
-					c.nshortBNodes.incrementAndGet();
-					
-					return;
-					
-				}
-				
-				// TODO xsd:dateTime should be inlined by the real code....
-				return;
-				
-			}
-			
 			if (value instanceof BigdataURI) {
 
 				final BigdataURI uri = (BigdataURI) value;
@@ -1451,42 +1568,86 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 					/*
 					 * Ingore URI that will be inlined into the statement
 					 * indices.
-					 * 
-					 * FIXME URIs with short localNames should have their
-					 * namespace registered against the NAMESPACE index and
-					 * should be inlined into the statement indices.
 					 */
 
 					c.nshortURIs.incrementAndGet();
 
-					return;
-					
+					return true;
+
 				}
-				
-			}
-			
-			if (value instanceof Literal) {
+
+				return false;
+
+			} else if (value instanceof BigdataLiteral) {
 
 				final Literal lit = (Literal) value;
 
-				if (//lit.getDatatype() == null &&
-						lit.getLabel().length() < conf.LITERAL_INLINE_LIMIT) {
+				if (// lit.getDatatype() == null &&
+				lit.getLabel().length() < conf.LITERAL_INLINE_LIMIT) {
 
 					/*
 					 * Ignore Literal that will be inlined in the statement
 					 * indices.
-					 * 
-					 * FIXME Literals with short labels should be inlined into
-					 * the statement indices, including languageCode literals
-					 * with short labels and plain literals with short labels.
 					 */
 
 					c.nshortLiterals.incrementAndGet();
 
-					return;
+					return true;
 
 				}
 
+				final URI datatype = ((BigdataLiteral) value).getDatatype();
+
+				// Note: URI.stringValue() is efficient....
+				if (datatype != null
+						&& XMLSchema.DATETIME.stringValue().equals(
+								datatype.stringValue())) {
+
+					// will be inlined into the statement indices.
+					return true;
+
+				}
+
+			} else if (value instanceof BigdataBNode) {
+
+				final BigdataBNode bnode = (BigdataBNode) value;
+
+				if (bnode.getID().length() < conf.BNODE_INLINE_LIMIT) {
+
+					/*
+					 * Ignore blank nodes that will be inlined into the
+					 * statement indices.
+					 */
+
+					c.nshortBNodes.incrementAndGet();
+
+					return true;
+
+				}
+
+			}
+
+			return false;
+
+		}
+
+		/**
+		 * If the RDF {@link Value} can not be represented inline within the
+		 * statement indices, then buffer the value for batch resolution against
+		 * the TERMS index.
+		 * 
+		 * @param value
+		 *            The RDF {@link Value}.
+		 *            
+		 * @throws InterruptedException
+		 */
+		private void bufferValue(final BigdataValue value)
+				throws InterruptedException {
+
+			if (isInlineValue(value)) {
+
+				return;
+				
 			}
 
 			if (values != null && nvalues == values.length) {
@@ -1498,23 +1659,30 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			if (values == null) {
 
 				// Lazy allocation of the buffer.
-				values = new BigdataValue[valueBufSize];
+				values = new KV[valueBufSize];
 
 			}
 			
 			if (nvalues < values.length) {
 
-				if(distinctValues.add(value)) {
+				final KV t = makeKV(value);
+				
+				if(distinctValues.add(t.val)) {
 
 					// Something not already buffered.
-					values[nvalues++] = value;
+					values[nvalues++] = t;
 					
 				}
 				
 			}
 			
 		}
-
+		
+		/**
+		 * Transfer a non-empty buffer to the {@link #valueQueue}.
+		 * 
+		 * @throws InterruptedException
+		 */
 		void flush() throws InterruptedException {
 
 			if (nvalues == 0)
@@ -1539,7 +1707,113 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			distinctValues.clear();
 			
 		}
-		
+
+		private KV makeKV(final BigdataValue r) {
+
+			/*
+			 * TODO This can not handle very large UTF strings. To do that
+			 * we need to either explore ICU support for that feature or
+			 * serialize the data using "wide" characters (java uses 2-byte
+			 * characters). [Use ICU binary Unicode compression plus gzip.]
+			 */
+//			final byte[] val = SerializerUtil.serialize(r);
+			byte[] val = valSer.serialize(r, out.reset()); 
+
+			if (compressor != null && val.length > 64) {
+
+				// compress, reusing [out].
+				out.reset();
+				compressor.compress(val, out);
+				
+			}
+			
+			// extract compressed byte[].
+			if (out.pos() < val.length) {
+
+				/*
+				 * Only accept compressed version if it is smaller.
+				 * 
+				 * FIXME In order to differentiate this, we will have to
+				 * mark the record with a header to indicate whether or not
+				 * it is compressed. Without that header we can not
+				 * deserialize a record resolved via its TermId since we
+				 * will not know whether or not it is compressed (actually,
+				 * that could be part of the termId....)
+				 */
+
+				val = out.toByteArray();
+
+//				System.err.println("Compressed: " + r);
+
+			} else {
+				
+//				System.err.println("Will not compress: " + r);
+				
+			}
+
+			/*
+			 * Note: This is an exclusive lower bound (it does not include
+			 * the counter).
+			 * 
+			 * TODO We could format the counter in here as a ZERO (0) since
+			 * it is a fixed length value and then patch it up later. That
+			 * would involve less copying. Also, the [fromKey] and [toKey]
+			 * could reuse a pair of buffers to reduce heap churn,
+			 * especially since they are FIXED length keys. The fromKey
+			 * would have to be formed more intelligently as we do not have
+			 * a version of SuccessorUtil#successor() which works with a
+			 * byte offset and length.
+			 */
+			final byte[] key = buildKey(r, val).getKey();
+
+			return new KV(key, val);
+			
+		} // makeKV()
+
+		private IKeyBuilder buildKey(final Value r, final byte[] val) {
+
+//		if (true) {
+
+			/*
+			 * Simple 32-bit hash code based on the byte[] representation of
+			 * the RDF Value.
+			 */
+			
+			final int hashCode = r.hashCode();
+
+			return keyBuilder.reset().append(hashCode);
+			
+//		} else {
+//
+//			/*
+//			 * Message digest of the serialized representation of the RDF
+//			 * Value.
+//			 * 
+//			 * TODO There are methods to copy out the digest (hash code)
+//			 * without memory allocations. getDigestLength() and
+//			 * getDigest(out,start,len).
+//			 */
+//			private final MessageDigest d;
+//
+//			try {
+//
+//				d = MessageDigest.getInstance("SHA-256"); // 256 bits (32 bytes)
+//
+//			} catch (NoSuchAlgorithmException e) {
+//
+//				throw new RuntimeException(e);
+//
+//			}
+//
+//			
+//			final byte[] hashCode = d.digest(val);
+//
+//			return keyBuilder.reset().append(hashCode);
+//			
+//		}
+
+	} // buildKey
+
 	} // class StatementHandler
     
     /**
@@ -1565,23 +1839,20 @@ sparse, but this suggests that we should try a different coder for the leaf keys
     	 */
     	private final IKeyBuilder keyBuilder = KeyBuilder.newInstance();
     	
-		/** Used to serialize RDF Values as byte[]s. */
-    	private final DataOutputBuffer out = new DataOutputBuffer();
+//		/** Used to serialize RDF Values as byte[]s. */
+//    	private final DataOutputBuffer out = new DataOutputBuffer();
 
-		/** Used to serialize RDF Values as byte[]s. */
+		/** Used to de-serialize RDF Values (debugging only). */
     	private final BigdataValueSerializer<BigdataValue> valSer;
 
 		/**
-		 * Used to (de-)compress the raw values.
+		 * Used to de-compress the raw values (debugging only).
 		 * <p>
 		 * Note: This is not thread-safe, even for decompression. You need a
 		 * pool or thread-local instance to support concurrent reads against the
 		 * TERMS index.
 		 */
-		private final RecordCompressor compressor = new RecordCompressor(
-				Deflater.BEST_SPEED);
-
-		private final MessageDigest d;
+		private final RecordCompressor compressor;
 
 		public IndexValueBufferTask(final ValueBuffer vbuf,
 				final BTree termsIndex, final BigdataValueFactory vf,
@@ -1602,19 +1873,14 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			
 			this.vbuf = vbuf;
 			this.termsIndex = termsIndex;
-			this.valSer = vf.getValueSerializer();
 			this.c = c;
+
+			/*
+			 * Note: debugging only.
+			 */
+			this.valSer = vf.getValueSerializer();
+			this.compressor = new RecordCompressor(Deflater.BEST_SPEED);
 			
-			try {
-
-				d = MessageDigest.getInstance("SHA-256"); // 256 bits (32 bytes)
-
-			} catch (NoSuchAlgorithmException e) {
-
-				throw new RuntimeException(e);
-
-			}
-
     	}
 		
 		public Void call() throws Exception {
@@ -1623,83 +1889,15 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			
 			if (log.isDebugEnabled())
 				log.debug("Indexing " + vbuf.nvalues);
-			
-			final int nvalues = vbuf.nvalues;
-			final BigdataValue[] values = vbuf.values;
-			
-			final KVO<Value>[] a = new KVO[nvalues];
-
-			for (int i = 0; i < nvalues; i++) {
-
-				final BigdataValue r = values[i];
-				
-				/*
-				 * TODO This can not handle very large UTF strings. To do that
-				 * we need to either explore ICU support for that feature or
-				 * serialize the data using "wide" characters (java uses 2-byte
-				 * characters). [Use ICU binary Unicode compression plus gzip.]
-				 */
-//				final byte[] val = SerializerUtil.serialize(r);
-				byte[] val = valSer.serialize(r, out.reset()); 
-
-				if (compressor != null && val.length > 64) {
-
-					// compress, reusing [out].
-					out.reset();
-					compressor.compress(val, out);
-					
-				}
-				
-				// extract compressed byte[].
-				if (out.pos() < val.length) {
-
-					/*
-					 * Only accept compressed version if it is smaller.
-					 * 
-					 * FIXME In order to differentiate this, we will have to
-					 * mark the record with a header to indicate whether or not
-					 * it is compressed. Without that header we can not
-					 * deserialize a record resolved via its TermId since we
-					 * will not know whether or not it is compressed (actually,
-					 * that could be part of the termId....)
-					 */
-
-					val = out.toByteArray();
-
-//					System.err.println("Compressed: " + r);
-
-				} else {
-					
-//					System.err.println("Will not compress: " + r);
-					
-				}
-
-				/*
-				 * Note: This is an exclusive lower bound (it does not include
-				 * the counter).
-				 * 
-				 * TODO We could format the counter in here as a ZERO (0) since
-				 * it is a fixed length value and then patch it up later. That
-				 * would involve less copying. Also, the [fromKey] and [toKey]
-				 * could reuse a pair of buffers to reduce heap churn,
-				 * especially since they are FIXED length keys. The fromKey
-				 * would have to be formed more intelligently as we do not have
-				 * a version of SuccessorUtil#successor() which works with a
-				 * byte offset and length.
-				 */
-				final byte[] key = buildKey(r, val).getKey();
-
-				a[i] = new KVO<Value>(key, val, r);
-				
-			}
-
+		
 			// Place into sorted order by the keys.
-			Arrays.sort(a, 0, nvalues);
+			Arrays.sort(vbuf.data, 0, vbuf.nvalues);
 
-			for(KVO<Value> x : a) {
-				
-				addValue(x);
-				
+			// Index the values.
+			for (int i = 0; i < vbuf.nvalues; i++) {
+
+				addValue(vbuf.data[i]);
+
 			}
 			
 			vbuf.clear();
@@ -1712,45 +1910,18 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 						+ "ms");
 			
 			}
-
+			
 			return (Void) null;
 
 		}
 
-		private IKeyBuilder buildKey(final Value r, final byte[] val) {
-
-			if (true) {
-
-				/*
-				 * Simple 32-bit hash code based on the byte[] representation of
-				 * the RDF Value.
-				 */
-				
-				final int hashCode = r.hashCode();
-
-				return keyBuilder.reset().append(hashCode);
-				
-			} else {
-
-				/*
-				 * Message digest of the serialized representation of the RDF
-				 * Value.
-				 * 
-				 * TODO There are methods to copy out the digest (hash code)
-				 * without memory allocations. getDigestLength() and
-				 * getDigest(out,start,len).
-				 */
-				
-				final byte[] hashCode = d.digest(val);
-
-				return keyBuilder.reset().append(hashCode);
-				
-			}
-
-		}
-
-		private void addValue(final KVO<Value> x) {
-
+		/**
+		 * Insert a record into the TERMS index.
+		 * 
+		 * @param x
+		 */
+		private void addValue(final KV x) {
+		
 			/*
 			 * This is the fixed length hash code prefix. When a collision
 			 * exists we can either append a counter -or- use more bits from the
@@ -1784,18 +1955,18 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			 * that key range must be compared for equality with the given
 			 * record to decide whether or not the given record already exists
 			 * in the index.
+			 * 
+			 * The fromKey is strictly LT any full key for the hash code of this
+			 * val but strictly GT any key have a hash code LT the hash code of
+			 * this val.
 			 */
-			
-//			final IKeyBuilder keyBuilder = buildKey(r, val);
-			
-			final byte[] val = x.val;
-			
-			// key strictly LT any full key for the hash code of this val but
-			// strictly GT any key have a hash code LT the hash code of this val.
 			final byte[] fromKey = x.key;
 
 			// key strictly LT any successor of the hash code of this val.
 			final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
+
+			// The (serialized and compressed) RDF Value.
+			final byte[] val = x.val;
 
 			// fast range count. this tells us how many collisions there are.
 			// this is an exact collision count since we are not deleting tuples
@@ -1872,13 +2043,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				// raw bytes
 				final byte[] tmp = tuple.getValue();
 				
-				if (false) {
-					// decompress
-					final ByteBuffer b = compressor.decompress(tmp);
-					final byte[] c = new byte[b.limit()];
-					b.get(c);
-					System.out.println(valSer.deserialize(c));
-				}
+				if (false)
+					System.out.println(getValue(tmp));
 				
 				// Note: Compares the compressed values ;-)
 				if(BytesUtil.bytesEqual(val, tmp)) {
@@ -1936,7 +2102,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 						+ c.ninserted + ", totalCollisions=" + c.totalCollisions
 						+ ", maxCollisions=" + c.maxCollisions
 						+ ", ncollThisTerm=" + rangeCount + ", resource="
-						+ x.obj);
+						+ getValue(x.val));
 			} else if (log.isInfoEnabled())
 				log.info("Collision: hashCode=" + BytesUtil.toString(key)
 						+ ", nstmts="+c.nstmts
@@ -1945,9 +2111,30 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 						+ c.ninserted + ", totalCollisions=" + c.totalCollisions
 						+ ", maxCollisions=" + c.maxCollisions
 						+ ", ncollThisTerm=" + rangeCount + ", resource="
-						+ x.obj);
+						+ getValue(x.val));
 
 		}
+
+		/**
+		 * Decompress and deserialize a {@link Value}.
+		 * 
+		 * @param tmp
+		 *            The serialized and compressed value.
+		 *            
+		 * @return The {@link Value}.
+		 */
+		private Value getValue(final byte[] tmp) {
+			
+			// decompress
+			final ByteBuffer b = compressor.decompress(tmp);
+			final byte[] c = new byte[b.limit()];
+			b.get(c);
+			
+			// deserialize.
+			return valSer.deserialize(c);
+			
+		}
+		
 
     } // class IndexValueBufferTask
 
@@ -1999,8 +2186,18 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		final String journalFile = System.getProperty(Journal.Options.FILE);
 		
 		properties.setProperty(Journal.Options.FILE, journalFile);
+
+		if (new File(journalFile).exists()) {
+		
+			System.err.println("Removing old journal: " + journalFile);
+			
+			new File(journalFile).delete();
+			
+		}
 		
 		final Journal jnl = new Journal(properties);
+
+		final RDFFormat fallback = RDFFormat.N3;
 
 		HashCollisionUtility u = null;
 		try {
@@ -2008,11 +2205,11 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			u = new HashCollisionUtility(jnl);
 
 			u.start();
-			
+
 			for (String filename : args) {
 
-				u.parseFileOrDirectory(new File(filename));
-				
+				u.parseFileOrDirectory(new File(filename), fallback);
+
 			}
 
 //			// flush anything left in the buffer.
