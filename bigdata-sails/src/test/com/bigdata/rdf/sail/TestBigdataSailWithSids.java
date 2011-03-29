@@ -61,6 +61,9 @@ public class TestBigdataSailWithSids extends AbstractBigdataSailTestCase {
 
         final ProxyTestSuite suite = new ProxyTestSuite(delegate, "SAIL with Triples (with SIDs)");
 
+        // test rewrite of RDF Value => BigdataValue for binding set and tuple expr.
+        suite.addTestSuite(TestBigdataValueReplacer.class);
+        
         // test pruning of variables not required for downstream processing.
         suite.addTestSuite(TestPruneBindingSets.class);
 
