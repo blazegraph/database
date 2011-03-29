@@ -67,6 +67,9 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
 
         final ProxyTestSuite suite = new ProxyTestSuite(delegate, "SAIL with Quads (pipeline joins)");
 
+        // test rewrite of RDF Value => BigdataValue for binding set and tuple expr.
+        suite.addTestSuite(TestBigdataValueReplacer.class);
+
         // test pruning of variables not required for downstream processing.
         suite.addTestSuite(TestPruneBindingSets.class);
 
