@@ -29,6 +29,8 @@ package com.bigdata.rdf.sail;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
@@ -97,12 +99,17 @@ public class BigdataValueReplacer {
         /*
          * Resolve the values used by this query.
          * 
-         * Note: If any value can not be resolved, then its term identifer
+         * Note: If any value can not be resolved, then its term identifier
          * will remain ZERO (0L) (aka NULL). Except within OPTIONALs, this
-         * indicates that the query CAN NOT be satisified by the data since
+         * indicates that the query CAN NOT be satisfied by the data since
          * one or more required terms are unknown to the database.
          */
         final HashMap<Value, BigdataValue> values = new HashMap<Value, BigdataValue>();
+        
+        /*
+         * The set of variables encountered in the query.
+         */
+        final Map<String/* name */, Var> vars = new LinkedHashMap<String, Var>();
 
         final BigdataValueFactory valueFactory = database.getValueFactory();
 
@@ -120,6 +127,8 @@ public class BigdataValueReplacer {
 
             @Override
             public void meet(final Var var) {
+                
+                vars.put(var.getName(), var);
                 
                 if (var.hasValue()) {
 
@@ -162,7 +171,7 @@ public class BigdataValueReplacer {
         
         if (bindings != null) {
         
-            Iterator<Binding> it = bindings.iterator();
+            final Iterator<Binding> it = bindings.iterator();
         
             while (it.hasNext()) {
                 
@@ -247,7 +256,7 @@ public class BigdataValueReplacer {
                  // the Sesame Value object.
                 final Value val = constant.getValue();
 
-                // Lookup the resolve BigdataValue object.
+                // Lookup the resolved BigdataValue object.
                 final BigdataValue val2 = values.get(val);
 
                 assert val2 != null : "value not found: "+constant.getValue();
@@ -277,17 +286,28 @@ public class BigdataValueReplacer {
         
         if (bindings != null) {
         
-            MapBindingSet bindings2 = new MapBindingSet();
+            final MapBindingSet bindings2 = new MapBindingSet();
         
-            Iterator<Binding> it = bindings.iterator();
+            final Iterator<Binding> it = bindings.iterator();
         
             while (it.hasNext()) {
                 
                 final BindingImpl binding = (BindingImpl) it.next();
+
+                if (!vars.containsKey(binding.getName())) {
+
+                    // Drop bindings which are not used within the query.
+                    
+                    if (log.isInfoEnabled())
+                        log.info("Dropping unused binding: var=" + binding);
+                    
+                    continue;
+                    
+                }
                 
                 final Value val = binding.getValue();
                 
-//              Lookup the resolve BigdataValue object.
+                // Lookup the resolved BigdataValue object.
                 final BigdataValue val2 = values.get(val);
 
                 assert val2 != null : "value not found: "+binding.getValue();
