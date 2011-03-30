@@ -29,6 +29,8 @@ import java.util.LinkedHashSet;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.OneShotInstrument;
 
@@ -56,6 +58,9 @@ import com.bigdata.counters.OneShotInstrument;
  * @author Martyn Cutcher
  */
 public class AllocationContext implements IMemoryManager {
+	
+	private static final transient Logger log = Logger
+			.getLogger(AllocationContext.class);
 	
 	/**
 	 * The top-level {@link MemoryManager}.
@@ -172,6 +177,9 @@ public class AllocationContext implements IMemoryManager {
 		lock.lock();
 		try {
 
+			if(log.isDebugEnabled())
+				log.debug("");
+			
 			for (Long addr : m_addresses) {
 
 				m_parent.free(addr);
