@@ -10,10 +10,12 @@ import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -54,6 +56,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KV;
@@ -678,7 +681,7 @@ public class HashCollisionUtility {
 		 * The allocation contexts which can be released once these data have
 		 * been processed.
 		 */
-		private final List<IMemoryManager> contexts = new LinkedList<IMemoryManager>();
+		private final Set<IMemoryManager> contexts = new LinkedHashSet<IMemoryManager>();
 		
 		/**
 		 * The #of distinct records in the addrMap (this is more than the map
@@ -738,6 +741,20 @@ public class HashCollisionUtility {
 				
 			}
 			
+		}
+		
+		public long getUserBytes() {
+
+			long nbytes = 0L;
+			
+			for(IMemoryManager context : contexts) {
+				
+				nbytes += context.getUserBytes();
+				
+			}
+			
+			return nbytes;
+
 		}
 
 	} // class ValueBuffer
@@ -1049,7 +1066,8 @@ public class HashCollisionUtility {
 						if (log.isDebugEnabled())
 							log.debug("Will index " + coll.size()
 									+ " chunks having " + b.nvalues
-									+ " values.");
+									+ " values in " + b.getUserBytes()
+									+ " bytes");
 
 						// Now index that chunk.
 						new IndexValueBufferTask(mmgr, b, termsIndex, vf, c)
@@ -1957,6 +1975,14 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 //			final byte[] val = SerializerUtil.serialize(r);
 			byte[] val = valSer.serialize(r, out.reset()); 
 
+			 /* 
+			 * FIXME In order support conditional compression  we will have to
+			 * mark the record with a header to indicate whether or not
+			 * it is compressed. Without that header we can not
+			 * deserialize a record resolved via its TermId since we
+			 * will not know whether or not it is compressed (actually,
+			 * that could be part of the termId....)
+			 */
 			if (compressor != null) {//&& val.length > 64) {
 
 				// compress, reusing [out].
@@ -1965,27 +1991,10 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				
 			}
 			
-			// extract compressed byte[].
-			if (out.pos() < val.length) {
-
-				/*
-				 * Only accept compressed version if it is smaller.
-				 * 
-				 * FIXME In order to differentiate this, we will have to
-				 * mark the record with a header to indicate whether or not
-				 * it is compressed. Without that header we can not
-				 * deserialize a record resolved via its TermId since we
-				 * will not know whether or not it is compressed (actually,
-				 * that could be part of the termId....)
-				 */
+//			if (out.pos() < val.length) // TODO Use compressed version iff smaller. 
+			{
 
 				val = out.toByteArray();
-
-//				System.err.println("Compressed: " + r);
-
-			} else {
-				
-//				System.err.println("Will not compress: " + r);
 				
 			}
 
@@ -2127,9 +2136,10 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		public Void call() throws Exception {
 			
 			final long begin = System.currentTimeMillis();
-			
+
 			if (log.isDebugEnabled())
-				log.debug("Indexing " + vbuf.nvalues);
+				log.debug("Indexing " + vbuf.nvalues + " values occupying "
+						+ vbuf.getUserBytes() + " bytes");
 
 			/*
 			 * Place into sorted order by the keys.
@@ -2167,8 +2177,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			
 				final long elapsed = System.currentTimeMillis() - begin;
 
-				log.debug("Indexed " + vbuf.nvalues + ", elapsed=" + elapsed
-						+ "ms");
+				log.debug("Indexed " + vbuf.nvalues + " values occupying "
+						+ vbuf.getUserBytes() + " bytes in " + elapsed + "ms");
 			
 			}
 			
@@ -2293,12 +2303,19 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			/*
 			 * iterator over that key range
 			 * 
-			 * TODO filter for the value of interest so we can optimize the
-			 * scan by comparing with the value without causing it to be
-			 * materialized. we can also visit something iff the desired tuple
-			 * already exists. if we visit nothing then we know that we have to
-			 * insert a tuple and we know the counter value from the collision
-			 * count.
+			 * TODO Filter for the value of interest so we can optimize the scan
+			 * by comparing with the value without causing it to be
+			 * materialized, especially we should be able to efficiently reject
+			 * tuples where the byte[] value length is known to differ from the
+			 * a given length, including when the value is stored as a raw
+			 * record at which point we are doing a fast rejection based on
+			 * comparing the byteCount(addr) for the raw record with the target
+			 * byte count for value that we are seeking in the index.
+			 * 
+			 * We can visit something iff the desired tuple already exists (same
+			 * length, and possibly the same data). If we visit nothing then we
+			 * know that we have to insert a tuple and we know the counter value
+			 * from the collision count.
 			 */
 			final ITupleIterator<?> itr = termsIndex.rangeIterator(fromKey, toKey,
 					0/* capacity */, IRangeQuery.VALS, null/* filter */);
@@ -2312,7 +2329,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				// raw bytes
 				final byte[] tmp = tuple.getValue();
 				
-				if (true)
+				if (false)
 					System.out.println(getValue(tmp));
 				
 				// Note: Compares the compressed values ;-)
@@ -2372,8 +2389,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 						+ ", maxCollisions=" + c.maxCollisions
 						+ ", ncollThisTerm=" + rangeCount + ", resource="
 						+ getValue(val));
-			} else if (log.isInfoEnabled())
-				log.info("Collision: hashCode=" + BytesUtil.toString(key)
+			} else if (log.isDebugEnabled())
+				log.debug("Collision: hashCode=" + BytesUtil.toString(key)
 						+ ", nstmts="+c.nstmts
 						+ ", nshortLiterals=" + c.nshortLiterals
 						+ ", nshortURIs=" + c.nshortURIs + ", ninserted="
