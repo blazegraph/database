@@ -208,19 +208,22 @@ public class TestMemoryManager extends TestCase2 {
 		assertEquals("allocationSize", sectorSize, manager.allocationSize(addr));
 		
 	}
-	
+
 	/**
 	 * Unit test in which we verify that a thread will block awaiting an
 	 * allocation until another thread releases an allocation, thereby making
 	 * enough memory available for the thread to continue.
 	 * 
 	 * @throws InterruptedException
-	 * @throws TimeoutException 
-	 * @throws ExecutionException 
+	 * @throws TimeoutException
+	 * @throws ExecutionException
 	 * 
-	 * TODO Version of test with lt blob size allocations, with blob size allocations, and with sector (or more) sized allocations.
+	 *             TODO Version of test with lt blob size allocations, with blob
+	 *             size allocations, and with sector (or more) sized
+	 *             allocations.
 	 */
-	public void test_blockingAllocation() throws InterruptedException, ExecutionException, TimeoutException {
+	public void test_blockingAllocation() throws InterruptedException,
+			ExecutionException, TimeoutException {
 
 		final int sectorSize = manager.getSectorSize();
 
@@ -337,6 +340,22 @@ public class TestMemoryManager extends TestCase2 {
 		if (log.isInfoEnabled())
 			log.info("Manager slotBytes: " + manager.getSlotBytes());
 
+	}
+
+	/**
+	 * Unit test for reading a copy of the data from the {@link IMemoryManager}.
+	 */
+	public void test_read() {
+		
+		final byte[] expected = new byte[1000];
+		r.nextBytes(expected);
+		
+		final long addr = manager.allocate(ByteBuffer.wrap(expected));
+		
+		final byte[] actual = manager.read(addr);
+		
+		assertEquals(expected,actual);
+		
 	}
 	
 	private String getString(final long saddr) {

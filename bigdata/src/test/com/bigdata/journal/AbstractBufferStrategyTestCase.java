@@ -116,14 +116,14 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
      */
     public void test_overflow() {
         
-        Journal store = (Journal) getStore();
-        
-        if (! (store.getBufferStrategy() instanceof AbstractBufferStrategy)) return;
+    	final Journal store = (Journal) getStore();
         
         try {
         
-        AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
-                .getBufferStrategy();
+        if (! (store.getBufferStrategy() instanceof AbstractBufferStrategy)) return;
+        
+        final AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
+            .getBufferStrategy();
 
         final long userExtent = bufferStrategy.getUserExtent();
         

@@ -9,10 +9,11 @@ import java.net.URL;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -602,25 +603,141 @@ public class HashCollisionUtility {
 	}
 
 	/**
+	 * A {@link Bucket} has an <code>unsigned byte[]</code> key and an unordered
+	 * list of <code>long</code> addrs for <code>byte[]</code> values.
+	 * {@link Bucket} implements {@link Comparable} can can be used to place an
+	 * array of {@link Bucket}s into ascending key order.
+	 * 
+	 * TODO This is space efficient for large {@link Value}s, but it would not
+	 * be efficient for storing binding sets which hash to the same key. In the
+	 * case of binding sets, the binding sets are normally small. An extensible
+	 * hash table would conserve space by dynamically determining the #of hash
+	 * bits in the address, and hence mapping the records onto a smaller #of
+	 * pages.
+	 */
+	static private class Bucket implements Comparable<Bucket> {
+		
+		/**
+		 * The <code>unsigned byte[]</code> key.
+		 */
+		public final byte[] key;
+		
+		/**
+		 * The list of addresses for this bucket.
+		 */
+		public final List<Long> addrs = new LinkedList<Long>();
+		
+		public Bucket(final byte[] key) {
+
+			if(key == null)
+				throw new IllegalArgumentException();
+			
+			this.key = key;
+			
+		}
+
+		public Bucket(final byte[] key,final long addr) {
+
+			this(key);
+			
+			addrs.add(addr);
+			
+		}
+
+		/**
+		 * Add an address to this bucket.
+		 * 
+		 * @param addr
+		 *            The address.
+		 */
+		public void add(final long addr) {
+			
+			addrs.add(addr);
+			
+		}
+
+		/**
+		 * Order {@link Bucket}s into ascending <code>unsigned byte[]</code> key
+		 * order.
+		 */
+		public int compareTo(final Bucket o) {
+			
+			return BytesUtil.compareBytes(key, o.key);
+			
+		}
+		
+	}
+	
+	/**
 	 * A chunk of RDF {@link Value}s from the parser which are ready to be
 	 * inserted into the TERMS index. 
 	 */
 	static private class ValueBuffer {
 
+		/**
+		 * The allocation contexts which can be released once these data have
+		 * been processed.
+		 */
+		private final List<IMemoryManager> contexts = new LinkedList<IMemoryManager>();
+		
+		/**
+		 * The #of distinct records in the addrMap (this is more than the map
+		 * size if there are hash collisions since some buckets will have more
+		 * than one entry).
+		 */
 		private final int nvalues;
-		private final KV[] data;
 
-		public ValueBuffer(final int nvalues, final KV[] data) {
+		/**
+		 * A map from the <code>unsigned byte[]</code> keys to the collision
+		 * bucket containing the address of each record for a given
+		 * <code>unsigned byte[]</code> key.
+		 */
+		private final Map<byte[]/* key */, Bucket> addrMap;
+
+		/**
+		 * 
+		 * @param contexts
+		 *            The allocation contexts for the records in the addrMap.
+		 * @param nvalues
+		 *            The #of distinct records in the addrMap (this is more than
+		 *            the map size if there are hash collisions since some
+		 *            buckets will have more than one entry).
+		 * @param addrMap
+		 *            A map from the <code>unsigned byte[]</code> keys to the
+		 *            collision bucket containing the address of each record for
+		 *            a given <code>unsigned byte[]</code> key.
+		 */
+		public ValueBuffer(final List<IMemoryManager> contexts,
+				final int nvalues, final Map<byte[], Bucket> addrMap) {
+
+			if (contexts == null)
+				throw new IllegalArgumentException();
+
+			if (addrMap == null)
+				throw new IllegalArgumentException();
+
+			this.contexts.addAll(contexts);
+
 			this.nvalues = nvalues;
-			this.data = data;
+
+			this.addrMap = addrMap;
+
 		}
 
-		/** Clear the hard references. */
+		/**
+		 * Clear the address map and the {@link IMemoryManager} allocation
+		 * contexts against which the data were stored.
+		 */
 		public void clear() {
-			for (int i = 0; i < nvalues; i++) {
-				data[i] = null;
+
+			addrMap.clear();
+			
+			for(IMemoryManager context : contexts) {
+				
+				context.clear();
+				
 			}
-//			nvalues = 0;
+			
 		}
 
 	} // class ValueBuffer
@@ -645,7 +762,7 @@ public class HashCollisionUtility {
 	 * will do better when it is given a bigger chunk since it can order the
 	 * data and be more efficient in the index updates.
 	 */
-	final int valBufSize = 10000;// 100000;
+	final int valBufSize = Bytes.megabyte32 * 10;// 100000;
 
 	/** Capacity of the {@link #valueQueue}. */
 	final int valQueueCapacity = 10;
@@ -695,7 +812,7 @@ public class HashCollisionUtility {
 	 * {@link #shutdownNow()} and no later than when the {@link #mmgr} is
 	 * finalized.
 	 */
-	final IMemoryManager mmgr;
+	final MemoryManager mmgr;
 	
 	private HashCollisionUtility(final Journal jnl) {		
 
@@ -812,7 +929,9 @@ public class HashCollisionUtility {
 	 * Poison pill used to indicate that no more objects will be placed onto the
 	 * {@link #valueQueue}.
 	 */
-	private final ValueBuffer poisonPill = new ValueBuffer(0, new KV[0]);
+	private final ValueBuffer poisonPill = new ValueBuffer(
+			new LinkedList<IMemoryManager>(), 0,
+			new LinkedHashMap<byte[], Bucket>());
 
 	/**
 	 * Normal shutdown. Running parsers will complete and their data will be
@@ -922,7 +1041,7 @@ public class HashCollisionUtility {
 								+ " chunks having " + b.nvalues + " values.");
 
 					// Now index that chunk.
-					new IndexValueBufferTask(b, termsIndex, vf, c).call();
+					new IndexValueBufferTask(mmgr, b, termsIndex, vf, c).call();
 
 				}
 
@@ -954,22 +1073,50 @@ public class HashCollisionUtility {
 				for (ValueBuffer t : coll)
 					nvalues += t.nvalues;
 
-				final KV[] values = new KV[nvalues];
+				final List<IMemoryManager> contexts = new LinkedList<IMemoryManager>();
+				final LinkedHashMap<byte[], Bucket> addrMap = new LinkedHashMap<byte[], Bucket>();
 
-				int off = 0;
+//				int off = 0;
 
 				for (ValueBuffer t : coll) {
 
-					System
-							.arraycopy(t.data/* src */, 0/* srcPos */,
-									values/* dest */, off/* destPos */,
-									t.nvalues/* length */);
+					contexts.addAll(t.contexts);
+					
+					nvalues += t.nvalues;
+					
+					for(Bucket bucket : t.addrMap.values()) {
+						
+						final Bucket tmp = addrMap.get(bucket.key);
+						
+						if(tmp == null) {
 
-					off += t.nvalues;
+							// copy bucket.
+							addrMap.put(bucket.key, bucket);
+							
+						} else {
+							
+							// merge bucket.
+							tmp.addrs.addAll(bucket.addrs);
+							
+						}
+						
+					}
+					
+//					System
+//					.arraycopy(t.keys/* src */, 0/* srcPos */,
+//							keys/* dest */, off/* destPos */,
+//							t.nvalues/* length */);
+//					
+//					System
+//					.arraycopy(t.addrs/* src */, 0/* srcPos */,
+//							addrs/* dest */, off/* destPos */,
+//							t.nvalues/* length */);
+//
+//					off += t.nvalues;
 
 				}
 
-				b = new ValueBuffer(nvalues, values);
+				b = new ValueBuffer(contexts, nvalues, addrMap);
 			
 			}
 
@@ -1227,7 +1374,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		}
 
 		final StatementHandler stmtHandler = new StatementHandler(valBufSize,
-				c, conf, vf, valueQueue, parsing);
+				c, conf, vf, mmgr, valueQueue, parsing);
 		
 		final FutureTask<Void> ft = new ReportingFutureTask<Void>(
 				f,
@@ -1354,40 +1501,6 @@ sparse, but this suggests that we should try a different coder for the leaf keys
     static private class StatementHandler extends RDFHandlerBase {
 
 		/**
-		 * Map of distinct values in the buffer.
-		 * 
-		 * TODO In addition to enforcing DISTINCT over the Values in the
-		 * ValueBuffer, an LRU/LIRS cache would be nice here so we can reuse the
-		 * frequently resolved (BigdataValue => IV) mappings across buffer
-		 * instances.
-		 * 
-		 * FIXME We need to provide a canonicalizing mapping for blank nodes.
-		 * 
-		 * FIXME This needs to evolve into a map from the byte[]:key to the
-		 * long:addr of the record. The map can not be used directly since all
-		 * addrs are distinct, but we are concerned about distinct Values. This
-		 * means that we will have to materialize the byte[] serialized form of
-		 * the Value from the memstore in case of a collision. (Another approach
-		 * is to not bother here with enforcing distinct on the large literals
-		 * and URIs. Since we are inlining all small things into the statement
-		 * indices, only large stuff will be buffered here and the TERMS index
-		 * can sort out whether or not there is a hash collision.)
-		 * 
-		 * FIXME The key should also include the URI,Literal,BNode, etc. prefix
-		 * bits (or is this necessary any more?).
-		 */
-    	private final Set<byte[]> distinctValues = new LinkedHashSet<byte[]>();
-    	
-    	/** The size of the {@link #values} buffer when it is allocated. */
-    	private final int valueBufSize;
-    	
-		/** Buffer for (serialized) RDF Values. */
-		private KV[] values;
-
-		/** #of buffered values. */
-		private int nvalues = 0;
-		
-		/**
     	 * Various counters that we track.
     	 */
     	private final Counters c;
@@ -1427,23 +1540,54 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		 */
 		private final RecordCompressor compressor = new RecordCompressor(
 				Deflater.BEST_SPEED);
+
+//		/** Buffer for (serialized) RDF Values. */
+//		private KV[] values;
+
+		/** #of buffered values. */
+		private int nvalues = 0;
 		
+		/** The memory manager. */
+		private final IMemoryManager memoryManager;
+		
+		/** The current allocation context. */
+		private IMemoryManager context = null;
+
+		/**
+		 * Map of distinct values in the buffer.
+		 * 
+		 * TODO In addition to enforcing DISTINCT over the Values in the
+		 * ValueBuffer, an LRU/LIRS cache would be nice here so we can reuse the
+		 * frequently resolved (BigdataValue => IV) mappings across buffer
+		 * instances.
+		 * 
+		 * FIXME We need to provide a canonicalizing mapping for blank nodes.
+		 * 
+		 * TODO The key should also include the URI,Literal,BNode, etc. prefix
+		 * bits (or is this necessary any more?).
+		 */
+		private final Map<byte[]/*key*/,Bucket> addrMap = new LinkedHashMap<byte[],Bucket>();
+    	
+    	/** The size of the {@link #values} buffer when it is allocated. */
+    	private final int valueBufSize;
+    	
 		public StatementHandler(//
     			final int valueBufSize,
 				final Counters c,
 				final LexiconConfiguration<BigdataValue> conf,
 				final BigdataValueFactory vf,
+				final IMemoryManager memoryManager,
 				final BlockingQueue<ValueBuffer> valueQueue,
 				final AtomicBoolean parsing) {
 			
 			this.valueBufSize = valueBufSize;
-			
-			this.values = null;
 
 			this.c = c;
 			
 			this.conf = conf;
 
+			this.memoryManager = memoryManager;
+			
 			this.valueQueue = valueQueue;
 			
 			this.parsing = parsing;
@@ -1650,34 +1794,93 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				
 			}
 
-			if (values != null && nvalues == values.length) {
+			if (context != null && context.getSlotBytes() >= valueBufSize) {
 
 				flush();
-				
+
 			}
 			
-			if (values == null) {
+			if (context == null) {
 
 				// Lazy allocation of the buffer.
-				values = new KV[valueBufSize];
+				context = memoryManager.createAllocationContext();
 
 			}
+
+			/*
+			 * Generate a key (hash code) and value (serialized and compressed)
+			 * from the BigdataValue.
+			 */
+			final KV t = makeKV(value);
+
+			/*
+			 * Lookup the list of addresses for RDF Values which hash to the
+			 * same key.
+			 */
+			Bucket bucket = addrMap.get(t.key);
 			
-			if (nvalues < values.length) {
+			if(bucket == null) {
 
-				final KV t = makeKV(value);
+				/*
+				 * No match on that hash code key.
+				 */
+
+				// lay the record down on the memory manager.
+				final long addr = context.allocate(ByteBuffer.wrap(t.val));
+					
+				// add new bucket to the map.
+				addrMap.put(t.key, bucket = new Bucket(t.key, addr));
+
+				nvalues++;
 				
-				if(distinctValues.add(t.val)) {
+			} else {
 
-					// Something not already buffered.
-					values[nvalues++] = t;
+				/*
+				 * Either a hash collision or the value is already stored at
+				 * a known address.
+				 */
+				{
+					for (Long addr : bucket.addrs) {
+
+						if (context.allocationSize(addr) != t.val.length) {
+
+							// Non-match based on the allocated record size.
+							continue;
+							
+						}
+
+						/*
+						 * TODO It would be more efficient to compare the data
+						 * using the zero-copy get(addr) method.
+						 */
+						final byte[] tmp = context.read(addr);
+
+						if (BytesUtil.bytesEqual(t.val, tmp)) {
+
+							// We've already seen this Value.
+							
+							if (log.isDebugEnabled())
+								log.debug("Duplicate value in chunk: " + t.val);
+							
+							return;
+							
+						}
+
+					}
+					
+					// Fall through - there is no such record on the store.
 					
 				}
+
+				// lay the record down on the memory manager.
+				bucket.add(context.allocate(ByteBuffer.wrap(t.val)));
 				
+				nvalues++;
+
 			}
-			
-		}
 		
+		} // bufferValue()
+
 		/**
 		 * Transfer a non-empty buffer to the {@link #valueQueue}.
 		 * 
@@ -1694,17 +1897,27 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			}
 
 			if (log.isDebugEnabled())
-				log.debug("Adding chunk with " + nvalues + " values to queue.");
+				log.debug("Adding chunk with " + nvalues + " values and "
+						+ context.getUserBytes() + " bytes to queue.");
 
+			/*
+			 * Create an object which encapsulates the allocation context (to be
+			 * cleared when the data have been consumed) and the address map.
+			 */
+			
+			final List<IMemoryManager> contexts = new LinkedList<IMemoryManager>();
+			contexts.add(context);
+			
 			// put the buffer on the queue (blocking operation).
-			valueQueue.put(new ValueBuffer(nvalues, values));
+			valueQueue.put(new ValueBuffer(contexts, nvalues, addrMap));
 
 			// clear reference since we just handed off the data.
-			values = null;
+			context = null;
 			nvalues = 0;
 
 			// clear distinct value set so it does not build for ever.
-			distinctValues.clear();
+//			distinctValues.clear();
+			addrMap.clear();
 			
 		}
 
@@ -1752,17 +1965,12 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			}
 
 			/*
-			 * Note: This is an exclusive lower bound (it does not include
-			 * the counter).
+			 * Note: This is an exclusive lower bound (it does not include the
+			 * counter).
 			 * 
-			 * TODO We could format the counter in here as a ZERO (0) since
-			 * it is a fixed length value and then patch it up later. That
-			 * would involve less copying. Also, the [fromKey] and [toKey]
-			 * could reuse a pair of buffers to reduce heap churn,
-			 * especially since they are FIXED length keys. The fromKey
-			 * would have to be formed more intelligently as we do not have
-			 * a version of SuccessorUtil#successor() which works with a
-			 * byte offset and length.
+			 * TODO We could format the counter in here as a ZERO (0) since it
+			 * is a fixed length value and then patch it up later. That would
+			 * involve less copying.
 			 */
 			final byte[] key = buildKey(r, val).getKey();
 
@@ -1821,6 +2029,11 @@ sparse, but this suggests that we should try a different coder for the leaf keys
      */
     private static class IndexValueBufferTask implements Callable<Void> {
 
+		/**
+		 * The {@link MemoryManager} against which the allocations were made.
+		 */
+    	private final MemoryManager mmgr;
+    	
     	/**
     	 * The data to be indexed.
     	 */
@@ -1854,10 +2067,12 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		 */
 		private final RecordCompressor compressor;
 
-		public IndexValueBufferTask(final ValueBuffer vbuf,
-				final BTree termsIndex, final BigdataValueFactory vf,
-				final Counters c
-				) {
+		public IndexValueBufferTask(final MemoryManager mmgr,
+				final ValueBuffer vbuf, final BTree termsIndex,
+				final BigdataValueFactory vf, final Counters c) {
+
+			if(mmgr == null)
+				throw new IllegalArgumentException();
 
 			if(vbuf == null)
 				throw new IllegalArgumentException();
@@ -1871,6 +2086,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			if(c == null)
 				throw new IllegalArgumentException();
 			
+			this.mmgr = mmgr;
 			this.vbuf = vbuf;
 			this.termsIndex = termsIndex;
 			this.c = c;
@@ -1889,17 +2105,37 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			
 			if (log.isDebugEnabled())
 				log.debug("Indexing " + vbuf.nvalues);
-		
-			// Place into sorted order by the keys.
-			Arrays.sort(vbuf.data, 0, vbuf.nvalues);
+
+			/*
+			 * Place into sorted order by the keys.
+			 * 
+			 * The Bucket implements Comparable. We extract the buckets, sort
+			 * them, and then process them.
+			 */
+			final Bucket[] a = vbuf.addrMap.values().toArray(new Bucket[0]);
+			Arrays.sort(a);
 
 			// Index the values.
-			for (int i = 0; i < vbuf.nvalues; i++) {
+			for (int i = 0; i <a.length; i++) {
 
-				addValue(vbuf.data[i]);
+				final Bucket b = a[i];
+				
+				// The key for that bucket.
+				final byte[] baseKey = keyBuilder.reset().append(b.key).getKey();
+				
+				// All records for that bucket.
+				for (long addr : b.addrs) {
+
+					// Materialize the byte[] from the memory manager.
+					final byte[] val = mmgr.read(addr);
+
+					addValue(baseKey, val);
+
+				}
 
 			}
-			
+
+			// release the address map and backing allocation context.
 			vbuf.clear();
 
 			if (log.isDebugEnabled()) {
@@ -1918,10 +2154,15 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		/**
 		 * Insert a record into the TERMS index.
 		 * 
-		 * @param x
+		 * @param baseKey
+		 *            The base key for the hash code (without the counter
+		 *            suffix).
+		 * 
+		 * @param val
+		 *            The (serialized and compressed) RDF Value.
 		 */
-		private void addValue(final KV x) {
-		
+		private void addValue(final byte[] baseKey, final byte[] val) {
+
 			/*
 			 * This is the fixed length hash code prefix. When a collision
 			 * exists we can either append a counter -or- use more bits from the
@@ -1959,14 +2200,17 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			 * The fromKey is strictly LT any full key for the hash code of this
 			 * val but strictly GT any key have a hash code LT the hash code of
 			 * this val.
+			 * 
+			 * TODO From [fromKey] and [toKey] could reuse a pair of buffers to
+			 * reduce heap churn, especially since they are FIXED length keys.
+			 * The fromKey would have to be formed more intelligently as we do
+			 * not have a version of SuccessorUtil#successor() which works with
+			 * a byte offset and length.
 			 */
-			final byte[] fromKey = x.key;
+			final byte[] fromKey = baseKey;
 
 			// key strictly LT any successor of the hash code of this val.
 			final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
-
-			// The (serialized and compressed) RDF Value.
-			final byte[] val = x.val;
 
 			// fast range count. this tells us how many collisions there are.
 			// this is an exact collision count since we are not deleting tuples
@@ -2043,7 +2287,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				// raw bytes
 				final byte[] tmp = tuple.getValue();
 				
-				if (false)
+				if (true)
 					System.out.println(getValue(tmp));
 				
 				// Note: Compares the compressed values ;-)
@@ -2102,7 +2346,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 						+ c.ninserted + ", totalCollisions=" + c.totalCollisions
 						+ ", maxCollisions=" + c.maxCollisions
 						+ ", ncollThisTerm=" + rangeCount + ", resource="
-						+ getValue(x.val));
+						+ getValue(val));
 			} else if (log.isInfoEnabled())
 				log.info("Collision: hashCode=" + BytesUtil.toString(key)
 						+ ", nstmts="+c.nstmts
@@ -2111,7 +2355,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 						+ c.ninserted + ", totalCollisions=" + c.totalCollisions
 						+ ", maxCollisions=" + c.maxCollisions
 						+ ", ncollThisTerm=" + rangeCount + ", resource="
-						+ getValue(x.val));
+						+ getValue(val));
 
 		}
 
