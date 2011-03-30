@@ -34,6 +34,9 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
+import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.DirectBufferPool;
 
 /**
@@ -48,21 +51,37 @@ import com.bigdata.io.DirectBufferPool;
  * 
  * @author Martyn Cutcher
  */
-public class MemoryManager implements IMemoryManager, ISectorManager {
+public class MemoryManager implements IMemoryManager, ISectorManager,
+		ICounterSetAccess {
 
 	private static final Logger log = Logger.getLogger(MemoryManager.class);
 
+	/**
+	 * The backing pool from which direct {@link ByteBuffer}s are recruited as
+	 * necessary and returned when possible.
+	 */
     private final DirectBufferPool m_pool;
+
+	/**
+	 * The set of direct {@link ByteBuffer} which are currently being managed by
+	 * this {@link MemoryManager} instance.
+	 */
     private final ByteBuffer[] m_resources;
 	
-    final private ReentrantLock m_allocationLock = new ReentrantLock();
+	/**
+	 * The lock used to serialize all allocation/deallocation requests. This is
+	 * shared across all allocation contexts to avoid lock ordering problems.
+	 */
+    final /*private*/ ReentrantLock m_allocationLock = new ReentrantLock();
 
 	/**
 	 * Condition signalled when a sector is added to {@link #m_free}.
 	 */
 	final private Condition m_sectorFree = m_allocationLock.newCondition();
 
-	int m_allocation = 0;
+	/**
+	 * The size of a backing buffer.
+	 */
     private final int m_sectorSize;
 	
 	private final ArrayList<SectorAllocator> m_sectors = new ArrayList<SectorAllocator>();
@@ -72,28 +91,79 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 */
 	private final ArrayList<SectorAllocator> m_free = new ArrayList<SectorAllocator>();
 
+	/**
+	 * The #of bytes in the backing buffers.
+	 */
+	private final AtomicLong m_allocation = new AtomicLong();
+	
+	/** The #of allocations. */
+	private final AtomicLong m_allocCount = new AtomicLong();
+
+	/** The #of application data bytes in current allocations. */
 	private final AtomicLong m_userBytes = new AtomicLong();
+	
+	/** The #of slot bytes in current allocations. */
 	private final AtomicLong m_slotBytes = new AtomicLong();
 
 	/**
-	 * Create a new {@link MemoryManager}. Any storage allocated by this
-	 * instance will be released no later than when the instance is
-	 * {@link #finalize() finalized}. Storage may be returned to the pool within
-	 * the life cycle of the {@link MemoryManager} using {@link #clear()}.
-	 * Nested allocation contexts may be created and managed using
-	 * {@link #createAllocationContext()}.
+	 * Create a new {@link MemoryManager}.
+	 * <p>
+	 * The backing {@link DirectBufferPool} may be either bounded or
+	 * (effectively) unbounded. The {@link MemoryManager} may also be bounded or
+	 * (effectively) unbounded. If either the pool or the memory manager is
+	 * bounded, then <em>blocking</em> allocation requests may block. Neither
+	 * non-blocking allocation requests nor allocation requests made against an
+	 * unbounded memory manager backed by an unbounded pool will block. The
+	 * preferred method for bounding the memory manager is to specify a maximum
+	 * #of buffers which it may consume from the pool.
+	 * <p>
+	 * The garbage collection of direct {@link ByteBuffer}s depends on a full GC
+	 * pass. In an application which managers its heap pressure well, full GC
+	 * passes are rare. Therefore, the best practice is to share an unbounded
+	 * pool across multiple purposes. Since there are typically multiple users
+	 * of the pool, the demand can not always be predicated and deadlocks can
+	 * arise with a bounded pool.
+	 * <p>
+	 * Individual buffers will be allocated as necessary and released if they
+	 * become empty. However, since allocation patterns may cause the in use
+	 * data to be scattered across the allocated buffers, the backing buffers
+	 * may not be returned to the backing pool until the top-level allocation
+	 * context is cleared.
+	 * <p>
+	 * Any storage allocated by this instance will be released no later than
+	 * when the instance is {@link #finalize() finalized}. Storage may be
+	 * returned to the pool within the life cycle of the {@link MemoryManager}
+	 * using {@link #clear()}. Nested allocation contexts may be created and
+	 * managed using {@link #createAllocationContext()}.
 	 * 
 	 * @param pool
 	 *            The pool from which the {@link MemoryManager} will allocate
-	 *            its buffers.
+	 *            its buffers (each "sector" is one buffer).
 	 * @param sectors
 	 *            The maximum #of buffers which the {@link MemoryManager} will
-	 *            allocate from that pool.
+	 *            allocate from that pool (each "sector" is one buffer). This
+	 *            may be {@link Integer#MAX_VALUE} for an effectively unbounded
+	 *            capacity.
+	 *            
+	 * @throws IllegalArgumentException
+	 *             if <i>pool</i> is <code>null</code>.
+	 * @throws IllegalArgumentException
+	 *             if <i>sectors</i> is non-positive.
 	 */
 	public MemoryManager(final DirectBufferPool pool, final int sectors) {
+		
+		if (pool == null)
+			throw new IllegalArgumentException();
+		
+		if (sectors <= 0)
+			throw new IllegalArgumentException();
+		
 		m_pool = pool;
+		
 		m_resources = new ByteBuffer[sectors];
+		
 		m_sectorSize = pool.getBufferCapacity();
+		
 	}
 
 	protected void finalize() throws Throwable {
@@ -169,16 +239,17 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 
 	}
 
-	/**
-	 * The memory manager can handle the ByteBuffer allocation and copying
-	 * directly.
-	 */
 	public long allocate(final ByteBuffer data, final boolean blocks) {
 
 		if (data == null)
 			throw new IllegalArgumentException();
 
-		final long retaddr = allocate(data.remaining(), blocks);
+		final int nbytes = data.remaining();
+
+		if (nbytes == 0)
+			throw new IllegalArgumentException();
+		
+		final long retaddr = allocate(nbytes, blocks);
 
 		final ByteBuffer[] bufs = get(retaddr);
 
@@ -187,15 +258,21 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		return retaddr;
 	}
 
-	static void copyData(final ByteBuffer data, final ByteBuffer[] bufs) {
+	/**
+	 * Copy the data from the source buffer to the target buffers.
+	 * <p>
+	 * Note: Per the API (and for consistency with the IRawStore API), this
+	 * method has a side-effect on the position of each source buffer.
+	 */
+	static void copyData(final ByteBuffer src, final ByteBuffer[] dst) {
 
-		final ByteBuffer src = data.duplicate();
+//		final ByteBuffer src = data;//data.duplicate();
 		int pos = 0;
-		for (int i = 0; i < bufs.length; i++) {
-			final int tsize = bufs[i].remaining();
+		for (int i = 0; i < dst.length; i++) {
+			final int tsize = dst[i].remaining();
 			src.limit(pos + tsize);
 			src.position(pos);
-			bufs[i].put(src);
+			dst[i].put(src);
 			pos += tsize;
 		}
 
@@ -239,12 +316,12 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 
 				final SectorAllocator sector = new SectorAllocator(this, null);
 				// Note: The sector will add itself to the free list.
-				sector.setSectorAddress(m_allocation, m_sectorSize);
+				sector.setSectorAddress(m_allocation.get(), m_sectorSize);
 				sector.setIndex(m_sectors.size());
 
 				m_sectors.add(sector);
 
-				m_allocation += m_sectorSize;
+				m_allocation.addAndGet(m_sectorSize);
 
 			} else {
 
@@ -284,6 +361,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 */
 	public long allocate(final int nbytes, final boolean blocks) {
 
+		if (nbytes <= 0)
+			throw new IllegalArgumentException();
+		
 		m_allocationLock.lock();
 		try {
 			if (nbytes <= SectorAllocator.BLOB_SIZE) {
@@ -307,6 +387,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 //				dest.position(bufferAddr);
 //				dest.put(data);
 				
+				m_allocCount.incrementAndGet();
 				m_userBytes.addAndGet(nbytes);
 				m_slotBytes.addAndGet(sector.getPhysicalSize(SectorAllocator
 						.getSectorOffset(rwaddr)));
@@ -346,14 +427,31 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	}
 	
 	public ByteBuffer[] get(final long addr) {
+
+		if (addr == 0L)
+			throw new IllegalArgumentException();
+		
 		final int rwaddr = getAllocationAddress(addr);
 		final int size = getAllocationSize(addr);
 
+		if (size <= 0)
+			throw new IllegalArgumentException();
+
 		if (size <= SectorAllocator.BLOB_SIZE) {
+
+			/*
+			 * This is a simple allocation.
+			 */
+			
 			return new ByteBuffer[] { getBuffer(rwaddr, size) };
+			
 		} else {
-			// This will be a BLOB, so retrieve the header, then parse
-			// to retrieve components and assign to ByteBuffer[]
+			
+			/*
+			 * This will be a BLOB, so retrieve the header, then parse to
+			 * retrieve components and assign to ByteBuffer[].
+			 */
+			
 			final ByteBuffer hdrbuf = getBlobHdr(addr);
 			
 			final int nblocks = hdrbuf.remaining() / 4;
@@ -370,7 +468,44 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 			return blobbufs;
 		}
 	}
+
+	public byte[] read(final long addr) {
+
+		return MemoryManager.read(this, addr);
+		
+	}
+
+	/**
+	 * Utility method to read and return the application data stored at a given
+	 * address.
+	 * 
+	 * @param mmgr
+	 *            The allocation context.
+	 * @param addr
+	 *            The allocation address.
+	 *            
+	 * @return A copy of the data stored at that address.
+	 */
+	static byte[] read(IMemoryManager mmgr, final long addr) {
+
+		final int nbytes = getAllocationSize(addr);
+		
+		final byte[] a = new byte[nbytes];
+		
+		final ByteBuffer mybb = ByteBuffer.wrap(a);
+		
+		final ByteBuffer[] bufs = mmgr.get(addr);
+		
+		for (ByteBuffer b : bufs) {
+			
+			mybb.put(b);
+			
+		}
 	
+		return a;
+
+	}
+
 	/**
 	 * Given an address of a blob, determine the size of the header and
 	 * create an address to support direct retrieval of the header.
@@ -462,12 +597,20 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	}
 
 	public void free(final long addr) {
+
+		if (addr == 0L)
+			throw new IllegalArgumentException();
+
+		final int rwaddr = getAllocationAddress(addr);
+		
+		final int size = getAllocationSize(addr);
+		
+		if (size == 0)
+			throw new IllegalArgumentException();
+		
 		m_allocationLock.lock();
 		try {
 
-			final int rwaddr = getAllocationAddress(addr);
-			final int size = getAllocationSize(addr);
-			
 			if (size <= SectorAllocator.BLOB_SIZE) {
 				
 				final int offset = SectorAllocator.getSectorOffset(rwaddr);
@@ -476,10 +619,18 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 				final SectorAllocator sector = getSector(rwaddr);
 				sector.free(offset);
 				
+				m_allocCount.decrementAndGet();
 				m_userBytes.addAndGet(-size);
 				m_slotBytes.addAndGet(-sector.getPhysicalSize(offset));
 
-				// TODO if the sector is empty, release it back to the pool.
+				/*
+				 * TODO if the sector is empty, release it back to the pool.
+				 * 
+				 * Note: Sectors can have allocator metadata so they may not be
+				 * empty in terms of slot bytes even though no user data is
+				 * allocated against the sector. Such sectors may be released
+				 * back to the pool.
+				 */
 				
 			} else {
 
@@ -518,23 +669,22 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		assert size == getAllocationSize(addr);
 		return addr;
 	}
-	
+
 	public void clear() {
 		m_allocationLock.lock();
 		try {
 			m_sectors.clear();
 			m_free.clear();
-			m_allocation = 0;
-			releaseDirectBuffers();
+			m_allocation.set(0L);
+			m_allocCount.set(0L);
+			m_userBytes.set(0L);
+			m_slotBytes.set(0L);
+			releaseDirectBuffers(); // release buffers back to the pool.
 			m_sectorFree.signalAll();
 		} finally {
 			m_allocationLock.unlock();
 		}
 	}
-	
-//	public void releaseResources() throws InterruptedException {
-//		DirectBufferPool.INSTANCE.release(m_resource);
-//	}
 	
 	public void addToFreeList(final SectorAllocator sector) {
 		m_allocationLock.lock();
@@ -577,6 +727,18 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 
 	}
 	
+	/**
+	 * The total #of bytes in the backing buffers currently attached to the
+	 * {@link MemoryManager}.
+	 */
+	public long getExtent() {
+		return m_allocation.get();
+	}
+	
+	public long getAllocationCount() {
+		return m_allocCount.get();
+	}
+
 	public long getSlotBytes() {
 		return m_slotBytes.get();
 	}
@@ -585,22 +747,53 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		return m_userBytes.get();
 	}
 
+	public CounterSet getCounters() {
+
+		final CounterSet root = new CounterSet();
+
+		// maximum #of buffers which may be allocated.
+		root.addCounter("bufferCapacity", new OneShotInstrument<Integer>(
+				m_resources.length));
+
+		// current #of buffers which are allocated.
+		root.addCounter("bufferCount", new OneShotInstrument<Integer>(
+				getSectorCount()));
+
+		// current backing storage in bytes.
+		root.addCounter("extent", new OneShotInstrument<Long>(m_allocation
+				.get()));
+
+		// the current #of allocation.
+		root.addCounter("allocationCount", new OneShotInstrument<Long>(
+				getAllocationCount()));
+		
+		// #of allocation slot bytes.
+		root.addCounter("slotBytes", new OneShotInstrument<Long>(
+				getUserBytes()));
+		
+		// #of application data bytes.
+		root.addCounter("userBytes", new OneShotInstrument<Long>(
+				getUserBytes()));
+		
+		return root;
+		
+	}
+
 	/*
-	 * @todo timeouts must be adjusted for the time already elapsed....
+	 * TODO The constructor must be able to accept nsectors := Integer.MAX_VALUE
+	 * in order to indicate that the #of backing buffers is (conceptually)
+	 * unbounded. This will require m_resources to be a data structure other
+	 * than a simple array.
 	 * 
-	 * @todo release empty buffers back to the pool. may require m_sectors to
-	 * be a proper array and explicitly track which elements of the array are
+	 * TODO Release empty buffers back to the pool. may require m_sectors to be
+	 * a proper array and explicitly track which elements of the array are
 	 * non-null.
 	 * 
-	 * @todo block if no free capacity is available.
+	 * TODO Give capacity to allocation context and have it throw an exception
+	 * if the capacity would be exceeded?
 	 * 
-	 * @todo track counters for sector so we can know when to release the sector.
-	 * 
-	 * @todo give capacity to allocation context and have it throw an exception
-	 * if the capacity would be exceeded.
-	 * 
-	 * @todo should all allocation contexts share the reference to the
-	 * allocation lock of the memory manager?
+	 * TODO Should all allocation contexts share the reference to the allocation
+	 * lock of the memory manager? (I think so. B)
 	 */
 	
 }

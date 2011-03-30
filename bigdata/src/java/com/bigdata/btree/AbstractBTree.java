@@ -28,14 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.PrintStream;
-import java.io.Serializable;
 import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -85,6 +83,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.TransientResourceMetadata;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.DataService;
@@ -1403,52 +1402,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                 
         };
         
-    }
-
-    /**
-     * Static class since must be {@link Serializable}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static final class TransientResourceMetadata implements IResourceMetadata {
-
-        private final UUID uuid;
-        
-        public TransientResourceMetadata(final UUID uuid) {
-            this.uuid = uuid;
-        }
-
-        private static final long serialVersionUID = 1L;
-
-        public boolean isJournal() {
-            return false;
-        }
-
-        public boolean isIndexSegment() {
-            return false;
-        }
-
-        public boolean equals(IResourceMetadata o) {
-            return false;
-        }
-
-        public long getCreateTime() {
-            return 0L;
-        }
-        
-        public long getCommitTime() {
-            return 0L;
-        }
-
-        public String getFile() {
-            return "";
-        }
-
-        public UUID getUUID() {
-            return uuid;
-        }
-
     }
 
     /**
