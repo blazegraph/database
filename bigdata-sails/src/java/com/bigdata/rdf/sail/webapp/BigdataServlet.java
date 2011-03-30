@@ -1,13 +1,9 @@
 package com.bigdata.rdf.sail.webapp;
 
-import info.aduna.xml.XMLWriter;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -15,8 +11,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.servlet.http.HttpServlet;
@@ -24,16 +18,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
-import org.openrdf.query.MalformedQueryException;
-import org.openrdf.query.QueryLanguage;
-import org.openrdf.query.parser.ParsedQuery;
-import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
 import org.openrdf.repository.RepositoryException;
-import org.openrdf.rio.rdfxml.RDFXMLWriter;
 
 import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IAtomicStore;
@@ -43,10 +31,8 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailGraphQuery;
-import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.BigdataSailTupleQuery;
+import com.bigdata.rdf.sail.bench.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.BigdataContext.Config;
 import com.bigdata.rdf.sail.webapp.BigdataContext.RunningQuery;
 import com.bigdata.rdf.store.AbstractTripleStore;

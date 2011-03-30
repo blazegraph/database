@@ -63,10 +63,10 @@ public class JettySparqlServer extends Server {
 				super.handle(target, baseRequest, req, resp);
 			}
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
+			// FIXME Auto-generated catch block
 			e.printStackTrace();
 		} catch (ServletException e) {
-			// TODO Auto-generated catch block
+			// FIXME Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
@@ -120,7 +120,8 @@ public class JettySparqlServer extends Server {
 	public void startup(final Config config, final IIndexManager indexManager) throws Exception {
 		setupHandlers(config, indexManager);
 
-		log.info("Calling start");
+        if (log.isInfoEnabled())
+            log.info("Calling start");
 		
 		start();
 
@@ -128,7 +129,8 @@ public class JettySparqlServer extends Server {
 
 		m_running = true;
 		
-		log.info("Running on port: " + m_port);
+        if (log.isInfoEnabled())
+            log.info("Running on port: " + m_port);
 	}
 
 	static Handler makeContextHandler(Handler handler, String spec) {
@@ -172,12 +174,11 @@ public class JettySparqlServer extends Server {
 	 * @throws Exception
 	 */
 	public void shutdownNow() throws Exception {
-		BigdataContext.clear();
+
+	    BigdataContext.clear();
 
 		stop();
-		
 
-		
 		m_port = -1;
 		m_running = false;
 	}
@@ -185,4 +186,5 @@ public class JettySparqlServer extends Server {
 	public int getPort() {
 		return m_port;
 	}
+
 }
