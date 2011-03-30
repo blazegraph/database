@@ -94,7 +94,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	/**
 	 * The #of bytes in the backing buffers.
 	 */
-	private final AtomicLong m_allocation = new AtomicLong();
+	private final AtomicLong m_extent = new AtomicLong();
 	
 	/** The #of allocations. */
 	private final AtomicLong m_allocCount = new AtomicLong();
@@ -316,21 +316,41 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 
 				final SectorAllocator sector = new SectorAllocator(this, null);
 				// Note: The sector will add itself to the free list.
-				sector.setSectorAddress(m_allocation.get(), m_sectorSize);
+				sector.setSectorAddress(m_extent.get(), m_sectorSize);
 				sector.setIndex(m_sectors.size());
 
 				m_sectors.add(sector);
 
-				m_allocation.addAndGet(m_sectorSize);
+				m_extent.addAndGet(m_sectorSize);
 
 			} else {
 
 				if (blocks) {
 					
 					/*
-					 * We are at the maximum #of sectors, so wait for something
-					 * to get freed. Once enough data is freed from some sector,
-					 * that sector will be placed back onto the free list.
+					 * We are at the maximum #of sectors.
+					 */
+
+//					/*
+//					 * Scan the sectors not on the free list and see if we can
+//					 * locate one which could service this allocation request.
+//					 */
+//					for(SectorAllocator s : m_sectors) {
+//						
+//						/*
+//						 * TODO The sector logic currently self-checks whether
+//						 * it is on the free list and will not service a request
+//						 * unless it is on the free list. It will also throw an
+//						 * exception if a request is made for a slot size which
+//						 * is not on the free list.
+//						 */
+//						
+//					}
+					
+					/*
+					 * Wait for something to get freed. Once enough data is
+					 * freed from some sector, that sector will be placed back
+					 * onto the free list.
 					 */
 
 					if(log.isDebugEnabled())
@@ -342,6 +362,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 						throw new RuntimeException(e);
 					}
 					
+					if (log.isDebugEnabled())
+						log.debug("Resuming...");
+
 				} else {
 					
 					throw new MemoryManagerOutOfMemory();
@@ -617,6 +640,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 				
 				// free of a simple allocation.
 				final SectorAllocator sector = getSector(rwaddr);
+
 				sector.free(offset);
 				
 				m_allocCount.decrementAndGet();
@@ -642,17 +666,27 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 				
 				// free each block
 				int remaining = size;
+				
 				for (int i = 0; i < nblocks; i++) {
-					int blockSize = remaining <= SectorAllocator.BLOB_SIZE ? remaining : SectorAllocator.BLOB_SIZE;
+
+					final int blockSize = remaining <= SectorAllocator.BLOB_SIZE ? remaining
+							: SectorAllocator.BLOB_SIZE;
+				
 					final long mkaddr = makeAddr(hdrbuf.getInt(), blockSize);
+					
 					/*
 					 * BLOB RECURSION
 					 */
+
 					free(mkaddr);
+					
 				}
-				hdrbuf.position(spos);
+				
+//				hdrbuf.position(spos);
+
 				// now free the header
 				free(makeAddr(rwaddr, hdrsize));
+				
 			}
 		} finally {
 			m_allocationLock.unlock();
@@ -673,9 +707,11 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	public void clear() {
 		m_allocationLock.lock();
 		try {
+			if(log.isDebugEnabled())
+				log.debug("");
 			m_sectors.clear();
 			m_free.clear();
-			m_allocation.set(0L);
+			m_extent.set(0L);
 			m_allocCount.set(0L);
 			m_userBytes.set(0L);
 			m_slotBytes.set(0L);
@@ -732,7 +768,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	 * {@link MemoryManager}.
 	 */
 	public long getExtent() {
-		return m_allocation.get();
+		return m_extent.get();
 	}
 	
 	public long getAllocationCount() {
@@ -760,7 +796,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 				getSectorCount()));
 
 		// current backing storage in bytes.
-		root.addCounter("extent", new OneShotInstrument<Long>(m_allocation
+		root.addCounter("extent", new OneShotInstrument<Long>(m_extent
 				.get()));
 
 		// the current #of allocation.

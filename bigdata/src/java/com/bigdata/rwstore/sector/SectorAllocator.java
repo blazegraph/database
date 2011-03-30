@@ -293,12 +293,7 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 			if ((!m_onFreeList) && hasFree(2)) { // minimum of 5 bits for each 32 bit block
 				m_onFreeList = true;
 				if (log.isInfoEnabled()) {
-					StringBuffer str = new StringBuffer("Returning Sector #" + m_index + ": ");
-					for (int t = 0; t < m_free.length; t++) {
-						str.append("("+ (m_free[t]/m_total[t]) + ")[T" + (m_total[t] * 32) + ",A" + m_allocations[t] + ",F" + m_free[t] + ",R" + m_recycles[t] + "]");
-					}
-				
-					log.info(str.toString());
+					log.info(toString());
 				}
 				m_store.addToFreeList(this);
 			}
@@ -668,6 +663,23 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 	public int alloc(int size, IAllocationContext context) {
 
 		return alloc(size);
+	}
+
+	public String toString() {
+
+		final StringBuilder str = new StringBuilder("Returning Sector #"
+				+ m_index + ": ");
+
+		for (int t = 0; t < m_free.length; t++) {
+
+			str.append("(" + (m_free[t] / m_total[t]) + ")[T"
+					+ (m_total[t] * 32) + ",A" + m_allocations[t] + ",F"
+					+ m_free[t] + ",R" + m_recycles[t] + "]");
+
+		}
+
+		return str.toString();
+		
 	}
 
 }
