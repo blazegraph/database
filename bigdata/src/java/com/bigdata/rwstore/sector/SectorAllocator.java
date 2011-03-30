@@ -138,22 +138,26 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 		m_writes = writes;
 	}
 
+	static byte getTag(final int size) {
+		byte tag = 0;
+		while (size > ALLOC_SIZES[tag]) tag++;
+		return tag;
+	}
+	
 	/**
 	 * Must find tag type that size fits in (or BLOB) and then find
 	 * block of type into which an allocation can be made.
-	 * 
-	 * 
 	 */
-	public int alloc(int size) {
+	public int alloc(final int size) {
+
 		if (size > BLOB_SIZE) {
 			throw new IllegalArgumentException("Cannot directly allocate a BLOB, use PSOutputStream");
 		}
 		
-		if (!m_onFreeList)
-			throw new IllegalStateException("Allocation request to allocator " + m_index + " not on the free list");
+//		if (!m_onFreeList)
+//			throw new IllegalStateException("Allocation request to allocator " + m_index + " not on the free list");
 		
-		byte tag = 0;
-		while (size > ALLOC_SIZES[tag]) tag++;
+		final byte tag = getTag(size);
 		
 		assert m_free[tag] > 0;
 
@@ -189,15 +193,10 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 					
 					m_allocations[tag]++;
 					
-					if (m_free[tag] == 0) {
+					if (m_free[tag] == 0 && m_onFreeList) {
 						if (!addNewTag(tag)) {
 							if (log.isInfoEnabled()) {
-								StringBuffer str = new StringBuffer("Removing Sector #" + m_index + ": ");
-								for (int t = 0; t < m_free.length; t++) {
-									str.append("[" + m_allocations[t] + "," + m_free[t] + "," + m_recycles[t] + "]");
-								}
-							
-								log.info(str.toString());
+								log.info("Removing Sector #" + m_index + ": "+toString());
 							}
 							m_store.removeFromFreeList(this);
 							m_onFreeList = false;
@@ -293,7 +292,9 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 			if ((!m_onFreeList) && hasFree(2)) { // minimum of 5 bits for each 32 bit block
 				m_onFreeList = true;
 				if (log.isInfoEnabled()) {
-					log.info(toString());
+					log
+							.info("Returning Sector #" + m_index + ": "
+									+ toString());
 				}
 				m_store.addToFreeList(this);
 			}
@@ -667,8 +668,7 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 
 	public String toString() {
 
-		final StringBuilder str = new StringBuilder("Returning Sector #"
-				+ m_index + ": ");
+		final StringBuilder str = new StringBuilder();
 
 		for (int t = 0; t < m_free.length; t++) {
 
