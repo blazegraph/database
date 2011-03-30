@@ -813,6 +813,11 @@ public class HashCollisionUtility {
 	 * finalized.
 	 */
 	final MemoryManager mmgr;
+
+	/**
+	 * The #of buffers to give to the {@link MemoryManager}.
+	 */
+	private final int nbuffers = 1000;
 	
 	private HashCollisionUtility(final Journal jnl) {		
 
@@ -885,7 +890,7 @@ public class HashCollisionUtility {
 //				50000 // hard reference queue capacity
 //				);
 		
-		mmgr = new MemoryManager(DirectBufferPool.INSTANCE, 100/*sectors*/);
+		mmgr = new MemoryManager(DirectBufferPool.INSTANCE, nbuffers);
 
 	}
 
@@ -1000,52 +1005,69 @@ public class HashCollisionUtility {
 		public Void call() throws Exception {
 
 			boolean done = false;
-			
+
 			while (!done) {
 
-				// Blocking take so we know that there is something ready.
-				final ValueBuffer first = valueQueue.take();
-				
-				// Drain the queue, but keep an eye out for that poison pill.
-				final LinkedList<ValueBuffer> coll = new LinkedList<ValueBuffer>();
+				try {
 
-				// The element we already took from the queue.
-				coll.add(first);
-				
-				// Drain (non-blocking).
-				final int ndrained = valueQueue.drainTo(coll, maxDrain) + 1;
+					// Blocking take so we know that there is something ready.
+					final ValueBuffer first = valueQueue.take();
 
-				if (log.isDebugEnabled())
-					log.debug("Drained " + ndrained + " chunks with "
-							+ valueQueue.size() + " remaining in the queue.");
+					// Drain the queue, but keep an eye out for that poison
+					// pill.
+					final LinkedList<ValueBuffer> coll = new LinkedList<ValueBuffer>();
 
-				// look for and remove the poison pill, noting if it was found.
-				if (coll.remove(poisonPill)) {
+					// The element we already took from the queue.
+					coll.add(first);
 
-					if(log.isDebugEnabled())
-						log.debug("Found poison pill.");
-						
-					done = true;
-
-					// fall through and index what we already have.
-					
-				}
-
-				if (!coll.isEmpty()) {
-
-					// combine the buffers into a single chunk.
-					final ValueBuffer b = combineChunks(coll);
+					// Drain (non-blocking).
+					final int ndrained = valueQueue.drainTo(coll, maxDrain) + 1;
 
 					if (log.isDebugEnabled())
-						log.debug("Will index " + coll.size()
-								+ " chunks having " + b.nvalues + " values.");
+						log.debug("Drained " + ndrained + " chunks with "
+								+ valueQueue.size()
+								+ " remaining in the queue.");
 
-					// Now index that chunk.
-					new IndexValueBufferTask(mmgr, b, termsIndex, vf, c).call();
+					// look for and remove the poison pill, noting if it was
+					// found.
+					if (coll.remove(poisonPill)) {
+
+						if (log.isDebugEnabled())
+							log.debug("Found poison pill.");
+
+						done = true;
+
+						// fall through and index what we already have.
+
+					}
+
+					if (!coll.isEmpty()) {
+
+						// combine the buffers into a single chunk.
+						final ValueBuffer b = combineChunks(coll);
+
+						if (log.isDebugEnabled())
+							log.debug("Will index " + coll.size()
+									+ " chunks having " + b.nvalues
+									+ " values.");
+
+						// Now index that chunk.
+						new IndexValueBufferTask(mmgr, b, termsIndex, vf, c)
+								.call();
+
+					}
+
+				} catch (Throwable t) {
+
+					log.error(t, t);
+
+					HashCollisionUtility.this.shutdownNow();
+
+					throw new RuntimeException(t);
 
 				}
 
-			}
+			} // while(!done)
 
 			log.debug("done.");
 
@@ -1566,7 +1588,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		 * TODO The key should also include the URI,Literal,BNode, etc. prefix
 		 * bits (or is this necessary any more?).
 		 */
-		private final Map<byte[]/*key*/,Bucket> addrMap = new LinkedHashMap<byte[],Bucket>();
+		private Map<byte[]/*key*/,Bucket> addrMap;
     	
     	/** The size of the {@link #values} buffer when it is allocated. */
     	private final int valueBufSize;
@@ -1805,6 +1827,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				// Lazy allocation of the buffer.
 				context = memoryManager.createAllocationContext();
 
+				addrMap = new LinkedHashMap<byte[], Bucket>();
+
 			}
 
 			/*
@@ -1818,8 +1842,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			 * same key.
 			 */
 			Bucket bucket = addrMap.get(t.key);
-			
-			if(bucket == null) {
+
+			if (bucket == null) {
 
 				/*
 				 * No match on that hash code key.
@@ -1827,7 +1851,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 				// lay the record down on the memory manager.
 				final long addr = context.allocate(ByteBuffer.wrap(t.val));
-					
+
 				// add new bucket to the map.
 				addrMap.put(t.key, bucket = new Bucket(t.key, addr));
 
@@ -1913,11 +1937,12 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 			// clear reference since we just handed off the data.
 			context = null;
+			addrMap = null;
 			nvalues = 0;
 
 			// clear distinct value set so it does not build for ever.
 //			distinctValues.clear();
-			addrMap.clear();
+//			addrMap.clear();
 			
 		}
 
@@ -1932,7 +1957,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 //			final byte[] val = SerializerUtil.serialize(r);
 			byte[] val = valSer.serialize(r, out.reset()); 
 
-			if (compressor != null && val.length > 64) {
+			if (compressor != null) {//&& val.length > 64) {
 
 				// compress, reusing [out].
 				out.reset();

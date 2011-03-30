@@ -283,16 +283,52 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		return allocate(nbytes, true/*blocks*/);
 
 	}
+	
+	/**
+	 * Scan the sectors not on the free list and see if we can locate one which
+	 * could service this allocation request.
+	 */
+	private SectorAllocator scanForSectorWithFreeSpace(final int nbytes) {
+
+		final byte tag = SectorAllocator.getTag(nbytes);
+
+		for (SectorAllocator s : m_sectors) {
+
+			if (s.m_free[tag] > 0) {
+
+				if (log.isDebugEnabled())
+					log.debug("Can allocate from sector: " + s);
+				
+				return s;
+				
+			}
+			
+		}
+
+		return null;
+
+	}
 
 	/**
-	 * Create a new sector and drop it on the free list.
+	 * Either create a new sector and drop it on the free list, find a sector
+	 * with free space which could be used to make the specified allocation, or
+	 * block and wait for a sector to become available on the free list.
 	 */
-	private SectorAllocator getSectorFromFreeList(final boolean blocks) {
+	private SectorAllocator getSectorFromFreeList(final boolean blocks,
+			final int nbytes) {
 		
 		while(m_free.isEmpty()) {
 
 			if (m_sectors.size() < m_resources.length) {
 
+				SectorAllocator sector = scanForSectorWithFreeSpace(nbytes);
+
+				if (sector != null) {
+
+					return sector;
+
+				}
+				
 				/*
 				 * We are under capacity, so allocate a new sector and add it to
 				 * the free list.
@@ -314,7 +350,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 
 				m_resources[m_sectors.size()] = nbuf;
 
-				final SectorAllocator sector = new SectorAllocator(this, null);
+				// Wrap buffer as a new sector.
+				sector = new SectorAllocator(this, null);
+				
 				// Note: The sector will add itself to the free list.
 				sector.setSectorAddress(m_extent.get(), m_sectorSize);
 				sector.setIndex(m_sectors.size());
@@ -331,22 +369,14 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 					 * We are at the maximum #of sectors.
 					 */
 
-//					/*
-//					 * Scan the sectors not on the free list and see if we can
-//					 * locate one which could service this allocation request.
-//					 */
-//					for(SectorAllocator s : m_sectors) {
-//						
-//						/*
-//						 * TODO The sector logic currently self-checks whether
-//						 * it is on the free list and will not service a request
-//						 * unless it is on the free list. It will also throw an
-//						 * exception if a request is made for a slot size which
-//						 * is not on the free list.
-//						 */
-//						
-//					}
-					
+					SectorAllocator sector = scanForSectorWithFreeSpace(nbytes);
+
+					if (sector != null) {
+
+						return sector;
+
+					}
+
 					/*
 					 * Wait for something to get freed. Once enough data is
 					 * freed from some sector, that sector will be placed back
@@ -374,9 +404,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 			}
 			
 		}
-		
-		return m_free.get(0);
 
+		return m_free.get(0);
+		
 	}
 
 	/*
@@ -391,8 +421,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		try {
 			if (nbytes <= SectorAllocator.BLOB_SIZE) {
 
-				final SectorAllocator sector = getSectorFromFreeList(blocks); 
-				
+				final SectorAllocator sector = getSectorFromFreeList(blocks,
+						nbytes);
+
 				final int rwaddr = sector.alloc(nbytes);
 				
 				if (SectorAllocator.getSectorIndex(rwaddr) >= m_sectors.size()) {
@@ -815,13 +846,19 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		
 	}
 
+	public String toString() {
+
+		return getClass().getName() + "{counters=" + getCounters() + "}";
+
+	}
+
 	/*
-	 * TODO The constructor must be able to accept nsectors := Integer.MAX_VALUE
-	 * in order to indicate that the #of backing buffers is (conceptually)
-	 * unbounded. This will require m_resources to be a data structure other
-	 * than a simple array.
+	 * FIXME The constructor must be able to accept nsectors :=
+	 * Integer.MAX_VALUE in order to indicate that the #of backing buffers is
+	 * (conceptually) unbounded. This will require m_resources to be a data
+	 * structure other than a simple array.
 	 * 
-	 * TODO Release empty buffers back to the pool. may require m_sectors to be
+	 * FIXME Release empty buffers back to the pool. may require m_sectors to be
 	 * a proper array and explicitly track which elements of the array are
 	 * non-null.
 	 * 
@@ -830,6 +867,16 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	 * 
 	 * TODO Should all allocation contexts share the reference to the allocation
 	 * lock of the memory manager? (I think so. B)
+	 * 
+	 * FIXME There are patterns of usage where the memory manager can deadlock
+	 * (for blocking requests) due to an inability to repurposed memory which
+	 * had already been provisioned for a given allocation size.
+	 * 
+	 * We could do blob style allocators if the address space is too fragmented
+	 * to do right sized allocators.
+	 * 
+	 * Maintain a free list per size and do not pre-provision allocators of any
+	 * given size against a new sector.
 	 */
-	
+
 }
