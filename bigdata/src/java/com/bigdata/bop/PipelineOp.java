@@ -38,6 +38,7 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.solutions.SliceOp;
+import com.bigdata.bop.solutions.SortOp.Annotations;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 
 /**
@@ -160,33 +161,18 @@ abstract public class PipelineOp extends BOpBase {
 		 */
 		int DEFAULT_PIPELINE_QUEUE_CAPACITY = 10;
 
-	    /**
+		/**
 		 * Annotation used to mark pipelined (aka vectored) operators. When
 		 * <code>false</code> the operator will use either "at-once" or
 		 * "blocked" evaluation depending on how it buffers its data for
 		 * evaluation.
-		 */
-		String PIPELINED = (PipelineOp.class.getName() + ".pipelined").intern();
-
-		/**
-		 * @see #PIPELINED
-		 */
-		boolean DEFAULT_PIPELINED = true;
-
-		/**
-		 * For non-{@link #PIPELINED} operators, this non-negative value
-		 * specifies the maximum #of bytes which the operator may buffer on the
-		 * native heap before evaluation of the operator is triggered -or- ZERO
-		 * (0) if the operator buffers the data on the Java heap (default
-		 * {@value #DEFAULT_MAX_MEMORY}). When non-zero, the #of bytes specified
-		 * should be a multiple of 4k. For a shared operation, the value is the
-		 * maximum #of bytes which may be buffered per shard.
 		 * <p>
-		 * Operator "at-once" evaluation will be used if either (a) the operator
-		 * is buffering data on the Java heap; or (b) the operator is buffering
-		 * data on the native heap and the amount of buffered data does not
-		 * exceed the specified value for {@link #MAX_MEMORY}. For convenience,
-		 * the value {@link Integer#MAX_VALUE} may be specified to indicate that
+		 * When <code>false</code>, operator "at-once" evaluation will be used
+		 * if either (a) the operator is buffering data on the Java heap; or (b)
+		 * the operator is buffering data on the native heap and the amount of
+		 * buffered data does not exceed the specified value for
+		 * {@link #MAX_MEMORY}. For convenience, you may specify
+		 * {@link Integer#MAX_VALUE} for {@link #MAX_MEMORY} to indicate that
 		 * "at-once" evaluation is required.
 		 * <p>
 		 * When data are buffered on the Java heap, "at-once" evaluation is
@@ -201,6 +187,21 @@ abstract public class PipelineOp extends BOpBase {
 		 * that some operators DO NOT support multiple pass evaluation
 		 * semantics. Such operators MUST throw an exception if the value of
 		 * this annotation could result in multiple evaluation passes.
+		 */
+		String PIPELINED = (PipelineOp.class.getName() + ".pipelined").intern();
+
+		/**
+		 * @see #PIPELINED
+		 */
+		boolean DEFAULT_PIPELINED = true;
+
+		/**
+		 * For non-{@link #PIPELINED} operators, this non-negative value
+		 * specifies the maximum #of bytes which the operator may buffer on the
+		 * native heap before evaluation of the operator is triggered -or- ZERO
+		 * (0) if the operator buffers the data on the Java heap (default
+		 * {@value #DEFAULT_MAX_MEMORY}). For a sharded operation, the value is
+		 * the maximum #of bytes which may be buffered per shard.
 		 */
 		String MAX_MEMORY = (PipelineOp.class.getName() + ".maxMemory").intern();
 
@@ -455,5 +456,25 @@ abstract public class PipelineOp extends BOpBase {
     		log.trace("bopId=" + getId());
     	
     }
+
+	/**
+	 * Assert that this operator is annotated as an "at-once" operator which
+	 * buffers its data on the java heap.
+	 */
+	protected void assertAtOnceJavaHeapOp() {
+
+		// operator may not be broken into multiple tasks.
+		if (getMaxParallel() != 1) {
+			throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
+					+ "=" + getMaxParallel());
+		}
+
+		// operator is "at-once" (not pipelined).
+		if (isPipelined()) {
+			throw new UnsupportedOperationException(Annotations.PIPELINED + "="
+					+ isPipelined());
+		}
+
+	}
 
 }
