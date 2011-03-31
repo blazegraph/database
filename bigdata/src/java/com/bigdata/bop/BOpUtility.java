@@ -888,29 +888,35 @@ public class BOpUtility {
 
     }
 
-	/**
-	 * Copy binding sets from the source to the sink(s).
-	 * 
-	 * @param source
-	 *            The source.
-	 * @param sink
-	 *            The sink (required).
-	 * @param sink2
-	 *            Another sink (optional).
-	 * @param constraints
-	 *            Binding sets which fail these constraints will NOT be copied
-	 *            (optional).
-	 * @param stats
-	 *            The {@link BOpStats#chunksIn} and {@link BOpStats#unitsIn}
-	 *            will be updated during the copy (optional).
-	 * 
-	 * @return The #of binding sets copied.
-	 */
+    /**
+     * Copy binding sets from the source to the sink(s).
+     * 
+     * @param source
+     *            The source.
+     * @param sink
+     *            The sink (required).
+     * @param sink2
+     *            Another sink (optional).
+     * @param select
+     *            The variables to be retained (optional). When not specified,
+     *            all variables will be retained.
+     * @param constraints
+     *            Binding sets which fail these constraints will NOT be copied
+     *            (optional).
+     * @param stats
+     *            The {@link BOpStats#chunksIn} and {@link BOpStats#unitsIn}
+     *            will be updated during the copy (optional).
+     * 
+     * @return The #of binding sets copied.
+     */
     static public long copy(
             final IAsynchronousIterator<IBindingSet[]> source,
             final IBlockingBuffer<IBindingSet[]> sink,
             final IBlockingBuffer<IBindingSet[]> sink2,
-            final IConstraint[] constraints, final BOpStats stats) {
+            final IVariable<?>[] select,//
+            final IConstraint[] constraints, //
+            final BOpStats stats//
+            ) {
 
     	long nout = 0;
     	
@@ -926,9 +932,10 @@ public class BOpUtility {
 
             }
 
-            // apply optional constraints.
-            final IBindingSet[] tmp = applyConstraints(chunk,constraints);
-            
+            // apply optional constraints and optional SELECT.
+            final IBindingSet[] tmp = applyConstraints(chunk, select,
+                    constraints);
+
 //            System.err.println("Copying: "+Arrays.toString(tmp));
             
             // copy accepted binding sets to the default sink.
@@ -955,18 +962,23 @@ public class BOpUtility {
      * 
      * @param chunk
      *            A chunk of binding sets.
+     * @param select
+     *            The variables to be retained (optional). When not specified,
+     *            all variables will be retained.
      * @param constraints
      *            The constraints (optional).
      *            
      * @return The dense chunk of binding sets.
      */
     static private IBindingSet[] applyConstraints(final IBindingSet[] chunk,
+            final IVariable<?>[] select,
             final IConstraint[] constraints) {
 
-        if (constraints == null) {
+        if (constraints == null && select == null) {
 
             /*
-             * No constraints, copy all binding sets.
+             * No constraints and everything is selected, so just return the
+             * caller's chunk.
              */
 
             return chunk;
@@ -983,13 +995,22 @@ public class BOpUtility {
 
         for (int i = 0; i < chunk.length; i++) {
 
-            final IBindingSet bindingSet = chunk[i];
+            IBindingSet bindingSet = chunk[i];
 
-            if (BOpUtility.isConsistent(constraints, bindingSet)) {
+            if (constraints != null
+                    && !BOpUtility.isConsistent(constraints, bindingSet)) {
 
-                t[j++] = bindingSet;
+                continue;
 
             }
+
+            if (select != null) {
+
+                bindingSet = bindingSet.copy(select);
+
+            }
+
+            t[j++] = bindingSet;
 
         }
 

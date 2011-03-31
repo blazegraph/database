@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.controller;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -51,6 +53,7 @@ import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.constraint.Constraint;
+import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
@@ -160,6 +163,323 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
             jnl.destroy();
             jnl = null;
         }
+
+    }
+
+    /**
+     * Unit test for a simple join.
+     */
+    public void test_join() throws Exception {
+
+//        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+        final int subqueryId = 4;
+        
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+        
+        final Predicate<E> predOp = new Predicate<E>(//
+                new IVariableOrConstant[] { //
+                new Constant<String>("John"), x }, //
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                }));
+
+        // the subquery (basically, an access path read with "x" unbound).
+        final PipelineJoin<E> subquery = new PipelineJoin<E>(
+                new BOp[] { },//
+                new NV(Predicate.Annotations.BOP_ID, joinId),//
+                new NV(PipelineJoin.Annotations.PREDICATE, predOp));
+
+        // the hash-join against the subquery.
+        final SubqueryOp subqueryOp = new SubqueryOp(
+                new BOp[] {},//
+                new NV(Predicate.Annotations.BOP_ID, subqueryId),//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subquery)//
+                );
+
+        final PipelineOp query = subqueryOp;
+        
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("Mary") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Brad"),
+                                          new Constant<String>("Fred"),
+                                }//
+                ),//
+        };
+
+        /*
+         * Setup the input binding sets. Each input binding set MUST provide
+         * binding for the join variable(s).
+         */
+        final IBindingSet[] initialBindingSets;
+        {
+            final List<IBindingSet> list = new LinkedList<IBindingSet>();
+            
+            IBindingSet tmp;
+
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Brad"));
+            tmp.set(y, new Constant<String>("Fred"));
+            list.add(tmp);
+            
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Mary"));
+            list.add(tmp);
+            
+            initialBindingSets = list.toArray(new IBindingSet[0]);
+            
+        }
+
+        final IRunningQuery runningQuery = queryEngine.eval(query,
+                initialBindingSets);
+
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+
+        {
+            final BOpStats stats = runningQuery.getStats().get(
+                    subqueryId);
+            assertEquals(2L, stats.chunksIn.get());
+            assertEquals(2L, stats.unitsIn.get());
+            assertEquals(2L, stats.unitsOut.get());
+            assertEquals(2L, stats.chunksOut.get());
+        }
+        {
+            // // access path
+            // assertEquals(0L, stats.accessPathDups.get());
+            // assertEquals(1L, stats.accessPathCount.get());
+            // assertEquals(1L, stats.accessPathChunksIn.get());
+            // assertEquals(2L, stats.accessPathUnitsIn.get());
+        }
+        
+        assertTrue(runningQuery.isDone());
+        assertFalse(runningQuery.isCancelled());
+        runningQuery.get(); // verify nothing thrown.
+
+    }
+    
+    /**
+     * Unit test for simple join with a constraint.
+     */
+    public void test_joinWithConstraint() throws Exception {
+
+//        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+        final int subqueryId = 4;
+        
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+
+//        final IConstant<String>[] set = new IConstant[] {//
+//                new Constant<String>("Fred"),//
+//        };
+
+        final Predicate<E> predOp = new Predicate<E>(//
+                new IVariableOrConstant[] { //
+                new Constant<String>("John"), x }, //
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                }));
+
+        // the subquery (basically, an access path read with "x" unbound).
+        final PipelineJoin<E> subquery = new PipelineJoin<E>(
+                new BOp[] { },//
+                new NV(Predicate.Annotations.BOP_ID, joinId),//
+                new NV(PipelineJoin.Annotations.PREDICATE, predOp));
+
+        // the hash-join against the subquery.
+        final SubqueryOp subqueryOp = new SubqueryOp(
+                new BOp[] {},//
+                new NV(Predicate.Annotations.BOP_ID, subqueryId),//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
+                new NV(SubqueryOp.Annotations.CONSTRAINTS,
+                        new IConstraint[] { Constraint
+                                .wrap(new EQConstant(x, new Constant<String>("Brad"))),//
+                        }));
+
+        final PipelineOp query = subqueryOp;
+        
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+//                new ArrayBindingSet(//
+//                        new IVariable[] { x },//
+//                        new IConstant[] { new Constant<String>("Mary") }//
+//                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Brad"),
+                                          new Constant<String>("Fred"),
+                                }//
+                ),//
+        };
+
+        /*
+         * Setup the input binding sets. Each input binding set MUST provide
+         * binding for the join variable(s).
+         */
+        final IBindingSet[] initialBindingSets;
+        {
+            final List<IBindingSet> list = new LinkedList<IBindingSet>();
+            
+            IBindingSet tmp;
+
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Brad"));
+            tmp.set(y, new Constant<String>("Fred"));
+            list.add(tmp);
+            
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Mary"));
+            list.add(tmp);
+            
+            initialBindingSets = list.toArray(new IBindingSet[0]);
+            
+        }
+
+        final IRunningQuery runningQuery = queryEngine.eval(query,
+                initialBindingSets);
+
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+
+        {
+            final BOpStats stats = runningQuery.getStats().get(
+                    subqueryId);
+            assertEquals(2L, stats.chunksIn.get());
+            assertEquals(2L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(2L, stats.chunksOut.get());
+        }
+        {
+            // // access path
+            // assertEquals(0L, stats.accessPathDups.get());
+            // assertEquals(1L, stats.accessPathCount.get());
+            // assertEquals(1L, stats.accessPathChunksIn.get());
+            // assertEquals(2L, stats.accessPathUnitsIn.get());
+        }
+        
+        assertTrue(runningQuery.isDone());
+        assertFalse(runningQuery.isCancelled());
+        runningQuery.get(); // verify nothing thrown.
+
+    }
+
+    /**
+     * Unit test for a simple join.
+     */
+    public void test_join_selectOnly_x() throws Exception {
+
+//        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+        final int subqueryId = 4;
+        
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+        
+        final Predicate<E> predOp = new Predicate<E>(//
+                new IVariableOrConstant[] { //
+                new Constant<String>("John"), x }, //
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                }));
+
+        // the subquery (basically, an access path read with "x" unbound).
+        final PipelineJoin<E> subquery = new PipelineJoin<E>(
+                new BOp[] { },//
+                new NV(Predicate.Annotations.BOP_ID, joinId),//
+                new NV(PipelineJoin.Annotations.PREDICATE, predOp));
+
+        // the hash-join against the subquery.
+        final SubqueryOp subqueryOp = new SubqueryOp(
+                new BOp[] {},//
+                new NV(Predicate.Annotations.BOP_ID, subqueryId),//
+                new NV(SubqueryOp.Annotations.SELECT, new IVariable[]{x}),//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subquery)//
+                );
+
+        final PipelineOp query = subqueryOp;
+        
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("Mary") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("Brad"),
+//                                          new Constant<String>("Fred"),
+                                }//
+                ),//
+        };
+
+        /*
+         * Setup the input binding sets. Each input binding set MUST provide
+         * binding for the join variable(s).
+         */
+        final IBindingSet[] initialBindingSets;
+        {
+            final List<IBindingSet> list = new LinkedList<IBindingSet>();
+            
+            IBindingSet tmp;
+
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Brad"));
+            tmp.set(y, new Constant<String>("Fred"));
+            list.add(tmp);
+            
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Mary"));
+            list.add(tmp);
+            
+            initialBindingSets = list.toArray(new IBindingSet[0]);
+            
+        }
+
+        final IRunningQuery runningQuery = queryEngine.eval(query,
+                initialBindingSets);
+
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+
+        {
+            final BOpStats stats = runningQuery.getStats().get(
+                    subqueryId);
+            assertEquals(2L, stats.chunksIn.get());
+            assertEquals(2L, stats.unitsIn.get());
+            assertEquals(2L, stats.unitsOut.get());
+            assertEquals(2L, stats.chunksOut.get());
+        }
+        {
+            // // access path
+            // assertEquals(0L, stats.accessPathDups.get());
+            // assertEquals(1L, stats.accessPathCount.get());
+            // assertEquals(1L, stats.accessPathChunksIn.get());
+            // assertEquals(2L, stats.accessPathUnitsIn.get());
+        }
+        
+        assertTrue(runningQuery.isDone());
+        assertFalse(runningQuery.isCancelled());
+        runningQuery.get(); // verify nothing thrown.
 
     }
 
