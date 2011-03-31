@@ -429,7 +429,15 @@ public class SubqueryOp extends PipelineOp {
                          * applied to all solutions copied out of the subquery.
                          */
 
-                    	parentContext.getSink().add(new IBindingSet[]{bset});
+                        if (constraints == null
+                                || BOpUtility.isConsistent(constraints, bset)) {
+
+                            final IBindingSet tmp = selectVars == null ? bset
+                                    : bset.copy(selectVars);
+                            
+                            parentContext.getSink().add(new IBindingSet[]{tmp});
+                            
+                        }
                         
                     }
                     
