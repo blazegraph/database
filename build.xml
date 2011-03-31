@@ -700,6 +700,7 @@ ${postInstallMessage}</echo>
       <property name="bigdata-jini.lib" location="${bigdata.dir}/bigdata-jini/lib/jini/lib" />
       <property name="bigdata-rdf.lib" location="${bigdata.dir}/bigdata-rdf/lib" />
       <property name="bigdata-sails.lib" location="${bigdata.dir}/bigdata-sails/lib" />
+      <property name="bigdata-jetty.lib" location="${bigdata.dir}/bigdata-sails/lib/jetty" />
       <property name="bigdata-zookeeper.lib" location="${bigdata.dir}/bigdata-jini/lib/apache" />
 
       <!-- Utility libraries -->
@@ -739,6 +740,20 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/slf4j.jar" />
       <copy file="${bigdata-rdf.lib}/slf4j-log4j12-1.4.3.jar"
             tofile="${dist.lib}/slf4j-log4j.jar" />
+
+      <!-- jetty library -->
+      <copy file="${bigdata-jetty.lib}/jetty-continuation-7.2.2.v20101205.jar"
+	        tofile="${dist.lib}/jetty-continuation.jar" />
+	  <copy file="${bigdata-jetty.lib}/jetty-http-7.2.2.v20101205.jar"
+	        tofile="${dist.lib}/jetty-http.jar" />
+	  <copy file="${bigdata-jetty.lib}/jetty-io-7.2.2.v20101205.jar"
+	        tofile="${dist.lib}/jetty-io.jar" />
+	  <copy file="${bigdata-jetty.lib}/jetty-server-7.2.2.v20101205.jar"
+	        tofile="${dist.lib}/jetty-server.jar" />
+	  <copy file="${bigdata-jetty.lib}/jetty-util-7.2.2.v20101205.jar"
+	        tofile="${dist.lib}/jetty-util.jar" />
+	  <copy file="${bigdata-jetty.lib}/servlet-api-2.5.jar"
+	        tofile="${dist.lib}/servlet-api.jar" />
 
       <!-- NxParser (RDF NQuads support) -->
       <copy file="${bigdata-rdf.lib}/nxparser-6-22-2010.jar"
@@ -1259,7 +1274,7 @@ ${postInstallMessage}</echo>
       <mkdir dir="${bigdata-test.lib}" />
       <property name="bigdata-test.jar" location="${bigdata-test.lib}/bigdata-test.jar" />
 
-      <property name="javac.test.classpath" value="${classes.dir}${path.separator}${junit.jar}${path.separator}${cweb-junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/cweb-commons.jar${path.separator}${dist.lib}/cweb-extser.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar" />
+      <property name="javac.test.classpath" value="${classes.dir}${path.separator}${junit.jar}${path.separator}${cweb-junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/cweb-commons.jar${path.separator}${dist.lib}/cweb-extser.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/servlet-api.jar" />
 
       <echo>javac
 </echo>
