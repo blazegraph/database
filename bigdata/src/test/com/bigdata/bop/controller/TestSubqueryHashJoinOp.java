@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop.controller;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -50,19 +52,20 @@ import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.constraint.Constraint;
+import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.Dechunkerator;
 
 /**
  * Unit tests for {@link SubqueryHashJoinOp}.
@@ -71,8 +74,6 @@ import com.bigdata.striterator.Dechunkerator;
  * 
  *         TODO There should be a standard join test case (w/o optional) for
  *         both {@link SubqueryHashJoinOp} and {@link SubqueryOp}.
- * 
- *         TODO There should be a test case using constraints.
  * 
  *         TODO There should be a test case using SELECT to drop variables which
  *         are not required in the generated binding sets (and that feature
@@ -162,14 +163,429 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
     }
 
 	/**
-	 * TODO Verify required and optional arguments, including "at-once".
+	 * Unit test to verify required and optional arguments.
 	 */
 	public void test_ctor() {
 		
-		fail("write tests");
-		
+	    final int startId = 1;
+        final int subqueryHashJoinId = 2;
+        final int subqueryId = 3;
+        
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+        
+        final PipelineOp startOp = new StartOp(new BOp[] {},
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, startId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
+                        }));
+
+        final PipelineOp subQuery = new StartOp(new BOp[] {},
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, subqueryId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER)//
+                        }));
+
+        // Ok.
+        {
+            new SubqueryHashJoinOp(//
+                    new BOp[] { startOp },// 
+                    new NV(Predicate.Annotations.BOP_ID, subqueryHashJoinId),//
+                    new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
+                    new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{x,y}),//
+                    new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery)//
+            );
+        }
+
+        // Operator must not be PIPELINED.
+        try {
+            new SubqueryHashJoinOp(//
+                    new BOp[] { startOp },// 
+                    new NV(Predicate.Annotations.BOP_ID, subqueryHashJoinId),//
+                    new NV(SubqueryHashJoinOp.Annotations.PIPELINED, true),//
+                    new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{x,y}),//
+                    new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery)//
+            );
+            fail("Expecting exception");
+        } catch(Throwable t) {
+            if(log.isInfoEnabled())
+                log.info("Ignoring expected exception: "+t);
+        }
+
+        // Operator may not specific a heap limit.
+        try {
+            new SubqueryHashJoinOp(//
+                    new BOp[] { startOp },// 
+                    new NV(Predicate.Annotations.BOP_ID, subqueryHashJoinId),//
+                    new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
+                    new NV(SubqueryHashJoinOp.Annotations.MAX_MEMORY, 100000L),//
+                    new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{x,y}),//
+                    new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery)//
+            );
+            fail("Expecting exception");
+        } catch(Throwable t) {
+            if(log.isInfoEnabled())
+                log.info("Ignoring expected exception: "+t);
+        }
+
+        // JOIN_VARS is required.
+        try {
+            new SubqueryHashJoinOp(//
+                    new BOp[] { startOp },// 
+                    new NV(Predicate.Annotations.BOP_ID, subqueryHashJoinId),//
+                    new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
+//                    new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{x,y}),//
+                    new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery)//
+            );
+            fail("Expecting exception");
+        } catch(Throwable t) {
+            if(log.isInfoEnabled())
+                log.info("Ignoring expected exception: "+t);
+        }
+
+        // SUBQUERY is required.
+        try {
+            new SubqueryHashJoinOp(//
+                    new BOp[] { startOp },// 
+                    new NV(Predicate.Annotations.BOP_ID, subqueryHashJoinId),//
+                    new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
+                    new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{x,y})//
+//                    new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery)//
+            );
+            fail("Expecting exception");
+        } catch(Throwable t) {
+            if(log.isInfoEnabled())
+                log.info("Ignoring expected exception: "+t);
+        }
+
 	}
 
+    /**
+     * Unit test for a simple join.
+     */
+    public void test_join() throws Exception {
+
+//        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+        final int subqueryHashJoinId = 4;
+        
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+        
+        final Predicate<E> predOp = new Predicate<E>(//
+                new IVariableOrConstant[] { //
+                new Constant<String>("John"), x }, //
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                }));
+
+        // the subquery (basically, an access path read with "x" unbound).
+        final PipelineJoin<E> subquery = new PipelineJoin<E>(
+                new BOp[] { },//
+                new NV(Predicate.Annotations.BOP_ID, joinId),//
+                new NV(PipelineJoin.Annotations.PREDICATE, predOp));
+
+        // the hash-join against the subquery.
+        final SubqueryHashJoinOp subqueryHashJoin = new SubqueryHashJoinOp(
+                new BOp[] {},//
+                new NV(Predicate.Annotations.BOP_ID, subqueryHashJoinId),//
+                new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
+                new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{x}),//
+                new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subquery)//
+                );
+
+        final PipelineOp query = subqueryHashJoin;
+        
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("Mary") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Brad"),
+                                          new Constant<String>("Fred"),
+                                }//
+                ),//
+        };
+
+        /*
+         * Setup the input binding sets. Each input binding set MUST provide
+         * binding for the join variable(s).
+         */
+        final IBindingSet[] initialBindingSets;
+        {
+            final List<IBindingSet> list = new LinkedList<IBindingSet>();
+            
+            IBindingSet tmp;
+
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Brad"));
+            tmp.set(y, new Constant<String>("Fred"));
+            list.add(tmp);
+            
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Mary"));
+            list.add(tmp);
+            
+            initialBindingSets = list.toArray(new IBindingSet[0]);
+            
+        }
+
+        final IRunningQuery runningQuery = queryEngine.eval(query,
+                initialBindingSets);
+
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+
+        {
+            final BOpStats stats = runningQuery.getStats().get(
+                    subqueryHashJoinId);
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(2L, stats.unitsIn.get());
+            assertEquals(2L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+        {
+            // // access path
+            // assertEquals(0L, stats.accessPathDups.get());
+            // assertEquals(1L, stats.accessPathCount.get());
+            // assertEquals(1L, stats.accessPathChunksIn.get());
+            // assertEquals(2L, stats.accessPathUnitsIn.get());
+        }
+        
+        assertTrue(runningQuery.isDone());
+        assertFalse(runningQuery.isCancelled());
+        runningQuery.get(); // verify nothing thrown.
+
+    }
+	
+    /**
+     * Unit test for simple join with a constraint.
+     */
+    public void test_joinWithConstraint() throws Exception {
+
+//        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+        final int subqueryHashJoinId = 4;
+        
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+
+//        final IConstant<String>[] set = new IConstant[] {//
+//                new Constant<String>("Fred"),//
+//        };
+
+        final Predicate<E> predOp = new Predicate<E>(//
+                new IVariableOrConstant[] { //
+                new Constant<String>("John"), x }, //
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                }));
+
+        // the subquery (basically, an access path read with "x" unbound).
+        final PipelineJoin<E> subquery = new PipelineJoin<E>(
+                new BOp[] { },//
+                new NV(Predicate.Annotations.BOP_ID, joinId),//
+                new NV(PipelineJoin.Annotations.PREDICATE, predOp));
+
+        // the hash-join against the subquery.
+        final SubqueryHashJoinOp subqueryHashJoin = new SubqueryHashJoinOp(
+                new BOp[] {},//
+                new NV(Predicate.Annotations.BOP_ID, subqueryHashJoinId),//
+                new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
+                new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS,
+                        new IVariable[] { x }),//
+                new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subquery),//
+                new NV(SubqueryHashJoinOp.Annotations.CONSTRAINTS,
+                        new IConstraint[] { Constraint
+                                .wrap(new EQConstant(x, new Constant<String>("Brad"))),//
+                        }));
+
+        final PipelineOp query = subqueryHashJoin;
+        
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+//                new ArrayBindingSet(//
+//                        new IVariable[] { x },//
+//                        new IConstant[] { new Constant<String>("Mary") }//
+//                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Brad"),
+                                          new Constant<String>("Fred"),
+                                }//
+                ),//
+        };
+
+        /*
+         * Setup the input binding sets. Each input binding set MUST provide
+         * binding for the join variable(s).
+         */
+        final IBindingSet[] initialBindingSets;
+        {
+            final List<IBindingSet> list = new LinkedList<IBindingSet>();
+            
+            IBindingSet tmp;
+
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Brad"));
+            tmp.set(y, new Constant<String>("Fred"));
+            list.add(tmp);
+            
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Mary"));
+            list.add(tmp);
+            
+            initialBindingSets = list.toArray(new IBindingSet[0]);
+            
+        }
+
+        final IRunningQuery runningQuery = queryEngine.eval(query,
+                initialBindingSets);
+
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+
+        {
+            final BOpStats stats = runningQuery.getStats().get(
+                    subqueryHashJoinId);
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(2L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+        {
+            // // access path
+            // assertEquals(0L, stats.accessPathDups.get());
+            // assertEquals(1L, stats.accessPathCount.get());
+            // assertEquals(1L, stats.accessPathChunksIn.get());
+            // assertEquals(2L, stats.accessPathUnitsIn.get());
+        }
+        
+        assertTrue(runningQuery.isDone());
+        assertFalse(runningQuery.isCancelled());
+        runningQuery.get(); // verify nothing thrown.
+
+    }
+
+    /**
+     * Unit test for a simple join.
+     */
+    public void test_join_selectOnly_x() throws Exception {
+
+//        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+        final int subqueryHashJoinId = 4;
+        
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+        
+        final Predicate<E> predOp = new Predicate<E>(//
+                new IVariableOrConstant[] { //
+                new Constant<String>("John"), x }, //
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                }));
+
+        // the subquery (basically, an access path read with "x" unbound).
+        final PipelineJoin<E> subquery = new PipelineJoin<E>(
+                new BOp[] { },//
+                new NV(Predicate.Annotations.BOP_ID, joinId),//
+                new NV(PipelineJoin.Annotations.PREDICATE, predOp));
+
+        // the hash-join against the subquery.
+        final SubqueryHashJoinOp subqueryHashJoin = new SubqueryHashJoinOp(
+                new BOp[] {},//
+                new NV(Predicate.Annotations.BOP_ID, subqueryHashJoinId),//
+                new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
+                new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{x}),//
+                new NV(SubqueryHashJoinOp.Annotations.SELECT, new IVariable[]{x}),//
+                new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subquery)//
+                );
+
+        final PipelineOp query = subqueryHashJoin;
+        
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("Mary") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("Brad"),
+//                                          new Constant<String>("Fred"),
+                                }//
+                ),//
+        };
+
+        /*
+         * Setup the input binding sets. Each input binding set MUST provide
+         * binding for the join variable(s).
+         */
+        final IBindingSet[] initialBindingSets;
+        {
+            final List<IBindingSet> list = new LinkedList<IBindingSet>();
+            
+            IBindingSet tmp;
+
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Brad"));
+            tmp.set(y, new Constant<String>("Fred"));
+            list.add(tmp);
+            
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Mary"));
+            list.add(tmp);
+            
+            initialBindingSets = list.toArray(new IBindingSet[0]);
+            
+        }
+
+        final IRunningQuery runningQuery = queryEngine.eval(query,
+                initialBindingSets);
+
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+
+        {
+            final BOpStats stats = runningQuery.getStats().get(
+                    subqueryHashJoinId);
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(2L, stats.unitsIn.get());
+            assertEquals(2L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+        {
+            // // access path
+            // assertEquals(0L, stats.accessPathDups.get());
+            // assertEquals(1L, stats.accessPathCount.get());
+            // assertEquals(1L, stats.accessPathChunksIn.get());
+            // assertEquals(2L, stats.accessPathUnitsIn.get());
+        }
+        
+        assertTrue(runningQuery.isDone());
+        assertFalse(runningQuery.isCancelled());
+        runningQuery.get(); // verify nothing thrown.
+
+    }
+    
     /**
      * Unit test for optional join group. Three joins are used and target a
      * {@link SliceOp}. The 2nd and 3rd joins are embedded in an
@@ -298,15 +714,10 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
 
         final PipelineOp joinGroup1Op = new SubqueryHashJoinOp(new BOp[]{join1Op}, 
                 new NV(Predicate.Annotations.BOP_ID, joinGroup1),//
-//                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-                new NV(SubqueryOp.Annotations.SUBQUERY, subQuery),//
-//                , new NV(BOp.Annotations.CONTROLLER,true)//
-//                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-//                        BOpEvaluationContext.CONTROLLER)//
-                // join is optional.
-                new NV(SubqueryOp.Annotations.OPTIONAL, true)//
-//                // optional target is the same as the default target.
-//                new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
+                new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
+                new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{b}),//
+                new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery),//
+                new NV(SubqueryHashJoinOp.Annotations.OPTIONAL, true)//
         );
         
         final PipelineOp sliceOp = new SliceOp(//
@@ -405,9 +816,8 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
              * many objects: reminder(3)=[{ a=John, b=Brad }, { a=Mary, b=Brad
              * }, { a=Paul, b=Brad }].
              */
-            assertSameSolutionsAnyOrder(expected,
-                    new Dechunkerator<IBindingSet>(runningQuery.iterator()));
-        
+            TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+
         }
 
         // Wait until the query is done.
@@ -563,16 +973,11 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
         }
         
         final PipelineOp joinGroup1Op = new SubqueryHashJoinOp(new BOp[]{join1Op}, 
-                new NV(Predicate.Annotations.BOP_ID, joinGroup1),//
-//                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-                new NV(SubqueryOp.Annotations.SUBQUERY, subQuery),//
-//                new NV(BOp.Annotations.CONTROLLER,true)//
-//                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-//                        BOpEvaluationContext.CONTROLLER)//
-                // join is optional.
-                new NV(SubqueryOp.Annotations.OPTIONAL, true)//
-//                // optional target is the same as the default target.
-//                new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
+        new NV(Predicate.Annotations.BOP_ID, joinGroup1),//
+        new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
+        new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{b}),//
+        new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery),//
+        new NV(SubqueryHashJoinOp.Annotations.OPTIONAL, true)//
         );
 
         final PipelineOp sliceOp = new SliceOp(//
@@ -652,9 +1057,8 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
             )
             };
 
-            assertSameSolutionsAnyOrder(expected,
-                    new Dechunkerator<IBindingSet>(runningQuery.iterator()));
-        
+            TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+
         }
 
         // Wait until the query is done.
@@ -826,15 +1230,10 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
         
         final PipelineOp joinGroup1Op = new SubqueryHashJoinOp(new BOp[]{condOp}, 
                 new NV(Predicate.Annotations.BOP_ID, joinGroup1),//
-//                new NV(PipelineOp.Annotations.CONDITIONAL_GROUP, joinGroup1),//
-                new NV(SubqueryOp.Annotations.SUBQUERY, subQuery),//
-//                new NV(BOp.Annotations.CONTROLLER,true)//
-//                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-//                        BOpEvaluationContext.CONTROLLER)//
-                // join is optional.
-                new NV(SubqueryOp.Annotations.OPTIONAL, true)//
-//                // optional target is the same as the default target.
-//                new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
+                new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
+                new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{b}),//
+                new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery),//
+                new NV(SubqueryHashJoinOp.Annotations.OPTIONAL, true)//
         );
         
         final PipelineOp sliceOp = new SliceOp(//
@@ -919,8 +1318,7 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
             )
             };
 
-            assertSameSolutionsAnyOrder(expected,
-                    new Dechunkerator<IBindingSet>(runningQuery.iterator()));
+            TestQueryEngine.assertSameSolutionsAnyOrder(expected,runningQuery);
         
         }
 

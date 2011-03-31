@@ -29,19 +29,17 @@ package com.bigdata.bop.controller;
 
 import java.util.Map;
 import java.util.concurrent.Callable;
-import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 
 /**
@@ -65,6 +63,9 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
  * @see AbstractSubqueryOp
+ * 
+ * FIXME Support {@link JoinAnnotations#SELECT}
+ * FIXME Support {@link JoinAnnotations#CONSTRAINTS}
  */
 public class SubqueryOp extends PipelineOp {
 
@@ -73,25 +74,8 @@ public class SubqueryOp extends PipelineOp {
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends PipelineOp.Annotations {
+    public interface Annotations extends SubqueryJoinAnnotations {
 
-		/**
-		 * The subquery to be evaluated for each binding sets presented to the
-		 * {@link SubqueryOp} (required). This should be a {@link PipelineOp}.
-		 * (It is basically the equivalent of the {@link IPredicate} for a
-		 * {@link PipelineJoin}).
-		 */
-        String SUBQUERY = (SubqueryOp.class.getName() + ".subquery").intern();
-
-        /**
-         * When <code>true</code> the subquery has optional semantics (if the
-         * subquery fails, the original binding set will be passed along to the
-         * downstream sink anyway) (default {@value #DEFAULT_OPTIONAL}).
-         */
-        String OPTIONAL = (SubqueryOp.class.getName() + ".optional").intern();
-
-        boolean DEFAULT_OPTIONAL = false;
-        
 //        /**
 //         * The maximum parallelism with which the subqueries will be evaluated
 //         * (default {@value #DEFAULT_MAX_PARALLEL}). 
@@ -205,7 +189,8 @@ public class SubqueryOp extends PipelineOp {
             
             this.context = context;
 
-            this.optional = controllerOp.getProperty(Annotations.OPTIONAL,
+            this.optional = controllerOp.getProperty(
+                    Annotations.OPTIONAL,
                     Annotations.DEFAULT_OPTIONAL);
 
 //            this.nparallel = controllerOp.getProperty(Annotations.MAX_PARALLEL,

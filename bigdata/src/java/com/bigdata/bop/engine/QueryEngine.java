@@ -996,12 +996,38 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     public AbstractRunningQuery eval(final BOp op, final IBindingSet bset)
             throws Exception {
-    	
-    	// Use a random UUID unless the UUID was specified on the query.
-    	final UUID queryId = op.getProperty(QueryEngine.Annotations.QUERY_ID,
-				UUID.randomUUID());
+        
+        // Use a random UUID unless the UUID was specified on the query.
+        final UUID queryId = op.getProperty(QueryEngine.Annotations.QUERY_ID,
+                UUID.randomUUID());
 
         return eval(queryId, op, newBindingSetIterator(bset));
+
+    }
+
+    /**
+     * Evaluate a query. This node will serve as the controller for the query.
+     * 
+     * @param query
+     *            The query to evaluate.
+     * @param bsets
+     *            The initial binding sets to present.
+     * 
+     * @return The {@link IRunningQuery}.
+     * 
+     * @throws IllegalStateException
+     *             if the {@link QueryEngine} has been {@link #shutdown()}.
+     * @throws Exception
+     */
+    public AbstractRunningQuery eval(final BOp op, final IBindingSet[] bsets)
+            throws Exception {
+
+        // Use a random UUID unless the UUID was specified on the query.
+        final UUID queryId = op.getProperty(QueryEngine.Annotations.QUERY_ID,
+                UUID.randomUUID());
+
+        return eval(queryId, op, new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { bsets }));
 
     }
 

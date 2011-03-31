@@ -176,7 +176,7 @@ public class INBinarySearch<T> extends INConstraint<T> {
 
         if (x == null) {
 
-            // not yet bound : @todo should this reject an unbound variable?
+            // not yet bound : FIXME Modify to return false - variables must be bound
             return true;
             
         }

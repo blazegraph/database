@@ -332,7 +332,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 		final int maxMessagesPerTask = bop.getProperty(
 				PipelineOp.Annotations.MAX_MESSAGES_PER_TASK,
 				PipelineOp.Annotations.DEFAULT_MAX_MESSAGES_PER_TASK);
-//		final int maxMemory = bop.getProperty(
+//		final long maxMemory = bop.getProperty(
 //				PipelineOp.Annotations.MAX_MEMORY,
 //				PipelineOp.Annotations.DEFAULT_MAX_MEMORY);
         // See BOpContext#isLastInvocation()
