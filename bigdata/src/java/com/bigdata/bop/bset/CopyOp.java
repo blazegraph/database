@@ -36,6 +36,7 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkAccessor;
@@ -65,16 +66,22 @@ public class CopyOp extends PipelineOp {
     public interface Annotations extends PipelineOp.Annotations {
 
         /**
+         * An optional {@link IVariable}[] which specifies which variables will
+         * have their bindings copied.
+         */
+        String SELECT = CopyOp.class.getName() + ".select";
+
+        /**
          * An optional {@link IConstraint}[] which places restrictions on the
          * legal patterns in the variable bindings.
          */
-        String CONSTRAINTS = (CopyOp.class.getName() + ".constraints").intern();
+        String CONSTRAINTS = CopyOp.class.getName() + ".constraints";
 
         /**
          * An optional {@link IBindingSet}[] to be used <strong>instead</strong>
          * of the default source.
          */
-        String BINDING_SETS = (CopyOp.class.getName() + ".bindingSets").intern();
+        String BINDING_SETS = CopyOp.class.getName() + ".bindingSets";
         
     }
 
@@ -95,6 +102,15 @@ public class CopyOp extends PipelineOp {
      */
     public CopyOp(BOp[] args, Map<String, Object> annotations) {
         super(args, annotations);
+    }
+
+    /**
+     * @see Annotations#SELECT
+     */
+    public IVariable<?>[] getSelect() {
+
+        return getProperty(Annotations.SELECT, null/* defaultValue */);
+
     }
 
     /**
@@ -156,6 +172,8 @@ public class CopyOp extends PipelineOp {
             
             final BOpStats stats = context.getStats();
 
+            final IVariable<?>[] select = op.getSelect();
+
             final IConstraint[] constraints = op.constraints();
 
             try {
@@ -168,12 +186,13 @@ public class CopyOp extends PipelineOp {
                     BOpUtility.copy(
                             new ThickAsynchronousIterator<IBindingSet[]>(
                                     new IBindingSet[][] { bindingSets }), sink,
-                            sink2, constraints, stats);
+                            sink2, select, constraints, stats);
 
                 } else {
 
                     // copy binding sets from the source.
-                    BOpUtility.copy(source, sink, sink2, constraints, stats);
+                    BOpUtility.copy(source, sink, sink2, select, constraints,
+                            stats);
 
                 }
                 

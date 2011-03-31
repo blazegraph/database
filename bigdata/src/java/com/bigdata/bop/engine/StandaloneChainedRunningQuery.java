@@ -232,7 +232,8 @@ public class StandaloneChainedRunningQuery extends AbstractRunningQuery {
             try {
 
                 BOpUtility.copy(msg.getChunkAccessor().iterator(), sink,
-                        null/* sink2 */, null/* constraints */, //
+                        null/* sink2 */, null/* selectVars */,
+                        null/* constraints */, //
                         null/* stats */
                 );
 

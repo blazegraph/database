@@ -45,7 +45,6 @@ import com.bigdata.bop.bset.Tee;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**
@@ -367,8 +366,8 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
 
                     // Copy solutions from the subquery to the query.
                     BOpUtility.copy(subquerySolutionItr, parentContext
-                            .getSink(), null/* sink2 */, null/* constraints */,
-                            null/* stats */);
+                            .getSink(), null/* sink2 */, null/* select */,
+                            null/* constraints */, null/* stats */);
                     
                     // wait for the subquery.
                     runningSubquery.get();

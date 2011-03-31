@@ -362,9 +362,10 @@ public class JoinGraph extends PipelineOp {
             subquerySolutionItr = runningQuery.iterator();
 
             // Copy solutions from the subquery to the query.
-            final long nout = BOpUtility.copy(subquerySolutionItr,
-                    parentContext.getSink(), null/* sink2 */,
-                    null/* constraints */, null/* stats */);
+            final long nout = BOpUtility
+                    .copy(subquerySolutionItr, parentContext.getSink(),
+                            null/* sink2 */, null/* selectVars */,
+                            null/* constraints */, null/* stats */);
 
 //            System.out.println("nout=" + nout);
 

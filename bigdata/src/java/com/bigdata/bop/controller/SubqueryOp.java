@@ -35,11 +35,12 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 
 /**
@@ -54,18 +55,13 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
  * 
  * @todo Parallel evaluation of subqueries is not implemented. What is the
  *       appropriate parallelism for this operator? More parallelism should
- *       reduce latency but could increase the memory burden. Review this
- *       decision once we have the RWStore operating as a binding set buffer on
- *       the Java process heap.
+ *       reduce latency but could increase the memory burden.
  * 
- * @todo Rename as SubqueryPipelineJoinOp and support for SELECT and CONSTRAINTS. 
+ * @todo Rename as SubqueryPipelineJoinOp. 
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
  * @see AbstractSubqueryOp
- * 
- * FIXME Support {@link JoinAnnotations#SELECT}
- * FIXME Support {@link JoinAnnotations#CONSTRAINTS}
  */
 public class SubqueryOp extends PipelineOp {
 
@@ -168,16 +164,23 @@ public class SubqueryOp extends PipelineOp {
 	 */
     private static class ControllerTask implements Callable<Void> {
 
-//        private final SubqueryOp controllerOp;
         private final BOpContext<IBindingSet> context;
 //        private final List<FutureTask<IRunningQuery>> tasks = new LinkedList<FutureTask<IRunningQuery>>();
 //        private final CountDownLatch latch;
         private final boolean optional;
 //        private final int nparallel;
+//      /** The {@link SubqueryOp}. */
+//      private final SubqueryOp controllerOp;
+        /** The subquery which is evaluated for each input binding set. */
         private final PipelineOp subquery;
+        /** The selected variables for the output binding sets (optional). */
+        private final IVariable<?>[] selectVars;
+        /** The optional constraints on the join. */
+        private final IConstraint[] constraints;
 //        private final Executor executor;
         
-        public ControllerTask(final SubqueryOp controllerOp, final BOpContext<IBindingSet> context) {
+        public ControllerTask(final SubqueryOp controllerOp,
+                final BOpContext<IBindingSet> context) {
 
             if (controllerOp == null)
                 throw new IllegalArgumentException();
@@ -198,6 +201,12 @@ public class SubqueryOp extends PipelineOp {
 
             this.subquery = (PipelineOp) controllerOp
                     .getRequiredProperty(Annotations.SUBQUERY);
+            
+            this.selectVars = (IVariable<?>[]) controllerOp
+                    .getProperty(Annotations.SELECT);
+
+            this.constraints = (IConstraint[]) controllerOp
+                    .getProperty(Annotations.CONSTRAINTS);
             
 //            this.executor = new LatchedExecutor(context.getIndexManager()
 //                    .getExecutorService(), nparallel);
@@ -379,25 +388,6 @@ public class SubqueryOp extends PipelineOp {
 
                     final QueryEngine queryEngine = parentContext.getRunningQuery()
                             .getQueryEngine();
-
-//                    final BOp startOp = BOpUtility.getPipelineStart(subQueryOp);
-//
-//                    final int startId = startOp.getId();
-//                    
-//                    final UUID queryId = UUID.randomUUID();
-//
-//                    // execute the subquery, passing in the source binding set.
-//                    runningSubquery = queryEngine
-//                            .eval(
-//                                    queryId,
-//                                    (PipelineOp) subQueryOp,
-//                                    new LocalChunkMessage<IBindingSet>(
-//                                            queryEngine,
-//                                            queryId,
-//                                            startId,
-//                                            -1 /* partitionId */,
-//                                            new ThickAsynchronousIterator<IBindingSet[]>(
-//                                                    new IBindingSet[][] { new IBindingSet[] { bset } })));
                     
                     runningSubquery = queryEngine.eval((PipelineOp) subQueryOp,
                             bset);
@@ -409,9 +399,10 @@ public class SubqueryOp extends PipelineOp {
 						subquerySolutionItr = runningSubquery.iterator();
 
 						// Copy solutions from the subquery to the query.
-						ncopied = BOpUtility.copy(subquerySolutionItr,
-								parentContext.getSink(), null/* sink2 */,
-								null/* constraints */, null/* stats */);
+                        ncopied = BOpUtility.copy(subquerySolutionItr,
+                                parentContext.getSink(), null/* sink2 */,
+                                selectVars, constraints, parentContext
+                                        .getStats());
 
 						// wait for the subquery to halt / test for errors.
 						runningSubquery.get();
