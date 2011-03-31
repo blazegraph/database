@@ -57,13 +57,13 @@ import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.Dechunkerator;
 
 /**
  * Test suite for handling of optional join groups during query evaluation
@@ -398,8 +398,7 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
              * many objects: reminder(3)=[{ a=John, b=Brad }, { a=Mary, b=Brad
              * }, { a=Paul, b=Brad }].
              */
-            assertSameSolutionsAnyOrder(expected,
-                    new Dechunkerator<IBindingSet>(runningQuery.iterator()));
+            TestQueryEngine.assertSameSolutionsAnyOrder(expected,runningQuery);
         
         }
 
@@ -645,9 +644,8 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
             )
             };
 
-            assertSameSolutionsAnyOrder(expected,
-                    new Dechunkerator<IBindingSet>(runningQuery.iterator()));
-        
+            TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+
         }
 
         // Wait until the query is done.
@@ -912,9 +910,8 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
             )
             };
 
-            assertSameSolutionsAnyOrder(expected,
-                    new Dechunkerator<IBindingSet>(runningQuery.iterator()));
-        
+            TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+
         }
 
         // Wait until the query is done.

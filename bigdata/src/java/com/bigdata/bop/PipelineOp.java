@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
-import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -38,8 +37,6 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.solutions.SliceOp;
-import com.bigdata.bop.solutions.SortOp.Annotations;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 
 /**
  * Abstract base class for pipeline operators where the data moving along the
@@ -72,17 +69,14 @@ abstract public class PipelineOp extends BOpBase {
          * the ancestor in the operator tree which serves as the default sink
          * for binding sets (optional, default is the parent).
          */
-        String SINK_REF = (PipelineOp.class.getName() + ".sinkRef").intern();
+        String SINK_REF = PipelineOp.class.getName() + ".sinkRef";
 
         /**
          * The value of the annotation is the {@link BOp.Annotations#BOP_ID} of
          * the ancestor in the operator tree which serves as the alternative
          * sink for binding sets (default is no alternative sink).
-         * 
-         * @see #ALT_SINK_GROUP
          */
-		String ALT_SINK_REF = (PipelineOp.class.getName() + ".altSinkRef")
-				.intern();
+		String ALT_SINK_REF = PipelineOp.class.getName() + ".altSinkRef";
 
 		/**
 		 * The value reported by {@link PipelineOp#isSharedState()} (default
@@ -97,8 +91,7 @@ abstract public class PipelineOp extends BOpBase {
 		 * When <code>true</code>, the {@link QueryEngine} will impose the
 		 * necessary constraints when the operator is evaluated.
 		 */
-		String SHARED_STATE = (PipelineOp.class.getName() + ".sharedState")
-				.intern();
+		String SHARED_STATE = PipelineOp.class.getName() + ".sharedState";
 
 		boolean DEFAULT_SHARED_STATE = false;
 
@@ -118,7 +111,7 @@ abstract public class PipelineOp extends BOpBase {
 		 * have less effect and performance tends to be best around a modest
 		 * value (10) for those annotations.
 		 */
-		String MAX_PARALLEL = (PipelineOp.class.getName() + ".maxParallel").intern();
+		String MAX_PARALLEL = PipelineOp.class.getName() + ".maxParallel";
 
 		/**
 		 * @see #MAX_PARALLEL
@@ -138,8 +131,8 @@ abstract public class PipelineOp extends BOpBase {
 		 * data to be assigned to an evaluation task is governed by
 		 * {@link #MAX_MEMORY} instead.
 		 */
-	    String MAX_MESSAGES_PER_TASK = (PipelineOp.class.getName()
-	            + ".maxMessagesPerTask").intern();
+	    String MAX_MESSAGES_PER_TASK = PipelineOp.class.getName()
+	            + ".maxMessagesPerTask";
 
 		/**
 		 * @see #MAX_MESSAGES_PER_TASK
@@ -153,8 +146,8 @@ abstract public class PipelineOp extends BOpBase {
 		 * amount of data which can be buffered on the JVM heap during pipelined
 		 * query evaluation.
 		 */
-		String PIPELINE_QUEUE_CAPACITY = (PipelineOp.class.getName()
-				+ ".pipelineQueueCapacity").intern();
+		String PIPELINE_QUEUE_CAPACITY = PipelineOp.class.getName()
+				+ ".pipelineQueueCapacity";
 
 		/**
 		 * @see #PIPELINE_QUEUE_CAPACITY
@@ -166,49 +159,44 @@ abstract public class PipelineOp extends BOpBase {
 		 * <code>false</code> the operator will use either "at-once" or
 		 * "blocked" evaluation depending on how it buffers its data for
 		 * evaluation.
-		 * <p>
-		 * When <code>false</code>, operator "at-once" evaluation will be used
-		 * if either (a) the operator is buffering data on the Java heap; or (b)
-		 * the operator is buffering data on the native heap and the amount of
-		 * buffered data does not exceed the specified value for
-		 * {@link #MAX_MEMORY}. For convenience, you may specify
-		 * {@link Integer#MAX_VALUE} for {@link #MAX_MEMORY} to indicate that
-		 * "at-once" evaluation is required.
-		 * <p>
-		 * When data are buffered on the Java heap, "at-once" evaluation is
-		 * implied and the data will be made available to the operator as a
-		 * single {@link IAsynchronousIterator} when the operator is invoked.
-		 * <p>
-		 * When {@link #MAX_MEMORY} is positive, data are marshaled in
-		 * {@link ByteBuffer}s and the operator will be invoked once either (a)
-		 * its memory threshold for the buffered data has been exceeded; or (b)
-		 * no predecessor of the operator is running (or can be triggered) -and-
-		 * all inputs for the operator have been materialized on this node. Note
-		 * that some operators DO NOT support multiple pass evaluation
-		 * semantics. Such operators MUST throw an exception if the value of
-		 * this annotation could result in multiple evaluation passes.
+		 * 
+		 * @see PipelineOp#isPipelined()
 		 */
-		String PIPELINED = (PipelineOp.class.getName() + ".pipelined").intern();
+		String PIPELINED = PipelineOp.class.getName() + ".pipelined";
 
 		/**
 		 * @see #PIPELINED
 		 */
 		boolean DEFAULT_PIPELINED = true;
 
-		/**
-		 * For non-{@link #PIPELINED} operators, this non-negative value
-		 * specifies the maximum #of bytes which the operator may buffer on the
-		 * native heap before evaluation of the operator is triggered -or- ZERO
-		 * (0) if the operator buffers the data on the Java heap (default
-		 * {@value #DEFAULT_MAX_MEMORY}). For a sharded operation, the value is
-		 * the maximum #of bytes which may be buffered per shard.
-		 */
-		String MAX_MEMORY = (PipelineOp.class.getName() + ".maxMemory").intern();
+        /**
+         * This annotation is only used for non-{@link #PIPELINED} operators and
+         * specifies the maximum #of bytes which the operator may buffer on the
+         * native heap before evaluation of the operator is triggered (default
+         * {@value #DEFAULT_MAX_MEMORY}).
+         * <p>
+         * If an operator buffers its data on the Java heap then this MUST be
+         * ZERO (0L). At-once evaluation is always used for non-pipelined
+         * operators which buffer their data on the Java heap as there is no
+         * ready mechanism to bound their heap demand.
+         * <p>
+         * If an operator buffers its data on the native heap, then this MUST be
+         * some positive value which specifies the maximum #of bytes which may
+         * be buffered before the operator is evaluated. At-once evaluation for
+         * operators which buffer their data on the native heap is indicated
+         * with the value {@link Long#MAX_VALUE}.
+         * <p>
+         * Note: For a sharded operation, the value is the maximum #of bytes
+         * which may be buffered per shard.
+         * 
+         * @see PipelineOp#isPipelined()
+         */
+		String MAX_MEMORY = PipelineOp.class.getName() + ".maxMemory";
 
 		/**
 		 * @see #MAX_MEMORY
 		 */
-		int DEFAULT_MAX_MEMORY = 0;
+		long DEFAULT_MAX_MEMORY = 0L;
 		
     }
 
@@ -457,17 +445,25 @@ abstract public class PipelineOp extends BOpBase {
     	
     }
 
-	/**
-	 * Assert that this operator is annotated as an "at-once" operator which
-	 * buffers its data on the java heap.
-	 */
+    /**
+     * Assert that this operator is annotated as an "at-once" operator which
+     * buffers its data on the java heap. The requirements are:
+     * 
+     * <pre>
+     * PIPELINED := false
+     * MAX_MEMORY := 0
+     * </pre>
+     * 
+     * When the operator is not pipelined then it is either "blocked" or
+     * "at-once". When MAX_MEMORY is ZERO, the operator will buffer its data on
+     * the Java heap. All operators which buffer data on the java heap will
+     * buffer an unbounded amount of data and are therefore "at-once" rather
+     * than "blocked". Operators which buffer their data on the native heap may
+     * support either "blocked" and/or "at-once" evaluation, depending on the
+     * operators. E.g., a hash join can be either "blocked" or "at-once" while
+     * an ORDER-BY is always "at-once".
+     */
 	protected void assertAtOnceJavaHeapOp() {
-
-		// operator may not be broken into multiple tasks.
-		if (getMaxParallel() != 1) {
-			throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
-					+ "=" + getMaxParallel());
-		}
 
 		// operator is "at-once" (not pipelined).
 		if (isPipelined()) {
@@ -475,6 +471,20 @@ abstract public class PipelineOp extends BOpBase {
 					+ isPipelined());
 		}
 
-	}
+//        // operator may not be broken into multiple tasks.
+//        if (getMaxParallel() != 1) {
+//            throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
+//                    + "=" + getMaxParallel());
+//        }
+
+        // operator must buffer its data on the Java heap
+        final long maxMemory = getProperty(Annotations.MAX_MEMORY,
+                Annotations.DEFAULT_MAX_MEMORY);
+
+        if (maxMemory != 0L)
+            throw new UnsupportedOperationException(Annotations.MAX_MEMORY
+                    + "=" + maxMemory);
+
+    }
 
 }

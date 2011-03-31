@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop;
 
+import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
@@ -332,33 +334,69 @@ public class BOpContext<E> extends BOpContextBase {
     }
 
     /**
-     * Copy the bound values from the element into a binding set using the
-     * caller's variable names.
+     * Copy the values for variables in the predicate from the element, applying
+     * them to the caller's {@link IBindingSet}.
      * 
-     * @param vars
-     *            The ordered list of variables.
-     * @param e
-     *            The element.
-     * @param bindingSet
-     *            The binding set, which is modified as a side-effect.
-     * 
-     * @todo This appears to be unused, in which case it should be dropped. 
+     * @param src
+     *            The source binding set.
+     * @param dst
+     *            The target binding set, which is modified as a side-effect.
+     *            
+     * @todo move to {@link BOpUtility}?
+     * @todo unit tests.
+     * @todo only copy / retain SELECTed variables within this method?
      */
-    final public void bind(final IVariable<?>[] vars, final IElement e,
-            final IBindingSet bindingSet) {
+    @SuppressWarnings("unchecked")
+    static public void copyValues(final IBindingSet src, final IBindingSet dst) {
 
-        for (int i = 0; i < vars.length; i++) {
+        final Iterator<Map.Entry<IVariable, IConstant>> itr = src.iterator();
 
-            final IVariable<?> var = vars[i];
+        while (itr.hasNext()) {
 
-            @SuppressWarnings("unchecked")
-            final Constant<?> newval = new Constant(e.get(i));
+            final Map.Entry<IVariable, IConstant> e = itr.next();
 
-            bindingSet.set(var, newval);
+            final IVariable<?> var = (IVariable<?>) e.getKey();
+
+            final IConstant<?> val = e.getValue();
+
+            if (val != null) {
+
+                dst.set(var, val);
+
+            }
 
         }
 
     }
+
+//    /**
+//     * Copy the bound values from the element into a binding set using the
+//     * caller's variable names.
+//     * 
+//     * @param vars
+//     *            The ordered list of variables.
+//     * @param e
+//     *            The element.
+//     * @param bindingSet
+//     *            The binding set, which is modified as a side-effect.
+//     * 
+//     * @todo This appears to be unused, in which case it should be dropped. 
+//     */
+//    final public void bind(final IVariable<?>[] vars, final IElement e,
+//            final IBindingSet bindingSet) {
+//
+//        for (int i = 0; i < vars.length; i++) {
+//
+//            final IVariable<?> var = vars[i];
+//
+//            @SuppressWarnings("unchecked")
+//            final Constant<?> newval = new Constant(e.get(i));
+//
+//            bindingSet.set(var, newval);
+//
+//        }
+//
+//    }
 
 //    /**
 //     * Cancel the running query (normal termination).

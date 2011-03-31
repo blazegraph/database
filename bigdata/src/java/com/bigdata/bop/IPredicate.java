@@ -97,10 +97,13 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 //        String KEY_ORDER = "keyOrder";
 
         /**
-         * <code>true</code> iff the predicate has SPARQL optional semantics.
+         * <code>true</code> iff the predicate has SPARQL optional semantics
+         * (default {@value #DEFAULT_OPTIONAL}).
          */
-        String OPTIONAL = (IPredicate.class.getName() + ".optional").intern();
+        String OPTIONAL = IPredicate.class.getName() + ".optional";
 
+        boolean DEFAULT_OPTIONAL = false;
+        
 //        /**
 //         * Constraints on the elements read from the relation.
 //         * 
