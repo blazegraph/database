@@ -603,6 +603,8 @@ public class TestNanoSparqlServer extends TestCase2 {
      */
     public void test_POST_withBody_NTRIPLES() throws Exception {
         
+        fail("This test deadlocks - use the jetty test suite instead.");
+        
         HttpURLConnection conn = null;
         try {
             final URL url = new URL(serviceURL);
