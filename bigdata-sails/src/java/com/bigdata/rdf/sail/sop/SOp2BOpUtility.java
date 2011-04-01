@@ -293,8 +293,8 @@ public class SOp2BOpUtility {
 	    }
     	
 		if (!left.getEvaluationContext()
-				.equals(BOpEvaluationContext.CONTROLLER)
-				&& !(left instanceof SubqueryOp)) {
+				.equals(BOpEvaluationContext.CONTROLLER)) {
+//				&& !(left instanceof SubqueryOp)) {
 			/*
 			 * Wrap with an operator which will be evaluated on the query
 			 * controller so the results will be streamed back to the query
