@@ -512,6 +512,11 @@ public class SubqueryHashJoinOp extends PipelineOp {
                     final IAsynchronousIterator<IBindingSet[]> subquerySolutionItr = runningSubquery
                             .iterator();
 
+                    if (log.isDebugEnabled()) {
+                    	if (!subquerySolutionItr.hasNext())
+                    		log.debug("Subquery produced no solutions");
+                    }
+                    
                     while (subquerySolutionItr.hasNext()) {
 
                         final IBindingSet[] chunk = subquerySolutionItr.next();

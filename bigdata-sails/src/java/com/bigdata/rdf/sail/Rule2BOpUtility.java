@@ -284,7 +284,7 @@ public class Rule2BOpUtility {
      *       Annotation interface for a given operator class, but that is not
      *       really all that accessible.
      */
-    private static PipelineOp applyQueryHints(PipelineOp op,
+    public static PipelineOp applyQueryHints(PipelineOp op,
             final Properties queryHints) {
 
         final Enumeration<?> pnames = queryHints.propertyNames();
@@ -317,22 +317,6 @@ public class Rule2BOpUtility {
             final AtomicInteger idFactory, final AbstractTripleStore db,
             final QueryEngine queryEngine, final Properties queryHints) {
 
-    	return convert(rule, 
-    			null/* conditionals */, 
-    			null/* known bound variables */, 
-    			idFactory, db, queryEngine, queryHints);
-    	
-    }
-    
-    public static PipelineOp convert(final IRule<?> rule,
-    		final Collection<IConstraint> conditionals,
-    		final Set<IVariable<?>> knownBound,
-            final AtomicInteger idFactory, final AbstractTripleStore db,
-            final QueryEngine queryEngine, final Properties queryHints) {
-
-//        // true iff the database is in quads mode.
-//        final boolean isQuadsQuery = db.isQuads();
-        
         final PipelineOp startOp = applyQueryHints(new StartOp(BOpBase.NOARGS,
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, idFactory
@@ -345,6 +329,54 @@ public class Rule2BOpUtility {
         	return startOp;
         }
 
+    	return convert(rule, 
+    			startOp, 
+    			null/* known bound variables */, 
+    			idFactory, db, queryEngine, queryHints);
+    	
+    }
+    
+    public static PipelineOp convert(final IRule<?> rule,
+    		final PipelineOp pipelineOp,
+    		final Set<IVariable<?>> knownBound,
+            final AtomicInteger idFactory, final AbstractTripleStore db,
+            final QueryEngine queryEngine, final Properties queryHints) {
+
+//        // true iff the database is in quads mode.
+//        final boolean isQuadsQuery = db.isQuads();
+        
+//        final PipelineOp startOp = applyQueryHints(new StartOp(BOpBase.NOARGS,
+//                NV.asMap(new NV[] {//
+//                        new NV(Predicate.Annotations.BOP_ID, idFactory
+//                                .incrementAndGet()),//
+//                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+//                                BOpEvaluationContext.CONTROLLER),//
+//                })),queryHints);
+//        
+//        if (rule.getTailCount() == 0) {
+//        	return startOp;
+//        }
+//
+//        PipelineOp left = startOp;
+//        
+//        if (conditionals != null) { // @todo lift into CONDITION on SubqueryOp
+//        	for (IConstraint c : conditionals) {
+//        		final int condId = idFactory.incrementAndGet();
+//                final PipelineOp condOp = applyQueryHints(
+//                	new ConditionalRoutingOp(new BOp[]{left},
+//                        NV.asMap(new NV[]{//
+//                            new NV(BOp.Annotations.BOP_ID,condId),
+//                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
+//                        })), queryHints);
+//                left = condOp;
+//                if (log.isDebugEnabled()) {
+//                	log.debug("adding conditional routing op: " + condOp);
+//                }
+//        	}
+//        }
+
+    	PipelineOp left = pipelineOp;
+    	
         /*
          * First put the tails in the correct order based on the logic in
          * DefaultEvaluationPlan2.
@@ -507,24 +539,6 @@ public class Rule2BOpUtility {
 //        final IVariable<?>[][] selectVars = RuleState
 //                .computeRequiredVarsForEachTail(rule, order);
         
-        PipelineOp left = startOp;
-        
-        if (conditionals != null) { // @todo lift into CONDITION on SubqueryOp
-        	for (IConstraint c : conditionals) {
-        		final int condId = idFactory.incrementAndGet();
-                final PipelineOp condOp = applyQueryHints(
-                	new ConditionalRoutingOp(new BOp[]{left},
-                        NV.asMap(new NV[]{//
-                            new NV(BOp.Annotations.BOP_ID,condId),
-                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
-                        })), queryHints);
-                left = condOp;
-                if (log.isDebugEnabled()) {
-                	log.debug("adding conditional routing op: " + condOp);
-                }
-        	}
-        }
-
         /*
          * Create an array of predicates in the decided evaluation with various
          * annotations providing details from the query optimizer.
@@ -582,7 +596,8 @@ public class Rule2BOpUtility {
 			assignedConstraints = PartitionedJoinGroup.getJoinGraphConstraints(
 					preds, constraints,
 					nknownBound == 0 ? IVariable.EMPTY : knownBound
-							.toArray(new IVariable<?>[nknownBound]), true// pathIsComplete
+							.toArray(new IVariable<?>[nknownBound]), 
+					true// pathIsComplete
 					);
 		}
 
