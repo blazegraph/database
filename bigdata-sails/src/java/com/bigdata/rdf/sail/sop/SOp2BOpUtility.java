@@ -619,6 +619,13 @@ public class SOp2BOpUtility {
 					final PipelineOp subquery = convert(hashGroup, constraints, 
 							null/*left*/, knownBound, 
 							idFactory, db, queryEngine, queryHints);
+		            final PipelineOp slice = new SliceOp(new BOp[] { subquery }, NV.asMap(//
+							new NV(BOp.Annotations.BOP_ID, idFactory.incrementAndGet()), //
+							new NV(BOp.Annotations.EVALUATION_CONTEXT,
+									BOpEvaluationContext.CONTROLLER),//
+							new NV(PipelineOp.Annotations.SHARED_STATE, true)//
+					));
+					
 					final IVariable<?>[] joinVarsArray = 
 							joinVars.toArray(new IVariable[joinVars.size()]);
 					
@@ -630,7 +637,7 @@ public class SOp2BOpUtility {
 					left = new SubqueryHashJoinOp(new BOp[]{left},
 	                	new NV(Predicate.Annotations.BOP_ID, idFactory.incrementAndGet()),//
 	                	new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
-	                	new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subquery),//
+	                	new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, slice),//
 	                	new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, joinVarsArray));
 	                	
 				}
