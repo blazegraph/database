@@ -56,7 +56,6 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KV;
@@ -283,9 +282,9 @@ import com.bigdata.util.concurrent.Latch;
  * Journal size: 7320764416 bytes
  * </pre>
  * 
- * BSBM 200M: split in 200 files.  69m versus best time so far of 62m. There is
- * only one thread in the pool, but the caller runs policy means that we are 
- * actually running two parsers.  So, this is not really the same as the best
+ * BSBM 200M: split in 200 files. 69m versus best time so far of 62m. There is
+ * only one thread in the pool, but the caller runs policy means that we are
+ * actually running two parsers. So, this is not really the same as the best
  * run, which was one parser running in the main thread with the indexer running
  * in another thread.
  * 
@@ -306,6 +305,96 @@ import com.bigdata.util.concurrent.Latch;
  * TotalValBytes: 4945278396
  * MaxCollisions: 2
  * TotalCollisions: 17260
+ * Journal size: 7320764416 bytes
+ * </pre>
+ * 
+ * BSBM 200M with 1M statement splits using the memory manager to buffer the
+ * data on the native heap. This is the best score so far (compare with
+ * 3724415ms with one parser and one indexer thread). For some reason, the #of
+ * distinct values and literals is slightly different for these two runs. One
+ * other change in this run is that we always gzip the record since we can not
+ * deserialize the record unless we know in advance whether or not it is
+ * compressed. Previous runs had conditionally compressed based on the original
+ * byte[] value length and stored the compressed record iff it was shorter.
+ * However, we can only conditionally compress if we use a header or bit flag to
+ * indicate that the record is compressed. Peak memory manager use was 262M.
+ * 
+ * <pre>
+ * Elapsed: 2863898ms
+ * NumStatements: 198805837
+ * NumDistinctVals: 12,202,052
+ * NumShortLiterals: 61,100,900
+ * NumShortBNodes: 0
+ * NumShortURIs: 493514954
+ * TotalKeyBytes: 61010260
+ * TotalValBytes: 4945376779
+ * MaxCollisions: 2
+ * TotalCollisions: 17260
+ * Journal size: 7320764416 bytes
+ * </pre>
+ * 
+ * BSBM 200M using memory manager (high tide of 351M) and 5 parser threads (plus
+ * the main thread). Heap usage is pretty controlled.
+ * 
+ * <pre>
+ * Elapsed: 2803451ms
+ * NumStatements: 198805837
+ * NumDistinctVals: 12202052
+ * NumShortLiterals: 61100900
+ * NumShortBNodes: 0
+ * NumShortURIs: 493514954
+ * TotalKeyBytes: 61010260
+ * TotalValBytes: 4945376779
+ * MaxCollisions: 2
+ * TotalCollisions: 17260
+ * Journal size: 7320764416 bytes
+ * </pre>
+ * 
+ * BSBM 200M. Using memory manager and only one parser thread. This does run
+ * significantly slower (55m versus 47m with two parser threads). It might not
+ * be slower if we also ran against the single source file (this ran against the
+ * split files) since each chunk placed onto the queue would then be full, but I
+ * doubt that this will make that much difference.
+ * 
+ * <pre>
+ * Elapsed: 3300871ms
+ * NumStatements: 198805837
+ * NumDistinctVals: 12049125
+ * NumShortLiterals: 61100900
+ * NumShortBNodes: 0
+ * NumShortURIs: 493514954
+ * TotalKeyBytes: 60245625
+ * TotalValBytes: 4877760110
+ * MaxCollisions: 2
+ * TotalCollisions: 16840
+ * Journal size: 7320764416 bytes
+ * </pre>
+ * 
+ * BSBM 200M. Using memory manager, one parser thread (the caller), and a single
+ * source file. The question is whether we do better with a statement handler
+ * that is only flushed incrementally (when full) compared to using 2 parsers
+ * and flushing each time we reach the end of a 1M statement source file. Nope.
+ * This was 77 minutes. (This was a fair comparison since the source files for
+ * the split sources are compressed. So we really do better with two parsers and
+ * split files)
+ * 
+ * <pre>
+ * /allocationCount=0
+ * /bufferCapacity=1000
+ * /bufferCount=232
+ * /extent=243269632
+ * /slotBytes=0
+ * /userBytes=0
+ * Elapsed: 4605950ms
+ * NumStatements: 198808848
+ * NumDistinctVals: 12198222
+ * NumShortLiterals: 61103832
+ * NumShortBNodes: 0
+ * NumShortURIs: 493520581
+ * TotalKeyBytes: 60991110
+ * TotalValBytes: 4944322031
+ * MaxCollisions: 2
+ * TotalCollisions: 17264
  * Journal size: 7320764416 bytes
  * </pre>
  * 
@@ -561,6 +650,7 @@ public class HashCollisionUtility {
 			
 				parserRunLatch.inc();
 				parserQueueLatch.dec();
+
 				super.run();
 				
 				parserRunLatch.dec();
@@ -771,13 +861,15 @@ public class HashCollisionUtility {
 	private final Counters c = new Counters();
 
 	/**
-	 * The upper bound on the size of a {@link ValueBuffer} chunk. The size of
-	 * the chunks, the capacity of the queue, and the number of chunks that may
-	 * be combined into a single chunk for the indexer may all be used to adjust
-	 * the parallelism and efficiency of the parsing and indexing. You have to
-	 * be careful not to let too much data onto the Java heap, but the indexer
-	 * will do better when it is given a bigger chunk since it can order the
-	 * data and be more efficient in the index updates.
+	 * The upper bound on the size of a {@link ValueBuffer} chunk (currently in
+	 * slotBytes for the allocations against the {@link MemoryManager}).
+	 * <p>
+	 * The size of the chunks, the capacity of the queue, and the number of
+	 * chunks that may be combined into a single chunk for the indexer may all
+	 * be used to adjust the parallelism and efficiency of the parsing and
+	 * indexing. You have to be careful not to let too much data onto the Java
+	 * heap, but the indexer will do better when it is given a bigger chunk
+	 * since it can order the data and be more efficient in the index updates.
 	 */
 	final int valBufSize = Bytes.megabyte32 * 10;// 100000;
 
@@ -798,7 +890,7 @@ public class HashCollisionUtility {
 
 	/**
 	 * How many parser threads to use. There can be only one parser per file,
-	 * but you can parse more than one file at a time.
+	 * but you can parse more than one file at a time. 
 	 */
 	final int nparserThreads = 1;
 
@@ -843,19 +935,24 @@ public class HashCollisionUtility {
 		this.termsIndex = getTermsIndex(jnl);
 
 		/*
-		 * Setup the parser thread pool.  If there is an attempt to run more
-		 * threads then 
+		 * Setup the parser thread pool. If there is an attempt to run more
+		 * threads then
+		 * 
+		 * Note: The pool size is one less than the total #of specified threads
+		 * since the caller will wind up running tasks rejected by the pool. If
+		 * the pool would be empty then it is [null] and the caller will run
+		 * the parser in its own thread.
 		 * 
 		 * Note: The work queue is bounded so that we do not read any too far in
 		 * the file system. The #of threads is bounded so that we do not run too
 		 * many parsers at once. However, running multiple parsers can increase
 		 * throughput as the parser itself caps out at ~ 68k tps.
 		 */
-		{
+		if (nparserThreads > 1) {
 			// this.parserService =
 			// Executors.newFixedThreadPool(nparserThreads);
-			final int corePoolSize = nparserThreads;
-			final int maximumPoolSize = nparserThreads;
+			final int corePoolSize = nparserThreads-1;
+			final int maximumPoolSize = nparserThreads-1;
 			final long keepAliveTime = 60;
 			final TimeUnit unit = TimeUnit.SECONDS;
 			final BlockingQueue<Runnable> workQueue = new LinkedBlockingQueue<Runnable>(
@@ -865,6 +962,11 @@ public class HashCollisionUtility {
 					maximumPoolSize, keepAliveTime, unit, workQueue,
 					new ThreadPoolExecutor.CallerRunsPolicy()
 			);
+		} else {
+			/*
+			 * The caller must run the parser in its own thread.
+			 */
+			this.parserService = null;
 		}
 		
 		// But they all feed the same indexer.
@@ -969,8 +1071,10 @@ public class HashCollisionUtility {
 			if (log.isDebugEnabled())
 				log.debug("Waiting on parserQueueLatch: " + parserQueueLatch);
 			parserQueueLatch.await();
-			// no new parsers may start
-			parserService.shutdown();
+			if (parserService != null) {
+				// no new parsers may start
+				parserService.shutdown();
+			}
 			if (log.isDebugEnabled())
 				log.debug("Waiting on parserRunLatch: " + parserRunLatch);
 			parserRunLatch.await();
@@ -983,8 +1087,11 @@ public class HashCollisionUtility {
 				// wait for the indexer to finish.
 				indexerTask.get();
 			}
-			indexerService.shutdown();
+			if (indexerService != null)
+				indexerService.shutdown();
 			if (mmgr != null) {
+				if (log.isInfoEnabled())
+					log.info(mmgr.getCounters().toString());
 				mmgr.clear();
 			}
 		} finally {
@@ -1001,8 +1108,10 @@ public class HashCollisionUtility {
 	public void shutdownNow() throws Exception {
 		log.debug("shutdownNow");
 		parsing.set(false);
-		parserService.shutdownNow();
-		indexerService.shutdownNow();
+		if (parserService != null)
+			parserService.shutdownNow();
+		if (indexerService != null)
+			indexerService.shutdownNow();
 		if (indexerTask != null) {
 			indexerTask.cancel(true/* mayInterruptIfRunning */);
 		}
@@ -1030,8 +1139,7 @@ public class HashCollisionUtility {
 					// Blocking take so we know that there is something ready.
 					final ValueBuffer first = valueQueue.take();
 
-					// Drain the queue, but keep an eye out for that poison
-					// pill.
+					// Drain queue, but keep an eye out for that poison pill.
 					final LinkedList<ValueBuffer> coll = new LinkedList<ValueBuffer>();
 
 					// The element we already took from the queue.
@@ -1040,13 +1148,12 @@ public class HashCollisionUtility {
 					// Drain (non-blocking).
 					final int ndrained = valueQueue.drainTo(coll, maxDrain) + 1;
 
-					if (log.isDebugEnabled())
-						log.debug("Drained " + ndrained + " chunks with "
+					if (log.isInfoEnabled())
+						log.info("Drained " + ndrained + " chunks with "
 								+ valueQueue.size()
 								+ " remaining in the queue.");
 
-					// look for and remove the poison pill, noting if it was
-					// found.
+					// look for and remove poison pill, noting if found.
 					if (coll.remove(poisonPill)) {
 
 						if (log.isDebugEnabled())
@@ -1421,8 +1528,15 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				new ParseFileTask(f, fallback, fileBufSize, vf, stmtHandler)
 				);
 
-        // run the parser
-        parserService.submit(ft);
+		if (parserService != null) {
+			// run on the thread pool.
+			parserService.submit(ft);
+		} else {
+			// Run in the caller's thread.
+			ft.run();
+			// Test the Future.
+			ft.get();
+		}
 
 	}
 
@@ -1540,6 +1654,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
      */
     static private class StatementHandler extends RDFHandlerBase {
 
+//    	private static final transient Logger log = HashCollisionUtility.log; 
+    	
 		/**
     	 * Various counters that we track.
     	 */
@@ -1929,7 +2045,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		 * @throws InterruptedException
 		 */
 		void flush() throws InterruptedException {
-
+			
 			if (nvalues == 0)
 				return;
 
@@ -1938,8 +2054,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				throw new IllegalStateException();
 			}
 
-			if (log.isDebugEnabled())
-				log.debug("Adding chunk with " + nvalues + " values and "
+			if (log.isInfoEnabled())
+				log.info("Adding chunk with " + nvalues + " values and "
 						+ context.getUserBytes() + " bytes to queue.");
 
 			/*
@@ -2137,8 +2253,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 			
 			final long begin = System.currentTimeMillis();
 
-			if (log.isDebugEnabled())
-				log.debug("Indexing " + vbuf.nvalues + " values occupying "
+			if (log.isInfoEnabled())
+				log.info("Indexing " + vbuf.nvalues + " values occupying "
 						+ vbuf.getUserBytes() + " bytes");
 
 			/*
@@ -2170,18 +2286,18 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 			}
 
-			// release the address map and backing allocation context.
-			vbuf.clear();
-
-			if (log.isDebugEnabled()) {
+			if (log.isInfoEnabled()) {
 			
 				final long elapsed = System.currentTimeMillis() - begin;
 
-				log.debug("Indexed " + vbuf.nvalues + " values occupying "
+				log.info("Indexed " + vbuf.nvalues + " values occupying "
 						+ vbuf.getUserBytes() + " bytes in " + elapsed + "ms");
 			
 			}
 			
+			// release the address map and backing allocation context.
+			vbuf.clear();
+
 			return (Void) null;
 
 		}
