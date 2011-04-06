@@ -37,6 +37,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -901,9 +902,6 @@ public class FullTextIndex extends AbstractRelation {
         
     }
 
-    /*
-     * FIXME [prefixMatch] has not been implemented yet.
-     */
     public Hiterator search(final String query, final String languageCode,
             final boolean prefixMatch) {
 
@@ -913,6 +911,7 @@ public class FullTextIndex extends AbstractRelation {
                 prefixMatch,//
                 .4, // minCosine
                 10000, // maxRank
+                false, // matchAllTerms
                 this.timeout,//
                 TimeUnit.MILLISECONDS//
                 );
@@ -942,7 +941,7 @@ public class FullTextIndex extends AbstractRelation {
             final double minCosine, final int maxRank) {
         
         return search(query, languageCode, false/* prefixMatch */, minCosine,
-                maxRank, this.timeout, TimeUnit.MILLISECONDS);
+                maxRank, false, this.timeout, TimeUnit.MILLISECONDS);
 
     }
 
@@ -990,6 +989,8 @@ public class FullTextIndex extends AbstractRelation {
      *            <code>free</code> will be an exact match on <code>free</code>
      *            but a partial match on <code>freedom</code>. When
      *            <code>false</code>, only exact matches will be made.
+     * @param matchAllTerms
+     * 			  if true, return only hits that match all search terms
      * @param timeout
      *            The timeout -or- ZERO (0) for NO timeout (this is equivalent
      *            to using {@link Long#MAX_VALUE}).
@@ -1014,7 +1015,8 @@ public class FullTextIndex extends AbstractRelation {
      */
     public Hiterator<Hit> search(final String query, final String languageCode,
             final boolean prefixMatch, final double minCosine,
-            final int maxRank, long timeout, final TimeUnit unit) {
+            final int maxRank, final boolean matchAllTerms,
+            long timeout, final TimeUnit unit) {
 
         final long begin = System.currentTimeMillis();
         
@@ -1039,6 +1041,7 @@ public class FullTextIndex extends AbstractRelation {
         if (log.isInfoEnabled())
             log.info("languageCode=[" + languageCode + "], text=[" + query
                     + "], minCosine=" + minCosine + ", maxRank=" + maxRank
+                    + ", matchAllTerms=" + matchAllTerms
                     + ", timeout=" + timeout + ", unit=" + unit);
 
         if (timeout == 0L) {
@@ -1126,6 +1129,22 @@ public class FullTextIndex extends AbstractRelation {
             }
 
         }
+
+        if (matchAllTerms) {
+	        final int nterms = qdata.terms.size();
+	        
+	        if (log.isInfoEnabled())
+	        	log.info("nterms: " + nterms);
+	        
+	        final Iterator<Map.Entry<Long,Hit>> it = hits.entrySet().iterator();
+	        while (it.hasNext()) {
+	        	final Hit hit = it.next().getValue();
+		        if (log.isInfoEnabled())
+		        	log.info("hit terms: " + hit.getTermCount());
+	        	if (hit.getTermCount() != nterms)
+	        		it.remove();
+	        }
+        }
         
         // #of hits.
         final int nhits = hits.size();
@@ -1151,7 +1170,7 @@ public class FullTextIndex extends AbstractRelation {
         if (log.isInfoEnabled())
             log.info("Rank ordering "+nhits+" hits by relevance");
         
-        final Hit[] a = hits.values().toArray(new Hit[0]);
+        final Hit[] a = hits.values().toArray(new Hit[nhits]);
         
         Arrays.sort(a);
 

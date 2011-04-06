@@ -225,7 +225,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
     final public boolean isOptional() {
 
-        return (Boolean) getProperty(Annotations.OPTIONAL,Boolean.FALSE);
+        return (Boolean) getProperty(Annotations.OPTIONAL,Annotations.DEFAULT_OPTIONAL);
         
     }
 

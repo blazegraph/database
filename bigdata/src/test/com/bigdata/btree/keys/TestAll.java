@@ -71,6 +71,9 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestJDKUnicodeKeyBuilder.class);
         suite.addTestSuite(TestICUUnicodeKeyBuilder.class);
 
+        suite.addTestSuite(TestICUPortabilityBug.class);
+        suite.addTestSuite(TestICUVersionRecord.class);
+                
         return suite;
         
     }

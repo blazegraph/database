@@ -32,6 +32,7 @@ import java.util.Properties;
 
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.keys.ICUVersionRecord;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileLockUtility;
@@ -350,6 +351,19 @@ public interface Options {
      */
     String IGNORE_BAD_ROOT_BLOCK = AbstractJournal.class.getName()+".ignoreBadRootBlock";
 
+    /**
+     * <strong>WARNING - The use of this option is dangerous.</strong> This
+     * option may be used to update the {@link ICUVersionRecord} associated with
+     * the journal. ICU provides a Unicode sort key generation service for
+     * bigdata. Unicode sort keys are used in many indices, including the
+     * {@link Name2Addr} index. If the new ICU version produces Unicode sort
+     * keys which are not binary compatible with the Journal, then your data may
+     * become inaccessible since you will be unable to probe the
+     * {@link Name2Addr} index to locate named indices. The same problem can
+     * manifest with application indices which use Unicode sort keys.
+     */
+    String UPDATE_ICU_VERSION = AbstractJournal.class.getName()+".updateICUVersion";
+    
     /**
      * An optional boolean property (default is {@value #DEFAULT_CREATE}). When
      * <code>true</code> and the named file is not found, a new journal will be

@@ -60,6 +60,7 @@ import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ReadOnlyIndex;
+import com.bigdata.btree.keys.ICUVersionRecord;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
@@ -76,6 +77,7 @@ import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.io.IDataRecord;
 import com.bigdata.io.IDataRecordAccess;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.mdi.IResourceMetadata;
@@ -174,18 +176,25 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 */
 	public static transient final int ROOT_NAME2ADDR = 0;
 
-	/**
-	 * The index of the address where the root block copy from the previous
-	 * commit is stored
-	 */
+    /**
+     * The index of the root address where the root block copy from the previous
+     * commit is stored.
+     */
 	public static transient final int PREV_ROOTBLOCK = 1;
 
 	/**
-	 * The index of the address of the delete blocks associated with
-	 * this transaction
+	 * The index of the root address of the delete blocks associated with
+	 * this transaction.
 	 */
 	public static transient final int DELETEBLOCK = 2;
 
+    /**
+     * The index of the root address containing the {@link ICUVersionRecord}.
+     * That record specifies the ICU version metadata which was in force when
+     * the journal was created.
+     */
+    public static transient final int ROOT_ICUVERSION = 3;
+    
 	/**
 	 * A clone of the properties used to initialize the {@link Journal}.
 	 */
@@ -290,6 +299,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 */
 	private volatile CommitRecordIndex _commitRecordIndex;
 
+	/**
+	 * The {@link ICUVersionRecord} iff known.
+	 */
+	private volatile ICUVersionRecord _icuVersionRecord;
+	
 	/**
 	 * The configured capacity for the {@link HardReferenceQueue} backing the
 	 * index cache maintained by the "live" {@link Name2Addr} object.
@@ -1003,6 +1017,27 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			// new or re-load commit record index from store via root block.
 			this._commitRecordIndex = _getCommitRecordIndex();
 
+            // new or re-load from the store.
+			this._icuVersionRecord = _getICUVersionRecord();
+
+			// verify the ICU version.
+            if (this._icuVersionRecord != null
+                    && !ICUVersionRecord.newInstance().equals(
+                            this._icuVersionRecord)) {
+
+                final boolean update = Boolean.valueOf(properties.getProperty(
+                        Options.UPDATE_ICU_VERSION, "false"));
+
+                if (!update) {
+
+                    throw new RuntimeException("ICUVersionChange: store="
+                            + this._icuVersionRecord + ", runtime="
+                            + ICUVersionRecord.newInstance());
+
+                }
+                
+			}
+			
 			// Give the store a chance to set any committers that it defines.
 			setupCommitters();
 
@@ -2081,6 +2116,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			// clear reference and reload from the store.
 			_commitRecordIndex = _getCommitRecordIndex();
 			
+			// clear reference and reload from the store.
+			_icuVersionRecord = _getICUVersionRecord();
+			
 			// clear the array of committers.
 			_committers = new ICommitter[_committers.length];
 
@@ -2813,10 +2851,112 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			if (_bufferStrategy instanceof RWStrategy)
 				setCommitter(DELETEBLOCK, new DeleteBlockCommitter((RWStrategy) _bufferStrategy));
 
-
+            /*
+             * Responsible for writing the ICUVersionRecord exactly once onto
+             * the backing store, e.g., when the store is created or when it is
+             * open with the "update" option specified for ICU.
+             */
+            setCommitter(ROOT_ICUVERSION, new ICUVersionCommitter());
 
 		}
 
+	}
+
+    /**
+     * Return the {@link ICUVersionRecord} from the current
+     * {@link ICommitRecord} -or- a new instance for the current runtime
+     * environment if the root address for {@link #ROOT_ICUVERSION} is
+     * {@link #NULL}.
+     */
+    private ICUVersionRecord _getICUVersionRecord() {
+
+        assert _fieldReadWriteLock.writeLock().isHeldByCurrentThread();
+
+        final long addr = getRootAddr(ROOT_ICUVERSION);
+
+        final ICUVersionRecord r;
+        if (addr == NULL) {
+            // New instance for the current runtime environment.
+            r = ICUVersionRecord.newInstance();
+        } else {
+            // Existing instance from the store.
+            r = (ICUVersionRecord) SerializerUtil.deserialize(read(addr));
+        }
+        return r;
+        
+    }
+
+    /**
+     * Writes the {@link ICUVersionRecord} onto the store iff either (a) it does
+     * not exist; or (b) it exists, it differs from the last persistent record,
+     * and the update flag was specified.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * 
+     * @see Options#UPDATE_ICU_VERSION
+     */
+    private class ICUVersionCommitter implements ICommitter {
+
+        private boolean update;
+        
+        private long lastAddr;
+
+        private ICUVersionCommitter() {
+            
+            // the "update" option.
+            update = Boolean.valueOf(properties.getProperty(
+                    Options.UPDATE_ICU_VERSION, "false"));
+            
+            // lookup the address of the ICU version record (may be NULL).
+            lastAddr = getRootAddr(ROOT_ICUVERSION);
+            
+        }
+
+        /**
+         * Commits a new {@link ICUVersionRecord} IF none is defined -OR- IF one
+         * is defined, it is a different version of ICU, and the update flag is
+         * set.
+         */
+        public long handleCommit(final long commitTime) {
+
+            if(!update && lastAddr != NULL) {
+                
+                // Nothing changed.
+                return lastAddr;
+                
+            }
+
+            /*
+             * Note: The Journal only validates the persistent ICU version
+             * record in its constructor. By the time the code reaches this
+             * point, it is either in agreement or will be written.
+             */
+
+            final ICUVersionRecord r = ICUVersionRecord.newInstance();
+
+            if (lastAddr == NULL || !(r.equals(_icuVersionRecord) && update)) {
+
+                if (_icuVersionRecord != null && update)
+                    log.warn("Updating ICUVersion: old=" + _icuVersionRecord
+                            + ", new=" + r);
+
+                // do not update next time.
+                update = false;
+                
+                // write ICU version record onto the store.
+                lastAddr = write(ByteBuffer.wrap(SerializerUtil.serialize(r)));
+            
+                // return address of the ICU version record.
+                return lastAddr;
+                
+            }
+            
+            // Nothing changed.
+            return lastAddr;
+            
+        }
+	    
 	}
 
 	/*

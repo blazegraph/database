@@ -159,7 +159,7 @@ public class INHashMap<T> extends INConstraint<T> {
 
         if (x == null) {
 
-            // not yet bound.
+            // not yet bound : FIXME Modify to return false - variables must be bound
             return true;
             
         }

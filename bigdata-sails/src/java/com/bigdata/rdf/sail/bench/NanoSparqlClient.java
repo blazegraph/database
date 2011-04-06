@@ -42,6 +42,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
@@ -60,6 +62,9 @@ import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLParserFactory;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.rio.rdfxml.RDFXMLParser;
+
+import com.bigdata.counters.CAT;
+import com.bigdata.jsr166.LinkedBlockingQueue;
 
 /**
  * A flyweight utility for issuing queries to an http SPARQL endpoint.
@@ -188,7 +193,7 @@ public class NanoSparqlClient {
 	/**
 	 * Class runs a SPARQL query against an HTTP endpoint.
 	 */
-	static public class Query implements Callable<Void> {
+	static public class QueryTask implements Callable<Void> {
 
 //		private final HttpClient client;
 		final QueryOptions opts;
@@ -197,7 +202,7 @@ public class NanoSparqlClient {
 		 * 
 		 * @param opts The query options.
 		 */
-		public Query(/* HttpClient client, */ final QueryOptions opts) {
+		public QueryTask(/* HttpClient client, */ final QueryOptions opts) {
 
 			if (opts == null)
 				throw new IllegalArgumentException();
@@ -225,7 +230,8 @@ public class NanoSparqlClient {
 			final ParsedQuery q = engine.parseQuery(opts.queryStr, opts.baseURI);
 
 			if (opts.showQuery) {
-				System.err.println("---- Query "
+				System.err.println("---- " + Thread.currentThread().getName()
+						+ " : Query "
 						+ (opts.source == null ? "" : " : " + opts.source)
 						+ "----");
 				System.err.println(opts.queryStr);
@@ -273,6 +279,7 @@ public class NanoSparqlClient {
 				case CONSTRUCT:
 					conn.setRequestProperty("Accept", MIME_RDF_XML);
 					break;
+				case ASK:
 				case SELECT:
 					conn.setRequestProperty("Accept", MIME_SPARQL_RESULTS_XML);
 					break;
@@ -332,14 +339,11 @@ public class NanoSparqlClient {
 					 */
 					final long nresults;
 					switch (queryType) {
-					case ASK:
-						// TODO parse the response.
-						nresults = 1L;
-						break;
 					case DESCRIBE:
 					case CONSTRUCT:
 						nresults = buildGraph(conn).size();
 						break;
+					case ASK: // I think that there are some alternative mime types for ask...
 					case SELECT:
 						nresults = countResults(conn);
 						break;
@@ -652,9 +656,20 @@ public class NanoSparqlClient {
 
 				int i = 1; // Note: Origin ONE (1).
 
-				for (String x : a) {
+				for (String queryStr : a) {
 
-					map.put(file.toString() + "#" + i, x);
+					if(queryStr.trim().length() == 0) {
+						// Skip blank lines.
+						continue;
+					}
+					
+//					// FIXME This is ignoring search queries!
+//					if (x.contains("#search"))
+						map.put(file.toString() + "#" + i, queryStr);
+						
+					if (log.isDebugEnabled())
+						log.debug("Read query: file=" + file + ", index=" + i
+								+ ", query=" + queryStr);
 
 					i++;
 
@@ -724,7 +739,7 @@ public class NanoSparqlClient {
     /**
 	 * Options for the query.
 	 */
-	public static class QueryOptions {
+	public static class QueryOptions implements Cloneable {
 
 		/** The URL of the SPARQL endpoint. */
 		public String serviceURL = null;
@@ -793,6 +808,354 @@ public class NanoSparqlClient {
 
         }
         
+        public QueryOptions clone() {
+        	
+        	try {
+				
+        		return (QueryOptions) super.clone();
+
+        	} catch (CloneNotSupportedException e) {
+        		
+				throw new RuntimeException(e);
+				
+			}
+        	
+        }
+        
+	}
+
+	/**
+	 * Metadata about a single presentation of a SPARQL query.
+	 * 
+	 * @author thompsonbry
+	 */
+	private static class QueryTrial {
+	
+		private final long elapsedNanos;
+		private final long resultCount;
+		private final Throwable cause;
+		public QueryTrial(final long elapsedTime,final long resultCount) {
+			this.elapsedNanos = elapsedTime;
+			this.resultCount = resultCount;
+			this.cause = null;
+		}
+		public QueryTrial(final Throwable cause) {
+			this.elapsedNanos = -1;
+			this.resultCount = -1;
+			this.cause = cause;
+		}
+		
+	}
+
+	/**
+	 * A SPARQL query together with its {@link Score}s and utility methods to
+	 * submit the query, aggregate across its {@link Score}s, and report on the
+	 * aggregated query performance.
+	 * 
+	 * TODO Now that we keep the elapsed time and result count for each query
+	 * trial, we can report on min/max/stdev and changes in the #of results
+	 * across trials (which indicates a query which is not stable in its result
+	 * set size).
+	 */
+	private static class Query {
+	
+		/** The source query identifier. */
+		public final String source;
+		
+		/** The query. */
+		public final String queryStr;
+
+		/** Metadata about each query presentation. */
+		public LinkedBlockingQueue<QueryTrial> trials = new LinkedBlockingQueue<QueryTrial>(/* unbounded */);
+
+		/**
+		 * Total elapsed nanoseconds over all {@link QueryTrial}s for this
+		 * {@link Query}.
+		 */
+		public final CAT elapsedNanos = new CAT();
+		
+		public Query(final String source, final String queryStr) {
+
+			this.source = source;
+
+			this.queryStr = queryStr;
+
+		}
+
+		public QueryTrial runQuery(QueryOptions opts) throws Exception {
+
+			opts = opts.clone();
+
+			opts.queryStr = this.queryStr;
+
+			opts.source = this.source;
+
+			try {
+
+				// Run the query
+				new QueryTask(/* client, */opts).call();
+
+				final QueryTrial trial = new QueryTrial(opts.elapsedNanos,
+						opts.nresults);
+
+				trials.add(trial);
+
+				elapsedNanos.add(opts.elapsedNanos);
+
+				return trial;
+
+			} catch (Throwable t) {
+
+				trials.add(new QueryTrial(t));
+
+				throw new Exception(t);
+				
+			}
+
+		}
+		
+	}
+
+	/**
+	 * Class models a aggregated score for a specific query.
+	 */
+	private static class Score implements Comparable<Score> {
+
+		/** The query. */
+		public final Query query;
+
+		/** Total elapsed time (nanos). */
+		public final long elapsedNanos;
+
+		public Score(final Query query) {
+
+			this.query = query;
+
+			// average elapsed nanos for this query across all trials.
+			this.elapsedNanos = query.elapsedNanos.get() / query.trials.size();
+
+		}
+
+		/**
+		 * Order by increasing elapsed time (slowest queries are last).
+		 */
+		public int compareTo(Score o) {
+			if (elapsedNanos < o.elapsedNanos)
+				return -1;
+			if (elapsedNanos > o.elapsedNanos)
+				return 1;
+			return 0;
+		}
+		
+	}
+
+	/**
+	 * Return the order in which the queries will be evaluated. The order in
+	 * which those queries will be executed is determined by the
+	 * <code>seed</code>. When non-zero, the queries evaluation order will be
+	 * randomized. Otherwise the queries are evaluated in the given order. The
+	 * elements of the returned <code>order[]</code> are indices into the
+	 * <code>query[]</code>. The length of the returned <code>order[]</code> is
+	 * the #of queries given times the <i>repeat</i> count.
+	 * 
+	 * @param seed
+	 *            The random seed -or- ZERO (0L) if the queries will be
+	 *            evaluated in the given order.
+	 * @param repeat
+	 *            The repeat count.
+	 * @param nqueries
+	 *            The #of queries.
+	 * 
+	 * @return The evaluation order. The indices in the array are in
+	 *         <code>[0:nqueries)</code>. Each index appears <i>repeat</i> times
+	 *         in the array.
+	 */
+	private static int[] getQueryOrder(final long seed, final int repeat,
+			final int nqueries) {
+
+		final int[] order;
+
+		// Total #of trials to execute.
+		final int ntrials = nqueries * repeat;
+
+		// Determine the query presentation order.
+		if (seed == 0) {
+		
+			// Run queries in the given order.
+			order = new int[ntrials];
+			
+			for (int i = 0; i < ntrials; i++) {
+			
+				order[i] = i;
+				
+			}
+			
+		} else {
+			
+			// Run queries in a randomized order.
+			order = getRandomOrder(seed, ntrials);
+		}
+
+		// Now normalize the query index into [0:nqueries).
+		for (int i = 0; i < ntrials; i++) {
+		
+			order[i] = order[i] % nqueries;
+			
+		}
+
+		return order;
+
+	}
+	
+//	/**
+//	 * Runs the queries in the evaluation order.
+//	 * 
+//	 * @param order
+//	 *            The evaluation order. This is an array of indices into the
+//	 *            <i>queries</i> array. Indices for the same query may appear
+//	 *            more than once.
+//	 * @param queries
+//	 *            The queries.
+//	 * @param opts
+//	 *            The configured query options.
+//	 * @param nerrors
+//	 *            The #of errors is reported via this variable as a side effect.
+//	 */
+//	private static void runQueriesSingleThreaded(final int[] order,
+//			final Query[] queries, final QueryOptions opts,
+//			final AtomicLong nerrors) {
+//
+//		for (int i = 0; i < order.length; i++) {
+//
+//			final int queryId = order[i];
+//
+//			final Query query = queries[queryId];
+//
+//			new RunQueryTask(query, opts, nerrors).run();
+//
+//		} // next query in the evaluation order
+//
+//	}
+
+	/**
+	 * Run a query.
+	 */
+	static class RunQueryTask implements Runnable {
+
+		private final Query query;
+		private final QueryOptions opts;
+		private final AtomicLong nerrors;
+
+		/**
+		 * @param query
+		 *            The query.
+		 * @param opts
+		 *            The configured query options (will be cloned).
+		 * @param nerrors
+		 *            The #of errors is reported via this variable as a side
+		 *            effect.
+		 */
+		public RunQueryTask(final Query query, final QueryOptions opts,
+				final AtomicLong nerrors) {
+
+			if (query == null)
+				throw new IllegalArgumentException();
+
+			if (opts == null)
+				throw new IllegalArgumentException();
+
+			if (nerrors == null)
+				throw new IllegalArgumentException();
+
+			this.query = query;
+
+			this.opts = opts;
+
+			this.nerrors = nerrors;
+
+		}
+
+		public void run() {
+
+			try {
+
+				final QueryTrial trial = query.runQuery(opts);
+
+				if (!opts.quiet) {
+					// Show the query run time, #of results, source, etc.
+					System.err.println("resultCount="
+							+ (trial.resultCount == -1 ? "N/A"
+									: trial.resultCount) + ", elapsed="
+							+ TimeUnit.NANOSECONDS.toMillis(trial.elapsedNanos)
+							+ "ms, source=" + query.source);
+				}
+
+			} catch (Throwable t) {
+
+				nerrors.incrementAndGet();
+
+				log.error("nerrors=" + nerrors + ", source=" + query.source
+						+ ", query=" + query.queryStr + ", cause=" + t);// , t);
+
+			}
+
+		}
+		
+	} // RunQueryTask
+	
+	/**
+	 * Return the {@link Score}s for a collection of queries.
+	 * 
+	 * @param queries
+	 *            The queries (after they have been evaluated).
+	 *            
+	 * @return The {@link Score}s.
+	 */
+	private static Score[] getScores(final Query[] queries) {
+
+		final Score[] a = new Score[queries.length];
+
+		for (int i = 0; i < queries.length; i++) {
+
+			final Query query = queries[i];
+
+			a[i] = new Score(query);
+
+		}
+
+		return a;
+		
+	}
+
+	/**
+	 * Report the average running time for each query on <code>stdout</code>.
+	 * 
+	 * @param a
+	 *            The query scores.
+	 * @param minMillisLatencyToReport
+	 *            The minimum latency (in milliseconds) to report.
+	 */
+	private static void reportScores(final Score[] a,
+			final long minMillisLatencyToReport) {
+
+		// Place into order (ascending average query evaluation time).
+		Arrays.sort(a);
+
+		System.out.println("average(ms)\tsource\tquery");
+
+		for (int i = 0; i < a.length; i++) {
+
+			final Score s = a[i];
+
+			final long elapsedMillis = TimeUnit.NANOSECONDS
+					.toMillis(s.elapsedNanos);
+
+			if (elapsedMillis >= minMillisLatencyToReport)
+				System.out.println(elapsedMillis + "\t" + s.query.source + "\t"
+						+ s.query.queryStr);
+
+		}
+
 	}
 
 	private static void usage() {
@@ -853,6 +1216,9 @@ public class NanoSparqlClient {
 	 *            <dt>-query</dt>
 	 *            <dd>The query follows immediately on the command line (be sure
 	 *            to quote the query).</dd>
+	 *            <dt>-clients</dt>
+	 *            <dd>The #of client threads which will issue queries (default
+	 *            ONE (1)).</dd>
 	 *            <dt>-repeat #</dt>
 	 *            <dd>The #of times to present each query. A seed of ZERO (0)
 	 *            will disable the randomized presentation of the queries. The
@@ -889,6 +1255,10 @@ public class NanoSparqlClient {
 		File file = null; // When non-null, file or directory containing query(s).
 		Pattern delim = null; // When non-null, this delimits queries within a file.
 		String queryStr = null; // A query given directly on the command line.
+		int nclients = 1; // The #of clients.
+		int threadsPerClient = 1; // TODO The #of threads per client IFF groupQueriesBySource is true.
+		boolean groupQueriesBySource = false; // TODO When true, each source represents a batch of queries.
+		long interGroupDelayMillis = 0L; // Latency by the client between query batches. 
 		final QueryOptions opts = new QueryOptions();
         {
 
@@ -941,7 +1311,15 @@ public class NanoSparqlClient {
 
                     queryStr = args[++i];
 
-				} else if (arg.equals("-repeat")) {
+        		} else if (arg.equals("-clients")) {
+
+                    if ((nclients = Integer.valueOf(args[++i])) < 1) {
+
+                        throw new IllegalArgumentException("Bad clients.");
+                        
+				    }
+        		
+        		} else if (arg.equals("-repeat")) {
 
                     if ((repeat = Integer.valueOf(args[++i])) < 1) {
 
@@ -1047,8 +1425,7 @@ public class NanoSparqlClient {
 //
 //		}
 
-        final String[] queries; // The query(s) to run.
-        final String[] sources; // The source for each query (stdin|filename).
+        final Query[] queries;
 		if (file != null) {
 
 			/*
@@ -1072,20 +1449,15 @@ public class NanoSparqlClient {
 			
 			if (!opts.quiet)
 				System.err.println("Read " + nqueries + " queries from "
-						+ file);
+						+ fileList.size() + " sources in " + file);
 
-			queries = new String[nqueries];
-			sources = new String[nqueries];
+			queries = new Query[nqueries];
 
 			int i = 0;
 
 			for (Map.Entry<String,String> e : map.entrySet()) {
 
-				sources[i] = e.getKey();
-				
-				queries[i] = e.getValue();
-				
-				i++;
+				queries[i++] = new Query(e.getKey(), e.getValue());
 				
 			}
 
@@ -1096,6 +1468,8 @@ public class NanoSparqlClient {
 			 * argument or we will read it from stdin now.
 			 */
 			
+			final String source;
+			
 			if (queryStr == null) {
 
 				if (opts.verbose)
@@ -1103,184 +1477,172 @@ public class NanoSparqlClient {
 
 				queryStr = readFromStdin();
 				
-				sources = new String[] { "stdin" };
+				source = "stdin";
 
 			} else {
 
-				sources = new String[] { "command line" };
+				source = "command line";
 
 			}
 
 			// An array with just the one query.
-			queries = new String[] { queryStr };
-			
-		}
+			queries = new Query[] { new Query(queryStr, source) };
 
-		/*
-		 * The order in which those queries will be executed. The elements of
-		 * this array are indices into the query[]. The length of the array is
-		 * the #of queries given times the repeat count.
-		 */
-		final int[] order;
-		{
-			// Total #of trials to execute.
-			final int ntrials = queries.length * repeat;
-
-			// Determine the query presentation order.
-			if (seed == 0) {
-				// Run queries in the given order.
-				order = new int[ntrials];
-				for (int i = 0; i < ntrials; i++) {
-					order[i] = i;
-				}
-			} else {
-				// Run queries in a randomized order.
-				order = getRandomOrder(seed, ntrials);
-			}
-			// Now normalize the query index into [0:nqueries).
-			for (int i = 0; i < ntrials; i++) {
-				order[i] = order[i] % queries.length;
-			}
 		}
 
 		/*
 		 * Run trials.
-		 * 
-		 * @todo option for concurrent clients (need N copies of opts).
-		 * 
-		 * @todo keep elapsed time for each presentation and result count so we
-		 * can report on min/max/stdev and changes in the #of results across
-		 * trials (which indicates a query which is not stable in its result set
-		 * size). This can be indexed by the trial# for a query. Each client
-		 * should be assigned a mixture from the pool, including a trial# for
-		 * each query.
 		 */
-
-		//		System.err.println("order="+Arrays.toString(order));
 		
 		// total elapsed milliseconds for all trials.
 		final long beginTrials = System.currentTimeMillis();
-		
-		// cumulative elapsed nanos for each presentation of each query
-		final long[] elapsedTimes = new long[queries.length];
-		
-		long nerrors = 0;
-		
-		for (int i = 0; i < order.length; i++) {
 
-			final int queryId = order[i];
+		// total #of errors across all query presentations.
+		final AtomicLong nerrors = new AtomicLong();
+		
+		if (nclients == 1 && !groupQueriesBySource) {
 
-			opts.queryStr = queries[queryId];
+			/*
+			 * Run the queries in a single thread.
+			 */
 
-			final String source = opts.source = sources[queryId];
+			System.err.println("Running queries with with a single client");
+
+			final int[] order = getQueryOrder(seed, repeat, queries.length);
+
+			for (int i = 0; i < order.length; i++) {
+
+				final int queryId = order[i];
+
+				final Query query = queries[queryId];
+
+				new RunQueryTask(query, opts, nerrors).run();
+
+			}
+
+		} else if(!groupQueriesBySource) {
+	
+			/*
+			 * Run the queries using N clients.
+			 */
+
+			System.err
+					.println("Running queries with parallel clients: nclients="
+							+ nclients);
+
+			// The evaluation order is used to assign tasks to clients.
+			final int[] order = getQueryOrder(seed, repeat, queries.length);
+
+			// The tasks to be run.
+			final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
+
+			for (int i = 0; i < order.length; i++) {
+
+				final RunQueryTask runnable = new RunQueryTask(
+						queries[order[i]], opts, nerrors);
+
+				tasks.add(new Callable<Void>() {
+					public Void call() throws Exception {
+						runnable.run();
+						return (Void) null;
+					}
+				});
+
+			}
+
+			final ExecutorService clientService = Executors
+					.newFixedThreadPool(nclients);
 
 			try {
 
-				// Run the query
-				new Query(/* client, */opts).call();
-
-				elapsedTimes[queryId] += opts.elapsedNanos;
-
-				if (!opts.quiet) {
-					// Show the query run time, #of results, source, etc.
-					System.err.println("queryId=" + queryId + ", resultCount="
-							+ opts.nresults + ", elapsed="
-							+ TimeUnit.NANOSECONDS.toMillis(opts.elapsedNanos)
-							+ "ms" + ", source=" + source);
-				}
-
-			} catch (Throwable t) {
-
-				nerrors++;
+				// Run the tasks.
+				clientService.invokeAll(tasks);
 				
-				log.error("nerrors=" + nerrors + ", source=" + source
-						+ ", cause=" + t);// , t);
+			} finally {
+
+				clientService.shutdownNow();
 				
 			}
-
-		}
-
-		{
 			
+		} else {
+
 			/*
-			 * Report the average running time for each query.
+			 * FIXME group queries by source and impose latency between batches.
+			 * Randomization is dependent on whether or not the seed was set to
+			 * ZERO (0L).
 			 */
-
-			final Score[] a = new Score[queries.length];
+			throw new UnsupportedOperationException();
 			
-			for (int i = 0; i < queries.length; i++) {
-
-				final long elapsedNanos = elapsedTimes[i] / repeat;
-
-				a[i] = new Score(sources[i], queries[i], elapsedNanos);
-				
-			}
-			
-			// Place into order
-			Arrays.sort(a);
-
-			System.out.println("average(ms), source");
-
-			for (int i = 0; i < a.length; i++) {
-
-				final Score s = a[i];
-
-				final long elapsedMillis = TimeUnit.NANOSECONDS
-						.toMillis(s.elapsedNanos);
-
-				if (elapsedMillis >= minLatencyToReport)
-					System.out.println(elapsedMillis + ", " + s.source);
-
-			}
-
 		}
+
+		/*
+		 * Report the average query latency for queries with at least a
+		 * specified latency.
+		 */
+		reportScores(getScores(queries), minLatencyToReport);
 
 		System.out.println("Total elapsed time: "
 				+ (System.currentTimeMillis() - beginTrials) + "ms for "
 				+ queries.length + " queries with " + repeat
-				+ " trials each.  Reporting only queries with at least "
+				+ " trials each and " + nclients
+				+ " clients.  Reporting only queries with at least "
 				+ minLatencyToReport + "ms latency.");
-		
+
 		// Normal exit.
 		System.exit(0);
 
 	}
 
-	/**
-	 * Class models scores for a specific query.
-	 */
-	private static class Score implements Comparable<Score> {
-		
-		/** The source query identifier. */
-		public final String source;
-		
-		/** The query. */
-		public final String queryStr;
-		
-		/** Total elapsed time (nanos). */
-		public final long elapsedNanos;
-		
-		public Score(final String source, final String queryStr, final long elapsedNanos) {
-
-			this.source = source;
-			
-			this.queryStr = queryStr;
-			
-			this.elapsedNanos = elapsedNanos;
-			
-		}
-
-		/**
-		 * Order by increasing elapsed time (slowest queries are last).
-		 */
-		public int compareTo(Score o) {
-			if (elapsedNanos < o.elapsedNanos)
-				return -1;
-			if (elapsedNanos > o.elapsedNanos)
-				return 1;
-			return 0;
-		}
-		
-	}
+//	/**
+//	 * A model of the query workload to be imposed on the SPARQL end point. The
+//	 * model allows you to group queries from the same "source" into a batch, to
+//	 * specify the latency between queries within a batch, and to specify the
+//	 * latency between one batch and the next. You can also specify the number
+//	 * of independent clients which will work their way through the available
+//	 * queries and the size of the per-client thread pool.
+//	 * <p>
+//	 * This workload model is sufficient to model the workload of N concurrent
+//	 * users operating against a shared SPARQL end point, including applications
+//	 * where each user action results in a set of SPARQL queries, such as when
+//	 * painting an HTML page.
+//	 * <p>
+//	 * There are some degenerate cases which are also useful. For example, it is
+//	 * easy to specify a workload model N clients run queries in a randomized
+//	 * order.
+//	 * 
+//	 * @author thompsonbry
+//	 */
+//	static class WorkloadModel implements Callable<Void> {
+//
+//		private final int nclients;
+//		private final int threadsPerClient;
+//		private final AtomicLong nerrors = new AtomicLong();
+//
+//		public WorkloadModel(final int nclients, final int threadsPerClient) {
+//
+//			if (nclients < 1)
+//				throw new IllegalArgumentException();
+//
+//			if (threadsPerClient < 1)
+//				throw new IllegalArgumentException();
+//
+//			this.nclients = nclients;
+//			
+//			this.threadsPerClient = threadsPerClient;
+//			
+//			
+//		}
+//
+//		public Void call() throws Exception {
+//			
+//			if (nclients == 1 && threadsPerClient == 1) {
+//
+//				runQueriesSingleThreaded(order, queries, opts, nerrors);
+//				
+//			}
+//			
+//		}
+//		
+//	}
 	
 }

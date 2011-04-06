@@ -74,17 +74,7 @@ public class MemorySortOp extends SortOp {
 							+ getEvaluationContext());
 		}
 
-		// operator may not be broken into multiple tasks.
-		if (getMaxParallel() != 1) {
-			throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
-					+ "=" + getMaxParallel());
-		}
-
-		// operator is "at-once" (not pipelined).
-		if (isPipelined()) {
-			throw new UnsupportedOperationException(Annotations.PIPELINED + "="
-					+ isPipelined());
-		}
+        assertAtOnceJavaHeapOp();
 
 	}
     

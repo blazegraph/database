@@ -82,14 +82,16 @@ public class TestPruneBindingSets extends ProxyBigdataSailTestCase {
     public void testPruneBindingSets() throws Exception {
 
         final BigdataSail sail = getSail();
-        sail.initialize();
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-        final BigdataSailRepositoryConnection cxn = 
-            (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
         
         try {
     
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            final BigdataSailRepositoryConnection cxn = 
+                (BigdataSailRepositoryConnection) repo.getConnection();
+            try {
+            cxn.setAutoCommit(false);
+
             URI x = new URIImpl("_:X");
             URI a = new URIImpl("_:A");
             URI b = new URIImpl("_:B");
@@ -139,9 +141,12 @@ public class TestPruneBindingSets extends ProxyBigdataSailTestCase {
                 compare(result, solution);
                 
             }
+            } finally {
+                
+                cxn.close();
+            }
             
         } finally {
-            cxn.close();
             sail.__tearDownUnitTest();
         }
 

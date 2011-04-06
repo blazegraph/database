@@ -125,6 +125,7 @@ public abstract class TestINConstraint extends TestCase2
 
         assertTrue ( op.get ( in ) ) ;
         assertFalse ( op.get ( notin ) ) ;
+        // FIXME Modify to assertFalse() - unbound variables should fail constraints
         assertTrue ( op.get ( nb ) ) ;
     }
 
