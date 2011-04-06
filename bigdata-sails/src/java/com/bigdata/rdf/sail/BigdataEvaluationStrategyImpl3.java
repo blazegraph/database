@@ -22,6 +22,7 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.BooleanLiteralImpl;
+import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
@@ -60,6 +61,7 @@ import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
+import org.openrdf.query.impl.MapBindingSet;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
@@ -75,6 +77,7 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
@@ -98,7 +101,6 @@ import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
-import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
@@ -133,6 +135,7 @@ import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.DistinctFilter;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Extended to rewrite Sesame {@link TupleExpr}s onto native {@link Rule}s and
@@ -662,7 +665,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	        	final Value p = sp.getPredicateVar().getValue();
 	        	if (s == null && p != null && 
 	        			(BD.RELEVANCE.equals(p) || BD.MAX_HITS.equals(p) ||
-	        				BD.MIN_RELEVANCE.equals(p))) {
+	        				BD.MIN_RELEVANCE.equals(p) || 
+	        				BD.MATCH_ALL_TERMS.equals(p))) {
         			final Var sVar = sp.getSubjectVar();
         			Set<StatementPattern> metadata = searchMetadata.get(sVar);
         			if (metadata != null) {
@@ -810,7 +814,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	 */
     	attachNamedGraphsFilterToSearches(sopTree);
     	
-		if (true) {
+		if (false) {
 			/*
 			 * Look for numerical filters that can be rotated inside predicates
 			 */
@@ -887,13 +891,9 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 
     }
     
-    /*
-     * FIXME What is [bs]?  It is not being used within this context.
-     */
     CloseableIteration<BindingSet, QueryEvaluationException> 
 		doEvaluateNatively(final PipelineOp query, final BindingSet bs,
 			final QueryEngine queryEngine, final IVariable[] required
-//			, final Collection<Filter> sesameFilters
 			) 
 			throws QueryEvaluationException {
 	    
@@ -901,13 +901,16 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	try {
     		
     		// Submit query for evaluation.
-    		runningQuery = queryEngine.eval(query);
+    		if (bs != null)
+    			runningQuery = queryEngine.eval(query, toBindingSet(bs));
+    		else
+    			runningQuery = queryEngine.eval(query);
 
 			/*
 			 * Wrap up the native bigdata query solution iterator as Sesame
 			 * compatible iteration with materialized RDF Values.
 			 */
-			return wrapQuery(runningQuery, required);//, sesameFilters);
+			return iterator(runningQuery, database, required);
 
 		} catch (UnsupportedOperatorException t) {
 			if (runningQuery != null) {
@@ -928,6 +931,34 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 		}
     	
 	}
+    
+    private static IBindingSet toBindingSet(final BindingSet src) {
+
+        if (src == null)
+            throw new IllegalArgumentException();
+
+        final ListBindingSet bindingSet = new ListBindingSet();
+
+        final Iterator<Binding> itr = src.iterator();
+
+        while(itr.hasNext()) {
+
+            final Binding binding = itr.next();
+
+            final IVariable var = com.bigdata.bop.Var.var(binding.getName());
+            
+            final IV iv = ((BigdataValue) binding.getValue()).getIV();
+            
+            final IConstant val = new Constant<IV>(iv);
+            
+            bindingSet.set(var, val);
+            
+        }
+        
+        return bindingSet;
+        
+    }
+
 
 	/**
 	 * Wrap the {@link IRunningQuery#iterator()}, returning a Sesame compatible
@@ -952,22 +983,62 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	    // De-chunk the IBindingSet[] visited by that iterator.
 	    final IChunkedOrderedIterator<IBindingSet> it2 = 
 	    	new ChunkedWrappedIterator<IBindingSet>(
-	            new Dechunkerator<IBindingSet>(it1));
+    	    	// Monitor IRunningQuery and cancel if Sesame iterator is closed.
+    	    	new RunningQueryCloseableIterator<IBindingSet>(runningQuery,
+    	    			new Dechunkerator<IBindingSet>(it1)));
 	    
 	    // Materialize IVs as RDF Values.
 	    final CloseableIteration<BindingSet, QueryEvaluationException> result =
-	    	// Monitor IRunningQuery and cancel if Sesame iterator is closed.
-	    	new RunningQueryCloseableIteration<BindingSet, QueryEvaluationException>(runningQuery,
 			// Convert bigdata binding sets to Sesame binding sets.
 	        new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
         		// Materialize IVs as RDF Values.
 	            new BigdataBindingSetResolverator(database, it2, required).start(
-	            		database.getExecutorService())));
+	            		database.getExecutorService()));
 	
 	    return result;
 
     }
+	
+	public static ICloseableIterator<IBindingSet> iterator(
+			final IRunningQuery runningQuery) {
+		
+		// The iterator draining the query solutions.
+		final IAsynchronousIterator<IBindingSet[]> it1 = 
+			runningQuery.iterator();
+
+		// Dechunkify the original iterator
+		final ICloseableIterator<IBindingSet> it2 = 
+			new Dechunkerator<IBindingSet>(it1);
+
+    	// Monitor IRunningQuery and cancel if Sesame iterator is closed.
+		final ICloseableIterator<IBindingSet> it3 =
+	    	new RunningQueryCloseableIterator<IBindingSet>(runningQuery, it2);
+
+	    return it3;
+	    
+	}
+	
+	public static CloseableIteration<BindingSet, QueryEvaluationException> 
+		iterator(final IRunningQuery runningQuery, final AbstractTripleStore db,
+			final IVariable[] required) {
     
+		final ICloseableIterator<IBindingSet> it1 = iterator(runningQuery);
+		
+		// Wrap in an IChunkedOrderedIterator
+	    final IChunkedOrderedIterator<IBindingSet> it2 = 
+	    	new ChunkedWrappedIterator<IBindingSet>(it1);
+		
+	    // Materialize IVs as RDF Values.
+	    final CloseableIteration<BindingSet, QueryEvaluationException> it3 =
+			// Convert bigdata binding sets to Sesame binding sets.
+	        new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
+        		// Materialize IVs as RDF Values.
+	            new BigdataBindingSetResolverator(db, it2, required).start(
+	            		db.getExecutorService()));
+	    
+	    return it3;
+		
+	}
     
     private void attachNamedGraphsFilterToSearches(final SOpTree sopTree) {
     	
@@ -1582,6 +1653,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         IVariableOrConstant<IV> relevance = new Constant(DummyIV.INSTANCE);
         Literal maxHits = null;
         Literal minRelevance = null;
+        boolean matchAllTerms = false;
         
         for (StatementPattern meta : metadata) {
         	if (!meta.getSubjectVar().equals(subjVar)) {
@@ -1608,12 +1680,17 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         			throw new IllegalArgumentException("illegal metadata: " + meta);
         		}
         		minRelevance = (Literal) oVal;
+	    	} else if (BD.MATCH_ALL_TERMS.equals(pVal)) {
+        		if (oVal == null || !(oVal instanceof Literal)) {
+        			throw new IllegalArgumentException("illegal metadata: " + meta);
+        		}
+        		matchAllTerms = ((Literal) oVal).booleanValue();
 	    	}
         }
         
         final IAccessPathExpander expander = 
         	new FreeTextSearchExpander(database, (Literal) objValue, 
-        			maxHits, minRelevance);
+        			maxHits, minRelevance, matchAllTerms);
 
         // Decide on the correct arity for the predicate.
         final BOp[] vars = new BOp[] {
@@ -1988,8 +2065,11 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         
         final Iterator<IHit> itr = (Iterator)database.getLexiconRelation()
                 .getSearchEngine().search(label, languageCode,
-                        false/* prefixMatch */, 0d/* minCosine */,
-                        10000/* maxRank */, 1000L/* timeout */,
+                        false/* prefixMatch */, 
+                        0d/* minCosine */,
+                        10000/* maxRank */, 
+                        false/* matchAllTerms */,
+                        0L/* timeout */,
                         TimeUnit.MILLISECONDS);
         
         // ensure that named graphs are handled correctly for quads

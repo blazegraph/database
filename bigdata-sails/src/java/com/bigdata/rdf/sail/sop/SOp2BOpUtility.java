@@ -31,7 +31,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -40,6 +43,7 @@ import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.StatementPattern;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
@@ -50,10 +54,14 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
+import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.controller.SubqueryHashJoinOp;
 import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.bop.solutions.SliceOp;
+import com.bigdata.rdf.sail.FreeTextSearchExpander;
 import com.bigdata.rdf.sail.Rule2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroups;
@@ -172,14 +180,6 @@ public class SOp2BOpUtility {
             final AtomicInteger idFactory, final AbstractTripleStore db,
             final QueryEngine queryEngine, final Properties queryHints) {
 
-    	/*
-    	 * These are constraints that use variables from non-optional parent
-    	 * join groups, and thus should be translated into ConditionalRoutingOps
-    	 * for maximum efficiency.
-    	 */
-    	final Collection<IConstraint> preConditionals = 
-    		new LinkedList<IConstraint>();
-
 		/*
 		 * These are constraints that use variables bound by optionals or
 		 * subqueries, and thus cannot be attached to the non-optional
@@ -189,7 +189,7 @@ public class SOp2BOpUtility {
     	final Collection<IConstraint> postConditionals = 
     		new LinkedList<IConstraint>();
     	
-    	PipelineOp left = rule2BOp(join, preConditionals, postConditionals, 
+    	PipelineOp left = rule2BOp(join, postConditionals, 
     			idFactory, db, queryEngine, queryHints);
     	
 //    	PipelineOp left = Rule2BOpUtility.convert(
@@ -293,8 +293,8 @@ public class SOp2BOpUtility {
 	    }
     	
 		if (!left.getEvaluationContext()
-				.equals(BOpEvaluationContext.CONTROLLER)
-				&& !(left instanceof SubqueryOp)) {
+				.equals(BOpEvaluationContext.CONTROLLER)) {
+//				&& !(left instanceof SubqueryOp)) {
 			/*
 			 * Wrap with an operator which will be evaluated on the query
 			 * controller so the results will be streamed back to the query
@@ -360,51 +360,34 @@ public class SOp2BOpUtility {
     }
 
     protected static PipelineOp rule2BOp(final SOpGroup group,
-    		final Collection<IConstraint> preConditionals,
     		final Collection<IConstraint> postConditionals,
             final AtomicInteger idFactory, final AbstractTripleStore db,
             final QueryEngine queryEngine, final Properties queryHints) {
     	
-    	final Collection<IPredicate> preds = new LinkedList<IPredicate>();
-    	final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
-    	
     	/*
-    	 * Gather up all the variables used by non-optional parent join groups
+    	 * Gather up all the variables used by predicates in non-optional parent
+    	 * join groups
+    	 * 
+    	 * TODO fix this so that is captures variables used by non-optional
+    	 * subqueries from parent join groups
     	 */
-    	final Set<IVariable<?>> nonOptParentVars = new HashSet<IVariable<?>>();
+    	final Set<IVariable<?>> knownBound = new HashSet<IVariable<?>>();
     	SOpGroup parent = group;
     	while ((parent = parent.getParent()) != null) {
     		if (isNonOptionalJoinGroup(parent))
-    			collectPredicateVariables(nonOptParentVars, parent);
+    			collectPredicateVariables(knownBound, parent);
     	}
     	
     	/*
     	 * Gather up all the predicates in this group.
     	 */
+    	final Collection<Predicate> preds = new LinkedList<Predicate>();
     	for (SOp sop : group) {
     		final BOp bop = sop.getBOp();
-    		if (bop instanceof IPredicate) {
-    			preds.add((IPredicate) bop);
+    		if (bop instanceof Predicate) {
+    			preds.add((Predicate) bop);
     		}
     	}
-    	
-//    	/*
-//    	 * The way that the Sesame operator tree is parsed, optional tails
-//    	 * become single-operator (predicate) join groups without any children
-//    	 * of their own.
-//    	 */
-//    	final SOpGroups children = group.getChildren();
-//    	if (children != null) {
-//	    	for (SOpGroup child : children) {
-//	    		if (isSingleOptional(child)) {
-//	    			final SOp sop = child.getSingletonSOp();
-//	    			final BOp bop = sop.getBOp();
-//					final IPredicate pred = (IPredicate) bop.setProperty(
-//							IPredicate.Annotations.OPTIONAL, Boolean.TRUE);
-//					preds.add(pred);
-//	    		}
-//	    	}
-//    	}
     	
     	/*
     	 * Gather up all the variables used by predicates in this group
@@ -425,6 +408,16 @@ public class SOp2BOpUtility {
     	 * -pre-conditionals: all variables already bound by parent group(s)
     	 * -post-conditionals: some or all variables bound in subqueries
     	 */
+    	final Collection<IConstraint> constraints = 
+    		new LinkedList<IConstraint>();
+    	/*
+    	 * These are constraints that use variables from non-optional parent
+    	 * join groups, and thus should be translated into ConditionalRoutingOps
+    	 * for maximum efficiency.
+    	 */
+    	final Collection<IConstraint> preConditionals = 
+    		new LinkedList<IConstraint>();
+
     	for (SOp sop : group) {
     		final BOp bop = sop.getBOp();
     		if (bop instanceof IConstraint) {
@@ -442,7 +435,7 @@ public class SOp2BOpUtility {
 	                boolean preConditional = true;
 	                while (constraintVars.hasNext()) {
 	                    final IVariable<?> v = constraintVars.next();
-	                    preConditional &= nonOptParentVars.contains(v);
+	                    preConditional &= knownBound.contains(v);
 	                }
 	    			if (preConditional) {
 	    				preConditionals.add(c);
@@ -464,7 +457,7 @@ public class SOp2BOpUtility {
 	    			boolean postConditional = false;
 	                while (constraintVars.hasNext()) {
 	                    final IVariable<?> v = constraintVars.next();
-	                    if (!nonOptParentVars.contains(v) &&
+	                    if (!knownBound.contains(v) &&
 	                    		!groupVars.contains(v)) {
 	                    	postConditional = true;
 	                    	break;
@@ -486,6 +479,77 @@ public class SOp2BOpUtility {
     		}
     	}
     	
+    	/*
+    	 * In the case of multiple free text searches, it is often better to
+    	 * use a hash join operator to avoid a heinous cross product of the
+    	 * results from the free text searches. 
+    	 */
+    	final Map<IVariable<?>, Collection<Predicate>> hashJoins =
+    		new LinkedHashMap<IVariable<?>, Collection<Predicate>>();
+    	final Collection<IVariable<?>> boundByHashJoins =
+    		new LinkedList<IVariable<?>>();
+    	if (true) { // maybe check query hints for this?
+
+    		int numSearches = 0;
+    		{ // first count the searches
+    			for (IPredicate pred : preds) {
+    				if (isFreeTextSearch(pred))
+    					numSearches++;
+    			}
+    		}
+    		if (numSearches > 1) { 
+    			{ // collect them up
+	    			final Iterator<Predicate> it = preds.iterator();
+	    			while (it.hasNext()) {
+	    				final Predicate pred = it.next();
+	    				if (isFreeTextSearch(pred)) {
+	    					// we're going to handle these separately
+	    					it.remove();
+	    					// create a hash group for this variable
+	    					final IVariable v = (IVariable) pred.get(0);
+	    					if (hashJoins.containsKey(v)) {
+	    						throw new IllegalArgumentException(
+	    								"multiple free text searches using the same variable!!");
+	    					}
+	    					final Collection<Predicate> hashGroup =
+	    						new LinkedList<Predicate>();
+	    					hashGroup.add(pred);
+	    					hashJoins.put(v, hashGroup);
+	    					// add this search variables to the list of known
+	    					// bound variables
+	    					boundByHashJoins.add(v);
+	    				}
+	    			}
+    			}
+    			{ // collect up other predicates that use the search vars
+	    			final Iterator<Predicate> it = preds.iterator();
+	    			while (it.hasNext()) {
+	    				final Predicate pred = it.next();
+	    				// search always binds to a literal, which can only be
+	    				// used as the 2nd arg (the object)
+	                    final BOp obj = pred.get(2);
+                        if (obj instanceof IVariable<?>) {
+                            final IVariable<?> v = (IVariable<?>) obj;
+                            if (hashJoins.containsKey(v)) {
+    	    					// we're going to handle these separately
+    	    					it.remove();
+    	    					// add this predicate to the hash group
+    	    					hashJoins.get(v).add(pred);
+    	    					// add any other variables used by this tail to 
+    	    					// the list of known bound variables
+    	    					for (BOp arg : pred.args()) {
+    	    						if (arg instanceof IVariable<?>) {
+    	    							boundByHashJoins.add((IVariable<?>) arg);
+    	    						}
+    	    					}
+                            }
+                        }
+	    			}    				
+    			}
+    		}
+    		
+    	}
+    	
     	final IVariable<?>[] required = group.getTree().getRequiredVars();
     	
     	if (log.isInfoEnabled()) {
@@ -495,24 +559,178 @@ public class SOp2BOpUtility {
     		log.info("postConds: " + Arrays.toString(postConditionals.toArray()));
     	}
     	
-		final IRule rule = new Rule(
-				"dummy rule",
-				null, // head
-				preds.toArray(new IPredicate[preds.size()]),
-				QueryOptions.NONE,
-				// constraints on the rule.
-				constraints.size() > 0 ? 
-						constraints.toArray(
-								new IConstraint[constraints.size()]) : null,
-				null/* constants */, null/* taskFactory */, 
-				required);    	
-    	
-		final PipelineOp left = Rule2BOpUtility.convert(
-				rule, preConditionals, nonOptParentVars, 
-				idFactory, db, queryEngine, queryHints);
+        PipelineOp left = Rule2BOpUtility.applyQueryHints(
+        		new StartOp(BOpBase.NOARGS,
+			        NV.asMap(new NV[] {//
+			              new NV(Predicate.Annotations.BOP_ID, idFactory
+			                      .incrementAndGet()),//
+			              new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+			                      BOpEvaluationContext.CONTROLLER),//
+			        })),queryHints);
+
+		if (preConditionals != null) { // @todo lift into CONDITION on SubqueryOp
+			for (IConstraint c : preConditionals) {
+				final int condId = idFactory.incrementAndGet();
+		      final PipelineOp condOp = Rule2BOpUtility.applyQueryHints(
+		      	new ConditionalRoutingOp(new BOp[]{left},
+		              NV.asMap(new NV[]{//
+		                  new NV(BOp.Annotations.BOP_ID,condId),
+		                  new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
+		              })), queryHints);
+		      left = condOp;
+		      if (log.isDebugEnabled()) {
+		      	log.debug("adding conditional routing op: " + condOp);
+		      }
+			}
+		}
+
+		if (hashJoins.size() > 0) {
+			final Set<IVariable<?>> lastVars = new LinkedHashSet<IVariable<?>>();
+			final Set<IVariable<?>> joinVars = new LinkedHashSet<IVariable<?>>();
+			int i = 0;
+			for (Collection<Predicate> hashGroup : hashJoins.values()) {
+				joinVars.clear();
+				if (lastVars.size() > 0) {
+					for (Predicate pred : hashGroup) {
+						for (BOp arg : pred.args()) {
+							if (arg instanceof IVariable<?>) {
+								final IVariable<?> v = (IVariable<?>) arg;
+								if (lastVars.contains(v)) {
+									joinVars.add(v);
+								}
+							}
+						}
+					}
+				}
+				lastVars.clear();
+				for (Predicate pred : hashGroup) {
+					for (BOp arg : pred.args()) {
+						if (arg instanceof IVariable<?>) {
+							final IVariable<?> v = (IVariable<?>) arg;
+							lastVars.add(v);
+						}
+					}
+				}
+				
+				if (i == 0) {
+					left = convert(hashGroup, constraints, left, knownBound, 
+							idFactory, db, queryEngine, queryHints);
+				} else {
+					final PipelineOp subquery = convert(hashGroup, constraints, 
+							null/*left*/, knownBound, 
+							idFactory, db, queryEngine, queryHints);
+		            final PipelineOp slice = new SliceOp(new BOp[] { subquery }, NV.asMap(//
+							new NV(BOp.Annotations.BOP_ID, idFactory.incrementAndGet()), //
+							new NV(BOp.Annotations.EVALUATION_CONTEXT,
+									BOpEvaluationContext.CONTROLLER),//
+							new NV(PipelineOp.Annotations.SHARED_STATE, true)//
+					));
+					
+					final IVariable<?>[] joinVarsArray = 
+							joinVars.toArray(new IVariable[joinVars.size()]);
+					
+					if (log.isInfoEnabled()) {
+						log.info(Arrays.toString(joinVarsArray));
+						log.info(subquery);
+					}
+					
+					left = new SubqueryHashJoinOp(new BOp[]{left},
+	                	new NV(Predicate.Annotations.BOP_ID, idFactory.incrementAndGet()),//
+	                	new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
+	                	new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, slice),//
+	                	new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, joinVarsArray));
+	                	
+				}
+				i++;
+			}
+		}
+		
+		if (preds.size() > 0) {
+			
+			final IRule rule = new Rule(
+					"dummy rule",
+					null, // head
+					preds.toArray(new IPredicate[preds.size()]),
+					QueryOptions.NONE,
+					// constraints on the rule.
+					constraints.size() > 0 ? 
+							constraints.toArray(
+									new IConstraint[constraints.size()]) : null,
+					null/* constants */, null/* taskFactory */, 
+					required);    	
+	    	
+			left = Rule2BOpUtility.convert(
+					rule, left, knownBound, 
+					idFactory, db, queryEngine, queryHints);
+			
+		}
 
 		return left;
 		
     }
+    
+    protected static final boolean isFreeTextSearch(final IPredicate pred) {
+    	return pred.getAccessPathExpander() 
+			instanceof FreeTextSearchExpander;
+    }
+    
+    protected static final PipelineOp convert(
+    		final Collection<Predicate> preds,
+    		final Collection<IConstraint> constraints,
+    		final PipelineOp pipelineOp,
+    		final Set<IVariable<?>> knownBound,
+            final AtomicInteger idFactory, final AbstractTripleStore db,
+            final QueryEngine queryEngine, final Properties queryHints) {
+
+    	PipelineOp left = pipelineOp;
+    	if (left == null) {
+    		left = Rule2BOpUtility.applyQueryHints(
+            		new StartOp(BOpBase.NOARGS,
+        			        NV.asMap(new NV[] {//
+        			              new NV(Predicate.Annotations.BOP_ID, idFactory
+        			                      .incrementAndGet()),//
+        			              new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+        			                      BOpEvaluationContext.CONTROLLER),//
+        			        })),queryHints);
+    	}
+    	
+        /*
+         * Analyze the predicates and constraints to decide which constraints
+         * will run with which predicates.  @todo does not handle optionals
+         * correctly, but we do not pass optionals in to Rule2BOpUtility
+         * from SOp2BOpUtility anymore so ok for now
+         */
+        final IConstraint[][] assignedConstraints;
+		{
+			final int nknownBound = knownBound.size();
+			
+			// figure out which constraints are attached to which
+			// predicates.
+			assignedConstraints = PartitionedJoinGroup.getJoinGraphConstraints(
+					preds.toArray(new Predicate[preds.size()]), 
+					constraints.toArray(new IConstraint[constraints.size()]),
+					nknownBound == 0 ? IVariable.EMPTY : knownBound
+							.toArray(new IVariable<?>[nknownBound]), 
+					false// pathIsComplete
+					);
+		}
+
+		final BOpContextBase context = new BOpContextBase(queryEngine);
+		
+		/*
+         * 
+         */
+		int i = 0;
+        for (Predicate<?> pred : preds) {
+            left = Rule2BOpUtility.join(queryEngine, left, pred,//
+                    Arrays.asList(assignedConstraints[i++]), //
+                    context, idFactory, queryHints);
+
+        }
+        
+        return left;
+    	
+    }
+
     
 }

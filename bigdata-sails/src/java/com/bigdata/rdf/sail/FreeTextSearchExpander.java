@@ -61,19 +61,21 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
     
     private final Literal query, maxHits, minRelevance;
     
+    private final boolean matchAllTerms;
+    
     /** Note: volatile for visibility (or use AtomicReference). */
     private volatile Set<URI> graphs;
     
     public FreeTextSearchExpander(final AbstractTripleStore database,
             final Literal query) {
 
-        this(database, query, null, null);
+        this(database, query, null, null, false);
         
     }
     
     public FreeTextSearchExpander(final AbstractTripleStore database,
             final Literal query, final Literal maxHits, 
-            final Literal minRelevance) {
+            final Literal minRelevance, final boolean matchAllTerms) {
 
         if (database == null)
             throw new IllegalArgumentException();
@@ -88,6 +90,8 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
         this.maxHits = maxHits;
         
         this.minRelevance = minRelevance;
+        
+        this.matchAllTerms = matchAllTerms;
         
     }
     
@@ -176,7 +180,8 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
                                 prefixMatch,
                                 minRelevance == null ? 0d : minRelevance.doubleValue()/* minCosine */, 
                                 maxHits == null ? 10000 : maxHits.intValue()+1/* maxRank */,
-                                1000L/* timeout */, TimeUnit.MILLISECONDS);
+                                matchAllTerms,
+                                0L/* timeout */, TimeUnit.MILLISECONDS);
             }
 
             return hiterator;

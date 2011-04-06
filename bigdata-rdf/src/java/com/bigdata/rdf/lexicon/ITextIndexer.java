@@ -100,6 +100,8 @@ public interface ITextIndexer<A extends IHit> {
      *            The minimum cosine that will be returned.
      * @param maxRank
      *            The upper bound on the #of hits in the result set.
+     * @param matchAllTerms
+     * 			  if true, return only hits that match all search terms
      * @param timeout
      *            The timeout -or- ZERO (0) for NO timeout (this is equivalent
      *            to using {@link Long#MAX_VALUE}).
@@ -110,6 +112,7 @@ public interface ITextIndexer<A extends IHit> {
      */
     public Hiterator<A> search(final String query, final String languageCode,
             final boolean prefixMatch, final double minCosine,
-            final int maxRank, long timeout, final TimeUnit unit);
+            final int maxRank, final boolean matchAllTerms, 
+            long timeout, final TimeUnit unit);
 
 }

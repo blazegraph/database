@@ -116,7 +116,7 @@ public class PipelineJoin<E> extends PipelineOp implements
      */
 	private static final long serialVersionUID = 1L;
 
-	public interface Annotations extends PipelineOp.Annotations {
+	public interface Annotations extends JoinAnnotations {
 
 		/**
 		 * The {@link IPredicate} which is used to generate the
@@ -124,13 +124,16 @@ public class PipelineJoin<E> extends PipelineOp implements
 		 */
 		String PREDICATE = (PipelineJoin.class.getName() + ".predicate").intern();
 
-		/**
-		 * An optional {@link IVariable}[] identifying the variables to be
-		 * retained in the {@link IBindingSet}s written out by the operator. All
-		 * variables are retained unless this annotation is specified.
-		 */
-		String SELECT = (PipelineJoin.class.getName() + ".select").intern();
+//		/**
+//		 * An optional {@link IVariable}[] identifying the variables to be
+//		 * retained in the {@link IBindingSet}s written out by the operator. All
+//		 * variables are retained unless this annotation is specified.
+//		 */
+//		String SELECT = (PipelineJoin.class.getName() + ".select").intern();
 
+//
+// Note: The OPTIONAL annotation is on the *predicate*.
+//
 //        /**
 //         * Marks the join as "optional" in the SPARQL sense. Binding sets which
 //         * fail the join will be routed to the alternative sink as specified by
@@ -146,11 +149,11 @@ public class PipelineJoin<E> extends PipelineOp implements
 //
 //		boolean DEFAULT_OPTIONAL = false;
 
-        /**
-         * An {@link IConstraint}[] which places restrictions on the legal
-         * patterns in the variable bindings (optional).
-         */
-        String CONSTRAINTS = (PipelineJoin.class.getName() + ".constraints").intern();
+//        /**
+//         * An {@link IConstraint}[] which places restrictions on the legal
+//         * patterns in the variable bindings (optional).
+//         */
+//        String CONSTRAINTS = (PipelineJoin.class.getName() + ".constraints").intern();
 
 		/**
 		 * The maximum parallelism with which the pipeline will consume the

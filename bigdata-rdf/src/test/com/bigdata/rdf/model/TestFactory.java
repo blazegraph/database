@@ -104,7 +104,12 @@ public class TestFactory extends TestCase2 {
         assertEquals(12, l1.intValue());
         
     }
-    
+
+    /**
+     * Unit test for {@link ValueFactory#createLiteral(XMLGregorianCalendar)}.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/117
+     */
     public void test_gregorian() throws DatatypeConfigurationException {
 
         final XMLGregorianCalendar cal = DatatypeFactory.newInstance().newXMLGregorianCalendarDate(

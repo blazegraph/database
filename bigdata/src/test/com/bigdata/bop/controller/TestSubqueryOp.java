@@ -27,15 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.controller;
 
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import junit.framework.TestCase2;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
@@ -57,22 +53,20 @@ import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.constraint.Constraint;
+import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.Dechunkerator;
-import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Test suite for handling of optional join groups during query evaluation
@@ -83,9 +77,8 @@ import com.bigdata.striterator.ICloseableIterator;
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class TestSubqueryOp extends TestCase2 {
+public class TestSubqueryOp extends AbstractSubqueryTestCase {
 
     /**
      * 
@@ -174,46 +167,319 @@ public class TestSubqueryOp extends TestCase2 {
     }
 
     /**
-     * Return an {@link IAsynchronousIterator} that will read a single,
-     * empty {@link IBindingSet}.
-     * 
-     * @param bindingSet
-     *            the binding set.
+     * Unit test for a simple join.
      */
-    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet bindingSet) {
+    public void test_join() throws Exception {
 
-        return new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
+//        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+        final int subqueryId = 4;
+        
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+        
+        final Predicate<E> predOp = new Predicate<E>(//
+                new IVariableOrConstant[] { //
+                new Constant<String>("John"), x }, //
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                }));
+
+        // the subquery (basically, an access path read with "x" unbound).
+        final PipelineJoin<E> subquery = new PipelineJoin<E>(
+                new BOp[] { },//
+                new NV(Predicate.Annotations.BOP_ID, joinId),//
+                new NV(PipelineJoin.Annotations.PREDICATE, predOp));
+
+        // the hash-join against the subquery.
+        final SubqueryOp subqueryOp = new SubqueryOp(
+                new BOp[] {},//
+                new NV(Predicate.Annotations.BOP_ID, subqueryId),//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subquery)//
+                );
+
+        final PipelineOp query = subqueryOp;
+        
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("Mary") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Brad"),
+                                          new Constant<String>("Fred"),
+                                }//
+                ),//
+        };
+
+        /*
+         * Setup the input binding sets. Each input binding set MUST provide
+         * binding for the join variable(s).
+         */
+        final IBindingSet[] initialBindingSets;
+        {
+            final List<IBindingSet> list = new LinkedList<IBindingSet>();
+            
+            IBindingSet tmp;
+
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Brad"));
+            tmp.set(y, new Constant<String>("Fred"));
+            list.add(tmp);
+            
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Mary"));
+            list.add(tmp);
+            
+            initialBindingSets = list.toArray(new IBindingSet[0]);
+            
+        }
+
+        final IRunningQuery runningQuery = queryEngine.eval(query,
+                initialBindingSets);
+
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+
+        {
+            final BOpStats stats = runningQuery.getStats().get(
+                    subqueryId);
+            assertEquals(2L, stats.chunksIn.get());
+            assertEquals(2L, stats.unitsIn.get());
+            assertEquals(2L, stats.unitsOut.get());
+            assertEquals(2L, stats.chunksOut.get());
+        }
+        {
+            // // access path
+            // assertEquals(0L, stats.accessPathDups.get());
+            // assertEquals(1L, stats.accessPathCount.get());
+            // assertEquals(1L, stats.accessPathChunksIn.get());
+            // assertEquals(2L, stats.accessPathUnitsIn.get());
+        }
+        
+        assertTrue(runningQuery.isDone());
+        assertFalse(runningQuery.isCancelled());
+        runningQuery.get(); // verify nothing thrown.
+
+    }
+    
+    /**
+     * Unit test for simple join with a constraint.
+     */
+    public void test_joinWithConstraint() throws Exception {
+
+//        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+        final int subqueryId = 4;
+        
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+
+//        final IConstant<String>[] set = new IConstant[] {//
+//                new Constant<String>("Fred"),//
+//        };
+
+        final Predicate<E> predOp = new Predicate<E>(//
+                new IVariableOrConstant[] { //
+                new Constant<String>("John"), x }, //
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                }));
+
+        // the subquery (basically, an access path read with "x" unbound).
+        final PipelineJoin<E> subquery = new PipelineJoin<E>(
+                new BOp[] { },//
+                new NV(Predicate.Annotations.BOP_ID, joinId),//
+                new NV(PipelineJoin.Annotations.PREDICATE, predOp));
+
+        // the hash-join against the subquery.
+        final SubqueryOp subqueryOp = new SubqueryOp(
+                new BOp[] {},//
+                new NV(Predicate.Annotations.BOP_ID, subqueryId),//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
+                new NV(SubqueryOp.Annotations.CONSTRAINTS,
+                        new IConstraint[] { Constraint
+                                .wrap(new EQConstant(x, new Constant<String>("Brad"))),//
+                        }));
+
+        final PipelineOp query = subqueryOp;
+        
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+//                new ArrayBindingSet(//
+//                        new IVariable[] { x },//
+//                        new IConstant[] { new Constant<String>("Mary") }//
+//                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Brad"),
+                                          new Constant<String>("Fred"),
+                                }//
+                ),//
+        };
+
+        /*
+         * Setup the input binding sets. Each input binding set MUST provide
+         * binding for the join variable(s).
+         */
+        final IBindingSet[] initialBindingSets;
+        {
+            final List<IBindingSet> list = new LinkedList<IBindingSet>();
+            
+            IBindingSet tmp;
+
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Brad"));
+            tmp.set(y, new Constant<String>("Fred"));
+            list.add(tmp);
+            
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Mary"));
+            list.add(tmp);
+            
+            initialBindingSets = list.toArray(new IBindingSet[0]);
+            
+        }
+
+        final IRunningQuery runningQuery = queryEngine.eval(query,
+                initialBindingSets);
+
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+
+        {
+            final BOpStats stats = runningQuery.getStats().get(
+                    subqueryId);
+            assertEquals(2L, stats.chunksIn.get());
+            assertEquals(2L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(2L, stats.chunksOut.get());
+        }
+        {
+            // // access path
+            // assertEquals(0L, stats.accessPathDups.get());
+            // assertEquals(1L, stats.accessPathCount.get());
+            // assertEquals(1L, stats.accessPathChunksIn.get());
+            // assertEquals(2L, stats.accessPathUnitsIn.get());
+        }
+        
+        assertTrue(runningQuery.isDone());
+        assertFalse(runningQuery.isCancelled());
+        runningQuery.get(); // verify nothing thrown.
 
     }
 
     /**
-     * Return an {@link IAsynchronousIterator} that will read a single, chunk
-     * containing all of the specified {@link IBindingSet}s.
-     * 
-     * @param bindingSets
-     *            the binding sets.
+     * Unit test for a simple join.
      */
-    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet[] bindingSets) {
+    public void test_join_selectOnly_x() throws Exception {
 
-        return new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { bindingSets });
+//        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+        final int subqueryId = 4;
+        
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+        
+        final Predicate<E> predOp = new Predicate<E>(//
+                new IVariableOrConstant[] { //
+                new Constant<String>("John"), x }, //
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                }));
 
-    }
+        // the subquery (basically, an access path read with "x" unbound).
+        final PipelineJoin<E> subquery = new PipelineJoin<E>(
+                new BOp[] { },//
+                new NV(Predicate.Annotations.BOP_ID, joinId),//
+                new NV(PipelineJoin.Annotations.PREDICATE, predOp));
 
-    /**
-     * Return an {@link IAsynchronousIterator} that will read a single, chunk
-     * containing all of the specified {@link IBindingSet}s.
-     * 
-     * @param bindingSetChunks
-     *            the chunks of binding sets.
-     */
-    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet[][] bindingSetChunks) {
+        // the hash-join against the subquery.
+        final SubqueryOp subqueryOp = new SubqueryOp(
+                new BOp[] {},//
+                new NV(Predicate.Annotations.BOP_ID, subqueryId),//
+                new NV(SubqueryOp.Annotations.SELECT, new IVariable[]{x}),//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subquery)//
+                );
 
-        return new ThickAsynchronousIterator<IBindingSet[]>(bindingSetChunks);
+        final PipelineOp query = subqueryOp;
+        
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("Mary") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("Brad"),
+//                                          new Constant<String>("Fred"),
+                                }//
+                ),//
+        };
+
+        /*
+         * Setup the input binding sets. Each input binding set MUST provide
+         * binding for the join variable(s).
+         */
+        final IBindingSet[] initialBindingSets;
+        {
+            final List<IBindingSet> list = new LinkedList<IBindingSet>();
+            
+            IBindingSet tmp;
+
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Brad"));
+            tmp.set(y, new Constant<String>("Fred"));
+            list.add(tmp);
+            
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Mary"));
+            list.add(tmp);
+            
+            initialBindingSets = list.toArray(new IBindingSet[0]);
+            
+        }
+
+        final IRunningQuery runningQuery = queryEngine.eval(query,
+                initialBindingSets);
+
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+
+        {
+            final BOpStats stats = runningQuery.getStats().get(
+                    subqueryId);
+            assertEquals(2L, stats.chunksIn.get());
+            assertEquals(2L, stats.unitsIn.get());
+            assertEquals(2L, stats.unitsOut.get());
+            assertEquals(2L, stats.chunksOut.get());
+        }
+        {
+            // // access path
+            // assertEquals(0L, stats.accessPathDups.get());
+            // assertEquals(1L, stats.accessPathCount.get());
+            // assertEquals(1L, stats.accessPathChunksIn.get());
+            // assertEquals(2L, stats.accessPathUnitsIn.get());
+        }
+        
+        assertTrue(runningQuery.isDone());
+        assertFalse(runningQuery.isCancelled());
+        runningQuery.get(); // verify nothing thrown.
 
     }
 
@@ -452,8 +718,7 @@ public class TestSubqueryOp extends TestCase2 {
              * many objects: reminder(3)=[{ a=John, b=Brad }, { a=Mary, b=Brad
              * }, { a=Paul, b=Brad }].
              */
-            assertSameSolutionsAnyOrder(expected,
-                    new Dechunkerator<IBindingSet>(runningQuery.iterator()));
+            TestQueryEngine.assertSameSolutionsAnyOrder(expected,runningQuery);
         
         }
 
@@ -699,9 +964,8 @@ public class TestSubqueryOp extends TestCase2 {
             )
             };
 
-            assertSameSolutionsAnyOrder(expected,
-                    new Dechunkerator<IBindingSet>(runningQuery.iterator()));
-        
+            TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+
         }
 
         // Wait until the query is done.
@@ -966,9 +1230,8 @@ public class TestSubqueryOp extends TestCase2 {
             )
             };
 
-            assertSameSolutionsAnyOrder(expected,
-                    new Dechunkerator<IBindingSet>(runningQuery.iterator()));
-        
+            TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+
         }
 
         // Wait until the query is done.
@@ -980,155 +1243,6 @@ public class TestSubqueryOp extends TestCase2 {
             assertEquals(5, statsMap.size());
             if (log.isInfoEnabled())
                 log.info(statsMap.toString());
-        }
-
-    }
-
-    /**
-     * Verify the expected solutions.
-     * 
-     * @param expected
-     * @param itr
-     */
-    static public void assertSameSolutions(final IBindingSet[] expected,
-            final IAsynchronousIterator<IBindingSet[]> itr) {
-        try {
-            int n = 0;
-            while (itr.hasNext()) {
-                final IBindingSet[] e = itr.next();
-                if (log.isInfoEnabled())
-                    log.info(n + " : chunkSize=" + e.length);
-                for (int i = 0; i < e.length; i++) {
-                    if (log.isInfoEnabled())
-                        log.info(n + " : " + e[i]);
-                    if (n >= expected.length) {
-                        fail("Willing to deliver too many solutions: n=" + n
-                                + " : " + e[i]);
-                    }
-                    if (!expected[n].equals(e[i])) {
-                        fail("n=" + n + ", expected=" + expected[n]
-                                + ", actual=" + e[i]);
-                    }
-                    n++;
-                }
-            }
-            assertEquals("Wrong number of solutions", expected.length, n);
-        } finally {
-            itr.close();
-        }
-    }
-
-    /**
-     * Verifies that the iterator visits the specified objects in some arbitrary
-     * ordering and that the iterator is exhausted once all expected objects
-     * have been visited. The implementation uses a selection without
-     * replacement "pattern".
-     * <p>
-     * Note: If the objects being visited do not correctly implement hashCode()
-     * and equals() then this can fail even if the desired objects would be
-     * visited. When this happens, fix the implementation classes.
-     */
-    static public <T> void assertSameSolutionsAnyOrder(final T[] expected,
-            final Iterator<T> actual) {
-
-        assertSameSolutionsAnyOrder("", expected, actual);
-
-    }
-
-    /**
-     * Verifies that the iterator visits the specified objects in some arbitrary
-     * ordering and that the iterator is exhausted once all expected objects
-     * have been visited. The implementation uses a selection without
-     * replacement "pattern".
-     * <p>
-     * Note: If the objects being visited do not correctly implement hashCode()
-     * and equals() then this can fail even if the desired objects would be
-     * visited. When this happens, fix the implementation classes.
-     */
-    static public <T> void assertSameSolutionsAnyOrder(final String msg,
-            final T[] expected, final Iterator<T> actual) {
-
-        try {
-
-            /*
-             * Populate a map that we will use to realize the match and
-             * selection without replacement logic. The map uses counters to
-             * handle duplicate keys. This makes it possible to write tests in
-             * which two or more binding sets which are "equal" appear.
-             */
-
-            final int nrange = expected.length;
-
-            final java.util.Map<T, AtomicInteger> range = new java.util.LinkedHashMap<T, AtomicInteger>();
-
-            for (int j = 0; j < nrange; j++) {
-
-                AtomicInteger count = range.get(expected[j]);
-
-                if (count == null) {
-
-                    count = new AtomicInteger();
-
-                }
-
-                range.put(expected[j], count);
-
-                count.incrementAndGet();
-                
-            }
-
-            // Do selection without replacement for the objects visited by
-            // iterator.
-
-            for (int j = 0; j < nrange; j++) {
-
-                if (!actual.hasNext()) {
-
-                    fail(msg
-                            + ": Iterator exhausted while expecting more object(s)"
-                            + ": index=" + j);
-
-                }
-
-                final T actualObject = actual.next();
-
-                if (log.isInfoEnabled())
-                    log.info("visting: " + actualObject);
-
-                AtomicInteger counter = range.get(actualObject);
-
-                if (counter == null || counter.get() == 0) {
-
-                    fail("Object not expected" + ": index=" + j + ", object="
-                            + actualObject);
-
-                }
-
-                counter.decrementAndGet();
-                
-            }
-
-            if (actual.hasNext()) {
-
-                final List<T> remainder = new LinkedList<T>(); 
-                
-                while(actual.hasNext()) {
-                    remainder.add(actual.next());
-                }
-
-                fail("Iterator will deliver too many objects: reminder("
-                        + remainder.size() + ")=" + remainder);
-
-            }
-
-        } finally {
-
-            if (actual instanceof ICloseableIterator<?>) {
-
-                ((ICloseableIterator<T>) actual).close();
-
-            }
-
         }
 
     }

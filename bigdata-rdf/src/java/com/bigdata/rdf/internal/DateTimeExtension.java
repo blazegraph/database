@@ -124,23 +124,23 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
     	 */
     	final long l = iv.getDelegate().longValue();
     	
-    	final GregorianCalendar c = new GregorianCalendar(
-//    			TimeZone.getTimeZone("GMT")
-    			defaultTZ
-    			);
-    	c.setTimeInMillis(l);
+		final TimeZone tz = BSBMHACK ? TimeZone.getDefault()/*getTimeZone("GMT")*/ : defaultTZ;
+    	final GregorianCalendar c = new GregorianCalendar(tz);
+		c.setTimeInMillis(l);
     	
     	try {
     		
 	    	final XMLGregorianCalendar xmlGC = 
 	    		DatatypeFactory.newInstance().newXMLGregorianCalendar(c);
-	    	
-	    	final String s = xmlGC.toString();
-//	    	Note: removed code which was chopping off the milliseconds part.
-//	    	final int i = s.lastIndexOf('.');
-//	    	if (i >= 0) {
-//	    		s = s.substring(0, i);
-//	    	}
+
+			String s = xmlGC.toString();
+			if (BSBMHACK) {
+				// Chopping off the milliseconds part and the trailing 'Z'.
+				final int i = s.lastIndexOf('.');
+				if (i >= 0) {
+					s = s.substring(0, i);
+				}
+			}
 	    	
 	        return (V) vf.createLiteral(s, dateTime);
 
@@ -151,5 +151,13 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
     	}
     	
     }
+
+	/**
+	 * This conditionally enables some logic for xsd:dateTime compatibility with
+	 * BSBM.
+	 * 
+	 * @see http://sourceforge.net/apps/trac/bigdata/ticket/277
+	 */
+    static private transient boolean BSBMHACK = Boolean.getBoolean("BSBM_HACK");
     
 }

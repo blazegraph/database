@@ -122,6 +122,9 @@ public class TestAll extends TestCase {
         suite.addTest(com.bigdata.rdf.TestAll.suite());
         suite.addTest(com.bigdata.rdf.sail.TestAll.suite());
 
+        // The REST API test suite.
+        suite.addTest(com.bigdata.rdf.sail.webapp.TestAll.suite());
+
         return suite;
         
     }
