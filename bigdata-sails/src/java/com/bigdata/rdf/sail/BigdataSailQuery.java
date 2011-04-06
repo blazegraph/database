@@ -43,7 +43,7 @@ public interface BigdataSailQuery {
     
 	/**
 	 * Return query hints associated with this query. Query hints are embedded
-	 * in query strings as namespaces. See {@link QueryHints#NAMESPACE} for more
+	 * in query strings as namespaces. See {@link QueryHints#PREFIX} for more
 	 * information.
 	 */
     Properties getQueryHints(); 

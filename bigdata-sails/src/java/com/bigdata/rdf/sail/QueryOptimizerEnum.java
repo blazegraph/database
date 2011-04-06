@@ -68,6 +68,6 @@ public enum QueryOptimizerEnum {
     Runtime;
     
     public static String queryHint(final QueryOptimizerEnum val) {
-    	return "prefix "+QueryHints.NAMESPACE+": <"+QueryHints.PREFIX+QueryHints.OPTIMIZER+"="+val+"> ";
+    	return "prefix "+QueryHints.PREFIX+": <"+QueryHints.NAMESPACE+QueryHints.OPTIMIZER+"="+val+"> ";
     }
 }
