@@ -313,7 +313,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
      * This is the top-level method called by the SAIL to evaluate a query.
      * The TupleExpr parameter here is guaranteed to be the root of the operator
      * tree for the query.  Query hints are parsed by the SAIL from the
-     * namespaces in the original query.  See {@link QueryHints#NAMESPACE}.
+     * namespaces in the original query.  See {@link QueryHints#PREFIX}.
      * <p>
      * The query root will be handled by the native Sesame evaluation until we
      * reach one of three possible top-level operators (union, join, or left

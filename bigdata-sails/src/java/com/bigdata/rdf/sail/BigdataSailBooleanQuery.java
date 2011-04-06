@@ -20,7 +20,7 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
     
     /**
      * Query hints are embedded in query strings as namespaces.  
-     * See {@link QueryHints#NAMESPACE} for more information.
+     * See {@link QueryHints#PREFIX} for more information.
      */
     private final Properties queryHints;
     
@@ -42,7 +42,7 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
     /**
      * Overriden to use query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
-     * See {@link QueryHints#NAMESPACE} for more information.
+     * See {@link QueryHints#PREFIX} for more information.
      */
     @Override
     public boolean evaluate() throws QueryEvaluationException {

@@ -67,7 +67,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 	 * {@inheritDoc}
 	 * <p>
 	 * Overridden to capture query hints from SPARQL queries. Query hints are
-	 * embedded in query strings as namespaces. See {@link QueryHints#NAMESPACE}
+	 * embedded in query strings as namespaces. See {@link QueryHints#PREFIX}
 	 * for more information.
 	 */
     @Override
@@ -92,7 +92,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 	 * {@inheritDoc}
 	 * <p>
 	 * Overridden to capture query hints from SPARQL queries. Query hints are
-	 * embedded in query strings as namespaces. See {@link QueryHints#NAMESPACE}
+	 * embedded in query strings as namespaces. See {@link QueryHints#PREFIX}
 	 * for more information.
 	 */
     @Override
@@ -113,7 +113,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 	 * {@inheritDoc}
 	 * <p>
 	 * Overridden to capture query hints from SPARQL queries. Query hints are
-	 * embedded in query strings as namespaces. See {@link QueryHints#NAMESPACE}
+	 * embedded in query strings as namespaces. See {@link QueryHints#PREFIX}
 	 * for more information.
 	 */
     @Override
@@ -134,7 +134,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 	 * {@inheritDoc}
 	 * <p>
 	 * Overridden to capture query hints from SPARQL queries. Query hints are
-	 * embedded in query strings as namespaces. See {@link QueryHints#NAMESPACE}
+	 * embedded in query strings as namespaces. See {@link QueryHints#PREFIX}
 	 * for more information.
 	 */
 	@Override
@@ -319,7 +319,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     /**
      * Parse query hints from a query string.  Query hints are embedded in the 
      * query string via special namespaces.      
-     * See {@link QueryHints#NAMESPACE} for more information.
+     * See {@link QueryHints#PREFIX} for more information.
      */
 	private Properties parseQueryHints(final QueryLanguage ql,
 			final String queryString, final String baseURI)
@@ -339,7 +339,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
                 for (Map.Entry<String, String> prefix : prefixes.entrySet()) {
                     // if we see one that matches the magic namespace, try
                     // to parse it
-                    if (prefix.getKey().equalsIgnoreCase(QueryHints.NAMESPACE)) {
+                    if (prefix.getKey().equalsIgnoreCase(QueryHints.PREFIX)) {
                         String hints = prefix.getValue();
                         // has to have a # and it can't be at the end
                         int i = hints.indexOf('#');
