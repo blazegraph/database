@@ -508,6 +508,11 @@ public class SubqueryHashJoinOp extends PipelineOp {
                     final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                             joinOp.getChunkCapacity(), sink);
 
+                    // Thread-local buffer iff optional sink is in use.
+                    final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? null
+                            : new UnsyncLocalOutputBuffer<IBindingSet>(
+                                    joinOp.getChunkCapacity(), sink2);
+
                     // The iterator draining the subquery
                     final IAsynchronousIterator<IBindingSet[]> subquerySolutionItr = runningSubquery
                             .iterator();
@@ -554,7 +559,7 @@ public class SubqueryHashJoinOp extends PipelineOp {
                                  * solutions produced by the join are rejected
                                  * by the filter.
                                  */
-                                src.nhits++;
+//                                src.nhits++;
 
                                 if (log.isDebugEnabled())
                                     log.debug("Join with " + src);
@@ -582,11 +587,13 @@ public class SubqueryHashJoinOp extends PipelineOp {
                                     if (log.isDebugEnabled())
                                         log.debug("Join fails constraint(s): "
                                                 + bset);
-
+                                    
                                     continue;
 
                                 }
 
+                                src.nhits++;
+                                
                                 // strip off unnecessary variables.
                                 bset = selectVars == null ? bset : bset
                                         .copy(selectVars);
@@ -616,11 +623,6 @@ public class SubqueryHashJoinOp extends PipelineOp {
                          * any constraint on the join.
                          */
 
-                        // Thread-local buffer iff optional sink is in use.
-                        final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? null
-                                : new UnsyncLocalOutputBuffer<IBindingSet>(
-                                        joinOp.getChunkCapacity(), sink2);
-
                         for(Bucket b : map.values()) {
                             
                             for(SolutionHit hit : b.solutions) {
@@ -633,20 +635,20 @@ public class SubqueryHashJoinOp extends PipelineOp {
                                 if (log.isDebugEnabled())
                                     log.debug("Optional solution: " + bs);
 
-                                if (constraints != null) {
-                                    if (!BOpUtility.isConsistent(constraints,
-                                            bs)) {
-
-                                        // Failed by the constraint on the join.
-
-                                        if (log.isDebugEnabled())
-                                            log
-                                                    .debug("Optional solution failed by constraints: "
-                                                            + hit);
-
-                                        continue;
-                                    }
-                                }
+//                                if (constraints != null) {
+//                                    if (!BOpUtility.isConsistent(constraints,
+//                                            bs)) {
+//
+//                                        // Failed by the constraint on the join.
+//
+//                                        if (log.isDebugEnabled())
+//                                            log
+//                                                    .debug("Optional solution failed by constraints: "
+//                                                            + hit);
+//
+//                                        continue;
+//                                    }
+//                                }
 
                                 if (log.isTraceEnabled())
                                     log.trace("Output optional solution: " + bs);

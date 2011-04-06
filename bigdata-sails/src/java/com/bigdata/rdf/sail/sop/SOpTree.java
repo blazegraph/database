@@ -165,6 +165,10 @@ public class SOpTree implements Iterable<SOp> {
 			return group == 0;
 		}
 		
+		public void pruneSOps(final Collection<SOp> sopsToPrune) {
+			this.sops.removeAll(sopsToPrune);
+		}
+		
 	}
 
 	public class SOpGroups implements Iterable<SOpGroup> {
