@@ -892,7 +892,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          * of indices.
          */
 
-        ((BTree)tmp).setBTreeCounters(getIndexCounters(name));
+        tmp.getMutableBTree().setBTreeCounters(getIndexCounters(name));
 
         return tmp;
 

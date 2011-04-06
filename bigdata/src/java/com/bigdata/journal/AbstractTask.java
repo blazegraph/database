@@ -815,13 +815,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * counters.
          */
 
-        if(resourceManager instanceof ResourceManager) {
+//        if(resourceManager instanceof ResourceManager) {
             
             btree
                     .setBTreeCounters(((ResourceManager) resourceManager)
                             .getIndexCounters(name));
             
-        }
+//        }
 
         /*
          * Note: delegate logic to materialize the view in case BTree is an
