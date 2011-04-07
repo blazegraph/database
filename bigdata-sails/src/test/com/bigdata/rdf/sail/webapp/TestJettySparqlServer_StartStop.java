@@ -56,6 +56,8 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 	private Journal m_jnl;
 	private JettySparqlServer m_fixture;
 	private String m_serviceURL;
+	
+	final static String REST = "";
 
 	protected void setUp() throws Exception {
 
@@ -475,8 +477,7 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 		opts.method = "GET";
 
 		// No solutions (assuming a told triple kb or quads kb w/o axioms).
-		assertEquals(0, countResults(doSparqlQuery(opts, "query")));
-		assertEquals(0, countResults(doSparqlQuery(opts, "REST")));
+		assertEquals(0, countResults(doSparqlQuery(opts, REST)));
 
 	}
 
@@ -493,16 +494,16 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
         opts.method = "POST";
 
         // No solutions (assuming a told triple kb or quads kb w/o axioms).
-        assertEquals(0, countResults(doSparqlQuery(opts, "REST")));
+        assertEquals(0, countResults(doSparqlQuery(opts, REST)));
 
     }
 
 	public void test_POSTUPDATE_withBody_NTRIPLES() throws Exception {
-		do_UPDATE_withBody_NTRIPLES("POST", 23, "REST");
+		do_UPDATE_withBody_NTRIPLES("POST", 23, REST);
 	}
     
 	public void test_PUTUPDATE_withBody_NTRIPLES() throws Exception {
-		do_UPDATE_withBody_NTRIPLES("PUT", 23, "REST");
+		do_UPDATE_withBody_NTRIPLES("PUT", 23, REST);
 	}
 	
     /**
@@ -517,14 +518,14 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
         opts.queryStr = queryStr;
         opts.method = "POST";
 
-    	do_UPDATE_withBody_NTRIPLES("POST", 23, "REST");
+    	do_UPDATE_withBody_NTRIPLES("POST", 23, REST);
     	
-        assertEquals(23, countResults(doSparqlQuery(opts, "REST")));
+        assertEquals(23, countResults(doSparqlQuery(opts, REST)));
     	
-    	do_DELETE_with_Query("REST", "construct {?s ?p ?o} where {?s ?p ?o}");
+    	do_DELETE_with_Query(REST, "construct {?s ?p ?o} where {?s ?p ?o}");
 
         // No solutions (assuming a told triple kb or quads kb w/o axioms).
-        assertEquals(0, countResults(doSparqlQuery(opts, "REST")));
+        assertEquals(0, countResults(doSparqlQuery(opts, REST)));
 
     }
 
@@ -541,14 +542,14 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
         opts.queryStr = queryStr;
         opts.method = "POST";
 
-    	do_UPDATE_withBody_NTRIPLES("POST", 23, "update");
+    	do_UPDATE_withBody_NTRIPLES("POST", 23, REST);
     	
-        assertEquals(23, countResults(doSparqlQuery(opts, "REST")));
+        assertEquals(23, countResults(doSparqlQuery(opts, REST)));
 
-        do_DELETE_with_Query("REST", "construct {?s ?p ?o} where {?s ?p ?o}");
+        do_DELETE_with_Query(REST, "construct {?s ?p ?o} where {?s ?p ?o}");
 
         // No solutions (assuming a told triple kb or quads kb w/o axioms).
-        assertEquals(0, countResults(doSparqlQuery(opts, "REST")));
+        assertEquals(0, countResults(doSparqlQuery(opts, REST)));
     }
 
     /**
@@ -563,14 +564,14 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
         opts.queryStr = queryStr;
         opts.method = "POST";
 
-    	do_UPDATE_withBody_NTRIPLES("POST", 23, "update");
+    	do_UPDATE_withBody_NTRIPLES("POST", 23, REST);
     	
-        assertEquals(23, countResults(doSparqlQuery(opts, "REST")));
+        assertEquals(23, countResults(doSparqlQuery(opts, REST)));
 
         do_DELETE_withBody_NTRIPLES("delete", 23);
 
         // No solutions (assuming a told triple kb or quads kb w/o axioms).
-        assertEquals(0, countResults(doSparqlQuery(opts, "REST")));
+        assertEquals(0, countResults(doSparqlQuery(opts, REST)));
 
     }
 
@@ -660,20 +661,22 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 	 * UPDATE should not be allowed with a GET request
 	 */
 	public void test_GETUPDATE_withBody_NTRIPLES() throws Exception {
-		HttpURLConnection conn = null;
-		final URL url = new URL(m_serviceURL + "/update?data=stuff");
-		conn = (HttpURLConnection) url.openConnection();
-		conn.setRequestMethod("GET");
-		conn.setDoOutput(true);
-		conn.setDoInput(true);
-		conn.setUseCaches(false);
-		conn.setReadTimeout(0);// TODO timeout (ms)
-		
-		conn.connect();
-		
-		final int rc = conn.getResponseCode();
-		
-		assertTrue(rc == 400);
+		if (JettySparqlServer.directServletAccess) {
+			HttpURLConnection conn = null;
+			final URL url = new URL(m_serviceURL + "/update?data=stuff");
+			conn = (HttpURLConnection) url.openConnection();
+			conn.setRequestMethod("GET");
+			conn.setDoOutput(true);
+			conn.setDoInput(true);
+			conn.setUseCaches(false);
+			conn.setReadTimeout(0);// TODO timeout (ms)
+			
+			conn.connect();
+			
+			final int rc = conn.getResponseCode();
+			
+			assertTrue(rc == 405); // NOT_ALLOWED
+		}
 	}
     
 	String genNTRIPLES(final int ntriples) {
@@ -749,7 +752,7 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 			opts.queryStr = queryStr;
 			opts.method = "GET";
 
-			assertEquals(ntriples, countResults(doSparqlQuery(opts, "REST")));
+			assertEquals(ntriples, countResults(doSparqlQuery(opts, REST)));
 		}
 
 	}
@@ -832,7 +835,7 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
                 "  ?x bd:likes bd:RDF " +//
                 "}";
 
-            final Graph actual = buildGraph(doSparqlQuery(opts, "REST"));
+            final Graph actual = buildGraph(doSparqlQuery(opts, REST));
 
             assertSameGraph(expected, actual);
             
