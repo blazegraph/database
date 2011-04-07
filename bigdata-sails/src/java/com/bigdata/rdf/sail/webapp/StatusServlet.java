@@ -15,9 +15,26 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.rdf.sail.webapp.BigdataContext.RunningQuery;
 
+/**
+ * A status page for the service.
+ * 
+ * @author thompsonbry
+ * @author martyncutcher
+ */
 public class StatusServlet extends BigdataServlet {
 
-	public void doGet(HttpServletRequest req, HttpServletResponse resp) {
+	/**
+     * <p>
+     * A status page is available:
+     * </p>
+     * 
+     * <pre>
+     * GET /status
+     * </pre>
+	 */
+	@Override
+	protected void doGet(final HttpServletRequest req,
+			final HttpServletResponse resp) {
 
 		try {
 			// SPARQL queries accepted by the SPARQL end point.

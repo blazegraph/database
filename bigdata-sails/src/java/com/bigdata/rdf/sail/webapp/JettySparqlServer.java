@@ -24,15 +24,15 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.BigdataContext.Config;
 
 /**
- * The JettySparqlServer enables easy embedding of the SparqlServlet.
  * 
- * To invoke from the commandline use the JettySparqlCommand.
+ * The {@link JettySparqlServer} enables easy embedding of the {@link RESTServlet}
+ * 
+ * To invoke from the command line use the {@link SparqlCommand}.
  * 
  * The server provides an embeddable alternative to a standard web application
  * deployment.
  * 
  * @author martyn Cutcher
- *
  */
 public class JettySparqlServer extends Server {
 
@@ -42,26 +42,42 @@ public class JettySparqlServer extends Server {
 
 	final TreeMap<String, Handler> m_handlerMap = new TreeMap<String, Handler>();
 
-	public JettySparqlServer(int port) {
+	/**
+	 * 
+	 * @param port
+	 *            The port at which the service will run.
+	 */
+	public JettySparqlServer(final int port) {
+
 		super(port); // creates Connector for specified port
+		
 	}
 
-	public void handle(String target, Request baseRequest, HttpServletRequest req, HttpServletResponse resp) {
+	public void handle(final String target, final Request baseRequest,
+			final HttpServletRequest req, final HttpServletResponse resp) {
+
 		try {
+		
 			if (log.isDebugEnabled())
 				log.debug("Lookingup " + target);
 			
-			Handler handler = m_handlerMap.get(lookup(target));
+			final Handler handler = m_handlerMap.get(lookup(target));
+			
 			if (handler != null) {
+			
 				handler.handle(target, baseRequest, req, resp);
+				
 				baseRequest.setHandled(true);
+				
 			} else {
 
 				if (log.isDebugEnabled())
 					log.debug("Calling default handler");
 				
 				super.handle(target, baseRequest, req, resp);
+				
 			}
+
 		} catch (IOException e) {
 			// FIXME Auto-generated catch block
 			e.printStackTrace();
@@ -69,20 +85,27 @@ public class JettySparqlServer extends Server {
 			// FIXME Auto-generated catch block
 			e.printStackTrace();
 		}
+		
 	}
 
-	private Object lookup(String target) {
-		int spi = target.indexOf("/", 1);
+	private Object lookup(final String target) {
+	
+		final int spi = target.indexOf("/", 1);
 
-		String ret = spi == -1 ? target : target.substring(0, spi);
+		final String ret = spi == -1 ? target : target.substring(0, spi);
 		
 		return ret;
+		
 	}
 
-	public void setupHandlers(final Config config, final IIndexManager indexManager) throws SailException,
+	public void setupHandlers(final Config config,
+			final IIndexManager indexManager) throws SailException,
 			RepositoryException, IOException {
-		ResourceHandler resource_handler = new ResourceHandler();
-		resource_handler.setDirectoriesListed(true);
+
+		final ResourceHandler resource_handler = new ResourceHandler();
+		
+		resource_handler.setDirectoriesListed(false); // Nope!
+
 		resource_handler.setWelcomeFiles(new String[] { "index.html" });
 
 		resource_handler.setResourceBase(config.resourceBase);
@@ -91,10 +114,10 @@ public class JettySparqlServer extends Server {
 
 		// embedded setup
 		m_handlerMap.put("/status", new ServletHandler(new StatusServlet()));
-		m_handlerMap.put("/query", new ServletHandler(new QueryServlet()));
-		m_handlerMap.put("/update", new ServletHandler(new UpdateServlet()));
-		m_handlerMap.put("/delete", new ServletHandler(new DeleteServlet()));
-		m_handlerMap.put("/REST", new ServletHandler(new RESTServlet()));
+//		m_handlerMap.put("/query", new ServletHandler(new QueryServlet()));
+//		m_handlerMap.put("/update", new ServletHandler(new UpdateServlet()));
+//		m_handlerMap.put("/delete", new ServletHandler(new DeleteServlet()));
+		m_handlerMap.put("/", new ServletHandler(new RESTServlet()));
 		
 		// the "stop" handler is only relevant for the embedded server
 		m_handlerMap.put("/stop", new AbstractHandler() {
@@ -111,13 +134,16 @@ public class JettySparqlServer extends Server {
 			}
 		});
 
-		HandlerList handlers = new HandlerList();
+		final HandlerList handlers = new HandlerList();
+		
 		handlers.setHandlers(new Handler[] { resource_handler, new DefaultHandler() });
 
 		setHandler(handlers);
+		
 	}
 
 	public void startup(final Config config, final IIndexManager indexManager) throws Exception {
+
 		setupHandlers(config, indexManager);
 
         if (log.isInfoEnabled())
@@ -131,6 +157,7 @@ public class JettySparqlServer extends Server {
 		
         if (log.isInfoEnabled())
             log.info("Running on port: " + m_port);
+	
 	}
 
 	static Handler makeContextHandler(Handler handler, String spec) {
