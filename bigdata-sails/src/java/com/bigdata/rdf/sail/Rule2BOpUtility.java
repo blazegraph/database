@@ -626,10 +626,20 @@ public class Rule2BOpUtility {
     }
     
     public static PipelineOp join(final QueryEngine queryEngine, 
-			PipelineOp left, Predicate pred, final AtomicInteger idFactory,
-			final Properties queryHints) {
+			final PipelineOp left, final Predicate pred, 
+			final AtomicInteger idFactory, final Properties queryHints) {
     	
 		return join(queryEngine, left, pred, null, 
+				idFactory, queryHints);
+    	
+    }
+    
+    public static PipelineOp join(final QueryEngine queryEngine, 
+			final PipelineOp left, final Predicate pred, 
+			final Collection<IConstraint> constraints, 
+			final AtomicInteger idFactory, final Properties queryHints) {
+    	
+		return join(queryEngine, left, pred, constraints, 
 				new BOpContextBase(queryEngine), idFactory, queryHints);
     	
     }
