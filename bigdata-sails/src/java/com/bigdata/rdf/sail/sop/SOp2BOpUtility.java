@@ -133,12 +133,42 @@ public class SOp2BOpUtility {
      */
     private static boolean isSingleOptional(final SOpGroup sopGroup) {
 
-    	if (sopGroup.size() == 1 && sopGroup.getChildren() == null) {
-    		final SOp sop = sopGroup.getSingletonSOp();
-    		return (sop.getOperator() instanceof StatementPattern) &&
-    			sop.isRightSideLeftJoin();
+    	if (log.isDebugEnabled()) {
+    		log.debug("testing for single optional:\n" + sopGroup);
     	}
-    	return false;
+    	
+    	// if the group has subqueries it's not a single optional group
+    	if (sopGroup.getChildren() != null) {
+    		if (log.isDebugEnabled()) {
+    			log.debug("group has children, not single optional");
+    		}
+    		return false;
+    	}
+    	
+    	int numPredicates = 0;
+    	for (SOp sop : sopGroup) {
+    		if (sop.getOperator() instanceof StatementPattern) {
+    			// if any predicate is not rslj we're not a single optional group
+    			if (!sop.isRightSideLeftJoin()) {
+    	    		if (log.isDebugEnabled()) {
+    	    			log.debug("sop not rslj, not single optional");
+    	    		}
+    				return false;
+    			}
+    			numPredicates++;
+    		}
+    	}
+		if (log.isDebugEnabled()) {
+			log.debug("group has numPredicates=" + numPredicates);
+		}
+    	return numPredicates == 1;
+    	
+//    	if (sopGroup.size() == 1 && sopGroup.getChildren() == null) {
+//    		final SOp sop = sopGroup.getSingletonSOp();
+//    		return (sop.getOperator() instanceof StatementPattern) &&
+//    			sop.isRightSideLeftJoin();
+//    	}
+//    	return false;
     	
     }
     
@@ -253,15 +283,22 @@ public class SOp2BOpUtility {
 	    			continue;
 	    		
 	    		if (isSingleOptional(child)) {
-	    			final SOp sop = child.getSingletonSOp();
-	    			final BOp bop = sop.getBOp();
-					Predicate pred = (Predicate) bop.setProperty(
+	    			Predicate pred = null;
+	    			final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
+	    			for (SOp sop : child) {
+	    				final BOp bop = sop.getBOp();
+	    				if (bop instanceof IConstraint) {
+	    					constraints.add((IConstraint) bop);
+	    				} else if (bop instanceof Predicate) {
+	    					pred = (Predicate) bop;
+	    				}
+	    			}
+					pred = (Predicate) pred.setProperty(
 							IPredicate.Annotations.OPTIONAL, Boolean.TRUE);
 					pred = pred.setBOpId(idFactory.incrementAndGet());
 					left = Rule2BOpUtility.join(
-							queryEngine, left, pred, 
-							idFactory, 
-							queryHints);
+							queryEngine, left, pred, constraints, 
+							idFactory, queryHints);
 	    		} else {
 		    		if (useHashJoin(queryHints)) {
 		    			
