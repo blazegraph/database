@@ -38,6 +38,8 @@ public class JettySparqlServer extends Server {
 
 	static private final Logger log = Logger.getLogger(JettySparqlServer.class);
 
+	protected static final boolean directServletAccess = true;
+
 	int m_port = -1; // allow package visibility from JettySparqlCommand
 
 	final TreeMap<String, Handler> m_handlerMap = new TreeMap<String, Handler>();
@@ -114,9 +116,19 @@ public class JettySparqlServer extends Server {
 
 		// embedded setup
 		m_handlerMap.put("/status", new ServletHandler(new StatusServlet()));
-//		m_handlerMap.put("/query", new ServletHandler(new QueryServlet()));
-//		m_handlerMap.put("/update", new ServletHandler(new UpdateServlet()));
-//		m_handlerMap.put("/delete", new ServletHandler(new DeleteServlet()));
+		
+		if (directServletAccess) {
+			m_handlerMap.put("/query", new ServletHandler(new QueryServlet()));
+			m_handlerMap.put("/update", new ServletHandler(new UpdateServlet()));
+			m_handlerMap.put("/delete", new ServletHandler(new DeleteServlet()));
+		} else {
+			// create implementation servlets
+			new QueryServlet();
+			new UpdateServlet();
+			
+			// still need delete endpoint for delete with body
+			m_handlerMap.put("/delete", new ServletHandler(new DeleteServlet()));
+		}
 		m_handlerMap.put("/", new ServletHandler(new RESTServlet()));
 		
 		// the "stop" handler is only relevant for the embedded server
