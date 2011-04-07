@@ -7,11 +7,14 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
-import org.openrdf.query.parser.QueryParser;
-import org.openrdf.query.parser.sparql.SPARQLParserFactory;
 
 import com.bigdata.rdf.sail.webapp.BigdataContext.AbstractQueryTask;
 
+/**
+ * SPARQL query handler for GET or POST verbs.
+ * 
+ * @author martyncutcher
+ */
 public class QueryServlet extends BigdataServlet {
 
 	/**
@@ -19,30 +22,40 @@ public class QueryServlet extends BigdataServlet {
 	 */
 	static private final Logger log = Logger.getLogger(BigdataServlet.class); 
 
-	/**
-	 * @todo use to decide ASK, DESCRIBE, CONSTRUCT, SELECT, EXPLAIN, etc.
-	 */
-	private final QueryParser m_engine;
-
+//	/**
+//	 * @todo use to decide ASK, DESCRIBE, CONSTRUCT, SELECT, EXPLAIN, etc.
+//	 */
+//	private final QueryParser m_engine;
 
     public QueryServlet() {
-		// used to parse qeries.
-        m_engine = new SPARQLParserFactory().getParser();
+    	
+//		// used to parse qeries.
+//        m_engine = new SPARQLParserFactory().getParser();
         
         getContext().registerServlet(this);
+        
     }
 
-    public void doPost(final HttpServletRequest req, final HttpServletResponse resp) {
+    @Override
+    protected void doPost(final HttpServletRequest req, final HttpServletResponse resp) {
+    
     	doGet(req, resp); // POST is allowed for query
+    	
 	}
 
-	public void doGet(final HttpServletRequest req, final HttpServletResponse resp) {
-		final String namespace = getNamespace(req.getRequestURI());
+	/**
+	 * FIXME Does not handle default-graph-uri or named-graph-uri query
+	 * parameters.
+	 */
+    @Override
+	protected void doGet(final HttpServletRequest req, final HttpServletResponse resp) {
+
+    	final String namespace = getNamespace(req.getRequestURI());
 
 		final long timestamp = getTimestamp(req.getRequestURI(), req);
 
-		final String uriqueryStr = req.getQueryString();
-		final String url = req.getRequestURL().toString();
+//		final String uriqueryStr = req.getQueryString();
+//		final String url = req.getRequestURL().toString();
 		
 		final String queryStr = req.getParameter("query");
 
@@ -101,3 +114,4 @@ public class QueryServlet extends BigdataServlet {
 	}
 
 }
+

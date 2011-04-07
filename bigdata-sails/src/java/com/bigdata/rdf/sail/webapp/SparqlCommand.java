@@ -92,7 +92,6 @@ public class SparqlCommand {
 	 *            </dl>
 	 *            </p>
 	 */
-
 	static public void main(String[] args) throws Exception {
 		// PropertyConfigurator.configure("C:/CT_Config/ct_test_log4j.properties");
 
