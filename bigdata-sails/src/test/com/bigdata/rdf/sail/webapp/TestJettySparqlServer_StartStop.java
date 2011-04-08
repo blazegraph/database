@@ -661,7 +661,8 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 	 * UPDATE should not be allowed with a GET request
 	 */
 	public void test_GETUPDATE_withBody_NTRIPLES() throws Exception {
-		if (JettySparqlServer.directServletAccess) {
+//		if (JettySparqlServer.directServletAccess) 
+		if(false) {
 			HttpURLConnection conn = null;
 			final URL url = new URL(m_serviceURL + "/update?data=stuff");
 			conn = (HttpURLConnection) url.openConnection();

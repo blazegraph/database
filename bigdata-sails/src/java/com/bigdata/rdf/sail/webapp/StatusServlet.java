@@ -193,7 +193,7 @@ public class StatusServlet extends BigdataServlet {
 
 			doc.closeAll(current);
 
-			buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, doc.toString());
+			buildResponse(resp, HTTP_OK, MIME_TEXT_HTML, doc.toString());
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
