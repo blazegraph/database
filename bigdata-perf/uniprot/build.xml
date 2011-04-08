@@ -21,7 +21,7 @@
 
 	<target name="prepare">
 	</target>
-	
+
 	<!-- Note: For scale-out, split the data files and use MappedRDFDataLoadMaster. -->
 	<target name="run-load" depends="clean, prepare">
 		<java classname="com.bigdata.rdf.store.DataLoader" fork="true" failonerror="true">
@@ -52,6 +52,7 @@
 		</java>
 	</target>
 
+	<!--
 	<target name="stop-nano-server" depends="prepare" description="Stop the small http server running at the configured port.">
 		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true">
 			<arg line="${nanoServerPort} -stop" />
@@ -60,5 +61,6 @@
 			</classpath>
 		</java>
 	</target>
+	-->
 
 </project>
