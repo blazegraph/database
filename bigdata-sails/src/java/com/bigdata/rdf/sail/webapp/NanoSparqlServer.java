@@ -12,22 +12,28 @@ import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.BigdataContext.Config;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniClient;
 
+/**
+ * Utility class provides a simple SPARQL end point with a REST API.
+ * 
+ * @author thompsonbry
+ * @author martyncutcher
+ * 
+ * @see https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer
+ */
 public class NanoSparqlServer {
 	
-	static private final Logger log = Logger.getLogger(JettySparqlServer.class);
+	static private final Logger log = Logger.getLogger(NanoSparqlServer.class);
 
 	/**
 	 * Run an httpd service exposing a SPARQL endpoint. The service will respond
@@ -46,8 +52,6 @@ public class NanoSparqlServer {
 	 * 
 	 * @param args
 	 *            USAGE:<br/>
-	 *            To stop the server:<br/>
-	 *            <code>port -stop</code><br/>
 	 *            To start the server:<br/>
 	 *            <code>(options) <i>namespace</i> (propertyFile|configFile) )</code>
 	 *            <p>
@@ -84,14 +88,16 @@ public class NanoSparqlServer {
 	 *            against the most recent commit point on the database.
 	 *            Regardless, each query will be issued against a read-only
 	 *            transaction.</dt>
-	 *            <dt>bufferCapacity [#bytes]</dt>
-	 *            <dd>Specify the capacity of the buffers used to decouple the
-	 *            query evaluation from the consumption of the HTTP response by
-	 *            the clinet. The capacity may be specified in bytes or
-	 *            kilobytes, e.g., <code>5k</code>.</dd>
 	 *            </dl>
 	 *            </p>
 	 */
+//	 *            To stop the server:<br/>
+//	 *            <code>port -stop</code><br/>
+//	 *            <dt>bufferCapacity [#bytes]</dt>
+//	 *            <dd>Specify the capacity of the buffers used to decouple the
+//	 *            query evaluation from the consumption of the HTTP response by
+//	 *            the client. The capacity may be specified in bytes or
+//	 *            kilobytes, e.g., <code>5k</code>.</dd>
 	static public void main(String[] args) throws Exception {
 		// PropertyConfigurator.configure("C:/CT_Config/ct_test_log4j.properties");
 
@@ -108,29 +114,29 @@ public class NanoSparqlServer {
 		JettySparqlServer server = null;
 
 		try {
-			/*
-			 * First, handle the [port -stop] command, where "port" is the port
-			 * number of the service. This case is a bit different because the
-			 * "-stop" option appears after the "port" argument.
-			 */
-			if (args.length == 2) {
-				if ("-stop".equals(args[1])) {
-					final int port;
-					try {
-						port = Integer.valueOf(args[0]);
-					} catch (NumberFormatException ex) {
-						usage(1/* status */, "Could not parse as port# : '" + args[0] + "'");
-						// keep the compiler happy wrt [port] being bound.
-						throw new AssertionError();
-					}
-					// Send stop to server.
-					sendStop(port);
-					// Normal exit.
-					System.exit(0);
-				} else {
-					usage(1/* status */, null/* msg */);
-				}
-			}
+//			/*
+//			 * First, handle the [port -stop] command, where "port" is the port
+//			 * number of the service. This case is a bit different because the
+//			 * "-stop" option appears after the "port" argument.
+//			 */
+//			if (args.length == 2) {
+//				if ("-stop".equals(args[1])) {
+//					final int port;
+//					try {
+//						port = Integer.valueOf(args[0]);
+//					} catch (NumberFormatException ex) {
+//						usage(1/* status */, "Could not parse as port# : '" + args[0] + "'");
+//						// keep the compiler happy wrt [port] being bound.
+//						throw new AssertionError();
+//					}
+//					// Send stop to server.
+//					sendStop(port);
+//					// Normal exit.
+//					System.exit(0);
+//				} else {
+//					usage(1/* status */, null/* msg */);
+//				}
+//			}
 
 			/*
 			 * Now that we have that case out of the way, handle all arguments
@@ -151,16 +157,16 @@ public class NanoSparqlServer {
 						if (config.queryThreadPoolSize < 0) {
 							usage(1/* status */, "-nthreads must be non-negative, not: " + s);
 						}
-					} else if (arg.equals("-bufferCapacity")) {
-						final String s = args[++i];
-						final long tmp = BytesUtil.getByteCount(s);
-						if (tmp < 1) {
-							usage(1/* status */, "-bufferCapacity must be non-negative, not: " + s);
-						}
-						if (tmp > Bytes.kilobyte32 * 100) {
-							usage(1/* status */, "-bufferCapacity must be less than 100kb, not: " + s);
-						}
-						config.bufferCapacity = (int) tmp;
+//					} else if (arg.equals("-bufferCapacity")) {
+//						final String s = args[++i];
+//						final long tmp = BytesUtil.getByteCount(s);
+//						if (tmp < 1) {
+//							usage(1/* status */, "-bufferCapacity must be non-negative, not: " + s);
+//						}
+//						if (tmp > Bytes.kilobyte32 * 100) {
+//							usage(1/* status */, "-bufferCapacity must be less than 100kb, not: " + s);
+//						}
+//						config.bufferCapacity = (int) tmp;
 					} else if (arg.equals("-readLock")) {
 						final String s = args[++i];
 						readLock = Long.valueOf(s);
@@ -446,9 +452,9 @@ public class NanoSparqlServer {
 
 		System.err.println("[options] port namespace (propertyFile|configFile)");
 
-		System.err.println("-OR-");
-
-		System.err.println("port -stop");
+//		System.err.println("-OR-");
+//
+//		System.err.println("port -stop");
 
 		System.exit(status);
 

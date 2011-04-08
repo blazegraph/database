@@ -96,6 +96,15 @@ public class QueryServlet extends BigdataServlet {
 			if (log.isTraceEnabled())
 				log.trace("Running query: " + queryStr);
 
+			/*
+			 * FIXME This needs to run on an ExecutorService with a configured
+			 * thread pool size so we can avoid running too many queries
+			 * concurrently. Please restore the logic for doing this with the
+			 * thread pool scoped appropriately. All non-administrative REST Api
+			 * tasks should adhere to this limit. The limit should not apply to
+			 * normal http requests against non-API services.
+			 */
+			
 			queryTask.call();
 
 			// Setup the response.

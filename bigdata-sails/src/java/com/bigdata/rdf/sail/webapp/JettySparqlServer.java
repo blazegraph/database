@@ -38,7 +38,11 @@ public class JettySparqlServer extends Server {
 
 	static private final Logger log = Logger.getLogger(JettySparqlServer.class);
 
-	protected static final boolean directServletAccess = true;
+	/*
+	 * Martyn, I took this out of the code because it was getting committed with
+	 * the wrong value to run the published API! Bryan
+	 */
+//	protected static final boolean directServletAccess = false;
 
 	int m_port = -1; // allow package visibility from JettySparqlCommand
 
@@ -117,34 +121,35 @@ public class JettySparqlServer extends Server {
 		// embedded setup
 		m_handlerMap.put("/status", new ServletHandler(new StatusServlet()));
 		
-		if (directServletAccess) {
-			m_handlerMap.put("/query", new ServletHandler(new QueryServlet()));
-			m_handlerMap.put("/update", new ServletHandler(new UpdateServlet()));
-			m_handlerMap.put("/delete", new ServletHandler(new DeleteServlet()));
-		} else {
+//		if (directServletAccess) {
+//			m_handlerMap.put("/query", new ServletHandler(new QueryServlet()));
+//			m_handlerMap.put("/update", new ServletHandler(new UpdateServlet()));
+//			m_handlerMap.put("/delete", new ServletHandler(new DeleteServlet()));
+//		} else 
+		{
 			// create implementation servlets
 			new QueryServlet();
 			new UpdateServlet();
 			
-			// still need delete endpoint for delete with body
+			// still need delete endpoint for delete with body 
 			m_handlerMap.put("/delete", new ServletHandler(new DeleteServlet()));
 		}
 		m_handlerMap.put("/", new ServletHandler(new RESTServlet()));
 		
-		// the "stop" handler is only relevant for the embedded server
-		m_handlerMap.put("/stop", new AbstractHandler() {
-			public void handle(String arg0, Request arg1, HttpServletRequest arg2, HttpServletResponse resp)
-					throws IOException, ServletException {
-				try {
-					resp.getWriter().println("Server Stop request received");
-					shutdownNow();
-				} catch (InterruptedException e) {
-					// okay
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-			}
-		});
+//		// the "stop" handler is only relevant for the embedded server
+//		m_handlerMap.put("/stop", new AbstractHandler() {
+//			public void handle(String arg0, Request arg1, HttpServletRequest arg2, HttpServletResponse resp)
+//					throws IOException, ServletException {
+//				try {
+//					resp.getWriter().println("Server Stop request received");
+//					shutdownNow();
+//				} catch (InterruptedException e) {
+//					// okay
+//				} catch (Exception e) {
+//					e.printStackTrace();
+//				}
+//			}
+//		});
 
 		final HandlerList handlers = new HandlerList();
 		
