@@ -27,7 +27,7 @@ import com.bigdata.rdf.sail.webapp.BigdataContext.Config;
  * 
  * The {@link JettySparqlServer} enables easy embedding of the {@link RESTServlet}
  * 
- * To invoke from the command line use the {@link SparqlCommand}.
+ * To invoke from the command line use the {@link NanoSparqlServer}.
  * 
  * The server provides an embeddable alternative to a standard web application
  * deployment.

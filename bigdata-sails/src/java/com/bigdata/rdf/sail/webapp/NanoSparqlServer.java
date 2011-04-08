@@ -25,7 +25,7 @@ import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniClient;
 
-public class SparqlCommand {
+public class NanoSparqlServer {
 	
 	static private final Logger log = Logger.getLogger(JettySparqlServer.class);
 
@@ -336,11 +336,11 @@ public class SparqlCommand {
 
 			}
 
-			System.out.println("JettySparqlServer up and raring to go..");
+			System.out.println("NanoSparqlServer running..");
 
 			server.join(); // wait for server to exit
 
-			System.out.println("SparqlServer going down!");
+			System.out.println("NanoSparqlServer stopping!");
 			
 		} catch (Throwable ex) {
 			ex.printStackTrace();
