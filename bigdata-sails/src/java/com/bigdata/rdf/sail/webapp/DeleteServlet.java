@@ -25,7 +25,13 @@ import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.webapp.BigdataContext.AbstractQueryTask;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
+/**
+ * Handler for DELETE by query (DELETE verb) and DELETE by data (POST).
+ * 
+ * @author martyncutcher
+ */
 public class DeleteServlet extends BigdataServlet {
+
 	/**
 	 * The logger for the concrete {@link BigdataServlet} class.
 	 */
@@ -37,25 +43,6 @@ public class DeleteServlet extends BigdataServlet {
     }
 
    /**
-     * REST DELETE. There are two forms for this operation.
-     * 
-     * <pre>
-     * DELETE [/namespace/NAMESPACE]
-     * ...
-     * Content-Type
-     * ...
-     * 
-     * BODY
-     * 
-     * </pre>
-     * <p>
-     * BODY contains RDF statements according to the specified Content-Type.
-     * Statements parsed from the BODY are deleted from the addressed namespace.
-     * </p>
-     * <p>
-     * -OR-
-     * </p>
-     * 
      * <pre>
      * DELETE [/namespace/NAMESPACE] ?query=...
      * </pre>
@@ -65,22 +52,20 @@ public class DeleteServlet extends BigdataServlet {
      * from that namespace.
      * </p>
      */
-     public void doDelete(final HttpServletRequest req, final HttpServletResponse resp) {
+	@Override
+	protected void doDelete(final HttpServletRequest req,
+			final HttpServletResponse resp) {
 
-        final String contentType = req.getContentType();
-        
         final String queryStr = req.getRequestURI();
 
-        if (contentType != null) {
-        
-            doDeleteWithBody(req, resp);
-            
-        } else if (queryStr != null) {
+        if (queryStr != null) {
             
             doDeleteWithQuery(req, resp);
             
         } else {
+  
         	resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+        	
         }
            
     }
@@ -203,13 +188,26 @@ public class DeleteServlet extends BigdataServlet {
 
      }
 
-     /**
-      * The delete servlet can delete statements posted in the body of
-      * the request.  Note that the DELETE method cannot be used directly for
-      * this since it is not permitted to open an OutputStream for a DELETE
-      * request.
-      */
-     public void doPost(final HttpServletRequest req, final HttpServletResponse resp) {
+	/**
+	 * <pre>
+	 * POST [/namespace/NAMESPACE]
+	 * ...
+	 * Content-Type
+	 * ...
+	 * 
+	 * BODY
+	 * 
+	 * </pre>
+	 * <p>
+	 * BODY contains RDF statements according to the specified Content-Type.
+	 * Statements parsed from the BODY are deleted from the addressed namespace.
+	 * </p>
+	 * <p>
+	 * Note: Most client APIs do not permit a message body to be sent with a
+	 * DELETE request.
+	 */
+     @Override
+     protected void doPost(final HttpServletRequest req, final HttpServletResponse resp) {
 
          final String contentType = req.getContentType();
          
@@ -334,6 +332,7 @@ public class DeleteServlet extends BigdataServlet {
         }
 
     }
+    
     /**
      * Helper class removes statements from the sail as they are visited by a parser.
      */
@@ -374,5 +373,4 @@ public class DeleteServlet extends BigdataServlet {
 
     }
     
-
 }

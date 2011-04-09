@@ -57,7 +57,7 @@
 	</target>
 
 	<target name="start-nano-server" depends="prepare" description="Start a small http server fronting for a bigdata database instance.">
-		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true">
+		<java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer" fork="true" failonerror="true">
 			<arg line="${nanoServerPort} ${namespace} ${journalPropertyFile}" />
 			<!-- specify/override the journal file name. -->
 			<jvmarg line="${queryJvmArgs}
@@ -69,6 +69,7 @@
 		</java>
 	</target>
 
+	<!--
 	<target name="stop-nano-server" depends="prepare" description="Stop the small http server running at the configured port.">
 		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true">
 			<arg line="${nanoServerPort} -stop" />
@@ -77,5 +78,6 @@
 			</classpath>
 		</java>
 	</target>
+	-->
 
 </project>

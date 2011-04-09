@@ -62,6 +62,7 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.rdf.sail.FreeTextSearchExpander;
+import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.rdf.sail.Rule2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroups;
@@ -132,12 +133,42 @@ public class SOp2BOpUtility {
      */
     private static boolean isSingleOptional(final SOpGroup sopGroup) {
 
-    	if (sopGroup.size() == 1 && sopGroup.getChildren() == null) {
-    		final SOp sop = sopGroup.getSingletonSOp();
-    		return (sop.getOperator() instanceof StatementPattern) &&
-    			sop.isRightSideLeftJoin();
+    	if (log.isDebugEnabled()) {
+    		log.debug("testing for single optional:\n" + sopGroup);
     	}
-    	return false;
+    	
+    	// if the group has subqueries it's not a single optional group
+    	if (sopGroup.getChildren() != null) {
+    		if (log.isDebugEnabled()) {
+    			log.debug("group has children, not single optional");
+    		}
+    		return false;
+    	}
+    	
+    	int numPredicates = 0;
+    	for (SOp sop : sopGroup) {
+    		if (sop.getOperator() instanceof StatementPattern) {
+    			// if any predicate is not rslj we're not a single optional group
+    			if (!sop.isRightSideLeftJoin()) {
+    	    		if (log.isDebugEnabled()) {
+    	    			log.debug("sop not rslj, not single optional");
+    	    		}
+    				return false;
+    			}
+    			numPredicates++;
+    		}
+    	}
+		if (log.isDebugEnabled()) {
+			log.debug("group has numPredicates=" + numPredicates);
+		}
+    	return numPredicates == 1;
+    	
+//    	if (sopGroup.size() == 1 && sopGroup.getChildren() == null) {
+//    		final SOp sop = sopGroup.getSingletonSOp();
+//    		return (sop.getOperator() instanceof StatementPattern) &&
+//    			sop.isRightSideLeftJoin();
+//    	}
+//    	return false;
     	
     }
     
@@ -252,27 +283,61 @@ public class SOp2BOpUtility {
 	    			continue;
 	    		
 	    		if (isSingleOptional(child)) {
-	    			final SOp sop = child.getSingletonSOp();
-	    			final BOp bop = sop.getBOp();
-					Predicate pred = (Predicate) bop.setProperty(
+	    			Predicate pred = null;
+	    			final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
+	    			for (SOp sop : child) {
+	    				final BOp bop = sop.getBOp();
+	    				if (bop instanceof IConstraint) {
+	    					constraints.add((IConstraint) bop);
+	    				} else if (bop instanceof Predicate) {
+	    					pred = (Predicate) bop;
+	    				}
+	    			}
+					pred = (Predicate) pred.setProperty(
 							IPredicate.Annotations.OPTIONAL, Boolean.TRUE);
 					pred = pred.setBOpId(idFactory.incrementAndGet());
 					left = Rule2BOpUtility.join(
-							queryEngine, left, pred, 
-							idFactory, 
-							queryHints);
+							queryEngine, left, pred, constraints, 
+							idFactory, queryHints);
 	    		} else {
-		    		final PipelineOp subquery = convert(
-		    				child, idFactory, db, queryEngine, queryHints);
-		    		final boolean optional = isOptional(child);
-		    		final int subqueryId = idFactory.incrementAndGet();
-		    		left = new SubqueryOp(new BOp[]{left}, 
-		                    new NV(Predicate.Annotations.BOP_ID, subqueryId),//
-		                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
-		                    new NV(SubqueryOp.Annotations.OPTIONAL,optional)//
-		            );
+		    		if (useHashJoin(queryHints)) {
+		    			
+		    			final IVariable<?>[] joinVars = 
+		    				gatherHashJoinVars(join, child);
+		    			final IConstraint[] joinConstraints =
+		    				gatherHashJoinConstraints(join, child);
+		    			
+			    		final PipelineOp subquery = convert(
+			    				child, idFactory, db, queryEngine, queryHints);
+			    		final boolean optional = isOptional(child);
+			    		final int subqueryId = idFactory.incrementAndGet();
+		    			
+		    			if (log.isInfoEnabled()) {
+		    				log.info("join vars: " + Arrays.toString(joinVars));
+		    				log.info("join constraints: " + Arrays.toString(joinConstraints));
+		    			}
+		    			
+			    		left = new SubqueryHashJoinOp(new BOp[]{left}, 
+			                    new NV(Predicate.Annotations.BOP_ID, subqueryId),//
+			                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
+			                    new NV(SubqueryOp.Annotations.OPTIONAL,optional),//
+			                	new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
+			                	new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, joinVars),
+	                			new NV(SubqueryHashJoinOp.Annotations.CONSTRAINTS, joinConstraints)
+			            );
+		    		} else {
+			    		final PipelineOp subquery = convert(
+			    				child, idFactory, db, queryEngine, queryHints);
+			    		final boolean optional = isOptional(child);
+			    		final int subqueryId = idFactory.incrementAndGet();
+			    		left = new SubqueryOp(new BOp[]{left}, 
+			                    new NV(Predicate.Annotations.BOP_ID, subqueryId),//
+			                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
+			                    new NV(SubqueryOp.Annotations.OPTIONAL,optional)//
+			            );
+		    		}
 		    		if (log.isInfoEnabled()) {
-		    			log.info("adding a subquery: " + subqueryId + "\n" + left);
+		    			log.info("adding a subquery:\n" + BOpUtility.toString2(left));
 		    		}
 	    		}
 	    	}
@@ -488,66 +553,8 @@ public class SOp2BOpUtility {
     		new LinkedHashMap<IVariable<?>, Collection<Predicate>>();
     	final Collection<IVariable<?>> boundByHashJoins =
     		new LinkedList<IVariable<?>>();
-    	if (true) { // maybe check query hints for this?
-
-    		int numSearches = 0;
-    		{ // first count the searches
-    			for (IPredicate pred : preds) {
-    				if (isFreeTextSearch(pred))
-    					numSearches++;
-    			}
-    		}
-    		if (numSearches > 1) { 
-    			{ // collect them up
-	    			final Iterator<Predicate> it = preds.iterator();
-	    			while (it.hasNext()) {
-	    				final Predicate pred = it.next();
-	    				if (isFreeTextSearch(pred)) {
-	    					// we're going to handle these separately
-	    					it.remove();
-	    					// create a hash group for this variable
-	    					final IVariable v = (IVariable) pred.get(0);
-	    					if (hashJoins.containsKey(v)) {
-	    						throw new IllegalArgumentException(
-	    								"multiple free text searches using the same variable!!");
-	    					}
-	    					final Collection<Predicate> hashGroup =
-	    						new LinkedList<Predicate>();
-	    					hashGroup.add(pred);
-	    					hashJoins.put(v, hashGroup);
-	    					// add this search variables to the list of known
-	    					// bound variables
-	    					boundByHashJoins.add(v);
-	    				}
-	    			}
-    			}
-    			{ // collect up other predicates that use the search vars
-	    			final Iterator<Predicate> it = preds.iterator();
-	    			while (it.hasNext()) {
-	    				final Predicate pred = it.next();
-	    				// search always binds to a literal, which can only be
-	    				// used as the 2nd arg (the object)
-	                    final BOp obj = pred.get(2);
-                        if (obj instanceof IVariable<?>) {
-                            final IVariable<?> v = (IVariable<?>) obj;
-                            if (hashJoins.containsKey(v)) {
-    	    					// we're going to handle these separately
-    	    					it.remove();
-    	    					// add this predicate to the hash group
-    	    					hashJoins.get(v).add(pred);
-    	    					// add any other variables used by this tail to 
-    	    					// the list of known bound variables
-    	    					for (BOp arg : pred.args()) {
-    	    						if (arg instanceof IVariable<?>) {
-    	    							boundByHashJoins.add((IVariable<?>) arg);
-    	    						}
-    	    					}
-                            }
-                        }
-	    			}    				
-    			}
-    		}
-    		
+    	if (useHashJoin(queryHints)) { // maybe check query hints for this?
+    		gatherHashJoins(preds, hashJoins, boundByHashJoins);
     	}
     	
     	final IVariable<?>[] required = group.getTree().getRequiredVars();
@@ -585,63 +592,32 @@ public class SOp2BOpUtility {
 		}
 
 		if (hashJoins.size() > 0) {
-			final Set<IVariable<?>> lastVars = new LinkedHashSet<IVariable<?>>();
-			final Set<IVariable<?>> joinVars = new LinkedHashSet<IVariable<?>>();
-			int i = 0;
+			Collection<Predicate> lastGroup = null;
 			for (Collection<Predicate> hashGroup : hashJoins.values()) {
-				joinVars.clear();
-				if (lastVars.size() > 0) {
-					for (Predicate pred : hashGroup) {
-						for (BOp arg : pred.args()) {
-							if (arg instanceof IVariable<?>) {
-								final IVariable<?> v = (IVariable<?>) arg;
-								if (lastVars.contains(v)) {
-									joinVars.add(v);
-								}
-							}
-						}
-					}
-				}
-				lastVars.clear();
-				for (Predicate pred : hashGroup) {
-					for (BOp arg : pred.args()) {
-						if (arg instanceof IVariable<?>) {
-							final IVariable<?> v = (IVariable<?>) arg;
-							lastVars.add(v);
-						}
-					}
-				}
 				
-				if (i == 0) {
+				if (lastGroup == null) {
 					left = convert(hashGroup, constraints, left, knownBound, 
 							idFactory, db, queryEngine, queryHints);
 				} else {
 					final PipelineOp subquery = convert(hashGroup, constraints, 
 							null/*left*/, knownBound, 
 							idFactory, db, queryEngine, queryHints);
-		            final PipelineOp slice = new SliceOp(new BOp[] { subquery }, NV.asMap(//
-							new NV(BOp.Annotations.BOP_ID, idFactory.incrementAndGet()), //
-							new NV(BOp.Annotations.EVALUATION_CONTEXT,
-									BOpEvaluationContext.CONTROLLER),//
-							new NV(PipelineOp.Annotations.SHARED_STATE, true)//
-					));
-					
-					final IVariable<?>[] joinVarsArray = 
-							joinVars.toArray(new IVariable[joinVars.size()]);
+					final IVariable<?>[] joinVars =
+						gatherHashJoinVars(lastGroup, hashGroup);
 					
 					if (log.isInfoEnabled()) {
-						log.info(Arrays.toString(joinVarsArray));
+						log.info(Arrays.toString(joinVars));
 						log.info(subquery);
 					}
 					
 					left = new SubqueryHashJoinOp(new BOp[]{left},
 	                	new NV(Predicate.Annotations.BOP_ID, idFactory.incrementAndGet()),//
+	                	new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subquery),//
 	                	new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
-	                	new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, slice),//
-	                	new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, joinVarsArray));
+	                	new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, joinVars));
 	                	
 				}
-				i++;
+				lastGroup = hashGroup;
 			}
 		}
 		
@@ -673,7 +649,13 @@ public class SOp2BOpUtility {
     	return pred.getAccessPathExpander() 
 			instanceof FreeTextSearchExpander;
     }
-    
+
+	/**
+	 * Used by hashJoins. Temporary measure. Have to do this because normal
+	 * rule2BOp would attach all the constraints to the last tail, which would
+	 * cause this subquery to fail. Need to be smarter about pruning the
+	 * constraints here and then we could just run through normal rule2BOp.
+	 */
     protected static final PipelineOp convert(
     		final Collection<Predicate> preds,
     		final Collection<IConstraint> constraints,
@@ -728,9 +710,194 @@ public class SOp2BOpUtility {
 
         }
         
-        return left;
+        final PipelineOp slice = new SliceOp(new BOp[] { left }, NV.asMap(//
+				new NV(BOp.Annotations.BOP_ID, idFactory.incrementAndGet()), //
+				new NV(BOp.Annotations.EVALUATION_CONTEXT,
+						BOpEvaluationContext.CONTROLLER),//
+				new NV(PipelineOp.Annotations.SHARED_STATE, true)//
+		));
+        
+        return slice;
     	
     }
 
+    protected static void gatherHashJoins(
+    		final Collection<Predicate> preds,
+    		final Map<IVariable<?>, Collection<Predicate>> hashJoins,
+			final Collection<IVariable<?>> boundByHashJoins) {
+		
+		int numSearches = 0;
+		{ // first count the searches
+			for (IPredicate pred : preds) {
+				if (isFreeTextSearch(pred))
+					numSearches++;
+			}
+		}
+		if (numSearches > 1) { 
+			{ // collect them up
+    			final Iterator<Predicate> it = preds.iterator();
+    			while (it.hasNext()) {
+    				final Predicate pred = it.next();
+    				if (isFreeTextSearch(pred)) {
+    					// we're going to handle these separately
+    					it.remove();
+    					// create a hash group for this variable
+    					final IVariable v = (IVariable) pred.get(0);
+    					if (hashJoins.containsKey(v)) {
+    						throw new IllegalArgumentException(
+    								"multiple free text searches using the same variable!!");
+    					}
+    					final Collection<Predicate> hashGroup =
+    						new LinkedList<Predicate>();
+    					hashGroup.add(pred);
+    					hashJoins.put(v, hashGroup);
+    					// add this search variables to the list of known
+    					// bound variables
+    					boundByHashJoins.add(v);
+    				}
+    			}
+			}
+			{ // collect up other predicates that use the search vars
+    			final Iterator<Predicate> it = preds.iterator();
+    			while (it.hasNext()) {
+    				final Predicate pred = it.next();
+    				// search always binds to a literal, which can only be
+    				// used as the 2nd arg (the object)
+                    final BOp obj = pred.get(2);
+                    if (obj instanceof IVariable<?>) {
+                        final IVariable<?> v = (IVariable<?>) obj;
+                        if (hashJoins.containsKey(v)) {
+	    					// we're going to handle these separately
+	    					it.remove();
+	    					// add this predicate to the hash group
+	    					hashJoins.get(v).add(pred);
+	    					// add any other variables used by this tail to 
+	    					// the list of known bound variables
+	    					for (BOp arg : pred.args()) {
+	    						if (arg instanceof IVariable<?>) {
+	    							boundByHashJoins.add((IVariable<?>) arg);
+	    						}
+	    					}
+                        }
+                    }
+    			}    				
+			}
+		}
+
+    }
+    
+    protected static IVariable<?>[] gatherHashJoinVars(
+    		final SOpGroup group1, 
+    		final SOpGroup group2) {
+    	
+    	final Collection<Predicate> p1 = new LinkedList<Predicate>();
+    	final Collection<Predicate> p2 = new LinkedList<Predicate>();
+    	
+    	for (SOp sop : group1) {
+    		final BOp bop = sop.getBOp();
+    		if (bop instanceof Predicate)
+    			p1.add((Predicate) bop);
+    	}
+    	
+    	for (SOp sop : group2) {
+    		final BOp bop = sop.getBOp();
+    		if (bop instanceof Predicate)
+    			p2.add((Predicate) bop);
+    	}
+    	
+    	return gatherHashJoinVars(p1, p2);
+    	
+    }
+    
+    protected static IVariable<?>[] gatherHashJoinVars(
+    		final Collection<Predicate> group1, 
+    		final Collection<Predicate> group2) {
+    	
+		final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
+		final Set<IVariable<?>> joinVars = new LinkedHashSet<IVariable<?>>();
+
+		for (Predicate pred : group1) {
+			for (BOp arg : pred.args()) {
+				if (arg instanceof IVariable<?>) {
+					final IVariable<?> v = (IVariable<?>) arg;
+					vars.add(v);
+				}
+			}
+		}
+		
+		if (vars.size() > 0) {
+			for (Predicate pred : group2) {
+				for (BOp arg : pred.args()) {
+					if (arg instanceof IVariable<?>) {
+						final IVariable<?> v = (IVariable<?>) arg;
+						if (vars.contains(v)) {
+							joinVars.add(v);
+						}
+					}
+				}
+			}
+		}
+		
+		return joinVars.toArray(new IVariable<?>[joinVars.size()]);
+    	
+    }
+    
+    protected static IConstraint[] gatherHashJoinConstraints(
+    		final SOpGroup group1, 
+    		final SOpGroup group2) {
+    	
+		final Set<IVariable<?>> vars1 = new LinkedHashSet<IVariable<?>>();
+
+		for (SOp sop : group1) {
+			final BOp bop = sop.getBOp();
+			if (bop instanceof Predicate) {
+				final Predicate pred = (Predicate) bop;
+				for (BOp arg : pred.args()) {
+					if (arg instanceof IVariable<?>) {
+						final IVariable<?> v = (IVariable<?>) arg;
+						vars1.add(v);
+					}
+				}
+			}
+		}
+		
+		// if the subquery has filters that use variables from the pipeline,
+		// we need to elevate those onto the HashJoin
+		
+		final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
+		final Collection<SOp> sopsToPrune = new LinkedList<SOp>();
+
+		for (SOp sop : group2) {
+			final BOp bop = sop.getBOp();
+			if (bop instanceof IConstraint) {
+				final IConstraint c = (IConstraint) bop;
+				final Iterator<IVariable<?>> vars = BOpUtility.getSpannedVariables(c);
+				while (vars.hasNext()) {
+					final IVariable<?> v = vars.next();
+					if (vars1.contains(v)) {
+						constraints.add(c);
+						sopsToPrune.add(sop);
+					}
+				}
+			}
+		}
+		
+		group2.pruneSOps(sopsToPrune);
+		
+		return constraints.toArray(new IConstraint[constraints.size()]);
+		
+    }    
+    
+    protected static boolean useHashJoin(final Properties queryHints) {
+    	final boolean hashJoin = Boolean.valueOf(queryHints.getProperty(
+    			QueryHints.HASH_JOIN, QueryHints.DEFAULT_HASH_JOIN)); 
+    	if (log.isInfoEnabled()) {
+    		log.info(queryHints);
+    		log.info(queryHints.getProperty(QueryHints.HASH_JOIN));
+    		log.info("use hash join = " + hashJoin);
+    	}
+    	return hashJoin;
+    }
+    
     
 }

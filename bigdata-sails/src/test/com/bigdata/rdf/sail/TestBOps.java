@@ -70,7 +70,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
         props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
         props.setProperty(BigdataSail.Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
         props.setProperty(BigdataSail.Options.JUSTIFY, "false");
-        props.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
+        props.setProperty(BigdataSail.Options.TEXT_INDEX, "true");
         
         return props;
         
@@ -442,6 +442,132 @@ public class TestBOps extends ProxyBigdataSailTestCase {
                 }));
                 
                 compare(result, solution);
+                
+            }
+            
+        } finally {
+            cxn.close();
+            sail.__tearDownUnitTest();
+        }
+
+    }
+    
+    public void testHashJoin() throws Exception {
+
+        final BigdataSail sail = getSail();
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        final BigdataSailRepositoryConnection cxn = 
+            (BigdataSailRepositoryConnection) repo.getConnection();
+        cxn.setAutoCommit(false);
+        
+        try {
+    
+            final ValueFactory vf = sail.getValueFactory();
+    
+            final LexiconRelation lex = sail.getDatabase().getLexiconRelation();
+            
+            final String ns = BD.NAMESPACE;
+            
+            URI mikeA = new URIImpl(ns+"MikeA");
+            URI mikeB = new URIImpl(ns+"MikeB");
+            URI bryan = new URIImpl(ns+"Bryan");
+            URI martyn = new URIImpl(ns+"Martyn");
+            URI person = new URIImpl(ns+"Person");
+            URI name = new URIImpl(ns+"name");
+            Literal l1 = new LiteralImpl("Mike");
+            Literal l2 = new LiteralImpl("Bryan");
+            Literal l3 = new LiteralImpl("Martyn");
+/**/
+            cxn.setNamespace("ns", ns);
+            
+            cxn.add(mikeA, RDF.TYPE, person);
+            cxn.add(mikeA, name, l1);
+            cxn.add(mikeB, RDF.TYPE, person);
+            cxn.add(mikeB, name, l1);
+            cxn.add(bryan, RDF.TYPE, person);
+            cxn.add(bryan, name, l2);
+            cxn.add(martyn, RDF.TYPE, person);
+            cxn.add(martyn, name, l3);
+
+            /*
+             * Note: The either flush() or commit() is required to flush the
+             * statement buffers to the database before executing any operations
+             * that go around the sail.
+             */
+            cxn.flush();//commit();
+            cxn.commit();//
+            
+            if (log.isInfoEnabled()) {
+                log.info("\n" + sail.getDatabase().dumpStore());
+            }
+
+            {
+                
+//                String query = 
+//                    "PREFIX "+QueryHints.PREFIX+": <"+QueryHints.NAMESPACE+QueryHints.HASH_JOIN+"=true> " +
+//                    "PREFIX rdf: <"+RDF.NAMESPACE+"> " +
+//                    "PREFIX rdfs: <"+RDFS.NAMESPACE+"> " +
+//                    "PREFIX bds: <"+BD.SEARCH_NAMESPACE+"> " +
+//                    "PREFIX ns: <"+ns+"> " +
+//                    
+//                    "select distinct ?s1 ?s2 " +
+////                    "select distinct ?s1 " +
+//                    "WHERE { " +
+//                    "  ?o1 bds:search \"m*\" ." +
+//                    "  ?s1 ns:name ?o1 . " +
+//                    "  ?s1 rdf:type ns:Person . " +
+//                    "  ?s1 ns:name ?name . " +
+//                    "  OPTIONAL { " +
+//                    "    ?o2 bds:search \"m*\" ." +
+//                    "    ?s2 ns:name ?o2 . " +
+//                    "    ?s2 rdf:type ns:Person . " +
+//                    "    ?s2 ns:name ?name . " +
+//                    "    filter(?s1 != ?s2) . " +
+//                    "  } " +
+////                    "  filter(!bound(?s2) || ?s1 != ?s2) . " +
+//                    "}";
+                
+                String query = 
+                    "PREFIX "+QueryHints.PREFIX+": <"+QueryHints.NAMESPACE+QueryHints.HASH_JOIN+"=true> " +
+                    "PREFIX rdf: <"+RDF.NAMESPACE+"> " +
+                    "PREFIX rdfs: <"+RDFS.NAMESPACE+"> " +
+                    "PREFIX bds: <"+BD.SEARCH_NAMESPACE+"> " +
+                    "PREFIX ns: <"+ns+"> " +
+                    
+                    "select distinct ?s1 ?s2 " +
+                    "WHERE { " +
+                    "  ?s1 rdf:type ns:Person . " +
+                    "  ?s1 ns:name ?name . " +
+                    "  OPTIONAL { " +
+                    "    ?s2 rdf:type ns:Person . " +
+                    "    ?s2 ns:name ?name . " +
+                    "    filter(?s1 != ?s2) . " +
+                    "  } " +
+                    "}";
+
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                TupleQueryResult result = tupleQuery.evaluate();
+                
+                while (result.hasNext()) {
+                    System.err.println(result.next());
+                }
+ 
+//                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+//                solution.add(createBindingSet(new Binding[] {
+//                    new BindingImpl("s", mike),
+//                    new BindingImpl("p", RDFS.LABEL),
+//                    new BindingImpl("label", l1)
+//                }));
+//                solution.add(createBindingSet(new Binding[] {
+//                    new BindingImpl("s", bryan),
+//                    new BindingImpl("p", RDFS.COMMENT),
+//                    new BindingImpl("label", l2)
+//                }));
+//                
+//                compare(result, solution);
                 
             }
             

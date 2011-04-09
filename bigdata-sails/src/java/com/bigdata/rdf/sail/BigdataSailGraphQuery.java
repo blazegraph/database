@@ -53,7 +53,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery
 	
     /**
      * Query hints are embedded in query strings as namespaces.  
-     * See {@link QueryHints#NAMESPACE} for more information.
+     * See {@link QueryHints#PREFIX} for more information.
      */
     private final Properties queryHints;
     
@@ -234,7 +234,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery
     /**
      * Overriden to use query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
-     * See {@link QueryHints#NAMESPACE} for more information.
+     * See {@link QueryHints#PREFIX} for more information.
      */
     @Override
     public GraphQueryResult evaluate() throws QueryEvaluationException {

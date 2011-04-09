@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.controller.SubqueryHashJoinOp;
 
 /**
  * Query hint directives understood by a bigdata SPARQL end point.
@@ -54,9 +55,9 @@ public interface QueryHints {
      * {@link BOp.Annotations}. A list of the known directives is declared by
      * this interface.
      */
-    String NAMESPACE = "BIGDATA_QUERY_HINTS";
+    String PREFIX = "BIGDATA_QUERY_HINTS";
     
-    String PREFIX = "http://www.bigdata.com/queryHints#";
+    String NAMESPACE = "http://www.bigdata.com/queryHints#";
 
 	/**
 	 * Specify the query optimizer. For example, you can disable the query
@@ -95,5 +96,24 @@ public interface QueryHints {
      * @see #TAG
      */
     String DEFAULT_TAG = "";
+    
+    
+	/**
+	 * If true, this query hint will let the evaluation strategy know it should
+	 * try to use the {@link SubqueryHashJoinOp} to perform a hash join between
+	 * subqueries.  Subqueries are identified in several ways: either an optional
+	 * join group, or a set of tails within one join group that create a cross
+	 * product if run normally (i.e. multiple free text searches).
+	 *  
+	 * <pre>
+	 * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sail.QueryHints.hashJoin=true&gt;
+	 * </pre>
+	 */
+    String HASH_JOIN = QueryHints.class.getName() + ".hashJoin";
+
+    /**
+     * @see #HASH_JOIN
+     */
+    String DEFAULT_HASH_JOIN = "false";
 
 }

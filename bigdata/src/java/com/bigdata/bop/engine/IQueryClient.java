@@ -15,7 +15,7 @@ public interface IQueryClient extends IQueryPeer {
 	 * request was processed. Queries reported in the returned array may
 	 * terminate at any time.
 	 */
-	UUID[] getRunningQueries();
+	UUID[] getRunningQueries() throws RemoteException;
 	
     /**
      * Return the query.

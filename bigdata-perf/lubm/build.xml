@@ -87,7 +87,7 @@
 	<target name="run-load" depends="compile">
 		<!-- delete file if it exists so we load into a new journal. -->
 		<delete verbose="true" file="${lubm.journalFile}" />
-		<java classname="com.bigdata.rdf.store.DataLoader" fork="true" failonerror="true">
+		<java classname="com.bigdata.rdf.store.DataLoader" fork="true" failonerror="true" dir="${build.dir}/bin">
 			<arg line="-closure -namespace ${lubm.namespace} ${lubm.journalPropertyFile} ${lubm.ontologyFile} ${lubm.dataDir}" />
 			<!-- specify/override the journal file name. -->
 			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${lubm.journalFile}
@@ -100,7 +100,11 @@
 	</target>
 
 	<target name="start-nano-server" depends="compile" description="Start a small http server fronting for a bigdata database instance.">
-		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
+		<echo message="propertyFile=${lubm.journalPropertyFile}"/>
+		<echo message="journalFile=${lubm.journalFile}"/>
+		<echo message="namespace=${lubm.namespace}"/>
+		<echo message="port=${lubm.nanoServerPort}"/>
+		<java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
 			<arg line="${lubm.nanoServerPort} ${lubm.namespace} ${lubm.journalPropertyFile}" />
 			<!-- specify/override the journal file name. -->
 			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${lubm.journalFile}" />
@@ -110,6 +114,7 @@
 		</java>
 	</target>
 
+	<!--
 	<target name="stop-nano-server" depends="compile" description="Stop the small http server running at the configured port (either qualification or normal trials).">
 		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
 			<arg line="${lubm.nanoServerPort} -stop" />
@@ -118,12 +123,14 @@
 			</classpath>
 		</java>
 	</target>
+	-->
 
 	<target name="run-query" depends="compile" description="Runs the benchmark queries against the loaded data.">
-		<java classname="edu.lehigh.swat.bench.ubt.Test" fork="true" failonerror="true">
+		<java classname="edu.lehigh.swat.bench.ubt.Test" fork="true" failonerror="true" dir="${build.dir}/bin">
 			<jvmarg value="-Dlubm.warmUp=false" />
 			<jvmarg value="-Dlubm.queryTime=10" />
 			<jvmarg value="-Dlubm.queryParallel=1" />
+			<jvmarg value="-Dlog4j.configuration=file:log4j.properties"/>
 			<arg value="query" />
 			<arg value="${lubm.configFile}" />
 			<arg value="${lubm.queryFile}" />

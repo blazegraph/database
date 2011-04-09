@@ -31,6 +31,11 @@ import com.bigdata.rdf.sail.bench.NanoSparqlServer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.httpd.NanoHTTPD;
 
+/**
+ * Handler for update (POST
+ * 
+ * @author martyncutcher
+ */
 public class UpdateServlet extends BigdataServlet {
 	
 	/**
@@ -43,10 +48,57 @@ public class UpdateServlet extends BigdataServlet {
         getContext().registerServlet(this);
     }
 
+	/**
+	 * <p>
+	 * Perform an HTTP-POST, which corresponds to the basic CRUD operation
+	 * "create" according to the generic interaction semantics of HTTP REST. The
+	 * operation will be executed against the target namespace per the URI.
+	 * </p>
+	 * 
+	 * <pre>
+	 * POST [/namespace/NAMESPACE]
+	 * ...
+	 * Content-Type: 
+	 * ...
+	 * 
+	 * BODY
+	 * </pre>
+	 * <p>
+	 * Where <code>BODY</code> is the new RDF content using the representation
+	 * indicated by the <code>Content-Type</code>.
+	 * </p>
+	 * <p>
+	 * -OR-
+	 * </p>
+	 * 
+	 * <pre>
+	 * POST [/namespace/NAMESPACE] ?uri=URL
+	 * </pre>
+	 * <p>
+	 * Where <code>URI</code> identifies a resource whose RDF content will be
+	 * inserted into the database. The <code>uri</code> query parameter may
+	 * occur multiple times. All identified resources will be loaded within a
+	 * single native transaction. Bigdata provides snapshot isolation so you can
+	 * continue to execute queries against the last commit point while this
+	 * operation is executed.
+	 * </p>
+	 */
+    @Override
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp) {
-		doPut(req, resp);
+		try {
+			if (req.getParameter("uri") != null) {
+				doPostWithURIs(req, resp);
+				return;
+			} else {
+				doPostWithBody(req, resp);
+				return;
+			}
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 	}
 
+    @Override
 	protected void doPut(HttpServletRequest req, HttpServletResponse resp) {
 		try {
 			doPostWithBody(req,  resp);
@@ -55,27 +107,29 @@ public class UpdateServlet extends BigdataServlet {
 		}
 	}
 
+    @Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
     	try {
-			buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN, 
+			buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN, 
 					"GET method not valid for update");
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
 	}
 
-    /**
-     * POST with request body containing statements to be inserted.
-     * 
-     * @param req
-     *            The request.
-     *
-     * @return The response.
-     * 
-     * @throws Exception
-     */
-    private void doPostWithBody(final HttpServletRequest req, final HttpServletResponse resp) throws Exception {
-        
+	/**
+	 * POST with request body containing statements to be inserted.
+	 * 
+	 * @param req
+	 *            The request.
+	 * 
+	 * @return The response.
+	 * 
+	 * @throws Exception
+	 */
+	private void doPostWithBody(final HttpServletRequest req,
+			final HttpServletResponse resp) throws Exception {
+
         final String baseURI = "";// @todo baseURI query parameter?
         
         final String namespace = getNamespace(req.getRequestURI());
@@ -183,31 +237,32 @@ public class UpdateServlet extends BigdataServlet {
         }
 
     }
-    
-    
-    /**
-     * POST with URIs of resources to be inserted.
-     * 
-     * @param req
-     *            The request.
-     *
-     * @return The response.
-     * 
-     * @throws Exception
-     */
-    private void doPostWithURIs(final HttpServletRequest req, final HttpServletResponse resp) throws Exception {
-        
-        final String namespace = getNamespace(req.getRequestURI());
 
-        final String contentType = req.getContentType();
+	/**
+	 * POST with URIs of resources to be inserted (loads the referenced
+	 * resources).
+	 * 
+	 * @param req
+	 *            The request.
+	 * 
+	 * @return The response.
+	 * 
+	 * @throws Exception
+	 */
+	private void doPostWithURIs(final HttpServletRequest req,
+			final HttpServletResponse resp) throws Exception {
 
-        final String[] uris = req.getParameterValues("uri");
-        
-        if (uris == null)
-            throw new UnsupportedOperationException();
+		final String namespace = getNamespace(req.getRequestURI());
 
-        if (uris.length == 0) {
-        	buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN,
+		final String contentType = req.getContentType();
+
+		final String[] uris = req.getParameterValues("uri");
+
+		if (uris == null)
+			throw new UnsupportedOperationException();
+
+		if (uris.length == 0) {
+			buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN,
                     "0 statements modified");
         	
         	return;
@@ -338,8 +393,8 @@ public class UpdateServlet extends BigdataServlet {
     }
     
 
-    InputStream debugStream(final InputStream instr) throws IOException {
-    	if (true) {
+    private InputStream debugStream(final InputStream instr) throws IOException {
+    	if (log.isDebugEnabled()) {
 	    	ByteArrayOutputStream outstr = new ByteArrayOutputStream();
 	    	
 	    	byte[] buf = new byte[1024];
@@ -354,14 +409,13 @@ public class UpdateServlet extends BigdataServlet {
 	    	InputStreamReader rdr = new InputStreamReader(new ByteArrayInputStream(outstr.toByteArray()));
 	    	char[] chars = new char[outstr.size()];
 	    	rdr.read(chars);
-	    	System.out.println("debugStream, START");
-	    	System.out.println(chars);
-	    	System.out.println("debugStream, END");
+	    	log.debug("debugStream, START");
+	    	log.debug(chars);
+	    	log.debug("debugStream, END");
 	    	
 	    	return new ByteArrayInputStream(outstr.toByteArray());
-    	} else {
-    		return instr;
     	}
+		return instr;
     }
    
     /**
