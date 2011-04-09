@@ -4,13 +4,12 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 /**
- * The RESTServlet maps a REST interface described by Eric Wilde and Michael
- * Hausenblas onto the implementation servlets with more targetted URLs.
- *
- * This provides an equivalent interface to the original NanoSparqlServer.
+ * Default dispatch pattern for a core REST API.
  * 
  * @author Martyn Cutcher
- *
+ * 
+ * @see <a href="RESTful SPARQL? You name it!">
+ *      http://dret.net/netdret/docs/wilde-wewst2009-restful-sparql.pdf</a>
  */
 public class RESTServlet extends BigdataServlet {
 

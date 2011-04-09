@@ -22,7 +22,7 @@ public class BigdataSailTupleQuery extends SailTupleQuery
     
     /**
      * Query hints are embedded in query strings as namespaces.  
-     * See {@link QueryHints#NAMESPACE} for more information.
+     * See {@link QueryHints#PREFIX} for more information.
      */
     private final Properties queryHints;
 
@@ -45,7 +45,7 @@ public class BigdataSailTupleQuery extends SailTupleQuery
 	 *{@inheritDoc}
 	 * <p>
 	 * Overridden to use query hints from SPARQL queries. Query hints are
-	 * embedded in query strings as namespaces. See {@link QueryHints#NAMESPACE}
+	 * embedded in query strings as namespaces. See {@link QueryHints#PREFIX}
 	 * for more information.
 	 */
     @Override

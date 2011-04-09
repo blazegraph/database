@@ -1714,6 +1714,11 @@ public class PipelineJoin<E> extends PipelineOp implements
 						 * binding set(s) to the sink join task(s), but the
 						 * original binding set still must pass any constraint
 						 * on the join.
+						 * 
+						 * Note: Changed this back to the other semantics:
+						 * optional joins need not pass the constraints when
+						 * no binding sets were accepted.  Use conditional
+						 * routing op after the join instead.
 						 */
 
 						// Thread-local buffer iff optional sink is in use.
@@ -1727,12 +1732,12 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 							final IBindingSet bs = bindingSets[bindex];
 
-							if (constraints != null) {
-								if(!BOpUtility.isConsistent(constraints, bs)) {
-								    // Failed by the constraint on the join.
-								    continue;
-								}
-							}
+//							if (constraints != null) {
+//								if(!BOpUtility.isConsistent(constraints, bs)) {
+//								    // Failed by the constraint on the join.
+//								    continue;
+//								}
+//							}
 							
 							if (log.isTraceEnabled())
 								log
@@ -2130,19 +2135,19 @@ public class PipelineJoin<E> extends PipelineOp implements
 						for (IBindingSet bset : bindingSets) {
 
                             // #of binding sets accepted.
-						    naccepted++;
+//						    naccepted++;
 						    
-                            /* #of elements accepted for this binding set.
-                             * 
-                             * Note: We count binding sets as accepted before we
-                             * apply the constraints. This has the effect that
-                             * an optional join which produces solutions that
-                             * are then rejected by a FILTER associated with the
-                             * optional predicate WILL NOT pass on the original
-                             * solution even if ALL solutions produced by the
-                             * join are rejected by the filter.
-                             */
-                            this.naccepted[bindex]++;
+//                            /* #of elements accepted for this binding set.
+//                             * 
+//                             * Note: We count binding sets as accepted before we
+//                             * apply the constraints. This has the effect that
+//                             * an optional join which produces solutions that
+//                             * are then rejected by a FILTER associated with the
+//                             * optional predicate WILL NOT pass on the original
+//                             * solution even if ALL solutions produced by the
+//                             * join are rejected by the filter.
+//                             */
+//                            this.naccepted[bindex]++;
 
 							/*
 							 * Clone the binding set since it is tested for each
@@ -2171,8 +2176,11 @@ public class PipelineJoin<E> extends PipelineOp implements
 								// Accept this binding set.
 								unsyncBuffer.add(bset);
 
-//								// #of binding sets accepted.
-//								naccepted++;
+								// #of binding sets accepted.
+								naccepted++;
+								
+								// #of elements accepted for this binding set.
+								this.naccepted[bindex]++;
 
 								// #of output solutions generated.
 								stats.outputSolutions.increment(); 

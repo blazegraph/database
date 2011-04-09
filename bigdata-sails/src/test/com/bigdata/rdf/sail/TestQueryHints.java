@@ -101,7 +101,7 @@ public class TestQueryHints extends QuadsTestCase {
 
             {
                 
-                final String query = "PREFIX " + QueryHints.NAMESPACE
+                final String query = "PREFIX " + QueryHints.PREFIX
                         + ": " + "<http://www.bigdata.com/queryOption#" + //
                         PipelineOp.Annotations.MAX_PARALLEL + "=-5" //
                         + "&" + "com.bigdata.fullScanTreshold=1000" //

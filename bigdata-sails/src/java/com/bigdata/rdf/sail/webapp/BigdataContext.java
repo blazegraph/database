@@ -211,11 +211,11 @@ public class BigdataContext {
 		 */
     	public int queryThreadPoolSize = 8;
 
-		/**
-		 * The capacity of the buffers for the pipe connecting the running query
-		 * to the HTTP response.
-		 */
-		public int bufferCapacity = Bytes.kilobyte32 * 1;
+//		/**
+//		 * The capacity of the buffers for the pipe connecting the running query
+//		 * to the HTTP response.
+//		 */
+//		public int bufferCapacity = Bytes.kilobyte32 * 1;
 
 		public String resourceBase = ".";
     	

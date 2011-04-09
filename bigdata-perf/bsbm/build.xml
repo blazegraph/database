@@ -98,7 +98,7 @@
 	
 	<target name="run-qualification-1" depends="compile" description="Run the qualification queries.">
 		<java classname="benchmark.testdriver.TestDriver" fork="true" failonerror="true" dir="${build.dir}/bin">
-			<arg line="-idir ${bsbm.qualDataDir}/td_data -q http://localhost:${bsbm.nanoServerPort}" />
+			<arg line="-idir ${bsbm.qualDataDir}/td_data -q http://localhost:${bsbm.nanoServerPort}/" />
 			<classpath>
 				<path refid="runtime.classpath" />
 			</classpath>
@@ -167,7 +167,7 @@
 	</target>
 
 	<target name="start-nano-server" depends="compile" description="Start a small http server fronting for a bigdata database instance.">
-		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
+		<java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
 			<arg line="${bsbm.nanoServerPort} ${bsbm.namespace} ${bsbm.journalPropertyFile}" />
 			<!-- specify/override the journal file name. -->
 			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}" />
@@ -177,6 +177,7 @@
 		</java>
 	</target>
 
+	<!--
 	<target name="stop-nano-server" depends="compile" description="Stop the small http server running at the configured port (either qualification or normal trials).">
 		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
 			<arg line="${bsbm.nanoServerPort} -stop" />
@@ -185,6 +186,7 @@
 			</classpath>
 		</java>
 	</target>
+	-->
 
 	<target name="rampup" depends="compile" description="Runs the benchmark queries against the loaded data until system performance reaches a steady state as defined by the benchmark.">
 		<java classname="benchmark.testdriver.TestDriver" fork="true" failonerror="true" dir="${build.dir}/bin">
@@ -205,7 +207,7 @@
 			<arg value="${bsbm.resultsDir}/benchmark_result_pc${bsbm.pc}_runs${bsbm.runs}_mt${bsbm.mt}.xml" />
 
 			<!-- The SPARQL endpoint. -->
-			<arg value="http://localhost:${bsbm.nanoServerPort}" />
+			<arg value="http://localhost:${bsbm.nanoServerPort}/" />
 
 			<classpath>
 				<path refid="runtime.classpath" />
@@ -243,7 +245,7 @@
 			<arg value="${bsbm.resultsDir}/benchmark_result_pc${bsbm.pc}_runs${bsbm.runs}_mt${bsbm.mt}.xml" />
 
 			<!-- The SPARQL endpoint. -->
-			<arg value="http://localhost:${bsbm.nanoServerPort}" />
+			<arg value="http://localhost:${bsbm.nanoServerPort}/" />
 
 			<classpath>
 				<path refid="runtime.classpath" />
@@ -281,7 +283,7 @@
             <arg value="${bsbm.resultsDir}/benchmark_result_pc${bsbm.pc}_runs${bsbm.runs}_mt${bsbm.mt}.xml" />
 
             <!-- The SPARQL endpoint. -->
-            <arg value="http://localhost:${bsbm.nanoServerPort}" />
+            <arg value="http://localhost:${bsbm.nanoServerPort}/" />
 
             <classpath>
                 <path refid="runtime.classpath" />

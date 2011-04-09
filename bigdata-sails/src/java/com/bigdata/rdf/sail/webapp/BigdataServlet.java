@@ -43,7 +43,11 @@ import com.bigdata.sparse.ITPS;
 import com.bigdata.util.concurrent.ThreadPoolExecutorBaseStatisticsTask;
 import com.bigdata.util.httpd.NanoHTTPD;
 
-public class BigdataServlet extends HttpServlet {
+/**
+ * Useful glue for implementing service actions, but does not directly implement
+ * any service action/
+ */
+abstract public class BigdataServlet extends HttpServlet {
 	
 	/**
 	 * The logger for the concrete {@link NanoSparqlServer} class.  The {@link NanoHTTPD}
@@ -56,6 +60,11 @@ public class BigdataServlet extends HttpServlet {
 	 */
     static protected final String charset = "UTF-8";
 
+    protected static final transient String GET = "GET";
+    protected static final transient String POST = "POST";
+    protected static final transient String PUT = "PUT";
+    protected static final transient String DELETE = "DELETE";
+    
 	/**
 	 * Some HTTP response status codes
 	 */
