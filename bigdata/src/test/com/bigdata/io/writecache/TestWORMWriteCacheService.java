@@ -835,6 +835,26 @@ public class TestWORMWriteCacheService extends TestCase3 {
     }
 
     /**
+     * FIXME This method is being used to disable some unit tests for the
+     * dynamic reorganization of the write pipeline which are causing CI to
+     * deadlock. The issue appears to be related to quorum dynamics, especially,
+     * and perhaps only, when we have to reorganize the pipeline in order for it
+     * to function correctly.  I've disabled these tests for now since the write
+     * pipeline is not being actively worked on at the moment and since the mock
+     * quorum implementation is itself suspect (it may allow transitions through
+     * illegal states which it can not then handle).  There are notes about this
+     * in the quorum implementation and how it might have to be restructured to
+     * no longer assume that it observes only legal states.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/235
+     */
+    private void failReorganizePipelineTest() {
+        
+        fail("Test not run.  See https://sourceforge.net/apps/trac/bigdata/ticket/235");
+        
+    }
+
+    /**
      * A test of the write pipeline driving from the {@link WriteCacheService}
      * of the leader using a quorum with k := 3, 2 running services, one buffer,
      * and one record written where the leader must reorganize the write
@@ -846,6 +866,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
     public void test_writeCacheService_HA_WORM_1record_1buffer_k3_size2_reorganizePipeline()
             throws InterruptedException, IOException {
 
+        // conditionally fail this test since it deadlocks CI.
+        failReorganizePipelineTest();
+        
         final int nbuffers = 1;
         final int nrecs = 1;
         final double largeRecordRate = 0d;
@@ -948,6 +971,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
      */
     public void test_writeCacheService_HA_WORM_1record_1buffer_k3_size3_reorganizePipeline()
             throws InterruptedException, IOException {
+
+        // conditionally fail this test since it deadlocks CI.
+        failReorganizePipelineTest();
 
         final int nbuffers = 1;
         final int nrecs = 1;
@@ -1059,6 +1085,55 @@ public class TestWORMWriteCacheService extends TestCase3 {
             fixture.terminate();
         }
 
+    }
+
+    /**
+     * Martyn wrote:
+     * 
+     * <pre>
+     * The simplest way to recreate the deadlock issue is to add a stress test
+     * to TestWORMWriteCacheService [this method].
+     * 
+     * ...
+     * 
+     * This will create a deadlock after a failure in serviceJoin spewed from
+     * the pipeline reorganization:
+     * 
+     * com.bigdata.quorum.QuorumException: Not a pipeline member : 3b680846-30dc-4013-bc15-47fd1c4b20a5
+     *      at com.bigdata.quorum.AbstractQuorum$QuorumActorBase.serviceJoin(AbstractQuorum.java:1251)
+     *      at com.bigdata.quorum.AbstractQuorum$QuorumWatcherBase$3.run(AbstractQuorum.java:2249)
+     *      at com.bigdata.quorum.AbstractQuorum$QuorumWatcherBase$1.run(AbstractQuorum.java:1927)
+     *      at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:886)
+     *      at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:908)
+     *      at java.lang.Thread.run(Thread.java:680)
+     * 
+     * As you summarized it appears to be due to an awaited condition which
+     * allows an interleaving of the lock such that a concurrent request to
+     * serviceJoin gets processed after the service had been removed from the
+     * pipeline prior to adding at the end.  Naively increasing lock protection
+     * results in immediate deadlock.
+     * 
+     * I have on occasion seen other failures relating to malformed quorums,
+     * but I suspect this is more of the same.
+     * </pre>
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_STRESSwriteCacheService_HA_WORM_1record_1buffer_k3_size3_reorganizePipeline()
+            throws InterruptedException, IOException {
+
+        // conditionally fail this test since it deadlocks CI.
+        failReorganizePipelineTest();
+
+        for (int i = 0; i < 80; i++) {
+        
+            System.out.println("TEST " + i);
+
+            test_writeCacheService_HA_WORM_1record_1buffer_k3_size3_reorganizePipeline();
+            
+        }
+        
     }
 
     /**
