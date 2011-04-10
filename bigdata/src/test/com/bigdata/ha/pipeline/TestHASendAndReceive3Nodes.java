@@ -265,6 +265,12 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 	}
 
     /**
+     * This test has been observed to deadlock CI and is disabled until we
+     * finish debugging the HA pipeline and quorums. See
+     * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/280>
+     * https://sourceforge.net/apps/trac/bigdata/ticket/280
+     * </a>.
+     * 
      * FIXME When I ramp up the stress test for three nodes to 1000 passes I get
      * one of the following exceptions repeatedly:
      * <p>
@@ -308,6 +314,8 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
      */
     public void testStressDirectBuffers() throws InterruptedException {
 
+        fail("This test has been observed to deadlock CI and is disabled for the moment.");
+        
 		ByteBuffer tst = null, rcv1 = null, rcv2 = null;
 		int i = -1, sze = -1;
 		try {
