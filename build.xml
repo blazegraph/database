@@ -3,7 +3,7 @@
 <!-- @todo change the release target to put release notes into the root of the archives. -->
 <!-- @todo maven2 setup so we can run and publish unit tests results. -->
 <!-- $Id$ -->
-<project name="bigdata" default="jar" basedir=".">
+<project name="bigdata" default="bundleJar" basedir=".">
 
 	<property file="build.properties" />
 
@@ -700,7 +700,7 @@ ${postInstallMessage}</echo>
       <property name="bigdata-jini.lib" location="${bigdata.dir}/bigdata-jini/lib/jini/lib" />
       <property name="bigdata-rdf.lib" location="${bigdata.dir}/bigdata-rdf/lib" />
       <property name="bigdata-sails.lib" location="${bigdata.dir}/bigdata-sails/lib" />
-      <property name="bigdata-jetty.lib" location="${bigdata.dir}/bigdata-sails/lib/jetty" />
+      <property name="bigdata-jetty.lib" location="${bigdata.dir}/bigdata/lib/jetty" />
       <property name="bigdata-zookeeper.lib" location="${bigdata.dir}/bigdata-jini/lib/apache" />
 
       <!-- Utility libraries -->
