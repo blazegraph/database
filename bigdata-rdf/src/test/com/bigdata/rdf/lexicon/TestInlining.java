@@ -509,7 +509,7 @@ public class TestInlining extends AbstractTripleStoreTestCase {
         return tmp;
 
     }
-  
+
     public void test_inlinedatetimes() {
 
         final Properties properties = getProperties();

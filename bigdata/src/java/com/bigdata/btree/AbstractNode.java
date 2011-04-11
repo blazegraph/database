@@ -503,7 +503,7 @@ public abstract class AbstractNode<T extends AbstractNode
             assert parent == null;
 
             // Update the root node on the btree.
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("Copy-on-write : replaced root node on btree.");
 
             final boolean wasDirty = btree.root.dirty;

@@ -55,7 +55,7 @@ abstract public class TupleFilter<E> extends FilterBase implements ITupleFilter<
      */
     private static final long serialVersionUID = 1L;
 
-    protected static transient final Logger log = Logger.getLogger(TupleFilter.class);
+    private static transient final Logger log = Logger.getLogger(TupleFilter.class);
   
     public TupleFilter() {
 

@@ -32,7 +32,6 @@ import javax.xml.datatype.DatatypeConstants;
 import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -84,6 +83,7 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
         
         final URI dt = lit.getDatatype();
         
+        // Note: URI.stringValue() is efficient....
         if (dt == null || !XSD.DATETIME.stringValue().equals(dt.stringValue()))
             throw new IllegalArgumentException();
         

@@ -265,7 +265,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
             // verify the values iterator
             final byte[][] tmp = new byte[root.getKeyCount()][];
             for (int j = 0; j < root.getKeyCount(); j++) {
-                tmp[j] = root.getValues().get(j);
+                tmp[j] = root.getValue(j);
             }
             assertSameIterator("values", tmp, new Striterator(root
                     .entryIterator()).addFilter(new Resolver() {

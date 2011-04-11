@@ -26,6 +26,8 @@ package com.bigdata.btree;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.btree.AbstractBTree.IBTreeCounters;
+import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
@@ -128,12 +130,12 @@ final public class BTreeCounters implements Cloneable {
         ninserts.addAndGet(o.ninserts.get());
         nremoves.addAndGet(o.nremoves.get());
         // ILinearList
-        nindexOf.addAndGet(o.nindexOf.get()); // Note: also does key search.
-        ngetKey.addAndGet(o.ngetKey.get());
-        ngetValue.addAndGet(o.ngetValue.get());
+        nindexOf.add(o.nindexOf.get()); // Note: also does key search.
+        ngetKey.add(o.ngetKey.get());
+        ngetValue.add(o.ngetValue.get());
 //        // IRangeQuery
-//        nrangeCount.addAndGet(o.nrangeCount.get());
-//        nrangeIterator.addAndGet(o.nrangeIterator.get());
+        nrangeCount.add(o.nrangeCount.get());
+        nrangeIterator.add(o.nrangeIterator.get());
         // Structural mutation.
         rootsSplit += o.rootsSplit;
         rootsJoined += o.rootsJoined;
@@ -152,17 +154,21 @@ final public class BTreeCounters implements Cloneable {
         ntupleUpdateDelete += o.ntupleUpdateDelete;
         ntupleRemove += o.ntupleRemove;
         // IO reads
-        nodesRead.addAndGet(o.nodesRead.get());
-        leavesRead.addAndGet(o.leavesRead.get());
-        bytesRead.addAndGet(o.bytesRead.get());
-        readNanos.addAndGet(o.readNanos.get());
-        deserializeNanos.addAndGet(o.deserializeNanos.get());
+        nodesRead.add(o.nodesRead.get());
+        leavesRead.add(o.leavesRead.get());
+        bytesRead.add(o.bytesRead.get());
+        readNanos.add(o.readNanos.get());
+        deserializeNanos.add(o.deserializeNanos.get());
+        rawRecordsRead.add(o.rawRecordsRead.get());
+        rawRecordsBytesRead.add(o.rawRecordsBytesRead.get());
         // IO writes.
         nodesWritten += o.nodesWritten;
         leavesWritten += o.leavesWritten;
         bytesWritten += o.bytesWritten;
         writeNanos += o.writeNanos;
         serializeNanos += o.serializeNanos;
+        rawRecordsWritten += o.rawRecordsWritten;
+        rawRecordsBytesWritten+= o.rawRecordsBytesWritten;
         
     }
     
@@ -189,12 +195,12 @@ final public class BTreeCounters implements Cloneable {
         t.ninserts.addAndGet(-o.ninserts.get());
         t.nremoves.addAndGet(-o.nremoves.get());
         // ILinearList
-        t.nindexOf.addAndGet(-o.nindexOf.get()); // Note: also does key search.
-        t.ngetKey.addAndGet(-o.ngetKey.get());
-        t.ngetValue.addAndGet(-o.ngetValue.get());
+        t.nindexOf.add(-o.nindexOf.get()); // Note: also does key search.
+        t.ngetKey.add(-o.ngetKey.get());
+        t.ngetValue.add(-o.ngetValue.get());
 //        // IRangeQuery
-//        t.nrangeCount.addAndGet(-o.nrangeCount.get());
-//        t.nrangeIterator.addAndGet(-o.nrangeIterator.get());
+        t.nrangeCount.add(-o.nrangeCount.get());
+        t.nrangeIterator.add(-o.nrangeIterator.get());
         // Structural mutation.
         t.rootsSplit -= o.rootsSplit;
         t.rootsJoined -= o.rootsJoined;
@@ -213,17 +219,21 @@ final public class BTreeCounters implements Cloneable {
         t.ntupleUpdateDelete -= o.ntupleUpdateDelete;
         t.ntupleRemove -= o.ntupleRemove;
         // IO reads
-        t.nodesRead.addAndGet(-o.nodesRead.get());
-        t.leavesRead.addAndGet(-o.leavesRead.get());
-        t.bytesRead.addAndGet(-o.bytesRead.get());
-        t.readNanos.addAndGet(-o.readNanos.get());
-        t.deserializeNanos.addAndGet(-o.deserializeNanos.get());
+        t.nodesRead.add(-o.nodesRead.get());
+        t.leavesRead.add(-o.leavesRead.get());
+        t.bytesRead.add(-o.bytesRead.get());
+        t.readNanos.add(-o.readNanos.get());
+        t.deserializeNanos.add(-o.deserializeNanos.get());
+        t.rawRecordsRead.add(-o.rawRecordsRead.get());
+        t.rawRecordsBytesRead.add(-o.rawRecordsBytesRead.get());
         // IO writes.
         t.nodesWritten -= o.nodesWritten;
         t.leavesWritten -= o.leavesWritten;
         t.bytesWritten -= o.bytesWritten;
         t.serializeNanos -= o.serializeNanos;
         t.writeNanos -= o.writeNanos;
+        t.rawRecordsWritten -= o.rawRecordsWritten;
+        t.rawRecordsBytesWritten -= o.rawRecordsBytesWritten;
         
         return t;
         
@@ -242,9 +252,9 @@ final public class BTreeCounters implements Cloneable {
     public final AtomicLong ninserts = new AtomicLong();
     public final AtomicLong nremoves = new AtomicLong();
     // ILinearList
-    public final AtomicLong nindexOf = new AtomicLong();
-    public final AtomicLong ngetKey = new AtomicLong();
-    public final AtomicLong ngetValue = new AtomicLong();
+    public final CAT nindexOf = new CAT();
+    public final CAT ngetKey = new CAT();
+    public final CAT ngetValue = new CAT();
 
     /*
      * Note: These counters are hot spots with concurrent readers and do not
@@ -252,8 +262,8 @@ final public class BTreeCounters implements Cloneable {
      * 1/26/2010.
      */
     // IRangeQuery
-//    public final AtomicLong nrangeCount = new AtomicLong();
-//    public final AtomicLong nrangeIterator = new AtomicLong();
+    public final CAT nrangeCount = new CAT();
+    public final CAT nrangeIterator = new CAT();
     // Structural change (single-threaded, so plain variables are Ok).
     public int rootsSplit = 0;
     public int rootsJoined = 0;
@@ -300,17 +310,20 @@ final public class BTreeCounters implements Cloneable {
      * transaction's write set and are counted here.
      */
     public long ntupleInsertDelete = 0;
+    
     /**
      * #of pre-existing tuples whose value was updated to a non-deleted value
      * (includes update of a deleted tuple to a non-deleted tuple by overwrite
      * of the tuple).
      */
     public long ntupleUpdateValue = 0;
+
     /**
      * #of pre-existing un-deleted tuples whose delete marker was set (we don't
      * count re-deletes of an already deleted tuple).
      */
     public long ntupleUpdateDelete = 0;
+    
     /**
      * #of pre-existing tuples that were removed from the B+Tree (only non-zero
      * when the B+Tree does not support delete markers).
@@ -324,19 +337,52 @@ final public class BTreeCounters implements Cloneable {
      */
     
     // IO reads (concurrent)
-    public final AtomicInteger nodesRead = new AtomicInteger();
-    public final AtomicInteger leavesRead = new AtomicInteger();
-    public final AtomicLong bytesRead = new AtomicLong();
-    public final AtomicLong readNanos = new AtomicLong();
-    public final AtomicLong deserializeNanos = new AtomicLong();
+    /** #of node read operations. */
+    public final CAT nodesRead = new CAT();
+    /** #of leaf read operations. */
+    public final CAT leavesRead = new CAT();
+    /** Total bytes read for nodes and leaves (but not raw records). */;
+    public final CAT bytesRead = new CAT();
+    /** Read time for nodes and leaves (but not raw records). */
+    public final CAT readNanos = new CAT();
+    /** De-serialization time for nodes and leaves. */
+    public final CAT deserializeNanos = new CAT();
+    /** The #of raw record read operations. */
+    public final CAT rawRecordsRead = new CAT();
+    /** Total bytes read for raw records. */
+    public final CAT rawRecordsBytesRead = new CAT();
 
     // IO writes (single-threaded)
     public int nodesWritten = 0;
     public int leavesWritten = 0;
     public long bytesWritten = 0L;
     public long writeNanos = 0;
-    public long serializeNanos = 0;
-    
+	public long serializeNanos = 0;
+	public long rawRecordsWritten = 0;
+	public long rawRecordsBytesWritten = 0;
+	
+	/**
+	 * The #of bytes in the unisolated view of the index which are being used to
+	 * store raw records.
+	 * 
+	 * @todo not correctly tracked in scale-out (overflow handling).
+	 */
+    public final AtomicLong bytesOnStore_rawRecords = new AtomicLong();
+
+	/**
+	 * The #of bytes in node and leaf) records on the backing store for the
+	 * unisolated view of the index. This value grows and shrinks as nodes
+	 * (leaves) are added to and removed from the index. The actual space
+	 * occupied by the index on the backing store depends on whether and when
+	 * persistence store reclaims the storage associated with deleted nodes and
+	 * leaves.
+	 * 
+	 * @todo break out for nodes and leaves separately.
+	 * 
+	 * @todo not correctly tracked in scale-out (overflow handling).
+	 */
+	public final AtomicLong bytesOnStore_nodesAndLeaves = new AtomicLong();
+
     /**
      * Return a score whose increasing value is correlated with the amount of
      * read/write activity on an index as reflected in these
@@ -480,7 +526,7 @@ final public class BTreeCounters implements Cloneable {
              */
             {
                 
-                final CounterSet tmp = counterSet.makePath("keySearch");
+                final CounterSet tmp = counterSet.makePath(IBTreeCounters.KeySearch);
 
 //                Note: This is a hotspot since it is used by concurrent readers.
 //                tmp.addCounter("find", new Instrument<Long>() {
@@ -508,7 +554,7 @@ final public class BTreeCounters implements Cloneable {
              */
             {
                 
-                final CounterSet tmp = counterSet.makePath("linearList");
+                final CounterSet tmp = counterSet.makePath(IBTreeCounters.LinearList);
 
                 tmp.addCounter("indexOf", new Instrument<Long>() {
                     protected void sample() {
@@ -530,32 +576,32 @@ final public class BTreeCounters implements Cloneable {
                 
             }
             
-//            /*
-//             * IRangeQuery
-//             * 
-//             * @todo Instrument the IRangeQuery API for times (must aggregate
-//             * across hasNext() and next()). Note that rangeCount and rangeCopy
-//             * both depend on rangeIterator so that is the only one for which we
-//             * really need timing data. The iterator should report the
-//             * cumulative service time when it is finalized.
-//             */
-//            {
-//                
-//                final CounterSet tmp = counterSet.makePath("rangeQuery");
-//
-//                tmp.addCounter("rangeCount", new Instrument<Long>() {
-//                    protected void sample() {
-//                        setValue(nrangeCount.get());
-//                    }
-//                });
-//                
-//                tmp.addCounter("rangeIterator", new Instrument<Long>() {
-//                    protected void sample() {
-//                        setValue(nrangeIterator.get());
-//                    }
-//                });
-//                
-//            }
+            /*
+             * IRangeQuery
+             * 
+             * @todo Instrument the IRangeQuery API for times (must aggregate
+             * across hasNext() and next()). Note that rangeCount and rangeCopy
+             * both depend on rangeIterator so that is the only one for which we
+             * really need timing data. The iterator should report the
+             * cumulative service time when it is finalized.
+             */
+            {
+                
+                final CounterSet tmp = counterSet.makePath(IBTreeCounters.RangeQuery);
+
+                tmp.addCounter("rangeCount", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(nrangeCount.get());
+                    }
+                });
+                
+                tmp.addCounter("rangeIterator", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(nrangeIterator.get());
+                    }
+                });
+                
+            }
             
             /*
              * Structural mutation statistics.
@@ -565,7 +611,7 @@ final public class BTreeCounters implements Cloneable {
              */
             {
                
-                final CounterSet tmp = counterSet.makePath("structure");
+                final CounterSet tmp = counterSet.makePath(IBTreeCounters.Structure);
                 
                 tmp.addCounter("rootSplit", new Instrument<Integer>() {
                     protected void sample() {
@@ -634,7 +680,7 @@ final public class BTreeCounters implements Cloneable {
              */
             {
                 
-                final CounterSet tmp = counterSet.makePath("tuples");
+                final CounterSet tmp = counterSet.makePath(IBTreeCounters.Tuples);
 
                 tmp.addCounter("insertValue", new Instrument<Long>() {
                     protected void sample() {
@@ -671,19 +717,41 @@ final public class BTreeCounters implements Cloneable {
              */
             {
 
-                final CounterSet tmp = counterSet.makePath("IO");
+                final CounterSet tmp = counterSet.makePath(IBTreeCounters.IO);
+
+                /*
+                 * bytes on store.
+                 */
+				tmp.addCounter("bytesOnStoreNodesAndLeaves", new Instrument<Long>() {
+					protected void sample() {
+						setValue(bytesOnStore_nodesAndLeaves.get());
+					}
+				});
+				
+				tmp.addCounter("bytesOnStoreRawRecords", new Instrument<Long>() {
+					protected void sample() {
+						setValue(bytesOnStore_rawRecords.get());
+					}
+				});
+
+				tmp.addCounter("bytesOnStoreTotal", new Instrument<Long>() {
+					protected void sample() {
+						setValue(bytesOnStore_nodesAndLeaves.get()
+								+ bytesOnStore_rawRecords.get());
+					}
+				});
 
                 /*
                  * nodes/leaves read/written
                  */
 
-                tmp.addCounter("leafReadCount", new Instrument<Integer>() {
+                tmp.addCounter("leafReadCount", new Instrument<Long>() {
                     protected void sample() {
                         setValue(leavesRead.get());
                     }
                 });
 
-                tmp.addCounter("nodeReadCount", new Instrument<Integer>() {
+                tmp.addCounter("nodeReadCount", new Instrument<Long>() {
                     protected void sample() {
                         setValue(nodesRead.get());
                     }
@@ -704,6 +772,7 @@ final public class BTreeCounters implements Cloneable {
                 /*
                  * store reads (bytes)
                  */
+
                 tmp.addCounter("bytesRead", new Instrument<Long>() {
                     protected void sample() {
                         setValue(bytesRead.get());
@@ -822,6 +891,30 @@ final public class BTreeCounters implements Cloneable {
                     public void sample() {
                         final double secs = (computeRawWriteScore()/ 1000000000.);
                         setValue(secs);
+                    }
+                });
+
+                /*
+                 * RawRecords
+                 */
+                tmp.addCounter("rawRecordsRead", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(rawRecordsRead.get());
+                    }
+                });
+                tmp.addCounter("rawRecordsBytesRead", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(rawRecordsBytesRead.get());
+                    }
+                });
+                tmp.addCounter("rawRecordsWritten", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(rawRecordsWritten);
+                    }
+                });
+                tmp.addCounter("rawRecordsBytesWritten", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(rawRecordsBytesWritten);
                     }
                 });
                 

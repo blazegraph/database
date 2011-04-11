@@ -25,7 +25,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rwstore.sector;
 
 import java.nio.ByteBuffer;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
+
+import org.apache.log4j.Logger;
+
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.OneShotInstrument;
 
 /**
  * The {@link AllocationContext} is used to maintain a handle on allocations
@@ -52,72 +59,230 @@ import java.util.HashSet;
  */
 public class AllocationContext implements IMemoryManager {
 	
+	private static final transient Logger log = Logger
+			.getLogger(AllocationContext.class);
+	
+	/**
+	 * The top-level {@link MemoryManager}.
+	 */
+	private final MemoryManager m_root;
+	
+	/**
+	 * The parent {@link IMemoryManager}.
+	 */
 	private final IMemoryManager m_parent;
 	
-	private HashSet<Long> m_addresses = new HashSet<Long>();
+	/**
+	 * The lock used to serialize all all allocation/deallocation requests. This
+	 * is shared by the top-level {@link MemoryManager} to avoid lock ordering
+	 * problems.
+	 */
+	private final ReentrantLock lock; 
+
+	/**
+	 * All addresses allocated either directly by this {@link AllocationContext}
+	 * or recursively by any {@link AllocationContext} created within this
+	 * {@link AllocationContext}.
+	 */
+	private final LinkedHashSet<Long> m_addresses = new LinkedHashSet<Long>();
 	
-	public AllocationContext(final IMemoryManager parent) {
+	private final AtomicLong m_allocCount = new AtomicLong();
+	private final AtomicLong m_userBytes = new AtomicLong();
+	private final AtomicLong m_slotBytes = new AtomicLong();
+
+	public AllocationContext(final MemoryManager root) {
+		
+		if(root == null)
+			throw new IllegalArgumentException();
+		
+		m_root = root;
+
+		m_parent = root;
+		
+		lock = root.m_allocationLock;
+
+	}
+	
+	public AllocationContext(final AllocationContext parent) {
 
 		if(parent == null)
 			throw new IllegalArgumentException();
 		
+		m_root = parent.m_root;
+
 		m_parent = parent;
+		
+		lock = m_root.m_allocationLock;
 		
 	}
 
-	synchronized
 	public long allocate(final ByteBuffer data) {
+
+		return allocate(data, true/* blocks */);
+
+	}
+	
+	public long allocate(final ByteBuffer data, final boolean blocks) {
 
 		if (data == null)
 			throw new IllegalArgumentException();
 		
-		final long addr = m_parent.allocate(data);
+		final long addr = allocate(data.remaining(), blocks);
 		
-		// getSectorAllocation(addr).allocate(addr);		
-		m_addresses.add(Long.valueOf(addr));
+		final ByteBuffer[] bufs = get(addr);
+
+		MemoryManager.copyData(data, bufs);
 		
 		return addr;
+
 	}
 
-	synchronized
 	public long allocate(final int nbytes) {
 
-		final long addr = m_parent.allocate(nbytes);
-		
-		// getSectorAllocation(addr).allocate(addr);		
-		m_addresses.add(Long.valueOf(addr));
-		
-		return addr;
-	}
+		return allocate(nbytes, true/*blocks*/);
 
-	synchronized
-	public void clear() {
-		for (Long addr : m_addresses) {
-			m_parent.free(addr);
+	}
+	
+	/*
+	 * Core impl.
+	 */
+	public long allocate(final int nbytes, final boolean blocks) {
+
+		lock.lock();
+		try {
+
+			final long addr = m_parent.allocate(nbytes, blocks);
+
+			final int rwaddr = MemoryManager.getAllocationAddress(addr);
+
+			final SectorAllocator sector = m_root.getSector(rwaddr);
+
+			m_addresses.add(Long.valueOf(addr));
+
+			m_allocCount.incrementAndGet();
+			m_userBytes.addAndGet(nbytes);
+			m_slotBytes.addAndGet(sector.getPhysicalSize(SectorAllocator
+					.getSectorOffset(rwaddr)));
+
+			return addr;
+
+		} finally {
+			lock.unlock();
 		}
-		
-		m_addresses.clear();
+
 	}
 
-	synchronized
+	public void clear() {
+
+		lock.lock();
+		try {
+
+			if(log.isDebugEnabled())
+				log.debug("");
+			
+			for (Long addr : m_addresses) {
+
+				m_parent.free(addr);
+
+			}
+
+			m_addresses.clear();
+
+			m_allocCount.set(0);
+			m_userBytes.set(0);
+			m_slotBytes.set(0);
+
+		} finally {
+			lock.unlock();
+		}
+
+	}
+
 	public void free(final long addr) {
-		// getSectorAllocation(addr).free(addr);
-		m_addresses.remove(Long.valueOf(addr));
-		
-		m_parent.free(addr);
+
+		final int rwaddr = MemoryManager.getAllocationAddress(addr);
+		final int size = MemoryManager.getAllocationSize(addr);
+		final int offset = SectorAllocator.getSectorOffset(rwaddr);
+
+		lock.lock();
+		try {
+
+			final SectorAllocator sector = m_root.getSector(rwaddr);
+
+			m_parent.free(addr);
+
+			m_addresses.remove(Long.valueOf(addr));
+
+			m_allocCount.decrementAndGet();
+			m_userBytes.addAndGet(-size);
+			m_slotBytes.addAndGet(-sector.getPhysicalSize(offset));
+
+		} finally {
+			lock.unlock();
+		}
+
 	}
 
-	synchronized
 	public ByteBuffer[] get(final long addr) {
-		return m_parent.get(addr);
+
+		return m_root.get(addr);
+
+	}
+
+	public byte[] read(final long addr) {
+
+		return MemoryManager.read(this, addr);
+
 	}
 
 	public IMemoryManager createAllocationContext() {
+
 		return new AllocationContext(this);
+
 	}
 
 	public int allocationSize(final long addr) {
-		return m_parent.allocationSize(addr);
+
+		return m_root.allocationSize(addr);
+		
+	}
+
+	public long getAllocationCount() {
+		
+		return m_allocCount.get();
+		
+	}
+	
+	public long getSlotBytes() {
+	
+		return m_slotBytes.get();
+		
+	}
+
+	public long getUserBytes() {
+
+		return m_userBytes.get();
+		
+	}
+
+	public CounterSet getCounters() {
+		
+		final CounterSet root = new CounterSet();
+		
+		// #of allocation slot bytes.
+		root.addCounter("slotBytes", new OneShotInstrument<Long>(
+				getUserBytes()));
+		
+		// #of application data bytes.
+		root.addCounter("userBytes", new OneShotInstrument<Long>(
+				getUserBytes()));
+	
+		// #of allocations spanned by this context.
+		root.addCounter("allocationCount", new OneShotInstrument<Long>(
+				getAllocationCount()));
+		
+		return root;
+		
 	}
 
 //	private SectorAllocation m_head = null;

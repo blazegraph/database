@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.data;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.io.DataOutputBuffer;
@@ -138,7 +139,8 @@ public class AbstractLeafDataRecordTestCase extends
                 new ReadOnlyKeysRaba(nkeys, keys),//
                 new ReadOnlyValuesRaba(nkeys, vals),//
                 deleteMarkers,//
-                versionTimestamps//
+                versionTimestamps,//
+                null// rawRecords
         );
 
         // spot check mock object impl.
@@ -187,7 +189,8 @@ public class AbstractLeafDataRecordTestCase extends
                 new ReadOnlyKeysRaba(nkeys, keys),//
                 new ReadOnlyValuesRaba(nkeys, vals),//
                 deleteMarkers,//
-                versionTimestamps//
+                versionTimestamps,//
+                null// rawRecords
         );
 
         assertFalse(expected.getDeleteMarker(0));
@@ -201,4 +204,33 @@ public class AbstractLeafDataRecordTestCase extends
         
     }
     
+    /**
+     * A single empty key (byte[0]) paired with a large value represented as a
+     * raw record.
+     */
+    public void test_tupleCount1_emptyKey_largeVal() {
+ 
+        final int m = 3;
+        final int nkeys = 1;
+        final byte[][] keys = new byte[m + 1][];
+        final byte[][] vals = new byte[m + 1][];
+        final boolean[] rawRecords = new boolean[m + 1];
+
+        keys[0] = new byte[0];
+        vals[0] = AbstractBTree.encodeRecordAddr(recordAddrBuf, nextAddr());
+        rawRecords[0] = true;
+        
+        final ILeafData expected = mockLeafFactory(//
+        		new ReadOnlyKeysRaba(
+                nkeys, keys), //
+                new ReadOnlyValuesRaba(nkeys, vals),//
+                null, // deleteMarkers
+                null, // version timestamps
+                rawRecords//
+        		);
+
+        doRoundTripTest(expected, coder, new DataOutputBuffer());
+        
+    }
+
 }

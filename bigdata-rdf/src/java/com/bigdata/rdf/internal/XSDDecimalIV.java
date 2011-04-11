@@ -63,12 +63,15 @@ public class XSDDecimalIV<V extends BigdataLiteral> extends
 
     @SuppressWarnings("unchecked")
     public V asValue(final LexiconRelation lex) {
-    	final BigdataValueFactory f = lex.getValueFactory();
-        // @todo factory should cache the XSD URIs.
-        final V v = (V) f.createLiteral(value.toPlainString(),//
-                f.createURI(DTE.XSDDecimal.getDatatype()));
-        v.setIV(this);
-        return v;
+		V v = getValueCache();
+		if (v == null) {
+			final BigdataValueFactory f = lex.getValueFactory();
+			v = (V) f.createLiteral(value.toPlainString(),//
+					f.createURI(DTE.XSDDecimal.getDatatype()));
+			v.setIV(this);
+			setValue(v);
+		}
+		return v;
     }
 
     @Override

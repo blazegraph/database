@@ -53,7 +53,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 public class LexiconConfiguration<V extends BigdataValue> 
         implements ILexiconConfiguration<V> {
 
-    protected static final Logger log = 
+    private static final Logger log = 
         Logger.getLogger(LexiconConfiguration.class);
     
     private final boolean inlineLiterals, inlineBNodes, inlineDateTimes;
@@ -63,7 +63,37 @@ public class LexiconConfiguration<V extends BigdataValue>
     private final Map<TermId, IExtension> termIds;
 
     private final Map<String, IExtension> datatypes;
-    
+
+	/**
+	 * The maximum length of a {@link BNode#getID()} before the {@link BNode}
+	 * will no longer be inlined into the statement indices. This limit only
+	 * applies to blank nodes whose IDs are not recognized as either integers or
+	 * UUIDs since those are inlined using a different mechanism. Note that
+	 * inlining of the IDs is permissible even in TOLD_BNODES mode since the ID
+	 * will be preserved.
+	 */
+	final int BNODE_INLINE_LIMIT = 64;
+
+	/**
+	 * The maximum length of a {@link URI#getLocalName()} before the {@link URI}
+	 * will no longer be inlined into the statement indices.
+	 * 
+	 * FIXME Configure and support URI inlining into the statement indices.
+	 */
+	final int URI_INLINE_LIMIT = 64;
+
+	/**
+	 * The maximum length of a plain, languageCode, or datatype literal's
+	 * {@link Literal#getLabel()} before the {@link Literal} will no longer be
+	 * inlined into the statement indices.
+	 * <p>
+	 * Note: When inlining a datatype {@link URI} which is non-numeric, the
+	 * {@link URI} of the datatype must also be inlined.
+	 * 
+	 * FIXME Configure and support literal inlining into the statement indices.
+	 */
+	final int LITERAL_INLINE_LIMIT = 64;
+
     public LexiconConfiguration(final boolean inlineLiterals, 
             final boolean inlineBNodes, final boolean inlineDateTimes, 
             final IExtensionFactory xFactory) {
@@ -93,8 +123,15 @@ public class LexiconConfiguration<V extends BigdataValue>
     }
 
     public V asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
-        final TermId datatype = iv.getExtensionDatatype();
-        return (V) termIds.get(datatype).asValue(iv, vf);
+        
+    	// The TermId for the ExtensionIV.
+    	final TermId datatype = iv.getExtensionDatatype();
+    	
+    	// Find the IExtension from the datatype IV.
+    	final IExtension ext = termIds.get(datatype);
+    	
+        return (V) ext.asValue(iv, vf);
+        
     }
 
     public IV createInlineIV(final Value value) {

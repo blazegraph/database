@@ -1,7 +1,5 @@
 package com.bigdata.htree.data;
 
-import it.unimi.dsi.fastutil.Hash;
-
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -29,7 +27,7 @@ public class MockBucketData extends MockLeafData implements IBucketData {
 			final int lengthMSB, final int[] hashCodes) {
 
 		this(keys, vals, null/* deleteMarkers */, null/* versionTimestamps */,
-				lengthMSB, hashCodes);
+				null/* rawRecords */, lengthMSB, hashCodes);
 
 	}
 
@@ -46,9 +44,10 @@ public class MockBucketData extends MockLeafData implements IBucketData {
 	 */
 	public MockBucketData(final IRaba keys, final IRaba vals,
 			final boolean[] deleteMarkers, final long[] versionTimestamps,
+			final boolean[] rawRecords,
 			final int lengthMSB, final int[] hashCodes) {
 
-		super(keys, vals, deleteMarkers, versionTimestamps);
+		super(keys, vals, deleteMarkers, versionTimestamps, rawRecords);
 
 		if (lengthMSB < 0 || lengthMSB > 32)
 			throw new IllegalArgumentException();

@@ -226,8 +226,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     /**
      * Logger.
      */
-    protected static final Logger log = Logger
-            .getLogger(IndexSegmentBuilder.class);
+	private static final Logger log = Logger
+			.getLogger(IndexSegmentBuilder.class);
 
     /**
      * Error message when the #of tuples in the {@link IndexSegment} would
@@ -317,7 +317,23 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * enabled.
      */
     final boolean versionTimestamps;
+
+	/**
+	 * <code>true</code> iff the source index has raw records enabled.
+	 * <p>
+	 * Note: raw records will be copied into the BLOBS region of the index
+	 * segment and the address of the raw record in the output tuple will be
+	 * updated to reflect the relative address of the record within the index
+	 * segment.
+	 */
+    final boolean rawRecords;
     
+	/**
+	 * A buffer used to encode a raw record address for a mutable {@link BTree}
+	 * and otherwise <code>null</code>.
+	 */
+    private final ByteArrayBuffer recordAddrBuf;
+        
     /**
      * The unique identifier for the generated {@link IndexSegment} resource.
      */
@@ -485,12 +501,12 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * transferred to the output file en mass.
      */
     final protected boolean bufferNodes;
-    
-    /**
-     * The optional buffer used to hold records referenced by index entries. In
-     * order to use this buffer the {@link IndexMetadata} MUST specify an
-     * {@link IOverflowHandler}.
-     */
+
+	/**
+	 * The optional buffer used to hold records referenced by index entries.
+	 * This is opened if the index uses raw records -or- if the index specifies
+	 * and {@link IOverflowHandler}.
+	 */
     private TemporaryRawStore blobBuffer;
     
     private final IOverflowHandler overflowHandler;
@@ -697,11 +713,17 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         // ~2x the nominal size of a 200M index shard in tuples at 50 bytes/tuple.
         final long MAX_TUPLES_IN_VIEW = Bytes.megabyte * 8;
 
-        /*
-         * FIXME I have temporary disabled this as it appears to be slower to
-         * fully buffer the data on the current test cluster.... I will look
-         * into this further as soon as I get a good baseline on that cluster.
-         */
+		/*
+		 * FIXME I have temporary disabled this as it appears to be slower to
+		 * fully buffer the data on the current test cluster.... I will look
+		 * into this further as soon as I get a good baseline on that cluster.
+		 * 
+		 * Ah. The problem is likely to be Java heap pressure. The one pass
+		 * approach might have to use the MemoryManager in order for us to
+		 * realize the efficiency obtain from a single IO pass, especially since
+		 * the two pass approach is already benefiting from the file system
+		 * cache.
+		 */
         if (false && stats.sumSegBytes < MAX_SIZE_ON_DISK
                 && fastRangeCount < MAX_TUPLES_IN_VIEW) {
 
@@ -878,9 +900,11 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         final boolean hasDeleteMarkers = indexMetadata.getDeleteMarkers();
 
+        final boolean hasRawRecords = indexMetadata.getRawRecords();
+
         // A temporary leaf used to buffer the data in RAM.
         final MutableLeafData tleaf = new MutableLeafData((int) fastRangeCount,
-                hasVersionTimestamps, hasDeleteMarkers);
+                hasVersionTimestamps, hasDeleteMarkers, hasRawRecords);
 
         final int flags;
         if (compactingMerge) {
@@ -966,6 +990,12 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
             } else {
 
+				/*
+				 * Note: If the source has raw records for some values, then
+				 * this will cause those records to be materialized within the
+				 * single massive root leaf. From there, the data will be
+				 * written onto the index segment file.
+				 */
                 tleaf.vals.values[i] = tuple.getValue();
 
             }
@@ -1281,6 +1311,21 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          */ 
         this.deleteMarkers = metadata.getDeleteMarkers(); 
 
+        /*
+         * true iff the source index supports raw records. raw records will be
+         * copied into the BLOBS region of the index segment and the address of
+         * the raw record in the output tuple will be updated to reflect the
+         * relative address of the record within the index segment.
+         */
+        this.rawRecords = metadata.getRawRecords();
+
+		/*
+		 * Buffer used to encode addresses into the tuple value for a mutable
+		 * B+Tree.
+		 */
+		this.recordAddrBuf = rawRecords ? new ByteArrayBuffer(Bytes.SIZEOF_LONG)
+				: null;
+        
         //
         this.commitTime = commitTime;
 
@@ -1508,11 +1553,13 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 nodeList = null;
             }
 
-            /*
-             * Open buffer for blobs iff an overflow handler was specified.
-             */
-            blobBuffer = overflowHandler == null ? null
-                    : new TemporaryRawStore(offsetBits);
+			/*
+			 * Open buffer for blobs if an overflow handler was specified -or-
+			 * if the index is using raw records.
+			 */
+			blobBuffer = (rawRecords || overflowHandler != null) //
+					? new TemporaryRawStore(offsetBits)
+					: null;
 
             /*
              * Generate the output B+Tree.
@@ -1802,13 +1849,40 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
             } else {
 
-                val = tuple.getValue();
+				/*
+				 * Note: If the source index uses raw records then this will
+				 * return the materialized value from the raw record.
+				 */
+
+            	val = tuple.getValue();
 
             }
         
         }
         
-        leaf.vals.values[j] = val; 
+		if (rawRecords) {
+			final long maxRecLen = metadata.getMaxRecLen();
+			if (val != null && val.length > maxRecLen) {
+				// write the value on the backing store.
+				final long addr1 = blobBuffer.write(ByteBuffer.wrap(val));
+				// decode the offset and byte length of the record.
+				final int nbytes = blobBuffer.getByteCount(addr1);
+				final long offset = blobBuffer.getOffset(addr1);
+				// recode as a relative address against the BLOBs region.
+				final long addr = addressManager.toAddr(nbytes,
+						IndexSegmentRegion.BLOB.encodeOffset(offset));
+				// save its address in the values raba.
+				leaf.vals.values[j] = AbstractBTree.encodeRecordAddr(
+						recordAddrBuf, addr);
+				// flag as a raw record.
+				leaf.rawRecords[j] = true;
+			} else {
+				leaf.vals.values[j] = val;
+				leaf.rawRecords[j] = false;
+			}
+        } else {
+            leaf.vals.values[j] = val;
+        } 
 
         if (bloomFilter != null) {
 
@@ -3110,6 +3184,43 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         }
         
         /*
+         * Write out the ICUVersionRecord at the end of the file.
+         * 
+         * FIXME Enable when merging in the ICUVersionRecord change set.
+         */
+//        {
+//
+//            /*
+//             * Serialize the record.
+//             */
+//            final byte[] icuVersionBytes = SerializerUtil.serialize(ICUVersionRecord.newInstance());
+//
+//            // #of bytes written so far on the output file.
+//            final long offset = out.length(); 
+//
+//            // seek to the end of the file.
+//            out.seek(offset);
+//            
+//            // write the serialized extension metadata.
+//            out.write(icuVersionBytes, 0, icuVersionBytes.length);
+//
+//            // Address of the region containing the metadata record (one record)
+//            long addrICUVersion = addressManager.toAddr(icuVersionBytes.length,
+//                    IndexSegmentRegion.BASE.encodeOffset(offset));
+//            
+//            if (storeCache != null) {
+//
+//                /*
+//                 * Insert the record into the cache.
+//                 */
+//                
+//                storeCache.putIfAbsent(addrMetadata, metadata);
+//                
+//            }
+//            
+//        }
+        
+        /*
          * Seek to the start of the file and write out the checkpoint record.
          */
         {
@@ -3328,6 +3439,11 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          */
         final long[] versionTimestamps;
 
+        /**
+         * Allocated iff raw record markers are maintained.
+         */
+        final boolean[] rawRecords;
+        
         public SimpleLeafData(final int level, final int m,
                 final IndexMetadata metadata) {
 
@@ -3340,7 +3456,10 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
             this.versionTimestamps = metadata.getVersionTimestamps() ? new long[m]
                     : null;
-            
+
+			this.rawRecords = metadata.getRawRecords() ? new boolean[m]
+					: null;
+
         }
         
         protected void reset(final int max) {
@@ -3387,6 +3506,18 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         }
 
+        final public long getRawRecord(final int index) {
+
+            if (rawRecords == null)
+                throw new UnsupportedOperationException();
+
+            if(!rawRecords[index])
+            	return IRawStore.NULL;
+
+            return AbstractBTree.decodeRecordAddr(vals.get(index));
+            
+        }
+
         final public boolean hasDeleteMarkers() {
 
             return deleteMarkers != null;
@@ -3396,6 +3527,12 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         final public boolean hasVersionTimestamps() {
 
             return versionTimestamps != null;
+
+        }
+
+        final public boolean hasRawRecords() {
+
+            return rawRecords != null;
 
         }
 

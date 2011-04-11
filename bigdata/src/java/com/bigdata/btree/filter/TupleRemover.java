@@ -115,13 +115,13 @@ abstract public class TupleRemover<E> extends FilterBase implements ITupleFilter
 
         }
 
-        /**
-         * Note: Visited tuples which satisify
-         * {@link TupleRemover#remove(Object)} will already have been removed
-         * from the source iterator. Attempting to remove them again using
-         * this method will cause an {@link IllegalStateException} to be
-         * thrown by the source iterator.
-         */
+		/**
+		 * Note: Visited tuples which satisfy
+		 * {@link TupleRemover#remove(Object)} will already have been removed
+		 * from the source iterator. Attempting to remove them again using this
+		 * method may cause an {@link IllegalStateException} to be thrown by the
+		 * source iterator.
+		 */
         public void remove() {
             
             src.remove();

@@ -143,7 +143,8 @@ public class TestUtilMethods extends AbstractBTreeTestCase {
                         new byte[] { 0 }} //
                     ),
                     null,// timestamps
-                    null// deleteMarkers
+                    null,// deleteMarkers
+                    null // rawRecords
                     ));
 
         leaf.assertKeysMonotonic();

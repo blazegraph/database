@@ -62,8 +62,8 @@ public class IndexSegmentCheckpoint {
     /**
      * Logger.
      */
-    protected static final Logger log = Logger
-            .getLogger(IndexSegmentCheckpoint.class);
+	private static final Logger log = Logger
+			.getLogger(IndexSegmentCheckpoint.class);
 
     /**
      * The file is empty.

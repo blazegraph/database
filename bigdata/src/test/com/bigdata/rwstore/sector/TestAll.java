@@ -56,12 +56,13 @@ public class TestAll extends TestCase {
      * Returns a test that will run each of the implementation specific test
      * suites in turn.
      */
-    public static Test suite()
-    {
-
+    public static Test suite() {
+    	
         final TestSuite suite = new TestSuite("memory manager");
 
-        suite.addTestSuite(com.bigdata.rwstore.sector.TestMemoryManager.class);
+        suite.addTestSuite(TestMemoryManager.class);
+
+        suite.addTest(TestMemStore.suite());
 
         return suite;
 

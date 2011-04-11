@@ -112,6 +112,9 @@ public class KVO<O> implements Comparable<KVO<O>>{
         
     }
 
+	/**
+	 * Imposes an <code>unsigned byte[]</code> order on the {@link KVO}s.
+	 */
     public int compareTo(final KVO<O> arg0) {
 
         return BytesUtil.compareBytes(key, arg0.key);

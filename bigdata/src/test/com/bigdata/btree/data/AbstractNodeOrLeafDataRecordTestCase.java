@@ -27,14 +27,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.data;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.FixedByteArrayBuffer;
+import com.bigdata.rawstore.Bytes;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -72,7 +75,8 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
 	 */
 	final protected ILeafData mockLeafFactory(final IRaba keys, final IRaba vals) {
 
-		return mockLeafFactory(keys, vals, null/* deleteMarkers */, null/* versionTimestamps */);
+		return mockLeafFactory(keys, vals, null/* deleteMarkers */,
+				null/* versionTimestamps */, null/* rawRecords */);
 
 	}
 
@@ -88,13 +92,19 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
 	 *            The delete markers (optional).
 	 * @param versionTimestamps
 	 *            The version timestamps (optional).
+	 * @param rawRecords
+	 *            The bit flags indicating which tuples are have their value
+	 *            stored as a raw record on the backing persistence store
+	 *            (optional).
 	 * 
 	 * @return The mock {@link ILeafData} object.
 	 */
 	protected ILeafData mockLeafFactory(final IRaba keys, final IRaba vals,
-			final boolean[] deleteMarkers, final long[] versionTimestamps) {
+			final boolean[] deleteMarkers, final long[] versionTimestamps,
+			final boolean[] rawRecords) {
 
-		return new MockLeafData(keys, vals, deleteMarkers, versionTimestamps);
+		return new MockLeafData(keys, vals, deleteMarkers, versionTimestamps,
+				rawRecords);
 
     }
     
@@ -149,6 +159,8 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
 
             final boolean versionTimestamps = r.nextBoolean();
 
+            final boolean rawRecords = r.nextBoolean();
+
             System.err.println("Trial "
                     + trial
                     + " of "
@@ -157,15 +169,17 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
                     + nnodes
                     + " random nodes:  branchingFactor="
                     + branchingFactor
-                    + (mayGenerateLeaves() ? ", deleteMarkers=" + deleteMarkers
-                            + ", versionTimestamps=" + versionTimestamps : ""));
+					+ (mayGenerateLeaves() ? ", deleteMarkers=" + deleteMarkers
+							+ ", versionTimestamps=" + versionTimestamps
+							+ ", rawRecords=" + rawRecords : ""));
 
             final DataOutputBuffer buf = new DataOutputBuffer();
             
             for (int i = 0; i < nnodes; i++) {
 
-                final IAbstractNodeData expected = getRandomNodeOrLeaf(
-                        branchingFactor, deleteMarkers, versionTimestamps);
+				final IAbstractNodeData expected = getRandomNodeOrLeaf(
+						branchingFactor, deleteMarkers, versionTimestamps,
+						rawRecords);
 
                 doRoundTripTest(expected, coder, buf);
                 
@@ -368,7 +382,6 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
         final int offset = r.nextInt(Integer.MAX_VALUE/2);
 
         final int nbytes = r.nextInt(1024);
-        
 
         // return Addr.toLong(nbytes,offset);
 
@@ -437,8 +450,12 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
     /**
      * Generates a leaf node with random data.
      */
-    public ILeafData getRandomLeaf(final int m,
-            final boolean isDeleteMarkers, final boolean isVersionTimestamps) {
+    public ILeafData getRandomLeaf(//
+    		final int m,//
+            final boolean isDeleteMarkers,// 
+            final boolean isVersionTimestamps,//
+            final boolean isRawRecords//
+            ) {
 
         // #of keys per node.
         final int branchingFactor = m;
@@ -460,17 +477,47 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
         final long[] versionTimestamps = isVersionTimestamps ? new long[branchingFactor + 1]
                 : null;
 
+		final boolean[] rawRecords = isRawRecords ? new boolean[branchingFactor + 1]
+				: null;
+
         for (int i = 0; i < nkeys; i++) {
 
-            values[i] = new byte[r.nextInt(100)];
+			// The % of deleted tuples in this leaf.
+			final boolean deleted = deleteMarkers!=null && r.nextDouble()<.05;
+        	
+			if (deleted) {
+				
+				// Delete marker is has a [null] value.
+				deleteMarkers[i] = r.nextBoolean();
+				
+			} else {
 
-            r.nextBytes(values[i]);
+	        	// The % of large values in this leaf.
+				final boolean isRawRecord = rawRecords != null
+						&& r.nextDouble() < .3;
 
-            if (deleteMarkers != null) {
+				// Not a deleted tuple.
+				if(isRawRecord) {
+					
+					// Raw record on the backing store.
+					values[i] = AbstractBTree.encodeRecordAddr(recordAddrBuf,
+							nextAddr());
 
-                deleteMarkers[i] = r.nextBoolean();
+					rawRecords[i] = true;
 
-            }
+				} else {
+
+					// Normal value (inline w/in the leaf).
+					values[i] = new byte[r.nextInt(100)];
+
+					r.nextBytes(values[i]);
+
+					if (rawRecords != null)
+						rawRecords[i] = false;
+
+				}
+				
+			}
 
             if (versionTimestamps != null) {
 
@@ -485,36 +532,42 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
                 new ReadOnlyKeysRaba(nkeys, keys),//
                 new ReadOnlyValuesRaba(nkeys, values),//
                 deleteMarkers,//
-                versionTimestamps//
+                versionTimestamps,//
+                rawRecords//
         );
 
     }
 
+	final ByteArrayBuffer recordAddrBuf = new ByteArrayBuffer(Bytes.SIZEOF_LONG);
+    
     /**
      * Generates a node or leaf (randomly) with random data.
      */
     public IAbstractNodeData getRandomNodeOrLeaf(final int m,
-            final boolean deleteMarkers, final boolean versionTimestamps) {
+            final boolean deleteMarkers, final boolean versionTimestamps,
+            final boolean rawRecords) {
 
         assert mayGenerateLeaves() || mayGenerateNodes();
 
         if (!mayGenerateLeaves()) {
 
-            return getRandomNode(m);
+			return getRandomNode(m);
 
-        } else if (!mayGenerateNodes()) {
+		} else if (!mayGenerateNodes()) {
 
-            return getRandomLeaf(m, deleteMarkers, versionTimestamps);
+			return getRandomLeaf(m, deleteMarkers, versionTimestamps,
+					rawRecords);
 
-        } else {
+		} else {
 
-            if (r.nextBoolean()) {
+			if (r.nextBoolean()) {
 
-                return getRandomNode(m);
+				return getRandomNode(m);
 
-            } else {
+			} else {
 
-                return getRandomLeaf(m, deleteMarkers, versionTimestamps);
+				return getRandomLeaf(m, deleteMarkers, versionTimestamps,
+						rawRecords);
 
             }
 

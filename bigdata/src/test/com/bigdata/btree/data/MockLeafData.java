@@ -1,8 +1,9 @@
 package com.bigdata.btree.data;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.raba.IRaba;
-import com.bigdata.htree.data.IBucketData;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * Mock object for {@link ILeafData} used for unit tests.
@@ -19,7 +20,9 @@ public class MockLeafData extends AbstractMockNodeData implements ILeafData {
     final private long[] versionTimestamps;
     
     final private long minVersionTimestamp, maxVersionTimestamp;
-    
+
+    final private boolean[] rawRecords;
+
     final public IRaba getValues() {
 
         return vals;
@@ -89,6 +92,22 @@ public class MockLeafData extends AbstractMockNodeData implements ILeafData {
 
     }
 
+    final public long getRawRecord(final int index) {
+
+        if (rawRecords == null)
+            throw new UnsupportedOperationException();
+
+        if(!rawRecords[index])
+        	return IRawStore.NULL;
+        
+        final byte[] b = vals.get(index);
+        
+        final long addr = AbstractBTree.decodeRecordAddr(b);
+  
+        return addr;
+
+    }
+
     final public boolean hasDeleteMarkers() {
 
         return deleteMarkers != null;
@@ -101,14 +120,22 @@ public class MockLeafData extends AbstractMockNodeData implements ILeafData {
 
     }
 
-    public MockLeafData(final IRaba keys, final IRaba vals) {
+	public boolean hasRawRecords() {
 
-        this(keys, vals, null/* deleteMarkers */, null/* versionTimestamps */);
-
+		return rawRecords != null;
+		
     }
 
+//    public MockLeafData(final IRaba keys, final IRaba vals) {
+//
+//		this(keys, vals, null/* deleteMarkers */, null/* versionTimestamps */,
+//				null/* rawRecords */);
+//
+//    }
+
     public MockLeafData(final IRaba keys, final IRaba vals,
-            final boolean[] deleteMarkers, final long[] versionTimestamps) {
+            final boolean[] deleteMarkers, final long[] versionTimestamps,
+            final boolean[] rawRecords) {
 
         super(keys);
 
@@ -123,10 +150,15 @@ public class MockLeafData extends AbstractMockNodeData implements ILeafData {
         if (versionTimestamps != null)
             assert versionTimestamps.length == vals.capacity();
 
+        if (rawRecords != null)
+            assert rawRecords.length == vals.capacity();
+
         this.vals = vals;
 
         this.deleteMarkers = deleteMarkers;
 
+        this.rawRecords = rawRecords;
+        
         this.versionTimestamps = versionTimestamps;
 
         long min = Long.MAX_VALUE;
