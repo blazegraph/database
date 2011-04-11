@@ -61,10 +61,16 @@ public class BTreeUtilizationReport implements IBTreeUtilizationReport,
 
         final int branchingFactor = stats.getBranchingFactor();
 
-        nodeUtilization = nnodes == 0 ? 100 : (100 * numNonRootNodes)
-                / (nnodes * branchingFactor);
+        /*
+         * Note: It is quite possible for the intermediate products in
+         * these formulae to exceed Integer.MAX_VALUE, which is why we
+         * need to cast to long.  The result will always be in [0:100].
+         */
+        
+		nodeUtilization = (int) (nnodes == 0 ? 100 : (100L * numNonRootNodes)
+				/ (nnodes * (long) branchingFactor));
 
-        leafUtilization = (100 * nentries) / (nleaves * branchingFactor);
+		leafUtilization = (int) ((100L * nentries) / (nleaves * (long) branchingFactor));
 
         totalUtilization = (nodeUtilization + leafUtilization) / 2;
 

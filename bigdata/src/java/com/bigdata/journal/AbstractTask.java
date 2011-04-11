@@ -636,13 +636,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                     // add to the unisolated index cache (must not exist).
                     name2Addr.putIndexCache(name, btree, false/* replace */);
 
-                    if(resourceManager instanceof ResourceManager) {
-                        
-                        btree
-                                .setBTreeCounters(((ResourceManager) resourceManager)
-                                        .getIndexCounters(name));
-                        
-                    }
+					btree.setBTreeCounters((resourceManager)
+							.getIndexCounters(name));
                     
                 }
 
@@ -820,13 +815,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * counters.
          */
 
-        if(resourceManager instanceof ResourceManager) {
-            
-            btree
-                    .setBTreeCounters(((ResourceManager) resourceManager)
-                            .getIndexCounters(name));
-            
-        }
+        btree.setBTreeCounters(resourceManager.getIndexCounters(name));
 
         /*
          * Note: delegate logic to materialize the view in case BTree is an

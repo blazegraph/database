@@ -36,6 +36,11 @@ import com.bigdata.rdf.model.BigdataValue;
  * URI IV, one where the {@link BigdataValue} is transormed into a simple
  * literal (no datatype, no language tag) using the URI's toString() or the
  * Literal's label.
+ * 
+ * TODO Mike, I'd advise handling this as a TermId standing in for a Literal
+ * whose datatype is xsd:string and whose termId is ZERO. That will basically
+ * look like a Literal which has not been inserted into (or looked up against)
+ * the database. At a minimum, I would extend {@link AbstractIV}. Bryan
  */
 public class StrIV implements IV {
 
@@ -139,6 +144,16 @@ public class StrIV implements IV {
 
 	public boolean isFloatingPointNumeric() {
 		return iv.isFloatingPointNumeric();
+	}
+
+	public void dropValue() {
+		// TODO Auto-generated method stub
+		
+	}
+
+	public BigdataValue getValue() throws NotMaterializedException {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 }

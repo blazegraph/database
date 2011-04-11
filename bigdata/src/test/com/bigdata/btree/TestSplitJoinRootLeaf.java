@@ -483,7 +483,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
         btree.insert(TestKeyBuilder.asSortKey(9), v9);
         
         assertKeys(new int[]{3,5,7,9},a);
-        assertValues(new Object[]{v3,v5,v7,v9},a);
+        assertValues(new byte[][]{v3,v5,v7,v9},a);
 
         // split the root leaf.
         btree.insert(TestKeyBuilder.asSortKey(2), v2);

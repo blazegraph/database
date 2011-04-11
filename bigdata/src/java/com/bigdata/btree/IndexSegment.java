@@ -767,13 +767,16 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
 
             final private boolean deleteMarkers;
             final private boolean versionTimestamps;
-            
-            public EmptyReadOnlyLeafData(final boolean deleteMarkers,
-                    final boolean versionTimestamps) {
+            final private boolean rawRecords;
 
-                this.deleteMarkers = deleteMarkers;
+			public EmptyReadOnlyLeafData(final boolean deleteMarkers,
+					final boolean versionTimestamps, final boolean rawRecords) {
 
-                this.versionTimestamps = versionTimestamps;
+				this.deleteMarkers = deleteMarkers;
+
+				this.versionTimestamps = versionTimestamps;
+
+				this.rawRecords = rawRecords;
                 
             }
             
@@ -783,6 +786,10 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
 
             final public boolean hasVersionTimestamps() {
                 return versionTimestamps;
+            }
+
+            final public boolean hasRawRecords() {
+                return rawRecords;
             }
 
             final public int getValueCount() {
@@ -798,6 +805,10 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
             }
 
             final public long getVersionTimestamp(int index) {
+                throw new IndexOutOfBoundsException();
+            }
+
+            final public long getRawRecord(int index) {
                 throw new IndexOutOfBoundsException();
             }
 
@@ -883,7 +894,9 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
                  */
                 this.data = new EmptyReadOnlyLeafData(//
                         btree.getIndexMetadata().getDeleteMarkers(), //
-                        btree.getIndexMetadata().getVersionTimestamps());
+                        btree.getIndexMetadata().getVersionTimestamps(),//
+                        btree.getIndexMetadata().getRawRecords()//
+                        );
 
 //                super(btree);
                 
@@ -1414,5 +1427,13 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
     public AbstractBTree[] getSources() {
         return new AbstractBTree[]{this};
     }
+
+//    @Override
+//	ByteBuffer readRawRecord(final long addr) {
+//
+//		// read from the backing store.
+//		return getStore().read(addr);
+//
+//	}
 
 }

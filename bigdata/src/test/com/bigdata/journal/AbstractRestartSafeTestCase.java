@@ -34,6 +34,8 @@ import java.util.Random;
 
 import com.bigdata.LRUNexus;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rwstore.PhysicalAddressResolutionException;
+import com.bigdata.util.InnerCause;
 
 /**
  * Test suite for restart-safe (data survives commit and reopen of the store).
@@ -181,9 +183,16 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
             try {
                 store.read(addr1);
                 fail("Expecting: " + IllegalArgumentException.class);
-            } catch (IllegalArgumentException ex) {
-                if (log.isInfoEnabled())
-                    log.info("Ignoring expected exception: " + ex);
+            } catch (RuntimeException ex) {
+                if (InnerCause.isInnerCause(ex,
+                        IllegalArgumentException.class)) {
+                    if (log.isInfoEnabled())
+                        log.info("Ignoring expected exception: " + ex);
+                } else {
+                    fail("Expecting inner cause: "
+                            + IllegalArgumentException.class
+                            + ", not: " + ex, ex);
+                }
             }
 
         } finally {

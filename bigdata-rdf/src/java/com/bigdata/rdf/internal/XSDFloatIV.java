@@ -55,16 +55,20 @@ public class XSDFloatIV<V extends BigdataLiteral> extends
         return value;
     }
 
-    @SuppressWarnings("unchecked")
-    public V asValue(final LexiconRelation lex) {
-    	final BigdataValueFactory f = lex.getValueFactory();
-        final V v = (V) f.createLiteral(value);
-        v.setIV(this);
-        return v;
-    }
+	@SuppressWarnings("unchecked")
+	public V asValue(final LexiconRelation lex) {
+		V v = getValueCache();
+		if (v == null) {
+			final BigdataValueFactory f = lex.getValueFactory();
+			v = (V) f.createLiteral(value);
+			v.setIV(this);
+			setValue(v);
+		}
+		return v;
+	}
 
-    @Override
-    final public float floatValue() {
+	@Override
+	final public float floatValue() {
         return value;
     }
 

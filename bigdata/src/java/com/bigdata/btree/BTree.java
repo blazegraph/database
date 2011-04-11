@@ -36,6 +36,7 @@ import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
 import com.bigdata.btree.Leaf.ILeafListener;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
@@ -45,6 +46,7 @@ import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -269,7 +271,13 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
      * counter into its serialized record (without the partition identifier).
      */
     protected AtomicLong counter;
-  
+
+	/**
+	 * A buffer used to encode a raw record address for a mutable {@link BTree}
+	 * and otherwise <code>null</code>.
+	 */
+    private final ByteArrayBuffer recordAddrBuf;
+    
 //    /**
 //     * The last address from which the {@link IndexMetadata} record was read or
 //     * on which it was written.
@@ -359,9 +367,34 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
          * before we read the root node.
          */
 //        reopen();
+
+        /*
+         * Buffer used to encode addresses into the tuple value for a mutable
+         * B+Tree.
+         */
+		recordAddrBuf = readOnly ? null
+				: new ByteArrayBuffer(Bytes.SIZEOF_LONG);
         
     }
-    
+
+	/**
+	 * Encode a raw record address into a byte[] suitable for storing in the
+	 * value associated with a tuple and decoding using
+	 * {@link AbstractBTree#decodeRecordAddr(byte[])}. This method is only
+	 * supported for a mutable {@link BTree} instance. Per the contract of the
+	 * mutable {@link BTree}, it is not thread-safe.
+	 * 
+	 * @param addr
+	 *            The raw record address.
+	 * 
+	 * @return A newly allocated byte[] which encodes that address.
+	 */
+    byte[] encodeRecordAddr(final long addr) {
+    	
+    	return AbstractBTree.encodeRecordAddr(recordAddrBuf, addr);
+    	
+    }
+
     /**
      * Sets the {@link #checkpoint} and initializes the mutable fields from the
      * checkpoint record. In order for this operation to be atomic, the caller
@@ -1215,7 +1248,7 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
                     if(childAddr != 0L) {
 
                         // delete persistent child.
-                        getStore().delete(childAddr);
+                        deleteNodeOrLeaf(childAddr);
                         
                     }
                     
@@ -1223,28 +1256,39 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
                 
             }
 
-            // delete root iff persistent.
-            if (getRoot().getIdentity() != 0L) {
-             
-                getStore().delete(getRoot().getIdentity());
-                
+            final long raddr = getRoot().getIdentity();
+			
+            if (raddr != IRawStore.NULL) {
+
+                // delete root iff persistent.
+				deleteNodeOrLeaf(raddr);
+
             }
             
+            // @todo update bytesOnStore to ZERO.
             replaceRootWithEmptyLeaf();
 
         } else if (getIndexMetadata().getDeleteMarkers()
-                || getStore() instanceof RWStrategy) {
+                || getStore() instanceof RWStrategy//
+                || metadata.getRawRecords()//
+                ) {
 
-            /*
-             * Write deletion markers for each non-deleted entry. When the
-             * transaction commits, those delete markers will have to validate
-             * against the global state of the tree. If the transaction
-             * validates, then the merge down onto the global state will cause
-             * the corresponding entries to be removed from the global tree.
-             * 
-             * Note: This operation can change the tree structure by triggering
-             * copy-on-write for immutable node or leaves.
-             */
+			/*
+			 * Visit each tuple.
+			 * 
+			 * If deletion markers are enabled, then this will write deletion
+			 * markers for each non-deleted entry. When the transaction commits,
+			 * those delete markers will have to validate against the global
+			 * state of the tree. If the transaction validates, then the merge
+			 * down onto the global state will cause the corresponding entries
+			 * to be removed from the global tree.
+			 * 
+			 * If raw record support is enabled, then the raw records for the
+			 * tuples visited will be deleted on the backing store.
+			 * 
+			 * Note: This operation can change the tree structure by triggering
+			 * copy-on-write for immutable node or leaves.
+			 */
 
             final ITupleIterator itr = rangeIterator(null, null,
                     0/* capacity */, REMOVEALL/* flags */, null/* filter */);

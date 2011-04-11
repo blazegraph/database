@@ -61,6 +61,7 @@ import com.bigdata.io.DataInputBuffer;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.ResourceManager;
 
 /**
@@ -1033,7 +1034,7 @@ public class Name2Addr extends BTree {
      * @return A new {@link CounterSet} reflecting the named indices that were
      *         open as of the time that this method was invoked.
      * 
-     * @see ConcurrencyManager#getIndexCounters()
+     * @see IndexManager#getIndexCounters()
      */
     public CounterSet getIndexCounters() {
 
@@ -1078,6 +1079,14 @@ public class Name2Addr extends BTree {
                 path = name;
 
             }
+
+			/*
+			 * Attach the B+Tree performance counters.
+			 * 
+			 * Note: These counters MUST NOT embed a hard reference to the
+			 * AbstractBTree. That could cause the BTree to be retained as long
+			 * as the caller holds the CounterSet object!
+			 */
 
             tmp.makePath(path).attach(btree.getCounters());
 

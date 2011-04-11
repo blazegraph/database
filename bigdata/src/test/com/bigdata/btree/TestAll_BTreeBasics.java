@@ -134,8 +134,13 @@ public class TestAll_BTreeBasics extends TestCase {
         suite.addTestSuite(TestTransientBTree.class);
 
         /*
+         * test index with raw record support enabled.
+         */
+        suite.addTestSuite(TestRawRecords.class);
+        
+        /*
          * Test bloom filters for a BTree (vs an IndexSegment, which is handled
-         * below).
+         * in the IndexSegment test suite).
          */
         suite.addTestSuite(TestBloomFilter.class);
         suite.addTestSuite(TestBTreeWithBloomFilter.class);

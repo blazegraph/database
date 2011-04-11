@@ -133,7 +133,16 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
         if (o == null)
             return false;
         
-        return id.equals(o.getID());
+		if ((o instanceof BigdataValue) //
+				&& getIV() != null//
+				&& ((BigdataValue) o).getIV() != null//
+				&& ((BigdataValue) o).getValueFactory() == getValueFactory()) {
+
+			return getIV().equals(((BigdataValue) o).getIV());
+
+        }
+
+		return id.equals(o.getID());
 
     }
 

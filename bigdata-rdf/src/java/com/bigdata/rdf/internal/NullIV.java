@@ -27,7 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
-
+/**
+ * Class is used solely to encode and decode <code>null</code> {@link IV}
+ * references. <code>null</code> {@link IV}s are somewhat special. They get used
+ * as wildcards for the keys in the justifications index and perhaps (?) in a
+ * few other locations.
+ * 
+ * @author mrpersonick
+ */
 class NullIV extends TermId {
 
     private static final long serialVersionUID = -214758033769962923L;

@@ -241,22 +241,41 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         }
 
         // verify the #of defined values (same as the #of defined keys).
-        assertEquals(msg + "nvalues", nvalues, leaf.getKeyCount());
+        assertEquals(msg + "nkeys", nvalues, leaf.getKeyCount());
+        assertEquals(msg + "nvalues", nvalues, leaf.getValueCount());
 
         // verify ordered values for the defined values.
         for (int i = 0; i < nvalues; i++) {
 
-            assertEquals(msg + "values[" + i + "]", values[i], leaf.getValues()
-                    .get(i));
+			final byte[] expected = (values[i] instanceof byte[]) ? (byte[]) values[i]
+					: SerializerUtil.serialize(values[i]);
+			
+			final byte[] actual = leaf.getValue(i);
+
+			if (!BytesUtil.bytesEqual(expected, actual)) {
+
+				fail(msg + "values[" + i + "]: expected="
+						+ Arrays.toString(expected) + ", actual="
+						+ Arrays.toString(actual));
+
+			}
 
         }
 
         // verify the undefined values are all null.
-        for (int i = nvalues; i < leaf.getValues().size(); i++) {
+		final int valueCapacity = leaf.getValues().size();
 
-            assertEquals(msg + "values[" + i + "]", null, leaf.getValues().get(
-                    i));
+		for (int i = nvalues; i < valueCapacity; i++) {
 
+			final byte[] actual = leaf.getValue(i);
+
+			if (actual != null) {
+
+				fail(msg + "values[" + i + "]: expected=null, actual="
+						+ Arrays.toString(actual));
+
+			}
+			
         }
 
     }
@@ -482,12 +501,41 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
         }
 
-        if(n1 instanceof IBucketData) {
-
-			assertSameHashCodes((IBucketData) n1, (IBucketData) n2);
-	
-        }
+//        if(n1 instanceof IBucketData) {
+//
+//			assertSameHashCodes((IBucketData) n1, (IBucketData) n2);
+//	
+//        }
         
+        assertEquals("hasRawRecords", n1.hasRawRecords(), n2
+                .hasRawRecords());
+
+        if (n1.hasRawRecords()) {
+
+            for (int i = 0; i < n1.getKeyCount(); i++) {
+
+                assertEquals("rawRecords[" + i + "]", n1.getRawRecord(i),
+                        n2.getRawRecord(i));
+
+            }
+
+        }
+
+		/*
+		 * TODO Errors will be thrown out of here if we wind up comparing two
+		 * leaves with raw records support enabled where the leaves belong to
+		 * different B+Tree instances. This is because the byte[] values in the
+		 * values rabas will encode the address of the raw records on the
+		 * backing store(s). Those addresses will be different for different
+		 * B+Tree instances.
+		 * 
+		 * If you encounter this problem, then the best thing to do is to roll
+		 * the logic to verify the leaf values raba into this method (the
+		 * caller) so we can properly avoid comparing getValue(index) for rabas
+		 * using raw records.
+		 * 
+		 * Or just don't do this if the leaf uses raw records.
+		 */
         assertSameRaba(n1.getValues(), n2.getValues());
         
     }
@@ -687,6 +735,14 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 	 */
     static public void assertSameHashCodes(final IBucketData b1, final IBucketData b2) {
 
+		/*
+		 * FIXME This method needs to be updated. The hash codes are now stored
+		 * as the unsigned byte[] keys in the bucket, which reuses the design
+		 * pattern for leaves and allows us to support hash codes having various
+		 * bit lengths.
+		 */
+    	fail("Update this method");
+    	
     	// The key and value counts must be the same.
     	final int n = b1.getKeyCount();
     	assertEquals("keyCount", n, b2.getKeyCount());
@@ -895,6 +951,20 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
 
+		if (r.nextBoolean()) {
+			/*
+			 * Randomly test with raw records enabled, using a small value for
+			 * the maximum record length to force heavy use of raw records when
+			 * they are chosen.
+			 * 
+			 * TODO Rather than doing this randomly, it would be better to do
+			 * this systematically. This will make any problems reported by CI
+			 * easier to interpret.
+			 */
+			metadata.setRawRecords(true);
+			metadata.setMaxRecLen(8);
+		}
+        
         metadata.setBranchingFactor(branchingFactor);
 
         metadata.setTupleSerializer(tupleSer);

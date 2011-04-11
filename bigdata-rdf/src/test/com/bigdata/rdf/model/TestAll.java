@@ -48,15 +48,14 @@ public class TestAll extends TestCase {
         super(arg0);
     }
 
-    /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
-     * 
-     * @todo while there is nothing left in this test suite the src/java package
-     *       is the {@link BigdataValue} and {@link BigdataStatement}
-     *       implementation and those implementations should be tested for
-     *       Sesame 2 API compatibility.
-     */
+	/**
+	 * Returns a test that will run each of the implementation specific test
+	 * suites in turn.
+	 * 
+	 * @todo The {@link BigdataValue} and {@link BigdataStatement}
+	 *       implementation and those implementations should be tested for
+	 *       Sesame 2 API compatibility.
+	 */
     public static Test suite()
     {
 
@@ -64,7 +63,10 @@ public class TestAll extends TestCase {
 
         // value factory test suite.
         suite.addTestSuite(TestFactory.class);
-        
+
+        // test suite for serialization semantics.
+        suite.addTestSuite(TestBigdataValueSerialization.class);
+
         return suite;
         
     }

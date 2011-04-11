@@ -26,61 +26,52 @@ package com.bigdata.rdf.internal;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 /**
  * Collects various XSD URIs as constants.
  * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
+ * 
+ * @see XMLSchema
  */
-public interface XSD {
+public class XSD extends XMLSchema {
     
-    String NAMESPACE = "http://www.w3.org/2001/XMLSchema#";
+//    String NAMESPACE = "http://www.w3.org/2001/XMLSchema#";
     
-    URI BOOLEAN = new URIImpl(NAMESPACE
-            + "boolean");
+//    URI BOOLEAN = XMLSchema.BOOLEAN;
+//
+//    URI BYTE = XMLSchema.BYTE;
+//
+//    URI SHORT = XMLSchema.SHORT;
+//
+//    URI INT = XMLSchema.INT;
+//
+//    URI LONG = XMLSchema.LONG;
+//
+//    URI UNSIGNED_BYTE = XMLSchema.UNSIGNED_BYTE;
+//
+//    URI UNSIGNED_SHORT = XMLSchema.UNSIGNED_SHORT;
+//
+//    URI UNSIGNED_INT = XMLSchema.UNSIGNED_INT;
+//
+//    URI UNSIGNED_LONG = XMLSchema.UNSIGNED_LONG;
+//    
+//    URI FLOAT = XMLSchema.FLOAT;
+//
+//    URI DOUBLE = XMLSchema.DOUBLE;
+//
+//    URI INTEGER = XMLSchema.INTEGER;
+//
+//    URI DECIMAL = XMLSchema.DECIMAL;
 
-    URI BYTE = new URIImpl(NAMESPACE
-            + "byte");
+	/**
+	 * @todo This really should not be in the XSD namespace since it is not part
+	 *       of the XML Schema Datatypes specification.
+	 */
+	static public final URI UUID = new URIImpl(NAMESPACE + "uuid");
 
-    URI SHORT = new URIImpl(NAMESPACE
-            + "short");
-
-    URI INT = new URIImpl(NAMESPACE
-            + "int");
-
-    URI LONG = new URIImpl(NAMESPACE
-            + "long");
-
-    URI UNSIGNED_BYTE = new URIImpl(NAMESPACE
-            + "unsignedByte");
-
-    URI UNSIGNED_SHORT = new URIImpl(NAMESPACE
-            + "unsignedShort");
-
-    URI UNSIGNED_INT = new URIImpl(NAMESPACE
-            + "unsignedInt");
-
-    URI UNSIGNED_LONG = new URIImpl(NAMESPACE
-            + "unsignedLong");
-    
-    URI FLOAT = new URIImpl(NAMESPACE
-            + "float");
-
-    URI DOUBLE = new URIImpl(NAMESPACE
-            + "double");
-
-    URI INTEGER = new URIImpl(NAMESPACE
-            + "integer");
-
-    URI DECIMAL = new URIImpl(NAMESPACE
-            + "decimal");
-
-    URI UUID = new URIImpl(NAMESPACE
-            + "uuid");
-
-    URI DATETIME = new URIImpl(NAMESPACE
-            + "dateTime");
-
+//	URI DATETIME = XMLSchema.DATETIME;
     
 }
