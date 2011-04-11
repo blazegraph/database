@@ -760,6 +760,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
     public void test_writeCacheService_HA_WORM_1record_1buffer_k3_size2()
             throws InterruptedException, IOException {
 
+    	failHATest();
+    	
         final int nbuffers = 1;
         final int nrecs = 1;
         final double largeRecordRate = 0d;
@@ -852,6 +854,19 @@ public class TestWORMWriteCacheService extends TestCase3 {
         
         fail("Test not run.  See https://sourceforge.net/apps/trac/bigdata/ticket/235");
         
+    }
+    
+    /**
+     * FIXME This method is being used to disable the write cache service tests
+     * which involve highly available services (k>1).  I've disabled these tests
+     * for now since they occasionally result in CI deadlocks. 
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/235
+     */
+    private void failHATest() {
+    	
+    	fail("Test not run.  See https://sourceforge.net/apps/trac/bigdata/ticket/235");
+    	
     }
 
     /**
@@ -1147,7 +1162,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
     public void test_writeCacheService_HA_RW_1record_1buffer_k3_size2()
             throws InterruptedException, IOException {
 
-        final int nbuffers = 1;
+    	failHATest();
+
+    	final int nbuffers = 1;
         final int nrecs = 1;
         /*
          * Note: The RW store breaks large records into multiple allocations,
@@ -1240,7 +1257,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
     public void test_writeCacheService_HA_WORM_1buffer_k3_size2()
             throws InterruptedException, IOException {
 
-        final int nbuffers = 1;
+    	failHATest();
+
+    	final int nbuffers = 1;
         final boolean useChecksums = true;
         // Note: This must be true for the write pipeline.
         final boolean isHighlyAvailable = true;
@@ -1325,6 +1344,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
      */
     public void test_writeCacheService_HA_RW_1buffer_k3_size2()
             throws InterruptedException, IOException {
+
+    	failHATest();
 
         final int nbuffers = 1;
         final int nrecs = nrecsRW;
@@ -1419,6 +1440,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
     public void test_writeCacheService_HA_WORM_2buffer_k3_size2()
             throws InterruptedException, IOException {
 
+    	failHATest();
+
         final int nbuffers = 2;
         final boolean useChecksums = true;
         // Note: This must be true for the write pipeline.
@@ -1505,7 +1528,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
     public void test_writeCacheService_HA_RW_2buffer_k3_size2()
             throws InterruptedException, IOException {
 
-        final int nbuffers = 2;
+    	failHATest();
+
+    	final int nbuffers = 2;
         final int nrecs = nrecsRW;
         /*
          * Note: The RW store breaks large records into multiple allocations,
@@ -1598,6 +1623,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
     public void test_writeCacheService_HA_WORM_2buffer_k3_size3()
             throws InterruptedException, IOException {
 
+    	failHATest();
+
         final int nbuffers = 6;
         final boolean useChecksums = true;
         // Note: This must be true for the write pipeline.
@@ -1688,6 +1715,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
      */
     public void test_writeCacheService_HA_RW_2buffer_k3_size3()
             throws InterruptedException, IOException {
+
+    	failHATest();
 
         final int nbuffers = 6;
         final int nrecs = nrecsRW;
