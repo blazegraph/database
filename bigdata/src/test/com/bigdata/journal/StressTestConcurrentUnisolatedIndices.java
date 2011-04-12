@@ -59,7 +59,7 @@ import com.bigdata.util.NV;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase implements IComparisonTest {
+public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal> implements IComparisonTest {
 
     public StressTestConcurrentUnisolatedIndices() {
     }
@@ -70,7 +70,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         
     }
 
-    Journal journal;
+    private Journal journal;
 
     public void setUpComparisonTest(Properties properties) throws Exception {
 
@@ -92,6 +92,9 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
             
         }
 
+        // release reference.
+        journal = null;
+        
     }
     
     /**
@@ -186,24 +189,33 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
             int nresources, int minLocks, int maxLocks, int ntrials,
             int keyLen, int nops, double failureRate)
             throws InterruptedException {
-        
-        if(journal==null) throw new IllegalArgumentException();
-        
-        if(timeout<=0) throw new IllegalArgumentException();
-        
-        if(nresources<=0) throw new IllegalArgumentException();
-        
-        if(minLocks<0) throw new IllegalArgumentException();
-        
-        if(maxLocks<minLocks||maxLocks>nresources) throw new IllegalArgumentException();
-        
-        if(ntrials<1) throw new IllegalArgumentException();
 
-        if(keyLen<1) throw new IllegalArgumentException();
-        
-        if(nops<0) throw new IllegalArgumentException();
+        if (journal == null)
+            throw new IllegalArgumentException();
 
-        if(failureRate<0.0||failureRate>1.0) throw new IllegalArgumentException();
+        if (timeout <= 0)
+            throw new IllegalArgumentException();
+
+        if (nresources <= 0)
+            throw new IllegalArgumentException();
+
+        if (minLocks < 0)
+            throw new IllegalArgumentException();
+
+        if (maxLocks < minLocks || maxLocks > nresources)
+            throw new IllegalArgumentException();
+
+        if (ntrials < 1)
+            throw new IllegalArgumentException();
+
+        if (keyLen < 1)
+            throw new IllegalArgumentException();
+
+        if (nops < 0)
+            throw new IllegalArgumentException();
+
+        if (failureRate < 0.0 || failureRate > 1.0)
+            throw new IllegalArgumentException();
         
         final Random r = new Random();
 
@@ -226,7 +238,8 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
             
         }
         
-        System.err.println("Created indices: "+Arrays.toString(resources));
+        if (log.isInfoEnabled())
+            log.info("Created indices: " + Arrays.toString(resources));
 
         /*
          * Setup the tasks that we will submit.
@@ -240,20 +253,20 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 
             // choose nlocks and indices to use.
             
-            int nlocks = r.nextInt(maxLocks-minLocks)+minLocks;
-            
-            assert nlocks>=minLocks && nlocks<=maxLocks;
-            
-            Collection<String> tmp = new HashSet<String>(nlocks);
-            
-            while(tmp.size()<nlocks) {
+            final int nlocks = r.nextInt(maxLocks - minLocks) + minLocks;
+
+            assert nlocks >= minLocks && nlocks <= maxLocks;
+
+            final Collection<String> tmp = new HashSet<String>(nlocks);
+
+            while (tmp.size() < nlocks) {
 
                 tmp.add(resources[r.nextInt(nresources)]);
-                
+
             }
-            
+
             String[] resource = tmp.toArray(new String[nlocks]);
-            
+
             tasks.add(new WriteTask(journal, resource, i, keyLen, nops,
                     failureRate, btrees));
 
@@ -263,7 +276,8 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
          * Run all tasks and wait for up to the timeout for them to complete.
          */
 
-        System.err.println("Submitting "+tasks.size()+" tasks");
+        if (log.isInfoEnabled())
+            log.info("Submitting "+tasks.size()+" tasks");
         
         final long begin = System.currentTimeMillis();
 
@@ -284,7 +298,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         
         while(itr.hasNext()) {
 
-            final Future future = itr.next();
+            final Future<?> future = itr.next();
             
             if(future.isCancelled()) {
                 
@@ -339,13 +353,15 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
          * Compute bytes written per second.
          */
         
-        long seconds = TimeUnit.SECONDS.convert(elapsed, TimeUnit.MILLISECONDS);
-        
-        long bytesWrittenPerSecond = journal.getRootBlockView().getNextOffset()
+        final long seconds = TimeUnit.SECONDS.convert(elapsed,
+                TimeUnit.MILLISECONDS);
+
+        final long bytesWrittenPerSecond = journal.getRootBlockView()
+                .getNextOffset()
                 / (seconds == 0 ? 1 : seconds);
 
-        Result ret = new Result();
-        
+        final Result ret = new Result();
+
         // these are the results.
         ret.put("nfailed",""+nfailed);
 //        ret.put("nretry",""+nretry);
@@ -418,7 +434,8 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 			final IIndex[] indices = new IIndex[resource.length];
 
 			for (int i = 0; i < resource.length; i++) {
-				indices[i] = getJournal().getIndex(resource[i]);
+
+			    indices[i] = getJournal().getIndex(resource[i]);
 
 				final Thread t = Thread.currentThread();
 
@@ -444,7 +461,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 
 					if (r.nextInt(100) > 10) {
 
-						byte[] val = new byte[5];
+						final byte[] val = new byte[5];
 
 						r.nextBytes(val);
 
@@ -478,9 +495,10 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 				}
 
 			}
+			
 		}
         
-    }
+    } // class WriteTask
     
     /**
      * Thrown by a {@link Writer} if it is selected for abort based on the
@@ -519,9 +537,9 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
      * @see ExperimentDriver
      * @see GenerateExperiment
      */
-    public static void main(String[] args) throws Exception {
+    public static void main(final String[] args) throws Exception {
 
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
 
         // avoids journal overflow when running out to 60 seconds.
         properties.put(Options.MAXIMUM_EXTENT, ""+Bytes.megabyte32*400);
@@ -678,12 +696,12 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
          * 
          * @param args
          */
-        public static void main(String[] args) throws Exception {
+        public static void main(final String[] args) throws Exception {
             
             // this is the test to be run.
-            String className = StressTestConcurrentUnisolatedIndices.class.getName();
+            final String className = StressTestConcurrentUnisolatedIndices.class.getName();
             
-            Map<String,String> defaultProperties = new HashMap<String,String>();
+            final Map<String,String> defaultProperties = new HashMap<String,String>();
 
             // force delete of the files on close of the journal under test.
             defaultProperties.put(Options.CREATE_TEMP_FILE,"true");
@@ -764,7 +782,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
                                             .toString()), }, //
                     });
             
-            Experiment exp = new Experiment(className,defaultProperties,conditions);
+            final Experiment exp = new Experiment(className,defaultProperties,conditions);
 
             // copy the output into a file and then you can run it later.
             System.err.println(exp.toXML());
