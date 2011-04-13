@@ -28,11 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.render;
 
-import java.io.IOException;
-import java.io.Writer;
-
-import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounter;
 import com.bigdata.counters.query.ICounterSelector;
 import com.bigdata.counters.query.ReportEnum;
 import com.bigdata.counters.query.URLQueryModel;

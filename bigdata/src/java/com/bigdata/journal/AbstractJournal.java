@@ -2708,6 +2708,18 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     	
     }
 
+    public void abortContext(final IAllocationContext context) {
+        
+        assertCanWrite();
+
+        if(_bufferStrategy instanceof RWStrategy) {
+
+            ((RWStrategy) _bufferStrategy).abortContext(context);
+            
+        }
+        
+    }
+
 	final public long getRootAddr(final int index) {
 
 		final ReadLock lock = _fieldReadWriteLock.readLock();

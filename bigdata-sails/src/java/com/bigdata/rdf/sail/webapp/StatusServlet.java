@@ -6,14 +6,17 @@ import java.util.List;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
-import com.bigdata.rdf.sail.webapp.BigdataContext.RunningQuery;
+import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 
 /**
  * A status page for the service.
@@ -21,9 +24,23 @@ import com.bigdata.rdf.sail.webapp.BigdataContext.RunningQuery;
  * @author thompsonbry
  * @author martyncutcher
  */
-public class StatusServlet extends BigdataServlet {
+public class StatusServlet extends BigdataRDFServlet {
 
 	/**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    static private final transient Logger log = Logger.getLogger(StatusServlet.class); 
+
+    @Override
+    public void init() throws ServletException {
+
+        super.init();
+        
+    }
+    
+    /**
      * <p>
      * A status page is available:
      * </p>
@@ -34,7 +51,7 @@ public class StatusServlet extends BigdataServlet {
 	 */
 	@Override
 	protected void doGet(final HttpServletRequest req,
-			final HttpServletResponse resp) {
+			final HttpServletResponse resp) throws IOException {
 
 		try {
 			// SPARQL queries accepted by the SPARQL end point.
@@ -50,6 +67,7 @@ public class StatusServlet extends BigdataServlet {
 			final boolean showNamespaces = req.getParameter("showNamespaces") != null;
 
 			final XMLBuilder.HTML doc = new XMLBuilder.HTML();
+
 			XMLBuilder.Node current = doc.root("html").node("body");
 
 			current.node("p", "Accepted query count=" + getQueryIdFactory().get());
@@ -194,9 +212,13 @@ public class StatusServlet extends BigdataServlet {
 			doc.closeAll(current);
 
 			buildResponse(resp, HTTP_OK, MIME_TEXT_HTML, doc.toString());
+
 		} catch (IOException e) {
-			throw new RuntimeException(e);
+		
+		    throw new RuntimeException(e);
+		    
 		}
+
 	}
 
 }

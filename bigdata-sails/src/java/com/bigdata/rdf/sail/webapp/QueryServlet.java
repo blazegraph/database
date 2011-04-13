@@ -8,19 +8,21 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.rdf.sail.webapp.BigdataContext.AbstractQueryTask;
+import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 
 /**
  * SPARQL query handler for GET or POST verbs.
  * 
  * @author martyncutcher
  */
-public class QueryServlet extends BigdataServlet {
+public class QueryServlet extends BigdataRDFServlet {
 
-	/**
-	 * The logger for the concrete {@link BigdataServlet} class.
-	 */
-	static private final Logger log = Logger.getLogger(BigdataServlet.class); 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+    
+    static private final transient Logger log = Logger.getLogger(QueryServlet.class); 
 
 //	/**
 //	 * @todo use to decide ASK, DESCRIBE, CONSTRUCT, SELECT, EXPLAIN, etc.
@@ -32,7 +34,7 @@ public class QueryServlet extends BigdataServlet {
 //		// used to parse qeries.
 //        m_engine = new SPARQLParserFactory().getParser();
         
-        getContext().registerServlet(this);
+//        getContext().registerServlet(this);
         
     }
 
@@ -91,7 +93,8 @@ public class QueryServlet extends BigdataServlet {
 		}
 		try {
 
-			final AbstractQueryTask queryTask = BigdataContext.getContext().getQueryTask(namespace, timestamp, queryStr, req, os);
+            final AbstractQueryTask queryTask = getBigdataRDFContext()
+                    .getQueryTask(namespace, timestamp, queryStr, req, os);
 
 			if (log.isTraceEnabled())
 				log.trace("Running query: " + queryStr);
@@ -113,7 +116,7 @@ public class QueryServlet extends BigdataServlet {
 
 		} catch (Throwable e) {
 			try {
-				throw launderThrowable(e, os, queryStr);
+				throw BigdataRDFServlet.launderThrowable(e, os, queryStr);
 			} catch (Exception e1) {
 				throw new RuntimeException(e);
 			}

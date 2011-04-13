@@ -2,7 +2,6 @@ package com.bigdata.rdf.sail.webapp;
 
 import info.aduna.xml.XMLWriter;
 
-import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.StringWriter;
@@ -14,7 +13,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 
 import org.apache.log4j.Logger;
@@ -26,40 +24,29 @@ import org.openrdf.query.parser.sparql.SPARQLParserFactory;
 import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
-import com.bigdata.rdf.sail.bench.NanoSparqlServer;
-import com.bigdata.rdf.sail.webapp.BigdataServlet.QueryType;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.concurrent.ThreadPoolExecutorBaseStatisticsTask;
-import com.bigdata.util.httpd.NanoHTTPD;
 
 /**
  * 
  * @author Martyn Cutcher
- *
+ * @author thompsonbry@users.sourceforge.net
  */
-public class BigdataContext {
-	/**
-	 * The logger for the concrete {@link NanoSparqlServer} class.  The {@link NanoHTTPD}
-	 * class has its own logger.
-	 */
-	static private final Logger log = Logger.getLogger(BigdataServlet.class); 
+public class BigdataRDFContext extends BigdataBaseContext {
 
-	static private BigdataContext s_context;
+    static private final transient Logger log = Logger
+            .getLogger(BigdataRDFContext.class);
 
-	private final Config m_config;
-	private final IIndexManager m_indexManager;
+	private final SparqlEndpointConfig m_config;
 	private final QueryParser m_engine;
 	
 	private final ScheduledFuture<?> m_queueStatsFuture;
@@ -70,69 +57,37 @@ public class BigdataContext {
      * has established a connection but the query is not running because the
      * {@link #queryService} is blocking).
      */
-    protected final ConcurrentHashMap<Long/* queryId */, RunningQuery> m_queries = new ConcurrentHashMap<Long, RunningQuery>();
-    
-    public Map<Long, RunningQuery> getQueries() {
-    	return m_queries;
-    }
+    private final ConcurrentHashMap<Long/* queryId */, RunningQuery> m_queries = new ConcurrentHashMap<Long, RunningQuery>();
     
     /**
      * Factory for the query identifiers.
      */
-    protected final AtomicLong m_queryIdFactory = new AtomicLong();
+    private final AtomicLong m_queryIdFactory = new AtomicLong();
     
-    public AtomicLong getQueryIdFactory() {
-    	return m_queryIdFactory;
+    final public Map<Long, RunningQuery> getQueries() {
+
+        return m_queries;
+        
     }
     
-	/**
-	 * This call establishes the context to run the servlets that
-	 * use it in an embedded server.
-	 * 
-	 * @param config
-	 * @param indexManager
-	 * @return the BigdataContext
-	 */
-	synchronized static public BigdataContext establishContext(final Config config, final IIndexManager indexManager)
-			throws SailException, RepositoryException, IOException {
-		if (s_context == null) {
-			s_context = new BigdataContext(config, indexManager);
-		}
+    final public AtomicLong getQueryIdFactory() {
+    
+        return m_queryIdFactory;
+        
+    }
+    
+    public BigdataRDFContext(final SparqlEndpointConfig config,
+            final IIndexManager indexManager) {
 
-		return s_context;
-	}
-
-	/**
-	 * When a servlet starts up in a web container it establishes the BigdataContext
-	 * that will be defined by the context parameters in the web.xml file.
-	 * 
-	 * @param context
-	 * @return the BigdataContext
-	 */
-	synchronized static BigdataContext establishContext(ServletContext context) {
-		if (s_context == null) {
-			// TODO get config info from servlet context
-		}
-		
-		return s_context;
-	}
-
-	static BigdataContext getContext() {
-		return s_context;
-	}
-
-	public BigdataContext(final Config config, final IIndexManager indexManager) throws IOException, SailException,
-			RepositoryException {
-
+        super(indexManager);
+        
+        if(config == null)
+            throw new IllegalArgumentException();
+        
 		if (config.namespace == null)
 			throw new IllegalArgumentException();
 
-		if (indexManager == null)
-			throw new IllegalArgumentException();
-
 		m_config = config;
-
-		m_indexManager = indexManager;
 
 		// used to parse qeries.
 		m_engine = new SPARQLParserFactory().getParser();
@@ -153,6 +108,7 @@ public class BigdataContext {
 			m_queueSampleTask = null;
 
 			m_queueStatsFuture = null;
+
 		} else {
 
 			m_queueSampleTask = null;
@@ -163,7 +119,12 @@ public class BigdataContext {
 
 	}
 
+    /*
+     * FIXME Provide shutdown semantics for the statistics collection on the
+     * SPARQL end point and the thread pool for processing SPARQL queries.
+     */
     public void shutdownNow() {
+
         if(log.isInfoEnabled())
             log.info("Normal shutdown.");
         
@@ -173,70 +134,16 @@ public class BigdataContext {
 
     }
 
-	public IIndexManager getIndexManager() {
-		return m_indexManager;
-	}
-	
-    /**
-     * Configuration object.
-     */
-    public static class Config {
-
-    	/**
-    	 * When true, suppress various things otherwise written on stdout.
-    	 */
-    	public boolean quiet = false;
-    	
-		/**
-		 * The port on which the server will answer requests -or- ZERO to
-		 * use any open port.
-		 */
-		public int port = 80;
+    public SparqlEndpointConfig getConfig() {
 		
-		/**
-		 * The default namespace.
-		 */
-		public String namespace;
-    	
-		/**
-		 * The default timestamp used to query the default namespace. The server
-		 * will obtain a read only transaction which reads from the commit point
-		 * associated with this timestamp.  
-		 */
-		public long timestamp = ITx.UNISOLATED;
-		
-    	/**
-		 * The #of threads to use to handle SPARQL queries -or- ZERO (0) for an
-		 * unbounded pool.
-		 */
-    	public int queryThreadPoolSize = 8;
-
-//		/**
-//		 * The capacity of the buffers for the pipe connecting the running query
-//		 * to the HTTP response.
-//		 */
-//		public int bufferCapacity = Bytes.kilobyte32 * 1;
-
-		public String resourceBase = ".";
-    	
-    	public Config() {
-    	}
-    	
-    }
-
-	public Config getConfig() {
-		return m_config;
+	    return m_config;
+	    
 	}
 
 	public ThreadPoolExecutorBaseStatisticsTask getSampleTask() {
-		return m_queueSampleTask;
-	}
 
-	public static void clear() {
-		if (s_context != null) {
-			s_context.shutdownNow();
-			s_context = null;
-		}
+	    return m_queueSampleTask;
+	    
 	}
 
 	/**
@@ -265,7 +172,7 @@ public class BigdataContext {
         /**
          * A symbolic constant indicating the type of query.
          */
-        protected final QueryType queryType;
+        protected final BigdataRDFServlet.QueryType queryType;
         
         /**
          * The negotiated MIME type to be used for the query response.
@@ -281,9 +188,10 @@ public class BigdataContext {
          * a hook to set it.
          */
         protected final String baseURI = null;
-        
+
         /**
-         * The queryId used by the {@link NanoSparqlServer}.
+         * The queryId as assigned by the SPARQL end point (rather than the
+         * {@link QueryEngine}).
          */
         protected final Long queryId;
         
@@ -307,7 +215,7 @@ public class BigdataContext {
          */
         protected AbstractQueryTask(final String namespace,
                 final long timestamp, final String queryStr,
-                final QueryType queryType,
+                final BigdataRDFServlet.QueryType queryType,
                 final String mimeType,
                 final OutputStream os) {
 
@@ -361,7 +269,7 @@ public class BigdataContext {
                 return null;
             } catch (Throwable t) {
                 // launder and rethrow the exception.
-                throw BigdataServlet.launderThrowable(t, os, queryStr);
+                throw BigdataRDFServlet.launderThrowable(t, os, queryStr);
             } finally {
                 m_queries.remove(queryId);
                 try {
@@ -386,7 +294,7 @@ public class BigdataContext {
 	private class TupleQueryTask extends AbstractQueryTask {
 
         public TupleQueryTask(final String namespace, final long timestamp,
-                final String queryStr, final QueryType queryType,
+                final String queryStr, final BigdataRDFServlet.QueryType queryType,
                 final String mimeType, final OutputStream os) {
 
 			super(namespace, timestamp, queryStr, queryType, mimeType, os);
@@ -422,7 +330,7 @@ public class BigdataContext {
     private class GraphQueryTask extends AbstractQueryTask {
 
         public GraphQueryTask(final String namespace, final long timestamp,
-                final String queryStr, final QueryType queryType,
+                final String queryStr, final BigdataRDFServlet.QueryType queryType,
                 final String mimeType, final OutputStream os) {
 
             super(namespace, timestamp, queryStr, queryType, mimeType, os);
@@ -473,7 +381,7 @@ public class BigdataContext {
         if(log.isDebugEnabled())
             log.debug(q.toString());
         
-		final QueryType queryType = QueryType
+		final BigdataRDFServlet.QueryType queryType = BigdataRDFServlet.QueryType
 				.fromQuery(queryStr);
 
 		final String mimeType;
@@ -486,11 +394,11 @@ public class BigdataContext {
 		case DESCRIBE:
 		case CONSTRUCT:
             // FIXME Conneg for the mime type for construct/describe!
-            mimeType = BigdataServlet.MIME_RDF_XML;
+            mimeType = BigdataRDFServlet.MIME_RDF_XML;
             return new GraphQueryTask(namespace, timestamp, queryStr,
                     queryType, mimeType, os);
         case SELECT:
-            mimeType = BigdataServlet.MIME_SPARQL_RESULTS_XML;
+            mimeType = BigdataRDFServlet.MIME_SPARQL_RESULTS_XML;
             return new TupleQueryTask(namespace, timestamp, queryStr,
                     queryType, mimeType, os);
         }
@@ -505,7 +413,8 @@ public class BigdataContext {
 	static class RunningQuery {
 
 		/**
-		 * The unique identifier for this query for the {@link NanoSparqlServer}.
+		 * The unique identifier for this query as assigned by the SPARQL 
+		 * end point (rather than the {@link QueryEngine}).
 		 */
 		final long queryId;
 
@@ -585,32 +494,5 @@ public class BigdataContext {
                 .getReadOnlyConnection(timestamp);
 
     }
-
-    QueryServlet m_queryServlet;
-	public void registerServlet(QueryServlet queryServlet) {
-		m_queryServlet = queryServlet;
-	}
-	
-	public QueryServlet getQueryServlet() {
-		return m_queryServlet;
-	}
-
-	DeleteServlet m_deleteServlet;
-	public void registerServlet(DeleteServlet deleteServlet) {
-		m_deleteServlet = deleteServlet;
-	}
-
-	public DeleteServlet getDeleteServlet() {
-		return m_deleteServlet;
-	}
-
-	UpdateServlet m_updateServlet;
-	public void registerServlet(UpdateServlet updateServlet) {
-		m_updateServlet = updateServlet;
-	}
-	public UpdateServlet getUpdateServlet() {
-		return m_updateServlet;
-	}
-
 
 }

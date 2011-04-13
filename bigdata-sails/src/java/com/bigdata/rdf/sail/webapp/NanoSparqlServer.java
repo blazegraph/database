@@ -1,27 +1,43 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.sail.webapp;
 
-import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.Date;
-import java.util.Properties;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
-import org.apache.log4j.Logger;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.handler.ResourceHandler;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
+import org.openrdf.rio.RDFParser;
 
+import com.bigdata.Banner;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITransactionService;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.webapp.BigdataContext.Config;
-import com.bigdata.service.AbstractDistributedFederation;
-import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.jini.JiniClient;
+import com.bigdata.rdf.store.DataLoader;
 
 /**
  * Utility class provides a simple SPARQL end point with a REST API.
@@ -29,11 +45,38 @@ import com.bigdata.service.jini.JiniClient;
  * @author thompsonbry
  * @author martyncutcher
  * 
- * @see https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer
+ * @see https
+ *      ://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer
+ * 
+ * @todo Add an "?explain" URL query parameter and show the execution plan and
+ *       costs (or make this a navigable option from the set of running queries
+ *       to drill into their running costs and offer an opportunity to kill them
+ *       as well).
+ * 
+ * @todo Add command to kill a running query, e.g., from the view of the long
+ *       running queries.
+ * 
+ * @todo If the addressed instance uses full transactions, then mutation should
+ *       also use a full transaction.
+ * 
+ * @todo Remote command to advance the read-behind point. This will let people
+ *       bulk load a bunch of stuff before advancing queries to read from the
+ *       new consistent commit point.
+ * 
+ * @todo Review the settings for the {@link RDFParser} instances, e.g.,
+ *       verifyData, preserveBNodeIds, etc. Perhaps we should use the same
+ *       defaults as the {@link DataLoader}?
+ * 
+ * @todo It is possible that we could have concurrent requests which each get
+ *       the unisolated connection. This could cause two problems: (1) we could
+ *       exhaust our request pool, which would cause the server to block; and
+ *       (2) I need to verify that the exclusive semaphore logic for the
+ *       unisolated sail connection works with cross thread access. Someone had
+ *       pointed out a bizarre hole in this....
  */
 public class NanoSparqlServer {
 	
-	static private final Logger log = Logger.getLogger(NanoSparqlServer.class);
+//	static private final Logger log = Logger.getLogger(NanoSparqlServer.class);
 
 	/**
 	 * Run an httpd service exposing a SPARQL endpoint. The service will respond
@@ -71,8 +114,6 @@ public class NanoSparqlServer {
 	 *            </dl>
 	 *            and <i>options</i> are any of:
 	 *            <dl>
-	 *            <dt>-q</dt>
-	 *            <dd>Suppress messages on stdout.</dd>
 	 *            <dt>-nthreads</dt>
 	 *            <dd>The #of threads which will be used to answer SPARQL
 	 *            queries (default 8).</dd>
@@ -91,373 +132,290 @@ public class NanoSparqlServer {
 	 *            </dl>
 	 *            </p>
 	 */
-//	 *            To stop the server:<br/>
-//	 *            <code>port -stop</code><br/>
 //	 *            <dt>bufferCapacity [#bytes]</dt>
 //	 *            <dd>Specify the capacity of the buffers used to decouple the
 //	 *            query evaluation from the consumption of the HTTP response by
 //	 *            the client. The capacity may be specified in bytes or
 //	 *            kilobytes, e.g., <code>5k</code>.</dd>
-	static public void main(String[] args) throws Exception {
-		// PropertyConfigurator.configure("C:/CT_Config/ct_test_log4j.properties");
+    public static void main(final String[] args) throws Exception {
 
-		final Config config = new Config();
-		/*
-		 * Connect to the database.
-		 */
-		final IIndexManager indexManager;
-		boolean forceOverflow = false;
-		Journal jnl = null;
-		JiniClient<?> jiniClient = null;
-		ITransactionService txs = null;
-		Long readLock = null;
-		JettySparqlServer server = null;
+        Banner.banner();
 
-		try {
-//			/*
-//			 * First, handle the [port -stop] command, where "port" is the port
-//			 * number of the service. This case is a bit different because the
-//			 * "-stop" option appears after the "port" argument.
-//			 */
-//			if (args.length == 2) {
-//				if ("-stop".equals(args[1])) {
-//					final int port;
-//					try {
-//						port = Integer.valueOf(args[0]);
-//					} catch (NumberFormatException ex) {
-//						usage(1/* status */, "Could not parse as port# : '" + args[0] + "'");
-//						// keep the compiler happy wrt [port] being bound.
-//						throw new AssertionError();
-//					}
-//					// Send stop to server.
-//					sendStop(port);
-//					// Normal exit.
-//					System.exit(0);
-//				} else {
-//					usage(1/* status */, null/* msg */);
-//				}
-//			}
+        int port = 80;
+        String namespace = "kb";
+        int queryThreadPoolSize = 8;
+        boolean forceOverflow = false;
+        Long readLock = null;
 
-			/*
-			 * Now that we have that case out of the way, handle all arguments
-			 * starting with "-". These should appear before any non-option
-			 * arguments to the program.
-			 */
-			int i = 0;
-			while (i < args.length) {
-				final String arg = args[i];
-				if (arg.startsWith("-")) {
-					if (arg.equals("-q")) {
-						config.quiet = true;
-					} else if (arg.equals("-forceOverflow")) {
-						forceOverflow = true;
-					} else if (arg.equals("-nthreads")) {
-						final String s = args[++i];
-						config.queryThreadPoolSize = Integer.valueOf(s);
-						if (config.queryThreadPoolSize < 0) {
-							usage(1/* status */, "-nthreads must be non-negative, not: " + s);
-						}
-//					} else if (arg.equals("-bufferCapacity")) {
-//						final String s = args[++i];
-//						final long tmp = BytesUtil.getByteCount(s);
-//						if (tmp < 1) {
-//							usage(1/* status */, "-bufferCapacity must be non-negative, not: " + s);
-//						}
-//						if (tmp > Bytes.kilobyte32 * 100) {
-//							usage(1/* status */, "-bufferCapacity must be less than 100kb, not: " + s);
-//						}
-//						config.bufferCapacity = (int) tmp;
-					} else if (arg.equals("-readLock")) {
-						final String s = args[++i];
-						readLock = Long.valueOf(s);
-						if (!TimestampUtility.isCommitTime(readLock.longValue())) {
-							usage(1/* status */, "Read lock must be commit time: " + readLock);
-						}
-					} else {
-						usage(1/* status */, "Unknown argument: " + arg);
-					}
-				} else {
-					break;
-				}
-				i++;
-			}
+        /*
+         * Handle all arguments starting with "-". These should appear before
+         * any non-option arguments to the program.
+         */
+        int i = 0;
+        while (i < args.length) {
+            final String arg = args[i];
+            if (arg.startsWith("-")) {
+                if (arg.equals("-forceOverflow")) {
+                    forceOverflow = true;
+                } else if (arg.equals("-nthreads")) {
+                    final String s = args[++i];
+                    queryThreadPoolSize = Integer.valueOf(s);
+                    if (queryThreadPoolSize < 0) {
+                        usage(1/* status */,
+                                "-nthreads must be non-negative, not: " + s);
+                    }
+                } else if (arg.equals("-readLock")) {
+                    final String s = args[++i];
+                    readLock = Long.valueOf(s);
+                    if (!TimestampUtility.isCommitTime(readLock.longValue())) {
+                        usage(1/* status */, "Read lock must be commit time: "
+                                + readLock);
+                    }
+                } else {
+                    usage(1/* status */, "Unknown argument: " + arg);
+                }
+            } else {
+                break;
+            }
+            i++;
+        }
 
-			/*
-			 * Finally, there should be exactly THREE (3) command line arguments
-			 * remaining. These are the [port], the [namespace] and the
-			 * [propertyFile] (journal) or [configFile] (scale-out).
-			 */
-			final int nremaining = args.length - i;
-			if (nremaining != 3) {
-				/*
-				 * There are either too many or too few arguments remaining.
-				 */
-				usage(1/* status */, nremaining < 3 ? "Too few arguments." : "Too many arguments");
-			}
-			/*
-			 * http service port.
-			 */
-			{
-				final String s = args[i++];
-				try {
-					config.port = Integer.valueOf(s);
-				} catch (NumberFormatException ex) {
-					usage(1/* status */, "Could not parse as port# : '" + s + "'");
-				}
-			}
-			/*
-			 * Namespace.
-			 */
-			config.namespace = args[i++];
-			/*
-			 * Property file.
-			 */
-			final String propertyFile = args[i++];
-			final File file = new File(propertyFile);
-			if (!file.exists()) {
-				throw new RuntimeException("Could not find file: " + file);
-			}
-			boolean isJini = false;
-			if (propertyFile.endsWith(".config")) {
-				// scale-out.
-				isJini = true;
-			} else if (propertyFile.endsWith(".properties")) {
-				// local journal.
-				isJini = false;
-			} else {
-				/*
-				 * Note: This is a hack, but we are recognizing the jini
-				 * configuration file with a .config extension and the journal
-				 * properties file with a .properties extension.
-				 */
-				usage(1/* status */, "File should have '.config' or '.properties' extension: " + file);
-			}
-			if (!config.quiet) {
-				System.out.println("port: " + config.port);
-				System.out.println("namespace: " + config.namespace);
-				System.out.println("file: " + file.getAbsoluteFile());
-			}
+        /*
+         * Finally, there should be exactly THREE (3) command line arguments
+         * remaining. These are the [port], the [namespace] and the
+         * [propertyFile] (journal) or [configFile] (scale-out).
+         */
+        final int nremaining = args.length - i;
+        if (nremaining != 3) {
+            /*
+             * There are either too many or too few arguments remaining.
+             */
+            usage(1/* status */, nremaining < 3 ? "Too few arguments."
+                    : "Too many arguments");
+        }
+        /*
+         * http service port.
+         */
+        {
+            final String s = args[i++];
+            try {
+                port = Integer.valueOf(s);
+            } catch (NumberFormatException ex) {
+                usage(1/* status */, "Could not parse as port# : '" + s + "'");
+            }
+        }
 
-			{
+        /*
+         * Namespace.
+         */
+        namespace = args[i++];
 
-				if (isJini) {
+        /*
+         * Property file.
+         */
+        final String propertyFile = args[i++];
+        final File file = new File(propertyFile);
+        if (!file.exists()) {
+            throw new RuntimeException("Could not find file: " + file);
+        }
+        boolean isJini = false;
+        if (propertyFile.endsWith(".config")) {
+            // scale-out.
+            isJini = true;
+        } else if (propertyFile.endsWith(".properties")) {
+            // local journal.
+            isJini = false;
+        } else {
+            /*
+             * Note: This is a hack, but we are recognizing the jini
+             * configuration file with a .config extension and the journal
+             * properties file with a .properties extension.
+             */
+            usage(1/* status */,
+                    "File should have '.config' or '.properties' extension: "
+                            + file);
+        }
 
-					/*
-					 * A bigdata federation.
-					 */
+        /*
+         * Setup the ServletContext properties.
+         */
 
-					jiniClient = new JiniClient(new String[] { propertyFile });
+        final Map<String, String> initParams = new LinkedHashMap<String, String>();
 
-					indexManager = jiniClient.connect();
+        initParams.put(
+                ConfigParams.PROPERTY_FILE,
+                propertyFile);
 
-				} else {
+        initParams.put(ConfigParams.NAMESPACE,
+                namespace);
 
-					/*
-					 * Note: we only need to specify the FILE when re-opening a
-					 * journal containing a pre-existing KB.
-					 */
-					final Properties properties = new Properties();
-					{
-						// Read the properties from the file.
-						final InputStream is = new BufferedInputStream(new FileInputStream(propertyFile));
-						try {
-							properties.load(is);
-						} finally {
-							is.close();
-						}
-						if (System.getProperty(BigdataSail.Options.FILE) != null) {
-							// Override/set from the environment.
-							properties.setProperty(BigdataSail.Options.FILE, System
-									.getProperty(BigdataSail.Options.FILE));
-						}
-					}
+        initParams.put(ConfigParams.QUERY_THREAD_POOL_SIZE,
+                Integer.toString(queryThreadPoolSize));
 
-					indexManager = jnl = new Journal(properties);
+        initParams.put(
+                ConfigParams.FORCE_OVERFLOW,
+                Boolean.toString(forceOverflow));
 
-				}
+        if (readLock != null) {
+            initParams.put(
+                    ConfigParams.READ_LOCK,
+                    Long.toString(readLock));
+        }
 
-			}
+        final Server server = NanoSparqlServer.newInstance(port, propertyFile,
+                initParams);
 
-			txs = (indexManager instanceof Journal ? ((Journal) indexManager).getTransactionManager()
-					.getTransactionService() : ((IBigdataFederation<?>) indexManager).getTransactionService());
+        server.start();
 
-			if (readLock != null) {
+        server.join();
 
-				/*
-				 * Obtain a read-only transaction which will assert a read lock
-				 * for the specified commit time. The database WILL NOT release
-				 * storage associated with the specified commit point while this
-				 * server is running. Queries will read against the specified
-				 * commit time by default, but this may be overridden on a query
-				 * by query basis.
-				 */
-				config.timestamp = txs.newTx(readLock);
-
-				if (!config.quiet) {
-
-					System.out.println("Holding read lock: readLock=" + readLock + ", tx: " + config.timestamp);
-
-				}
-
-			} else {
-
-				/*
-				 * The default for queries is to read against then most recent
-				 * commit time as of the moment when the request is accepted.
-				 */
-
-				config.timestamp = ITx.READ_COMMITTED;
-
-			}
-
-			if (log.isInfoEnabled()) {
-				/*
-				 * Log some information about the default kb (#of statements,
-				 * etc).
-				 */
-				// FIXME log.info("\n" + server.getKBInfo(config.namespace,
-				// config.timestamp));
-			}
-
-			if (forceOverflow && indexManager instanceof IBigdataFederation<?>) {
-
-				if (!config.quiet)
-					System.out.println("Forcing compacting merge of all data services: " + new Date());
-
-				((AbstractDistributedFederation<?>) indexManager)
-						.forceOverflow(true/* compactingMerge */, false/* truncateJournal */);
-
-				if (!config.quiet)
-					System.out.println("Did compacting merge of all data services: " + new Date());
-
-			}
-
-			 server = new JettySparqlServer(config.port);
-			 
-			 server.startup(config, indexManager);
-
-			if (!config.quiet) {
-
-				log.warn("Service is running: port=" + server.m_port);
-
-			}
-
-			System.out.println("NanoSparqlServer running..");
-
-			server.join(); // wait for server to exit
-
-			System.out.println("NanoSparqlServer stopping!");
-			
-		} catch (Throwable ex) {
-			ex.printStackTrace();
-		} finally {
-			if (txs != null && readLock != null) {
-				try {
-					txs.abort(config.timestamp);
-				} catch (IOException e) {
-					log.error("Could not release transaction: tx=" + config.timestamp, e);
-				}
-			}
-//			if (server != null)
-//				server.shutdownNow();
-//			if (jnl != null) {
-//				jnl.close();
-//			}
-			if (jiniClient != null) {
-				jiniClient.disconnect(true/* immediateShutdown */);
-			}
-		}
-	}
+    }
 
     /**
-     * Send a STOP message to the service
+     * Variant used when you already have the {@link IIndexManager} on hand.
      * 
      * @param port
-     *            The port for that service.
+     *            The port on which the service will run -OR- ZERO (0) for any
+     *            open port.
+     * @param indexManager
+     *            The {@link IIndexManager}.
+     * @param initParams
+     *            Initialization parameters for the web application as specified
+     *            by {@link ConfigParams}.
      * 
-     * @throws IOException
-     * 
-     * @todo This winds up warning <code>
-     * java.net.SocketTimeoutException: Read timed out
-     * </code> even though the shutdown request was
-     *       accepted and processed by the server. I'm not sure why.
+     * @return The server instance.
      */
-    public static void sendStop(final int port) throws IOException {
+    static public Server newInstance(final int port, final IIndexManager indexManager,
+            final Map<String, String> initParams) {
 
-        final URL url = new URL("http://localhost:" + port + "/stop");
-        HttpURLConnection conn = null;
-        try {
+        final ServletContextHandler context = getContext(initParams);
 
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setDoInput(true); // true to read from the server.
-            conn.setDoOutput(true); // true to write to the server.
-            conn.setUseCaches(false);
-            conn.setReadTimeout(2000/* ms */);
-            conn.setRequestProperty("Content-Type",
-                    "application/x-www-form-urlencoded");
-            conn.setRequestProperty("Content-Length", "" + Integer.toString(0));
-            conn.setRequestProperty("Content-Language", "en-US");
+        // Force the use of the caller's IIndexManager.
+        context.setAttribute(IIndexManager.class.getName(), indexManager);
+        
+        final Server server = new Server(port);
 
-            // Send request
-            conn.getOutputStream().close();
+        server.setHandler(context);
 
-            // connect.
-			try {
-
-				conn.connect();
-
-				final int rc = conn.getResponseCode();
-				
-				if (rc < 200 || rc >= 300) {
-					
-					log.error(conn.getResponseMessage());
-					
-				}
-
-				System.out.println(conn.getResponseMessage());
-
-			} catch (IOException ex) {
-
-				log.warn(ex);
-				
-			}
-
-		} finally {
-
-			// clean up the connection resources
-			if (conn != null)
-				conn.disconnect();
-
-		}
-
-	}
+        return server;
+        
+    }
 
     /**
-	 * Print the optional message on stderr, print the usage information on
-	 * stderr, and then force the program to exit with the given status code.
-	 * 
-	 * @param status
-	 *            The status code.
-	 * @param msg
-	 *            The optional message
-	 */
-	private static void usage(final int status, final String msg) {
+     * Variant used when the life cycle of the {@link IIndexManager} will be
+     * managed by the server.
+     * 
+     * @param port
+     *            The port on which the service will run -OR- ZERO (0) for any
+     *            open port.
+     * @param propertyFile
+     *            The <code>.properties</code> file (for a standalone database
+     *            instance) or the <code>.config</code> file (for a federation).
+     * @param initParams
+     *            Initialization parameters for the web application as specified
+     *            by {@link ConfigParams}.
+     * 
+     * @return The server instance.
+     */
+    static public Server newInstance(final int port, final String propertyFile,
+            final Map<String, String> initParams) {
 
-		if (msg != null) {
+        final ServletContextHandler context = getContext(initParams);
+        
+        final Server server = new Server(port);
 
-			System.err.println(msg);
+        server.setHandler(context);
 
-		}
+        return server;
+        
+    }
 
-		System.err.println("[options] port namespace (propertyFile|configFile)");
+    /**
+     * Construct a {@link ServletContextHandler}.
+     * 
+     * @param initParams
+     *            The init parameters, per the web.xml definition.
+     */
+    static private ServletContextHandler getContext(
+            final Map<String, String> initParams) {
 
-//		System.err.println("-OR-");
-//
-//		System.err.println("port -stop");
+        if (initParams == null)
+            throw new IllegalArgumentException();
+        
+        final ServletContextHandler context = new ServletContextHandler(
+                ServletContextHandler.NO_SECURITY
+                        | ServletContextHandler.NO_SESSIONS);
 
-		System.exit(status);
+        context.setContextPath("/");
 
-	}
+        /*
+         * Register a listener which will handle the life cycle events for the
+         * ServletContext.
+         */
+        context.addEventListener(new BigdataRDFServletContextListener());
+
+        /*
+         * Set the servlet context properties.
+         */
+        for (Map.Entry<String, String> e : initParams.entrySet()) {
+
+            context.setInitParameter(e.getKey(), e.getValue());
+            
+        }
+                
+        final ResourceHandler resource_handler = new ResourceHandler();
+
+        resource_handler.setDirectoriesListed(false); // Nope!
+
+        resource_handler.setWelcomeFiles(new String[] { "index.html" });
+
+        // final HandlerList handlers = new HandlerList();
+        //          
+        // handlers.setHandlers(new Handler[] { resource_handler, new
+        // DefaultHandler() });
+        //
+        // setHandler(handlers);
+
+        // FIXME Set to locate the flot files as part of the CountersServlet
+        // setup.
+        // resource_handler.setResourceBase(config.resourceBase);
+
+        // Performance counters.
+        context.addServlet(new ServletHolder(new CountersServlet()),
+                "/counters");
+
+        // Status page : TODO The status page is really SPARQL specific.
+        context.addServlet(new ServletHolder(new StatusServlet()), "/status");
+
+        // Core RDF REST API, including SPARQL query and update.
+        context.addServlet(new ServletHolder(new RESTServlet()), "/");
+
+        return context;
+        
+    }
+
+    /**
+     * Print the optional message on stderr, print the usage information on
+     * stderr, and then force the program to exit with the given status code.
+     * 
+     * @param status
+     *            The status code.
+     * @param msg
+     *            The optional message
+     */
+    private static void usage(final int status, final String msg) {
+
+        if (msg != null) {
+
+            System.err.println(msg);
+
+        }
+
+        System.err
+                .println("[options] port namespace (propertyFile|configFile)");
+
+        System.exit(status);
+
+    }
 
 }

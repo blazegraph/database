@@ -604,24 +604,50 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             synchronized (name2Addr) {
 
                 /*
-                 * FIXME In order to use shadow allocations, the unisolated
-                 * index MUST be loaded using the IsolatedActionJournal. There
-                 * are two places immediate below where it tests the cache and
-                 * where it loads using the AbstractJournal, both of which are
-                 * not appropriate as they fail to impose the
-                 * IsolatedActionJournal with the consequence that the
-                 * allocation contexts are not isolated.
+                 * RWStore: There are two reasons why we must use shadow
+                 * allocations for unisolated operations against the RWStore.
+                 * 
+                 * (1) A rollback of an unisolated operation which caused
+                 * mutations to the structure of an index will cause operations
+                 * which access the index the rollback to fail since the backing
+                 * allocations would have been immediately recycled by the
+                 * RWStore (if running with a zero retention policy).
+                 * 
+                 * (2) Allocations made during the unisolated operation should
+                 * be immediately recycled if the operation is rolled back. This
+                 * will not occur unless the unisolated operation makes those
+                 * allocations against a shadow allocation context. Given that
+                 * it does so, the rollback logic must also discard the shadow
+                 * allocator in order for the shadowed allocations to be
+                 * reclaimed immediately.
+                 * 
+                 * In order to use shadow allocations, the unisolated index MUST
+                 * be loaded using the IsolatedActionJournal. There are two
+                 * places immediate below where it tests the cache and where it
+                 * loads using the AbstractJournal, both of which are not
+                 * appropriate as they fail to impose the IsolatedActionJournal
+                 * with the consequence that the allocation contexts are not
+                 * isolated. [Also, we do not want N2A to cache references to a
+                 * B+Tree backed by a different shadow journal.]
                  */
                 
-                // recover from unisolated index cache.
-                btree = name2Addr.getIndexCache(name);
-//                btree = null; // do not use the name2Addr cache.
+                if ((resourceManager.getLiveJournal().getBufferStrategy() instanceof RWStrategy)) {
+                    /*
+                     * Note: Do NOT use the name2Addr cache for the RWStore.
+                     * Each unisolated index view MUST be backed by a shadow
+                     * journal!
+                     */
+                    btree = null;
+                } else {
+                    // recover from unisolated index cache.
+                    btree = name2Addr.getIndexCache(name);
+                }
                 
                 if (btree == null) {
 
                     final IJournal tmp;
-                    tmp = resourceManager.getLiveJournal();
-//                  tmp = getJournal();// wrap with the IsolatedActionJournal.
+//                    tmp = resourceManager.getLiveJournal();
+                    tmp = getJournal();// wrap with the IsolatedActionJournal.
                     
                     // re-load btree from the store.
                     btree = BTree.load(//
@@ -636,8 +662,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                     // add to the unisolated index cache (must not exist).
                     name2Addr.putIndexCache(name, btree, false/* replace */);
 
-					btree.setBTreeCounters((resourceManager)
-							.getIndexCounters(name));
+                    btree.setBTreeCounters(resourceManager
+                            .getIndexCounters(name));
                     
                 }
 
@@ -686,7 +712,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     /**
      * Given the name of an index and a {@link BTree}, obtain the view for all
      * source(s) described by the {@link BTree}s index partition metadata (if
-     * any),insert that view into the {@link #indexCache}, and return the view.
+     * any), inserts that view into the {@link #indexCache}, and return the view.
      * <p>
      * Note: This method is used both when registering a new index ({@link #registerIndex(String, BTree)})
      * and when reading an index view from the source ({@link #getIndex(String)}).
@@ -954,8 +980,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
             l.btree.writeCheckpoint();
 
-            ((IsolatedActionJournal) getJournal()).detachContext();
-            
         }
         
         if(INFO) { 
@@ -1054,11 +1078,18 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         }
 
+        /*
+         * Do clean up.
+         */
+
         // clear n2a.
         n2a.clear();
         
         // clear the commit list.
         commitList.clear();
+
+        // Detach the allocation context used by the operation.
+        ((IsolatedActionJournal) getJournal()).detachContext();
         
         final long elapsed = System.nanoTime() - begin;
         
@@ -1073,6 +1104,17 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         
     }
 
+    /**
+     * Discard any allocations for writes on unisolated indices touched by the
+     * task for an {@link ITx#UNISOLATED} which fails, but while the task still
+     * has its locks.
+     */
+    private void abortTask() {
+        
+        ((IsolatedActionJournal) getJournal()).abortContext();
+        
+    }
+    
     /*
      * End isolation support for name2addr.
      */
@@ -1747,7 +1789,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * 
      * @throws Exception
      * 
-     * FIXME update javadoc to reflect the change in how the locks are acquired.
+     * @todo update javadoc to reflect the change in how the locks are acquired.
      */
     private T doUnisolatedReadWriteTask() throws Exception {
         
@@ -2010,7 +2052,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * prevent tasks from progressing. If there is strong lock contention then
      * writers will be more or less serialized.
      * 
-     * FIXME javadoc update to reflect the {@link NonBlockingLockManager}
+     * @todo javadoc update to reflect the {@link NonBlockingLockManager}
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -2044,8 +2086,15 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                 // invoke doTask() on AbstractTask with locks.
                 final T ret = delegate.doTask();
 
+                // checkpoint while holding locks.
+                delegate.checkpointNanoTime = delegate.checkpointTask();
+
+                return ret;
+
+            } catch(Throwable t) {
+
                 /*
-                 * FIXME If there is an error in the task execution, then for
+                 * RWStore: If there is an error in the task execution, then for
                  * RWStore we need to explicitly undo the allocations for the
                  * B+Tree(s) on which this task wrote. If we do not take this
                  * step, then the records already written onto the store up to
@@ -2053,12 +2102,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                  * succeeds. This is essentially a persistent memory leak on the
                  * store.
                  */
+                delegate.abortTask();
                 
-                // checkpoint while holding locks.
-                delegate.checkpointNanoTime = delegate.checkpointTask();
-
-                return ret;
-
+                // rethrow the exception.
+                throw new RuntimeException(t);
+                
             } finally {
                 
                 /*
@@ -2248,7 +2296,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * declare a lock - such views will always be read-only and support
          * concurrent readers.
          */
-        public IIndex getIndex(String name, long timestamp) {
+        public IIndex getIndex(final String name, final long timestamp) {
 
             if (timestamp == ITx.UNISOLATED) {
                 
@@ -2393,15 +2441,15 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //            return delegate.getKeyBuilder();
 //        }
         
-        public void force(boolean metadata) {
+        public void force(final boolean metadata) {
             delegate.force(metadata);
         }
 
-        public int getByteCount(long addr) {
+        public int getByteCount(final long addr) {
             return delegate.getByteCount(addr);
         }
 
-        public ICommitRecord getCommitRecord(long timestamp) {
+        public ICommitRecord getCommitRecord(final long timestamp) {
             return delegate.getCommitRecord(timestamp);
         }
 
@@ -2413,7 +2461,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.getFile();
         }
 
-        public long getOffset(long addr) {
+        public long getOffset(final long addr) {
             return delegate.getOffset(addr);
         }
 
@@ -2429,7 +2477,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.getResourceMetadata();
         }
 
-        public long getRootAddr(int index) {
+        public long getRootAddr(final int index) {
             return delegate.getRootAddr(index);
         }
 
@@ -2461,7 +2509,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //            delegate.packAddr(out, addr);
 //        }
 
-        public ByteBuffer read(long addr) {
+        public ByteBuffer read(final long addr) {
             return delegate.read(addr);
         }
 
@@ -2469,19 +2517,19 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.size();
         }
 
-        public long toAddr(int nbytes, long offset) {
+        public long toAddr(final int nbytes, final long offset) {
             return delegate.toAddr(nbytes, offset);
         }
 
-        public String toString(long addr) {
+        public String toString(final long addr) {
             return delegate.toString(addr);
         }
 
-        public IRootBlockView getRootBlock(long commitTime) {
+        public IRootBlockView getRootBlock(final long commitTime) {
             return delegate.getRootBlock(commitTime);
         }
 
-        public Iterator<IRootBlockView> getRootBlocks(long startTime) {
+        public Iterator<IRootBlockView> getRootBlocks(final long startTime) {
             return delegate.getRootBlocks(startTime);
         }
 
@@ -2492,16 +2540,16 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * the IsolatedActionJournal as the IAllocationContext. This causes the
          * allocations to be scoped to the AbstractTask.
          */
-        
-        public long write(ByteBuffer data) {
+
+        public long write(final ByteBuffer data) {
             return delegate.write(data, this);
         }
 
-        public long write(ByteBuffer data, long oldAddr) {
+        public long write(final ByteBuffer data, final long oldAddr) {
             return delegate.write(data, oldAddr, this);
         }
 
-        public void delete(long addr) {
+        public void delete(final long addr) {
             delegate.delete(addr, this);
         }
 
@@ -2517,12 +2565,16 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //			return delegate.write(data, oldAddr, context);
 //		}
 
-		public void detachContext() {
-			delegate.detachContext(this);
-		}
+        public void detachContext() {
+            delegate.detachContext(this);
+        }
 
-		public ScheduledFuture<?> addScheduledTask(Runnable task,
-				long initialDelay, long delay, TimeUnit unit) {
+        public void abortContext() {
+            delegate.abortContext(this);
+        }
+
+		public ScheduledFuture<?> addScheduledTask(final Runnable task,
+				final long initialDelay, final long delay, final TimeUnit unit) {
 			return delegate.addScheduledTask(task, initialDelay, delay, unit);
 		}
 

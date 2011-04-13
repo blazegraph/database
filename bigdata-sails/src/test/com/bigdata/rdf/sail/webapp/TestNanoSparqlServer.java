@@ -10,12 +10,15 @@ import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.TestCase2;
 
+import org.eclipse.jetty.server.Server;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
@@ -44,17 +47,23 @@ import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.webapp.BigdataContext.Config;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.util.config.NicUtil;
 
-public class TestJettySparqlServer_StartStop extends TestCase2 {
+/**
+ * Test suite for {@link RESTServlet} (SPARQL end point and REST API for RDF
+ * data).
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
+public class TestNanoSparqlServer extends TestCase2 {
 
 	private Journal m_jnl;
-	private JettySparqlServer m_fixture;
+	private Server m_fixture;
 	private String m_serviceURL;
 	
 	final static String REST = "";
@@ -65,75 +74,74 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 
 		final String namespace = getName();
 
-		// log.info("Creating journal");
-
 		m_jnl = new Journal(properties);
-
-		// log.info("Creating kb");
 
 		// Create the kb instance.
 		new LocalTripleStore(m_jnl, namespace, ITx.UNISOLATED, properties).create();
 
-		final Config config = new Config();
+//		/*
+//		 * Service will not hold a read lock.
+//		 * 
+//		 * Queries will read from the last commit point by default and will use
+//		 * a read-only tx to have snapshot isolation for that query.
+//		 */
+//		config.timestamp = ITx.READ_COMMITTED;
 
-		config.namespace = namespace;
-		config.port = 0; // any open port.
-		/*
-		 * Service will not hold a read lock.
-		 * 
-		 * Queries will read from the last commit point by default and will use
-		 * a read-only tx to have snapshot isolation for that query.
-		 */
-		config.timestamp = ITx.READ_COMMITTED;
+        final Map<String, String> initParams = new LinkedHashMap<String, String>();
+        {
+            
+            initParams.put(
+                    ConfigParams.NAMESPACE,
+                    namespace);
+            
+        }
+        // Start server for that kb instance.
+        m_fixture = NanoSparqlServer
+                .newInstance(0/* port */, m_jnl, initParams);
 
-		// log.info("Starting server");
+        m_fixture.start();
 
-		// Start server for that kb instance.
-		m_fixture = new JettySparqlServer(config.port);
-		m_fixture.startup(config, m_jnl);
-
-		// log.info("Server running");
-
-		assertTrue("open", m_fixture.isOpen());
-
-		final int port = m_fixture.getPort();
+//		final int port = m_fixture.getPort();
+		final int port = m_fixture.getConnectors()[0].getLocalPort();
 
 		// log.info("Getting host address");
 
-		final String hostAddr = NicUtil.getIpAddress("default.nic", "default", true/* loopbackOk */);
+        final String hostAddr = NicUtil.getIpAddress("default.nic", "default",
+                true/* loopbackOk */);
 
-		if (hostAddr == null) {
+        if (hostAddr == null) {
 
-			fail("Could not identify network address for this host.");
+            fail("Could not identify network address for this host.");
 
-		}
+        }
 
-		m_serviceURL = new URL("http", hostAddr, port, ""/* file */).toExternalForm();
+        m_serviceURL = new URL("http", hostAddr, port, ""/* file */)
+                .toExternalForm();
 
-		// log.info("Setup done: "+serviceURL);
+        // log.info("Setup done: "+serviceURL);
 
-	}
+    }
 
-	/**
-	 * Returns a view of the triple store using the sail interface.
-	 */
-	protected BigdataSail getSail() {
+    /**
+     * Returns a view of the triple store using the sail interface.
+     */
+    protected BigdataSail getSail() {
 
-		final String namespace = getName();
+        final String namespace = getName();
 
-		final AbstractTripleStore tripleStore = (AbstractTripleStore) m_jnl.getResourceLocator().locate(namespace,
-				ITx.UNISOLATED);
+        final AbstractTripleStore tripleStore = (AbstractTripleStore) m_jnl
+                .getResourceLocator().locate(namespace, ITx.UNISOLATED);
 
-		return new BigdataSail(tripleStore);
+        return new BigdataSail(tripleStore);
 
-	}
+    }
 
-	@Override
+    @Override
 	protected void tearDown() throws Exception {
 
 		if (m_fixture != null) {
 
-			m_fixture.shutdownNow();
+			m_fixture.stop();
 
 			m_fixture = null;
 
@@ -154,7 +162,8 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 	}
 
 	public Properties getProperties() {
-		final Properties properties = new Properties();
+
+	    final Properties properties = new Properties();
 
 		properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE, BufferMode.Transient.toString());
 
@@ -190,30 +199,11 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 	}
 
 	public void test_startup() throws Exception {
-		assertTrue("open", m_fixture.isOpen());
+
+	    assertTrue("open", m_fixture.isRunning());
+	    
 	}
 	
-	public void testXMLBuilder() throws IOException {
-		XMLBuilder xml = new XMLBuilder();
-		
-		XMLBuilder.Node close = xml.root("data")
-			.attr("id", "TheRoot")
-			.attr("name", "Test")
-			.node("child", "My Child")
-			.node("child")
-				.attr("name", "My Child")
-				.close()
-			.node("child")
-				.attr("name", "My Child")
-				.text("Content")
-				.close()
-			.close();
-		
-		assertTrue(close == null);
-		
-		System.out.println(xml.toString());
-	}
-
 	/**
 	 * Options for the query.
 	 */
@@ -240,33 +230,42 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 
 	}
 
-	protected HttpURLConnection doConnect(final String urlString, final String method) throws Exception {
-		final URL url = new URL(urlString);
-		HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-		
-		conn.setRequestMethod(method);
-		conn.setDoOutput(true);
-		conn.setUseCaches(false);
+    protected HttpURLConnection doConnect(final String urlString,
+            final String method) throws Exception {
+        
+        final URL url = new URL(urlString);
+        
+        final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
-		return conn;
-	}
+        conn.setRequestMethod(method);
+        conn.setDoOutput(true);
+        conn.setUseCaches(false);
 
-	/**
-	 * Connect to a SPARQL end point (GET or POST query only).
-	 * 
-	 * @param opts
-	 *            The query request.
-	 * 
-	 * @return The connection.
-	 */
-	protected HttpURLConnection doSparqlQuery(final QueryOptions opts, final String servlet) throws Exception {
+        return conn;
+    }
 
-		// Fully formed and encoded URL @todo use */* for ASK.
+    /**
+     * Connect to a SPARQL end point (GET or POST query only).
+     * 
+     * @param opts
+     *            The query request.
+     * 
+     * @return The connection.
+     * 
+     * TODO Test default-graph-uri(s) and named-graph-uri(s).
+     */
+    protected HttpURLConnection doSparqlQuery(final QueryOptions opts,
+            final String servlet) throws Exception {
+
+		// Fully formed and encoded URL.
 		final String urlString = opts.serviceURL
-				+ "/" + servlet + "?query="
-				+ URLEncoder.encode(opts.queryStr, "UTF-8")
-				+ (opts.defaultGraphUri == null ? "" : ("&default-graph-uri=" + URLEncoder.encode(opts.defaultGraphUri,
-						"UTF-8")));
+                + "/"
+                + servlet
+                + "?query="
+                + URLEncoder.encode(opts.queryStr, "UTF-8")
+                + (opts.defaultGraphUri == null ? ""
+                        : ("&default-graph-uri=" + URLEncoder.encode(
+                                opts.defaultGraphUri, "UTF-8")));
 
 		HttpURLConnection conn = null;
 		try {
@@ -281,9 +280,9 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 			 * available.
 			 */
 			conn.setRequestProperty("Accept",//
-					BigdataServlet.MIME_SPARQL_RESULTS_XML + ";q=1" + //
+					BigdataRDFServlet.MIME_SPARQL_RESULTS_XML + ";q=1" + //
 							"," + //
-							BigdataServlet.MIME_RDF_XML + ";q=1"//
+							BigdataRDFServlet.MIME_RDF_XML + ";q=1"//
 			);
 
 			// write out the request headers
@@ -428,7 +427,7 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 	 */
 	public void test_STATUS() throws Exception {
 
-		HttpURLConnection conn = doConnect(m_serviceURL + "/status", "GET");
+		final HttpURLConnection conn = doConnect(m_serviceURL + "/status", "GET");
 
 		// No solutions (assuming a told triple kb or quads kb w/o axioms).
 		
@@ -436,32 +435,41 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 		conn.connect();
 
 		final int rc = conn.getResponseCode();
+
 		if (rc < 200 || rc >= 300) {
-			throw new IOException(conn.getResponseMessage());
+		
+		    throw new IOException(conn.getResponseMessage());
+		    
 		}
 		
-		Reader rdr = new InputStreamReader(conn.getInputStream());
-		
-		
-		String txt = getStreamContents(conn.getInputStream());
+		final String txt = getStreamContents(conn.getInputStream());
 		
 		System.out.println(txt);
 
 	}
 
-	private String getStreamContents(InputStream inputStream) throws IOException {
-		Reader rdr = new InputStreamReader(inputStream);
+    private String getStreamContents(final InputStream inputStream)
+            throws IOException {
+
+        final Reader rdr = new InputStreamReader(inputStream);
 		
-		StringBuffer sb = new StringBuffer();
-		char[] buf = new char[512];
+	    final StringBuffer sb = new StringBuffer();
+		
+	    final char[] buf = new char[512];
+	    
 		while (true) {
-			int rdlen = rdr.read(buf);
-			if (rdlen == -1)
+		
+		    final int rdlen = rdr.read(buf);
+			
+		    if (rdlen == -1)
 				break;
-			sb.append(buf, 0, rdlen);
+			
+		    sb.append(buf, 0, rdlen);
+		    
 		}
 		
 		return sb.toString();
+
 	}
 
 	/**
@@ -499,11 +507,15 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
     }
 
 	public void test_POSTUPDATE_withBody_NTRIPLES() throws Exception {
-		do_UPDATE_withBody_NTRIPLES("POST", 23, REST);
+
+	    do_UPDATE_withBody_NTRIPLES("POST", 23, REST);
+	    
 	}
     
 	public void test_PUTUPDATE_withBody_NTRIPLES() throws Exception {
-		do_UPDATE_withBody_NTRIPLES("PUT", 23, REST);
+		
+	    do_UPDATE_withBody_NTRIPLES("PUT", 23, REST);
+	    
 	}
 	
     /**
@@ -568,14 +580,12 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
     	
         assertEquals(23, countResults(doSparqlQuery(opts, REST)));
 
-        do_DELETE_withBody_NTRIPLES("delete", 23);
+        do_DELETE_withBody_NTRIPLES("", 23);
 
         // No solutions (assuming a told triple kb or quads kb w/o axioms).
         assertEquals(0, countResults(doSparqlQuery(opts, REST)));
 
     }
-
-
     
 	private void do_DELETE_with_Query(final String servlet, final String query) {
 		HttpURLConnection conn = null;
@@ -613,7 +623,7 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 		HttpURLConnection conn = null;
 		try {
 
-			final URL url = new URL(m_serviceURL + "/" + servlet);
+			final URL url = new URL(m_serviceURL + "/" + servlet+"?delete");
 			conn = (HttpURLConnection) url.openConnection();
 			conn.setRequestMethod("POST");
 			conn.setDoOutput(true);
@@ -621,7 +631,8 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 			conn.setUseCaches(false);
 			conn.setReadTimeout(0);// TODO timeout (ms)
 
-			String defmimetype = RDFFormat.NTRIPLES.getDefaultMIMEType();
+			final String defmimetype = RDFFormat.NTRIPLES.getDefaultMIMEType();
+
 			conn.setRequestProperty("Content-Type", defmimetype);
 
 			final String data = genNTRIPLES(ntriples);
@@ -657,28 +668,28 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 		}
 	}
 
-	/**
-	 * UPDATE should not be allowed with a GET request
-	 */
-	public void test_GETUPDATE_withBody_NTRIPLES() throws Exception {
-//		if (JettySparqlServer.directServletAccess) 
-		if(false) {
-			HttpURLConnection conn = null;
-			final URL url = new URL(m_serviceURL + "/update?data=stuff");
-			conn = (HttpURLConnection) url.openConnection();
-			conn.setRequestMethod("GET");
-			conn.setDoOutput(true);
-			conn.setDoInput(true);
-			conn.setUseCaches(false);
-			conn.setReadTimeout(0);// TODO timeout (ms)
-			
-			conn.connect();
-			
-			final int rc = conn.getResponseCode();
-			
-			assertTrue(rc == 405); // NOT_ALLOWED
-		}
-	}
+//	/**
+//	 * UPDATE should not be allowed with a GET request
+//	 */
+//	public void test_GETUPDATE_withBody_NTRIPLES() throws Exception {
+////		if (JettySparqlServer.directServletAccess) 
+//		if(false) {
+//			HttpURLConnection conn = null;
+//			final URL url = new URL(m_serviceURL + "/update?data=stuff");
+//			conn = (HttpURLConnection) url.openConnection();
+//			conn.setRequestMethod("GET");
+//			conn.setDoOutput(true);
+//			conn.setDoInput(true);
+//			conn.setUseCaches(false);
+//			conn.setReadTimeout(0);// TODO timeout (ms)
+//			
+//			conn.connect();
+//			
+//			final int rc = conn.getResponseCode();
+//			
+//			assertTrue(rc == 405); // NOT_ALLOWED
+//		}
+//	}
     
 	String genNTRIPLES(final int ntriples) {
 		StringBuffer databuf = new StringBuffer();
@@ -695,7 +706,8 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 	/**
 	 * @todo Test of POST w/ BODY having data to be loaded.
 	 */
-	public void do_UPDATE_withBody_NTRIPLES(final String method, final int ntriples, final String servlet) throws Exception {
+    public void do_UPDATE_withBody_NTRIPLES(final String method,
+            final int ntriples, final String servlet) throws Exception {
 
 		HttpURLConnection conn = null;
 		try {
@@ -756,17 +768,22 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
 			assertEquals(ntriples, countResults(doSparqlQuery(opts, REST)));
 		}
 
-	}
+    }
 
-	   public void test_GET_DESCRIBE() throws Exception {
-		   do_construct_describe("describe");
-	   }
-	   
-	   public void test_GET_CONSTRUCT() throws Exception {
-		   fail("Fix construct test");
-		   
-		   do_construct_describe("construct");
-	   }
+    public void test_GET_DESCRIBE() throws Exception {
+
+        do_construct_describe("describe");
+
+    }
+
+    // FIXME fix test_GET_CONSTRUCT
+    public void test_GET_CONSTRUCT() throws Exception {
+
+        fail("Fix construct test");
+
+        do_construct_describe("construct");
+    }
+
     /**
      * Test GET with DESCRIBE query.
      */
@@ -790,6 +807,7 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
             final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) repo
                     .getConnection();
             try {
+
                 cxn.setAutoCommit(false);
 
                 cxn.add(mike, RDF.TYPE, person);
@@ -868,6 +886,5 @@ public class TestJettySparqlServer_StartStop extends TestCase2 {
         assertEquals("size", expected.size(), actual.size());
 
     }
-
 
 }

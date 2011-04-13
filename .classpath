@@ -29,6 +29,10 @@
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-server-7.2.2.v20101205.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-util-7.2.2.v20101205.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/servlet-api-2.5.jar"/>
+	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-servlet-7.2.2.v20101205.jar"/>
+	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-security-7.2.2.v20101205.jar"/>
+	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-webapp-7.2.2.v20101205.jar"/>
+	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-xml-7.2.2.v20101205.jar"/>
 	<classpathentry kind="src" path="lgpl-utils/src/java"/>
 	<classpathentry kind="src" path="lgpl-utils/src/test"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-3_6.jar"/>

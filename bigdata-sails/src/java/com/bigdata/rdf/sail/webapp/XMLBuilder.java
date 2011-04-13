@@ -7,11 +7,11 @@ import java.io.StringWriter;
 import java.io.Writer;
 
 /**
- * Utility Java class for outputing XML.
- * 
+ * Utility Java class for outputting XML.
+ * <p>
  * The motivation is to provide a similar interface to a document builder but
  * instead of building an in-memory model, to directly stream the output.
- * 
+ * <p>
  * Example usage:
  * <pre>
  * 	<xml>
@@ -39,12 +39,14 @@ import java.io.Writer;
  *  
  *  assert(closed == null);
  * </pre>
+ * 
  * @author Martyn Cutcher
- *
  */
 public class XMLBuilder {
-	Writer m_writer;
-	boolean m_pp = false;
+    
+	private final Writer m_writer;
+	
+//	private boolean m_pp = false;
 	
 	public XMLBuilder() throws IOException {
 		this(true, (OutputStream) null);
@@ -55,7 +57,12 @@ public class XMLBuilder {
 	}
 	
 	public XMLBuilder(boolean xml, OutputStream outstr) throws IOException {
-		initWriter(outstr);
+
+	    if (outstr == null) {
+            m_writer = new StringWriter();
+        } else {
+            m_writer = new OutputStreamWriter(outstr);
+        }
 		
 		if (xml) {
 			m_writer.write("<?xml version=\"1.0\"?>");
@@ -63,28 +70,31 @@ public class XMLBuilder {
 	}
 	
 	public XMLBuilder(boolean xml, String encoding) throws IOException {
-		this(xml, encoding, (OutputStream) null);
+
+	    this(xml, encoding, (OutputStream) null);
+	    
 	}
 	
 	public XMLBuilder(boolean xml, String encoding, OutputStream outstr) throws IOException {
-		initWriter(outstr);
+        
+	    if (outstr == null) {
+            m_writer = new StringWriter();
+        } else {
+            m_writer = new OutputStreamWriter(outstr);
+        }
 		
 		if (xml) {
 			m_writer.write("<?xml version=\"1.0\" encoding=\"" + encoding + "\"?>");
 		}
+		
 	}
 	
-	public void prettyPrint(boolean pp) {
-		m_pp = pp;
-	}
+//	public void prettyPrint(boolean pp) {
+//		m_pp = pp;
+//	}
 	
-	private void initWriter(OutputStream outstr) {
-		if (outstr == null) {
-			m_writer = new StringWriter();
-		} else {
-			m_writer = new OutputStreamWriter(outstr);
-		}
-	}
+//	private void initWriter(OutputStream outstr) {
+//	}
 
 	public String toString() {
 		return m_writer.toString();
@@ -188,15 +198,16 @@ public class XMLBuilder {
 		
 	}
 	
-	static public class HTML extends XMLBuilder {
-		public HTML() throws IOException {
-			super(false);
-		}
-		
-		public Node body() throws IOException {
-			return root("html").node("body");
-		}
-		
-		
-	}
+    static public class HTML extends XMLBuilder {
+
+        public HTML() throws IOException {
+            super(false);
+        }
+
+        public Node body() throws IOException {
+            return root("html").node("body");
+        }
+
+    }
+
 }
