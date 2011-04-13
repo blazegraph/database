@@ -114,36 +114,7 @@ import com.bigdata.util.httpd.NanoHTTPD;
  */
 public class CounterSetQuery {
 
-    static protected final Logger log = Logger.getLogger(CounterSetQuery.class);
-
-    /**
-     * Create a {@link URLQueryModel} from a URL.
-     * 
-     * @param url
-     *            The URL.
-     * 
-     * @return The {@link URLQueryModel}
-     * 
-     * @throws UnsupportedEncodingException
-     */
-    static private URLQueryModel newQueryModel(final URL url)
-            throws UnsupportedEncodingException {
-
-        // Extract the URL query parameters.
-        final LinkedHashMap<String, Vector<String>> params = NanoHTTPD
-                .decodeParams(url.getQuery(),
-                        new LinkedHashMap<String, Vector<String>>());
-
-        // add any relevant headers
-        final Map<String, String> headers = new TreeMap<String, String>(
-                new CaseInsensitiveStringComparator());
-
-        headers.put("host", url.getHost() + ":" + url.getPort());
-
-        return new URLQueryModel(null/* service */, url.toString(), params,
-                headers);
-
-    }
+    static private final Logger log = Logger.getLogger(CounterSetQuery.class);
 
     /**
      * Reads a list of {@link URL}s from a file. Blank lines and comment lines
@@ -477,7 +448,7 @@ public class CounterSetQuery {
                     
                     for (URL url : urls) {
                         
-                        queries.add(newQueryModel(url));
+                        queries.add(URLQueryModel.getInstance(url));
 
                     }
 

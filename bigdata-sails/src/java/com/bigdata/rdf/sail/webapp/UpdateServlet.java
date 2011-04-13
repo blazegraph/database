@@ -27,25 +27,26 @@ import org.openrdf.sail.SailException;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
-import com.bigdata.rdf.sail.bench.NanoSparqlServer;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.util.httpd.NanoHTTPD;
 
 /**
  * Handler for update (POST
  * 
  * @author martyncutcher
  */
-public class UpdateServlet extends BigdataServlet {
+public class UpdateServlet extends BigdataRDFServlet {
 	
-	/**
-	 * The logger for the concrete {@link NanoSparqlServer} class.  The {@link NanoHTTPD}
-	 * class has its own logger.
-	 */
-	static private final Logger log = Logger.getLogger(BigdataServlet.class); 
-	
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+    
+    static private final transient Logger log = Logger.getLogger(UpdateServlet.class); 
+
     public UpdateServlet() {
-        getContext().registerServlet(this);
+    
+//        getContext().registerServlet(this);
+        
     }
 
 	/**

@@ -46,6 +46,8 @@ import com.bigdata.rdf.store.LocalTripleStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated along with {@link NanoSparqlServer}
  */
 public class TestNanoSparqlServer_StartStop extends TestCase2 {
 

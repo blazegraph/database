@@ -56,9 +56,9 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("WebApp");
        
-        suite.addTestSuite(TestJettySparqlServer_StartStop.class);
-
-//        suite.addTestSuite(TestNanoSparqlServer.class);
+        suite.addTestSuite(TestXMLBuilder.class);
+        
+        suite.addTestSuite(TestNanoSparqlServer.class);
         
         return suite;
 

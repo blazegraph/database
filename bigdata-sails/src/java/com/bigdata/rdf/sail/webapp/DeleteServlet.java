@@ -22,7 +22,7 @@ import org.openrdf.sail.SailException;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
-import com.bigdata.rdf.sail.webapp.BigdataContext.AbstractQueryTask;
+import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -30,16 +30,19 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * 
  * @author martyncutcher
  */
-public class DeleteServlet extends BigdataServlet {
+public class DeleteServlet extends BigdataRDFServlet {
 
 	/**
-	 * The logger for the concrete {@link BigdataServlet} class.
-	 */
-	static private final Logger log = Logger.getLogger(BigdataServlet.class); 
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+    
+	static private final transient Logger log = Logger.getLogger(DeleteServlet.class); 
 
     public DeleteServlet() {
         
-        getContext().registerServlet(this);
+//        getContext().registerServlet(this);
+
     }
 
    /**
@@ -111,9 +114,9 @@ public class DeleteServlet extends BigdataServlet {
              final ByteArrayOutputStream bos = new ByteArrayOutputStream();
              try {
 
-                 final AbstractQueryTask queryTask = BigdataContext.getContext().getQueryTask(namespace,
-                         ITx.READ_COMMITTED, queryStr, req,
-                         bos);
+                final AbstractQueryTask queryTask = getBigdataRDFContext()
+                        .getQueryTask(namespace, ITx.READ_COMMITTED, queryStr,
+                                req, bos);
 
                  switch (queryTask.queryType) {
                  case DESCRIBE:
@@ -175,7 +178,7 @@ public class DeleteServlet extends BigdataServlet {
 
              } catch (Throwable t) {
 
-                 throw launderThrowable(t, resp.getOutputStream(), queryStr);
+                 throw BigdataRDFServlet.launderThrowable(t, resp.getOutputStream(), queryStr);
 
              }
 

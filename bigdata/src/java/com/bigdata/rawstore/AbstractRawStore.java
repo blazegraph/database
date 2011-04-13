@@ -96,4 +96,12 @@ abstract public class AbstractRawStore implements IRawStore {
 	public void detachContext(IAllocationContext context) {
 		// NOP
 	}
+
+    /**
+     * The default implementation is a NOP.
+     */
+    public void abortContext(final IAllocationContext context) {
+        // NOP
+    }
+    
 }

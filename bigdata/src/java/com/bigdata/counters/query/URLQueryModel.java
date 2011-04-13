@@ -31,6 +31,8 @@ package com.bigdata.counters.query;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
+import java.net.URL;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.text.DateFormat;
 import java.text.DecimalFormat;
@@ -38,13 +40,19 @@ import java.text.Format;
 import java.text.NumberFormat;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.Vector;
 import java.util.regex.Pattern;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.CognitiveWeb.util.CaseInsensitiveStringComparator;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.History;
@@ -54,6 +62,7 @@ import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.service.Event;
 import com.bigdata.service.IEventReportingService;
 import com.bigdata.service.IService;
+import com.bigdata.util.httpd.NanoHTTPD;
 
 /**
  * The model for a URL used to query an {@link ICounterSelector}.
@@ -63,7 +72,7 @@ import com.bigdata.service.IService;
  */
 public class URLQueryModel {
 
-    protected static transient final Logger log = Logger.getLogger(URLQueryModel.class);
+    private static transient final Logger log = Logger.getLogger(URLQueryModel.class);
     
     /**
      * Name of the URL query parameter specifying the starting path for the page
@@ -207,10 +216,15 @@ public class URLQueryModel {
      */
     final public LinkedHashMap<String,Vector<String>> params;
     
+//    /**
+//     * The request headers.
+//     */
+//    final public Map<String,String> headers;
+    
     /**
-     * The request headers.
+     * The reconstructed request URL.
      */
-    final public Map<String,String> headers;
+    private final String requestURL;
     
     /**
      * The value of the {@link #PATH} query parameter. 
@@ -329,7 +343,9 @@ public class URLQueryModel {
     final public File file;
     
     /**
-     * @param fed
+     * Factory for {@link NanoHTTPD} integration.
+     * 
+     * @param service
      *            The service object IFF one was specified when
      *            {@link CounterSetHTTPD} was started.
      * @param uri
@@ -345,16 +361,134 @@ public class URLQueryModel {
      * @param header
      *            Header entries, percent decoded
      */
-    public URLQueryModel(final IService service, final String uri,
+    public static URLQueryModel getInstance(//
+            final IService service,//
+            final String uri,//
+            final LinkedHashMap<String, Vector<String>> params,//
+            final Map<String, String> headers//
+            ) {
+
+        /*
+         * Re-create the request URL, including the protocol, host, port, and
+         * path but not any query parameters.
+         */
+
+        final StringBuilder sb = new StringBuilder();
+
+        // protocol (known from the container).
+        sb.append("http://");
+
+        // host and port
+        sb.append(headers.get("host"));
+
+        // path (including the leading '/')
+        sb.append(uri);
+        
+        final String requestURL = sb.toString();
+
+        return new URLQueryModel(service, uri, params, requestURL);
+
+    }
+
+    /**
+     * Factory for Servlet API integration.
+     * 
+     * @param service
+     *            The service object IFF one was specified when
+     *            {@link CounterSetHTTPD} was started.
+     * @param req
+     *            The request.
+     * @param resp
+     *            The response.
+     */
+    public static URLQueryModel getInstance(//
+            final IService service,
+            final HttpServletRequest req,
+            final HttpServletResponse resp
+            ) throws UnsupportedEncodingException {
+        
+        final String uri = URLDecoder.decode(req.getRequestURI(), "UTF-8");
+        
+        final LinkedHashMap<String, Vector<String>> params = new LinkedHashMap<String, Vector<String>>();
+
+        @SuppressWarnings("unchecked")
+        final Enumeration<String> enames = req.getParameterNames();
+
+        while (enames.hasMoreElements()) {
+
+            final String name = enames.nextElement();
+
+            final String[] values = req.getParameterValues(name);
+
+            final Vector<String> value = new Vector<String>();
+
+            for (String v : values) {
+
+                value.add(v);
+
+            }
+
+            params.put(name, value);
+            
+        }
+        
+        final String requestURL = req.getRequestURL().toString();
+        
+        return new URLQueryModel(service, uri, params, requestURL);
+        
+    }
+    
+    /**
+     * Create a {@link URLQueryModel} from a URL. This is useful when serving
+     * historical performance counter data out of a file.
+     * 
+     * @param url
+     *            The URL.
+     * 
+     * @return The {@link URLQueryModel}
+     * 
+     * @throws UnsupportedEncodingException
+     */
+    static public URLQueryModel getInstance(final URL url)
+            throws UnsupportedEncodingException {
+
+        // Extract the URL query parameters.
+        final LinkedHashMap<String, Vector<String>> params = NanoHTTPD
+                .decodeParams(url.getQuery(),
+                        new LinkedHashMap<String, Vector<String>>());
+
+        // add any relevant headers
+        final Map<String, String> headers = new TreeMap<String, String>(
+                new CaseInsensitiveStringComparator());
+
+        headers.put("host", url.getHost() + ":" + url.getPort());
+
+        return URLQueryModel.getInstance(null/* service */, url.toString(),
+                params, headers);
+
+    }
+
+    private URLQueryModel(final IService service, final String uri,
             final LinkedHashMap<String, Vector<String>> params,
-            final Map<String, String> headers) {
+            final String requestURL) {
+
+        if (uri == null)
+            throw new IllegalArgumentException();
+
+        if (params == null)
+            throw new IllegalArgumentException();
+
+        if (requestURL == null)
+            throw new IllegalArgumentException();
 
         this.uri = uri;
 
         this.params = params;
         
-        this.headers = headers;
+//        this.headers = headers;
 
+        this.requestURL = requestURL;
+        
         this.path = getProperty(params, PATH, ICounterSet.pathSeparator);
 
         if (log.isInfoEnabled())
@@ -691,18 +825,7 @@ public class URLQueryModel {
      */
     public StringBuilder getRequestURL() {
         
-        final StringBuilder sb = new StringBuilder();
-
-        // protocol (known from the container).
-        sb.append("http://");
-        
-        // host and port
-        sb.append(headers.get("host"));
-        
-        // path (including the leading '/')
-        sb.append(uri);
-
-        return sb;
+        return new StringBuilder(requestURL);
 
     }
 

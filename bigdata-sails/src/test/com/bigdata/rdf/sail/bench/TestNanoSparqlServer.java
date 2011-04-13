@@ -107,6 +107,8 @@ import com.bigdata.util.config.NicUtil;
  * 
  * @todo do another test suite which uses a journal that we load once and keep
  *       around as a test file similar to the RTO test classes.
+ *       
+ * @deprecated along with {@link NanoSparqlServer}
  */
 public class TestNanoSparqlServer extends TestCase2 {
 

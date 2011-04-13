@@ -1,0 +1,63 @@
+<!DOCTYPE web-app PUBLIC "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN" "http://java.sun.com/dtd/web-app_2_3.dtd">
+<web-app>
+  <display-name>Bigdata</display-name>
+  <description>Bigdata</description>
+  <context-param>
+  	<param-name>property-file</param-name>
+  	<param-value>bigdata-perf/lubm/WORMStore.properties</param-value>
+  	<description>The property file (for a standalone database instance) or the
+  	jini configuration file (for a federation).  The file MUST end with either
+  	".properties" or ".config".</description>
+  </context-param>
+  <context-param>
+  	<param-name>namespace</param-name>
+  	<param-value>LUBM_U1</param-value>
+  	<description>The default bigdata namespace of for the triple or quad store
+  	instance to be exposed (there can be many triple or quad store instances
+  	within a bigdata instance).</description>
+  </context-param>
+  <context-param>
+  	<param-name>query-thread-pool-size</param-name>
+  	<param-value>8</param-value>
+  	<description>The size of the thread pool used to service SPARQL queries -OR-
+    ZERO (0) for an unbounded thread pool.</description>
+  </context-param>
+  <context-param>
+  	<param-name>force-overflow</param-name>
+  	<param-value>false</param-value>
+  	<description>Force a compacting merge of all shards on all data
+	services in a bigdata federation (this option should only be
+	used for benchmarking purposes).</description>
+  </context-param>
+  <listener>
+   <listener-class>com.bigdata.rdf.sail.webapp.BigdataRDFServletContextListener</listener-class>
+  </listener>
+  <servlet>
+  	<servlet-name>REST API</servlet-name>
+  	<display-name>REST API</display-name>
+  	<servlet-class>com.bigdata.rdf.sail.webapp.RESTServlet</servlet-class>
+  	<load-on-startup>0</load-on-startup>
+  </servlet>
+  <servlet>
+  	<servlet-name>Status</servlet-name>
+  	<display-name>Status</display-name>
+  	<servlet-class>com.bigdata.rdf.sail.webapp.StatusServlet</servlet-class>
+  </servlet>
+  <servlet>
+  	<servlet-name>Counters</servlet-name>
+  	<display-name>Performance counters</display-name>
+  	<servlet-class>com.bigdata.rdf.sail.webapp.CountersServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+  <servlet-name>REST API</servlet-name>
+  <url-pattern>/</url-pattern>
+  </servlet-mapping>
+  <servlet-mapping>
+  <servlet-name>Status</servlet-name>
+  <url-pattern>/status</url-pattern>
+  </servlet-mapping>
+  <servlet-mapping>
+  <servlet-name>Counters</servlet-name>
+  <url-pattern>/counters</url-pattern>
+  </servlet-mapping>
+</web-app>

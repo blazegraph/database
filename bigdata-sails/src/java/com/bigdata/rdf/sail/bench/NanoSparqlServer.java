@@ -167,6 +167,9 @@ import com.bigdata.util.httpd.NanoHTTPD;
  *       (2) I need to verify that the exclusive semaphore logic for the
  *       unisolated sail connection works with cross thread access. Someone had
  *       pointed out a bizarre hole in this....
+ * 
+ * @deprecated This has been replaced by the class of the same name in the
+ *             <code>com.bigdata.sail.webapp</code> package.
  */
 public class NanoSparqlServer extends AbstractHTTPD {
 

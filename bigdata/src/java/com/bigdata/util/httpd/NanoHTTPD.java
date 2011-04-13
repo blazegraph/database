@@ -112,6 +112,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * </pre>
  * 
  * @version $Id$
+ * 
+ * @deprecated This is being replaced by the use of the Servlet API and embedded
+ * use of jetty as a light weight servlet container.
  */
 public class NanoHTTPD implements IServiceShutdown
 {

@@ -265,11 +265,17 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		
 	}
 	
-	public void detachContext(final IAllocationContext context) {
-		
-	    m_store.detachContext(context);
-	    
-	}
+    public void detachContext(final IAllocationContext context) {
+        
+        m_store.detachContext(context);
+        
+    }
+
+    public void abortContext(final IAllocationContext context) {
+        
+        m_store.abortContext(context);
+        
+    }
 
     /**
      * Operation is not supported.
