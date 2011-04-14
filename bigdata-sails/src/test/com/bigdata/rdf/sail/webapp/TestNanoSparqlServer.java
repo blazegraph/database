@@ -58,8 +58,12 @@ import com.bigdata.util.config.NicUtil;
  * Test suite for {@link RESTServlet} (SPARQL end point and REST API for RDF
  * data).
  * 
+ * @todo The methods which return a mutation count should verify the returned
+ *       XML document.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestNanoSparqlServer.java 4398 2011-04-14 13:55:29Z thompsonbry
+ *          $
  */
 public class TestNanoSparqlServer extends TestCase2 {
 
