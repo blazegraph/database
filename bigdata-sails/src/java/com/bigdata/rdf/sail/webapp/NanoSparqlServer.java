@@ -79,60 +79,61 @@ public class NanoSparqlServer {
 	
 //	static private final Logger log = Logger.getLogger(NanoSparqlServer.class);
 
-	/**
-	 * Run an httpd service exposing a SPARQL endpoint. The service will respond
-	 * to the following URL paths:
-	 * <dl>
-	 * <dt>http://localhost:port/</dt>
-	 * <dd>The SPARQL end point for the default namespace as specified by the
-	 * <code>namespace</code> command line argument.</dd>
-	 * <dt>http://localhost:port/namespace/NAMESPACE</dt>
-	 * <dd>where <code>NAMESPACE</code> is the namespace of some triple store or
-	 * quad store, may be used to address ANY triple or quads store in the
-	 * bigdata instance.</dd>
-	 * <dt>http://localhost:port/status</dt>
-	 * <dd>A status page.</dd>
-	 * </dl>
-	 * 
-	 * @param args
-	 *            USAGE:<br/>
-	 *            To start the server:<br/>
-	 *            <code>(options) <i>namespace</i> (propertyFile|configFile) )</code>
-	 *            <p>
-	 *            <i>Where:</i>
-	 *            <dl>
-	 *            <dt>port</dt>
-	 *            <dd>The port on which the service will respond -or-
-	 *            <code>0</code> to use any open port.</dd>
-	 *            <dt>namespace</dt>
-	 *            <dd>The namespace of the default SPARQL endpoint (the
-	 *            namespace will be <code>kb</code> if none was specified when
-	 *            the triple/quad store was created).</dd>
-	 *            <dt>propertyFile</dt>
-	 *            <dd>A java properties file for a standalone {@link Journal}.</dd>
-	 *            <dt>configFile</dt>
-	 *            <dd>A jini configuration file for a bigdata federation.</dd>
-	 *            </dl>
-	 *            and <i>options</i> are any of:
-	 *            <dl>
-	 *            <dt>-nthreads</dt>
-	 *            <dd>The #of threads which will be used to answer SPARQL
-	 *            queries (default 8).</dd>
-	 *            <dt>-forceOverflow</dt>
-	 *            <dd>Force a compacting merge of all shards on all data
-	 *            services in a bigdata federation (this option should only be
-	 *            used for benchmarking purposes).</dd>
-	 *            <dt>readLock</dt>
-	 *            <dd>The commit time against which the server will assert a
-	 *            read lock by holding open a read-only transaction against that
-	 *            commit point. When given, queries will default to read against
-	 *            this commit point. Otherwise queries will default to read
-	 *            against the most recent commit point on the database.
-	 *            Regardless, each query will be issued against a read-only
-	 *            transaction.</dt>
-	 *            </dl>
-	 *            </p>
-	 */
+    /**
+     * Run an httpd service exposing a SPARQL endpoint. The service will respond
+     * to the following URL paths:
+     * <dl>
+     * <dt>http://localhost:port/</dt>
+     * <dd>The SPARQL end point for the default namespace as specified by the
+     * <code>namespace</code> command line argument.</dd>
+     * <dt>http://localhost:port/namespace/NAMESPACE</dt>
+     * <dd>where <code>NAMESPACE</code> is the namespace of some triple store or
+     * quad store, may be used to address ANY triple or quads store in the
+     * bigdata instance.</dd>
+     * <dt>http://localhost:port/status</dt>
+     * <dd>A status page.</dd>
+     * </dl>
+     * 
+     * @param args
+     *            USAGE:<br/>
+     *            To start the server:<br/>
+     *            <code>(options) <i>namespace</i> (propertyFile|configFile) )</code>
+     *            <p>
+     *            <i>Where:</i>
+     *            <dl>
+     *            <dt>port</dt>
+     *            <dd>The port on which the service will respond -or-
+     *            <code>0</code> to use any open port.</dd>
+     *            <dt>namespace</dt>
+     *            <dd>The namespace of the default SPARQL endpoint (the
+     *            namespace will be <code>kb</code> if none was specified when
+     *            the triple/quad store was created).</dd>
+     *            <dt>propertyFile</dt>
+     *            <dd>A java properties file for a standalone {@link Journal}.</dd>
+     *            <dt>configFile</dt>
+     *            <dd>A jini configuration file for a bigdata federation.</dd>
+     *            </dl>
+     *            and <i>options</i> are any of:
+     *            <dl>
+     *            <dt>-nthreads</dt>
+     *            <dd>The #of threads which will be used to answer SPARQL
+     *            queries (default
+     *            {@value ConfigParams#DEFAULT_QUERY_THREAD_POOL_SIZE}).</dd>
+     *            <dt>-forceOverflow</dt>
+     *            <dd>Force a compacting merge of all shards on all data
+     *            services in a bigdata federation (this option should only be
+     *            used for benchmarking purposes).</dd>
+     *            <dt>readLock</dt>
+     *            <dd>The commit time against which the server will assert a
+     *            read lock by holding open a read-only transaction against that
+     *            commit point. When given, queries will default to read against
+     *            this commit point. Otherwise queries will default to read
+     *            against the most recent commit point on the database.
+     *            Regardless, each query will be issued against a read-only
+     *            transaction.</dt>
+     *            </dl>
+     *            </p>
+     */
 //	 *            <dt>bufferCapacity [#bytes]</dt>
 //	 *            <dd>Specify the capacity of the buffers used to decouple the
 //	 *            query evaluation from the consumption of the HTTP response by
@@ -144,7 +145,7 @@ public class NanoSparqlServer {
 
         int port = 80;
         String namespace = "kb";
-        int queryThreadPoolSize = 8;
+        int queryThreadPoolSize = ConfigParams.DEFAULT_QUERY_THREAD_POOL_SIZE;
         boolean forceOverflow = false;
         Long readLock = null;
 
