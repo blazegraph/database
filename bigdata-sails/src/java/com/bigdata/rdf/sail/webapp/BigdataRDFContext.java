@@ -3,17 +3,22 @@ package com.bigdata.rdf.sail.webapp;
 import info.aduna.xml.XMLWriter;
 
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.StringWriter;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
@@ -24,9 +29,18 @@ import org.openrdf.query.parser.sparql.SPARQLParserFactory;
 import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
+import org.openrdf.sail.SailException;
 
+import com.bigdata.bop.BufferAnnotations;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
+import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
@@ -34,9 +48,16 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.AbstractResource;
+import com.bigdata.relation.RelationSchema;
+import com.bigdata.rwstore.RWStore;
+import com.bigdata.sparse.ITPS;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ThreadPoolExecutorBaseStatisticsTask;
 
 /**
+ * Class encapsulates state shared by {@link QueryServlet}(s) for the same
+ * {@link IIndexManager}.
  * 
  * @author Martyn Cutcher
  * @author thompsonbry@users.sourceforge.net
@@ -48,6 +69,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
 	private final SparqlEndpointConfig m_config;
 	private final QueryParser m_engine;
+
+    /**
+     * A thread pool for running accepted queries against the
+     * {@link QueryEngine}.
+     */
+    /*package*/final ExecutorService queryService;
 	
 	private final ScheduledFuture<?> m_queueStatsFuture;
 	private final ThreadPoolExecutorBaseStatisticsTask m_queueSampleTask;
@@ -89,8 +116,22 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
 		m_config = config;
 
-		// used to parse qeries.
+		// used to parse queries.
 		m_engine = new SPARQLParserFactory().getParser();
+
+        if (config.queryThreadPoolSize == 0) {
+
+            queryService = (ThreadPoolExecutor) Executors
+                    .newCachedThreadPool(new DaemonThreadFactory
+                            (getClass().getName()+".queryService"));
+
+        } else {
+
+            queryService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
+                    config.queryThreadPoolSize, new DaemonThreadFactory(
+                            getClass().getName() + ".queryService"));
+
+        }
 
 		if (indexManager.getCollectQueueStatistics()) {
 
@@ -98,16 +139,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
 			final long delay = 1000; // delay in ms.
 			final TimeUnit unit = TimeUnit.MILLISECONDS;
 
-			// FIXME add mechanism for stats sampling
-			// queueSampleTask = new ThreadPoolExecutorBaseStatisticsTask(
-			// (ThreadPoolExecutor) queryService);
-			//			
-			// queueStatsFuture = indexManager.addScheduledTask(queueSampleTask,
-			// initialDelay, delay, unit);
+            m_queueSampleTask = new ThreadPoolExecutorBaseStatisticsTask(
+                    (ThreadPoolExecutor) queryService);
 
-			m_queueSampleTask = null;
-
-			m_queueStatsFuture = null;
+            m_queueStatsFuture = indexManager.addScheduledTask(
+                    m_queueSampleTask, initialDelay, delay, unit);
 
 		} else {
 
@@ -119,19 +155,51 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
 	}
 
-    /*
-     * FIXME Provide shutdown semantics for the statistics collection on the
-     * SPARQL end point and the thread pool for processing SPARQL queries.
+//    /**
+//     * Normal shutdown waits until all accepted queries are done. 
+//     */
+//    void shutdown() {
+//        
+//        if(log.isInfoEnabled())
+//            log.info("Normal shutdown.");
+//
+//        // Stop collecting queue statistics.
+//        if (m_queueStatsFuture != null)
+//            m_queueStatsFuture.cancel(true/* mayInterruptIfRunning */);
+//
+//        // Stop servicing new requests. 
+//        queryService.shutdown();
+//        try {
+//            queryService.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
+//        } catch (InterruptedException ex) {
+//            throw new RuntimeException(ex);
+//        }
+//        
+//    }
+
+    /**
+     * Immediate shutdown interrupts any running queries.
+     * 
+     * FIXME Must abort any open transactions. This does not matter for the
+     * standalone database, but it will make a difference in scale-out. The
+     * transaction identifiers could be obtained from the {@link #queries} map.
+     * 
+     * FIXME This must also abort any running updates. Those are currently
+     * running in thread handling the {@link HttpServletRequest}, however it
+     * probably makes sense to execute them on a bounded thread pool as well.
      */
-    public void shutdownNow() {
+    void shutdownNow() {
 
         if(log.isInfoEnabled())
-            log.info("Normal shutdown.");
+            log.info("Immediate shutdown.");
         
         // Stop collecting queue statistics.
-		if (m_queueStatsFuture != null)
-			m_queueStatsFuture.cancel(true/* mayInterruptIfRunning */);
+        if (m_queueStatsFuture != null)
+            m_queueStatsFuture.cancel(true/* mayInterruptIfRunning */);
 
+        // Interrupt all running queries.
+        queryService.shutdownNow();
+        
     }
 
     public SparqlEndpointConfig getConfig() {
@@ -172,14 +240,17 @@ public class BigdataRDFContext extends BigdataBaseContext {
         /**
          * A symbolic constant indicating the type of query.
          */
-        protected final BigdataRDFServlet.QueryType queryType;
+        protected final QueryType queryType;
         
         /**
          * The negotiated MIME type to be used for the query response.
          */
         protected final String mimeType;
+
+        /** The request. */
+        private final HttpServletRequest req;
         
-        /** A pipe used to incrementally deliver the results to the client. */
+        /** Where to write the response. */
         private final OutputStream os;
 
         /**
@@ -209,21 +280,25 @@ public class BigdataRDFContext extends BigdataBaseContext {
          *            the query will be run.
          * @param queryStr
          *            The SPARQL query string.
-         * @param os
-         *            A pipe used to incrementally deliver the results to the
-         *            client.
+         * @param req The request.
+         * @param resp The response.
          */
-        protected AbstractQueryTask(final String namespace,
-                final long timestamp, final String queryStr,
-                final BigdataRDFServlet.QueryType queryType,
-                final String mimeType,
-                final OutputStream os) {
+        protected AbstractQueryTask(//
+                final String namespace,//
+                final long timestamp, //
+                final String queryStr,//
+                final QueryType queryType,//
+                final String mimeType,//
+                final HttpServletRequest req,//
+                final OutputStream os//
+                ) {
 
             this.namespace = namespace;
             this.timestamp = timestamp;
             this.queryStr = queryStr;
             this.queryType = queryType;
             this.mimeType = mimeType;
+            this.req = req;
             this.os = os;
             this.queryId = Long.valueOf(m_queryIdFactory.incrementAndGet());
             this.queryId2 = UUID.randomUUID();
@@ -248,8 +323,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
 			BigdataSailRepositoryConnection cxn = null;
             try {
                 cxn = getQueryConnection(namespace, timestamp);
-                m_queries.put(queryId, new RunningQuery(queryId.longValue(),queryId2,
-                        queryStr, begin));
+                m_queries.put(queryId, new RunningQuery(queryId.longValue(),
+                        queryId2, queryStr, begin));
                 if(log.isTraceEnabled())
                     log.trace("Query running...");
 //                try {
@@ -267,26 +342,29 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 if(log.isTraceEnabled())
                     log.trace("Query done - output stream closed.");
                 return null;
-            } catch (Throwable t) {
-                // launder and rethrow the exception.
-                throw BigdataRDFServlet.launderThrowable(t, os, queryStr);
+//            } catch (Throwable t) {
+//                // launder and rethrow the exception.
+//                throw BigdataRDFServlet.launderThrowable(t, resp, queryStr);
             } finally {
                 m_queries.remove(queryId);
-                try {
-                    os.close();
-                } catch (Throwable t) {
-                    log.error(t, t);
-                }
-                try {
-                    if (cxn != null)
+//                if (os != null) {
+//                    try {
+//                        os.close();
+//                    } catch (Throwable t) {
+//                        log.error(t, t);
+//                    }
+//                }
+                if (cxn != null) {
+                    try {
                         cxn.close();
-                } catch (Throwable t) {
-                    log.error(t, t);
+                    } catch (Throwable t) {
+                        log.error(t, t);
+                    }
                 }
             }
-        }
+        } // call()
 
-    }
+    } // class AbstractQueryTask
 
 	/**
 	 * Executes a tuple query.
@@ -294,10 +372,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
 	private class TupleQueryTask extends AbstractQueryTask {
 
         public TupleQueryTask(final String namespace, final long timestamp,
-                final String queryStr, final BigdataRDFServlet.QueryType queryType,
-                final String mimeType, final OutputStream os) {
+                final String queryStr, final QueryType queryType,
+                final String mimeType, final HttpServletRequest req,
+                final OutputStream os) {
 
-			super(namespace, timestamp, queryStr, queryType, mimeType, os);
+            super(namespace, timestamp, queryStr, queryType, mimeType, req,
+                    os);
 
 		}
 
@@ -306,20 +386,20 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
 			final BigdataSailTupleQuery query = cxn.prepareTupleQuery(
 					QueryLanguage.SPARQL, queryStr, baseURI);
-			
-			if (true) {
-				StringWriter strw = new StringWriter();
-				
-				query.evaluate(new SPARQLResultsXMLWriter(new XMLWriter(strw)));
-				
-				OutputStreamWriter outstr = new OutputStreamWriter(os);
-				String res = strw.toString();
-				outstr.write(res);
-				outstr.flush();
-				outstr.close();
-			} else {
+			// TODO What was this alternative logic about?
+//			if (true) {
+//				StringWriter strw = new StringWriter();
+//				
+//				query.evaluate(new SPARQLResultsXMLWriter(new XMLWriter(strw)));
+//				
+//				OutputStreamWriter outstr = new OutputStreamWriter(os);
+//				String res = strw.toString();
+//				outstr.write(res);
+//				outstr.flush();
+//				outstr.close();
+//			} else {
 				query.evaluate(new SPARQLResultsXMLWriter(new XMLWriter(os)));
-			}
+//			}
 		}
 
 	}
@@ -330,10 +410,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
     private class GraphQueryTask extends AbstractQueryTask {
 
         public GraphQueryTask(final String namespace, final long timestamp,
-                final String queryStr, final BigdataRDFServlet.QueryType queryType,
-                final String mimeType, final OutputStream os) {
+                final String queryStr, final QueryType queryType,
+                final String mimeType, final HttpServletRequest req,
+                final OutputStream os) {
 
-            super(namespace, timestamp, queryStr, queryType, mimeType, os);
+            super(namespace, timestamp, queryStr, queryType, mimeType, req,
+                    os);
 
         }
 
@@ -349,40 +431,48 @@ public class BigdataRDFContext extends BigdataBaseContext {
         }
 
 	}
-    
-	/**
-	 * Return the task which will execute the query.
-	 * 
-	 * @param queryStr
-	 *            The query.
-	 * @param os
-	 *            Where the task will write its output.
-	 *            
-	 * @return The task.
-	 * 
-	 * @throws MalformedQueryException 
-	 */
-    public AbstractQueryTask getQueryTask(final String namespace,
-            final long timestamp, final String queryStr,
-            final HttpServletRequest req,
+
+    /**
+     * Return the task which will execute the query.
+     * <p>
+     * Note: The {@link OutputStream} is passed in rather than the
+     * {@link HttpServletResponse} in order to permit operations such as
+     * "DELETE WITH QUERY" where this method is used in a context which writes
+     * onto an internal pipe rather than onto the {@link HttpServletResponse}.
+     * 
+     * @param queryStr
+     *            The query.
+     * @param req
+     *            The request.
+     * @param os
+     *            Where to write the results.
+     * 
+     * @return The task.
+     * 
+     * @throws MalformedQueryException
+     */
+    public AbstractQueryTask getQueryTask(//
+            final String namespace,//
+            final long timestamp,//
+            final String queryStr,//
+            final HttpServletRequest req,//
             final OutputStream os) throws MalformedQueryException {
-    	
-		/*
-		 * Parse the query so we can figure out how it will need to be executed.
-		 * 
-		 * Note: This will fail a query on its syntax. However, the logic used
-		 * in the tasks to execute a query will not fail a bad query for some
-		 * reason which I have not figured out yet. Therefore, we are in the
-		 * position of having to parse the query here and then again when it is
-		 * executed.
-		 */
+
+        /*
+         * Parse the query so we can figure out how it will need to be executed.
+         * 
+         * FIXME Parse the query once. [This will fail a query on its syntax.
+         * However, the logic used in the tasks to execute a query will not fail
+         * a bad query for some reason which I have not figured out yet.
+         * Therefore, we are in the position of having to parse the query here
+         * and then again when it is executed.]
+         */
         final ParsedQuery q = m_engine.parseQuery(queryStr, null/*baseURI*/);
         
         if(log.isDebugEnabled())
             log.debug(q.toString());
         
-		final BigdataRDFServlet.QueryType queryType = BigdataRDFServlet.QueryType
-				.fromQuery(queryStr);
+        final QueryType queryType = QueryType.fromQuery(queryStr);
 
 		final String mimeType;
 		switch (queryType) {
@@ -396,11 +486,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
             // FIXME Conneg for the mime type for construct/describe!
             mimeType = BigdataRDFServlet.MIME_RDF_XML;
             return new GraphQueryTask(namespace, timestamp, queryStr,
-                    queryType, mimeType, os);
+                    queryType, mimeType, req, os);
         case SELECT:
             mimeType = BigdataRDFServlet.MIME_SPARQL_RESULTS_XML;
             return new TupleQueryTask(namespace, timestamp, queryStr,
-                    queryType, mimeType, os);
+                    queryType, mimeType, req, os);
         }
 
 		throw new RuntimeException("Unknown query type: " + queryType);
@@ -467,6 +557,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
     public BigdataSailRepositoryConnection getQueryConnection(
             final String namespace, final long timestamp)
             throws RepositoryException {
+
+        if (timestamp == ITx.UNISOLATED)
+            throw new IllegalArgumentException("UNISOLATED reads disallowed.");
         
         // resolve the default namespace.
         final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
@@ -479,11 +572,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
         }
 
-        /*
-         * Since the kb exists, wrap it as a sail.
-         * 
-         * @todo cache? close when not in use any more?
-         */
+        // Wrap with SAIL.
         final BigdataSail sail = new BigdataSail(tripleStore);
 
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
@@ -495,4 +584,299 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
     }
 
+    /**
+     * Return an UNISOLATED connection.
+     * 
+     * @param namespace
+     *            The namespace.
+     * 
+     * @return The UNISOLATED connection.
+     * 
+     * @throws SailException
+     * 
+     * @throws RepositoryException
+     */
+    public BigdataSailRepositoryConnection getUnisolatedConnection(
+            final String namespace) throws SailException, RepositoryException {
+
+        // resolve the default namespace.
+        final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
+                .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+
+        if (tripleStore == null) {
+
+            throw new RuntimeException("Not found: namespace=" + namespace);
+
+        }
+
+        // Wrap with SAIL.
+        final BigdataSail sail = new BigdataSail(tripleStore);
+
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+
+        repo.initialize();
+
+        final BigdataSailRepositoryConnection conn = (BigdataSailRepositoryConnection) repo
+                .getUnisolatedConnection();
+
+        conn.setAutoCommit(false);
+
+        return conn;
+
+    }
+
+    /**
+     * Return various interesting metadata about the KB state.
+     * 
+     * @todo The range counts can take some time if the cluster is heavily
+     *       loaded since they must query each shard for the primary statement
+     *       index and the TERM2ID index.
+     */
+    protected StringBuilder getKBInfo(final String namespace,
+            final long timestamp) {
+
+        final StringBuilder sb = new StringBuilder();
+
+        BigdataSailRepositoryConnection conn = null;
+
+        try {
+
+            conn = getQueryConnection(namespace, timestamp);
+            
+            final AbstractTripleStore tripleStore = conn.getTripleStore();
+
+            sb.append("class\t = " + tripleStore.getClass().getName() + "\n");
+
+            sb
+                    .append("indexManager\t = "
+                            + tripleStore.getIndexManager().getClass()
+                                    .getName() + "\n");
+
+            sb.append("namespace\t = " + tripleStore.getNamespace() + "\n");
+
+            sb.append("timestamp\t = "
+                    + TimestampUtility.toString(tripleStore.getTimestamp())
+                    + "\n");
+
+            sb.append("statementCount\t = " + tripleStore.getStatementCount()
+                    + "\n");
+
+            sb.append("termCount\t = " + tripleStore.getTermCount() + "\n");
+
+            sb.append("uriCount\t = " + tripleStore.getURICount() + "\n");
+
+            sb.append("literalCount\t = " + tripleStore.getLiteralCount() + "\n");
+
+            /*
+             * Note: The blank node count is only available when using the told
+             * bnodes mode.
+             */
+            sb
+                    .append("bnodeCount\t = "
+                            + (tripleStore.getLexiconRelation()
+                                    .isStoreBlankNodes() ? ""
+                                    + tripleStore.getBNodeCount() : "N/A")
+                            + "\n");
+
+            sb.append(IndexMetadata.Options.BTREE_BRANCHING_FACTOR
+                    + "="
+                    + tripleStore.getSPORelation().getPrimaryIndex()
+                            .getIndexMetadata().getBranchingFactor() + "\n");
+
+            sb.append(IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY
+                    + "="
+                    + tripleStore.getSPORelation().getPrimaryIndex()
+                            .getIndexMetadata()
+                            .getWriteRetentionQueueCapacity() + "\n");
+
+            sb.append(BigdataSail.Options.STAR_JOINS + "="
+                    + conn.getRepository().getSail().isStarJoins() + "\n");
+
+            sb.append("-- All properties.--\n");
+            
+            // get the triple store's properties from the global row store.
+            final Map<String, Object> properties = getIndexManager()
+                    .getGlobalRowStore().read(RelationSchema.INSTANCE,
+                            namespace);
+
+            // write them out,
+            for (String key : properties.keySet()) {
+                sb.append(key + "=" + properties.get(key)+"\n");
+            }
+
+            /*
+             * And show some properties which can be inherited from
+             * AbstractResource. These have been mainly phased out in favor of
+             * BOP annotations, but there are a few places where they are still
+             * in use.
+             */
+            
+            sb.append("-- Interesting AbstractResource effective properties --\n");
+            
+            sb.append(AbstractResource.Options.CHUNK_CAPACITY + "="
+                    + tripleStore.getChunkCapacity() + "\n");
+
+            sb.append(AbstractResource.Options.CHUNK_OF_CHUNKS_CAPACITY + "="
+                    + tripleStore.getChunkOfChunksCapacity() + "\n");
+
+            sb.append(AbstractResource.Options.CHUNK_TIMEOUT + "="
+                    + tripleStore.getChunkTimeout() + "\n");
+
+            sb.append(AbstractResource.Options.FULLY_BUFFERED_READ_THRESHOLD + "="
+                    + tripleStore.getFullyBufferedReadThreshold() + "\n");
+
+            sb.append(AbstractResource.Options.MAX_PARALLEL_SUBQUERIES + "="
+                    + tripleStore.getMaxParallelSubqueries() + "\n");
+
+            /*
+             * And show some interesting effective properties for the KB, SPO
+             * relation, and lexicon relation.
+             */
+            sb.append("-- Interesting KB effective properties --\n");
+            
+            sb
+                    .append(AbstractTripleStore.Options.TERM_CACHE_CAPACITY
+                            + "="
+                            + tripleStore
+                                    .getLexiconRelation()
+                                    .getProperties()
+                                    .getProperty(
+                                            AbstractTripleStore.Options.TERM_CACHE_CAPACITY,
+                                            AbstractTripleStore.Options.DEFAULT_TERM_CACHE_CAPACITY) + "\n");
+
+            /*
+             * And show several interesting properties with their effective
+             * defaults.
+             */
+
+            sb.append("-- Interesting Effective BOP Annotations --\n");
+
+            sb.append(BufferAnnotations.CHUNK_CAPACITY
+                    + "="
+                    + tripleStore.getProperties().getProperty(
+                            BufferAnnotations.CHUNK_CAPACITY,
+                            "" + BufferAnnotations.DEFAULT_CHUNK_CAPACITY)
+                    + "\n");
+
+            sb
+                    .append(BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY
+                            + "="
+                            + tripleStore
+                                    .getProperties()
+                                    .getProperty(
+                                            BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY,
+                                            ""
+                                                    + BufferAnnotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY)
+                            + "\n");
+
+            sb.append(BufferAnnotations.CHUNK_TIMEOUT
+                    + "="
+                    + tripleStore.getProperties().getProperty(
+                            BufferAnnotations.CHUNK_TIMEOUT,
+                            "" + BufferAnnotations.DEFAULT_CHUNK_TIMEOUT)
+                    + "\n");
+
+            sb.append(PipelineJoin.Annotations.MAX_PARALLEL_CHUNKS
+                    + "="
+                    + tripleStore.getProperties().getProperty(
+                            PipelineJoin.Annotations.MAX_PARALLEL_CHUNKS,
+                            "" + PipelineJoin.Annotations.DEFAULT_MAX_PARALLEL_CHUNKS) + "\n");
+
+            sb
+                    .append(IPredicate.Annotations.FULLY_BUFFERED_READ_THRESHOLD
+                            + "="
+                            + tripleStore
+                                    .getProperties()
+                                    .getProperty(
+                                            IPredicate.Annotations.FULLY_BUFFERED_READ_THRESHOLD,
+                                            ""
+                                                    + IPredicate.Annotations.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD)
+                            + "\n");
+
+            // sb.append(tripleStore.predicateUsage());
+
+            if (tripleStore.getIndexManager() instanceof Journal) {
+
+                final Journal journal = (Journal) tripleStore.getIndexManager();
+                
+                final IBufferStrategy strategy = journal.getBufferStrategy();
+                
+                if (strategy instanceof RWStrategy) {
+                
+                    final RWStore store = ((RWStrategy) strategy).getRWStore();
+                    
+                    store.showAllocators(sb);
+                    
+                }
+                
+            }
+
+        } catch (Throwable t) {
+
+            log.warn(t.getMessage(), t);
+
+        } finally {
+            
+            if(conn != null) {
+                try {
+                    conn.close();
+                } catch (RepositoryException e) {
+                    log.error(e, e);
+                }
+                
+            }
+            
+        }
+
+        return sb;
+
+    }
+
+    /**
+     * Return a list of the namespaces for the registered
+     * {@link AbstractTripleStore}s.
+     */
+    /*package*/ List<String> getNamespaces() {
+    
+        // the triple store namespaces.
+        final List<String> namespaces = new LinkedList<String>();
+
+        // scan the relation schema in the global row store.
+        final Iterator<ITPS> itr = (Iterator<ITPS>) getIndexManager()
+                .getGlobalRowStore().rangeIterator(RelationSchema.INSTANCE);
+
+        while (itr.hasNext()) {
+
+            // A timestamped property value set is a logical row with
+            // timestamped property values.
+            final ITPS tps = itr.next();
+
+            // If you want to see what is in the TPS, uncomment this.
+//          System.err.println(tps.toString());
+            
+            // The namespace is the primary key of the logical row for the
+            // relation schema.
+            final String namespace = (String) tps.getPrimaryKey();
+
+            // Get the name of the implementation class
+            // (AbstractTripleStore, SPORelation, LexiconRelation, etc.)
+            final String className = (String) tps.get(RelationSchema.CLASS)
+                    .getValue();
+
+            try {
+                final Class<?> cls = Class.forName(className);
+                if (AbstractTripleStore.class.isAssignableFrom(cls)) {
+                    // this is a triple store (vs something else).
+                    namespaces.add(namespace);
+                }
+            } catch (ClassNotFoundException e) {
+                log.error(e,e);
+            }
+
+        }
+
+        return namespaces;
+
+    }
+    
 }

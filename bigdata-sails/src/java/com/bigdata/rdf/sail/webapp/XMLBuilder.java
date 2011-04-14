@@ -197,17 +197,5 @@ public class XMLBuilder {
 		}
 		
 	}
-	
-    static public class HTML extends XMLBuilder {
-
-        public HTML() throws IOException {
-            super(false);
-        }
-
-        public Node body() throws IOException {
-            return root("html").node("body");
-        }
-
-    }
 
 }

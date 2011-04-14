@@ -1,7 +1,7 @@
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
-import java.io.OutputStream;
+import java.util.concurrent.FutureTask;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -14,6 +14,7 @@ import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
  * SPARQL query handler for GET or POST verbs.
  * 
  * @author martyncutcher
+ * @author thompsonbry
  */
 public class QueryServlet extends BigdataRDFServlet {
 
@@ -24,105 +25,92 @@ public class QueryServlet extends BigdataRDFServlet {
     
     static private final transient Logger log = Logger.getLogger(QueryServlet.class); 
 
-//	/**
-//	 * @todo use to decide ASK, DESCRIBE, CONSTRUCT, SELECT, EXPLAIN, etc.
-//	 */
-//	private final QueryParser m_engine;
-
     public QueryServlet() {
-    	
-//		// used to parse qeries.
-//        m_engine = new SPARQLParserFactory().getParser();
-        
-//        getContext().registerServlet(this);
-        
+
     }
 
     @Override
-    protected void doPost(final HttpServletRequest req, final HttpServletResponse resp) {
-    
-    	doGet(req, resp); // POST is allowed for query
-    	
-	}
+    protected void doPost(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
 
-	/**
-	 * FIXME Does not handle default-graph-uri or named-graph-uri query
-	 * parameters.
-	 */
+        doQuery(req, resp);
+
+    }
+
     @Override
-	protected void doGet(final HttpServletRequest req, final HttpServletResponse resp) {
+    protected void doGet(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+
+        doQuery(req, resp);
+        
+    }
+
+    /**
+     * Run a SPARQL query.
+     * 
+     * FIXME Does not handle default-graph-uri or named-graph-uri query
+     * parameters.
+     */
+    private void doQuery(final HttpServletRequest req,
+                final HttpServletResponse resp) throws IOException {
 
     	final String namespace = getNamespace(req.getRequestURI());
 
 		final long timestamp = getTimestamp(req.getRequestURI(), req);
 
-//		final String uriqueryStr = req.getQueryString();
-//		final String url = req.getRequestURL().toString();
-		
 		final String queryStr = req.getParameter("query");
 
-		if (queryStr == null) {
-			resp.setContentType("text/test;charset=utf-8");
-			resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-			try {
-				resp.getWriter().println("Specify query using ?query=....");
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+		if(queryStr == null) {
 
-			return;
+		    buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN, "Not found: query");
+		    
+		    return;
+		    
 		}
-
-		/*
-		 * Setup pipes. The [os] will be passed into the task that executes
-		 * the query. The [is] will be passed into the Response. The task is
-		 * executed on a thread pool.
-		 * 
-		 * Note: If the client closes the connection, then the InputStream
-		 * passed into the Response will be closed and the task will
-		 * terminate rather than running on in the background with a
-		 * disconnected client.
-		 */
-		OutputStream os;
-		try {
-			os = resp.getOutputStream();
-		} catch (IOException e2) {
-			e2.printStackTrace();
-			
-			throw new RuntimeException(e2);
-		}
+		
+        /*
+         * Setup task to execute the query. The task is executed on a thread
+         * pool. This bounds the possible concurrency of query execution (as
+         * opposed to queries accepted for eventual execution).
+         * 
+         * Note: If the client closes the connection, then the response's
+         * InputStream will be closed and the task will terminate rather than
+         * running on in the background with a disconnected client.
+         */
 		try {
 
             final AbstractQueryTask queryTask = getBigdataRDFContext()
-                    .getQueryTask(namespace, timestamp, queryStr, req, os);
+                    .getQueryTask(namespace, timestamp, queryStr, req,
+                            resp.getOutputStream());
 
-			if (log.isTraceEnabled())
-				log.trace("Running query: " + queryStr);
+            final FutureTask<Void> ft = new FutureTask<Void>(queryTask);
 
-			/*
-			 * FIXME This needs to run on an ExecutorService with a configured
-			 * thread pool size so we can avoid running too many queries
-			 * concurrently. Please restore the logic for doing this with the
-			 * thread pool scoped appropriately. All non-administrative REST Api
-			 * tasks should adhere to this limit. The limit should not apply to
-			 * normal http requests against non-API services.
-			 */
+            if (log.isTraceEnabled())
+				log.trace("Will run query: " + queryStr);
+
+            /*
+             * Note: This is run on an ExecutorService with a configured thread
+             * pool size so we can avoid running too many queries concurrently.
+             */
+
+            // Setup the response.
+            // TODO Move charset choice into conneg logic.
+            buildResponse(resp, HTTP_OK, queryTask.mimeType + "; charset='" + charset + "'");
 			
-			queryTask.call();
-
-			// Setup the response.
-			// TODO Move charset choice into conneg logic.
-			buildResponse(resp, HTTP_OK, queryTask.mimeType + "; charset='" + charset + "'");
+            // Begin executing the query (asynchronous)
+            getBigdataRDFContext().queryService.execute(ft);
+            
+            // wait for the Future.
+            ft.get();
 
 		} catch (Throwable e) {
 			try {
-				throw BigdataRDFServlet.launderThrowable(e, os, queryStr);
+				throw BigdataRDFServlet.launderThrowable(e, resp, queryStr);
 			} catch (Exception e1) {
 				throw new RuntimeException(e);
 			}
 		}
-
-		
+	
 	}
 
 }

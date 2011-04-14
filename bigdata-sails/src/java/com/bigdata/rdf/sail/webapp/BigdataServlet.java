@@ -1,7 +1,10 @@
 package com.bigdata.rdf.sail.webapp;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 
 import javax.servlet.ServletContext;
@@ -73,6 +76,7 @@ abstract public class BigdataServlet extends HttpServlet {
 
     protected <T> T getRequiredServletContextAttribute(final String name) {
 
+        @SuppressWarnings("unchecked")
         final T v = (T) getServletContext().getAttribute(name);
 
         if (v == null)
@@ -145,5 +149,49 @@ abstract public class BigdataServlet extends HttpServlet {
         }
 
     }
-    
+
+    /**
+     * Conditionally wrap the input stream, causing the data to be logged as
+     * characters at DEBUG. Whether or not the input stream is wrapped depends
+     * on the current {@link #log} level.
+     * 
+     * @param instr
+     *            The input stream.
+     * 
+     * @return The wrapped input stream.
+     * 
+     * @throws IOException
+     */
+    protected InputStream debugStream(final InputStream instr)
+            throws IOException {
+
+        if (!log.isDebugEnabled()) {
+
+            return instr;
+
+        }
+
+        final ByteArrayOutputStream outstr = new ByteArrayOutputStream();
+
+        final byte[] buf = new byte[1024];
+        int rdlen = 0;
+        while (rdlen >= 0) {
+            rdlen = instr.read(buf);
+            if (rdlen > 0) {
+                outstr.write(buf, 0, rdlen);
+            }
+        }
+
+        final InputStreamReader rdr = new InputStreamReader(
+                new ByteArrayInputStream(outstr.toByteArray()));
+        final char[] chars = new char[outstr.size()];
+        rdr.read(chars);
+        log.debug("debugStream, START");
+        log.debug(chars);
+        log.debug("debugStream, END");
+
+        return new ByteArrayInputStream(outstr.toByteArray());
+        
+    }
+
 }
