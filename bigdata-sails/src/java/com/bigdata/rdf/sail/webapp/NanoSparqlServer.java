@@ -28,7 +28,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.openrdf.rio.RDFParser;
@@ -45,16 +44,17 @@ import com.bigdata.rdf.store.DataLoader;
  * @author thompsonbry
  * @author martyncutcher
  * 
- * @see https
- *      ://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer
+ * @see <a
+ *      href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer">
+ *      NanoSparqlServer </a> on the wiki.
  * 
  * @todo Add an "?explain" URL query parameter and show the execution plan and
  *       costs (or make this a navigable option from the set of running queries
  *       to drill into their running costs and offer an opportunity to kill them
  *       as well).
  * 
- * @todo Add command to kill a running query, e.g., from the view of the long
- *       running queries.
+ * @todo Add command (or UI) to kill a running query, e.g., from the view of the
+ *       long running queries.
  * 
  * @todo If the addressed instance uses full transactions, then mutation should
  *       also use a full transaction.
@@ -65,7 +65,8 @@ import com.bigdata.rdf.store.DataLoader;
  * 
  * @todo Review the settings for the {@link RDFParser} instances, e.g.,
  *       verifyData, preserveBNodeIds, etc. Perhaps we should use the same
- *       defaults as the {@link DataLoader}?
+ *       defaults as the {@link DataLoader}? Regardless, collect the logic to
+ *       setup the parser in a single place for the webapp.
  * 
  * @todo It is possible that we could have concurrent requests which each get
  *       the unisolated connection. This could cause two problems: (1) we could
@@ -362,13 +363,13 @@ public class NanoSparqlServer {
             context.setInitParameter(e.getKey(), e.getValue());
             
         }
-                
-        final ResourceHandler resource_handler = new ResourceHandler();
 
-        resource_handler.setDirectoriesListed(false); // Nope!
-
-        resource_handler.setWelcomeFiles(new String[] { "index.html" });
-
+        // final ResourceHandler resource_handler = new ResourceHandler();
+        //
+        // resource_handler.setDirectoriesListed(false); // Nope!
+        //
+        // resource_handler.setWelcomeFiles(new String[] { "index.html" });
+        //
         // final HandlerList handlers = new HandlerList();
         //          
         // handlers.setHandlers(new Handler[] { resource_handler, new
@@ -384,7 +385,7 @@ public class NanoSparqlServer {
         context.addServlet(new ServletHolder(new CountersServlet()),
                 "/counters");
 
-        // Status page : TODO The status page is really SPARQL specific.
+        // Status page.
         context.addServlet(new ServletHolder(new StatusServlet()), "/status");
 
         // Core RDF REST API, including SPARQL query and update.

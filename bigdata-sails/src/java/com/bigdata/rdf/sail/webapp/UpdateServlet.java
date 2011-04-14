@@ -1,12 +1,9 @@
 package com.bigdata.rdf.sail.webapp;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Arrays;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -24,10 +21,8 @@ import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.helpers.RDFHandlerBase;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.journal.ITx;
-import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
-import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Handler for update (POST
@@ -44,8 +39,6 @@ public class UpdateServlet extends BigdataRDFServlet {
     static private final transient Logger log = Logger.getLogger(UpdateServlet.class); 
 
     public UpdateServlet() {
-    
-//        getContext().registerServlet(this);
         
     }
 
@@ -131,14 +124,13 @@ public class UpdateServlet extends BigdataRDFServlet {
 	private void doPostWithBody(final HttpServletRequest req,
 			final HttpServletResponse resp) throws Exception {
 
+	    final long begin = System.currentTimeMillis();
+	    
         final String baseURI = "";// @todo baseURI query parameter?
         
         final String namespace = getNamespace(req.getRequestURI());
 
         final String contentType = req.getContentType();
-
-        if (false && contentType == null)
-            throw new UnsupportedOperationException();
 
         if (log.isInfoEnabled())
             log.info("Request body: " + contentType);
@@ -146,10 +138,12 @@ public class UpdateServlet extends BigdataRDFServlet {
         final RDFFormat format = RDFFormat.forMIMEType(contentType);
 
         if (format == null) {
-        	buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN, 
-        			"Content-Type not recognized as RDF: " + contentType);
-        	
-        	return;
+
+            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    "Content-Type not recognized as RDF: " + contentType);
+
+            return;
+
         }
 
         if (log.isInfoEnabled())
@@ -159,33 +153,24 @@ public class UpdateServlet extends BigdataRDFServlet {
                 .getInstance().get(format);
 
         if (rdfParserFactory == null) {
-        	buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
-                    "Parser not found: Content-Type=" + contentType);
+
+            buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                    "Parser factory not found: Content-Type="
+                            + contentType + ", format=" + format);
         	
         	return;
+
         }
 
         try {
-
-            // resolve the default namespace.
-            final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
-                    .getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-            if (tripleStore == null) {
-            	buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
-                        "Not found: namespace=" + namespace);
-            	return;
-            }
-
+            
             final AtomicLong nmodified = new AtomicLong(0L);
 
-            // Wrap with SAIL.
-            final BigdataSail sail = new BigdataSail(tripleStore);
-            BigdataSailConnection conn = null;
+            BigdataSailRepositoryConnection conn = null;
             try {
 
-                sail.initialize();
-                conn = sail.getConnection();
+                conn = getBigdataRDFContext()
+                        .getUnisolatedConnection(namespace);
 
                 /*
                  * There is a request body, so let's try and parse it.
@@ -193,7 +178,8 @@ public class UpdateServlet extends BigdataRDFServlet {
 
                 final RDFParser rdfParser = rdfParserFactory.getParser();
 
-                rdfParser.setValueFactory(tripleStore.getValueFactory());
+                rdfParser.setValueFactory(conn.getTripleStore()
+                        .getValueFactory());
 
                 rdfParser.setVerifyData(true);
 
@@ -202,22 +188,20 @@ public class UpdateServlet extends BigdataRDFServlet {
                 rdfParser
                         .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
-                rdfParser.setRDFHandler(new AddStatementHandler(conn,nmodified));
+                rdfParser.setRDFHandler(new AddStatementHandler(conn
+                        .getSailConnection(), nmodified));
 
                 /*
                  * Run the parser, which will cause statements to be inserted.
                  */
-                rdfParser.parse(debugStream(req.getInputStream()), baseURI);
+                rdfParser.parse(req.getInputStream(), baseURI);
 
                 // Commit the mutation.
                 conn.commit();
 
-                XMLBuilder xml = new XMLBuilder();
-                xml.root("data")
-                	.attr("modified", nmodified.get())
-                	.close();
+                final long elapsed = System.currentTimeMillis() - begin;
                 
-                buildResponse(resp, HTTP_OK, MIME_TEXT_XML, xml.toString());
+                reportModifiedCount(resp, nmodified.get(), elapsed);
                 
                 return;
 
@@ -225,8 +209,6 @@ public class UpdateServlet extends BigdataRDFServlet {
 
                 if (conn != null)
                     conn.close();
-
-//                sail.shutDown();
                 
             }
 
@@ -253,6 +235,8 @@ public class UpdateServlet extends BigdataRDFServlet {
 	private void doPostWithURIs(final HttpServletRequest req,
 			final HttpServletResponse resp) throws Exception {
 
+	    final long begin = System.currentTimeMillis();
+	    
 		final String namespace = getNamespace(req.getRequestURI());
 
 		final String contentType = req.getContentType();
@@ -263,42 +247,36 @@ public class UpdateServlet extends BigdataRDFServlet {
 			throw new UnsupportedOperationException();
 
 		if (uris.length == 0) {
-			buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN,
-                    "0 statements modified");
-        	
+
+            reportModifiedCount(resp, 0L/* nmodified */, System
+                    .currentTimeMillis()
+                    - begin);
+
         	return;
+        	
         }
 
         if (log.isInfoEnabled())
-            log.info("URIs: " + uris);
+            log.info("URIs: " + Arrays.toString(uris));
 
         // Before we do anything, make sure we have valid URLs.
         final Vector<URL> urls = new Vector<URL>(uris.length);
+ 
         for (String uri : uris) {
+        
             urls.add(new URL(uri));
+            
         }
 
         try {
 
-            // resolve the default namespace.
-            final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
-                    .getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-            if (tripleStore == null) {
-            	buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
-                        "Not found: namespace=" + namespace);
-            	
-            	return;
-            }
-
             final AtomicLong nmodified = new AtomicLong(0L);
 
-            // Wrap with SAIL.
-            final BigdataSail sail = new BigdataSail(tripleStore);
-            BigdataSailConnection conn = null;
+            BigdataSailRepositoryConnection conn = null;
             try {
 
-                conn = sail.getConnection();
+                conn = getBigdataRDFContext().getUnisolatedConnection(
+                        namespace);
 
                 for (URL url : urls) {
 
@@ -340,8 +318,8 @@ public class UpdateServlet extends BigdataRDFServlet {
                         final RDFParser rdfParser = rdfParserFactory
                                 .getParser();
 
-                        rdfParser
-                                .setValueFactory(tripleStore.getValueFactory());
+                        rdfParser.setValueFactory(conn.getTripleStore()
+                                .getValueFactory());
 
                         rdfParser.setVerifyData(true);
 
@@ -350,18 +328,19 @@ public class UpdateServlet extends BigdataRDFServlet {
                         rdfParser
                                 .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
-                        rdfParser.setRDFHandler(new AddStatementHandler(conn, nmodified));
+                        rdfParser.setRDFHandler(new AddStatementHandler(conn
+                                .getSailConnection(), nmodified));
 
                         /*
                          * Run the parser, which will cause statements to be
                          * inserted.
                          */
-                        
+
                         rdfParser.parse(req.getInputStream(), url
                                 .toExternalForm()/* baseURL */);
 
                     } finally {
-                        
+
                         if (hconn != null)
                             hconn.disconnect();
 
@@ -371,16 +350,15 @@ public class UpdateServlet extends BigdataRDFServlet {
 
                 // Commit the mutation.
                 conn.commit();
+                
+                final long elapsed = System.currentTimeMillis();
 
-                buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, nmodified.get()
-                        + " statements modified.");
+                reportModifiedCount(resp, nmodified.get(), elapsed);
 
             } finally {
 
                 if (conn != null)
                     conn.close();
-
-//                sail.shutDown();
 
             }
 
@@ -393,33 +371,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
     }
     
-
-    private InputStream debugStream(final InputStream instr) throws IOException {
-    	if (log.isDebugEnabled()) {
-	    	ByteArrayOutputStream outstr = new ByteArrayOutputStream();
-	    	
-	    	byte[] buf = new byte[1024];
-	    	int rdlen = 0;
-	    	while (rdlen >= 0) {
-	    		rdlen = instr.read(buf);
-	    		if (rdlen > 0) {
-	    			outstr.write(buf, 0, rdlen);
-	    		}
-	    	}
-	    	
-	    	InputStreamReader rdr = new InputStreamReader(new ByteArrayInputStream(outstr.toByteArray()));
-	    	char[] chars = new char[outstr.size()];
-	    	rdr.read(chars);
-	    	log.debug("debugStream, START");
-	    	log.debug(chars);
-	    	log.debug("debugStream, END");
-	    	
-	    	return new ByteArrayInputStream(outstr.toByteArray());
-    	}
-		return instr;
-    }
-   
-    /**
+	/**
      * Helper class adds statements to the sail as they are visited by a parser.
      */
     private static class AddStatementHandler extends RDFHandlerBase {

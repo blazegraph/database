@@ -1,11 +1,11 @@
 package com.bigdata.rdf.sail.webapp;
 
+import java.io.IOException;
+
 import javax.servlet.Servlet;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import org.apache.log4j.Logger;
 
 /**
  * Default dispatch pattern for a core REST API.
@@ -14,8 +14,8 @@ import org.apache.log4j.Logger;
  */
 public class RESTServlet extends BigdataRDFServlet {
 
-    private static final transient Logger log = Logger
-            .getLogger(RESTServlet.class);
+//    private static final transient Logger log = Logger
+//            .getLogger(RESTServlet.class);
 
     /**
      * 
@@ -79,18 +79,22 @@ public class RESTServlet extends BigdataRDFServlet {
 	/**
 	 * GET is only allowed with query requests, so delegate to the QueryServlet.
 	 */
-	public void doGet(final HttpServletRequest req, final HttpServletResponse resp) {
-		
-	    m_queryServlet.doGet(req, resp);
-	    
-	}
+    @Override
+    protected void doGet(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+
+        m_queryServlet.doGet(req, resp);
+
+    }
 
 	/**
 	 * A query can be submitted with a POST if a query parameter is provided.
 	 * 
 	 * Otherwise delegate to the UpdateServlet
 	 */
-	public void doPost(final HttpServletRequest req, final HttpServletResponse resp) {
+    @Override
+    protected void doPost(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
 
         if (req.getParameter("delete") != null) {
             
@@ -111,22 +115,26 @@ public class RESTServlet extends BigdataRDFServlet {
 	/**
 	 * A PUT request always delegates to the UpdateServlet
 	 */
-	public void doPut(final HttpServletRequest req, final HttpServletResponse resp) {
-		
-	    m_updateServlet.doPut(req, resp);
-	    
-	}
-	
-	/**
-	 * A DELETE request will delete statements indicated by a provided namespace
-	 * URI and an optional query parameter.
-	 * 
-	 * Delegate to the DeleteServlet.
-	 */
-    public void doDelete(final HttpServletRequest req, final HttpServletResponse resp) {
+    @Override
+    protected void doPut(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+
+        m_updateServlet.doPut(req, resp);
+
+    }
+
+    /**
+     * A DELETE request will delete statements indicated by a provided namespace
+     * URI and an optional query parameter.
+     * 
+     * Delegate to the DeleteServlet.
+     */
+    @Override
+    protected void doDelete(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
 
         m_deleteServlet.doDelete(req, resp);
-        
+
     }
 
 }

@@ -1,7 +1,9 @@
 package com.bigdata.rdf.sail.webapp;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PipedOutputStream;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.servlet.http.HttpServletRequest;
@@ -20,10 +22,9 @@ import org.openrdf.rio.rdfxml.RDFXMLParser;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.journal.ITx;
-import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
-import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Handler for DELETE by query (DELETE verb) and DELETE by data (POST).
@@ -36,28 +37,17 @@ public class DeleteServlet extends BigdataRDFServlet {
      * 
      */
     private static final long serialVersionUID = 1L;
-    
-	static private final transient Logger log = Logger.getLogger(DeleteServlet.class); 
+
+    static private final transient Logger log = Logger
+            .getLogger(DeleteServlet.class);
 
     public DeleteServlet() {
-        
-//        getContext().registerServlet(this);
 
     }
 
-   /**
-     * <pre>
-     * DELETE [/namespace/NAMESPACE] ?query=...
-     * </pre>
-     * <p>
-     * Where <code>query</code> is a CONSTRUCT or DESCRIBE query. Statements are
-     * materialized using the query from the addressed namespace are deleted
-     * from that namespace.
-     * </p>
-     */
 	@Override
 	protected void doDelete(final HttpServletRequest req,
-			final HttpServletResponse resp) {
+			final HttpServletResponse resp) throws IOException {
 
         final String queryStr = req.getRequestURI();
 
@@ -73,168 +63,150 @@ public class DeleteServlet extends BigdataRDFServlet {
            
     }
 
-     /**
-      * Delete all statements materialized by a DESCRIBE or CONSTRUCT query.
-      * <p>
-      * Note: To avoid materializing the statements, this runs the query against
-      * the last commit time. This is done while it is holding the unisolated
-      * connection which prevents concurrent modifications. Therefore the entire
-      * SELECT + DELETE operation is ACID.
-      */
-     private void doDeleteWithQuery(final HttpServletRequest req, final HttpServletResponse resp) {
-         
-         final String baseURI = "";// @todo baseURI query parameter?
-         
-         final String namespace = getNamespace(req.getRequestURI());
-         
-         final String queryStr = req.getParameter("query");
+    /**
+     * Delete all statements materialized by a DESCRIBE or CONSTRUCT query.
+     * <p>
+     * Note: To avoid materializing the statements, this runs the query against
+     * the last commit time and uses a pipe to connect the query directly to the
+     * process deleting the statements. This is done while it is holding the
+     * unisolated connection which prevents concurrent modifications. Therefore
+     * the entire SELECT + DELETE operation is ACID.
+     */
+    private void doDeleteWithQuery(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
 
-         if(queryStr == null)
-             throw new UnsupportedOperationException();
-                 
-         if (log.isInfoEnabled())
-             log.info("delete with query: "+queryStr);
-         
-         try {
+        final long begin = System.currentTimeMillis();
+        
+        final String baseURI = "";// @todo baseURI query parameter?
 
-             // resolve the default namespace.
-             final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
-                     .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+        final String namespace = getNamespace(req.getRequestURI());
 
-             if (tripleStore == null) {
-             	buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
-                         "Not found: namespace=" + namespace);
-             	return;
-             }
+        final String queryStr = req.getParameter("query");
 
-             /*
-              * Note: pipe is drained by this thread to consume the query
-              * results, which are the statements to be deleted.
-              */
-             final ByteArrayOutputStream bos = new ByteArrayOutputStream();
-             try {
+        if (queryStr == null)
+            throw new UnsupportedOperationException();
+
+        if (log.isInfoEnabled())
+            log.info("delete with query: " + queryStr);
+
+        try {
+
+            /*
+             * Note: pipe is drained by this thread to consume the query
+             * results, which are the statements to be deleted.
+             */
+            final PipedOutputStream os = new PipedOutputStream();
+            final InputStream is = newPipedInputStream(os);
+            try {
 
                 final AbstractQueryTask queryTask = getBigdataRDFContext()
                         .getQueryTask(namespace, ITx.READ_COMMITTED, queryStr,
-                                req, bos);
+                                req, os);
 
-                 switch (queryTask.queryType) {
-                 case DESCRIBE:
-                 case CONSTRUCT:
-                     break;
-                 default:
-                 	buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
-                             "Must be DESCRIBE or CONSTRUCT query.");
-                 	return;
-                 }
-                 
-                 // invoke query, writing statements into temporary OS
-                 queryTask.call();
+                switch (queryTask.queryType) {
+                case DESCRIBE:
+                case CONSTRUCT:
+                    break;
+                default:
+                    buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                            "Must be DESCRIBE or CONSTRUCT query.");
+                    return;
+                }
 
-                 final AtomicLong nmodified = new AtomicLong(0L);
+                final AtomicLong nmodified = new AtomicLong(0L);
 
-                 // Wrap with SAIL.
-                 final BigdataSail sail = new BigdataSail(tripleStore);
-                 BigdataSailConnection conn = null;
-                 try {
+                BigdataSailRepositoryConnection conn = null;
+                try {
 
-                     sail.initialize();
-                     
-                     // get the unisolated connection.
-                     conn = sail.getConnection();
+                    conn = getBigdataRDFContext().getUnisolatedConnection(
+                            namespace);
 
-                     final RDFXMLParser rdfParser = new RDFXMLParser(
-                             tripleStore.getValueFactory());
+                    final RDFXMLParser rdfParser = new RDFXMLParser(conn
+                            .getTripleStore().getValueFactory());
 
-                     rdfParser.setVerifyData(false);
-                     
-                     rdfParser.setStopAtFirstError(true);
-                     
-                     rdfParser
-                             .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+                    rdfParser.setVerifyData(false);
 
-                     rdfParser.setRDFHandler(new RemoveStatementHandler(conn, nmodified));
+                    rdfParser.setStopAtFirstError(true);
 
-                     /*
-                      * Run the parser, which will cause statements to be
-                      * deleted.
-                      */
-                     rdfParser.parse(new ByteArrayInputStream(bos.toByteArray()), baseURI);
+                    rdfParser
+                            .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
-                     // Commit the mutation.
-                     conn.commit();
+                    rdfParser.setRDFHandler(new RemoveStatementHandler(conn
+                            .getSailConnection(), nmodified));
 
-                 } finally {
+                    // Wrap as Future.
+                    final FutureTask<Void> ft = new FutureTask<Void>(queryTask);
+                    
+                    // Submit query for evaluation.
+                    getBigdataRDFContext().queryService.execute(ft);
+                    
+                    // Run parser : visited statements will be deleted.
+                    rdfParser.parse(is, baseURI);
 
-                     if (conn != null)
-                         conn.close();
+                    // Await the Future (of the Query)
+                    ft.get();
+                    
+                    // Commit the mutation.
+                    conn.commit();
 
-//                     sail.shutDown();
+                    final long elapsed = System.currentTimeMillis() - begin;
+                    
+                    reportModifiedCount(resp, nmodified.get(), elapsed);
+                    
+                } finally {
 
-                 }
+                    if (conn != null)
+                        conn.close();
 
-                 buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, nmodified.get()
-                         + " statements modified.");
+                }
 
-             } catch (Throwable t) {
+            } catch (Throwable t) {
 
-                 throw BigdataRDFServlet.launderThrowable(t, resp.getOutputStream(), queryStr);
+                throw BigdataRDFServlet.launderThrowable(t, resp, queryStr);
 
-             }
+            }
 
-         } catch (Exception ex) {
+        } catch (Exception ex) {
 
-             // Will be rendered as an INTERNAL_ERROR.
-             throw new RuntimeException(ex);
+            // Will be rendered as an INTERNAL_ERROR.
+            throw new RuntimeException(ex);
 
-         }
+        }
 
-     }
+    }
 
-	/**
-	 * <pre>
-	 * POST [/namespace/NAMESPACE]
-	 * ...
-	 * Content-Type
-	 * ...
-	 * 
-	 * BODY
-	 * 
-	 * </pre>
-	 * <p>
-	 * BODY contains RDF statements according to the specified Content-Type.
-	 * Statements parsed from the BODY are deleted from the addressed namespace.
-	 * </p>
-	 * <p>
-	 * Note: Most client APIs do not permit a message body to be sent with a
-	 * DELETE request.
-	 */
-     @Override
-     protected void doPost(final HttpServletRequest req, final HttpServletResponse resp) {
+    @Override
+    protected void doPost(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
 
-         final String contentType = req.getContentType();
-         
-         final String queryStr = req.getRequestURI();
+        final String contentType = req.getContentType();
 
-         if (contentType != null) {
-         
-             doDeleteWithBody(req, resp);
-             
-         } else if (queryStr != null) {
-             
-             doDeleteWithQuery(req, resp);
-             
-         } else {
-         	resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-         }
-            
-     }
+        final String queryStr = req.getRequestURI();
+
+        if (contentType != null) {
+
+            doDeleteWithBody(req, resp);
+
+        } else if (queryStr != null) {
+
+            doDeleteWithQuery(req, resp);
+
+        } else {
+
+            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+
+        }
+
+    }
 
     /**
      * DELETE request with a request body containing the statements to be
      * removed.
      */
-    private void doDeleteWithBody(final HttpServletRequest req, final HttpServletResponse resp) {
+    private void doDeleteWithBody(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+
+        final long begin = System.currentTimeMillis();
 
         final String baseURI = "";// @todo baseURI query parameter?
         
@@ -250,52 +222,46 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         try {
 
-            // resolve the default namespace.
-            final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
-                    .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+            /*
+             * There is a request body, so let's try and parse it.
+             */
 
-            if (tripleStore == null) {
-            	buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
-                        "Not found: namespace=" + namespace);
-            	return;
+            final RDFFormat format = RDFFormat.forMIMEType(contentType);
+
+            if (format == null) {
+
+                buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                        "Content-Type not recognized as RDF: " + contentType);
+
+                return;
+
             }
+
+            final RDFParserFactory rdfParserFactory = RDFParserRegistry
+                    .getInstance().get(format);
+
+            if (rdfParserFactory == null) {
+
+                buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                        "Parser factory not found: Content-Type=" + contentType
+                                + ", format=" + format);
+
+                return;
+
+            }
+
+            final RDFParser rdfParser = rdfParserFactory.getParser();
 
             final AtomicLong nmodified = new AtomicLong(0L);
 
-            // Wrap with SAIL.
-            final BigdataSail sail = new BigdataSail(tripleStore);
-            BigdataSailConnection conn = null;
+            BigdataSailRepositoryConnection conn = null;
             try {
 
-                sail.initialize();
-                conn = sail.getConnection();
+                conn = getBigdataRDFContext()
+                        .getUnisolatedConnection(namespace);
 
-                /*
-                 * There is a request body, so let's try and parse it.
-                 */
-
-                final RDFFormat format = RDFFormat.forMIMEType(contentType);
-
-                if (format == null) {
-                	buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
-                            "Content-Type not recognized as RDF: "
-                                    + contentType);
-                	
-                	return;
-                }
-
-                final RDFParserFactory rdfParserFactory = RDFParserRegistry
-                        .getInstance().get(format);
-
-                if (rdfParserFactory == null) {
-                	buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
-                            "Parser not found: Content-Type=" + contentType);
-                	return;
-                }
-
-                final RDFParser rdfParser = rdfParserFactory.getParser();
-
-                rdfParser.setValueFactory(tripleStore.getValueFactory());
+                rdfParser.setValueFactory(conn.getTripleStore()
+                        .getValueFactory());
 
                 rdfParser.setVerifyData(true);
 
@@ -304,8 +270,8 @@ public class DeleteServlet extends BigdataRDFServlet {
                 rdfParser
                         .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
-                rdfParser.setRDFHandler(new RemoveStatementHandler(conn,
-                        nmodified));
+                rdfParser.setRDFHandler(new RemoveStatementHandler(conn
+                        .getSailConnection(), nmodified));
 
                 /*
                  * Run the parser, which will cause statements to be deleted.
@@ -315,15 +281,14 @@ public class DeleteServlet extends BigdataRDFServlet {
                 // Commit the mutation.
                 conn.commit();
 
-                buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, nmodified.get()
-                        + " statements modified.");
+                final long elapsed = System.currentTimeMillis() - begin;
+
+                reportModifiedCount(resp, nmodified.get(), elapsed);
 
             } finally {
 
                 if (conn != null)
                     conn.close();
-
-//                sail.shutDown();
 
             }
 
@@ -346,15 +311,18 @@ public class DeleteServlet extends BigdataRDFServlet {
         
         public RemoveStatementHandler(final BigdataSailConnection conn,
                 final AtomicLong nmodified) {
+
             this.conn = conn;
+            
             this.nmodified = nmodified;
+            
         }
 
-        Resource[] nullArray = new Resource[]{};
         public void handleStatement(Statement stmt) throws RDFHandlerException {
 
             try {
-            	Resource context = stmt.getContext();
+
+                final Resource context = stmt.getContext();
             	
                 conn.removeStatements(//
                         stmt.getSubject(), //
@@ -375,5 +343,7 @@ public class DeleteServlet extends BigdataRDFServlet {
         }
 
     }
+    
+    static private transient final Resource[] nullArray = new Resource[]{};
     
 }

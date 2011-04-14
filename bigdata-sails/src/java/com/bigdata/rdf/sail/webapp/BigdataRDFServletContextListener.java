@@ -69,6 +69,7 @@ public class BigdataRDFServletContextListener implements
     private ITransactionService txs = null;
     private Long readLock = null;
     private long readLockTx;
+    private BigdataRDFContext rdfContext;
 
     /**
      * <code>true</code> iff this class opened the {@link IIndexManager}, in
@@ -205,13 +206,21 @@ public class BigdataRDFServletContextListener implements
                 namespace,timestamp,queryThreadPoolSize
                 );
 
-//        if (log.isInfoEnabled()) {
+        rdfContext = new BigdataRDFContext(config, indexManager);
+
+        // Used by BigdataBaseServlet
+        context.setAttribute(IIndexManager.class.getName(), indexManager);
+
+        // Used by BigdataRDFBaseServlet
+        context.setAttribute(BigdataRDFContext.class.getName(), rdfContext);
+
+        if (log.isInfoEnabled()) {
             /*
              * Log some information about the default kb (#of statements, etc).
              */
-            // FIXME log.info("\n" + server.getKBInfo(config.namespace,
-            // config.timestamp));
-        // }
+            log.info("\n"
+                    + rdfContext.getKBInfo(config.namespace, config.timestamp));
+        }
 
         {
         
@@ -233,13 +242,6 @@ public class BigdataRDFServletContextListener implements
 
         }
 
-        // Used by BigdataBaseServlet
-        context.setAttribute(IIndexManager.class.getName(), indexManager);
-
-        // Used by BigdataRDFBaseServlet
-        context.setAttribute(BigdataRDFContext.class.getName(),
-                new BigdataRDFContext(config, indexManager));
-
         if (log.isInfoEnabled())
             log.info("done");
 
@@ -249,6 +251,14 @@ public class BigdataRDFServletContextListener implements
 
         if(log.isInfoEnabled())
             log.info("");
+
+        if (rdfContext != null) {
+
+            rdfContext.shutdownNow();
+
+            rdfContext = null;
+            
+        }
         
         if (txs != null && readLock != null) {
 

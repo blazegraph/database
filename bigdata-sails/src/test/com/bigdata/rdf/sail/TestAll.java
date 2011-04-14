@@ -94,7 +94,7 @@ public class TestAll extends TestCase {
         suite.addTest(TestBigdataSailWithQuads.suite());
 
         // NanoSparqlServer
-        suite.addTest(com.bigdata.rdf.sail.bench.TestAll.suite());
+        suite.addTest(com.bigdata.rdf.sail.webapp.TestAll.suite());
 
         // quad store in scale-out.
         suite.addTest(TestBigdataSailEmbeddedFederationWithQuads.suite());

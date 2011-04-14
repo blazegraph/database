@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
+import java.io.StringWriter;
 import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -339,6 +340,8 @@ public class TestNanoSparqlServer extends TestCase2 {
 	 */
 	protected Graph buildGraph(final HttpURLConnection conn) throws Exception {
 
+//	    System.err.println(getResponseBody(conn));
+	    
 		final Graph g = new GraphImpl();
 
 		try {
@@ -506,13 +509,13 @@ public class TestNanoSparqlServer extends TestCase2 {
 
     }
 
-	public void test_POSTUPDATE_withBody_NTRIPLES() throws Exception {
+	public void test_POST_UPDATE_withBody_NTRIPLES() throws Exception {
 
 	    do_UPDATE_withBody_NTRIPLES("POST", 23, REST);
 	    
 	}
     
-	public void test_PUTUPDATE_withBody_NTRIPLES() throws Exception {
+	public void test_PUT_UPDATE_withBody_NTRIPLES() throws Exception {
 		
 	    do_UPDATE_withBody_NTRIPLES("PUT", 23, REST);
 	    
@@ -521,7 +524,7 @@ public class TestNanoSparqlServer extends TestCase2 {
     /**
      * Select everything in the kb using a POST.
      */
-    public void test_DELETE_withqueryandnamespace() throws Exception {
+    public void test_DELETE_withQuery() throws Exception {
     	
         final String queryStr = "select * where {?s ?p ?o}";
 
@@ -545,7 +548,7 @@ public class TestNanoSparqlServer extends TestCase2 {
     /**
      * Select everything in the kb using a DELETE.
      */
-    public void test_REST_DELETE_withquery() throws Exception {
+    public void test_REST_DELETE_withQuery() throws Exception {
     	
         final String queryStr = "select * where {?s ?p ?o}";
 
@@ -719,12 +722,15 @@ public class TestNanoSparqlServer extends TestCase2 {
 			conn.setDoInput(true);
 			conn.setUseCaches(false);
 			conn.setReadTimeout(0);// TODO timeout (ms)
-			String defmimetype = RDFFormat.NTRIPLES.getDefaultMIMEType();
-			conn.setRequestProperty("Content-Type", defmimetype);
-
-			final String data = genNTRIPLES(ntriples);
 			
-			conn.setRequestProperty("Content-Length", "" + Integer.toString(data.length()));
+            final String defmimetype = RDFFormat.NTRIPLES.getDefaultMIMEType();
+
+            conn.setRequestProperty("Content-Type", defmimetype);
+
+            final String data = genNTRIPLES(ntriples);
+
+            conn.setRequestProperty("Content-Length", ""
+                    + Integer.toString(data.length()));
 
 			final OutputStream os = conn.getOutputStream();
 			try {
@@ -739,15 +745,17 @@ public class TestNanoSparqlServer extends TestCase2 {
 			}
 			// conn.connect();
 
-			if (log.isInfoEnabled())
-				log.info(conn.getResponseMessage());
-
 			final int rc = conn.getResponseCode();
-			
-			System.out.println("Response: " + rc + " for " + method);
-			
+
+            if (log.isInfoEnabled()) {
+                log.info("*** RESPONSE: " + rc + " for " + method);
+                log.info("*** RESPONSE: " + getResponseBody(conn));
+            }
+
 			if (rc < 200 || rc >= 300) {
-				throw new IOException(conn.getResponseMessage());
+
+			    throw new IOException(conn.getResponseMessage());
+			    
 			}
 
 		} catch (Throwable t) {
@@ -770,24 +778,35 @@ public class TestNanoSparqlServer extends TestCase2 {
 
     }
 
+    private static String getResponseBody(final HttpURLConnection conn)
+            throws IOException {
+
+        final Reader r = new InputStreamReader(conn.getInputStream());
+
+        try {
+
+            final StringWriter w = new StringWriter();
+
+            int ch;
+            while ((ch = r.read()) != -1) {
+
+                w.append((char) ch);
+
+            }
+
+            return w.toString();
+        
+        } finally {
+            
+            r.close();
+            
+        }
+        
+        
+        
+    }
+
     public void test_GET_DESCRIBE() throws Exception {
-
-        do_construct_describe("describe");
-
-    }
-
-    // FIXME fix test_GET_CONSTRUCT
-    public void test_GET_CONSTRUCT() throws Exception {
-
-        fail("Fix construct test");
-
-        do_construct_describe("construct");
-    }
-
-    /**
-     * Test GET with DESCRIBE query.
-     */
-    public void do_construct_describe(final String type) throws Exception {
 
         final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
         final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
@@ -848,10 +867,86 @@ public class TestNanoSparqlServer extends TestCase2 {
                 "prefix bd: <"+BD.NAMESPACE+"> " +//
                 "prefix rdf: <"+RDF.NAMESPACE+"> " +//
                 "prefix rdfs: <"+RDFS.NAMESPACE+"> " +//
-                type + " ?x " +//
+                "DESCRIBE ?x " +//
                 "WHERE { " +//
                 "  ?x rdf:type bd:Person . " +//
                 "  ?x bd:likes bd:RDF " +//
+                "}";
+
+            final Graph actual = buildGraph(doSparqlQuery(opts, REST));
+
+            assertSameGraph(expected, actual);
+            
+        }
+
+    }
+
+    public void test_GET_CONSTRUCT() throws Exception {
+
+        final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
+        final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
+        final URI person = new URIImpl(BD.NAMESPACE + "Person");
+        final URI likes = new URIImpl(BD.NAMESPACE + "likes");
+        final URI rdf = new URIImpl(BD.NAMESPACE + "RDF");
+        final URI rdfs = new URIImpl(BD.NAMESPACE + "RDFS");
+        final Literal label1 = new LiteralImpl("Mike");
+        final Literal label2 = new LiteralImpl("Bryan");
+
+        final BigdataSail sail = getSail();
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        
+        try {
+
+            final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) repo
+                    .getConnection();
+            try {
+
+                cxn.setAutoCommit(false);
+
+                cxn.add(mike, RDF.TYPE, person);
+                cxn.add(mike, likes, rdf);
+                cxn.add(mike, RDFS.LABEL, label1);
+                cxn.add(bryan, RDF.TYPE, person);
+                cxn.add(bryan, likes, rdfs);
+                cxn.add(bryan, RDFS.LABEL, label2);
+
+                /*
+                 * Note: The either flush() or commit() is required to flush the
+                 * statement buffers to the database before executing any
+                 * operations that go around the sail.
+                 */
+                cxn.commit();
+            } finally {
+                cxn.close();
+            }
+             
+        } finally {
+            sail.shutDown();
+        }
+
+        // The expected results.
+        final Graph expected = new GraphImpl();
+        {
+//            expected.add(new StatementImpl(mike, likes, rdf));
+            expected.add(new StatementImpl(mike, RDF.TYPE, person));
+            expected.add(new StatementImpl(bryan, RDF.TYPE, person));
+//            expected.add(new StatementImpl(mike, RDFS.LABEL, label1));
+        }
+        
+        // Run the query and verify the results.
+        {
+            
+            final QueryOptions opts = new QueryOptions();
+            opts.serviceURL = m_serviceURL;
+            opts.queryStr =//
+                "prefix bd: <"+BD.NAMESPACE+"> " +//
+                "prefix rdf: <"+RDF.NAMESPACE+"> " +//
+                "prefix rdfs: <"+RDFS.NAMESPACE+"> " +//
+                "CONSTRUCT { ?x rdf:type bd:Person }" +//
+                "WHERE { " +//
+                "  ?x rdf:type bd:Person . " +//
+//                "  ?x bd:likes bd:RDF " +//
                 "}";
 
             final Graph actual = buildGraph(doSparqlQuery(opts, REST));
@@ -885,6 +980,13 @@ public class TestNanoSparqlServer extends TestCase2 {
 
         assertEquals("size", expected.size(), actual.size());
 
+    }
+
+    // FIXME test ASK.
+    public void test_ASK() throws Exception {
+        
+        fail("Write unit test for ASK");
+        
     }
 
 }

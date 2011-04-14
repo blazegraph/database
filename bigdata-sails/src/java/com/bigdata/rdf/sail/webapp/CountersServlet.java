@@ -54,29 +54,15 @@ import com.bigdata.service.IService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- *          FIXME The state needs to be added to the servlet context
- *          (BigdataContext), ideally under named attribute which is specific to
- *          the performance counters. That state includes the time since the
- *          last rendering of the performance counter data (unless this can be
- *          done by a jetty configuration).
- *          <p>
- *          The {@link BigdataRDFContext} has all sorts of logic for starting and
- *          stopping statistics collection which belongs in the Journal or the
- *          DataService, not in the BigdataContext. [Or perhaps some of it is
- *          logic for the NanoSparqlServer's performance counter collection, in
- *          which case it might make sense where it is, but we need to separate
- *          the core bigdata layer from the SPARQL layer.]
- *          <p>
- *          The SPARQL layer needs to be separated from the core bigdata layer,
- *          with the BigdataContext moving into a servlet package in the bigdata
- *          module and the CountersServlet moving into a servlet package in the
- *          com.bigdata.counters package namespace.
+ *          FIXME The SPARQL layer needs to be separated from the core bigdata
+ *          layer, with the BigdataContext moving into a servlet package in the
+ *          bigdata module and the CountersServlet moving into a servlet package
+ *          in the com.bigdata.counters package namespace.
  *          <p>
  *          The flot resources need to be retrievable.
  *          <p>
  *          The event reporting needs to be hooked via
  *          {@link IEventReceivingService}, at least for scale-out.
- * 
  */
 public class CountersServlet extends BigdataServlet {
 
