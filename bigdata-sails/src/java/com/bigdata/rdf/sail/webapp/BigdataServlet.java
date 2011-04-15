@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.Writer;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
@@ -49,22 +50,23 @@ abstract public class BigdataServlet extends HttpServlet {
 	 * Some HTTP response status codes
 	 */
 	public static final transient int
-		HTTP_OK = HttpServletResponse.SC_ACCEPTED,
-		HTTP_REDIRECT = HttpServletResponse.SC_TEMPORARY_REDIRECT,
-		HTTP_FORBIDDEN = HttpServletResponse.SC_FORBIDDEN,
-		HTTP_NOTFOUND = HttpServletResponse.SC_NOT_FOUND,
+        HTTP_OK = HttpServletResponse.SC_OK,
+//        HTTP_ACCEPTED = HttpServletResponse.SC_ACCEPTED,
+//		HTTP_REDIRECT = HttpServletResponse.SC_TEMPORARY_REDIRECT,
+//		HTTP_FORBIDDEN = HttpServletResponse.SC_FORBIDDEN,
+//		HTTP_NOTFOUND = HttpServletResponse.SC_NOT_FOUND,
         HTTP_BADREQUEST = HttpServletResponse.SC_BAD_REQUEST,
         HTTP_METHOD_NOT_ALLOWED = HttpServletResponse.SC_METHOD_NOT_ALLOWED,
 		HTTP_INTERNALERROR = HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
 		HTTP_NOTIMPLEMENTED = HttpServletResponse.SC_NOT_IMPLEMENTED;
 
 	/**
-	 * Common mime types for dynamic content
+	 * Common MIME types for dynamic content.
 	 */
 	public static final transient String
 		MIME_TEXT_PLAIN = "text/plain",
 		MIME_TEXT_HTML = "text/html",
-		MIME_TEXT_XML = "text/xml",
+//		MIME_TEXT_XML = "text/xml",
 		MIME_DEFAULT_BINARY = "application/octet-stream",
         MIME_APPLICATION_XML = "application/xml",
         MIME_TEXT_JAVASCRIPT = "text/javascript",
@@ -92,8 +94,8 @@ abstract public class BigdataServlet extends HttpServlet {
 	    
 	}
 	
-    static protected void buildResponse(HttpServletResponse resp, int status,
-            String mimeType) throws IOException {
+    static protected void buildResponse(final HttpServletResponse resp,
+            final int status, final String mimeType) throws IOException {
 
         resp.setStatus(status);
 
@@ -101,21 +103,30 @@ abstract public class BigdataServlet extends HttpServlet {
 
     }
 
-    static protected void buildResponse(HttpServletResponse resp, int status,
-            String mimeType, String content) throws IOException {
+    static protected void buildResponse(final HttpServletResponse resp, final int status,
+            final String mimeType, final String content) throws IOException {
 
         buildResponse(resp, status, mimeType);
 
-        resp.getWriter().print(content);
+        final Writer w = resp.getWriter();
+
+        w.write(content);
+
+        w.flush();
 
     }
 
-    static protected void buildResponse(HttpServletResponse resp, int status,
-            String mimeType, InputStream content) throws IOException {
+    static protected void buildResponse(final HttpServletResponse resp,
+            final int status, final String mimeType, final InputStream content)
+            throws IOException {
 
         buildResponse(resp, status, mimeType);
 
-        copyStream(content, resp.getOutputStream());
+        final OutputStream os = resp.getOutputStream();
+
+        copyStream(content, os);
+
+        os.flush();
 
     }
 

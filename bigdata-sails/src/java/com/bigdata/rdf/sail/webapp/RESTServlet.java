@@ -26,6 +26,7 @@ public class RESTServlet extends BigdataRDFServlet {
      * The delegates to which we dispatch the various requests.
      */
     private QueryServlet m_queryServlet;
+    private InsertServlet m_insertServlet;
     private DeleteServlet m_deleteServlet;
     private UpdateServlet m_updateServlet;
 
@@ -42,10 +43,12 @@ public class RESTServlet extends BigdataRDFServlet {
         super.init();
         
         m_queryServlet = new QueryServlet();
+        m_insertServlet = new InsertServlet();
         m_updateServlet = new UpdateServlet();
         m_deleteServlet = new DeleteServlet();
         
         m_queryServlet.init(getServletConfig());
+        m_insertServlet.init(getServletConfig());
         m_updateServlet.init(getServletConfig());
         m_deleteServlet.init(getServletConfig());
         
@@ -60,6 +63,11 @@ public class RESTServlet extends BigdataRDFServlet {
         if (m_queryServlet != null) {
             m_queryServlet.destroy();
             m_queryServlet = null;
+        }
+        
+        if (m_insertServlet != null) {
+            m_insertServlet.destroy();
+            m_insertServlet = null;
         }
         
         if (m_updateServlet != null) {
@@ -87,34 +95,45 @@ public class RESTServlet extends BigdataRDFServlet {
 
     }
 
-	/**
-	 * A query can be submitted with a POST if a query parameter is provided.
-	 * 
-	 * Otherwise delegate to the UpdateServlet
-	 */
+    /**
+     * A query can be submitted with a POST if a query parameter is provided.
+     * Otherwise delegate to the {@link InsertServlet} or {@link DeleteServlet}
+     * as appropriate.
+     */
     @Override
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
         if (req.getParameter("delete") != null) {
             
+            // DELETE via POST w/ Body.
             m_deleteServlet.doPost(req, resp);
             
         } else if (req.getParameter("query") != null) {
-		
-	        m_queryServlet.doGet(req, resp);
+
+            // QUERY via POST
+            m_queryServlet.doPost(req, resp);
+            
+        } else if(req.getParameter("uri") != null) {
+
+            // INSERT via w/ URIs
+            m_insertServlet.doPost(req, resp);
 	        
 		} else {
-			
-		    m_updateServlet.doPut(req, resp);
+
+		    // INSERT via POST w/ Body
+		    m_insertServlet.doPost(req, resp);
 		    
 		}
 
 	}
-	
-	/**
-	 * A PUT request always delegates to the UpdateServlet
-	 */
+
+    /**
+     * A PUT request always delegates to the {@link UpdateServlet}.
+     * <p>
+     * Note: The semantics of PUT are "DELETE+INSERT" for the API. PUT is not
+     * support for just "INSERT". Use POST instead for that purpose.
+     */
     @Override
     protected void doPut(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
@@ -124,10 +143,7 @@ public class RESTServlet extends BigdataRDFServlet {
     }
 
     /**
-     * A DELETE request will delete statements indicated by a provided namespace
-     * URI and an optional query parameter.
-     * 
-     * Delegate to the DeleteServlet.
+     * Delegate to the {@link DeleteServlet}.
      */
     @Override
     protected void doDelete(final HttpServletRequest req,

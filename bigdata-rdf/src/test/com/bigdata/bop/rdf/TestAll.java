@@ -61,6 +61,8 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("RDF operators");
 
+        suite.addTestSuite(TestBOpUtility.class);
+        
         // Aggregate operators (COUNT, SUM, MIN, MAX, etc.)
         suite.addTest(com.bigdata.bop.rdf.aggregate.TestAll.suite());
 

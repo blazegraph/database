@@ -121,7 +121,7 @@ public class DeleteServlet extends BigdataRDFServlet {
                             namespace);
 
                     /*
-                     * FIXME The RDF for the *query* will be generated using the
+                     * TODO The RDF for the *query* will be generated using the
                      * MIME type negotiated based on the Accept header (if any)
                      * in the DELETE request. That means that we need to look at
                      * the Accept header here and chose the right RDFFormat for

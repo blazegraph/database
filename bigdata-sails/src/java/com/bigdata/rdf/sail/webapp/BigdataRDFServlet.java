@@ -252,6 +252,18 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
     }
 
+    /**
+     * Report a mutation count and elapsed time back to the user agent.
+     * 
+     * @param resp
+     *            The response.
+     * @param nmodified
+     *            The mutation count.
+     * @param elapsed
+     *            The elapsed time (milliseconds).
+     * 
+     * @throws IOException
+     */
     protected void reportModifiedCount(final HttpServletResponse resp,
             final long nmodified, final long elapsed) throws IOException {
 
@@ -260,7 +272,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         t.root("data").attr("modified", nmodified)
                 .attr("milliseconds", elapsed).close();
 
-        buildResponse(resp, HTTP_OK, MIME_TEXT_XML, t.toString());
+        buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, t.toString());
 
     }
 
