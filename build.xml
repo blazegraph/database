@@ -116,7 +116,7 @@
 
 	<!-- Builds the bigdata JAR and bundles it together with all of its dependencies in the ${build.dir}/lib directory. -->
 	<target name="bundleJar" depends="clean, bundle, jar" description="Builds the bigdata JAR and bundles it together with all of its dependencies in the ${build.dir}/lib directory.">
-		<copy file="${build.dir}/${version}.jar" todir="${build.dir}/lib" />
+		<copy file="${build.dir}/${version}.jar" todir="${build.dir}/lib"/>
 		<!--<property name="myclasspath" refid="runtime.classpath" />
 		<echo message="${myclasspath}"/>-->
 	</target>
@@ -131,9 +131,6 @@
 			</manifest>
 		</jar>
 	</target>
-
-
-
 
 	<!-- This generates an osgi bundle jar, and does not bundled the dependencies.
 		 See 'bundleJar'. -->
@@ -158,8 +155,8 @@
 		</jar>
 		<bnd output="${build.dir}/bundles/com.bigata-${osgi.version}.jar" classpath="${build.dir}/classes" eclipse="false" failok="false" exceptions="true" files="${basedir}/osgi/bigdata.bnd" />
 
-		<bndwrap jars="${build.dir}/lib/unimi/colt-1.2.0.jar" output="${build.dir}/bundles/colt-1.2.0.jar" definitions="${basedir}/osgi/" />
-		<bndwrap jars="${build.dir}/lib/unimi/fastutil-5.1.5.jar" output="${build.dir}/bundles/fastutil-5.1.5.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/colt-1.2.0.jar" output="${build.dir}/bundles/colt-1.2.0.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/fastutil-5.1.5.jar" output="${build.dir}/bundles/fastutil-5.1.5.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/cweb-commons-1.1-b2-dev.jar" output="${build.dir}/bundles/cweb-commons-1.1.2.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/cweb-extser-0.1-b2-dev.jar" output="${build.dir}/bundles/cweb-extser-1.1.2.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/dsi-utils-1.0.6-020610.jar" output="${build.dir}/bundles/dsi-utils-1.0.6-020610.jar" definitions="${basedir}/osgi/" />
@@ -202,7 +199,7 @@
 </target>
 
 <target name="bundle" description="Bundles all dependencies for easier deployments and releases (does not bundle the bigdata jar).">
-<copy toDir="${build.dir}/lib">
+<copy toDir="${build.dir}/lib" flatten="true">
 	<fileset dir="${bigdata.dir}/bigdata/lib">
 		<include name="**/*.jar" />
 		<include name="**/*.so" />
@@ -226,6 +223,53 @@
 </copy>
 </target>
 
+	<!--depends="bundleJar"-->
+	<!--
+	TODO 13M of the resulting WAR is fastutils. We need to slim down that JAR to
+	just the classes that we actually use before deploying it.
+	-->
+	<target name="war" 
+		description="Generates a WAR artifact.">
+		<delete file="${build.dir}/bigdata.war"/>
+		<echo message="Building WAR"/>
+		<war destfile="${build.dir}/bigdata.war"
+			webxml="bigdata-war/src/resources/WEB-INF/web.xml"
+			>
+		  <fileset dir="bigdata-war/src/html"/>
+		  <fileset dir="bigdata-war/src/jsp"/>
+		  <fileset dir="bigdata-war/src/images"/>
+		  <file file="bigdata-war/src/resources/RWStore.properties"/>
+		  <lib dir="${build.dir}/lib">
+		  	<exclude name="iris*.jar"/>
+		  	<exclude name="jgrapht*.jar"/>
+		  	<exclude name="tuprolog*.jar"/>
+		  	<exclude name="sesame*testsuite*.jar"/>
+		  	<exclude name="bnd*.jar"/>
+	  		<exclude name="jetty*.jar"/>
+	  		<exclude name="servlet-api*.jar"/>
+	  		<exclude name="zookeeper*.jar"/>
+	  		<!-- jini -->
+		  	<exclude name="jini*.jar"/>
+		  	<exclude name="jsk*.jar"/>
+		  	<exclude name="mahalo*.jar"/>
+		  	<exclude name="mercury*.jar"/>
+		  	<exclude name="norm*.jar"/>
+		  	<exclude name="outrigger*.jar"/>
+		  	<exclude name="phoenix*.jar"/>
+		  	<exclude name="reggie*.jar"/>
+		  	<exclude name="sdm*.jar"/>
+		  	<exclude name="start*.jar"/>
+		  	<exclude name="sun-util*.jar"/>
+		  	<exclude name="tools*.jar"/>
+		  	<exclude name="browser*.jar"/>
+		  	<exclude name="classserver*.jar"/>
+		  	<exclude name="fiddler*.jar"/>
+		  	<exclude name="group*.jar"/>
+		  </lib>
+		  <classes file="bigdata-war/src/resources/log4j.properties"/>
+		</war>
+	</target>
+	
 <target name="release-prepare" depends="jar, bundle, javadoc" description="create a release.">
 <!-- The source tree. -->
 <copy toDir="${build.dir}/bigdata/src">
