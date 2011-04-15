@@ -47,6 +47,30 @@ public class QueryServlet extends BigdataRDFServlet {
     }
 
     /**
+     * Return <code>true</code> if the <code>Content-disposition</code> header
+     * should be set to indicate that the response body should be handled as an
+     * attachment rather than presented inline. This is just a hint to the user
+     * agent. How the user agent handles this hint is up to it.
+     * 
+     * @param mimeType
+     *            The mime type.
+     *            
+     * @return <code>true</code> if it should be handled as an attachment.
+     */
+    private boolean isAttachment(final String mimeType) {
+        if(mimeType.equals(MIME_TEXT_PLAIN)) {
+            return false;
+        } else if(mimeType.equals(MIME_SPARQL_RESULTS_XML)) {
+            return false;
+        } else if(mimeType.equals(MIME_SPARQL_RESULTS_JSON)) {
+            return false;
+        } else if(mimeType.equals(MIME_APPLICATION_XML)) {
+            return false;
+        }
+        return true;
+    }
+    
+    /**
      * Run a SPARQL query.
      * 
      * FIXME Does not handle default-graph-uri or named-graph-uri query
@@ -95,53 +119,25 @@ public class QueryServlet extends BigdataRDFServlet {
 
             resp.setStatus(HTTP_OK);
 
-            // Figure out the filename extension for the response.
-            
-            final String ext;
-            final String charset;
-            
-            if(queryTask.format != null) {
+            resp.setContentType(queryTask.mimeType);
 
-                /*
-                 * If some RDFormat was negotiated, then construct the filename
-                 * for the attachment using the default extension for that
-                 * format and the queryId.
-                 */
-                
-                ext = queryTask.format.getDefaultFileExtension();
-                
-                charset = queryTask.format.getCharset().name();
+            if (queryTask.charset != null) {
 
-            } else {
-
-                if(queryTask.mimeType.equals(MIME_SPARQL_RESULTS_XML)) {
-
-                    // See http://www.w3.org/TR/rdf-sparql-XMLres/
-
-                    ext = "srx"; // Sparql Result Set.
-                    
-                } else if(queryTask.mimeType.equals(MIME_SPARQL_RESULTS_JSON)) {
-
-                    // See http://www.w3.org/TR/rdf-sparql-json-res/
-                    
-                    ext = "srj";
-                    
-                } else {
-                    
-                    ext = "xxx";
-                    
-                }
-
-                charset = QueryServlet.charset;
+                // Note: Binary encodings do not specify charset.
+                resp.setCharacterEncoding(queryTask.charset.name());
                 
             }
-            
-            resp.setContentType(queryTask.mimeType);
-            
-            resp.setCharacterEncoding(charset);
 
-            resp.setHeader("Content-disposition", "attachment; filename=query"
-                    + queryTask.queryId + "." + ext);
+            if (isAttachment(queryTask.mimeType)) {
+                /*
+                 * Mark this as an attachment (rather than inline). This is just
+                 * a hint to the user agent. How the user agent handles this
+                 * hint is up to it.
+                 */
+                resp.setHeader("Content-disposition",
+                        "attachment; filename=query" + queryTask.queryId + "."
+                                + queryTask.fileExt);
+            }
 
             if(TimestampUtility.isCommitTime(queryTask.timestamp)) {
 

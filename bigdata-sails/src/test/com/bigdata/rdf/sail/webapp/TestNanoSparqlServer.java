@@ -33,8 +33,14 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.TupleQueryResultHandlerBase;
+import org.openrdf.query.resultio.BooleanQueryResultFormat;
+import org.openrdf.query.resultio.BooleanQueryResultParser;
+import org.openrdf.query.resultio.BooleanQueryResultParserFactory;
+import org.openrdf.query.resultio.BooleanQueryResultParserRegistry;
+import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultParser;
-import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLParserFactory;
+import org.openrdf.query.resultio.TupleQueryResultParserFactory;
+import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParser;
@@ -65,14 +71,12 @@ import com.bigdata.util.config.NicUtil;
  * 
  * @todo Test default-graph-uri(s) and named-graph-uri(s).
  * 
- * @todo Verify conneg for various mime type for different kinds of queries.
- *       E.g., conneg for json result sets for SELECT, conneg for n3 response
- *       for CONSTRUCT, etc. The logic for handling Accept headers does not pay
- *       attention to q=... parameters, so only a single mime type should be
- *       specified in the Accept header.
- * 
- * @todo NQUADS RDFWriter needs to be written. Then we can test NQUADS
+ * @todo An NQUADS RDFWriter needs to be written. Then we can test NQUADS
  *       interchange.
+ * 
+ * @todo A SPARQL result sets JSON parser needs to be written (Sesame bundles a
+ *       writer, but not a parser) before we can test queries which CONNEG for a
+ *       JSON result set.
  * 
  * @todo Add tests for SIDS mode interchange of RDF XML.
  * 
@@ -247,7 +251,7 @@ public class TestNanoSparqlServer extends TestCase2 {
         public String defaultGraphUri = null;
         /** The accept header. */
         public String acceptHeader = //
-        BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON + ";q=1" + //
+        BigdataRDFServlet.MIME_SPARQL_RESULTS_XML + ";q=1" + //
         "," + //
         RDFFormat.RDFXML.getDefaultMIMEType() + ";q=1"//
         ;
@@ -356,10 +360,6 @@ public class TestNanoSparqlServer extends TestCase2 {
 	 */
 	protected Graph buildGraph(final HttpURLConnection conn) throws Exception {
 
-//	    System.err.println(getResponseBody(conn));
-	    
-		final Graph g = new GraphImpl();
-
 		try {
 
 			final String baseURI = "";
@@ -379,6 +379,8 @@ public class TestNanoSparqlServer extends TestCase2 {
             if (factory == null)
                 fail("RDFParserFactory not found: Content-Type=" + contentType
                         + ", format=" + format);
+
+            final Graph g = new GraphImpl();
 
 			final RDFParser rdfParser = factory.getParser();
 			
@@ -405,6 +407,52 @@ public class TestNanoSparqlServer extends TestCase2 {
 
 	}
 
+    /**
+     * Parse a SPARQL result set for an ASK query.
+     * 
+     * @param conn
+     *            The connection from which to read the results.
+     * 
+     * @return <code>true</code> or <code>false</code> depending on what was
+     *         encoded in the SPARQL result set.
+     * 
+     * @throws Exception
+     *             If anything goes wrong, including if the result set does not
+     *             encode a single boolean value.
+     */
+    protected boolean askResults(final HttpURLConnection conn) throws Exception {
+
+        try {
+
+            final String contentType = conn.getContentType();
+
+            final BooleanQueryResultFormat format = BooleanQueryResultFormat
+                    .forMIMEType(contentType);
+
+            if (format == null)
+                fail("No format for Content-Type: " + contentType);
+
+            final BooleanQueryResultParserFactory factory = BooleanQueryResultParserRegistry
+                    .getInstance().get(format);
+
+            if (factory == null)
+                fail("No factory for Content-Type: " + contentType);
+
+            final BooleanQueryResultParser parser = factory.getParser();
+
+            final boolean result = parser.parse(conn.getInputStream());
+            
+            return result;
+
+        } finally {
+
+            // terminate the http connection.
+            conn.disconnect();
+
+        }
+
+    }
+
 	/**
 	 * Counts the #of results in a SPARQL result set.
 	 * 
@@ -418,11 +466,25 @@ public class TestNanoSparqlServer extends TestCase2 {
 	 */
 	protected long countResults(final HttpURLConnection conn) throws Exception {
 
-		final AtomicLong nsolutions = new AtomicLong();
+        try {
 
-		try {
+            final String contentType = conn.getContentType();
 
-			final TupleQueryResultParser parser = new SPARQLResultsXMLParserFactory().getParser();
+            final TupleQueryResultFormat format = TupleQueryResultFormat
+                    .forMIMEType(contentType);
+
+            if (format == null)
+                fail("No format for Content-Type: " + contentType);
+
+            final TupleQueryResultParserFactory factory = TupleQueryResultParserRegistry
+                    .getInstance().get(format);
+
+            if (factory == null)
+                fail("No factory for Content-Type: " + contentType);
+
+			final TupleQueryResultParser parser = factory.getParser();
+
+	        final AtomicLong nsolutions = new AtomicLong();
 
 			parser.setTupleQueryResultHandler(new TupleQueryResultHandlerBase() {
 				// Indicates the end of a sequence of solutions.
@@ -460,7 +522,7 @@ public class TestNanoSparqlServer extends TestCase2 {
 	}
 
 	/**
-	 * Select everything in the kb using a GET.
+	 * Issue a "status" request against the service. 
 	 */
 	public void test_STATUS() throws Exception {
 
@@ -509,9 +571,50 @@ public class TestNanoSparqlServer extends TestCase2 {
 
 	}
 
-	/**
-	 * Select everything in the kb using a GET.
-	 */
+    /**
+     * "ASK" query using GET with an empty KB.
+     */
+    public void test_GET_ASK() throws Exception {
+        
+        final String queryStr = "ASK where {?s ?p ?o}";
+
+        final QueryOptions opts = new QueryOptions();
+        opts.serviceURL = m_serviceURL;
+        opts.queryStr = queryStr;
+        opts.method = "GET";
+
+        opts.acceptHeader = BooleanQueryResultFormat.SPARQL.getDefaultMIMEType();
+        assertEquals(false, askResults(doSparqlQuery(opts, requestPath)));
+
+        opts.acceptHeader = BooleanQueryResultFormat.TEXT.getDefaultMIMEType();
+        assertEquals(false, askResults(doSparqlQuery(opts, requestPath)));
+        
+    }
+
+    /**
+     * "ASK" query using POST with an empty KB.
+     */
+    public void test_POST_ASK() throws Exception {
+        
+        final String queryStr = "ASK where {?s ?p ?o}";
+
+        final QueryOptions opts = new QueryOptions();
+        opts.serviceURL = m_serviceURL;
+        opts.queryStr = queryStr;
+        opts.method = "POST";
+
+        opts.acceptHeader = BooleanQueryResultFormat.SPARQL.getDefaultMIMEType();
+        assertEquals(false, askResults(doSparqlQuery(opts, requestPath)));
+
+        opts.acceptHeader = BooleanQueryResultFormat.TEXT.getDefaultMIMEType();
+        assertEquals(false, askResults(doSparqlQuery(opts, requestPath)));
+        
+    }
+
+    /**
+     * Select everything in the kb using a GET. There will be no solutions
+     * (assuming that we are using a told triple kb or quads kb w/o axioms).
+     */
 	public void test_GET_SELECT_ALL() throws Exception {
 
 		final String queryStr = "select * where {?s ?p ?o}";
@@ -521,17 +624,21 @@ public class TestNanoSparqlServer extends TestCase2 {
 		opts.queryStr = queryStr;
 		opts.method = "GET";
 
-		// No solutions (assuming a told triple kb or quads kb w/o axioms).
+		opts.acceptHeader = TupleQueryResultFormat.SPARQL.getDefaultMIMEType();
 		assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
 
-		// Now with json.
-		opts.acceptHeader = BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON;
-		assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
+		// TODO JSON parser is not bundled by openrdf.
+//        opts.acceptHeader = TupleQueryResultFormat.JSON.getDefaultMIMEType();
+//        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
+
+        opts.acceptHeader = TupleQueryResultFormat.BINARY.getDefaultMIMEType();
+        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
 
 	}
 
     /**
-     * Select everything in the kb using a POST.
+     * Select everything in the kb using a POST. There will be no solutions
+     * (assuming that we are using a told triple kb or quads kb w/o axioms).
      */
     public void test_POST_SELECT_ALL() throws Exception {
 
@@ -542,11 +649,14 @@ public class TestNanoSparqlServer extends TestCase2 {
         opts.queryStr = queryStr;
         opts.method = "POST";
 
-        // No solutions (assuming a told triple kb or quads kb w/o axioms).
+        opts.acceptHeader = TupleQueryResultFormat.SPARQL.getDefaultMIMEType();
         assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
 
-        // Now with json.
-        opts.acceptHeader = BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON;
+        // TODO JSON parser is not bundled by openrdf.
+//        opts.acceptHeader = TupleQueryResultFormat.JSON.getDefaultMIMEType();
+//        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
+
+        opts.acceptHeader = TupleQueryResultFormat.BINARY.getDefaultMIMEType();
         assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
 
     }
@@ -1196,13 +1306,6 @@ public class TestNanoSparqlServer extends TestCase2 {
 
         assertEquals("size", expected.size(), actual.size());
 
-    }
-
-    // FIXME test ASK.
-    public void test_ASK() throws Exception {
-        
-        fail("Write unit test for ASK");
-        
     }
 
 }
