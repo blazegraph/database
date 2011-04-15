@@ -76,9 +76,9 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         final long begin = System.currentTimeMillis();
         
-        final String baseURI = "";// @todo baseURI query parameter?
+        final String baseURI = req.getRequestURL().toString();
 
-        final String namespace = getNamespace(req.getRequestURI());
+        final String namespace = getNamespace(req);
 
         final String queryStr = req.getParameter("query");
 
@@ -227,9 +227,9 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         final long begin = System.currentTimeMillis();
 
-        final String baseURI = "";// @todo baseURI query parameter?
+        final String baseURI = req.getRequestURL().toString();
         
-        final String namespace = getNamespace(req.getRequestURI());
+        final String namespace = getNamespace(req);
 
         final String contentType = req.getContentType();
 

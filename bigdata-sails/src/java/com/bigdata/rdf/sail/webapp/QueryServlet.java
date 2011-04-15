@@ -79,9 +79,9 @@ public class QueryServlet extends BigdataRDFServlet {
     private void doQuery(final HttpServletRequest req,
                 final HttpServletResponse resp) throws IOException {
 
-    	final String namespace = getNamespace(req.getRequestURI());
+    	final String namespace = getNamespace(req);
 
-		final long timestamp = getTimestamp(req.getRequestURI(), req);
+		final long timestamp = getTimestamp(req);
 
 		final String queryStr = req.getParameter("query");
 

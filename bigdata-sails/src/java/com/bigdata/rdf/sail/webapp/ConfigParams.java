@@ -14,12 +14,22 @@ public interface ConfigParams {
     String PROPERTY_FILE = "property-file";
 
     /**
-     * The default bigdata namespace of for the triple or quad store
-     * instance to be exposed (there can be many triple or quad store
-     * instances within a bigdata instance).
+     * The default bigdata namespace of for the triple or quad store instance to
+     * be exposed (default {@link #DEFAULT_NAMESPACE}). Note that there can be
+     * many triple or quad store instances within a bigdata instance.
      */
     String NAMESPACE = "namespace";
+    
+    String DEFAULT_NAMESPACE = "kb";
 
+    /**
+     * When <code>true</code>, an instance of the specified {@link #NAMESPACE}
+     * will be created if none exists.
+     */
+    String CREATE = "create";
+    
+    boolean DEFAULT_CREATE = true;
+    
     /**
      * The size of the thread pool used to service SPARQL queries -OR- ZERO
      * (0) for an unbounded thread pool (default

@@ -47,9 +47,11 @@ import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniClient;
+import com.bigdata.service.jini.JiniFederation;
 
 /**
  * Listener provides life cycle management of the {@link IIndexManager} by
@@ -89,14 +91,30 @@ public class BigdataRDFServletContextListener implements
         final String namespace;
         {
          
-            namespace = context.getInitParameter(ConfigParams.NAMESPACE);
+            String s = context.getInitParameter(ConfigParams.NAMESPACE);
 
-            if (namespace == null)
-                throw new RuntimeException("Required: "
-                        + ConfigParams.NAMESPACE);
+            if (s == null)
+                s = ConfigParams.DEFAULT_NAMESPACE;
+
+            namespace = s;
+            
+            if (log.isInfoEnabled())
+                log.info(ConfigParams.NAMESPACE + "=" + namespace);
+
+        }
+
+        final boolean create;
+        {
+
+            final String s = context.getInitParameter(ConfigParams.CREATE);
+
+            if (s != null)
+                create = Boolean.valueOf(s);
+            else
+                create = ConfigParams.DEFAULT_CREATE;
 
             if (log.isInfoEnabled())
-                log.info("namespace: " + namespace);
+                log.info(ConfigParams.CREATE + "=" + create);
 
         }
 
@@ -128,7 +146,7 @@ public class BigdataRDFServletContextListener implements
                         + ConfigParams.PROPERTY_FILE);
 
             if (log.isInfoEnabled())
-                log.info("propertyFile: " + propertyFile);
+                log.info(ConfigParams.PROPERTY_FILE + "=" + propertyFile);
 
             indexManager = openIndexManager(propertyFile);
             
@@ -137,6 +155,56 @@ public class BigdataRDFServletContextListener implements
 
         }
 
+        if(create) {
+            
+            // Attempt to resolve the namespace.
+            if (indexManager.getResourceLocator().locate(namespace,
+                    ITx.UNISOLATED) == null) {
+
+                log.warn("Creating KB instance: namespace=" + namespace);
+                
+                if (indexManager instanceof Journal) {
+
+                    /*
+                     * Create a local triple store.
+                     * 
+                     * Note: This hands over the logic to some custom code
+                     * located on the BigdataSail.
+                     */
+                    
+                    final Journal jnl = (Journal) indexManager;
+
+                    final Properties properties = new Properties(jnl
+                            .getProperties());
+
+                    // override the namespace.
+                    properties.setProperty(BigdataSail.Options.NAMESPACE,
+                            namespace);
+
+                    // create the appropriate as configured triple/quad store.
+                    BigdataSail.createLTS(jnl, properties);
+
+                } else {
+                    
+                    /*
+                     * Register triple store for scale-out.
+                     */
+                    
+                    final JiniFederation<?> fed = (JiniFederation<?>) indexManager;
+                    
+                    final Properties properties = fed.getClient().getProperties();
+                    
+                    final ScaleOutTripleStore lts = new ScaleOutTripleStore(
+                            indexManager, namespace, ITx.UNISOLATED, properties);
+                    
+                    lts.create();
+                    
+                }
+            
+            } // if( tripleStore == null ) 
+            
+        } // if( create )
+        
         txs = (indexManager instanceof Journal ? ((Journal) indexManager).getTransactionManager()
                 .getTransactionService() : ((IBigdataFederation<?>) indexManager).getTransactionService());
 
@@ -199,6 +267,10 @@ public class BigdataRDFServletContextListener implements
                         + " : Must be non-negative, not: " + s);
 
             }
+
+            if (log.isInfoEnabled())
+                log.info(ConfigParams.QUERY_THREAD_POOL_SIZE + "="
+                        + queryThreadPoolSize);
 
         }
 

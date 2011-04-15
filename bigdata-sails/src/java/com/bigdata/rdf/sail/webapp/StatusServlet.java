@@ -104,8 +104,7 @@ public class StatusServlet extends BigdataRDFServlet {
 
             // General information on the connected kb.
             current.node("pre", getBigdataRDFContext().getKBInfo(
-                    getNamespace(req.getRequestURI()),
-                    getTimestamp(req.getRequestURI(), req)).toString());
+                    getNamespace(req), getTimestamp(req)).toString());
 
         }
 
