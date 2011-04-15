@@ -18,7 +18,6 @@ import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.helpers.RDFHandlerBase;
-import org.openrdf.rio.rdfxml.RDFXMLParser;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.journal.ITx;
@@ -121,8 +120,28 @@ public class DeleteServlet extends BigdataRDFServlet {
                     conn = getBigdataRDFContext().getUnisolatedConnection(
                             namespace);
 
-                    final RDFXMLParser rdfParser = new RDFXMLParser(conn
-                            .getTripleStore().getValueFactory());
+                    /*
+                     * FIXME The RDF for the *query* will be generated using the
+                     * MIME type negotiated based on the Accept header (if any)
+                     * in the DELETE request. That means that we need to look at
+                     * the Accept header here and chose the right RDFFormat for
+                     * the parser. (The alternative is to have an alternative
+                     * way to run the query task where we specify the MIME Type
+                     * of the result directly. That might be better all around.)
+                     */
+
+                    final String contentType = req.getContentType();
+
+                    final RDFFormat format = RDFFormat.forMIMEType(contentType,
+                            RDFFormat.RDFXML);
+
+                    final RDFParserFactory factory = RDFParserRegistry
+                            .getInstance().get(format);
+
+                    final RDFParser rdfParser = factory.getParser();
+
+                    rdfParser.setValueFactory(conn.getTripleStore()
+                            .getValueFactory());
 
                     rdfParser.setVerifyData(false);
 

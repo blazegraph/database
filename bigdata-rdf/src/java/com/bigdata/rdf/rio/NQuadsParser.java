@@ -48,6 +48,7 @@ import org.openrdf.rio.RDFParseException;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
+import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.helpers.RDFParserBase;
 import org.semanticweb.yars.nx.Node;
 import org.semanticweb.yars.nx.parser.NxParser;
@@ -63,6 +64,8 @@ import com.bigdata.rdf.internal.ILexiconConfiguration;
  * @version $Id$
  * 
  * FIXME Write some unit tests for this integration.
+ * 
+ * FIXME Add {@link RDFWriter} for NQUADS.
  */
 public class NQuadsParser extends RDFParserBase implements RDFParser  {
 

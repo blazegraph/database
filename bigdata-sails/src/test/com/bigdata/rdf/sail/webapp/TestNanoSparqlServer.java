@@ -1,13 +1,12 @@
 package com.bigdata.rdf.sail.webapp;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.StringWriter;
-import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -24,6 +23,7 @@ import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
@@ -36,9 +36,14 @@ import org.openrdf.query.TupleQueryResultHandlerBase;
 import org.openrdf.query.resultio.TupleQueryResultParser;
 import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLParserFactory;
 import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParser;
+import org.openrdf.rio.RDFParserFactory;
+import org.openrdf.rio.RDFParserRegistry;
+import org.openrdf.rio.RDFWriter;
+import org.openrdf.rio.RDFWriterFactory;
+import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.rio.helpers.StatementCollector;
-import org.openrdf.rio.rdfxml.RDFXMLParser;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -58,8 +63,23 @@ import com.bigdata.util.config.NicUtil;
  * Test suite for {@link RESTServlet} (SPARQL end point and REST API for RDF
  * data).
  * 
+ * @todo Test default-graph-uri(s) and named-graph-uri(s).
+ * 
+ * @todo Verify conneg for various mime type for different kinds of queries.
+ *       E.g., conneg for json result sets for SELECT, conneg for n3 response
+ *       for CONSTRUCT, etc. The logic for handling Accept headers does not pay
+ *       attention to q=... parameters, so only a single mime type should be
+ *       specified in the Accept header.
+ * 
+ * @todo NQUADS RDFWriter needs to be written. Then we can test NQUADS
+ *       interchange.
+ * 
+ * @todo Add tests for SIDS mode interchange of RDF XML.
+ * 
  * @todo The methods which return a mutation count should verify the returned
  *       XML document.
+ * 
+ * @todo Test suite for reading from a historical commit point.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestNanoSparqlServer.java 4398 2011-04-14 13:55:29Z thompsonbry
@@ -71,10 +91,10 @@ public class TestNanoSparqlServer extends TestCase2 {
 	private Server m_fixture;
 	private String m_serviceURL;
 	
-	final static String REST = "";
+	final private static String requestPath = "";
 
 	protected void setUp() throws Exception {
-
+	    
 		final Properties properties = getProperties();
 
 		final String namespace = getName();
@@ -219,27 +239,29 @@ public class TestNanoSparqlServer extends TestCase2 {
 
 		/** The URL of the SPARQL endpoint. */
 		public String serviceURL = null;
-		// public String username = null;
-		// public String password = null;
 		/** The HTTP method (GET, POST, etc). */
 		public String method = "GET";
 		/** The SPARQL query. */
 		public String queryStr = null;
-		/** The default graph URI (optional). */
-		public String defaultGraphUri = null;
+        /** TODO DG and NG protocol params: The default graph URI (optional). */
+        public String defaultGraphUri = null;
+        /** The accept header. */
+        public String acceptHeader = //
+        BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON + ";q=1" + //
+        "," + //
+        RDFFormat.RDFXML.getDefaultMIMEType() + ";q=1"//
+        ;
 		
-		/** The connection timeout (ms) -or- ZERO (0) for an infinate timeout. */
-		// public int timeout = DEFAULT_TIMEOUT;
+		/** The connection timeout (ms) -or- ZERO (0) for an infinite timeout. */
 		public int timeout = 0;
-		// public boolean showQuery = false;
 
 	}
 
-    protected HttpURLConnection doConnect(final String urlString,
+    private HttpURLConnection doConnect(final String urlString,
             final String method) throws Exception {
-        
+
         final URL url = new URL(urlString);
-        
+
         final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
         conn.setRequestMethod(method);
@@ -247,6 +269,7 @@ public class TestNanoSparqlServer extends TestCase2 {
         conn.setUseCaches(false);
 
         return conn;
+
     }
 
     /**
@@ -256,8 +279,6 @@ public class TestNanoSparqlServer extends TestCase2 {
      *            The query request.
      * 
      * @return The connection.
-     * 
-     * TODO Test default-graph-uri(s) and named-graph-uri(s).
      */
     protected HttpURLConnection doSparqlQuery(final QueryOptions opts,
             final String servlet) throws Exception {
@@ -274,21 +295,12 @@ public class TestNanoSparqlServer extends TestCase2 {
 
 		HttpURLConnection conn = null;
 		try {
-			conn = doConnect(urlString, opts.method);
+
+		    conn = doConnect(urlString, opts.method);
 			
 			conn.setReadTimeout(opts.timeout);
 
-			/*
-			 * Set an appropriate Accept header for the query.
-			 * 
-			 * @todo ASK queries have boolean data, JSON format is also
-			 * available.
-			 */
-			conn.setRequestProperty("Accept",//
-					BigdataRDFServlet.MIME_SPARQL_RESULTS_XML + ";q=1" + //
-							"," + //
-							BigdataRDFServlet.MIME_RDF_XML + ";q=1"//
-			);
+            conn.setRequestProperty("Accept", opts.acceptHeader);
 
 			// write out the request headers
 			if (log.isDebugEnabled()) {
@@ -352,7 +364,25 @@ public class TestNanoSparqlServer extends TestCase2 {
 
 			final String baseURI = "";
 
-			final RDFXMLParser rdfParser = new RDFXMLParser(new ValueFactoryImpl());
+			final String contentType = conn.getContentType();
+
+            if (contentType == null)
+                fail("Not found: Content-Type");
+            
+			final RDFFormat format = RDFFormat.forMIMEType(contentType);
+
+            if (format == null)
+                fail("RDFFormat not found: Content-Type=" + contentType);
+
+			final RDFParserFactory factory = RDFParserRegistry.getInstance().get(format);
+
+            if (factory == null)
+                fail("RDFParserFactory not found: Content-Type=" + contentType
+                        + ", format=" + format);
+
+			final RDFParser rdfParser = factory.getParser();
+			
+			rdfParser.setValueFactory(new ValueFactoryImpl());
 
 			rdfParser.setVerifyData(true);
 
@@ -492,7 +522,11 @@ public class TestNanoSparqlServer extends TestCase2 {
 		opts.method = "GET";
 
 		// No solutions (assuming a told triple kb or quads kb w/o axioms).
-		assertEquals(0, countResults(doSparqlQuery(opts, REST)));
+		assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
+
+		// Now with json.
+		opts.acceptHeader = BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON;
+		assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
 
 	}
 
@@ -509,21 +543,87 @@ public class TestNanoSparqlServer extends TestCase2 {
         opts.method = "POST";
 
         // No solutions (assuming a told triple kb or quads kb w/o axioms).
-        assertEquals(0, countResults(doSparqlQuery(opts, REST)));
+        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
+
+        // Now with json.
+        opts.acceptHeader = BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON;
+        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
 
     }
 
-	public void test_POST_UPDATE_withBody_NTRIPLES() throws Exception {
+    public void test_POST_UPDATE_withBody_RDFXML() throws Exception {
 
-	    do_UPDATE_withBody_NTRIPLES("POST", 23, REST);
-	    
-	}
+        do_UPDATE_withBody("POST", 23, requestPath, RDFFormat.RDFXML);
+        
+    }
     
-	public void test_PUT_UPDATE_withBody_NTRIPLES() throws Exception {
-		
-	    do_UPDATE_withBody_NTRIPLES("PUT", 23, REST);
-	    
-	}
+    public void test_POST_UPDATE_withBody_NTRIPLES() throws Exception {
+
+        do_UPDATE_withBody("POST", 23, requestPath, RDFFormat.NTRIPLES);
+        
+    }
+    
+    public void test_POST_UPDATE_withBody_N3() throws Exception {
+
+        do_UPDATE_withBody("POST", 23, requestPath, RDFFormat.N3);
+        
+    }
+    
+    public void test_POST_UPDATE_withBody_TURTLE() throws Exception {
+
+        do_UPDATE_withBody("POST", 23, requestPath, RDFFormat.TURTLE);
+        
+    }
+    
+    // Note: quads interchange
+    public void test_POST_UPDATE_withBody_TRIG() throws Exception {
+
+        do_UPDATE_withBody("POST", 23, requestPath, RDFFormat.TRIG);
+        
+    }
+    
+    // Note: quads interchange
+    public void test_POST_UPDATE_withBody_TRIX() throws Exception {
+
+        do_UPDATE_withBody("POST", 23, requestPath, RDFFormat.TRIX);
+        
+    }
+
+    public void test_PUT_UPDATE_withBody_RDFXML() throws Exception {
+
+        do_UPDATE_withBody("PUT", 23, requestPath, RDFFormat.RDFXML);
+
+    }
+
+    public void test_PUT_UPDATE_withBody_NTRIPLES() throws Exception {
+
+        do_UPDATE_withBody("PUT", 23, requestPath, RDFFormat.NTRIPLES);
+
+    }
+
+    public void test_PUT_UPDATE_withBody_N3() throws Exception {
+
+        do_UPDATE_withBody("PUT", 23, requestPath, RDFFormat.N3);
+
+    }
+
+    public void test_PUT_UPDATE_withBody_TURTLE() throws Exception {
+
+        do_UPDATE_withBody("PUT", 23, requestPath, RDFFormat.TURTLE);
+
+    }
+
+    public void test_PUT_UPDATE_withBody_TRIG() throws Exception {
+
+        do_UPDATE_withBody("PUT", 23, requestPath, RDFFormat.TRIG);
+
+    }
+
+    public void test_PUT_UPDATE_withBody_TRIX() throws Exception {
+
+        do_UPDATE_withBody("PUT", 23, requestPath, RDFFormat.TRIX);
+
+    }
 	
     /**
      * Select everything in the kb using a POST.
@@ -537,14 +637,14 @@ public class TestNanoSparqlServer extends TestCase2 {
         opts.queryStr = queryStr;
         opts.method = "POST";
 
-    	do_UPDATE_withBody_NTRIPLES("POST", 23, REST);
+    	do_UPDATE_withBody("POST", 23, requestPath, RDFFormat.NTRIPLES);
     	
-        assertEquals(23, countResults(doSparqlQuery(opts, REST)));
+        assertEquals(23, countResults(doSparqlQuery(opts, requestPath)));
     	
-    	do_DELETE_with_Query(REST, "construct {?s ?p ?o} where {?s ?p ?o}");
+    	do_DELETE_with_Query(requestPath, "construct {?s ?p ?o} where {?s ?p ?o}");
 
         // No solutions (assuming a told triple kb or quads kb w/o axioms).
-        assertEquals(0, countResults(doSparqlQuery(opts, REST)));
+        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
 
     }
 
@@ -561,21 +661,49 @@ public class TestNanoSparqlServer extends TestCase2 {
         opts.queryStr = queryStr;
         opts.method = "POST";
 
-    	do_UPDATE_withBody_NTRIPLES("POST", 23, REST);
+    	do_UPDATE_withBody("POST", 23, requestPath, RDFFormat.NTRIPLES);
     	
-        assertEquals(23, countResults(doSparqlQuery(opts, REST)));
+        assertEquals(23, countResults(doSparqlQuery(opts, requestPath)));
 
-        do_DELETE_with_Query(REST, "construct {?s ?p ?o} where {?s ?p ?o}");
+        do_DELETE_with_Query(requestPath, "construct {?s ?p ?o} where {?s ?p ?o}");
 
         // No solutions (assuming a told triple kb or quads kb w/o axioms).
-        assertEquals(0, countResults(doSparqlQuery(opts, REST)));
+        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
+    }
+
+    public void test_DELETE_withPOST_RDFXML() throws Exception {
+        doDeleteWithPostTest(RDFFormat.RDFXML);
+    }
+
+    public void test_DELETE_withPOST_NTRIPLES() throws Exception {
+        doDeleteWithPostTest(RDFFormat.NTRIPLES);
+    }
+
+    public void test_DELETE_withPOST_N3() throws Exception {
+        doDeleteWithPostTest(RDFFormat.N3);
+    }
+
+    public void test_DELETE_withPOST_TURTLE() throws Exception {
+        doDeleteWithPostTest(RDFFormat.TURTLE);
+    }
+
+    public void test_DELETE_withPOST_TRIG() throws Exception {
+        doDeleteWithPostTest(RDFFormat.TRIG);
+    }
+
+    public void test_DELETE_withPOST_TRIX() throws Exception {
+        doDeleteWithPostTest(RDFFormat.TRIX);
     }
 
     /**
-     * Select everything in the kb using a POST.
+     * Test helps PUTs some data, verifies that it is visible, DELETEs the data,
+     * and then verifies that it is gone.
+     * 
+     * @param format
+     *            The interchange format.
      */
-    public void test_DELETE_withPOST() throws Exception {
-    	
+    private void doDeleteWithPostTest(final RDFFormat format) throws Exception {
+
         final String queryStr = "select * where {?s ?p ?o}";
 
         final QueryOptions opts = new QueryOptions();
@@ -583,17 +711,17 @@ public class TestNanoSparqlServer extends TestCase2 {
         opts.queryStr = queryStr;
         opts.method = "POST";
 
-    	do_UPDATE_withBody_NTRIPLES("POST", 23, REST);
-    	
-        assertEquals(23, countResults(doSparqlQuery(opts, REST)));
+        do_UPDATE_withBody("POST", 23, requestPath, format);
 
-        do_DELETE_withBody_NTRIPLES("", 23);
+        assertEquals(23, countResults(doSparqlQuery(opts, requestPath)));
+
+        do_DELETE_withBody("", 23, format);
 
         // No solutions (assuming a told triple kb or quads kb w/o axioms).
-        assertEquals(0, countResults(doSparqlQuery(opts, REST)));
-
+        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
+        
     }
-    
+
 	private void do_DELETE_with_Query(final String servlet, final String query) {
 		HttpURLConnection conn = null;
 		try {
@@ -624,10 +752,12 @@ public class TestNanoSparqlServer extends TestCase2 {
 				conn.disconnect();
 			throw new RuntimeException(t);
 		}
-	}
+    }
 
-	private void do_DELETE_withBody_NTRIPLES(final String servlet, final int ntriples) {
-		HttpURLConnection conn = null;
+    private void do_DELETE_withBody(final String servlet, final int ntriples,
+            final RDFFormat format) {
+
+        HttpURLConnection conn = null;
 		try {
 
 			final URL url = new URL(m_serviceURL + "/" + servlet+"?delete");
@@ -638,22 +768,19 @@ public class TestNanoSparqlServer extends TestCase2 {
 			conn.setUseCaches(false);
 			conn.setReadTimeout(0);// TODO timeout (ms)
 
-			final String defmimetype = RDFFormat.NTRIPLES.getDefaultMIMEType();
+            conn
+                    .setRequestProperty("Content-Type", format
+                            .getDefaultMIMEType());
 
-			conn.setRequestProperty("Content-Type", defmimetype);
-
-			final String data = genNTRIPLES(ntriples);
+            final byte[] data = genNTRIPLES(ntriples, format);
 			
-			conn.setRequestProperty("Content-Length", "" + Integer.toString(data.length()));
+            conn.setRequestProperty("Content-Length", ""
+                    + Integer.toString(data.length));
 
 			final OutputStream os = conn.getOutputStream();
 			try {
-				final Writer w = new OutputStreamWriter(os);
-				w.write(data);
-				w.flush();
-				w.close();
+			    os.write(data);
 				os.flush();
-				os.close();
 			} finally {
 				os.close();
 			}
@@ -697,24 +824,67 @@ public class TestNanoSparqlServer extends TestCase2 {
 //			assertTrue(rc == 405); // NOT_ALLOWED
 //		}
 //	}
-    
-	String genNTRIPLES(final int ntriples) {
-		StringBuffer databuf = new StringBuffer();
-		databuf.append("#@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n");
-		databuf.append("#@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n");
-		databuf.append("#@prefix owl:  <http://www.w3.org/2002/07/owl#> .\n");
-		databuf.append("#@prefix : <#> .\n");
-		for (int i = 0; i < ntriples; i++) {
-			databuf.append("<http://www.bigdata.org/b> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.bigdata.org/c#" + i + ">.\n");
-		}
-		
-		return databuf.toString();
+
+    /**
+     * Generates some statements and serializes them using the specified
+     * {@link RDFFormat}.
+     * 
+     * @param ntriples
+     *            The #of statements to generate.
+     * @param format
+     *            The format.
+     * 
+     * @return the serialized statements.
+     */
+    final byte[] genNTRIPLES(final int ntriples, final RDFFormat format)
+            throws RDFHandlerException {
+
+        final Graph g = new GraphImpl();
+
+        final ValueFactory f = new ValueFactoryImpl();
+        
+        final URI s = f.createURI("http://www.bigdata.org/b");
+        
+        final URI rdfType = f
+                .createURI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
+        
+        for (int i = 0; i < ntriples; i++) {
+        
+            final URI o = f.createURI("http://www.bigdata.org/c#" + i);
+            
+            g.add(s, rdfType, o);
+            
+        }
+	    
+        final RDFWriterFactory writerFactory = RDFWriterRegistry.getInstance()
+                .get(format);
+
+        if (writerFactory == null)
+            fail("RDFWriterFactory not found: format=" + format);
+
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        final RDFWriter writer = writerFactory.getWriter(baos);
+
+        writer.startRDF();
+
+        for (Statement stmt : g) {
+
+            writer.handleStatement(stmt);
+
+        }
+
+        writer.endRDF();
+
+        return baos.toByteArray();
+        
 	}
+	
 	/**
-	 * @todo Test of POST w/ BODY having data to be loaded.
+	 * FIXME Test of POST w/ BODY having data to be loaded.
 	 */
-    public void do_UPDATE_withBody_NTRIPLES(final String method,
-            final int ntriples, final String servlet) throws Exception {
+    private void do_UPDATE_withBody(final String method, final int ntriples,
+            final String servlet, final RDFFormat format) throws Exception {
 
 		HttpURLConnection conn = null;
 		try {
@@ -727,23 +897,18 @@ public class TestNanoSparqlServer extends TestCase2 {
 			conn.setUseCaches(false);
 			conn.setReadTimeout(0);// TODO timeout (ms)
 			
-            final String defmimetype = RDFFormat.NTRIPLES.getDefaultMIMEType();
+            conn.setRequestProperty("Content-Type", format
+                            .getDefaultMIMEType());
 
-            conn.setRequestProperty("Content-Type", defmimetype);
+            final byte[] data = genNTRIPLES(ntriples, format);
 
-            final String data = genNTRIPLES(ntriples);
-
-            conn.setRequestProperty("Content-Length", ""
-                    + Integer.toString(data.length()));
+            conn.setRequestProperty("Content-Length", Integer.toString(data
+                    .length));
 
 			final OutputStream os = conn.getOutputStream();
 			try {
-				final Writer w = new OutputStreamWriter(os);
-				w.write(data);
-				w.flush();
-				w.close();
+			    os.write(data);
 				os.flush();
-				os.close();
 			} finally {
 				os.close();
 			}
@@ -777,7 +942,7 @@ public class TestNanoSparqlServer extends TestCase2 {
 			opts.queryStr = queryStr;
 			opts.method = "GET";
 
-			assertEquals(ntriples, countResults(doSparqlQuery(opts, REST)));
+			assertEquals(ntriples, countResults(doSparqlQuery(opts, requestPath)));
 		}
 
     }
@@ -806,12 +971,56 @@ public class TestNanoSparqlServer extends TestCase2 {
             
         }
         
-        
-        
     }
 
-    public void test_GET_DESCRIBE() throws Exception {
+    // TODO Also test POST DESCRIBE
+    public void test_GET_DESCRIBE_RDFXML() throws Exception {
 
+        doDescribeTest(RDFFormat.RDFXML);
+
+    }
+
+    public void test_GET_DESCRIBE_NTRIPLES() throws Exception {
+
+        doDescribeTest(RDFFormat.NTRIPLES);
+
+    }
+
+    public void test_GET_DESCRIBE_N3() throws Exception {
+
+        doDescribeTest(RDFFormat.N3);
+
+    }
+
+    public void test_GET_DESCRIBE_TURTLE() throws Exception {
+
+        doDescribeTest(RDFFormat.TURTLE);
+
+    }
+
+    public void test_GET_DESCRIBE_TRIG() throws Exception {
+
+        doDescribeTest(RDFFormat.TRIG);
+
+    }
+
+    public void test_GET_DESCRIBE_TRIX() throws Exception {
+
+        doDescribeTest(RDFFormat.TRIX);
+
+    }
+
+    /**
+     * Inserts some data into the KB and then issues a DESCRIBE query against
+     * the REST API and verifies the expected results.
+     * 
+     * @param format
+     *            The format is used to specify the Accept header.
+     *            
+     * @throws Exception
+     */
+    private void doDescribeTest(final RDFFormat format) throws Exception {
+        
         final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
         final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
         final URI person = new URIImpl(BD.NAMESPACE + "Person");
@@ -876,15 +1085,18 @@ public class TestNanoSparqlServer extends TestCase2 {
                 "  ?x rdf:type bd:Person . " +//
                 "  ?x bd:likes bd:RDF " +//
                 "}";
+            opts.acceptHeader = format.getDefaultMIMEType();
 
-            final Graph actual = buildGraph(doSparqlQuery(opts, REST));
+            final Graph actual = buildGraph(doSparqlQuery(opts, requestPath));
 
             assertSameGraph(expected, actual);
             
         }
 
     }
-
+    
+    // TODO Test for all RDFFormats.
+    // TODO Also test POST CONSTRUCT
     public void test_GET_CONSTRUCT() throws Exception {
 
         final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
@@ -953,7 +1165,7 @@ public class TestNanoSparqlServer extends TestCase2 {
 //                "  ?x bd:likes bd:RDF " +//
                 "}";
 
-            final Graph actual = buildGraph(doSparqlQuery(opts, REST));
+            final Graph actual = buildGraph(doSparqlQuery(opts, requestPath));
 
             assertSameGraph(expected, actual);
             
