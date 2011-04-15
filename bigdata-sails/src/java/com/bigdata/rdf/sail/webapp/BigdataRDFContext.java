@@ -278,13 +278,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
         protected final OutputStream os;
 
         /**
-         * Sesame has an option for a base URI during query evaluation. This
-         * provides a symbolic place holder for that URI in case we ever provide
-         * a hook to set it.
-         * 
-         * FIXME This should be the service end point URI.
+         * The baseURI is set from the effective request URI.
          */
-        protected final String baseURI = null;
+        protected final String baseURI;
 
         /**
          * The queryId as assigned by the SPARQL end point (rather than the
@@ -361,6 +357,18 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.os = os;
             this.queryId = Long.valueOf(m_queryIdFactory.incrementAndGet());
             this.queryId2 = UUID.randomUUID();
+
+            /*
+             * Setup the baseURI for this request. It will be set to the
+             * requestURI.
+             * 
+             * TODO This is basically a constant and should be set once rather
+             * than for each request. It should also be explicitly configurable
+             * in order to always choose a specific baseURI when there might be
+             * multiple ways in which the target service could have been
+             * addressed (e.g., different host names).
+             */
+            this.baseURI = req.getRequestURL().toString();
 
         }
 
