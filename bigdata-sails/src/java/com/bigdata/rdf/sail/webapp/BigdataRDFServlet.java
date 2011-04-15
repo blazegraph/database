@@ -59,9 +59,18 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
     /**
      * A SPARQL results set in XML.
+     * 
+     * @see http://www.w3.org/TR/rdf-sparql-XMLres/
      */
     static protected final transient String MIME_SPARQL_RESULTS_XML = "application/sparql-results+xml";
-    
+
+    /**
+     * A SPARQL results set in JSON.
+     * 
+     * @see http://www.w3.org/TR/rdf-sparql-json-res/
+     */
+    static protected final transient String MIME_SPARQL_RESULTS_JSON = "application/sparql-results+json";
+
     /**
      * RDF/XML.
      */

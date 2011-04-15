@@ -57,13 +57,20 @@ public class TimestampUtility {
         return "readOnly(" + timestamp + ")";
 
     }
-    
+
     /**
      * True iff the timestamp is a possible commit time (GT ZERO).
+     * <p>
+     * Note: Both read-only transactions are commit times are positive. The
+     * transition identifier for a read-only transaction is chosen from among
+     * those distinct timestamps available between the effective commit time
+     * requested for the read-only transaction and the next commit time on the
+     * database.
      * 
      * @param timestamp
      *            The timestamp.
-     * @return
+     *            
+     * @return <code>true</code> for a possible commit time or a read-only tx.
      */
     static public boolean isCommitTime(final long timestamp) {
         
@@ -71,6 +78,16 @@ public class TimestampUtility {
         
     }
 
+    /**
+     * True iff the timestamp is a possible commit time (GT ZERO) -OR- a
+     * {@link ITx#READ_COMMITTED} request.
+     * 
+     * @param timestamp
+     *            The timestamp.
+     * 
+     * @return <code>true</code> for a possible commit time, a read-only tx, or
+     *         a {@link ITx#READ_COMMITTED} request.
+     */
     static public boolean isReadOnly(final long timestamp) {
         
 //        return timestamp < ITx.READ_COMMITTED;
@@ -78,6 +95,16 @@ public class TimestampUtility {
         
     }
 
+    /**
+     * Return <code>true</code> iff the timestamp is a possible read-write
+     * transaction identifier (LT ZERO).
+     * 
+     * @param timestamp
+     *            The timestamp.
+     * 
+     * @return <code>true</code> iff the timestamp is a possible read-write
+     *         transaction identifier.
+     */
     static public boolean isReadWriteTx(final long timestamp) {
         
 //        return timestamp > 0;

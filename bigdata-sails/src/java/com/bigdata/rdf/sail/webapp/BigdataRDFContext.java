@@ -26,8 +26,14 @@ import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.query.parser.QueryParser;
 import org.openrdf.query.parser.sparql.SPARQLParserFactory;
+import org.openrdf.query.resultio.TupleQueryResultFormat;
+import org.openrdf.query.resultio.TupleQueryResultWriter;
+import org.openrdf.query.resultio.TupleQueryResultWriterRegistry;
 import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
 import org.openrdf.repository.RepositoryException;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFWriter;
+import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailException;
 
@@ -232,7 +238,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * The timestamp of the view for that namespace against which the query
          * will be run.
          */
-        private final long timestamp;
+        public final long timestamp;
 
         /** The SPARQL query string. */
         protected final String queryStr;
@@ -247,6 +253,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         protected final String mimeType;
 
+        /**
+         * The {@link RDFFormat} for the response (required only for queries
+         * which produce RDF data, as opposed to RDF result sets).
+         */
+        protected final RDFFormat format;
+        
         /** The request. */
         private final HttpServletRequest req;
         
@@ -270,7 +282,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * The queryId used by the {@link QueryEngine}.
          */
         protected final UUID queryId2;
-        
+
         /**
          * 
          * @param namespace
@@ -280,8 +292,16 @@ public class BigdataRDFContext extends BigdataBaseContext {
          *            the query will be run.
          * @param queryStr
          *            The SPARQL query string.
-         * @param req The request.
-         * @param resp The response.
+         * @param mimeType
+         *            The MIME type to be used for the response.
+         * @param format
+         *            The {@link RDFFormat} for the response (required only for
+         *            queries which produce RDF data, as opposed to RDF result
+         *            sets).
+         * @param req
+         *            The request.
+         * @param resp
+         *            The response.
          */
         protected AbstractQueryTask(//
                 final String namespace,//
@@ -289,6 +309,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 final String queryStr,//
                 final QueryType queryType,//
                 final String mimeType,//
+                final RDFFormat format,//
                 final HttpServletRequest req,//
                 final OutputStream os//
                 ) {
@@ -298,6 +319,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.queryStr = queryStr;
             this.queryType = queryType;
             this.mimeType = mimeType;
+            this.format = format;
             this.req = req;
             this.os = os;
             this.queryId = Long.valueOf(m_queryIdFactory.incrementAndGet());
@@ -328,15 +350,15 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 if(log.isTraceEnabled())
                     log.trace("Query running...");
 //                try {
-                	doQuery(cxn, os);
+                doQuery(cxn, os);
 //                } catch(Throwable t) {
 //                	/*
 //                	 * Log the query and the exception together.
 //                	 */
 //					log.error(t.getLocalizedMessage() + ":\n" + queryStr, t);
 //                }
-                	if(log.isTraceEnabled())
-                	    log.trace("Query done - flushing results.");
+            	if(log.isTraceEnabled())
+            	    log.trace("Query done - flushing results.");
                 os.flush();
                 os.close();
                 if(log.isTraceEnabled())
@@ -357,6 +379,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 if (cxn != null) {
                     try {
                         cxn.close();
+                        if(log.isTraceEnabled())
+                            log.trace("Connection closed.");
                     } catch (Throwable t) {
                         log.error(t, t);
                     }
@@ -373,11 +397,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
         public TupleQueryTask(final String namespace, final long timestamp,
                 final String queryStr, final QueryType queryType,
-                final String mimeType, final HttpServletRequest req,
+                final String mimeType, final RDFFormat format,
+                final HttpServletRequest req,
                 final OutputStream os) {
 
-            super(namespace, timestamp, queryStr, queryType, mimeType, req,
-                    os);
+            super(namespace, timestamp, queryStr, queryType, mimeType, format,
+                    req, os);
 
 		}
 
@@ -386,20 +411,25 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
 			final BigdataSailTupleQuery query = cxn.prepareTupleQuery(
 					QueryLanguage.SPARQL, queryStr, baseURI);
-			// TODO What was this alternative logic about?
-//			if (true) {
-//				StringWriter strw = new StringWriter();
-//				
-//				query.evaluate(new SPARQLResultsXMLWriter(new XMLWriter(strw)));
-//				
-//				OutputStreamWriter outstr = new OutputStreamWriter(os);
-//				String res = strw.toString();
-//				outstr.write(res);
-//				outstr.flush();
-//				outstr.close();
-//			} else {
-				query.evaluate(new SPARQLResultsXMLWriter(new XMLWriter(os)));
-//			}
+		
+			/*
+			 * FIXME Raise this into the query CONNEG logic parallel to how
+			 * we handle queries which result in RDF data rather than SPARQL
+			 * result sets.
+			 */
+            final TupleQueryResultFormat format = TupleQueryResultWriterRegistry
+                    .getInstance().getFileFormatForMIMEType(mimeType);
+
+            final TupleQueryResultWriter w = format == null ? new SPARQLResultsXMLWriter(
+                    new XMLWriter(os))
+                    : TupleQueryResultWriterRegistry.getInstance().get(format)
+                            .getWriter(os);
+            
+//			final RDFWriter w = format == null ? new RDFXMLWriter(os)
+//                : RDFWriterRegistry.getInstance().get(format).getWriter(os);
+
+			query.evaluate(w);
+
 		}
 
 	}
@@ -411,11 +441,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
         public GraphQueryTask(final String namespace, final long timestamp,
                 final String queryStr, final QueryType queryType,
-                final String mimeType, final HttpServletRequest req,
+                final String mimeType, final RDFFormat format,
+                final HttpServletRequest req,
                 final OutputStream os) {
 
-            super(namespace, timestamp, queryStr, queryType, mimeType, req,
-                    os);
+            super(namespace, timestamp, queryStr, queryType, mimeType, format,
+                    req, os);
 
         }
 
@@ -426,7 +457,32 @@ public class BigdataRDFContext extends BigdataBaseContext {
 			final BigdataSailGraphQuery query = cxn.prepareGraphQuery(
 					QueryLanguage.SPARQL, queryStr, baseURI);
 
-           query.evaluate(new RDFXMLWriter(os));
+            /*
+             * FIXME An error thrown here (such as if format is null and we do
+             * not check it) will cause the response to hang, at least for the
+             * test suite. Look into this further and make the error handling
+             * bullet proof!
+             * 
+             * This may be related to queryId2. That should be imposed on the
+             * IRunningQuery via a query hint such that the QueryEngine assigns
+             * that UUID to the query. We can then correlate the queryId to the
+             * IRunningQuery, which is important for some of the status pages.
+             * This will also let us INTERRUPT the IRunningQuery if there is an
+             * error during evaluation, which might be necessary. For example,
+             * if the client dies while the query is running.  Look at the old
+             * NSS code and see what it was doing and whether this was logic was
+             * lost of simply never implemented.
+             * 
+             * However, I do not see how that would explain the failure of the
+             * ft.get() method to return.
+             */
+//			if(true)
+//			    throw new RuntimeException();
+
+            final RDFWriter w = format == null ? new RDFXMLWriter(os)
+                    : RDFWriterRegistry.getInstance().get(format).getWriter(os);
+
+			query.evaluate(w);
 
         }
 
@@ -474,28 +530,65 @@ public class BigdataRDFContext extends BigdataBaseContext {
         
         final QueryType queryType = QueryType.fromQuery(queryStr);
 
-		final String mimeType;
-		switch (queryType) {
-		case ASK:
-			/*
-			 * FIXME handle ASK.
-			 */
-			break;
-		case DESCRIBE:
-		case CONSTRUCT:
-            // FIXME Conneg for the mime type for construct/describe!
-            mimeType = BigdataRDFServlet.MIME_RDF_XML;
-            return new GraphQueryTask(namespace, timestamp, queryStr,
-                    queryType, mimeType, req, os);
-        case SELECT:
-            mimeType = BigdataRDFServlet.MIME_SPARQL_RESULTS_XML;
-            return new TupleQueryTask(namespace, timestamp, queryStr,
-                    queryType, mimeType, req, os);
+        /*
+         * CONNEG for the mime type.
+         * 
+         * TODO This is a hack which will obey an Accept header IF the header
+         * contains a single well-formed MIME Type. Complex accept headers will
+         * not be matched and quality parameters (q=...) are ignored. (Sesame
+         * has some stuff related to generating Accept headers in their
+         * RDFFormat which could bear some more looking into in this regard.)
+         */
+        final String acceptStr = req.getHeader("Accept");
+
+        RDFFormat format = acceptStr == null ? null : RDFFormat
+                .forMIMEType(acceptStr);
+
+        final String mimeType;
+        switch (queryType) {
+        case ASK: {
+            /*
+             * FIXME handle ASK.
+             */
+            break;
         }
+        case DESCRIBE:
+        case CONSTRUCT: {
 
-		throw new RuntimeException("Unknown query type: " + queryType);
+            if (format != null) {
 
-	}
+                mimeType = format.getDefaultMIMEType();
+
+            } else {
+
+                mimeType = BigdataRDFServlet.MIME_RDF_XML;
+
+            }
+
+            return new GraphQueryTask(namespace, timestamp, queryStr,
+                    queryType, mimeType, format, req, os);
+        }
+        case SELECT: {
+
+            if (format != null) {
+
+                mimeType = format.getDefaultMIMEType();
+
+            } else {
+
+                mimeType = BigdataRDFServlet.MIME_SPARQL_RESULTS_XML;
+
+            }
+
+            return new TupleQueryTask(namespace, timestamp, queryStr,
+                    queryType, mimeType, format, req, os);
+
+        }
+        } // switch(queryType)
+
+        throw new RuntimeException("Unknown query type: " + queryType);
+
+    }
 
 	/**
      * Metadata about running queries.
@@ -833,8 +926,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
     }
 
     /**
-     * Return a list of the namespaces for the registered
-     * {@link AbstractTripleStore}s.
+     * Return a list of the namespaces for the {@link AbstractTripleStore}s
+     * registered against the bigdata instance.
      */
     /*package*/ List<String> getNamespaces() {
     

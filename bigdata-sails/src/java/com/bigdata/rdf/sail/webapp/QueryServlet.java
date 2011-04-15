@@ -8,6 +8,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 
 /**
@@ -67,7 +68,7 @@ public class QueryServlet extends BigdataRDFServlet {
 		    return;
 		    
 		}
-		
+
         /*
          * Setup task to execute the query. The task is executed on a thread
          * pool. This bounds the possible concurrency of query execution (as
@@ -86,17 +87,96 @@ public class QueryServlet extends BigdataRDFServlet {
             final FutureTask<Void> ft = new FutureTask<Void>(queryTask);
 
             if (log.isTraceEnabled())
-				log.trace("Will run query: " + queryStr);
+                log.trace("Will run query: " + queryStr);
 
             /*
-             * Note: This is run on an ExecutorService with a configured thread
-             * pool size so we can avoid running too many queries concurrently.
+             * Setup the response headers.
              */
 
-            // Setup the response.
-            // TODO Move charset choice into conneg logic.
-            buildResponse(resp, HTTP_OK, queryTask.mimeType + "; charset='" + charset + "'");
-			
+            resp.setStatus(HTTP_OK);
+
+            // Figure out the filename extension for the response.
+            
+            final String ext;
+            final String charset;
+            
+            if(queryTask.format != null) {
+
+                /*
+                 * If some RDFormat was negotiated, then construct the filename
+                 * for the attachment using the default extension for that
+                 * format and the queryId.
+                 */
+                
+                ext = queryTask.format.getDefaultFileExtension();
+                
+                charset = queryTask.format.getCharset().name();
+
+            } else {
+
+                if(queryTask.mimeType.equals(MIME_SPARQL_RESULTS_XML)) {
+
+                    // See http://www.w3.org/TR/rdf-sparql-XMLres/
+
+                    ext = "srx"; // Sparql Result Set.
+                    
+                } else if(queryTask.mimeType.equals(MIME_SPARQL_RESULTS_JSON)) {
+
+                    // See http://www.w3.org/TR/rdf-sparql-json-res/
+                    
+                    ext = "srj";
+                    
+                } else {
+                    
+                    ext = "xxx";
+                    
+                }
+
+                charset = QueryServlet.charset;
+                
+            }
+            
+            resp.setContentType(queryTask.mimeType);
+            
+            resp.setCharacterEncoding(charset);
+
+            resp.setHeader("Content-disposition", "attachment; filename=query"
+                    + queryTask.queryId + "." + ext);
+
+            if(TimestampUtility.isCommitTime(queryTask.timestamp)) {
+
+                /*
+                 * A read against a commit time or a read-only tx. Such results
+                 * SHOULD be cached because the data from which the response was
+                 * constructed have snapshot isolation. (Note: It is possible
+                 * that the commit point against which the query reads will be
+                 * aged out of database and that the query would therefore fail
+                 * if it were retried. This can happen with the RWStore or in
+                 * scale-out.)
+                 * 
+                 * Note: READ_COMMITTED requests SHOULD NOT be cached. Such
+                 * requests will read against then current committed state of
+                 * the database each time they are processed.
+                 * 
+                 * Note: UNISOLATED queries SHOULD NOT be cached. Such
+                 * operations will read on (and write on) the then current state
+                 * of the unisolated indices on the database each time they are
+                 * processed. The results of such operations could be different
+                 * with each request.
+                 * 
+                 * Note: Full read-write transaction requests SHOULD NOT be
+                 * cached unless they are queries and the transaction scope is
+                 * limited to the request (rather than running across multiple
+                 * requests).
+                 */
+
+                resp.addHeader("Cache-Control", "public");
+                
+                // to disable caching.
+                // r.addHeader("Cache-Control", "no-cache");
+
+            }
+            
             // Begin executing the query (asynchronous)
             getBigdataRDFContext().queryService.execute(ft);
             

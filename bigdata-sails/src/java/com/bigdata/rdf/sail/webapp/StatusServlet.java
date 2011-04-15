@@ -34,13 +34,6 @@ public class StatusServlet extends BigdataRDFServlet {
 //    static private final transient Logger log = Logger
 //            .getLogger(StatusServlet.class);
 
-//    @Override
-//    public void init() throws ServletException {
-//
-//        super.init();
-//
-//    }
-
     /**
      * <p>
      * A status page. Options include:
