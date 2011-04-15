@@ -74,7 +74,15 @@ import com.bigdata.util.config.NicUtil;
  * Test suite for {@link RESTServlet} (SPARQL end point and REST API for RDF
  * data).
  * 
- * @todo Test default-graph-uri(s) and named-graph-uri(s).
+ * @todo Test default-graph-uri(s) and named-graph-uri(s). [To test this, it
+ *       might help to refactor into unit tests for QUERY, INSERT, DELETE, and
+ *       UPDATE and unit tests for TRIPLES (w/ and w/o inferences), SIDS, and
+ *       QUADS]
+ * 
+ * @todo How is the REST API supposed to handle INSERT w/ body and DELETE w/
+ *       body against a quad store?
+ * 
+ * @todo Security model?
  * 
  * @todo An NQUADS RDFWriter needs to be written. Then we can test NQUADS
  *       interchange.
@@ -119,15 +127,6 @@ public class TestNanoSparqlServer extends TestCase2 {
         // Create the kb instance.
         new LocalTripleStore(m_jnl, namespace, ITx.UNISOLATED, properties)
                 .create();
-
-        // /*
-        // * Service will not hold a read lock.
-        // *
-        // * Queries will read from the last commit point by default and will
-        // use
-        // * a read-only tx to have snapshot isolation for that query.
-        // */
-        // config.timestamp = ITx.READ_COMMITTED;
 
         final Map<String, String> initParams = new LinkedHashMap<String, String>();
         {
@@ -248,18 +247,22 @@ public class TestNanoSparqlServer extends TestCase2 {
 	 */
 	private static class QueryOptions {
 
-		/** The URL of the SPARQL endpoint. */
+		/** The URL of the SPARQL end point. */
 		public String serviceURL = null;
+		
 		/** The HTTP method (GET, POST, etc). */
 		public String method = "GET";
-        /**
+
+		/**
          * The SPARQL query (this is a short hand for setting the
          * <code>query</code> URL query parameter).
          */
 		public String queryStr = null;
+		
 		/** Request parameters to be formatted as URL query parameters. */
 		public Map<String,String[]> requestParams;
-        /** The accept header. */
+        
+		/** The accept header. */
         public String acceptHeader = //
         BigdataRDFServlet.MIME_SPARQL_RESULTS_XML + ";q=1" + //
         "," + //
@@ -574,7 +577,8 @@ public class TestNanoSparqlServer extends TestCase2 {
      * Class representing the result of a mutation operation against the REST
      * API.
      * 
-     * TODO Refactor into the non-test code base?
+     * TODO Refactor into the non-test code base along with the XML generation
+     * and XML parsing?
      */
     private static class MutationResult {
 
@@ -651,10 +655,9 @@ public class TestNanoSparqlServer extends TestCase2 {
 	 */
 	public void test_STATUS() throws Exception {
 
-		final HttpURLConnection conn = doConnect(m_serviceURL + "/status", "GET");
+        final HttpURLConnection conn = doConnect(m_serviceURL + "/status",
+                "GET");
 
-		// No solutions (assuming a told triple kb or quads kb w/o axioms).
-		
 		// connect.
 		conn.connect();
 

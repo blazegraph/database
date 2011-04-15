@@ -20,8 +20,12 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.impl.URIImpl;
+import org.openrdf.query.Dataset;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.impl.AbstractQuery;
+import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.query.parser.QueryParser;
 import org.openrdf.query.parser.sparql.SPARQLParserFactory;
@@ -268,15 +272,17 @@ public class BigdataRDFContext extends BigdataBaseContext {
         protected final String fileExt;
         
         /** The request. */
-        private final HttpServletRequest req;
+        protected final HttpServletRequest req;
         
         /** Where to write the response. */
-        private final OutputStream os;
+        protected final OutputStream os;
 
         /**
          * Sesame has an option for a base URI during query evaluation. This
          * provides a symbolic place holder for that URI in case we ever provide
          * a hook to set it.
+         * 
+         * FIXME This should be the service end point URI.
          */
         protected final String baseURI = null;
 
@@ -355,6 +361,42 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.os = os;
             this.queryId = Long.valueOf(m_queryIdFactory.incrementAndGet());
             this.queryId2 = UUID.randomUUID();
+
+        }
+
+        /**
+         * If the {@link HttpServletRequest} included one or more
+         * <code>default-graph-uri</code>s and/or or a
+         * <code>named-graph-uri</code>s then the {@link Dataset} for the query
+         * is replaced by the {@link Dataset} constructed from those protocol
+         * parameters.
+         * 
+         * @param query
+         *            The query.
+         */
+        protected void overrideDataset(final AbstractQuery query) {
+            
+            final String[] defaultGraphURIs = req
+                    .getParameterValues("default-graph-uri");
+
+            final String[] namedGraphURIs = req
+                    .getParameterValues("named-graph-uri");
+
+            if (defaultGraphURIs != null || namedGraphURIs != null) {
+
+                final DatasetImpl dataset = new DatasetImpl();
+
+                if (defaultGraphURIs != null)
+                    for (String graphURI : defaultGraphURIs)
+                        dataset.addDefaultGraph(new URIImpl(graphURI));
+
+                if (namedGraphURIs != null)
+                    for (String graphURI : namedGraphURIs)
+                        dataset.addNamedGraph(new URIImpl(graphURI));
+
+                query.setDataset(dataset);
+
+            }
 
         }
 
@@ -443,6 +485,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final BigdataSailBooleanQuery query = cxn.prepareBooleanQuery(
                     QueryLanguage.SPARQL, queryStr, baseURI);
         
+            // Override query if data set protocol parameters were used.
+            overrideDataset(query);
+
             // Note: getQueryTask() verifies that format will be non-null.
             final BooleanQueryResultFormat format = BooleanQueryResultWriterRegistry
                     .getInstance().getFileFormatForMIMEType(mimeType);
@@ -481,6 +526,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
 			final BigdataSailTupleQuery query = cxn.prepareTupleQuery(
 					QueryLanguage.SPARQL, queryStr, baseURI);
 
+			// Override query if data set protocol parameters were used.
+			overrideDataset(query);
+			
             // Note: getQueryTask() verifies that format will be non-null.
             final TupleQueryResultFormat format = TupleQueryResultWriterRegistry
                     .getInstance().getFileFormatForMIMEType(mimeType);
@@ -517,6 +565,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
 			final BigdataSailGraphQuery query = cxn.prepareGraphQuery(
 					QueryLanguage.SPARQL, queryStr, baseURI);
+
+			// Override query if data set protocol parameters were used.
+            overrideDataset(query);
 
             /*
              * FIXME An error thrown here (such as if format is null and we do
