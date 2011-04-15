@@ -613,9 +613,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
         switch (queryType) {
         case ASK: {
 
-            final BooleanQueryResultFormat format = acceptStr == null ? null
-                    : BooleanQueryResultFormat.forMIMEType(acceptStr,
-                            BooleanQueryResultFormat.SPARQL);
+            final BooleanQueryResultFormat format = BooleanQueryResultFormat
+                    .forMIMEType(acceptStr, BooleanQueryResultFormat.SPARQL);
 
             return new AskQueryTask(namespace, timestamp, queryStr, queryType,
                     format, req, os);
