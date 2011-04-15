@@ -65,7 +65,7 @@ public class WebAppUnassembled
         int port = 80;
         
         // default config file.
-        String file = "bigdata-sails/src/java/com/bigdata/rdf/sail/webapp/web.xml";
+        String file = "bigdata-war/src/resources/WEB-INF/web.xml";
 
         /*
          * Handle all arguments starting with "-". These should appear before

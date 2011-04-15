@@ -62,7 +62,6 @@ import info.aduna.iteration.CloseableIteration;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -83,16 +82,12 @@ import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ContextStatementImpl;
 import org.openrdf.model.impl.NamespaceImpl;
-import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.algebra.LangMatches;
 import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
-import org.openrdf.query.algebra.ValueConstant;
-import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.evaluation.impl.BindingAssigner;
 import org.openrdf.query.algebra.evaluation.impl.CompareOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
@@ -101,10 +96,6 @@ import org.openrdf.query.algebra.evaluation.impl.FilterOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.QueryJoinOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 import org.openrdf.query.algebra.evaluation.util.QueryOptimizerList;
-import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
-import org.openrdf.query.impl.BindingImpl;
-import org.openrdf.query.impl.DatasetImpl;
-import org.openrdf.query.impl.MapBindingSet;
 import org.openrdf.sail.NotifyingSailConnection;
 import org.openrdf.sail.Sail;
 import org.openrdf.sail.SailConnection;
@@ -688,9 +679,31 @@ public class BigdataSail extends SailBase implements Sail {
      * @return The {@link LocalTripleStore}.
      */
     private static LocalTripleStore createLTS(final Properties properties) {
-        
+
         final Journal journal = new Journal(properties);
         
+       return createLTS(journal, properties);
+
+    }
+    
+    /**
+     * If the {@link LocalTripleStore} with the appropriate namespace exists,
+     * then return it. Otherwise, create the {@link LocalTripleStore}. When the
+     * properties indicate that full transactional isolation should be
+     * supported, a new {@link LocalTripleStore} will be created within a
+     * transaction in order to ensure that it uses isolatable indices. Otherwise
+     * it is created using the {@link ITx#UNISOLATED} connection.
+     * 
+     * @param properties
+     *            The properties.
+     *            
+     * @return The {@link LocalTripleStore}.
+     */
+    public static LocalTripleStore createLTS(final Journal journal,
+            final Properties properties) {
+
+//        final Journal journal = new Journal(properties);
+
         final ITransactionService txService = 
             journal.getTransactionManager().getTransactionService();
         

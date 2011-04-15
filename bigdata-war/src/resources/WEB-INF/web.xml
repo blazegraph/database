@@ -4,30 +4,32 @@
   <description>Bigdata</description>
   <context-param>
   	<param-name>property-file</param-name>
-  	<param-value>bigdata-perf/lubm/WORMStore.properties</param-value>
+  	<param-value>../webapps/bigdata/RWStore.properties</param-value>
   	<description>The property file (for a standalone database instance) or the
   	jini configuration file (for a federation).  The file MUST end with either
-  	".properties" or ".config".</description>
+  	".properties" or ".config".  This path is relative to the directory from
+  	which you start the servlet container so you may have to edit it for your
+  	installation, e.g., by specifying an absolution path.  Also, it is a good
+  	idea to review the RWStore.properties file as well and specify the location
+  	of the database file on which it will persist your data.</description>
   </context-param>
   <context-param>
   	<param-name>namespace</param-name>
-  	<param-value>LUBM_U1</param-value>
+  	<param-value>kb</param-value>
   	<description>The default bigdata namespace of for the triple or quad store
-  	instance to be exposed (there can be many triple or quad store instances
-  	within a bigdata instance).</description>
+  	instance to be exposed.</description>
+  </context-param>
+  <context-param>
+  	<param-name>create</param-name>
+  	<param-value>true</param-value>
+  	<description>When true a new triple or quads store instance will be created
+  	if none is found at that namespace.</description>
   </context-param>
   <context-param>
   	<param-name>query-thread-pool-size</param-name>
-  	<param-value>8</param-value>
+  	<param-value>16</param-value>
   	<description>The size of the thread pool used to service SPARQL queries -OR-
     ZERO (0) for an unbounded thread pool.</description>
-  </context-param>
-  <context-param>
-  	<param-name>force-overflow</param-name>
-  	<param-value>false</param-value>
-  	<description>Force a compacting merge of all shards on all data
-	services in a bigdata federation (this option should only be
-	used for benchmarking purposes).</description>
   </context-param>
   <listener>
    <listener-class>com.bigdata.rdf.sail.webapp.BigdataRDFServletContextListener</listener-class>
@@ -35,17 +37,22 @@
   <servlet>
   	<servlet-name>REST API</servlet-name>
   	<display-name>REST API</display-name>
+  	<description>The REST API, including a SPARQL end point, as described at
+  	https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer
+  	</description>
   	<servlet-class>com.bigdata.rdf.sail.webapp.RESTServlet</servlet-class>
   	<load-on-startup>0</load-on-startup>
   </servlet>
   <servlet>
   	<servlet-name>Status</servlet-name>
   	<display-name>Status</display-name>
+  	<description>A status page.</description>
   	<servlet-class>com.bigdata.rdf.sail.webapp.StatusServlet</servlet-class>
   </servlet>
   <servlet>
   	<servlet-name>Counters</servlet-name>
   	<display-name>Performance counters</display-name>
+  	<description>Performance counters.</description>
   	<servlet-class>com.bigdata.rdf.sail.webapp.CountersServlet</servlet-class>
   </servlet>
   <servlet-mapping>

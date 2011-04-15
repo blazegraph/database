@@ -189,8 +189,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      *       we should bundle the (namespace,timestamp) together as a single
      *       object).
      */
-    protected long getTimestamp(final String uri,
-            final HttpServletRequest req) {
+    protected long getTimestamp(final HttpServletRequest req) {
         
         final String timestamp = req.getParameter("timestamp");
         
@@ -214,16 +213,17 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * 
      * @return The namespace.
      */
-    protected String getNamespace(final String uri) {
-
-//        // locate the "//" after the protocol.
-//        final int index = uri.indexOf("//");
+    protected String getNamespace(final HttpServletRequest req) {
         
-        int snmsp = uri.indexOf("/namespace/");
+        final String uri = req.getRequestURI();
+        
+        final int snmsp = uri.indexOf("/namespace/");
 
         if (snmsp == -1) {
+
             // use the default namespace.
             return getConfig().namespace;
+            
         }
 
         // locate the next "/" in the URI path.

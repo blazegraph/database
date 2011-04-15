@@ -107,9 +107,9 @@ public class InsertServlet extends BigdataRDFServlet {
 
 	    final long begin = System.currentTimeMillis();
 	    
-        final String baseURI = "";// @todo baseURI query parameter?
+        final String baseURI = req.getRequestURL().toString();
         
-        final String namespace = getNamespace(req.getRequestURI());
+        final String namespace = getNamespace(req);
 
         final String contentType = req.getContentType();
 
@@ -218,7 +218,7 @@ public class InsertServlet extends BigdataRDFServlet {
 
 	    final long begin = System.currentTimeMillis();
 	    
-		final String namespace = getNamespace(req.getRequestURI());
+		final String namespace = getNamespace(req);
 
 		final String[] uris = req.getParameterValues("uri");
 
