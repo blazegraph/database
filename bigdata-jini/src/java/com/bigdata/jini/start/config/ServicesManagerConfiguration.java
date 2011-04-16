@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.start.config;
 
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -35,8 +36,6 @@ import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
 import org.apache.zookeeper.server.quorum.QuorumPeerMain;
-
-import cern.colt.Arrays;
 
 import com.bigdata.jini.start.ServicesManagerServer;
 import com.bigdata.service.jini.ClientServer;
