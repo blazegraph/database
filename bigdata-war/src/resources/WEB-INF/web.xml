@@ -3,7 +3,12 @@
   <display-name>Bigdata</display-name>
   <description>Bigdata</description>
   <context-param>
+  	<!-- Note: This path is relative to the directory in which you start -->
+  	<!-- the servlet container. -->
   	<param-name>property-file</param-name>
+  	<!-- Note: This path may be used with WebAppUnassembled for testing.
+  	<param-value>bigdata-war/src/resources/RWStore.properties</param-value>
+  	 -->
   	<param-value>../webapps/bigdata/RWStore.properties</param-value>
   	<description>The property file (for a standalone database instance) or the
   	jini configuration file (for a federation).  The file MUST end with either

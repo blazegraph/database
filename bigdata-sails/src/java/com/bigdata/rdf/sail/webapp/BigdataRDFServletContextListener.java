@@ -42,6 +42,7 @@ import javax.servlet.ServletContextListener;
 import org.apache.log4j.Logger;
 
 import com.bigdata.Banner;
+import com.bigdata.cache.SynchronizedHardReferenceQueueWithTimeout;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
@@ -151,7 +152,7 @@ public class BigdataRDFServletContextListener implements
             indexManager = openIndexManager(propertyFile);
             
             // we are responsible for the life cycle.
-            closeIndexManager = false;
+            closeIndexManager = true;
 
         }
 
@@ -365,6 +366,18 @@ public class BigdataRDFServletContextListener implements
             
         }
 
+        /*
+         * Terminate various threads which should no longer be executing once we
+         * have destroyed the servlet context. If you do not do this then
+         * servlet containers such as tomcat will complain that we did not stop
+         * some threads.
+         */
+        {
+            
+            SynchronizedHardReferenceQueueWithTimeout.stopStaleReferenceCleaner();
+            
+        }
+        
     }
 
     /**
