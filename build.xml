@@ -223,12 +223,35 @@
 </copy>
 </target>
 
+	<!-- 
+	This target produces a new jar which includes everything from the bigdata
+	jar, the dsi-util jar, the lgpl-utils jar, and exactly those class files
+	from colt and fastutil which are required by the proceeding jars.  The
+	main advantage of the resulting jar is that the vast majority of fastutil
+	is not necessary, and it is a 13M jar.
+	-->
+	<target name="autojar" 
+		description="Produce an expanded version of the bigdata jar which 
+		includes the data from the dsi-util and lgpl-utils jars and only
+		those classes from fastutil and colt which are required to support
+		bigdata and dsiutil at runtime.">
+		<java jar="src/build/autojar/autojar.jar" fork="true" failonerror="true">
+			<arg line="-o ${build.dir}/bigdataPlus.jar
+				-c ${bigdata.dir}/bigdata/lib/unimi/fastutil*.jar
+				-c ${bigdata.dir}/bigdata/lib/unimi/colt*.jar
+				${build.dir}/lib/bigdata*.jar
+				${bigdata.dir}/bigdata/lib/dsi-util*.jar
+				${bigdata.dir}/bigdata/lib/lgpl-utils*.jar
+				" />
+		</java>
+	</target>
+
 	<!--depends="bundleJar"-->
 	<!--
 	TODO 13M of the resulting WAR is fastutils. We need to slim down that JAR to
 	just the classes that we actually use before deploying it.
 	-->
-	<target name="war" 
+	<target name="war" depends="autojar" 
 		description="Generates a WAR artifact.">
 		<delete file="${build.dir}/bigdata.war"/>
 		<echo message="Building WAR"/>
@@ -239,16 +262,31 @@
 		  <fileset dir="bigdata-war/src/jsp"/>
 		  <fileset dir="bigdata-war/src/images"/>
 		  <file file="bigdata-war/src/resources/RWStore.properties"/>
+		  <!-- bigdata jar plus some dependencies as filtered by autojar. -->
+		  <lib file="${build.dir}/bigdataPlus.jar"/>
 		  <lib dir="${build.dir}/lib">
+		  	<!-- jars bundled into "bigdata-plus" by autojar. -->
+		  	<exclude name="fastutil*.jar"/>
+		  	<exclude name="colt*.jar"/>
+		  	<exclude name="dsi-util*.jar"/>
+		  	<exclude name="lgpl-utils*.jar"/>
+		  	<exclude name="bigdata*.jar"/>
+		  	<!-- jars which are not currently used. -->
 		  	<exclude name="iris*.jar"/>
 		  	<exclude name="jgrapht*.jar"/>
 		  	<exclude name="tuprolog*.jar"/>
+		  	<!-- test suite stuff is not needed. -->
+		  	<exclude name="junit*.jar"/>
+		  	<exclude name="cweb-junit*.jar"/>
 		  	<exclude name="sesame*testsuite*.jar"/>
+		  	<!-- osgi stuff is not needed. -->
 		  	<exclude name="bnd*.jar"/>
+		  	<!-- jetty / servlet API not required for the WAR. --> 
 	  		<exclude name="jetty*.jar"/>
 	  		<exclude name="servlet-api*.jar"/>
+		  	<!-- zookeeper only used in scale-out. -->
 	  		<exclude name="zookeeper*.jar"/>
-	  		<!-- jini -->
+	  		<!-- jini only used in scale-out. -->
 		  	<exclude name="jini*.jar"/>
 		  	<exclude name="jsk*.jar"/>
 		  	<exclude name="mahalo*.jar"/>

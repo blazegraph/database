@@ -58,9 +58,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 public class SynchronizedHardReferenceQueueWithTimeout<T> implements
         IHardReferenceQueue<T> {
 
-    protected static final Logger log = Logger.getLogger(SynchronizedHardReferenceQueueWithTimeout.class);
-    
-    protected static final boolean DEBUG = log.isDebugEnabled();
+    private static final Logger log = Logger.getLogger(SynchronizedHardReferenceQueueWithTimeout.class);
     
     /**
      * Note: Synchronization for the inner {@link #queue} is realized using the
@@ -202,7 +200,7 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
 
             }
 
-            if (DEBUG && ncleared > 3)
+            if (log.isDebugEnabled() && ncleared > 3)
                 log.debug("#ncleared=" + ncleared + ", size=" + size()
                         + ", timeout=" + TimeUnit.NANOSECONDS.toMillis(timeout)
                         + ", maxAge=" + TimeUnit.NANOSECONDS.toMillis(maxAge)
@@ -338,6 +336,21 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
     /*
      * Cleaner service.
      */
+
+    /**
+     * This method may be invoked by life cycle operations which need to tear
+     * down the bigdata environment. Normally you do not need to do this as the
+     * cleaner service uses a daemon thread and will not prevent the JVM from
+     * halting. However, a servlet container running bigdata can complain that
+     * some threads were not terminated if the webapp running bigdata is
+     * stopped. You can invoke this method to terminate the stale reference
+     * cleaner thread.
+     */
+    public static final void stopStaleReferenceCleaner() {
+        
+        cleanerService.shutdownNow();
+        
+    }
     
     private static final ScheduledExecutorService cleanerService;
     static {

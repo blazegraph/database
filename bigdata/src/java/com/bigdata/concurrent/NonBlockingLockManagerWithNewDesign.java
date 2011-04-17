@@ -848,6 +848,17 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
 
         }
 
+        try {
+            // wait for the service to terminate.
+            if (log.isInfoEnabled())
+                log.info("Waiting for service shutdown.");
+            service.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+            if (log.isInfoEnabled())
+                log.info("Service is shutdown.");
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
     }
 
     public void shutdownNow() {
