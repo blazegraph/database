@@ -161,6 +161,8 @@ public class FixedAllocator implements Allocator {
 	 * requests and concurrent transactions.
 	 */
 	boolean m_sessionActive;
+
+	private boolean m_pendingContextCommit = false;
 	
 	public void setAllocationContext(final IAllocationContext context) {
 		if (context == null && m_context != null) {
@@ -171,6 +173,7 @@ public class FixedAllocator implements Allocator {
 			
 			// return to dirty list
 			m_store.addToCommit(this);
+			m_pendingContextCommit  = true;
 			
 		} else if (context != null && m_context == null) {
 			// restore commit bits in AllocBlocks
@@ -223,11 +226,7 @@ public class FixedAllocator implements Allocator {
 
                     str.writeInt(block.m_addr);
                     for (int i = 0; i < m_bitSize; i++) {
-                    	if (m_context != null) { // shadowed
-                       		str.writeInt(block.m_transients[i]);
-                    	} else {
-                    		str.writeInt(block.m_live[i]);
-                    	}
+                    	str.writeInt(block.m_live[i]);
                     }
 
                     if (!m_sessionActive) {
@@ -256,6 +255,13 @@ public class FixedAllocator implements Allocator {
 			    str.close();
 			}
 
+			if (m_pendingContextCommit) {
+				m_pendingContextCommit = false;
+				if (hasFree()) {
+					m_freeList.add(this);
+				}
+			}
+			
 			if (!this.m_sessionActive) {
 				m_freeBits += m_freeTransients;
 	

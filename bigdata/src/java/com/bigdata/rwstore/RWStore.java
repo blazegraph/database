@@ -1856,7 +1856,7 @@ public class RWStore implements IStore, IBufferedWriter {
 				
 				final int addr = allocator.alloc(this, size, context);
 
-				if (allocator.m_context != null && !m_commitList.contains(allocator)) {
+				if (!m_commitList.contains(allocator)) {
 					m_commitList.add(allocator);
 				}
 
