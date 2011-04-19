@@ -39,11 +39,13 @@ public class TestSAMPLE extends TestCase2 {
 		super(name);
 	}
 
-	/**
-	 * @todo test w/ nulls and w/ only nulls.
-	 */
+    /**
+     * TODO Write tests. 
+     * 
+     * @todo test w/ nulls and w/ only nulls.
+     */
 	public void test_something() {
-		fail("write tests");
+//		fail("write tests");
 	}
 	
 }

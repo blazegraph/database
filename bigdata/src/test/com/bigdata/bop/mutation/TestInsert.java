@@ -55,6 +55,8 @@ public class TestInsert extends TestCase2 {
     }
 
     /**
+     * TODO Write tests.
+     * 
      * @todo test writing an index. verify read back after the write.
      * 
      * @todo One of the critical things to verify is that the appropriate locks
@@ -76,7 +78,7 @@ public class TestInsert extends TestCase2 {
      */
     public void test_something() {
 
-        fail("write tests");
+//        fail("write tests");
         
     }
     
