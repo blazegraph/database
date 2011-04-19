@@ -107,11 +107,6 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
         
         final Journal journal = new Journal(properties);
 
-//        final IBufferStrategy bufferStrategy = journal.getBufferStrategy();
-//        if (bufferStrategy instanceof RWStrategy) {
-//            ((RWStrategy)bufferStrategy).getRWStore().activateTx();
-//        }
-
         try {
         
 //        if(journal.getBufferStrategy() instanceof MappedBufferStrategy) {
@@ -126,22 +121,31 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
 //            
 //        }
 
-        doConcurrentClientTest(journal,//
-                30,// timeout
+            /*
+             * Note: Using a timeout will cause any tasks still running when the
+             * timeout expires to be interrupted. The code is clearly stable
+             * when the timeout is Long.MAX_VALUE, even with the presence of a
+             * number of spurious extensions from the failureRate. However,
+             * there are clearly problems which emerge when the timeout is less
+             * than the time required to complete the scheduled tasks. A variety
+             * of errors can be emerged when the scheduled tasks are all
+             * cancelled. It is difficult to say whether any of those problems
+             * could be observed by an application outside of a shutdownNow()
+             * scenario.
+             */
+            doConcurrentClientTest(journal,//
+                Long.MAX_VALUE,//30,// timeout
                 20,// nresources
                 1, // minLocks
                 3, // maxLocks
-                100, // ntrials
+                100,//100, // ntrials
                 3, // keyLen
                 1000, // nops
-                0.02d // failureRate
+                .05//0.02d // failureRate
         );
         
         } finally {
-//            if (bufferStrategy instanceof RWStrategy) {
-//                ((RWStrategy)bufferStrategy).getRWStore().deactivateTx();
-//            }
-            
+
             journal.destroy();
             
         }
@@ -225,32 +229,32 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
          */
         final String[] resources = new String[nresources];
         {
-         
-            for(int i=0; i<nresources; i++) {
-            
-                resources[i] = "index#"+i;
-                
+
+            for (int i = 0; i < nresources; i++) {
+
+                resources[i] = "index#" + i;
+
                 journal.registerIndex(resources[i], BTree.create(journal,
                         new IndexMetadata(resources[i], UUID.randomUUID())));
                 
             }
-            
+
             journal.commit();
-            
+
         }
-        
+
         if (log.isInfoEnabled())
             log.info("Created indices: " + Arrays.toString(resources));
 
         /*
          * Setup the tasks that we will submit.
          */
-        
-        final Collection<AbstractTask> tasks = new HashSet<AbstractTask>(); 
 
-        final ConcurrentHashMap<IIndex, Thread> btrees = new ConcurrentHashMap<IIndex, Thread>();
-        
-        for(int i=0; i<ntrials; i++) {
+        final Collection<AbstractTask> tasks = new HashSet<AbstractTask>();
+
+        final ConcurrentHashMap<String, Thread> btrees = new ConcurrentHashMap<String, Thread>();
+
+        for (int i = 0; i < ntrials; i++) {
 
             // choose nlocks and indices to use.
             
@@ -266,7 +270,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
 
             }
 
-            String[] resource = tmp.toArray(new String[nlocks]);
+            final String[] resource = tmp.toArray(new String[nlocks]);
 
             tasks.add(new WriteTask(journal, resource, i, keyLen, nops,
                     failureRate, btrees));
@@ -278,8 +282,8 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
          */
 
         if (log.isInfoEnabled())
-            log.info("Submitting "+tasks.size()+" tasks");
-        
+            log.info("Submitting " + tasks.size() + " tasks");
+
         final long begin = System.currentTimeMillis();
 
         final List<Future> results = journal.invokeAll(tasks, timeout, TimeUnit.SECONDS);
@@ -296,17 +300,17 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
         int ninterrupt = 0; // #of interrupted tasks.
         int ncommitted = 0; // #of tasks that successfully committed.
         int nuncommitted = 0; // #of tasks that did not complete in time.
-        
-        while(itr.hasNext()) {
+
+        while (itr.hasNext()) {
 
             final Future<?> future = itr.next();
-            
-            if(future.isCancelled()) {
-                
+
+            if (future.isCancelled()) {
+
                 nuncommitted++;
-                
+
                 continue;
-                
+
             }
 
             try {
@@ -324,9 +328,9 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
                      * Note: Tasks will be interrupted if a timeout occurs when
                      * attempting to run the submitted tasks - this is normal.
                      */
-                    
-                    log.warn("Interrupted: "+ex);
-                    
+
+                    log.warn("Interrupted: " + ex);
+
                     ninterrupt++;
                     
                 } else if(isInnerCause(ex, SpuriousException.class)) {
@@ -340,9 +344,9 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
                 } else {
                 
                     // Other kinds of exceptions are errors.
-                    
-                    fail("Not expecting: "+ex, ex);
-                    
+
+                    fail("Not expecting: " + ex, ex);
+
                 }
                 
             }
@@ -386,6 +390,8 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
        
     }
     
+    static private final Random r = new Random();
+    
     /**
      * A task that writes on named unisolated index(s).
      */
@@ -395,13 +401,12 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
         private final int keyLen;
         private final int nops;
         private final double failureRate;
-        private final ConcurrentHashMap<IIndex, Thread> btrees;
+        private final ConcurrentHashMap<String/*indexName*/, Thread> btrees;
         
-        final Random r = new Random();
-        
-        public WriteTask(IConcurrencyManager concurrencyManager,
-                String[] resource, int trial, int keyLen, int nops, double failureRate,
-                ConcurrentHashMap<IIndex, Thread> btrees) {
+        public WriteTask(final IConcurrencyManager concurrencyManager,
+                final String[] resource, final int trial, final int keyLen,
+                final int nops, final double failureRate,
+                final ConcurrentHashMap<String, Thread> btrees) {
 
             super(concurrencyManager, ITx.UNISOLATED, resource);
 
@@ -430,29 +435,44 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
          */
         public Object doTask() throws Exception {
 
-			// the index names on which the writer holds a lock.
-			final String[] resource = getResource();
+            // the index names on which the writer holds a lock.
+            final String[] resource = getResource();
 
-			final IIndex[] indices = new IIndex[resource.length];
+            final IIndex[] indices = new IIndex[resource.length];
+            
+            final Thread t = Thread.currentThread();
+            
+            try {
 
-			for (int i = 0; i < resource.length; i++) {
+                /*
+                 * First, mark each index in the [btrees] concurrent hash map
+                 * with the thread in which this task instance is executing.
+                 * 
+                 * Note: These marks will be cleared by a finally {} clause
+                 * below. They exist to detect failures in the lock manager.
+                 */
+                for (int i = 0; i < resource.length; i++) {
 
-			    indices[i] = getJournal().getIndex(resource[i]);
+                    final String name = resource[i];
+                    
+                    final Thread other = btrees.putIfAbsent(name, t);
+                    
+                    if (other != null) {
 
-				final Thread t = Thread.currentThread();
-				final Thread other = btrees.putIfAbsent(indices[i], t);
-				if (other != null) {
+                        throw new AssertionError(
+                                "Unisolated index already in use: "
+                                        + resource[i] + ", currentThread=" + t
+                                        + ", otherThread=" + other);
 
-					throw new AssertionError("Unisolated index already in use: " + resource[i]+", currentThread="+t+", otherThread="+other);
+                    }
 
-				}
+                    indices[i] = getJournal().getIndex(name);
 
-			}
+                }
 
-			try {
-
-				// Random write operations on the named index(s).
-
+                /*
+                 * Random write operations on the named index(s).
+                 */
 				for (int i = 0; i < nops; i++) {
 
 					final IIndex ndx = indices[i % resource.length];
@@ -475,7 +495,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
 
 					}
 
-				}
+				} // for( i : nops )
 
 				if (r.nextDouble() < failureRate) {
 
@@ -487,14 +507,27 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
 
 			} finally {
 
-				for (int i = 0; i < resource.length; i++) {
+                /*
+                 * Clear the marks from the concurrent hash map which associate
+                 * the named resources (the indices) with the thread in which
+                 * this test was executing.
+                 */
+                for (int i = 0; i < resource.length; i++) {
 
-					final IIndex ndx = indices[i];
+                    final String name = resource[i];
 
-					if (ndx != null)
-						btrees.remove(ndx);
+                    final Thread tmp = btrees.remove(name);
 
-				}
+                    if (tmp != t) {
+
+                        throw new AssertionError(
+                                "Index associated with another thread? index="
+                                        + name + ", currentThread=" + t
+                                        + ", otherThread=" + tmp);
+
+                    }
+
+                }
 
 			}
 			
