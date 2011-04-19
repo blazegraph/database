@@ -689,7 +689,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		 */
 		public void test_reallocation() throws IOException {
 			final Properties properties = getProperties();
-			File tmpfile = File.createTempFile("TestRW", "rw");
+			File tmpfile = File.createTempFile("TestRW", ".rw");
 			properties.setProperty(Options.FILE, tmpfile.getAbsolutePath());
 			properties.remove(Options.CREATE_TEMP_FILE);
 			Journal store = new Journal(properties);
@@ -1226,12 +1226,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		public void test_metaAlloc() {
 
 			Journal store = (Journal) getStore();
+            try {
 
 			RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
 			RWStore rw = bs.getRWStore();
 			long realAddr = 0;
-			try {
 				for (int i = 0; i < 100000; i++) {
 					int allocAddr = rw.metaAlloc();
 
@@ -1379,12 +1379,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		public void test_stressAlloc() {
 
 			Journal store = (Journal) getStore();
+            try {
 
 			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
 			final RWStore rw = bs.getRWStore();
 			// long realAddr = 0;
-			try {
 				// allocBatch(store, 1, 32, 650, 100000000);
 				allocBatch(store, 1, 32, 650, 50000);
 				store.commit();
@@ -1410,6 +1410,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			// Sequential logic
 
 			final Journal store = (Journal) getStore();
+			try {
 			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 			final RWStore rw = bs.getRWStore();
 
@@ -1434,6 +1435,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			rw.deactivateTx();
 
 			store.commit();
+			} finally {
+			    store.destroy();
+			}
+			
 		}
 
 		/**
@@ -1447,6 +1452,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			// Sequential logic
 
 			final Journal store = (Journal) getStore();
+			try {
 			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 			final RWStore rw = bs.getRWStore();
 
@@ -1492,8 +1498,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				assertEquals(bb, rdBuf);
 			}
 
-
 			store.commit();
+			} finally {
+			    store.destroy();
+			}
 		}
 
 		/**
@@ -1503,12 +1511,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		public void test_pureAlloc() {
 
 			Journal store = (Journal) getStore();
+            try {
 
 			RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
 			RWStore rw = bs.getRWStore();
 			long realAddr = 0;
-			try {
 				// allocBatch(store, 1, 32, 650, 100000000);
 				pureAllocBatch(store, 1, 32, rw.m_maxFixedAlloc - 4, 300000); // cover
 																				// wider
