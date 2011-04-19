@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.Writer;
+import java.nio.channels.ClosedByInterruptException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -316,7 +317,8 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
                 
             } catch(ExecutionException ex ) {
 
-                if(isInnerCause(ex, InterruptedException.class)) {
+				if (isInnerCause(ex, InterruptedException.class)
+						|| isInnerCause(ex, ClosedByInterruptException.class)) {
 
                     /*
                      * Note: Tasks will be interrupted if a timeout occurs when
@@ -438,10 +440,10 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
 			    indices[i] = getJournal().getIndex(resource[i]);
 
 				final Thread t = Thread.currentThread();
+				final Thread other = btrees.putIfAbsent(indices[i], t);
+				if (t != null) {
 
-				if (btrees.putIfAbsent(indices[i], t) != null) {
-
-					throw new AssertionError("Unisolated index already in use: " + resource[i]);
+					throw new AssertionError("Unisolated index already in use: " + resource[i]+", currentThread="+t+", otherThread="+other);
 
 				}
 
