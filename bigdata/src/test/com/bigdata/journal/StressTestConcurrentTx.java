@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.nio.channels.ClosedByInterruptException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -318,7 +319,8 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
 //                    
 //                    log.info(getInnerCause(ex, RetryException.class));
                     
-                } else if(isInnerCause(ex,InterruptedException.class)){
+                } else if (isInnerCause(ex, InterruptedException.class)
+                        || isInnerCause(ex, ClosedByInterruptException.class)) {
 
                     ninterrupt++;
 
@@ -341,9 +343,9 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
                
         // Now test rootBlocks
         int rootBlockCount = 0;
-        Iterator<IRootBlockView> rbvs = journal.getRootBlocks(10); // cannot use 0
+        final Iterator<IRootBlockView> rbvs = journal.getRootBlocks(10); // cannot use 0
         while (rbvs.hasNext()) {
-        	IRootBlockView rbv = rbvs.next();
+        	final IRootBlockView rbv = rbvs.next();
         	rootBlockCount++;           	
         }
 
