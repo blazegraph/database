@@ -512,7 +512,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 	public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
-		return new FutureTask<Void>(new JoinTask<E>(this, context));
+		return new FutureTaskMon<Void>(new JoinTask<E>(this, context));
 
 	}
 

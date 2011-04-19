@@ -833,12 +833,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 						lastCommitTime, commitCounter, commitRecordAddr, commitRecordIndexAddr, uuid, quorumToken, 0L, // metaStartAddr
 						0L, // metaStartBits
 						StoreTypeEnum.WORM,//
-						createTime, closedTime, checker);
+						createTime, closedTime, RootBlockView.currentVersion, checker);
 				final IRootBlockView rootBlock1 = new RootBlockView(false, offsetBits, nextOffset, firstCommitTime,
 						lastCommitTime, commitCounter, commitRecordAddr, commitRecordIndexAddr, uuid, quorumToken, 0L, // metaStartAddr
 						0L, // metaStartBits
 						StoreTypeEnum.WORM,//
-						createTime, closedTime, checker);
+						createTime, closedTime, RootBlockView.currentVersion, checker);
 				_bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.No);
 				_bufferStrategy.writeRootBlock(rootBlock1, ForceEnum.No);
 
@@ -1540,7 +1540,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 					metaBitsAddr, //
 					old.getStoreType(), //
 					old.getCreateTime(), closeTime, //
-					checker);
+					old.getVersion(), checker);
 
 			/*
 			 * Write it on the store.
@@ -2431,7 +2431,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                         lastCommitTime, newCommitCounter, commitRecordAddr,
                         commitRecordIndexAddr, old.getUUID(), quorumToken,
                         metaStartAddr, metaBitsAddr, old.getStoreType(),
-                        old.getCreateTime(), old.getCloseTime(), checker);
+                        old.getCreateTime(), old.getCloseTime(), 
+                        old.getVersion(), checker);
 
 			}
 

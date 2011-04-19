@@ -76,7 +76,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
     private static final transient Logger log = Logger.getLogger(RWStrategy.class);
 
-    private final IAddressManager m_am = new RWAddressManager();
+    private final IAddressManager m_am;
 
     /**
      * The backing store implementation.
@@ -114,6 +114,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	    m_quorum = quorum;
 	    
 		m_store = new RWStore(fileMetadata, quorum); 
+		
+		m_am = new RWAddressManager(m_store);
 		
 		m_initialExtent = fileMetadata.file.length();
 	

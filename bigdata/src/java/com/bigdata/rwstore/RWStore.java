@@ -60,6 +60,7 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.BufferedWrite;
+import com.bigdata.io.writecache.IBufferedWriter;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.journal.AbstractBufferStrategy;
@@ -225,7 +226,7 @@ import com.bigdata.util.ChecksumUtility;
  *         space can be reclaimed).
  */
 
-public class RWStore implements IStore {
+public class RWStore implements IStore, IBufferedWriter {
 
     private static final transient Logger log = Logger.getLogger(RWStore.class);
 
@@ -1138,7 +1139,7 @@ public class RWStore implements IStore {
 			m_allocs.add(allocator);
 			
 			if (m_storageStats != null) {
-				m_storageStats.register(allocator);
+				m_storageStats.register(allocator, true);
 			}
 
 			return allocator;
@@ -1424,6 +1425,8 @@ public class RWStore implements IStore {
 		                c.release();
 		            }
 				}
+			} catch (PhysicalAddressResolutionException e) {
+				throw new IllegalArgumentException("Unable to read data: "+e, e);
 			} catch (Throwable e) {
 				/*
 				 * Note: ClosedByInterruptException can be thrown out of
@@ -1432,8 +1435,6 @@ public class RWStore implements IStore {
 				 * error.
 				 */
 //				log.error(e,e);
-				
-//				throw new IllegalArgumentException("Unable to read data: "+e, e);
 				throw new RuntimeException("addr=" + addr + " : cause=" + e, e);
 
 			}
@@ -1538,7 +1539,7 @@ public class RWStore implements IStore {
 	    free(laddr, sze, null/* AlocationContext */);
 	    
 	}
-
+	private long m_unsafeFrees = 0;
     /**
      * free
      * <p>
@@ -1573,7 +1574,22 @@ public class RWStore implements IStore {
 				freeBlob(addr, sze, context);
 			} else {
 				final FixedAllocator alloc = getBlockByAddress(addr);
-                /*
+
+				/**
+				 * If a request is made to free storage associated with some other
+				 *  allocation context, then it is unsafe to recycle.
+				 */
+				if (alloc.isUnsafeFree(context)) {
+					if ((++m_unsafeFrees % 5000) == 0 && log.isDebugEnabled()) {
+						log.debug("Unsafe frees : " + m_unsafeFrees + ", allocations: " + m_allocations + ", frees: " + m_frees);
+						StringBuilder sb = new StringBuilder();
+						m_storageStats.showStats(sb);
+						log.debug(sb);
+					}
+					return;
+				}
+				
+				/*
                  * There are a few conditions here. If the context owns the
                  * allocator and the allocation was made by this context then it
                  * can be freed immediately. The problem comes when the context
@@ -1602,6 +1618,8 @@ public class RWStore implements IStore {
 						immediateFree(addr, sze);
 					}
 				} else {
+					// if a free request is made within a context not managed by
+					// the allocator then it is not safe to free
 	                boolean alwaysDefer = m_activeTxCount > 0;
 
 					if (!alwaysDefer)
@@ -1733,14 +1751,15 @@ public class RWStore implements IStore {
 				m_writeCache.clearWrite(pa);
 			}
 			m_frees++;
+			
 			if (alloc.isAllocated(addrOffset))
 				throw new IllegalStateException("Reallocation problem with WriteCache");
 
-			if (!m_commitList.contains(alloc)) {
+			if (alloc.m_context != null && !m_commitList.contains(alloc)) {
 				m_commitList.add(alloc);
-				
-				m_recentAlloc = true;
 			}
+			
+			m_recentAlloc = true;
 		} finally {
 			m_allocationLock.unlock();
 		}
@@ -1837,7 +1856,7 @@ public class RWStore implements IStore {
 				
 				final int addr = allocator.alloc(this, size, context);
 
-				if (!m_commitList.contains(allocator)) {
+				if (allocator.m_context != null && !m_commitList.contains(allocator)) {
 					m_commitList.add(allocator);
 				}
 
@@ -2169,7 +2188,7 @@ public class RWStore implements IStore {
 //		return "RWStore " + s_version;
 //	}
 
-	public void commitChanges(final Journal journal) {
+	public void commitChanges(final AbstractJournal journal) {
 	    assertOpen();
 		checkCoreAllocations();
 
@@ -2289,7 +2308,7 @@ public class RWStore implements IStore {
      * returns number of addresses freed
      */
     /* public */int checkDeferredFrees(final boolean freeNow,
-            final Journal journal) {
+            final AbstractJournal journal) {
 
         // Note: Invoked from unit test w/o the lock...
 //        if (!m_allocationLock.isHeldByCurrentThread())
@@ -2297,7 +2316,7 @@ public class RWStore implements IStore {
 		
         if (journal != null) {
 		
-            final JournalTransactionService transactionService = (JournalTransactionService) journal
+            final AbstractTransactionService transactionService = (AbstractTransactionService) journal
                     .getLocalTransactionManager().getTransactionService();
 
 //            // the previous commit point.
@@ -2492,8 +2511,6 @@ public class RWStore implements IStore {
 	 * the allocation blocks at the end of the file.
 	 */
 	int metaAlloc() {
-//		long lnextAlloc = convertAddr(m_nextAllocation);
-
 		int bit = fndMetabit();
 
 		if (bit < 0) {
@@ -2910,7 +2927,7 @@ public class RWStore implements IStore {
 	 * latched2Physical
 	 **/
 	public long physicalAddress(final int addr) {
-		if (addr > 0) {
+		if (addr >= 0) {
 			return addr & 0xFFFFFFE0;
 		} else {
 			final FixedAllocator allocator = getBlock(addr);
@@ -3096,10 +3113,15 @@ public class RWStore implements IStore {
 //		}
 //	}
 
-	public void addToCommit(final Allocator allocator) {
+	void addToCommit(final Allocator allocator) {
 		if (!m_commitList.contains(allocator)) {
 			m_commitList.add(allocator);
 		}
+	}
+
+
+	void removeFromCommit(final Allocator allocator) {
+		m_commitList.remove(allocator);
 	}
 
 	public Allocator getAllocator(final int i) {
@@ -3138,61 +3160,40 @@ public class RWStore implements IStore {
 
         }
 
-        public FileChannel reopenChannel() throws IOException {
+         synchronized public FileChannel reopenChannel() throws IOException {
 
-			/*
-			 * Note: This is basically a double-checked locking pattern. It is
-			 * used to avoid synchronizing when the backing channel is already
-			 * open.
-			 */
-			{
-				final RandomAccessFile tmp = raf;
-				if (tmp != null) {
-					final FileChannel channel = tmp.getChannel();
-					if (channel.isOpen()) {
-						// The channel is still open.
-						return channel;
-					}
-				}
-			}
-        	
-        	synchronized(this) {
+            if (raf != null && raf.getChannel().isOpen()) {
 
-				if (raf != null) {
-					final FileChannel channel = raf.getChannel();
-					if (channel.isOpen()) {
-						/*
-						 * The channel is still open. If you are allowing
-						 * concurrent reads on the channel, then this could
-						 * indicate that two readers each found the channel
-						 * closed and that one was able to re-open the channel
-						 * before the other such that the channel was open again
-						 * by the time the 2nd reader got here.
-						 */
-						return channel;
-					}
-				}
+                /*
+                 * The channel is still open. If you are allowing concurrent
+                 * reads on the channel, then this could indicate that two
+                 * readers each found the channel closed and that one was able
+                 * to re-open the channel before the other such that the channel
+                 * was open again by the time the 2nd reader got here.
+                 */
 
-				// open the file.
-				this.raf = new RandomAccessFile(file, mode);
+                return raf.getChannel();
 
-				// Update counters.
-				final StoreCounters<?> c = (StoreCounters<?>) storeCounters
-						.get().acquire();
-				try {
-					c.nreopen++;
-				} finally {
-					c.release();
-				}
+            }
 
-				return raf.getChannel();
+            // open the file.
+            this.raf = new RandomAccessFile(file, mode);
 
-			}
+            // Update counters.
+            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+                    .acquire();
+            try {
+                c.nreopen++;
+            } finally {
+                c.release();
+            }
+            
+            return raf.getChannel();
 
         }
 
     }
-
+    
     /**
      * If the current file extent is different from the required extent then the
      * call is made to {@link #extendFile(int)}.
@@ -3502,6 +3503,7 @@ public class RWStore implements IStore {
 			final ContextAllocation alloc = m_contexts.remove(context);
 			
 			if (alloc != null) {
+				m_contextRemovals++;
 				alloc.release();			
 			}
 		} finally {
@@ -3525,6 +3527,7 @@ public class RWStore implements IStore {
 			final ContextAllocation alloc = m_contexts.remove(context);
 			
 			if (alloc != null) {
+				m_contextRemovals++;
 				alloc.abort();			
 			}
 		} finally {
@@ -3592,12 +3595,13 @@ public class RWStore implements IStore {
 
 			for (FixedAllocator f : m_allFixed) {
 				f.setAllocationContext(pcontext);
+				// will add to free list if required
 				f.setFreeList(freeFixed[m_store.fixedAllocatorIndex(f.m_size)]);
 			}
 			
-			for (int i = 0; i < m_freeFixed.length; i++) {
-				freeFixed[i].addAll(m_freeFixed[i]);
-			}
+//			for (int i = 0; i < m_freeFixed.length; i++) {
+//				freeFixed[i].addAll(m_freeFixed[i]);
+//			}
 			
 //			freeBlobs.addAll(m_freeBlobs);
 		}
@@ -3610,12 +3614,13 @@ public class RWStore implements IStore {
                     : m_parent.m_context;
 
 			for (FixedAllocator f : m_allFixed) {
-				f.abortAllocationContext(pcontext);
+				f.abortAllocationContext(pcontext, m_store.m_writeCache);
+				f.setFreeList(freeFixed[m_store.fixedAllocatorIndex(f.m_size)]);
 			}
 			
-			for (int i = 0; i < m_freeFixed.length; i++) {
-				freeFixed[i].addAll(m_freeFixed[i]);
-			}
+//			for (int i = 0; i < m_freeFixed.length; i++) {
+//				freeFixed[i].addAll(m_freeFixed[i]);
+//			}
 			
 //			freeBlobs.addAll(m_freeBlobs);
 		}
@@ -3625,8 +3630,7 @@ public class RWStore implements IStore {
 			if (free.size() == 0) {
 				final FixedAllocator falloc = establishFixedAllocator(i);
 				falloc.setAllocationContext(m_context);
-				falloc.setFreeList(free);
-				free.add(falloc);
+				falloc.setFreeList(free); // will add to free list
 				m_allFixed.add(falloc);
 			}
 			
@@ -3656,6 +3660,8 @@ public class RWStore implements IStore {
 	private final Map<IAllocationContext, ContextAllocation> m_contexts = 
 		new ConcurrentHashMap<IAllocationContext, ContextAllocation>();
 	
+	private int m_contextRequests = 0;
+	private int m_contextRemovals = 0;
     private ContextAllocation establishContextAllocation(
             final IAllocationContext context) {
 
@@ -3668,7 +3674,7 @@ public class RWStore implements IStore {
         ContextAllocation ret = m_contexts.get(context);
         
         if (ret == null) {
-        
+        	
             ret = new ContextAllocation(this, m_freeFixed.length, null, context);
 
             if (m_contexts.put(context, ret) != null) {
@@ -3677,6 +3683,14 @@ public class RWStore implements IStore {
                 
             }
         
+            if (log.isTraceEnabled())
+				log.trace("Establish ContextAllocation: " + ret 
+						+ ", total: " + m_contexts.size() 
+						+ ", requests: " + ++m_contextRequests 
+						+ ", removals: " + m_contextRemovals 
+						+ ", allocators: " + m_allocs.size() );
+      
+            
             if (log.isInfoEnabled())
                 log.info("Context: ncontexts=" + m_contexts.size()
                         + ", context=" + context);

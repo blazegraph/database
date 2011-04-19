@@ -59,7 +59,7 @@ public class BufferedWrite {
 	 * the slot. This can improve the IO efficiency When the slots are sized so
 	 * as to fall on multiples of sector boundaries.
 	 */
-	private final RWStore m_store;
+	private final IBufferedWriter m_store;
 
 	/**
 	 * The direct {@link ByteBuffer} used to combine writes which are contiguous
@@ -95,7 +95,7 @@ public class BufferedWrite {
 	private final CAT m_dataWrites = new CAT();
 	private final CAT m_fileWrites = new CAT();
 	
-	public BufferedWrite(final RWStore store) throws InterruptedException {
+	public BufferedWrite(final IBufferedWriter store) throws InterruptedException {
 		
 		if (store == null)
 			throw new IllegalArgumentException();

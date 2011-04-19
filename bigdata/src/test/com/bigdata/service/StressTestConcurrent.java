@@ -134,7 +134,7 @@ public class StressTestConcurrent extends
         final Properties properties = new Properties(super.getProperties());
 
         // Make sure this test uses disk so that it can trigger overflows.
-        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
+       properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                 .toString());
 
         /*

@@ -42,7 +42,7 @@ import com.bigdata.quorum.Quorum;
  * 
  * @author mgc
  */
-public class RWWriteCacheService extends WriteCacheService {
+public class RWWriteCacheService extends WriteCacheService implements IWriteCacheManager {
 
     protected static final Logger log = Logger.getLogger(RWWriteCacheService.class);
     
@@ -74,5 +74,9 @@ public class RWWriteCacheService extends WriteCacheService {
                 (IReopenChannel<FileChannel>) opener, null);
 
     }
+
+	public boolean removeWriteToAddr(long address) {
+		return clearWrite(address);
+	}
     
 }

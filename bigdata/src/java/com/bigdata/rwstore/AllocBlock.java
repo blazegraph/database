@@ -139,6 +139,10 @@ public class AllocBlock {
 	 */
 	public boolean freeBit(final int bit, final boolean sessionProtect) {
 		if (!RWStore.tstBit(m_live, bit)) {
+			
+			if (sessionProtect && RWStore.tstBit(m_transients, bit)) 
+				return false;
+			
 			throw new IllegalArgumentException("Freeing bit not set");
 		}
 
@@ -293,12 +297,38 @@ public class AllocBlock {
 	 * T 1100	1110		1111		1110	
 	 * C 1100	1100		1110		1100
 	 */
-	public void abortshadow() {
+	public void abortshadow(final RWWriteCacheService cache) {
 		for (int i = 0; i < m_live.length; i++) {
+			final int startBit = i * 32;
+			final int chkbits = m_live[i] & ~m_commit[i];
+			clearCacheBits(cache, startBit, chkbits);
+			
 			m_live[i] &= m_commit[i];
 			m_transients[i] = m_live[i] | m_saveCommit[i];
 		}
 		m_commit = m_saveCommit;
+	}
+	
+	private int clearCacheBits(RWWriteCacheService cache, final int startBit, final int chkbits) {
+		int freebits = 0;
+		
+		if (chkbits != 0) {
+			// there are writes to clear
+			for (int b = 0; b < 32; b++) {
+				if ((chkbits & (1 << b)) != 0) {
+					long clr = RWStore.convertAddr(m_addr) + ((long) m_allocator.m_size * (startBit + b));
+					
+					if (log.isTraceEnabled())
+						log.trace("releasing address: " + clr);
+					
+					cache.clearWrite(clr);
+					
+					freebits++;
+				}
+			}
+		}
+		
+		return freebits;
 	}
 
 	/**
@@ -325,21 +355,8 @@ public class AllocBlock {
 				chkbits &= ~m_transients[i];
 				
 				final int startBit = i * 32;
-				if (chkbits != 0) {
-					// there are writes to clear
-					for (int b = 0; b < 32; b++) {
-						if ((chkbits & (1 << b)) != 0) {
-							long clr = RWStore.convertAddr(m_addr) + ((long) m_allocator.m_size * (startBit + b));
-							
-							if (log.isTraceEnabled())
-								log.trace("releasing address: " + clr);
-							
-							cache.clearWrite(clr);
-							
-							freebits++;
-						}
-					}
-				}
+				
+				freebits += clearCacheBits(cache, startBit, chkbits);
 			}
 		}
 		

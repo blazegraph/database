@@ -321,11 +321,11 @@ abstract public class WriteCacheService implements IWriteCache {
 	 * 
 	 * Toggle comment appropriately to activate/deactivate
 	 */
-/*	final long[] addrsUsed = new long[4024 * 1024];
-	int addrsUsedCurs = 0;
-	final char[] addrActions = new char[addrsUsed.length];
-	final int[] addrLens = new int[addrsUsed.length];
-*/	private final long[] addrsUsed = null;
+//	final long[] addrsUsed = new long[4024 * 1024];
+//	int addrsUsedCurs = 0;
+//	final char[] addrActions = new char[addrsUsed.length];
+//	final int[] addrLens = new int[addrsUsed.length];
+	private final long[] addrsUsed = null;
 	private int addrsUsedCurs = 0;
 	private final char[] addrActions = null;
 	private final int[] addrLens = null;
@@ -600,7 +600,7 @@ abstract public class WriteCacheService implements IWriteCache {
                         if (remoteWriteFuture != null) {
                             try {
                                 remoteWriteFuture.get();
-                            } catch (ExecutionException ex) {
+                           } catch (ExecutionException ex) {
                                 retrySend(quorum, cache, ex);
                             }
                         }
@@ -769,6 +769,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
                 // duplicate the write cache's buffer.
                 final ByteBuffer b = cache.peek().duplicate();
+                // final ByteBuffer b = ByteBuffer.allocate(0);
                 
                 // flip(limit=pos;pos=0)
                 b.flip();
@@ -1812,6 +1813,9 @@ abstract public class WriteCacheService implements IWriteCache {
 			 * When this method returns, the record will be on the disk and can
 			 * be read back safely from the disk.
 			 */
+			if (log.isTraceEnabled())
+				log.trace("FLUSHING LARGE RECORD");
+			
 			flush(false/* force */);
 			// done.
 			return true;
@@ -1968,15 +1972,17 @@ abstract public class WriteCacheService implements IWriteCache {
      * @param offset
      *            the address to check
      */
-	public void clearWrite(final long offset) {
+	public boolean clearWrite(final long offset) {
 		try {
 			final WriteCache cache = recordMap.remove(offset);
 			if (cache == null)
-				return;
+				return false;
 			final WriteCache cur = acquireForWriter(); // in case current
 			debugAddrs(offset, 0, 'F');
 			try {
 				cache.clearAddrMap(offset);
+				
+				return true;
 			} finally {
 				release();
 			}

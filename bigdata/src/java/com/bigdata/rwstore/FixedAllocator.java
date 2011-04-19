@@ -153,7 +153,7 @@ public class FixedAllocator implements Allocator {
 		}
 	}
 
-	volatile private IAllocationContext m_context;
+	volatile IAllocationContext m_context;
 
 	/**
 	 * Indicates whether session protection has been used to protect
@@ -168,25 +168,34 @@ public class FixedAllocator implements Allocator {
 			for (AllocBlock allocBlock : m_allocBlocks) {
 				allocBlock.deshadow();
 			}
-		} else if (context != null & m_context == null) {
+			
+			// return to dirty list
+			m_store.addToCommit(this);
+			
+		} else if (context != null && m_context == null) {
 			// restore commit bits in AllocBlocks
 			for (AllocBlock allocBlock : m_allocBlocks) {
 				allocBlock.shadow();
 			}
+			
+			// remove from dirty list if present!
+			// NO! m_store.removeFromCommit(this);
 		}
 		m_context = context;
 	}
 
 	/**
-	 * Unwinds the allocations made within the context and clears
+	 * Unwinds the allocations made within the context and clears the write
+	 * cache of any associated data
+	 * @param writeCacheService 
 	 */
-	public void abortAllocationContext(final IAllocationContext context) {
-		if (context != null && m_context == context) {
+	public void abortAllocationContext(final IAllocationContext context, RWWriteCacheService writeCacheService) {
+		if (m_context != null) {
 			// restore commit bits in AllocBlocks
 			for (AllocBlock allocBlock : m_allocBlocks) {
-				allocBlock.abortshadow();
+				allocBlock.abortshadow(writeCacheService);
 			}
-			m_context = null;
+			m_context = context;
 		} else {
 			throw new IllegalArgumentException();
 		}
@@ -214,7 +223,11 @@ public class FixedAllocator implements Allocator {
 
                     str.writeInt(block.m_addr);
                     for (int i = 0; i < m_bitSize; i++) {
-                        str.writeInt(block.m_live[i]);
+                    	if (m_context != null) { // shadowed
+                       		str.writeInt(block.m_transients[i]);
+                    	} else {
+                    		str.writeInt(block.m_live[i]);
+                    	}
                     }
 
                     if (!m_sessionActive) {
@@ -513,18 +526,22 @@ public class FixedAllocator implements Allocator {
 			final int block = offset/nbits;
 			
 			m_sessionActive = m_store.isSessionProtected();
-			
-			if (((AllocBlock) m_allocBlocks.get(block))
-					.freeBit(offset % nbits, m_sessionActive && !overideSession)) { // bit adjust
+			try {
+				if (((AllocBlock) m_allocBlocks.get(block))
+						.freeBit(offset % nbits, m_sessionActive && !overideSession)) { // bit adjust
+					
+					m_freeBits++;
+					checkFreeList();
+				} else {
+					m_freeTransients++;
+				}
 				
-				m_freeBits++;
-				checkFreeList();
-			} else {
-				m_freeTransients++;
-			}
-			
-			if (m_statsBucket != null) {
-				m_statsBucket.delete(size);
+				if (m_statsBucket != null) {
+					m_statsBucket.delete(size);
+				}
+			} catch (IllegalArgumentException iae) {
+				// catch and rethrow with more information
+				throw new IllegalArgumentException("IAE with address: " + addr + ", size: " + size + ", context: " + (m_context == null ? -1 : m_context.hashCode()), iae);
 			}
 
 			return true;
@@ -797,6 +814,11 @@ public class FixedAllocator implements Allocator {
 			return false;
 		}
 	}
+    
+    public boolean isUnsafeFree(final IAllocationContext context) {
+    	// return m_context != null || context != null; // m_context != context;
+    	return m_context != context;
+    }
 
 	public void setBucketStats(Bucket b) {
 		m_statsBucket = b;
