@@ -1,6 +1,7 @@
 package com.bigdata.journal;
 
 import com.bigdata.rawstore.IAddressManager;
+import com.bigdata.rwstore.RWStore;
 
 /**
  * 
@@ -8,6 +9,11 @@ import com.bigdata.rawstore.IAddressManager;
  */
 public class RWAddressManager implements IAddressManager {
 
+	RWStore m_store;
+	
+	public RWAddressManager(final RWStore store) {
+		m_store = store;
+	}
     public int getByteCount(final long addr) {
         return (int) (addr & 0xFFFFFFFFL);
     }
@@ -21,8 +27,13 @@ public class RWAddressManager implements IAddressManager {
     }
 
     public String toString(final long addr) {
-        return "{off=" + getOffset(addr) + ",len=" + getByteCount(addr)
-                + "}";
+    	if (m_store == null) {
+	        return "{off=NATIVE:" + getOffset(addr) + ",len=" + getByteCount(addr)
+	        + "}";
+    	} else {
+	        return "{off=" + m_store.physicalAddress((int) getOffset(addr)) + ",len=" + getByteCount(addr)
+	        + "}";
+    	}
     }
     
 }

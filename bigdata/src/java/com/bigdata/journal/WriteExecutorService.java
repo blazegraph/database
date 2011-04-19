@@ -913,6 +913,18 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 final int nwrites = this.nwrites.incrementAndGet();
                 
                 assert nwrites > 0;
+                
+                /*
+                 *  If an IsolatedActionJournal then we want to unravel any 
+                 *  updates.
+                 *  
+                 *  So should we even be here doing a group commit?
+                 */
+//                IJournal jnl = r.getJournal();
+//                if (jnl instanceof AbstractTask.IsolatedActionJournal) {
+//                	// undo any journal writes prior to external commit
+//                	((AbstractTask.IsolatedActionJournal) jnl).abortContext();
+//                }
 
                 // add to the commit group.
                 commitGroup.put(Thread.currentThread(), r);
@@ -2300,6 +2312,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         }
         
         // note: throws IllegalStateException if resource manager is not open.
+        // final AbstractJournal journal = resourceManager.getLiveJournal();
         final AbstractJournal journal = resourceManager.getLiveJournal();
 
         if(!journal.isOpen()) {

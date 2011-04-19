@@ -32,6 +32,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 
+import com.bigdata.rwstore.sector.SectorAllocator;
+
 /**
  * Maintains stats on the RWStore allocations, useful for tuning Allocator
  * sizes and tracking store efficiency.
@@ -527,5 +529,10 @@ public class StorageStats {
 		BigDecimal total = new BigDecimal(totalData);
 		
 		return used.divide(total, 2, RoundingMode.HALF_UP).floatValue();
+	}
+
+	public void register(SectorAllocator allocator, boolean init) {
+		// TODO Auto-generated method stub
+		
 	}
 }

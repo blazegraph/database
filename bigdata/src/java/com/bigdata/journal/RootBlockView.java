@@ -279,7 +279,7 @@ public class RootBlockView implements IRootBlockView {
                 0L, // metaStartAddr
                 0L, // metaBitsAddr
                 StoreTypeEnum.WORM, //
-                createTime, closeTime, checker);
+                createTime, closeTime, currentVersion, checker);
     
     }
 
@@ -353,6 +353,7 @@ public class RootBlockView implements IRootBlockView {
      *            used by the {@link ResourceManager} to indicate that a journal
      *            is no longer available for writing (because it has been
      *            superseded by another journal).
+     * @param version 
      */
     RootBlockView(//
             final boolean rootBlock0, final int offsetBits,
@@ -365,7 +366,7 @@ public class RootBlockView implements IRootBlockView {
             final long metaBitsAddr, // VERSION1
             final StoreTypeEnum storeTypeEnum, // VERSION1
             final long createTime, final long closeTime,
-            final ChecksumUtility checker)
+            final int version, final ChecksumUtility checker)
     {
 
         // Note: There is a unit test specifically for this condition.
@@ -383,7 +384,7 @@ public class RootBlockView implements IRootBlockView {
         case RW: {
             // @todo check metaStartAddr
             // @todo check metaBitsAddr
-            am = new RWAddressManager();
+            am = new RWAddressManager(null);
             // @todo check nextOffset
             break;
         }
@@ -647,7 +648,7 @@ public class RootBlockView implements IRootBlockView {
         switch (getStoreType()) {
         case RW: {
          
-            am = new RWAddressManager();
+            am = new RWAddressManager(null);
             
             break;
             

@@ -750,12 +750,12 @@ public class FileMetadata {
 						offsetBits, nextOffset, firstCommitTime,
 						lastCommitTime, commitCounter, commitRecordAddr,
 						commitRecordIndexAddr, uuid, quorumToken,//
-						0L, 0L, stenum, createTime, closeTime, checker);
+						0L, 0L, stenum, createTime, closeTime, version, checker);
 				final IRootBlockView rootBlock1 = new RootBlockView(false,
 						offsetBits, nextOffset, firstCommitTime,
 						lastCommitTime, commitCounter, commitRecordAddr,
 						commitRecordIndexAddr, uuid, quorumToken,//
-						0L, 0L, stenum, createTime, closeTime, checker);
+						0L, 0L, stenum, createTime, closeTime, version, checker);
 
 				if (!temporary) {
 

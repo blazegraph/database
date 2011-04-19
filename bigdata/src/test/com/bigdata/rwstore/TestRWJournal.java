@@ -766,7 +766,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				RWStore rw = bufferStrategy.getRWStore();
 
-				final int tcount = 2000; // increase to ramp up stress levels
+				final int tcount = 5000; // increase to ramp up stress levels
 
 				long numAllocs = rw.getTotalAllocations();
 				long startAllocations = rw.getTotalAllocationsSize();
@@ -820,6 +820,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 
+		public void notest_stressReallocationWithReadAndReopen() {
+			for (int i = 0; i < 20; i++) {
+				test_reallocationWithReadAndReopen();
+			}
+		}
+		
 		void showStore(Journal store) {
 			RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
@@ -896,7 +902,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			try {
 
-				final int tcount = 2000; // increase to ramp up stress levels
+				final int tcount = 20000; // increase to ramp up stress levels
 
 				RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
@@ -1043,6 +1049,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			}
 
+		}
+		
+		public void notest_stressBlobReadBack() {
+			for (int i = 0; i < 100; i++) {
+				test_blob_readBack();
+			}
 		}
 
 		/**
