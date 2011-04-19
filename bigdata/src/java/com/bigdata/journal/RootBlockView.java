@@ -565,7 +565,7 @@ public class RootBlockView implements IRootBlockView {
         
         buf.putLong(challisField);
         buf.putInt(MAGIC);
-        buf.putInt(currentVersion);
+        buf.putInt(version);
         buf.put((byte)offsetBits);
         buf.putLong(nextOffset);
         buf.putLong(localTime);
