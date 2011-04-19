@@ -441,7 +441,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
 
 				final Thread t = Thread.currentThread();
 				final Thread other = btrees.putIfAbsent(indices[i], t);
-				if (t != null) {
+				if (other != null) {
 
 					throw new AssertionError("Unisolated index already in use: " + resource[i]+", currentThread="+t+", otherThread="+other);
 
