@@ -44,11 +44,11 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.XorShift;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
@@ -138,33 +138,6 @@ public class TestHardReferenceQueueWithBatchingUpdates extends TestCase2
         
     }
 
-    /**
-     * XorShift
-     *
-     * @author Brian Goetz and Tim Peierls
-     */
-    public static class XorShift {
-        
-        static final AtomicInteger seq = new AtomicInteger(8862213);
-        
-        int x = -1831433054;
-
-        public XorShift(int seed) {
-            x = seed;
-        }
-
-        public XorShift() {
-            this((int) System.nanoTime() + seq.getAndAdd(129));
-        }
-
-        public int next() {
-            x ^= x << 6;
-            x ^= x >>> 21;
-            x ^= (x << 7);
-            return x;
-        }
-    }
-    
     /**
      * A default configuration of a parameterized stress test.
      * 

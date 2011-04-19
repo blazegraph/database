@@ -41,13 +41,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.LRUNexus;
+import com.bigdata.XorShift;
 import com.bigdata.LRUNexus.AccessPolicyEnum;
 import com.bigdata.LRUNexus.CacheSettings;
 import com.bigdata.concurrent.TestLockManager;
@@ -524,33 +524,6 @@ public class StressTestGlobalLRU extends TestCase implements IComparisonTest {
 
         return new RunCounters(elapsed, perThreadCounters);
         
-    }
-
-    /**
-     * XorShift
-     *
-     * @author Brian Goetz and Tim Peierls
-     */
-    public static class XorShift {
-        
-        static final AtomicInteger seq = new AtomicInteger(8862213);
-        
-        int x = -1831433054;
-
-        public XorShift(int seed) {
-            x = seed;
-        }
-
-        public XorShift() {
-            this((int) System.nanoTime() + seq.getAndAdd(129));
-        }
-
-        public int next() {
-            x ^= x << 6;
-            x ^= x >>> 21;
-            x ^= (x << 7);
-            return x;
-        }
     }
 
     /**
