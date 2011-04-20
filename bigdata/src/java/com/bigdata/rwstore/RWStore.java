@@ -1755,7 +1755,7 @@ public class RWStore implements IStore, IBufferedWriter {
 			if (alloc.isAllocated(addrOffset))
 				throw new IllegalStateException("Reallocation problem with WriteCache");
 
-			if (alloc.m_context != null && !m_commitList.contains(alloc)) {
+			if (!m_commitList.contains(alloc)) {
 				m_commitList.add(alloc);
 			}
 			
