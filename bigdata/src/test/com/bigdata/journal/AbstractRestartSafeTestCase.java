@@ -435,10 +435,10 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
         
         Journal store = (Journal) getStore();
         
-        if (store.getBufferStrategy() instanceof RWStrategy)
-        	return; // void test
-
         try {
+
+            if (store.getBufferStrategy() instanceof RWStrategy)
+                return; // void test
 
             final int nrecs = 1000;
             final ByteBuffer[] recs = new ByteBuffer[nrecs];
