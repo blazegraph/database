@@ -520,14 +520,14 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 
-		/**
-		 * Test write of a record and then update of a slice of that record.
-		 * <p>
-		 * Note: Since the record was written but not flushed it will be found
-		 * in the write cache by update().
-		 */
-		public void test_write_plus_update() {
-		}
+//		/**
+//		 * Test write of a record and then update of a slice of that record.
+//		 * <p>
+//		 * Note: Since the record was written but not flushed it will be found
+//		 * in the write cache by update().
+//		 */
+//		public void test_write_plus_update() {
+//		}
 
 		/**
 		 * Ensures the allocation of unique addresses by mapping allocated
@@ -613,9 +613,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		 * Not so much a test as a code coverage exercise.
 		 * 
 		 * The output from showAllocReserve confirms the relative merits of
-		 * optimising for space vs density. The DirectFixedAllocators will
+		 * optimizing for space vs density. The DirectFixedAllocators will
 		 * allocate from DirectBuffers, where locality of reference is less
-		 * important than efficient management of the memory, which is optimised
+		 * important than efficient management of the memory, which is optimized
 		 * by allocations in smaller amounts that match the demands at a finer
 		 * granularity.
 		 */
