@@ -138,7 +138,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
                 20,// nresources
                 1, // minLocks
                 3, // maxLocks
-                100,//100, // ntrials
+                300,//100, // ntrials
                 3, // keyLen
                 1000, // nops
                 .05//0.02d // failureRate

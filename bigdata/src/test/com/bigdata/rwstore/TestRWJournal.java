@@ -710,7 +710,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				bufferStrategy = (RWStrategy) store.getBufferStrategy();
 				rw = bufferStrategy.getRWStore();
 
-				reallocBatch(rw, 1000, 100, 10000);
+				reallocBatch(rw, 1000, 100, 1000);
 
 				store.commit();
 				store.close();
@@ -718,7 +718,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				bufferStrategy = (RWStrategy) store.getBufferStrategy();
 				rw = bufferStrategy.getRWStore();
 
-				reallocBatch(rw, 1000, 100, 10000);
+				reallocBatch(rw, 1000, 100, 1000);
 
 				store.commit();
 				store.close();
@@ -902,7 +902,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			try {
 
-				final int tcount = 20000; // increase to ramp up stress levels
+				final int tcount = 1000; // increase to ramp up stress levels
 
 				RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
@@ -1518,7 +1518,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			RWStore rw = bs.getRWStore();
 			long realAddr = 0;
 				// allocBatch(store, 1, 32, 650, 100000000);
-				pureAllocBatch(store, 1, 32, rw.m_maxFixedAlloc - 4, 300000); // cover
+				pureAllocBatch(store, 1, 32, rw.m_maxFixedAlloc - 4, 30000); // cover
 																				// wider
 																				// range
 																				// of

@@ -114,7 +114,7 @@ public class FixedAllocator implements Allocator {
 		final int bit = offset % allocBlockRange;
 		
 //		if (RWStore.tstBit(block.m_live, bit) 
-//				|| (m_sessionActive && RWStore.tstBit(block.m_transients, bit))) 
+//				|| (m_sessionActive && RWStore.tstBit(block.m_transients, bit))) { 
 		/*
 		 * Just check transients since there are case (eg CommitRecordIndex)
 		 * where committed data is accessed even if has been marked as ready to
@@ -147,7 +147,7 @@ public class FixedAllocator implements Allocator {
 	public void setFreeList(ArrayList list) {
 		m_freeList = list;
 
-		if (hasFree()) {
+		if (!m_pendingContextCommit && hasFree()) {
 			m_freeList.add(this);
 			m_freeWaiting = false;
 		}
@@ -165,6 +165,9 @@ public class FixedAllocator implements Allocator {
 	private boolean m_pendingContextCommit = false;
 	
 	public void setAllocationContext(final IAllocationContext context) {
+		if (m_pendingContextCommit) {
+			throw new IllegalStateException("Already pending commit");
+		}
 		if (context == null && m_context != null) {
 			// restore commit bits in AllocBlocks
 			for (AllocBlock allocBlock : m_allocBlocks) {
@@ -193,6 +196,10 @@ public class FixedAllocator implements Allocator {
 	 * @param writeCacheService 
 	 */
 	public void abortAllocationContext(final IAllocationContext context, RWWriteCacheService writeCacheService) {
+		if (m_pendingContextCommit) {
+			throw new IllegalStateException("Already pending commit");
+		}
+
 		if (m_context != null) {
 			// restore commit bits in AllocBlocks
 			for (AllocBlock allocBlock : m_allocBlocks) {
@@ -568,7 +575,7 @@ public class FixedAllocator implements Allocator {
 	}
 
 	private void checkFreeList() {
-		if (m_freeWaiting) {
+		if (m_freeWaiting && !m_pendingContextCommit) {
 			if (m_freeBits > 0 && this instanceof DirectFixedAllocator) {
 				m_freeWaiting = false;
 				m_freeList.add(0, this);
@@ -812,10 +819,12 @@ public class FixedAllocator implements Allocator {
 	 */
     public boolean canImmediatelyFree(final int addr, final int size,
             final IAllocationContext context) {
-		if (context == m_context) {
+		if (context == m_context && !m_pendingContextCommit) {
 			final int offset = ((-addr) & RWStore.OFFSET_BITS_MASK); // bit adjust
 
-			return !isCommitted(offset);
+			final boolean ret = !isCommitted(offset);
+
+			return ret;
 		} else {
 			return false;
 		}
