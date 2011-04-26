@@ -147,7 +147,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * The IO interface for the file - <strong>use
      * {@link #getRandomAccessFile()} rather than this field</strong>.
      */
-    /*private*/ /*final*/ RandomAccessFile raf;
+    private /*final*/ volatile RandomAccessFile raf;
 
     /**
      * The size of the journal header, including MAGIC, version, and both root
