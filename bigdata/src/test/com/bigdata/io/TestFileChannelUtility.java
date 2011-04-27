@@ -353,6 +353,8 @@ public class TestFileChannelUtility extends TestCase {
         if(SystemUtil.isOSX()) {
             /*
              * FIXME For some reason, this unit test is hanging under OS X.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/287
              */
             fail("Unit test hangs under OS X");
         }
