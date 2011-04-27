@@ -131,7 +131,7 @@ abstract public class AbstractNodeDataRecordTestCase extends
         keys[0] = new byte[] { 1, 2, 3 };
 
         int entryCount = 0;
-        for (int i = 0; i < nkeys; i++) {
+        for (int i = 0; i <= nkeys; i++) {
 
             entryCount += childEntryCount[i];
 
@@ -164,7 +164,7 @@ abstract public class AbstractNodeDataRecordTestCase extends
         keys[0] = new byte[] { 1, 2, 3 };
 
         int entryCount = 0;
-        for (int i = 0; i < nkeys; i++) {
+        for (int i = 0; i <= nkeys; i++) {
 
             entryCount += childEntryCount[i];
 
