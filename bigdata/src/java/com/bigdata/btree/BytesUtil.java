@@ -67,7 +67,7 @@ import com.bigdata.rawstore.Bytes;
  */
 public class BytesUtil {
 
-    protected static final transient Logger log = Logger.getLogger(BytesUtil.class);
+    private static final transient Logger log = Logger.getLogger(BytesUtil.class);
 
     /**
      * An empty <code>byte[]</code>.
