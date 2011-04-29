@@ -1350,196 +1350,196 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
     }
 
-    /**
-     * Assign unique statement identifiers to triples.
-     * <p>
-     * Each distinct {@link StatementEnum#Explicit} {s,p,o} is assigned a unique
-     * statement identifier using the {@link LexiconKeyOrder#TERM2ID} index. The
-     * assignment of statement identifiers is <i>consistent</i> using an
-     * unisolated atomic write operation similar to
-     * {@link #addTerms(BigdataValue[], int, boolean)}
-     * <p>
-     * Note: Statement identifiers are NOT inserted into the reverse (id:term)
-     * index. Instead, they are written into the values associated with the
-     * {s,p,o} in each of the statement indices. That is handled by
-     * {@link AbstractTripleStore#addStatements(AbstractTripleStore, boolean, IChunkedOrderedIterator, IElementFilter)}
-     * , which is also responsible for invoking this method in order to have the
-     * statement identifiers on hand before it writes on the statement indices.
-     * <p>
-     * Note: The caller's {@link ISPO}[] is sorted into SPO order as a
-     * side-effect.
-     * <p>
-     * Note: The statement identifiers are assigned to the {@link ISPO}s as a
-     * side-effect.
-     * <p>
-     * Note: SIDs are NOT supported for quads, so this code is never executed
-     * for quads.
-     */
-    public void addStatementIdentifiers(final ISPO[] a, final int n) {
-
-        //        * @throws UnsupportedOperationException
-//        *             if {@link Options#STATEMENT_IDENTIFIERS} was not specified.
-//        * 
-//        if (!statementIdentifiers)
-//            throw new UnsupportedOperationException();
-
-        if (n == 0)
-            return;
-
-        final long begin = System.currentTimeMillis();
-        final long keyGenTime; // time to convert {s,p,o} to byte[] sort keys.
-        final long sortTime; // time to sort terms by assigned byte[] keys.
-        final long insertTime; // time to insert terms into the term:id index.
-
-        /*
-         * Sort the caller's array into SPO order. This order will correspond to
-         * the total order of the term:id index.
-         * 
-         * Note: This depends critically on SPOComparator producing the same
-         * total order as we would obtain by an unsigned byte[] sort of the
-         * generated sort keys.
-         * 
-         * Note: the keys for the term:id index are NOT precisely the keys used
-         * by the SPO index since there is a prefix code used to mark the keys
-         * are Statements (vs Literals, BNodes, or URIs).
-         */
-        {
-
-            final long _begin = System.currentTimeMillis();
-
-            Arrays.sort(a, 0, n, SPOComparator.INSTANCE);
-
-            sortTime = System.currentTimeMillis() - _begin;
-
-        }
-
-        /*
-         * Insert into the forward index (term -> id). This will either assign a
-         * statement identifier or return the existing statement identifier if
-         * the statement is already in the lexicon (the statement identifier is
-         * in a sense a term identifier since it is assigned by the term:id
-         * index).
-         * 
-         * Note: Since we only assign statement identifiers for explicit
-         * statements the caller's SPO[] can not be directly correlated to the
-         * keys[]. We copy the references into b[] so that we can keep that
-         * correlation 1:1.
-         */
-        final byte[][] keys = new byte[n][];
-        final ISPO[] b = new ISPO[n];
-
-        /*
-         * Generate the sort keys for the term:id index.
-         */
-        int nexplicit = 0;
-        {
-
-            final long _begin = System.currentTimeMillis();
-
-            // local instance, no unicode support.
-            final IKeyBuilder keyBuilder = KeyBuilder
-                    .newInstance(1/* statement byte */+ (3/* triple */* Bytes.SIZEOF_LONG));
-
-            for (int i = 0; i < n; i++) {
-
-                final ISPO spo = a[i];
-
-                if (!spo.isExplicit())
-                    continue;
-                
-                if (!spo.isFullyBound())
-                    throw new IllegalArgumentException("Not fully bound: "
-                            + spo.toString(/*this*/));
-
-                /*
-                 * Creating a dummy term for the Term2Id index.
-                 */
-                keyBuilder.reset().append(ITermIndexCodes.TERM_CODE_STMT);
-                spo.s().encode(keyBuilder);
-                spo.p().encode(keyBuilder);
-                spo.o().encode(keyBuilder);
-                keys[nexplicit] = keyBuilder.getKey();
-
-                // Note: keeps correlation between key and SPO.
-                b[nexplicit] = spo;
-
-                nexplicit++;
-
-            }
-
-            keyGenTime = System.currentTimeMillis() - _begin;
-
-        }
-
-        /*
-         * Execute a remote unisolated batch operation that assigns the
-         * statement identifier.
-         */
-        {
-
-            final long _begin = System.currentTimeMillis();
-
-            final IIndex termIdIndex = getTerm2IdIndex();
-
-            // run the procedure.
-            if (nexplicit > 0) {
-
-                termIdIndex.submit(0/* fromIndex */, nexplicit/* toIndex */,
-                        keys, null/* vals */, new Term2IdWriteProcConstructor(
-                                false/* readOnly */, storeBlankNodes, //scaleOutTermIds,
-                                termIdBitsToReverse),
-                        new IResultHandler<Term2IdWriteProc.Result, Void>() {
-
-                            /**
-                             * Copy the assigned / discovered statement
-                             * identifiers onto the corresponding elements of
-                             * the SPO[].
-                             */
-                            public void aggregate(Term2IdWriteProc.Result result,
-                                    Split split) {
-
-                                for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
-
-//                                    if (b[i].c() != 0L
-//                                            && b[i].c() != result.ids[j]) {
-//                                        System.err.println("spo="
-//                                                + getContainer().toString(b[i])
-//                                                + ", sid="
-//                                                + getContainer().toString(
-//                                                        result.ids[j]));
-//                                    }
-
-                                    b[i].setStatementIdentifier(result.ivs[j]);
-
-                                }
-
-                            }
-
-                            public Void getResult() {
-
-                                return null;
-
-                            }
-
-                        });
-
-            }
-
-            insertTime = System.currentTimeMillis() - _begin;
-
-        }
-
-        final long elapsed = System.currentTimeMillis() - begin;
-
-        if (log.isInfoEnabled() && n > 1000 || elapsed > 3000) {
-
-            log.info("Wrote " + n + " in " + elapsed + "ms; keygen="
-                    + keyGenTime + "ms, sort=" + sortTime + "ms, insert="
-                    + insertTime + "ms");
-
-        }
-
-    }
+//    /**
+//     * Assign unique statement identifiers to triples.
+//     * <p>
+//     * Each distinct {@link StatementEnum#Explicit} {s,p,o} is assigned a unique
+//     * statement identifier using the {@link LexiconKeyOrder#TERM2ID} index. The
+//     * assignment of statement identifiers is <i>consistent</i> using an
+//     * unisolated atomic write operation similar to
+//     * {@link #addTerms(BigdataValue[], int, boolean)}
+//     * <p>
+//     * Note: Statement identifiers are NOT inserted into the reverse (id:term)
+//     * index. Instead, they are written into the values associated with the
+//     * {s,p,o} in each of the statement indices. That is handled by
+//     * {@link AbstractTripleStore#addStatements(AbstractTripleStore, boolean, IChunkedOrderedIterator, IElementFilter)}
+//     * , which is also responsible for invoking this method in order to have the
+//     * statement identifiers on hand before it writes on the statement indices.
+//     * <p>
+//     * Note: The caller's {@link ISPO}[] is sorted into SPO order as a
+//     * side-effect.
+//     * <p>
+//     * Note: The statement identifiers are assigned to the {@link ISPO}s as a
+//     * side-effect.
+//     * <p>
+//     * Note: SIDs are NOT supported for quads, so this code is never executed
+//     * for quads.
+//     */
+//    public void addStatementIdentifiers(final ISPO[] a, final int n) {
+//
+//        //        * @throws UnsupportedOperationException
+////        *             if {@link Options#STATEMENT_IDENTIFIERS} was not specified.
+////        * 
+////        if (!statementIdentifiers)
+////            throw new UnsupportedOperationException();
+//
+//        if (n == 0)
+//            return;
+//
+//        final long begin = System.currentTimeMillis();
+//        final long keyGenTime; // time to convert {s,p,o} to byte[] sort keys.
+//        final long sortTime; // time to sort terms by assigned byte[] keys.
+//        final long insertTime; // time to insert terms into the term:id index.
+//
+//        /*
+//         * Sort the caller's array into SPO order. This order will correspond to
+//         * the total order of the term:id index.
+//         * 
+//         * Note: This depends critically on SPOComparator producing the same
+//         * total order as we would obtain by an unsigned byte[] sort of the
+//         * generated sort keys.
+//         * 
+//         * Note: the keys for the term:id index are NOT precisely the keys used
+//         * by the SPO index since there is a prefix code used to mark the keys
+//         * are Statements (vs Literals, BNodes, or URIs).
+//         */
+//        {
+//
+//            final long _begin = System.currentTimeMillis();
+//
+//            Arrays.sort(a, 0, n, SPOComparator.INSTANCE);
+//
+//            sortTime = System.currentTimeMillis() - _begin;
+//
+//        }
+//
+//        /*
+//         * Insert into the forward index (term -> id). This will either assign a
+//         * statement identifier or return the existing statement identifier if
+//         * the statement is already in the lexicon (the statement identifier is
+//         * in a sense a term identifier since it is assigned by the term:id
+//         * index).
+//         * 
+//         * Note: Since we only assign statement identifiers for explicit
+//         * statements the caller's SPO[] can not be directly correlated to the
+//         * keys[]. We copy the references into b[] so that we can keep that
+//         * correlation 1:1.
+//         */
+//        final byte[][] keys = new byte[n][];
+//        final ISPO[] b = new ISPO[n];
+//
+//        /*
+//         * Generate the sort keys for the term:id index.
+//         */
+//        int nexplicit = 0;
+//        {
+//
+//            final long _begin = System.currentTimeMillis();
+//
+//            // local instance, no unicode support.
+//            final IKeyBuilder keyBuilder = KeyBuilder
+//                    .newInstance(1/* statement byte */+ (3/* triple */* Bytes.SIZEOF_LONG));
+//
+//            for (int i = 0; i < n; i++) {
+//
+//                final ISPO spo = a[i];
+//
+//                if (!spo.isExplicit())
+//                    continue;
+//                
+//                if (!spo.isFullyBound())
+//                    throw new IllegalArgumentException("Not fully bound: "
+//                            + spo.toString(/*this*/));
+//
+//                /*
+//                 * Creating a dummy term for the Term2Id index.
+//                 */
+//                keyBuilder.reset().append(ITermIndexCodes.TERM_CODE_STMT);
+//                spo.s().encode(keyBuilder);
+//                spo.p().encode(keyBuilder);
+//                spo.o().encode(keyBuilder);
+//                keys[nexplicit] = keyBuilder.getKey();
+//
+//                // Note: keeps correlation between key and SPO.
+//                b[nexplicit] = spo;
+//
+//                nexplicit++;
+//
+//            }
+//
+//            keyGenTime = System.currentTimeMillis() - _begin;
+//
+//        }
+//
+//        /*
+//         * Execute a remote unisolated batch operation that assigns the
+//         * statement identifier.
+//         */
+//        {
+//
+//            final long _begin = System.currentTimeMillis();
+//
+//            final IIndex termIdIndex = getTerm2IdIndex();
+//
+//            // run the procedure.
+//            if (nexplicit > 0) {
+//
+//                termIdIndex.submit(0/* fromIndex */, nexplicit/* toIndex */,
+//                        keys, null/* vals */, new Term2IdWriteProcConstructor(
+//                                false/* readOnly */, storeBlankNodes, //scaleOutTermIds,
+//                                termIdBitsToReverse),
+//                        new IResultHandler<Term2IdWriteProc.Result, Void>() {
+//
+//                            /**
+//                             * Copy the assigned / discovered statement
+//                             * identifiers onto the corresponding elements of
+//                             * the SPO[].
+//                             */
+//                            public void aggregate(Term2IdWriteProc.Result result,
+//                                    Split split) {
+//
+//                                for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
+//
+////                                    if (b[i].c() != 0L
+////                                            && b[i].c() != result.ids[j]) {
+////                                        System.err.println("spo="
+////                                                + getContainer().toString(b[i])
+////                                                + ", sid="
+////                                                + getContainer().toString(
+////                                                        result.ids[j]));
+////                                    }
+//
+//                                    b[i].setStatementIdentifier(result.ivs[j]);
+//
+//                                }
+//
+//                            }
+//
+//                            public Void getResult() {
+//
+//                                return null;
+//
+//                            }
+//
+//                        });
+//
+//            }
+//
+//            insertTime = System.currentTimeMillis() - _begin;
+//
+//        }
+//
+//        final long elapsed = System.currentTimeMillis() - begin;
+//
+//        if (log.isInfoEnabled() && n > 1000 || elapsed > 3000) {
+//
+//            log.info("Wrote " + n + " in " + elapsed + "ms; keygen="
+//                    + keyGenTime + "ms, sort=" + sortTime + "ms, insert="
+//                    + insertTime + "ms");
+//
+//        }
+//
+//    }
 
     /**
      * <p>
@@ -2168,25 +2168,27 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
         if (tid.isStatement()) {
 
-            /*
-             * Statement identifiers are not stored in the reverse lexicon (or
-             * the cache).
-             * 
-             * A statement identifier is externalized as a BNode. The "S" prefix
-             * is a syntactic marker for those in the know to indicate that the
-             * BNode corresponds to a statement identifier.
-             */
-
-			final BigdataBNode stmt = valueFactory.createBNode("S"
-                    + Long.toString(tid.getTermId()));
-
-            // set the term identifier on the object.
-            stmt.setIV(tid);
-
-            // mark as a statement identifier.
-			stmt.setStatementIdentifier(true);
-
-            return stmt;
+//            /*
+//             * Statement identifiers are not stored in the reverse lexicon (or
+//             * the cache).
+//             * 
+//             * A statement identifier is externalized as a BNode. The "S" prefix
+//             * is a syntactic marker for those in the know to indicate that the
+//             * BNode corresponds to a statement identifier.
+//             */
+//
+//			final BigdataBNode stmt = valueFactory.createBNode("S"
+//                    + Long.toString(tid.getTermId()));
+//
+//            // set the term identifier on the object.
+//            stmt.setIV(tid);
+//
+//            // mark as a statement identifier.
+//			stmt.setStatementIdentifier(true);
+//
+//            return stmt;
+        	
+        	throw new IllegalArgumentException("sids should be inline");
 
         }
 

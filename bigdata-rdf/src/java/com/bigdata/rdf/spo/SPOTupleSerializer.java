@@ -32,6 +32,8 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -41,8 +43,6 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.StatementEnum;
 
 /**
@@ -71,12 +71,17 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
 
     private static final long serialVersionUID = 2893830958762265104L;
     
-//    private static final transient long NULL = IRawTripleStore.NULL;
+    private static final transient Logger log = Logger.getLogger(SPOTupleSerializer.class);
     
     /**
      * The natural order for the index.
      */
     private SPOKeyOrder keyOrder;
+    
+    /**
+     * If true, explicit SPOs decoded from index tuples will have a sid attached.
+     */
+    private boolean sids;
     
     /**
      * Used to format the value.
@@ -102,9 +107,9 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
      * @param keyOrder
      *            The access path.
      */
-    public SPOTupleSerializer(final SPOKeyOrder keyOrder) {
+    public SPOTupleSerializer(final SPOKeyOrder keyOrder, final boolean sids) {
 
-        this(keyOrder, getDefaultLeafKeysCoder(), getDefaultValuesCoder());
+        this(keyOrder, sids, getDefaultLeafKeysCoder(), getDefaultValuesCoder());
 
     }
     
@@ -113,10 +118,13 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
      * 
      * @param keyOrder
      *            The access path.
+     * @param sids
+     * 			  If true, attach sids to decoded SPOs where appropriate.            
      * @param leafKeySer
      * @param leafValSer
      */
     public SPOTupleSerializer(final SPOKeyOrder keyOrder,
+    		final boolean sids,
             final IRabaCoder leafKeySer, final IRabaCoder leafValSer) {
 
         super(new ASCIIKeyBuilderFactory(), leafKeySer, leafValSer);
@@ -126,62 +134,10 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         
         this.keyOrder = keyOrder;
         
+        this.sids = sids;
+        
     }
     
-    public SPO deserialize(final ITuple tuple) {
-
-        if (tuple == null)
-            throw new IllegalArgumentException();
-
-        // copy of the key in a reused buffer.
-        final byte[] key = tuple.getKeyBuffer().array();
-
-        final SPO spo = keyOrder.decodeKey(key);
-    
-        if ((tuple.flags() & IRangeQuery.VALS) == 0) {
-
-            // Note: No type or statement identifier information.
-            return spo;
-            
-        }
-
-        /*
-         * Decode the StatementEnum and the optional statement identifier.
-         */
-
-        final ByteArrayBuffer vbuf = tuple.getValueBuffer();
-
-        final StatementEnum type = StatementEnum.decode(vbuf.array()[0]);
-
-        spo.setStatementType(type);
-        
-        spo.setUserFlag(StatementEnum.isUserFlag(vbuf.array()[0]));
-
-        if (vbuf.limit() == 1 + 8) {
-
-            /*
-             * The value buffer appears to contain a statement identifier, so we
-             * read it.
-             */
-
-            // SIDs only valid for triples.
-            assert keyOrder.getKeyArity() == 3;
-
-            spo.setStatementIdentifier(new TermId(VTE.STATEMENT, vbuf.getLong(1)));
-
-        }
-
-        return spo;
-        
-    }
-
-    public SPO deserializeKey(final ITuple tuple) {
-        
-        // just de-serialize the whole tuple.
-        return deserialize(tuple);
-        
-    }
-
     public byte[] serializeKey(final Object obj) {
 
         if (obj == null)
@@ -205,80 +161,128 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
     public byte[] serializeKey(final ISPO spo) {
         
         return keyOrder.encodeKey(getKeyBuilder(), spo);
-//        return statement2Key(keyOrder, spo);
         
     }
 
-//    /**
-//     * Forms the statement key.
-//     * 
-//     * @param keyOrder
-//     *            The key order.
-//     * @param spo
-//     *            The statement.
-//     * 
-//     * @return The key.
-//     * 
-//     * @deprecated by {@link #serializeKey(ISPO)}
-//     */
-//    public byte[] statement2Key(final IKeyOrder<ISPO> keyOrder, final ISPO spo) {
-//        
-//        switch (((SPOKeyOrder)keyOrder).index()) {
-//
-//        case SPOKeyOrder._SPO:
-//        
-//            return statement2Key(spo.s(), spo.p(), spo.o());
-//            
-//        case SPOKeyOrder._POS:
-//            
-//            return statement2Key(spo.p(), spo.o(), spo.s());
-//            
-//        case SPOKeyOrder._OSP:
-//            
-//            return statement2Key(spo.o(), spo.s(), spo.p());
-//            
-//        default:
-//            throw new UnsupportedOperationException("keyOrder=" + keyOrder);
-//        
-//        }
-//        
-//    }
-    
     /**
      * Encodes the {@link StatementEnum} and the optional statement identifier.
      */
-    public byte[] serializeVal(final SPO spo) {
+    public byte[] serializeVal(final ISPO spo) {
 
         if (spo == null)
             throw new IllegalArgumentException();
 
-        buf.reset();
+		return serializeVal(buf,
+				spo.isOverride(), spo.getUserFlag(), spo.getStatementType());
 
-        final StatementEnum type = spo.getStatementType();
+	}
 
-        // optionally set the override bit on the value.
-        byte b = (byte) (spo.isOverride() ? (type.code() | StatementEnum.MASK_OVERRIDE)
-                : type.code());
-        b=(byte)(spo.getUserFlag()?b|StatementEnum.MASK_USER_FLAG:b);
-        buf.putByte(b);
+	/**
+	 * Return the byte[] that would be written into a statement index for this
+	 * {@link SPO}, including the optional {@link StatementEnum#MASK_OVERRIDE}
+	 * bit. If the statement identifier is non-null then it will be included in
+	 * the returned byte[].
+	 * 
+	 * @param buf
+	 *            A buffer supplied by the caller. The buffer will be reset
+	 *            before the value is written on the buffer.
+	 * @param override
+	 *            <code>true</code> iff you want the
+	 *            {@link StatementEnum#MASK_OVERRIDE} bit set (this is only set
+	 *            when serializing values for a remote procedure that will write
+	 *            on the index, it is never set in the index itself).
+	 * @param userFalg
+	 *            <code>true</code> iff you want the
+	 *            {@link StatementEnum#MASK_USER_FLAG} bit set.
+	 * @param type
+	 *            The {@link StatementEnum}.
+	 * 
+	 * @return The value that would be written into a statement index for this
+	 *         {@link SPO}.
+	 */
+	public static byte[] serializeVal(final ByteArrayBuffer buf,
+			final boolean override, final boolean userFlag,
+			final StatementEnum type) {
+		
+		buf.reset();
 
-        if (keyOrder.getKeyArity() == 3) {
+		// optionally set the override and user flag bits on the value.
+		final byte b = (byte) 
+			(type.code()
+				| (override ? StatementEnum.MASK_OVERRIDE : 0x0) 
+				| (userFlag ? StatementEnum.MASK_USER_FLAG : 0x0)
+				);
 
-            // 4th position is interpretable as SID for triples only (vs quads).
+		buf.putByte(b);
+
+		return buf.toByteArray();
+
+	}
+
+	public SPO deserialize(final ITuple tuple) {
+
+        if (tuple == null)
+            throw new IllegalArgumentException();
+        
+        // copy of the key in a reused buffer.
+        final byte[] key = tuple.getKeyBuffer().array();
+
+        final SPO spo = keyOrder.decodeKey(key);
+    
+        if ((tuple.flags() & IRangeQuery.VALS) == 0) {
+
+            // Note: No type or statement identifier information.
+            return spo;
             
-            if (spo.hasStatementIdentifier()) {
-
-                assert type == StatementEnum.Explicit : "Statement identifier not allowed: type="
-                        + type;
-
-                buf.putLong(spo.getStatementIdentifier().getTermId());
-
-            }
-
         }
 
-        return buf.toByteArray();
+        // Decode the StatementEnum, bit flags, and attach a sid.
+        final ByteArrayBuffer vbuf = tuple.getValueBuffer();
+
+        decodeValue(spo, vbuf.array());
         
+        return spo;
+        
+    }
+
+    public SPO deserializeKey(final ITuple tuple) {
+        
+        // just de-serialize the whole tuple.
+        return deserialize(tuple);
+        
+    }
+
+	/**
+	 * Set the statement type, bit flags, and optional sid based on the tuple
+	 * value.
+	 */
+    public ISPO decodeValue(final ISPO spo, final byte[] val) {
+    	
+        final byte code = val[0];
+
+        final StatementEnum type = StatementEnum.decode(code);
+
+        spo.setStatementType(type);
+        
+        spo.setOverride(StatementEnum.isOverride(code));
+
+        spo.setUserFlag(StatementEnum.isUserFlag(code));
+
+        if (sids) {
+        	
+            // SIDs only valid for triples.
+            assert keyOrder.getKeyArity() == 3;
+          
+            if (spo.isExplicit()) {
+            	
+            	spo.setStatementIdentifier(true);
+        	
+            }
+        	
+        }
+        
+        return spo;
+
     }
 
     /**
@@ -287,9 +291,14 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
     private final static transient byte VERSION0 = 0;
 
     /**
+     * The new version for the inline sids refactor.
+     */
+    private final static transient byte VERSION1 = 1;
+
+    /**
      * The current version.
      */
-    private final static transient byte VERSION = VERSION0;
+    private final static transient byte VERSION = VERSION1;
 
     public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
@@ -300,13 +309,22 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         
         switch (version) {
         case VERSION0:
+            keyOrder = SPOKeyOrder.valueOf(in.readByte());
+			/*
+			 * New version is not backwards compatible with old journals that
+			 * used sids.
+			 */
+            sids = false;
+            break;
+        case VERSION1:
+            keyOrder = SPOKeyOrder.valueOf(in.readByte());
+            sids = in.readByte() > 0;
             break;
         default:
             throw new UnsupportedOperationException("Unknown version: "
                     + version);
         }
 
-        keyOrder = SPOKeyOrder.valueOf(in.readByte());
 
     }
 
@@ -317,6 +335,8 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         out.writeByte(VERSION);
 
         out.writeByte(keyOrder.index());
+        
+        out.writeByte(sids ? 1 : 0);
 
     }
 

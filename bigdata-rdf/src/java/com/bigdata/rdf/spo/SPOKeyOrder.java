@@ -30,36 +30,18 @@ package com.bigdata.rdf.spo;
 import java.io.Externalizable;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-import java.util.UUID;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.internal.AbstractLiteralIV;
-import com.bigdata.rdf.internal.AbstractIV;
-import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.UUIDLiteralIV;
-import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.XSDBooleanIV;
-import com.bigdata.rdf.internal.XSDByteIV;
-import com.bigdata.rdf.internal.XSDDoubleIV;
-import com.bigdata.rdf.internal.XSDFloatIV;
-import com.bigdata.rdf.internal.XSDIntIV;
-import com.bigdata.rdf.internal.XSDIntegerIV;
-import com.bigdata.rdf.internal.XSDLongIV;
-import com.bigdata.rdf.internal.XSDShortIV;
-import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.striterator.IKeyOrder;
@@ -84,6 +66,8 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
      * 
      */
     private static final long serialVersionUID = 87501920529732159L;
+    
+    private static final transient Logger log = Logger.getLogger(SPOKeyOrder.class);
     
     /*
      * Note: these constants make it possible to use switch(index()) constructs.
@@ -525,22 +509,45 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
      * value. However, if the {@link SPOKeyOrder} is a quad order then the
      * {@link SPO#c()} will be bound.
      * 
-     * @param keyOrder
-     *            The natural order of the key.
      * @param key
      *            The key.
      * 
      * @return The decoded key.
      */
     final public SPO decodeKey(final byte[] key) {
-        
+
+    	return decodeKey(key, 0 /* offset */);
+    	
+    }
+    	
+    /**
+     * Decode the key into an {@link SPO}. The {@link StatementEnum} and the
+     * optional SID will not be decoded, since it is carried in the B+Tree
+     * value. However, if the {@link SPOKeyOrder} is a quad order then the
+     * {@link SPO#c()} will be bound.
+     * 
+     * @param key
+     *            The key.
+     * @param offset
+     *            The offset into the key.
+     * 
+     * @return The decoded key.
+     */
+    final public SPO decodeKey(final byte[] key, final int offset) {
+            
         /*
          * Note: GTE since the key is typically a reused buffer which may be
          * larger than the #of bytes actually holding valid data.
          */
         final int keyArity = getKeyArity();
 
-        final IV[] ivs = IVUtility.decode(key, keyArity);
+        final IV[] ivs = IVUtility.decode(key, offset, keyArity);
+        
+        if (log.isDebugEnabled()) {
+        	log.debug("key: " + Arrays.toString(key));
+        	log.debug("keyArity: " + keyArity);
+        	log.debug(Arrays.toString(ivs));
+        }
 
         final IV _0 = ivs[0];
         

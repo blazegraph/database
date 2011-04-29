@@ -31,10 +31,11 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Random;
 import java.util.UUID;
-import org.openrdf.model.URI;
-import org.openrdf.model.impl.LiteralImpl;
 
 import junit.framework.TestCase2;
+
+import org.openrdf.model.URI;
+import org.openrdf.model.impl.LiteralImpl;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -44,6 +45,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.spo.SPO;
 
 /**
  * Unit tests for encoding and decoding compound keys (such as are used by the
@@ -756,6 +758,23 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 ext.createIV(new LiteralImpl("Blue", ColorsEnumExtension.COLOR)),
+        };
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    public void test_SPO_encodeDecodeSids() {
+        
+    	final SPO spo = new SPO(
+    			new TermId(VTE.URI, 1L), 
+    			new TermId(VTE.URI, 2L), 
+    			new TermId(VTE.URI, 4L));
+    	
+        final IV<?, ?>[] e = {//
+                new SidIV(spo),//
+                new TermId(VTE.URI, 8L),//
+                new TermId(VTE.URI, 16L) //
         };
 
         doEncodeDecodeTest(e);

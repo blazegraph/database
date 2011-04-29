@@ -57,7 +57,7 @@ import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBufferHandler;
 import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.rdf.spo.ISPO.ModifiedEnum;
+import com.bigdata.rdf.spo.ModifiedEnum;
 import com.bigdata.rdf.spo.SPOIndexWriteProc.IndexWriteProcConstructor;
 import com.bigdata.relation.accesspath.IElementFilter;
 
@@ -236,8 +236,6 @@ public class SPOIndexWriter implements Callable<Long> {
         // dense array of statements to write.
         final ISPO[] denseStmts = reportMutation ? new ISPO[numStmts] : null;
 
-        final ByteArrayBuffer vbuf = new ByteArrayBuffer(1+8/*max length*/);
-        
         for (int i = 0; i < numStmts; i++) {
 
             final ISPO spo = stmts[i];
@@ -268,7 +266,7 @@ public class SPOIndexWriter implements Callable<Long> {
             keys[numToAdd] = tupleSer.serializeKey(spo);
             
             // generate value for the index.
-            vals[numToAdd] = spo.serializeValue(vbuf);
+            vals[numToAdd] = tupleSer.serializeVal(spo);
 
             if(reportMutation)
                 denseStmts[numToAdd] = spo;

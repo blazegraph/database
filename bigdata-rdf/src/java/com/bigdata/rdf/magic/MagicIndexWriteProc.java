@@ -35,34 +35,8 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.btree.raba.codec.IRabaCoder;
-import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
-/**
- * Procedure for batch index on a single statement index (or index partition).
- * <p>
- * The key for each statement encodes the {s:p:o} of the statement in the order
- * that is appropriate for the index (SPO, POS, OSP, etc). The key is written
- * unchanged on the index.
- * <p>
- * The value for each statement is a byte that encodes the {@link StatementEnum}
- * and also encodes whether or not the "override" flag is set using - see
- * {@link StatementEnum#MASK_OVERRIDE} - followed by 8 bytes representing the
- * statement identifier IFF statement identifiers are enabled AND the
- * {@link StatementEnum} is {@link StatementEnum#Explicit}. The value requires
- * interpretation to determine the byte[] that will be written as the value on
- * the index - see the code for more details.
- * <p>
- * Note: This needs to be a custom batch operation using a conditional insert so
- * that we do not write on the index when the data would not be changed and to
- * handle the overflow flag and the optional statement identifier correctly.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: MagicIndexWriteProc.java 2265 2009-10-26 12:51:06Z thompsonbry
- *          $
- * 
- */
 public class MagicIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
         IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure, 
         Externalizable {
