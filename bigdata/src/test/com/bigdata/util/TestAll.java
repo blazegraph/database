@@ -79,6 +79,8 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite( TestCSVReader.class );
 
+        suite.addTestSuite( TestBits.class );
+
         return suite;
         
     }

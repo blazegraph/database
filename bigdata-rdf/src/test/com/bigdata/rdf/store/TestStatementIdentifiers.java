@@ -50,16 +50,17 @@ package com.bigdata.rdf.store;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
+
+import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
+
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -73,6 +74,7 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
@@ -84,6 +86,8 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  */
 public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
+	private static final transient Logger log = Logger.getLogger(TestStatementIdentifiers.class);
+	
     /**
      * 
      */
@@ -467,6 +471,8 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             
             assertEquals(1,store.addStatements(stmts1, stmts1.length));
 
+            log.info(stmts1[0]);
+            
             final IV sid1 = stmts1[0].getStatementIdentifier();
             
             final SPO[] stmts2 = new SPO[] {
@@ -477,8 +483,35 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
             assertEquals(1,store.addStatements(stmts2, stmts2.length));
 
+            log.info(stmts2[0]);
+            
             assertEquals(2,store.getStatementCount(true/*exact*/));
 
+            final IAccessPath<ISPO> ap = store.getAccessPath(sid1, null, null);
+            
+            log.info(ap);
+            
+            final IChunkedOrderedIterator<ISPO> itr = ap.iterator();
+
+            try {
+
+            	int i = 0;
+            	while (itr.hasNext()) {
+            		
+            		final ISPO actual = itr.next();
+                    
+            		log.info(i++ + ": " + actual);
+                
+            	}
+                    
+            } finally {
+
+                itr.close();
+
+            }
+            
+            log.info(store.dumpStore());
+            
             /*
              * Verify read back.
              */
@@ -691,6 +724,10 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
                 final ISPO actual = itr.next();
                 
+                log.info("expected: " + expected);
+
+                log.info("actual: " + actual);
+                
                 assertEquals("S @ i=" + i, expected.s, actual.s());
 
                 assertEquals("P @ i=" + i, expected.p, actual.p());
@@ -763,7 +800,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
                 } catch (StatementCyclesException ex) {
 
-                    System.err.println("Ignoring expected exception: " + ex);
+                    log.info("Ignoring expected exception: " + ex);
 
                 }
 
@@ -827,7 +864,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                     
                 } catch(StatementCyclesException ex) {
                     
-                    System.err.println("Ignoring expected exception: "+ex);
+                    log.info("Ignoring expected exception: "+ex);
                     
                 }
 
@@ -885,7 +922,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 
             } catch(UnificationException ex) {
                 
-                System.err.println("Ignoring expected exception: "+ex);
+                log.info("Ignoring expected exception: "+ex);
                 
             }
 

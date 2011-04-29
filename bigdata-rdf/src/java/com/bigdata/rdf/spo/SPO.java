@@ -24,12 +24,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.spo;
 
 import org.openrdf.model.Statement;
-import com.bigdata.io.ByteArrayBuffer;
+
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.SidIV;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataStatementImpl;
@@ -42,6 +41,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IVariableOrConstant;
+import com.bigdata.util.Bits;
 
 /**
  * Represents a triple, triple+SID, or quad. When used to represent a triple,
@@ -56,6 +56,7 @@ import com.bigdata.relation.rule.IVariableOrConstant;
  */
 public class SPO implements ISPO {
     
+	
     /** The internal value for the subject position. */
     public final IV s;
 
@@ -73,30 +74,74 @@ public class SPO implements ISPO {
      */
     private IV c = null;
 
-    /**
-     * Statement type (inferred, explicit, or axiom).
-     */
-    private StatementEnum type;
+//    /**
+//     * Statement type (inferred, explicit, or axiom).
+//     */
+//    private StatementEnum type;
+//    
+//    /**
+//     * User flag
+//     */
+//    private boolean userFlag;
+//    
+//    /**
+//     * Override flag used for downgrading statements during truth maintenance.
+//     */
+//    private transient boolean override = false;
+//
+//    /**
+//     * Used to signify if and how this spo was modified. Used by change log.
+//     */
+//    private transient ModifiedEnum modified = ModifiedEnum.NONE;
+//    
+//    /**
+//     * If sidable, we will lazily instantiate a sid when requested via {@link #c()},
+//     * {@link #getStatementIdentifier()}, and {@link SPO#get(int)} with a 
+//     * parameter of 3.  This should reduce heap pressure by only creating
+//     * sids on-demand on an as-needed basis.
+//     */
+//    private boolean sidable = false;
     
-    /**
-     * User flag
-     */
-    private boolean userFlag;
-    
-    /**
-     * Override flag used for downgrading statements during truth maintenance.
-     */
-    private transient boolean override = false;
-    
-//    private transient boolean modified = false;
-    private transient ModifiedEnum modified = ModifiedEnum.NONE;
+	/**
+	 * Bit flags used to represent statement type, user flag, override, 
+	 * modified enum, and sidable flag.  Much more compact representation.
+	 */
+	private byte flags = 0;
 
+	/**
+	 * Denotes which bit to find the StatementType within the {@link #flags}.
+	 * Type takes two bits.
+	 */
+    private static int TYPE_BIT = 0;
+
+    /**
+	 * Denotes which bit to find the ModifiedEnum within the {@link #flags}.
+	 * Modified takes two bits.
+	 */
+    private static int MODIFIED_BIT = 2;
+
+    /**
+	 * Denotes which bit to find the userFlag within the {@link #flags}.
+	 */
+    private static int USERFLAG_BIT = 4;
+
+    /**
+	 * Denotes which bit to find the override flag within the {@link #flags}.
+	 */
+    private static int OVERRIDE_BIT = 5;
+
+    /**
+	 * Denotes which bit to find the sidable flag within the {@link #flags}.
+	 */
+    private static int SIDABLE_BIT = 6;
+
+    
     final public IV get(final int index) {
         switch(index) {
         case 0: return s;
         case 1: return p;
         case 2: return o;
-        case 3: return c;
+        case 3: return c();
         default: throw new IllegalArgumentException();
         }
     }
@@ -114,70 +159,100 @@ public class SPO implements ISPO {
     }
 
     final public IV c() {
+    	
+    	// lazy instantiate the sid if necessary
+    	if (c == null && sidable()) {
+    		c = new SidIV(this);
+    	}
+    	
         return c;
+        
     }
     
+//    /**
+//     * Set the statement identifier. This sets the 4th position of the quad, but
+//     * some constraints are imposed on its argument.
+//     * 
+//     * @param sid
+//     *            The statement identifier.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if <i>sid</i> is {@link #NULL}.
+//     * @throws IllegalStateException
+//     *             if the statement identifier is already set.
+//     */
+//    public final void setStatementIdentifier(final IV sid) {
+//
+//        if (sid == null || !sid.isStatement()) {
+//        	
+//        	throw new IllegalArgumentException();
+//        	
+//        }
+//        	
+//        if (type() != StatementEnum.Explicit) {
+//
+//            // Only allowed for explicit statements.
+//            throw new IllegalStateException();
+//
+//        }
+//
+//        sidable(true);
+//
+//        // set the current value for c
+//        this.c = sid;
+//
+//    }
+
     /**
-     * Set the statement identifier.
+     * Set the statement identifier. This sets the 4th position of the quad, but
+     * some constraints are imposed on its argument.
      * 
-     * @param iv
-     *            The statement identifier.
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>id</i> is {@link #NULL}.
-     * @throws IllegalStateException
-     *             if the statement identifier is already set.
+     * @param sid
+     *            If sid is true, this ISPO will produce a sid on-demand when
+     *            requested.
      */
-    public final void setStatementIdentifier(final IV iv) {
+    public final void setStatementIdentifier(final boolean sid) {
 
-        if (iv == null)
-            throw new IllegalArgumentException();
-
-        if (!iv.isStatement())
-            throw new IllegalArgumentException("Not a statement identifier: "
-                    + toString(iv));
-
-        if (type != StatementEnum.Explicit) {
+        if (sid && type() != StatementEnum.Explicit) {
 
             // Only allowed for explicit statements.
             throw new IllegalStateException();
 
         }
 
-        if (c != null && !IVUtility.equals(iv, c))
-            throw new IllegalStateException(
-                    "Different statement identifier already defined: "
-                            + toString() + ", new=" + iv);
+        sidable(sid);
 
-        this.c = iv;
+        // clear the current value for c
+        this.c = null;
 
     }
 
     public final IV getStatementIdentifier() {
 
-        if (c == null)
-            throw new IllegalStateException("No statement identifier: "
+    	if (!sidable())
+             throw new IllegalStateException("No statement identifier: "
                     + toString());
 
-        return c;
+    	// will lazy instantiate the sid
+        return c();
 
     }
 
     final public boolean hasStatementIdentifier() {
         
-        return c != null && c.isStatement();
+        return sidable();
         
     }
     
     public void setOverride(final boolean override) {
 
-        this.override = override;
+        override(override);
         
     }
 
     public boolean isOverride() {
         
-        return override;
+        return override();
         
     }
 
@@ -194,7 +269,7 @@ public class SPO implements ISPO {
         this.s = s;
         this.p = p;
         this.o = o;
-        this.type = null;
+        type(null);
         
     }
 
@@ -212,7 +287,7 @@ public class SPO implements ISPO {
         this.p = p;
         this.o = o;
         this.c = c;
-        this.type = null;
+        type(null);
 
     }
 
@@ -236,8 +311,7 @@ public class SPO implements ISPO {
         this.s = s;
         this.p = p;
         this.o = o;
-        
-        this.type = type;
+        type(type);
         
     }
     
@@ -259,8 +333,7 @@ public class SPO implements ISPO {
         this.p = p;
         this.o = o;
         this.c = c;
-        
-        this.type = type;
+        type(type);
         
     }
 
@@ -377,130 +450,21 @@ public class SPO implements ISPO {
      */
     public SPO(final BigdataStatement stmt) {
         
-        this(   stmt.s(),//
-                stmt.p(),//
-                stmt.o(),//
-                stmt.c(),//
-                stmt.getStatementType()//
-                );
-        
-//        final BigdataResource c = stmt.getContext();
-//        
-//        if (c != null && c.getTermId() != NULL) {
-//
-//            setStatementIdentifier(c.getTermId());
-//            
-//        }
+        this(stmt.s(),//
+             stmt.p(),//
+             stmt.o(),//
+             stmt.c(),//
+             stmt.getStatementType()//
+             );
         
     }
 
-    /**
-     * Sets the statement type and optionally the statement identifier by
-     * decoding the value associated with the key one of the statement indices.
-     * 
-     * @param val
-     *            The value associated with the key one of the statement
-     *            indices.
-     * 
-     * @return The <i>spo</i>.
-     */
-    public static ISPO decodeValue(final ISPO spo, final byte[] val) {
-        
-        final byte code = val[0];
-
-        final StatementEnum type = StatementEnum.decode(code);
-
-        spo.setStatementType(type);
-        
-        spo.setUserFlag(StatementEnum.isUserFlag(code));
-
-        if (val.length == 1 + 8) {
-
-            /*
-             * The value buffer appears to contain a statement identifier, so we
-             * read it.
-             */
-            
-            final long sid = new ByteArrayBuffer(1, val.length, val).getLong(1);
-            
-            assert sid != TermId.NULL : "statement identifier is NULL for explicit statement: "
-                + spo.toString();
-
-            assert type == StatementEnum.Explicit : "statement identifier for non-explicit statement : "
-                    + spo.toString();
-
-            spo.setStatementIdentifier(new TermId(VTE.STATEMENT, sid));
-            
-        }
-
-        return spo;
-        
-    }
-
-    public byte[] serializeValue(final ByteArrayBuffer buf) {
-
-        return serializeValue(buf, isOverride(),getUserFlag(), type, c);
-        
-    }
-
-    /**
-     * Return the byte[] that would be written into a statement index for this
-     * {@link SPO}, including the optional {@link StatementEnum#MASK_OVERRIDE}
-     * bit. If the statement identifier is non-null then it will be
-     * included in the returned byte[].
-     * 
-     * @param buf
-     *            A buffer supplied by the caller. The buffer will be reset
-     *            before the value is written on the buffer.
-     * 
-     * @param override
-     *            <code>true</code> iff you want the
-     *            {@link StatementEnum#MASK_OVERRIDE} bit set (this is only set
-     *            when serializing values for a remote procedure that will write
-     *            on the index, it is never set in the index itself).
-     * @param type
-     *            The {@link StatementEnum}.
-     * @param c
-     *            The term identifier associated with the context position. This
-     *            will be included in the returned byte[] value IFF
-     *            {@link AbstractTripleStore#isStatement(IV)} returns
-     *            <code>true</code> for <i>c</i> AND the <i>type</i> is
-     *            {@link StatementEnum#Explicit}.
-     * 
-     * @return The value that would be written into a statement index for this
-     *         {@link SPO}.
-     */
-    static public byte[] serializeValue(final ByteArrayBuffer buf,
-            final boolean override, final boolean userFlag, 
-            final StatementEnum type, final IV c) {
-
-        buf.reset();
-
-        // optionally set the override bit on the value.
-        final byte b = (byte) 
-            (type.code() 
-                    | (override ? StatementEnum.MASK_OVERRIDE : 0x0)
-                    | (userFlag ? StatementEnum.MASK_USER_FLAG : 0x0));
-        
-        buf.putByte(b);
-
-        if (type == StatementEnum.Explicit
-                && c != null && c.isStatement()) {
-
-            buf.putLong(c.getTermId());
-
-        }
-
-        return buf.toByteArray();
-
-    }
-    
     /**
      * Return <code>true</code> IFF the {@link SPO} is marked as {@link StatementEnum#Explicit}. 
      */
     public final boolean isExplicit() {
         
-        return type == StatementEnum.Explicit;
+        return type() == StatementEnum.Explicit;
         
     }
     
@@ -509,7 +473,7 @@ public class SPO implements ISPO {
      */
     public final boolean isInferred() {
         
-        return type == StatementEnum.Inferred;
+        return type() == StatementEnum.Inferred;
         
     }
     
@@ -518,7 +482,7 @@ public class SPO implements ISPO {
      */
     public final boolean isAxiom() {
         
-        return type == StatementEnum.Axiom;
+        return type() == StatementEnum.Axiom;
         
     }
     
@@ -527,7 +491,7 @@ public class SPO implements ISPO {
      */
     public final boolean getUserFlag() {
         
-        return userFlag;
+        return userFlag();
         
     }
     
@@ -538,7 +502,7 @@ public class SPO implements ISPO {
      */
     public final void setUserFlag(final boolean userFlag) {
         
-        this.userFlag=userFlag;
+        userFlag(userFlag);
         
     }
     
@@ -605,7 +569,7 @@ public class SPO implements ISPO {
                 IVUtility.equals(this.s, stmt2.s()) && //
                 IVUtility.equals(this.p, stmt2.p()) && //
                 IVUtility.equals(this.o, stmt2.o()) && //
-                this.type == stmt2.getStatementType()
+                type() == stmt2.getStatementType()
                 ;
 
     }
@@ -620,12 +584,12 @@ public class SPO implements ISPO {
 
         return ("< " + toString(s) + ", " + toString(p) + ", " + toString(o))
                 + (c == null ? "" : ", " + toString(c))
-                + (type == null ? "" : " : " + type
-                        + (override ? ", override" : ""))
-                + (isModified() ? ", modified ("+modified+")" : "") + " >";
+                + (type() == null ? "" : " : " + type()
+                        + (override() ? ", override" : ""))
+                + (isModified() ? ", modified ("+modified()+")" : "") + " >";
 
     }
-
+    
     /**
      * Represents the term identifier together with its type (literal, bnode,
      * uri, or statement identifier).
@@ -660,8 +624,8 @@ public class SPO implements ISPO {
 
             String t = null;
             
-            if (type != null) {
-                switch(type) {
+            if (type() != null) {
+                switch(type()) {
                 case Explicit    : t = "Explicit    "; break;
                 case Inferred    : t = "Inferred    "; break;
                 case Axiom       : t = "Axiom       "; break;
@@ -690,44 +654,193 @@ public class SPO implements ISPO {
 
     final public StatementEnum getStatementType() {
 
-        return type;
+        return type();
 
     }
 
     final public void setStatementType(final StatementEnum type) {
         
-        if(this.type != null && this.type != type) {
+        if(this.type() != null && this.type() != type) {
             
             throw new IllegalStateException("newValue="+type+", spo="+this);
             
         }
         
-        this.type = type;
+        type(type);
         
     }
     
     final public boolean hasStatementType() {
         
-        return type != null;
+        return type() != null;
         
     }
 
     public boolean isModified() {
         
-        return modified != ModifiedEnum.NONE;
+        return modified() != ModifiedEnum.NONE;
         
     }
 
     public void setModified(final ModifiedEnum modified) {
 
-        this.modified = modified;
+        modified(modified);
 
     }
     
     public ModifiedEnum getModified() {
         
-        return modified;
+        return modified();
         
     }
 
+	/**
+	 * Statement type is hiding in the 0 and 1 bits of the flags.
+	 */
+	private StatementEnum type() {
+		
+		// get just the 0 and 1 bits
+//		final byte b = Bits.mask(flags, 0, 1);
+		byte b = 0;
+		b |= (0x1 << TYPE_BIT);
+		b |= (0x1 << (TYPE_BIT+1));
+		b &= flags;
+		
+        switch (b) {
+        case 0: return null;
+        case 1: return StatementEnum.Explicit;
+        case 2: return StatementEnum.Axiom;
+        case 3: return StatementEnum.Inferred;
+        }
+        
+        throw new IllegalStateException();
+        
+	}
+	
+	/**
+	 * Statement type is hiding in the 0 and 1 bits of the flags.
+	 */
+	private void type(final StatementEnum type) {
+
+		byte b = flags;
+		
+		if (type == null) {
+			b = Bits.set(Bits.set(b, TYPE_BIT, false), (TYPE_BIT+1), false);
+		} else {
+			switch(type) {
+			case Explicit: 
+				b = Bits.set(Bits.set(b, TYPE_BIT, true), (TYPE_BIT+1), false);
+				break;
+			case Axiom: 
+				b = Bits.set(Bits.set(b, TYPE_BIT, false), (TYPE_BIT+1), true);
+				break;
+			case Inferred:
+				b = Bits.set(Bits.set(b, TYPE_BIT, true), (TYPE_BIT+1), true);
+				break;
+			default:
+		        throw new IllegalStateException();
+			}
+		}
+		
+		flags = b;
+		
+	}
+	
+	/**
+	 * Modified enum is hiding in the 2 and 3 bits of the flags.
+	 */
+	private ModifiedEnum modified() {
+		
+		// get just the 2 and 3 bits
+//		final byte b = Bits.mask(flags, 2, 3);
+		byte b = 0;
+		b |= (0x1 << MODIFIED_BIT);
+		b |= (0x1 << (MODIFIED_BIT+1));
+		b &= flags;
+		
+        switch (b) {
+        case 0: return ModifiedEnum.NONE;
+        case 4: return ModifiedEnum.INSERTED;
+        case 8: return ModifiedEnum.REMOVED;
+        case 12: return ModifiedEnum.UPDATED;
+        }
+        
+        throw new IllegalStateException();
+
+	}
+	
+	/**
+	 * Modified enum is hiding in the 2 and 3 bits of the flags.
+	 */
+	private void modified(final ModifiedEnum modified) {
+		
+		byte b = flags;
+		
+		if (modified == null) {
+			throw new IllegalArgumentException();
+		} else {
+			switch(modified) {
+			case NONE: 
+				b = Bits.set(Bits.set(b, MODIFIED_BIT, false), (MODIFIED_BIT+1), false);
+				break;
+			case INSERTED: 
+				b = Bits.set(Bits.set(b, MODIFIED_BIT, true), (MODIFIED_BIT+1), false);
+				break;
+			case REMOVED: 
+				b = Bits.set(Bits.set(b, MODIFIED_BIT, false), (MODIFIED_BIT+1), true);
+				break;
+			case UPDATED:
+				b = Bits.set(Bits.set(b, MODIFIED_BIT, true), (MODIFIED_BIT+1), true);
+				break;
+			default:
+		        throw new IllegalStateException();
+			}
+		}
+		
+		flags = b;
+		
+	}
+	
+	/**
+	 * User flag is hiding in the 4 bit of the flags.
+	 */
+	private boolean userFlag() {
+		return Bits.get(flags, USERFLAG_BIT);
+	}
+	
+	/**
+	 * User flag is hiding in the 4 bit of the flags.
+	 */
+	private void userFlag(final boolean userFlag) {
+		flags = Bits.set(flags, USERFLAG_BIT, userFlag);
+	}
+	
+	/**
+	 * Override is hiding in the 5 bit of the flags.
+	 */
+	private boolean override() {
+		return Bits.get(flags, OVERRIDE_BIT);
+	}
+	
+	/**
+	 * Override is hiding in the 5 bit of the flags.
+	 */
+	private void override(final boolean override) {
+		flags = Bits.set(flags, OVERRIDE_BIT, override);
+	}
+	
+	/**
+	 * Sidable is hiding in the 6 bit of the flags.
+	 */
+	private boolean sidable() {
+		return Bits.get(flags, SIDABLE_BIT);
+	}
+	
+	/**
+	 * Sidable is hiding in the 6 bit of the flags.
+	 */
+	private void sidable(final boolean sidable) {
+		flags = Bits.set(flags, SIDABLE_BIT, sidable);
+	}
+	
 }

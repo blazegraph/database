@@ -173,7 +173,8 @@ public class TestSPOKeyCoders extends TestCase2 {
         /*
          * Generate keys from the SPOs.
          */
-        final SPOTupleSerializer tupleSer = new SPOTupleSerializer(SPOKeyOrder.SPO);
+        final SPOTupleSerializer tupleSer = new SPOTupleSerializer(
+        		SPOKeyOrder.SPO, false/* sids */);
         final byte[][] keys = new byte[a.length][];
         {
 

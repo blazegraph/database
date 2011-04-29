@@ -29,8 +29,8 @@ package com.bigdata.rdf.sail;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Properties;
+
 import org.apache.log4j.Logger;
-import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.Binding;
@@ -40,6 +40,7 @@ import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.rio.RDFFormat;
+
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
@@ -51,7 +52,7 @@ import com.bigdata.rdf.vocab.NoVocabulary;
  */
 public class TestSids extends ProxyBigdataSailTestCase {
 
-    protected static final Logger log = Logger.getLogger(TestSids.class);
+    private static final transient Logger log = Logger.getLogger(TestSids.class);
     
     @Override
     public Properties getProperties() {
@@ -108,41 +109,60 @@ public class TestSids extends ProxyBigdataSailTestCase {
 
             {
                 
+            	final String s = null;
+//            	final String s = "http://localhost/host1";
+//            	final String s = "http://localhost/switch1";
+            	
                 String query = 
                     "PREFIX myns: <http://mynamespace.com#> " +
                     "SELECT distinct ?s ?p ?o " +
                     " { " +
                     "   ?sid myns:creator <http://1.com> . " +
-                    "   graph ?sid { ?s ?p ?o } " +
+//                    "   graph ?sid { ?s ?p ?o } " +
+                    "   graph ?sid { "+(s == null ? "?s" : "<"+s+">")+" ?p ?o } " +
                     " }";
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                TupleQueryResult result = tupleQuery.evaluate();
-
-                while (result.hasNext()) {
-                    BindingSet bs = result.next();
-                    System.err.println(bs.getBinding("s") + ", " + bs.getBinding("p") + ", " + bs.getBinding("o"));
+                
+                {
+	                final TupleQueryResult result = tupleQuery.evaluate();
+	
+	                if (!result.hasNext()) {
+	                	log.info("no bindings");
+	                } else {
+		                while (result.hasNext()) {
+		                    BindingSet bs = result.next();
+	//	                    log.info(bs.getBinding("s").getValue() + " " + bs.getBinding("p").getValue() + " " + bs.getBinding("o").getValue() + " .");
+		                    log.info((s == null ? bs.getBinding("s").getValue() : s) + " " + bs.getBinding("p").getValue() + " " + bs.getBinding("o").getValue() + " .");
+		                }
+	                }
                 }
                 
-                Collection<BindingSet> solution = new LinkedList<BindingSet>();
-                solution.add(createBindingSet(new Binding[] {
-                        new BindingImpl("s", new URIImpl("http://localhost/host1")),
-                        new BindingImpl("p", new URIImpl("http://mynamespace.com#connectedTo")),
-                        new BindingImpl("o", new URIImpl("http://localhost/switch1")),
-                }));
-                solution.add(createBindingSet(new Binding[] {
-                        new BindingImpl("s", new URIImpl("http://localhost/host1")),
-                        new BindingImpl("p", RDF.TYPE),
-                        new BindingImpl("o", new URIImpl("http://domainnamespace.com/host#Host")),
-                }));
-                solution.add(createBindingSet(new Binding[] {
-                        new BindingImpl("s", new URIImpl("http://localhost/switch2")),
-                        new BindingImpl("p", RDF.TYPE),
-                        new BindingImpl("o", new URIImpl("http://domainnamespace.com/san#Switch")),
-                }));
+                {
                 
-//                compare(result, solution);
+	                final TupleQueryResult result = tupleQuery.evaluate();
+	            	
+	                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+	                solution.add(createBindingSet(new Binding[] {
+	                        new BindingImpl("s", new URIImpl("http://localhost/host1")),
+	                        new BindingImpl("p", new URIImpl("http://mynamespace.com#connectedTo")),
+	                        new BindingImpl("o", new URIImpl("http://localhost/switch1")),
+	                }));
+	                solution.add(createBindingSet(new Binding[] {
+	                        new BindingImpl("s", new URIImpl("http://localhost/host1")),
+	                        new BindingImpl("p", RDF.TYPE),
+	                        new BindingImpl("o", new URIImpl("http://domainnamespace.com/host#Host")),
+	                }));
+	                solution.add(createBindingSet(new Binding[] {
+	                        new BindingImpl("s", new URIImpl("http://localhost/switch1")),
+	                        new BindingImpl("p", RDF.TYPE),
+	                        new BindingImpl("o", new URIImpl("http://domainnamespace.com/san#Switch")),
+	                }));
+                
+	                compare(result, solution);
+	                
+                }
                 
             }
             
