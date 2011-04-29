@@ -35,6 +35,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Random;
 
+import org.apache.system.SystemUtil;
+
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.rawstore.Bytes;
 
@@ -347,6 +349,15 @@ public class TestFileChannelUtility extends TestCase {
      * @throws IOException
      */
     public void test_transferAllFrom() throws IOException {
+
+        if(SystemUtil.isOSX()) {
+            /*
+             * FIXME For some reason, this unit test is hanging under OS X.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/287
+             */
+            fail("Unit test hangs under OS X");
+        }
 
         final File sourceFile = File.createTempFile("TestFileChannelUtility", getName());
 
