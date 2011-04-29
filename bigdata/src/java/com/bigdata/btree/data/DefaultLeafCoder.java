@@ -597,10 +597,16 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
             // keys
             this.keys = keysCoder.decode(buf.slice(pos, keysSize));
             pos += keysSize;// skip over the keys.
-
+			if (nkeys != keys.size()) // sanity check nkeys
+				throw new RuntimeException("nkeys=" + nkeys + ", keys.size="
+						+ keys.size());
+            
             // values
             this.vals = valuesCoder.decode(buf.slice(pos,valuesSize));
             pos += valuesSize;// skip over the values.
+			if (nkeys != vals.size()) // sanity check nkeys
+				throw new RuntimeException("nkeys=" + nkeys + ", vals.size="
+						+ vals.size());
 
             // delete markers
             if (hasDeleteMarkers) {

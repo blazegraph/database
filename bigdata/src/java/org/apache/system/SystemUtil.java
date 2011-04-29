@@ -40,6 +40,7 @@ public final class SystemUtil
     private static final String m_osVersion;
     private static final boolean m_windows;
     private static final boolean m_linux;
+    private static final boolean m_osx;
 
     private static final Logger log = Logger.getLogger(SystemUtil.class);
     
@@ -57,19 +58,20 @@ public final class SystemUtil
 
         try {
             
-            Class klass = Class.forName( name );
+            final Class<?> klass = Class.forName( name );
             
-            CPUParser parser = (CPUParser)klass.newInstance();
-
+            final CPUParser parser = (CPUParser)klass.newInstance();
+            
             procs = parser.numProcessors();
             
             info = parser.cpuInfo();
             
-        } catch (Exception e) {
+        } catch (Throwable e) {
             
-            log.warn("No CPUParser for this platform - looking for class: "+name);
-            
-            String proc = System.getProperty( "os.arch.cpus", "1" );
+            log.warn("No CPUParser for this platform - looking for class: ["
+                    + name + "]");
+
+            final String proc = System.getProperty( "os.arch.cpus", "1" );
             
             info = System.getProperty("os.arch.info", m_architecture
                     + " Family n, Model n, Stepping n, Undeterminable");
@@ -82,24 +84,33 @@ public final class SystemUtil
         m_cpuInfo = info;
         m_windows = SystemUtil.operatingSystem().startsWith("Windows");
         m_linux = SystemUtil.operatingSystem().startsWith("Linux");
+        m_osx = SystemUtil.operatingSystem().contains("OS X");
         
-        if(log.isInfoEnabled()) {
-        log.info("architecture: "+m_architecture);
-        log.info("operating system: "+m_osName);
-        log.info("operation system version: "+m_osVersion);
-        log.info("#processors: "+m_processors);
-        log.info("cpu info: "+m_cpuInfo);
+        if (log.isInfoEnabled()) {
+            log.info("architecture: " + m_architecture);
+            log.info("operating system: " + m_osName);
+            log.info("operation system version: " + m_osVersion);
+            log.info("#processors: " + m_processors);
+            log.info("cpu info: " + m_cpuInfo);
         }
 
     }
 
     /**
-     * Utility method to strip whitespace from specified name.
-     *
-     * @param mosname the name
+     * Utility method to strip whitespace from specified name (unlike trim(),
+     * whitespace is stripped at any position in the name).
+     * 
+     * @param mosname
+     *            the name.
+     * 
      * @return the whitespace stripped version
+     * 
+     * @todo This should be more like munge(), which forces the name to have
+     *       only legal characters for the file system. For the purposes of this
+     *       class, we should force the name of have only legal characters for a
+     *       java class name.
      */
-    private static String stripWhitespace( String mosname )
+    private static String stripWhitespace( final String mosname )
     {
         final StringBuffer sb = new StringBuffer();
 
@@ -174,6 +185,15 @@ public final class SystemUtil
     public static final boolean isLinux() {
 
         return m_linux;
+        
+    }
+
+    /**
+     * Return <code>true</code> if running on OSX.
+     */
+    public static final boolean isOSX() {
+        
+        return m_osx;
         
     }
 

@@ -202,11 +202,17 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
         
         // childEntryCount[] : @todo code childEntryCount[]
 //        final int O_childEntryCount = buf.pos();
-        for (int i = 0; i <= nkeys; i++) {
-            
-            buf.putInt(node.getChildEntryCount(i));
-            
-        }
+		{ // Note: sanity checks [nentries] during coding.
+			int sum = 0;
+			for (int i = 0; i <= nkeys; i++) {
+				final int nchildren = node.getChildEntryCount(i);
+				buf.putInt(nchildren);
+				sum += nchildren;
+			}
+			if (sum != nentries)
+				throw new RuntimeException("spannedTupleCount=" + nentries
+						+ ", but sum over children=" + sum);
+		}
         
         if(hasVersionTimestamps) {
             
@@ -341,6 +347,9 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
             this.keys = keys;//keysCoder.decode(buf.slice(O_keys, keysSize));
             pos += keysSize;
 //            assert b.position() == O_keys + keysSize;
+			if (keys.size() != nkeys) // sanity check.
+				throw new RuntimeException("nkeys=" + nkeys + ", keys.size="
+						+ keys.size());
             
             O_childAddr = pos;
             
@@ -410,6 +419,9 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
             this.keys = keysCoder.decode(buf.slice(O_keys, keysSize));
             pos += keysSize;
 //            assert b.position() == O_keys + keysSize;
+			if (keys.size() != nkeys) // sanity check.
+				throw new RuntimeException("nkeys=" + nkeys + ", keys.size="
+						+ keys.size());
             
             O_childAddr = pos;
             
