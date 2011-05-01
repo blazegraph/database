@@ -27,10 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.util.Formatter;
+
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.htree.HTreeUtil;
 
 /**
  * Test suite for low-level operations on variable length byte[]s.
@@ -853,6 +856,467 @@ public class TestBytesUtil extends TestCase2 {
 
         }
 
+    }
+
+
+    /**
+     * Correct rejection tests for {@link HTreeUtil#getMSBMask(int)}
+     */
+    public void test_getMaskBits_correctRejection() {
+        try {
+            BytesUtil.getMSBMask(-1);
+            fail("Expecting: "+IllegalArgumentException.class);
+        } catch(IllegalArgumentException ex) {
+            // ignore
+        }
+        try {
+        	BytesUtil.getMSBMask(33);
+            fail("Expecting: "+IllegalArgumentException.class);
+        } catch(IllegalArgumentException ex) {
+            // ignore
+        }
+    }
+    
+    /**
+     * Unit test for {@link HTreeUtil#getMSBMask(int)}
+     */
+    public void test_getMaskBits() {
+        
+        assertEquals(0x00000000, getMSBMask(0));
+        assertEquals(0x80000000, getMSBMask(1));
+        assertEquals(0xc0000000, getMSBMask(2));
+        assertEquals(0xe0000000, getMSBMask(3));
+        assertEquals(0xf0000000, getMSBMask(4));
+        assertEquals(0xf8000000, getMSBMask(5));
+        assertEquals(0xfc000000, getMSBMask(6));
+        assertEquals(0xfe000000, getMSBMask(7));
+        assertEquals(0xff000000, getMSBMask(8));
+        assertEquals(0xff800000, getMSBMask(9));
+        assertEquals(0xffc00000, getMSBMask(10));
+        assertEquals(0xffe00000, getMSBMask(11));
+        assertEquals(0xfff00000, getMSBMask(12));
+        assertEquals(0xfff80000, getMSBMask(13));
+        assertEquals(0xfffc0000, getMSBMask(14));
+        assertEquals(0xfffe0000, getMSBMask(15));
+        assertEquals(0xffff0000, getMSBMask(16));
+        assertEquals(0xffff8000, getMSBMask(17));
+        assertEquals(0xffffc000, getMSBMask(18));
+        assertEquals(0xffffe000, getMSBMask(19));
+        assertEquals(0xfffff000, getMSBMask(20));
+        assertEquals(0xfffff800, getMSBMask(21));
+        assertEquals(0xfffffc00, getMSBMask(22));
+        assertEquals(0xfffffe00, getMSBMask(23));
+        assertEquals(0xffffff00, getMSBMask(24));
+        assertEquals(0xffffff80, getMSBMask(25));
+        assertEquals(0xffffffc0, getMSBMask(26));
+        assertEquals(0xffffffe0, getMSBMask(27));
+        assertEquals(0xfffffff0, getMSBMask(28));
+        assertEquals(0xfffffff8, getMSBMask(29));
+        assertEquals(0xfffffffc, getMSBMask(30));
+        assertEquals(0xfffffffe, getMSBMask(31));
+        assertEquals(0xffffffff, getMSBMask(32));
+        
+    }
+
+    /**
+     * Test help logs the {@link HTreeUtil#getMSBMask(int)} results for
+     * inspection.
+     * 
+     * @param nbits
+     *            The #of bits whose MSB mask is desired.
+     *            
+     * @return The MSB mask.
+     */
+    private int getMSBMask(final int nbits) {
+
+        final int mask = BytesUtil.getMSBMask(nbits);
+
+        if(log.isInfoEnabled()) {
+            System.err.printf("%2d : [%32s]\n", nbits, Integer.toBinaryString(mask));
+        }
+
+        return mask;
+
+    }
+    
+    /**
+     * Unit test for {@link BytesUtil#maskOff(int, int)}
+     */
+    public void test_maskOff() {
+
+        assertEquals(0x00000003, BytesUtil.maskOff(0xffffffff/* key */, 2/* nbits */));
+        
+        assertEquals(0x00000003, BytesUtil.maskOff(0xc0000000/* key */, 2/* nbits */));
+
+        assertEquals(0x00000006, BytesUtil.maskOff(0xc0000000/* key */, 3/* nbits */));
+        
+        assertEquals(0x0000000c, BytesUtil.maskOff(0xc0000000/* key */, 4/* nbits */));
+        
+        assertEquals(0x00000018, BytesUtil.maskOff(0xc0000000/* key */, 5/* nbits */));
+        
+    }
+
+    /*
+     * toBitString() tests. 
+     */
+    
+    public void test_toBitString_correctRejection() {
+
+		try {
+			BytesUtil.toBitString(null);
+			fail("Expecting: " + IllegalArgumentException.class);
+		} catch (IllegalArgumentException ex) {
+			if (log.isInfoEnabled())
+				log.info("Ignoring expected exception: " + ex);
+		}
+		
+    }
+
+    public void test_toBitString_emptyByteArray() {
+
+    	// zero length byte[] => zero length bit string.
+		assertEquals("", BytesUtil.toBitString(new byte[0]));
+
+    }
+    
+    public void test_toBitString_oneByte() {
+
+		assertEquals("00000000", BytesUtil.toBitString(new byte[] { 0 }));
+		assertEquals("00000001", BytesUtil.toBitString(new byte[] { 1 << 0 }));
+		assertEquals("00000010", BytesUtil.toBitString(new byte[] { 1 << 1 }));
+		assertEquals("00000100", BytesUtil.toBitString(new byte[] { 1 << 2 }));
+		assertEquals("00001000", BytesUtil.toBitString(new byte[] { 1 << 3 }));
+		assertEquals("00010000", BytesUtil.toBitString(new byte[] { 1 << 4 }));
+		assertEquals("00100000", BytesUtil.toBitString(new byte[] { 1 << 5 }));
+		assertEquals("01000000", BytesUtil.toBitString(new byte[] { 1 << 6 }));
+		assertEquals("10000000", BytesUtil.toBitString(new byte[] { (byte) (1 << 7) }));
+
+    }
+    
+	public void test_toBitString_twoBytes() {
+
+		assertEquals("00000010" + "00100000", BytesUtil.toBitString(new byte[] { 1 << 1,
+				1 << 5 }));
+
+    }
+
+	public void test_getBitsFromByteArray_correctRejection_nullArg() {
+
+		try {
+			BytesUtil.getBits(null, 0, 0);
+			fail("Expecting: " + IllegalArgumentException.class);
+		} catch (IllegalArgumentException ex) {
+			if (log.isInfoEnabled())
+				log.info("Ignoring expected exception: " + ex);
+		}
+
+	}
+
+	/**
+	 * offset may be zero, but not negative.
+	 */
+	public void test_getBitsFromByteArray_correctRejection_off_and_len_01() {
+
+		BytesUtil.getBits(new byte[1], 0, 0); // ok
+		try {
+			BytesUtil.getBits(new byte[1], -1, 0); // no good
+			fail("Expecting: " + IllegalArgumentException.class);
+		} catch (IllegalArgumentException ex) {
+			if (log.isInfoEnabled())
+				log.info("Ignoring expected exception: " + ex);
+		}
+
+	}
+
+	/**
+	 * length may be zero, but not negative.
+	 */
+	public void test_getBitsFromByteArray_correctRejection_off_and_len_02() {
+
+		BytesUtil.getBits(new byte[1], 0, 0); // ok
+		try {
+			BytesUtil.getBits(new byte[1], 0, -1); // no good
+			fail("Expecting: " + IllegalArgumentException.class);
+		} catch (IllegalArgumentException ex) {
+			if (log.isInfoEnabled())
+				log.info("Ignoring expected exception: " + ex);
+		}
+
+	}
+
+	/**
+	 * length may address all bits (8) in a single byte, but not the 9th bit.
+	 */
+	public void test_getBitsFromByteArray_correctRejection_off_and_len_03() {
+
+		BytesUtil.getBits(new byte[1], 0, 8); // ok
+		try {
+			BytesUtil.getBits(new byte[1], 0, 8 + 1); // no good
+			fail("Expecting: " + IllegalArgumentException.class);
+		} catch (IllegalArgumentException ex) {
+			if (log.isInfoEnabled())
+				log.info("Ignoring expected exception: " + ex);
+		}
+
+	}
+
+	/**
+	 * length may address all bits (32) in 4 bytes, but not 33 bits since the
+	 * return value would be larger than an int32.
+	 */
+	public void test_getBitsFromByteArray_correctRejection_off_and_len_04() {
+
+		BytesUtil.getBits(new byte[4], 0, 32); // ok
+		try {
+			BytesUtil.getBits(new byte[4], 0, 33); // no good
+			fail("Expecting: " + IllegalArgumentException.class);
+		} catch (IllegalArgumentException ex) {
+			if (log.isInfoEnabled())
+				log.info("Ignoring expected exception: " + ex);
+		}
+
+	}
+
+	/**
+	 * length may address (32) bits in 5 bytes, but not 33 bits since the return
+	 * value would be larger than an int32.
+	 */
+	public void test_getBitsFromByteArray_correctRejection_off_and_len_05() {
+
+		BytesUtil.getBits(new byte[5], 0, 32); // ok
+		try {
+			BytesUtil.getBits(new byte[5], 0, 33); // no good
+			fail("Expecting: " + IllegalArgumentException.class);
+		} catch (IllegalArgumentException ex) {
+			if (log.isInfoEnabled())
+				log.info("Ignoring expected exception: " + ex);
+		}
+
+	}
+
+	/**
+	 * You can request a zero length slice starting at bit zero of a zero length
+	 * byte[].
+	 */
+	public void test_getBitsFromByteArray_zeroLength() {
+
+		assertEquals(0, BytesUtil.getBits(new byte[0], 0, 0));
+
+	}
+
+	/** byte[4] (32-bits) with all bits zero. */
+	public void test_getBitsFromByteArray_01() {
+
+		final byte[] b = new byte[4];
+
+		assertEquals(0x00000000, getBits(b, 0/* off */, 0/* len */));
+		assertEquals(0x00000000, getBits(b, 0/* off */, 1/* len */));
+		assertEquals(0x00000000, getBits(b, 0/* off */, 31/* len */));
+		assertEquals(0x00000000, getBits(b, 0/* off */, 32/* len */));
+
+	}
+
+	/** byte[4] (32-bits) with LSB ONE. */
+	public void test_getBitsFromByteArray_02() {
+
+		final byte[] b = new byte[4];
+
+		BytesUtil.setBit(b, 31/* off */, true);
+
+		assertEquals(0x00000000, getBits(b, 0/* off */, 0/* len */));
+		assertEquals(0x00000000, getBits(b, 0/* off */, 1/* len */));
+		assertEquals(0x00000000, getBits(b, 0/* off */, 31/* len */));//x
+		assertEquals(0x00000001, getBits(b, 0/* off */, 32/* len */));
+		assertEquals(0x00000001, getBits(b, 31/* off */, 1/* len */));//x
+		assertEquals(0x00000001, getBits(b, 30/* off */, 2/* len */));
+
+	}
+
+	/**
+	 * byte[4] (32-bits) with bit ONE (1) set.
+	 */
+	public void test_getBitsFromByteArray_03() {
+		
+		final byte[] b = new byte[4];
+
+		BytesUtil.setBit(b, 1/* off */, true);
+
+		assertEquals(0x00000000, getBits(b, 0/* off */, 0/* len */));
+		assertEquals(0x00000000, getBits(b, 0/* off */, 1/* len */));
+		assertEquals(0x00000001, getBits(b, 0/* off */, 2/* len */));
+		assertEquals(0x00000002, getBits(b, 1/* off */, 2/* len */));
+		assertEquals(0x00000004, getBits(b, 1/* off */, 3/* len */));
+
+		assertEquals(0x00000001, getBits(b, 1/* off */, 1/* len */));
+
+		assertEquals(0x40000000, getBits(b, 0/* off */, 32/* len */));
+		assertEquals(0x20000000, getBits(b, 0/* off */, 31/* len */));
+		assertEquals(0x10000000, getBits(b, 0/* off */, 30/* len */));
+		assertEquals(0x08000000, getBits(b, 0/* off */, 29/* len */));
+
+	}
+
+	/**
+	 * byte[4] (32-bits) with MSB ONE (this test case is the mostly likely to
+	 * run a foul of a sign bit extension).
+	 */
+	public void test_getBitsFromByteArray_04() {
+		
+		final byte[] b = new byte[4];
+
+		BytesUtil.setBit(b, 0/* off */, true);
+
+		assertEquals(0x00000000, getBits(b, 0/* off */, 0/* len */));
+		assertEquals(0x00000001, getBits(b, 0/* off */, 1/* len */));
+		assertEquals(0x00000002, getBits(b, 0/* off */, 2/* len */));
+		assertEquals(0x00000004, getBits(b, 0/* off */, 3/* len */));
+		assertEquals(0x00000008, getBits(b, 0/* off */, 4/* len */));
+		
+		assertEquals(0x00000000, getBits(b, 1/* off */, 0/* len */));
+		assertEquals(0x00000000, getBits(b, 1/* off */, 1/* len */));
+		assertEquals(0x00000000, getBits(b, 1/* off */, 2/* len */));
+		assertEquals(0x00000000, getBits(b, 1/* off */, 3/* len */));
+
+	}
+
+	/**
+	 * byte[4] (32-bits) with slice in the 2nd byte.
+	 */
+	public void test_getBitsFromByteArray_05() {
+		
+		final byte[] b = new byte[4];
+
+		// four bits on starting at bit 11.
+		BytesUtil.setBit(b, 11/* offset */, true);
+		BytesUtil.setBit(b, 12/* offset */, true);
+		BytesUtil.setBit(b, 13/* offset */, true);
+		BytesUtil.setBit(b, 14/* offset */, true);
+
+		/*
+		 * Test with a window extending from bit zero with a variety of bit
+		 * lengths ranging from an end bit index one less than the first ONE bit
+		 * through an end bit index beyond the last ONE bit.
+		 */
+		assertEquals(0x00000000, getBits(b, 0/* off */, 11/* len */));
+		assertEquals(0x00000001, getBits(b, 0/* off */, 12/* len */));
+		assertEquals(0x00000003, getBits(b, 0/* off */, 13/* len */));
+		assertEquals(0x00000007, getBits(b, 0/* off */, 14/* len */));
+		assertEquals(0x0000000f, getBits(b, 0/* off */, 15/* len */));
+		assertEquals(0x0000001e, getBits(b, 0/* off */, 16/* len */));
+		assertEquals(0x0000003c, getBits(b, 0/* off */, 17/* len */));
+		assertEquals(0x00000078, getBits(b, 0/* off */, 18/* len */));
+		assertEquals(0x000000f0, getBits(b, 0/* off */, 19/* len */));
+
+		/*
+		 * Test with a 4-bit window that slides over the ONE bits. The initial
+		 * window is to the left of the first ONE bit. The window slides right
+		 * by one bit position for each assertion.
+		 */
+		assertEquals(0x00000000, getBits(b, 7/* off */, 4/* len */));
+		assertEquals(0x00000001, getBits(b, 8/* off */, 4/* len */));
+		assertEquals(0x00000003, getBits(b, 9/* off */, 4/* len */));
+		assertEquals(0x00000007, getBits(b,10/* off */, 4/* len */));
+		assertEquals(0x0000000f, getBits(b,11/* off */, 4/* len */));
+		assertEquals(0x0000000e, getBits(b,12/* off */, 4/* len */));
+		assertEquals(0x0000000c, getBits(b,13/* off */, 4/* len */));
+		assertEquals(0x00000008, getBits(b,14/* off */, 4/* len */));
+		assertEquals(0x00000000, getBits(b,15/* off */, 4/* len */));
+
+	}
+
+	 /** 
+	 * byte[2] (16-bits) 
+	 * 
+	 * @todo test slices from arrays with more than 4 bytes
+	 */
+	public void test_getBitsFromByteArray_06() {
+		
+		final byte[] b = new byte[2];
+
+		// four bits on starting at bit 11.
+		BytesUtil.setBit(b, 11/* offset */, true);
+		BytesUtil.setBit(b, 12/* offset */, true);
+		BytesUtil.setBit(b, 13/* offset */, true);
+		BytesUtil.setBit(b, 14/* offset */, true);
+
+		/*
+		 * Test with a window extending from bit zero with a variety of bit
+		 * lengths ranging from an end bit index one less than the first ONE bit
+		 * through an end bit index beyond the last ONE bit.
+		 */
+		assertEquals(0x00000000, getBits(b, 0/* off */, 11/* len */));
+		assertEquals(0x00000001, getBits(b, 0/* off */, 12/* len */));
+		assertEquals(0x00000003, getBits(b, 0/* off */, 13/* len */));
+		assertEquals(0x00000007, getBits(b, 0/* off */, 14/* len */));
+		assertEquals(0x0000000f, getBits(b, 0/* off */, 15/* len */));
+		assertEquals(0x0000001e, getBits(b, 0/* off */, 16/* len */));
+
+		/*
+		 * Now that we have reached the last legal length verify that length 17
+		 * is rejected.
+		 */
+		try {
+			getBits(b, 0/* off */, 17/* len */);
+			fail("Expecting: " + IllegalArgumentException.class);
+		} catch (IllegalArgumentException ex) {
+			if (log.isInfoEnabled())
+				log.info("Ignoring expected exception: " + ex);
+		}
+
+		/*
+		 * Now increase the offset while decreasing the length and step through
+		 * a few more slices. These all see the FOUR (4) ON bits plus one
+		 * trailing ZERO (0) bit.
+		 */
+		assertEquals(0x0000001e, getBits(b, 1/* off */, 15/* len */));
+		assertEquals(0x0000001e, getBits(b, 2/* off */, 14/* len */));
+		assertEquals(0x0000001e, getBits(b, 3/* off */, 13/* len */));
+		assertEquals(0x0000001e, getBits(b, 4/* off */, 12/* len */));
+		assertEquals(0x0000001e, getBits(b, 5/* off */, 11/* len */));
+		assertEquals(0x0000001e, getBits(b, 6/* off */, 10/* len */));
+		assertEquals(0x0000001e, getBits(b, 7/* off */,  9/* len */));
+		assertEquals(0x0000001e, getBits(b, 8/* off */,  8/* len */));
+		assertEquals(0x0000001e, getBits(b, 9/* off */,  7/* len */));
+		assertEquals(0x0000001e, getBits(b,10/* off */,  6/* len */));
+		assertEquals(0x0000001e, getBits(b,11/* off */,  5/* len */));
+
+		/*
+		 * Continue to increase the offset while decreasing the length, but now
+		 * we will start to loose the ONE bits on both sides as the window keeps
+		 * sliding and shrinking.
+		 */
+		assertEquals(0x0000000e, getBits(b,12/* off */,  4/* len */));
+		assertEquals(0x00000006, getBits(b,13/* off */,  3/* len */));
+		assertEquals(0x00000002, getBits(b,14/* off */,  2/* len */));
+		assertEquals(0x00000000, getBits(b,15/* off */,  1/* len */));
+
+		/*
+		 * This is also illegal (the starting offset is too large).
+		 */
+		try {
+			getBits(b,16/* off */,  1/* len */);
+			fail("Expecting: " + IllegalArgumentException.class);
+		} catch (IllegalArgumentException ex) {
+			if (log.isInfoEnabled())
+				log.info("Ignoring expected exception: " + ex);
+		}
+
+	}
+		
+    private int getBits(final byte[] a,final int off,final int len) {
+    
+        final int ret = BytesUtil.getBits(a, off, len);
+
+		if (log.isInfoEnabled()) {
+			final StringBuilder sb = new StringBuilder();
+			final Formatter f = new Formatter(sb);
+			f.format("[%" + (a.length * 8) + "s] =(%2d:%2d)=> [%32s]",
+					BytesUtil.toBitString(a), off, len, Integer.toBinaryString(ret));
+			log.info(sb.toString());
+		}
+
+        return ret;
+    	
     }
 
 }

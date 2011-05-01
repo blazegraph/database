@@ -968,7 +968,207 @@ public class BytesUtil {
         return oldValue;
 
     }
+
+    /**
+	 * An array of 32-bit mask values. The index in the array is the #of bits of
+	 * the hash code to be considered. The value at that index in the array is
+	 * the mask to be applied to mask off to zero the high bits of the hash code
+	 * which are to be ignored.
+	 */
+    static private final int[] masks32;
+    static {
+
+        // Populate the array of masking values.
+        masks32 = new int[32];
+
+        for (int i = 0; i < 32; i++)
+            masks32[i] = getMSBMask(i);
+        
+    }
     
+    /**
+     * Return a bit mask which reveals only the MSB (Most Significant Bits) N
+     * bits of an int32 value.
+     * 
+     * @param nbits
+     *            The #of bits to be revealed.
+     * 
+     * @return The mask.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>nbits</i> is LT ZERO (0).
+     * @throws IllegalArgumentException
+     *             if <i>nbits</i> is GT 32.
+     */
+	static/* private */int getMSBMask(final int nbits) {
+
+        if (nbits < 0 || nbits > 32)
+            throw new IllegalArgumentException();
+
+        final int limit = (32 - nbits);
+        int mask = 0;
+
+        for (int i = 31; i >= limit; i--) {
+
+            final int bit = (1 << i);
+
+            mask |= bit;
+
+        }
+
+        return mask;
+
+    }
+
+	/**
+	 * Mask off all but the MSB <i>nbits</i> of the hash value and shift them
+	 * down such that the masked bits appear at bits (nbits:0] of the returned
+	 * value. This is used to index into a dictionary page based on the revealed
+	 * bits.
+	 * 
+	 * @param h
+	 *            The hash value.
+	 * @param nbits
+	 *            The #of bits already accounted for by the path from the root.
+	 * 
+	 * @return The hash value considering only the MSB <i>nbits</i> and shifted
+	 *         down into an <i>nbits</i> integer.
+	 */
+	public static int maskOff(final int h, final int nbits) {
+	
+	    if (nbits < 0 || nbits > 32)
+	        throw new IllegalArgumentException();
+	
+	    final int v = h & masks32[nbits];
+	
+	    final int x = v >>> (32 - nbits);
+	
+	    return x;
+	
+	}
+
+	/**
+	 * Return the n-bit integer corresponding to the inclusive bit range of the
+	 * byte[]. Bit ZERO (0) is the Most Significant Bit (MSB). Bit positions
+	 * increase from zero up to <code>a.length * 8 - 1</code>. The return value
+	 * is an int32 and the bit range must not be greater than 32 bits.
+	 * <p>
+	 * For example, given the following data and the bit range (0,2)
+	 * 
+	 * <pre>
+	 * bit index: 01234567 
+	 * ---------+---------- 
+	 * bit value: 10110000
+	 * </pre>
+	 * 
+	 * TWO (2) bits starting at bit offset ZERO (0) would be extracted and
+	 * returned as a 2-bit integer. For those data, the return value would be an
+	 * int32 value whose binary representation was <code>10</code> (with leading
+	 * zeros suppressed).
+	 * <p>
+	 * Note: This method is design for use with the unsigned byte[] keys in a
+	 * bigdata hash index. All keys in bigdata are internally represented as
+	 * unsigned byte[]s, which is why this method accepts a byte[] rather than
+	 * an long[] for the bits. Also, while the length of an unsigned byte[] key
+	 * can vary, they are never huge and an int32 value is sufficient to index
+	 * into the bits in the byte[]. Finally, the return value is an int because
+	 * it will be used in hash table designs to index into a hash table based on
+	 * those bits in a hash code key which are masked as relevant to that hash
+	 * table. 32bits is far more than we will need to index into a hash table.
+	 * For an 8k page, we might expect a fan out of at most 1024 which is only
+	 * 10 bits.
+	 * 
+	 * @param a
+	 *            A byte[].
+	 * @param off
+	 *            The index of the first bit to be included.
+	 * @param len
+	 *            The number of bits to be returned in [0:32]. However, a bit
+	 *            length of zero will always return zero.
+	 * 
+	 * @return The integer extracted from the specified bit range.
+	 */
+	public static int getBits(final byte[] a, final int off, final int len) {
+	
+		if (a == null)
+			throw new IllegalArgumentException();
+		if (off < 0)
+			throw new IllegalArgumentException();
+		if (len < 0 || len > 32)
+			throw new IllegalArgumentException();
+		if (len == 0) // zero length is always a zero.
+			return 0;
+		if (off + len > a.length * 8)
+			throw new IllegalArgumentException();
+	
+		/*
+		 * Build int32 value having the desired bits. 
+		 */
+		
+		// byte in which the bit range begins.
+		final int fromByteOffset = byteIndexForBit(off);
+	
+		// byte in which the bit range ends (inclusive).
+		final int toByteOffset = byteIndexForBit(off + len - 1);
+
+		/*
+		 * The data are assembled into the int64 value by copying each byte in
+		 * turn having data for the slice. This will copy at most 5 bytes. For
+		 * example, when a 32-bit window starts in the middle of a byte. Once
+		 * the bytes are assembled into the int64 buffer, they are shifted down
+		 * to put the last bit extracted at bit index ZERO (0) of the int32
+		 * word. Finally, the unused high bits are cleared to zero using a mask.
+		 */
+		
+		long v = 0L; // buffer for up to 5 source bytes.
+		final int nbytes = toByteOffset - fromByteOffset + 1;
+		for (int i = fromByteOffset, j = 1; i <= toByteOffset; i++, j++) {
+			final byte x = a[i]; // next byte.
+			final int shift = ((nbytes - j) << 3); //  
+			v |= (x << shift); // mask off high bits and shift into buf.
+		} // next byte in the byte[].
+		final int last = off + len - 1; // index of the last bit (inclusive).
+		final int rshift = 7 - (last % 8); // final right shift to word align.
+		int w = (int) (v >>> rshift); // int32 result.
+		int mask = masks32[32 - len]; // lookup mask with [len] LSB ZEROs.
+		mask = ~mask; // flip bits to get [len] LSB ONEs.
+		w &= mask; // mask off the lower [len] bits (handles sign extension and
+				   // starting offset within byte).
+		return w;
+	}
+
+	/**
+	 * Return the binary representation of the unsigned byte[].
+	 * 
+	 * @param a
+	 *            The unsigned byte[].
+	 * 
+	 * @return The representation of the bits in that unsigned byte[].
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if the argument is <code>null</code>.
+	 */
+	public static String toBitString(final byte[] b) {
+		if (b == null)// Note: fromKey/toKey may be null; caller must check 1st
+			throw new IllegalArgumentException();
+		final char[] chars = new char[b.length << 3]; // one char per bit.
+		int bitIndex = 0; // start at the msb.
+		for (int i = 0; i < b.length; i++) {
+			final byte x = b[i]; // next byte.
+			for (int withinByteIndex = 7; withinByteIndex >= 0; withinByteIndex--) {
+				final int mask = 1 << withinByteIndex;
+				final boolean bit = (x & mask) != 0;
+				chars[bitIndex++] = bits[bit ? 1 : 0];
+			} // next bit in the current byte.
+		} // next byte in the byte[].
+//		System.err.println("b[]=" + BytesUtil.toString(b) + ", chars="
+//				+ Arrays.toString(chars));
+		return new String(chars);
+	}
+
+	/** binary digits. */
+	private final static char[] bits = { '0', '1' };
+
     /**
      * Decode a string of the form <code>[0-9]+(k|kb|m|mb|g|gb)?</code>,
      * returning the number of bytes. When a suffix indicates kilobytes,
@@ -1096,5 +1296,5 @@ public class BytesUtil {
         return a;
 
     }
-    
+
 }
