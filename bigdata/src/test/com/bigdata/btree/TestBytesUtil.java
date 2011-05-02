@@ -33,7 +33,6 @@ import junit.framework.TestCase2;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.htree.HTreeUtil;
 
 /**
  * Test suite for low-level operations on variable length byte[]s.
@@ -860,7 +859,7 @@ public class TestBytesUtil extends TestCase2 {
 
 
     /**
-     * Correct rejection tests for {@link HTreeUtil#getMSBMask(int)}
+     * Correct rejection tests for {@link BytesUtil#getMSBMask(int)}
      */
     public void test_getMaskBits_correctRejection() {
         try {
@@ -878,7 +877,7 @@ public class TestBytesUtil extends TestCase2 {
     }
     
     /**
-     * Unit test for {@link HTreeUtil#getMSBMask(int)}
+     * Unit test for {@link BytesUtil#getMSBMask(int)}
      */
     public void test_getMaskBits() {
         
@@ -919,7 +918,7 @@ public class TestBytesUtil extends TestCase2 {
     }
 
     /**
-     * Test help logs the {@link HTreeUtil#getMSBMask(int)} results for
+     * Test help logs the {@link BytesUtil#getMSBMask(int)} results for
      * inspection.
      * 
      * @param nbits
