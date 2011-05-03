@@ -59,7 +59,7 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
      */
     private final AbstractTripleStore database;
     
-    private final Literal query, maxHits, minRelevance;
+    private final Literal query, maxHits, minRelevance, maxRelevance;
     
     private final boolean matchAllTerms;
     
@@ -69,13 +69,14 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
     public FreeTextSearchExpander(final AbstractTripleStore database,
             final Literal query) {
 
-        this(database, query, null, null, false);
+        this(database, query, null, null, null, false);
         
     }
     
     public FreeTextSearchExpander(final AbstractTripleStore database,
             final Literal query, final Literal maxHits, 
-            final Literal minRelevance, final boolean matchAllTerms) {
+            final Literal minRelevance, final Literal maxRelevance,
+            final boolean matchAllTerms) {
 
         if (database == null)
             throw new IllegalArgumentException();
@@ -90,6 +91,8 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
         this.maxHits = maxHits;
         
         this.minRelevance = minRelevance;
+        
+        this.maxRelevance = maxRelevance;
         
         this.matchAllTerms = matchAllTerms;
         
@@ -179,7 +182,8 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
                                 query.getLanguage(), 
                                 prefixMatch,
                                 minRelevance == null ? 0d : minRelevance.doubleValue()/* minCosine */, 
-                                maxHits == null ? 10000 : maxHits.intValue()+1/* maxRank */,
+                                maxRelevance == null ? 1.0d : maxRelevance.doubleValue()/* maxCosine */, 
+                                maxHits == null ? Integer.MAX_VALUE : maxHits.intValue()+1/* maxRank */,
                                 matchAllTerms,
                                 0L/* timeout */, TimeUnit.MILLISECONDS);
             }
