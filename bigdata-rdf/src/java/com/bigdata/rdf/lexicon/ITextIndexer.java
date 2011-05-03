@@ -98,6 +98,9 @@ public interface ITextIndexer<A extends IHit> {
      *            <code>false</code>, only exact matches will be made.
      * @param minCosine
      *            The minimum cosine that will be returned.
+     * @param maxCosine
+     *            The maximum cosine that will be returned.  Useful for 
+     *            evaluating in relevance ranges.
      * @param maxRank
      *            The upper bound on the #of hits in the result set.
      * @param matchAllTerms
@@ -111,7 +114,8 @@ public interface ITextIndexer<A extends IHit> {
      * @return The result set.
      */
     public Hiterator<A> search(final String query, final String languageCode,
-            final boolean prefixMatch, final double minCosine,
+            final boolean prefixMatch, 
+            final double minCosine, final double maxCosine,
             final int maxRank, final boolean matchAllTerms, 
             long timeout, final TimeUnit unit);
 

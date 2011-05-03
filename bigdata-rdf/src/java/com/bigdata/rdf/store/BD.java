@@ -193,6 +193,22 @@ public interface BD {
      * select ?s
      * where {
      *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bd:maxRelevance "0.9"^^xsd:double .
+     * }
+     * 
+     * </pre>
+     */
+    final URI MAX_RELEVANCE = new URIImpl(SEARCH_NAMESPACE+"maxRelevance");
+
+    /**
+     * Magic predicate used to query for free text search metadata.  Use 
+     * in conjunction with {@link #SEARCH} as follows:
+     * <p>
+     * <pre>
+     * 
+     * select ?s
+     * where {
+     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
      *   ?s bd:matchAllTerms "true" .
      * }
      * 

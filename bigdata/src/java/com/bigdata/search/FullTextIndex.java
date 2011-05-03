@@ -910,6 +910,7 @@ public class FullTextIndex extends AbstractRelation {
                 languageCode,//
                 prefixMatch,//
                 .4, // minCosine
+                1.0d, // maxCosine
                 10000, // maxRank
                 false, // matchAllTerms
                 this.timeout,//
@@ -940,8 +941,8 @@ public class FullTextIndex extends AbstractRelation {
     public Hiterator search(final String query, final String languageCode,
             final double minCosine, final int maxRank) {
         
-        return search(query, languageCode, false/* prefixMatch */, minCosine,
-                maxRank, false, this.timeout, TimeUnit.MILLISECONDS);
+        return search(query, languageCode, false/* prefixMatch */, minCosine, 
+        		1.0d, maxRank, false, this.timeout, TimeUnit.MILLISECONDS);
 
     }
 
@@ -979,6 +980,8 @@ public class FullTextIndex extends AbstractRelation {
      *            ).
      * @param minCosine
      *            The minimum cosine that will be returned.
+     * @param maxCosine
+     *            The maximum cosine that will be returned.
      * @param maxRank
      *            The upper bound on the #of hits in the result set.
      * @param prefixMatch
@@ -1014,7 +1017,8 @@ public class FullTextIndex extends AbstractRelation {
      *       terms are visited only when they occur in the matching field(s).
      */
     public Hiterator<Hit> search(final String query, final String languageCode,
-            final boolean prefixMatch, final double minCosine,
+            final boolean prefixMatch, 
+            final double minCosine, final double maxCosine,
             final int maxRank, final boolean matchAllTerms,
             long timeout, final TimeUnit unit) {
 
@@ -1027,6 +1031,9 @@ public class FullTextIndex extends AbstractRelation {
             throw new IllegalArgumentException();
         
         if (minCosine < 0d || minCosine > 1d)
+            throw new IllegalArgumentException();
+
+        if (maxCosine < 0d || maxCosine > 1d)
             throw new IllegalArgumentException();
 
         if (maxRank <= 0)
@@ -1130,7 +1137,12 @@ public class FullTextIndex extends AbstractRelation {
 
         }
 
+        /*
+         * If match all is specified, remove any hits with a term count less
+         * than the number of search tokens.
+         */
         if (matchAllTerms) {
+        	
 	        final int nterms = qdata.terms.size();
 	        
 	        if (log.isInfoEnabled())
@@ -1144,6 +1156,7 @@ public class FullTextIndex extends AbstractRelation {
 	        	if (hit.getTermCount() != nterms)
 	        		it.remove();
 	        }
+	        
         }
         
         // #of hits.
@@ -1170,9 +1183,39 @@ public class FullTextIndex extends AbstractRelation {
         if (log.isInfoEnabled())
             log.info("Rank ordering "+nhits+" hits by relevance");
         
-        final Hit[] a = hits.values().toArray(new Hit[nhits]);
+        Hit[] a = hits.values().toArray(new Hit[nhits]);
         
         Arrays.sort(a);
+
+        /*
+         * If maxCosine is specified, prune the hits that are above the max
+         */
+        if (maxCosine < 1.0d) {
+
+        	// find the first occurrence of a hit that is <= maxCosine
+        	int i = 0;
+        	for (Hit h : a) {
+        		if (h.getCosine() <= maxCosine)
+        			break;
+        		i++;
+        	}
+        	
+        	// no hits with relevance less than maxCosine
+        	if (i == a.length) {
+        		
+        		a = new Hit[0];
+        		
+        	} else {
+        	
+	        	// copy the hits from that first occurrence to the end
+	        	final Hit[] tmp = new Hit[a.length - i];
+	        	System.arraycopy(a, i, tmp, 0, tmp.length);
+	        	
+	        	a = tmp;
+	        	
+        	}
+        	
+        }
 
         final long elapsed = System.currentTimeMillis() - begin;
         

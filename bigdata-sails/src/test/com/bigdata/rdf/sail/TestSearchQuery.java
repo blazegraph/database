@@ -797,6 +797,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             null, // languageCode
                             false, // prefixMatch
                             0d, // minCosine
+                            1.0d, // maxCosine
                             10000, // maxRank (=maxResults + 1)
                             false, // matchAllTerms
                             1000L, // timeout 
@@ -859,6 +860,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             null, // languageCode
                             false, // prefixMatch
                             0d, // minCosine
+                            1.0d, // maxCosine
                             maxHits+1, // maxRank (=maxResults + 1)
                             false, // matchAllTerms
                             1000L, // timeout 
@@ -886,6 +888,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             { 
             	final String searchQuery = "how now brown cow";
             	final double minRelevance = 0.6d;
+            	final double maxRelevance = 0.9d;
             	
                 final String query = 
                     "select ?s ?o ?score " + 
@@ -895,6 +898,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
                     "    ?o <"+BD.RELEVANCE+"> ?score . " +
                     "    ?o <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
+                    "    ?o <"+BD.MAX_RELEVANCE+"> \""+maxRelevance+"\" . " +
 //                    "    ?o <"+BD.MAX_HITS+"> \"5\" . " +
                     "} " +
                     "order by desc(?score)";
@@ -908,7 +912,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 while (result.hasNext()) {
                 	System.err.println(i++ + ": " + result.next().toString());
                 }
-                assertTrue("wrong # of results", i == 3);
+                assertTrue("wrong # of results", i == 2);
                 
                 result = tupleQuery.evaluate();
 
@@ -921,6 +925,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             null, // languageCode
                             false, // prefixMatch
                             minRelevance, // minCosine
+                            maxRelevance, // maxCosine
                             10000, // maxRank (=maxResults + 1)
                             false, // matchAllTerms
                             1000L, // timeout 
@@ -949,6 +954,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             	
             	final String searchQuery = "brown cow";
             	final double minRelevance = 0.0d;
+            	final double maxRelevance = 1.0d;
             	
                 final String query = 
                     "select ?s ?o ?score " + 
@@ -987,6 +993,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             null, // languageCode
                             false, // prefixMatch
                             minRelevance, // minCosine
+                            maxRelevance, // maxCosine
                             10000, // maxRank (=maxResults + 1)
                             false, // matchAllTerms
                             1000L, // timeout 
@@ -1017,6 +1024,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             	
             	final String searchQuery = "bro*";
             	final double minRelevance = 0.0d;
+            	final double maxRelevance = 1.0d;
             	
                 final String query = 
                     "select ?s ?o ?score " + 
@@ -1055,6 +1063,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             null, // languageCode
                             true, // prefixMatch
                             minRelevance, // minCosine
+                            maxRelevance, // maxCosine
                             10000, // maxRank (=maxResults + 1)
                             false, // matchAllTerms
                             1000L, // timeout 
@@ -1083,6 +1092,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             	
             	final String searchQuery = "to*";
             	final double minRelevance = 0.0d;
+            	final double maxRelevance = 1.0d;
             	
                 final String query = 
                     "select ?s ?o ?score " + 
@@ -1121,6 +1131,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             null, // languageCode
                             true, // prefixMatch
                             minRelevance, // minCosine
+                            maxRelevance, // maxCosine
                             10000, // maxRank (=maxResults + 1)
                             false, // matchAllTerms
                             1000L, // timeout 
@@ -1149,6 +1160,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             	
             	final String searchQuery = "how now brown cow";
             	final double minRelevance = 0.0d;
+            	final double maxRelevance = 1.0d;
             	
                 final String query = 
                     "select ?s ?o " + 
@@ -1183,6 +1195,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             null, // languageCode
                             true, // prefixMatch
                             minRelevance, // minCosine
+                            maxRelevance, // maxCosine
                             10000, // maxRank (=maxResults + 1)
                             true, // matchAllTerms
                             1000L, // timeout 

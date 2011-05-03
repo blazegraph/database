@@ -666,6 +666,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	        	if (s == null && p != null && 
 	        			(BD.RELEVANCE.equals(p) || BD.MAX_HITS.equals(p) ||
 	        				BD.MIN_RELEVANCE.equals(p) || 
+	        				BD.MAX_RELEVANCE.equals(p) || 
 	        				BD.MATCH_ALL_TERMS.equals(p))) {
         			final Var sVar = sp.getSubjectVar();
         			Set<StatementPattern> metadata = searchMetadata.get(sVar);
@@ -1653,6 +1654,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         IVariableOrConstant<IV> relevance = new Constant(DummyIV.INSTANCE);
         Literal maxHits = null;
         Literal minRelevance = null;
+        Literal maxRelevance = null;
         boolean matchAllTerms = false;
         
         for (StatementPattern meta : metadata) {
@@ -1680,6 +1682,11 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         			throw new IllegalArgumentException("illegal metadata: " + meta);
         		}
         		minRelevance = (Literal) oVal;
+	    	} else if (BD.MAX_RELEVANCE.equals(pVal)) {
+        		if (oVal == null || !(oVal instanceof Literal)) {
+        			throw new IllegalArgumentException("illegal metadata: " + meta);
+        		}
+        		maxRelevance = (Literal) oVal;
 	    	} else if (BD.MATCH_ALL_TERMS.equals(pVal)) {
         		if (oVal == null || !(oVal instanceof Literal)) {
         			throw new IllegalArgumentException("illegal metadata: " + meta);
@@ -1690,7 +1697,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         
         final IAccessPathExpander expander = 
         	new FreeTextSearchExpander(database, (Literal) objValue, 
-        			maxHits, minRelevance, matchAllTerms);
+        			maxHits, minRelevance, maxRelevance, matchAllTerms);
 
         // Decide on the correct arity for the predicate.
         final BOp[] vars = new BOp[] {
@@ -2067,7 +2074,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
                 .getSearchEngine().search(label, languageCode,
                         false/* prefixMatch */, 
                         0d/* minCosine */,
-                        10000/* maxRank */, 
+                        1.0d/* maxCosine */,
+                        Integer.MAX_VALUE/* maxRank */, 
                         false/* matchAllTerms */,
                         0L/* timeout */,
                         TimeUnit.MILLISECONDS);

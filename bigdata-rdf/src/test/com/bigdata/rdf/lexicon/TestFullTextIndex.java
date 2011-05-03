@@ -132,7 +132,8 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
             final float minCosine, final BigdataValue[] expected) {
 
         final Hiterator hitr = store.getLexiconRelation().getSearchEngine()
-                .search(query, languageCode, false/* prefixMatch */, minCosine,
+                .search(query, languageCode, false/* prefixMatch */, 
+                		minCosine, 1.0d/* maxCosine */,
                         Integer.MAX_VALUE/* maxRank */,
                         false/* matchAllTerms */,
                         2L/* timeout */,
