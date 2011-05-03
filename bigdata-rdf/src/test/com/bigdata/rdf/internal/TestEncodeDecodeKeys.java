@@ -45,6 +45,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
 
 /**
@@ -769,7 +770,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     	final SPO spo = new SPO(
     			new TermId(VTE.URI, 1L), 
     			new TermId(VTE.URI, 2L), 
-    			new TermId(VTE.URI, 4L));
+    			new TermId(VTE.URI, 4L),
+    			StatementEnum.Explicit);
     	
         final IV<?, ?>[] e = {//
                 new SidIV(spo),//
