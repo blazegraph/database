@@ -1429,7 +1429,7 @@ ${postInstallMessage}</echo>
           <include name="**/*.class" />
           <include name="**/log4j*.properties" />
         </fileset>
-
+<!--
         <fileset dir="${bigdata.dir}/bigdata/src/test">
           <include name="**/*.csv" />
           <include name="**/*.xml" />
@@ -1443,6 +1443,20 @@ ${postInstallMessage}</echo>
         <fileset dir="${bigdata.dir}">
           <include name="**/*.owl" />
         </fileset>
+-->
+        <fileset dir="${bigdata.dir}/bigdata/src/test">
+          <exclude name="**/*.java" />
+        </fileset>
+        <fileset dir="${bigdata.dir}/bigdata-rdf/src/test">
+          <exclude name="**/*.java" />
+        </fileset>
+        <fileset dir="${bigdata.dir}/bigdata-sails/src/test">
+          <exclude name="**/*.java" />
+        </fileset>
+        <fileset dir="${bigdata.dir}/bigdata-jini/src/test">
+          <exclude name="**/*.java" />
+        </fileset>
+      	
       </jar>
 
       <!-- Generate lookupstarter.jar file -->
