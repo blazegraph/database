@@ -1240,11 +1240,16 @@ public class BigdataSail extends SailBase implements Sail {
         }
         
     }
-    
+
     /**
-     * Strengthens the return type.  This returns the unisolated view of the
-     * database, which because of truth maintenance means only one connection
-     * at a time.
+     * {@inheritDoc}
+     * <p>
+     * If the triple store was provisioned to support full read/write
+     * transactions then this is delegated to {@link #getReadWriteConnection()}.
+     * Otherwise, is delegated to {@link #getUnisolatedConnection()} which
+     * returns the unisolated view of the database. Note that truth maintenance
+     * requires only one connection at a time and is therefore not compatible
+     * with full read/write transactions.
      */
     @Override
     public BigdataSailConnection getConnection() throws SailException {
