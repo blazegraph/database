@@ -31,6 +31,7 @@ package com.bigdata.relation;
 import java.util.Properties;
 import java.util.UUID;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
@@ -159,7 +160,7 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
                 
             }
             
-            ndx = new UnisolatedReadWriteIndex(ndx);
+            ndx = new UnisolatedReadWriteIndex((BTree) ndx);
 
         }
 
