@@ -81,7 +81,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
         return commitTime;
     }
 
-    public void abort() {
+    synchronized public void abort() {
                 
         super.abort();
         
