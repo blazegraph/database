@@ -1679,7 +1679,7 @@ abstract public class AbstractTripleStore extends
      *             if the view is read only.
      */
     @SuppressWarnings("unchecked")
-    public void abort() {
+    synchronized public void abort() {
 
         if (isReadOnly())
             throw new IllegalStateException();
