@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
 import java.io.File;
 import java.util.Date;
 import java.util.Map;
@@ -36,10 +38,14 @@ import java.util.TreeMap;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DumpIndex;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.DumpIndex.PageStats;
+import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.Name2Addr.Entry;
+import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.InnerCause;
 
@@ -72,9 +78,7 @@ import com.bigdata.util.InnerCause;
  */
 public class DumpJournal {
 
-    protected static final Logger log = Logger.getLogger(DumpJournal.class);
-    
-//    protected static final boolean INFO = log.isInfoEnabled();
+    private static final Logger log = Logger.getLogger(DumpJournal.class);
     
     public DumpJournal() {
         
@@ -259,13 +263,33 @@ public class DumpJournal {
                     ", bytesAvailable="+bytesAvailable+"("+bytesAvailable/Bytes.megabyte+"M)"+
                     ", nextOffset="+fmd.nextOffset);
 
-            if (dumpHistory) {
+			final CommitRecordIndex commitRecordIndex = journal
+					.getCommitRecordIndex();
+
+			System.err.println("There are " + commitRecordIndex
+					+ " commit points.");
+
+			if (dumpHistory) {
 
                 System.out.println("Historical commit points follow in temporal sequence (first to last):");
                 
-                final CommitRecordIndex commitRecordIndex = journal.getCommitRecordIndex();
-//                CommitRecordIndex commitRecordIndex = journal._commitRecordIndex;
-                
+//                final IKeyBuilder keyBuilder = KeyBuilder.newInstance(Bytes.SIZEOF_LONG);
+//
+//				final long targetTime = 1303505388420L;
+//				int indexOf = commitRecordIndex.indexOf(keyBuilder.reset()
+//						.append(targetTime).getKey());
+//				if (indexOf < 0)
+//					indexOf = (-(indexOf) - 1);
+//
+//				// @todo handle leading/trailing edge cases.
+//                final long fromTime = KeyBuilder.decodeLong(commitRecordIndex.keyAt(indexOf-3), 0/*off*/);
+//                final long toTime = KeyBuilder.decodeLong(commitRecordIndex.keyAt(indexOf+3), 0/*off*/);
+//                
+//                final ITupleIterator<CommitRecordIndex.Entry> itr = commitRecordIndex.rangeIterator(
+//                		keyBuilder.reset().append(fromTime+1).getKey(),
+//                		keyBuilder.reset().append(toTime+1).getKey()
+//                		);
+
                 final ITupleIterator<CommitRecordIndex.Entry> itr = commitRecordIndex.rangeIterator();
                 
                 while(itr.hasNext()) {
@@ -308,7 +332,33 @@ public class DumpJournal {
 
     }
     
-    /**
+	/**
+	 * Get the {@link Checkpoint} record for a named index.
+	 * 
+	 * @param journal
+	 *            The journal.
+	 * @param name2Addr
+	 *            Some {@link Name2Addr} instance (might not implement
+	 *            {@link Name2Addr}).
+	 * @param name
+	 *            The index name.
+	 * @return The {@link Checkpoint} record.
+	 */
+	private static Checkpoint getCheckpoint(final Journal journal,
+			final IIndex name2Addr, final String name) {
+		final byte[] val = name2Addr.lookup(name2Addr.getIndexMetadata()
+				.getTupleSerializer().getKeyBuilder().reset().append(name)
+				.getKey());
+		assert val != null;
+		final Entry e = EntrySerializer.INSTANCE
+				.deserialize(new DataInputStream(new ByteArrayInputStream(val)));
+		assert e.name.equals(name);
+		final Checkpoint checkpoint = (Checkpoint) SerializerUtil
+				.deserialize(journal.read(e.checkpointAddr));
+		return checkpoint;
+	}
+
+	/**
      * Dump metadata about each named index as of the specified commit record.
      * 
      * @param journal
