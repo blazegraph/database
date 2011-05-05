@@ -1893,8 +1893,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 	 * by {@link Semaphore#release()}. However, uses of this {@link Semaphore}
 	 * should ensure that it is release along all code paths, including a
 	 * finalizer if necessary.
-	 */
-    
+	 */   
 	private final Semaphore unisolatedSemaphore = new Semaphore(1/* permits */,
 			false/* fair */);
 
