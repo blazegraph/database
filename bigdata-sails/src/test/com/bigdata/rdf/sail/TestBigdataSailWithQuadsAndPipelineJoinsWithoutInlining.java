@@ -46,6 +46,8 @@ import com.bigdata.relation.AbstractResource;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated Support for inlining is non-optional in the development branch.
  */
 public class TestBigdataSailWithQuadsAndPipelineJoinsWithoutInlining extends AbstractBigdataSailTestCase {
 
@@ -97,6 +99,8 @@ public class TestBigdataSailWithQuadsAndPipelineJoinsWithoutInlining extends Abs
         
         suite.addTestSuite(TestDescribe.class);
         
+		suite.addTestSuite(com.bigdata.rdf.sail.contrib.TestRollbacks.class);
+
         // The Sesame TCK, including the SPARQL test suite.
         {
 

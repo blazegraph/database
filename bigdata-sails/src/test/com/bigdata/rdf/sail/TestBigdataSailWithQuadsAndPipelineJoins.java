@@ -32,7 +32,6 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 import junit.framework.TestSuite;
 
-import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.tck.BigdataConnectionTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlTest;
@@ -97,7 +96,9 @@ public class TestBigdataSailWithQuadsAndPipelineJoins extends AbstractBigdataSai
         
         suite.addTestSuite(TestDescribe.class);
         
-        // The Sesame TCK, including the SPARQL test suite.
+		suite.addTestSuite(com.bigdata.rdf.sail.contrib.TestRollbacks.class);
+
+		// The Sesame TCK, including the SPARQL test suite.
         {
 
             final TestSuite tckSuite = new TestSuite("Sesame 2.x TCK");

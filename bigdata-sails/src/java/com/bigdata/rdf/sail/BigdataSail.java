@@ -1156,12 +1156,18 @@ public class BigdataSail extends SailBase implements Sail {
     public BigdataSailConnection getUnisolatedConnection() 
             throws InterruptedException {
         
-        Lock writeLock = lock.writeLock();
+		if (getDatabase().getIndexManager() instanceof Journal) {
+			// acquire permit from Journal.
+			((Journal) getDatabase().getIndexManager())
+					.acquireUnisolatedConnection();
+		}
+		
+		final Lock writeLock = lock.writeLock();
         writeLock.lock();
         
         // new writable connection.
-        final BigdataSailConnection conn = 
-            new BigdataSailConnection(database, writeLock);
+		final BigdataSailConnection conn = new BigdataSailConnection(database,
+				writeLock, true/* unisolated */);
         
         return conn;
 
@@ -1197,7 +1203,7 @@ public class BigdataSail extends SailBase implements Sail {
                     database.getNamespace(),
                     TimestampUtility.asHistoricalRead(timestamp));
 
-        return new BigdataSailConnection(view, null);
+        return new BigdataSailConnection(view, null, false/*unisolated*/);
         
     }
     
@@ -1225,7 +1231,7 @@ public class BigdataSail extends SailBase implements Sail {
         final Lock readLock = lock.readLock();
         readLock.lock();
         
-        return new BigdataSailConnection(readLock) {
+        return new BigdataSailConnection(readLock,false/*unisolated*/) {
             
             /**
              * The transaction id.
@@ -1428,8 +1434,21 @@ public class BigdataSail extends SailBase implements Sail {
          * Used to coordinate between read/write transactions and the unisolated
          * view.
          */
-        private Lock lock;
+        final private Lock lock;
 
+		/**
+		 * <code>true</code> iff this is the UNISOLATED connection (only one of
+		 * those at a time).
+		 */
+        private final boolean unisolated;
+
+        public String toString() {
+        	
+			return getClass().getName() + "{timestamp="
+					+ TimestampUtility.toString(database.getTimestamp()) + "}";
+        	
+        }
+                
         /**
          * Return the assertion buffer.
          * <p>
@@ -1539,10 +1558,11 @@ public class BigdataSail extends SailBase implements Sail {
 
         }
         
-        protected BigdataSailConnection(final Lock lock) {
+        protected BigdataSailConnection(final Lock lock,final boolean unisolated) {
             
             this.lock = lock;
-            
+            this.unisolated = unisolated;
+
         }
         
         /**
@@ -1553,11 +1573,12 @@ public class BigdataSail extends SailBase implements Sail {
          *            {@link SailConnection} will not support update.
          */
         protected BigdataSailConnection(final AbstractTripleStore database, 
-                final Lock lock) {
+                final Lock lock, final boolean unisolated) {
             
             attach(database);
             
             this.lock = lock;
+            this.unisolated = unisolated;
             
         }
         
@@ -2663,6 +2684,11 @@ public class BigdataSail extends SailBase implements Sail {
                 if (lock != null) {
                     lock.unlock();
                 }
+        		if (unisolated && getDatabase().getIndexManager() instanceof Journal) {
+                    // release the permit.
+        			((Journal) getDatabase().getIndexManager())
+        					.releaseUnisolatedConnection();
+        		}
                 open = false;
             }
             
@@ -3471,7 +3497,7 @@ public class BigdataSail extends SailBase implements Sail {
          * @param log
          *          the change log
          */
-        public void setChangeLog(final IChangeLog changeLog) {
+        synchronized public void setChangeLog(final IChangeLog changeLog) {
             
             this.changeLog = changeLog;
             
