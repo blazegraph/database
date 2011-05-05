@@ -382,8 +382,8 @@ public abstract class SPARQLQueryTest extends TestCase {
 	private void uploadDataset(Dataset dataset)
 		throws Exception
 	{
-		RepositoryConnection con = dataRep.getConnection();
-		try {
+//		RepositoryConnection con = dataRep.getConnection();
+//		try {
 			// Merge default and named graphs to filter duplicates
 			Set<URI> graphURIs = new HashSet<URI>();
 			graphURIs.addAll(dataset.getDefaultGraphs());
@@ -392,18 +392,18 @@ public abstract class SPARQLQueryTest extends TestCase {
 			for (Resource graphURI : graphURIs) {
 				upload(((URI)graphURI), graphURI);
 			}
-		}
-		finally {
-			con.close();
-		}
+//		}
+//		finally {
+//			con.close();
+//		}
 	}
 
 	private void upload(URI graphURI, Resource context)
 		throws Exception
 	{
-		RepositoryConnection con = dataRep.getConnection();
-		con.setAutoCommit(false);
+		final RepositoryConnection con = dataRep.getConnection();
 		try {
+			con.setAutoCommit(false);
 			RDFFormat rdfFormat = Rio.getParserFormatForFileName(graphURI.toString(), RDFFormat.TURTLE);
 			RDFParser rdfParser = Rio.createParser(rdfFormat, dataRep.getValueFactory());
 			rdfParser.setVerifyData(false);
