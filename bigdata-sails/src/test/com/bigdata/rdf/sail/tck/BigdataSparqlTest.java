@@ -41,7 +41,6 @@ import junit.framework.Test;
 import junit.framework.TestSuite;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.Statement;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.Query;
 import org.openrdf.query.QueryLanguage;
@@ -52,7 +51,6 @@ import org.openrdf.query.parser.sparql.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
-import org.openrdf.repository.RepositoryResult;
 import org.openrdf.repository.dataset.DatasetRepository;
 import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.sail.memory.MemoryStore;
@@ -62,8 +60,8 @@ import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSail.Options;
 
 /**
  * Test harness for running the SPARQL test suites.
@@ -73,8 +71,7 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
  */
 public class BigdataSparqlTest extends SPARQLQueryTest {
 
-    static protected final Logger log = Logger.getLogger(BigdataSparqlTest.class);
-    
+    static private final Logger log = Logger.getLogger(BigdataSparqlTest.class);
     
     /**
      * We cannot use inlining for these test because we do normalization on
@@ -414,8 +411,8 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
 //      Force identical unicode comparisons (assuming default COLLATOR setting).
 //        props.setProperty(Options.STRENGTH, StrengthEnum.Identical.toString());
         
-        // disable read/write transactions
-        props.setProperty(Options.ISOLATABLE_INDICES, "false");
+        // enable/disable read/write transactions
+        props.setProperty(Options.ISOLATABLE_INDICES, "true");
         
         // disable truth maintenance in the SAIL
         props.setProperty(Options.TRUTH_MAINTENANCE, "false");

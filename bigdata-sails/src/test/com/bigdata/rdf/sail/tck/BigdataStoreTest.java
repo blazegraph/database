@@ -25,13 +25,35 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Jun 19, 2008
  */
+/* Note: Portions of this file are copyright by Aduna.
+ * 
+ * Copyright Aduna (http://www.aduna-software.com/) (c) 1997-2007.
+ *
+ * Licensed under the Aduna BSD-style license.
+ */
 package com.bigdata.rdf.sail.tck;
+
+import info.aduna.iteration.CloseableIteration;
+import info.aduna.iteration.Iteration;
+import info.aduna.iteration.Iterations;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.query.Binding;
+import org.openrdf.query.BindingSet;
+import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.algebra.TupleExpr;
+import org.openrdf.query.impl.EmptyBindingSet;
+import org.openrdf.query.impl.MapBindingSet;
+import org.openrdf.query.parser.ParsedTupleQuery;
+import org.openrdf.query.parser.QueryParserUtil;
 import org.openrdf.sail.RDFStoreTest;
 import org.openrdf.sail.Sail;
 import org.openrdf.sail.SailConnection;
@@ -39,6 +61,7 @@ import org.openrdf.sail.SailException;
 
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.StrengthEnum;
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
@@ -46,7 +69,7 @@ import com.bigdata.rdf.store.LocalTripleStore;
 
 public class BigdataStoreTest extends RDFStoreTest {
 
-    protected static final Logger log = Logger.getLogger(BigdataStoreTest.class);
+    private static final Logger log = Logger.getLogger(BigdataStoreTest.class);
  
     /**
      * Return a test suite using the {@link LocalTripleStore} and pipeline
@@ -107,29 +130,6 @@ public class BigdataStoreTest extends RDFStoreTest {
         super(name);
         
     }
-
-    /**
-     * @todo The problem here is that the {@link BigdataSail} uses a semaphore
-     *       to grant the unisolated write connection. If a thread requests two
-     *       sail connections then it will deadlock. This could be fixed either
-     *       by supporting full transactions in the sail or by allowing more
-     *       than one connection but having them interleave their incremental
-     *       writes.
-    @Override
-    public void testDualConnections(){
-        fail("Not supported yet.");
-    }
-     */
-
-    /**
-     * This unit test has been disabled. Sesame 2.x assumes that two blank nodes
-     * are the same if they have the same identifier. bigdata does not have
-     * those semantics. Neither does RDF. Sesame 3.x has the standard behavior
-     * and does not run this unit test either.
-    public void testStatementSerialization() {
-        
-    }
-     */
     
     protected Properties getProperties() {
         
@@ -139,7 +139,14 @@ public class BigdataStoreTest extends RDFStoreTest {
         
         props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
 
-        // use told bnode mode
+		/*
+		 * WORM supports full tx right now. RW has tx issue which we plan to
+		 * resolve shortly (5/5/2011).
+		 */
+		props.setProperty(BigdataSail.Options.BUFFER_MODE, BufferMode.DiskWORM
+				.toString());
+
+		// use told bnode mode
         props.setProperty(BigdataSail.Options.STORE_BLANK_NODES,"true");
         
         // quads mode: quads=true, sids=false, axioms=NoAxioms, vocab=NoVocabulary
@@ -200,49 +207,106 @@ public class BigdataStoreTest extends RDFStoreTest {
     }
 
     /**
-     * This one is failing because of this code:
+     * FIXME This one is failing because of this code:
      * <code>
      * bindings.addBinding("Y", painter);
      * iter = con.evaluate(tupleExpr, null, bindings, false);
      * resultCount = verifyQueryResult(iter, 1);
      * </code>
      * Adding a binding for the "Y" variable causes that binding to appear in
-     * the result set, even though "Y" is not one of the selected variables. 
+     * the result set, even though "Y" is not one of the selected variables. This
+     * is a bigdata bug and should be fixed.
      * 
-     * @todo FIXME
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/254
      */
     @Override
     public void testQueryBindings()
         throws Exception
     {
         log.warn("FIXME");
+        super.testQueryBindings();
     }
 
-    /**
-     * This one is failing because we cannot handle literals longer than
-     * 65535 characters.
-     * 
-     * @todo FIXME
-     */
+	/**
+	 * FIXME This one is failing because we cannot handle literals longer than
+	 * 65535 characters. This is a known issue.
+	 * 
+	 * @see https://sourceforge.net/apps/trac/bigdata/ticket/109
+	 */
     @Override
     public void testReallyLongLiteralRoundTrip()
         throws Exception
     {
         log.warn("FIXME");
+        super.testReallyLongLiteralRoundTrip();
     }
-    
-    /**
-     * This one fails because Sesame assumes "read-committed" transaction
-     * semantics, which are incompatible with bigdata's MVCC transaction 
-     * semantics.
-     * 
-     * @todo FIXME
-     */
+
+	/**
+	 * Bigdata uses snapshot isolation for transactions while openrdf assumes
+	 * that any writes committed by a transaction become immediately visible to
+	 * transactions which are already running. This unit test from the base
+	 * class has been overridden since bigdata has stronger semantics for
+	 * transactional isolation.
+	 */
     @Override
     public void testDualConnections()
         throws Exception
     {
-        log.warn("FIXME");
+        log.warn("Test overridden since bigdata uses full snapshot tx isolation.");
+//    	super.testDualConnections();
+		SailConnection con2 = sail.getConnection();
+		try {
+			assertEquals(0, countAllElements());
+			con.addStatement(painter, RDF.TYPE, RDFS.CLASS);
+			con.addStatement(painting, RDF.TYPE, RDFS.CLASS);
+			con.addStatement(picasso, RDF.TYPE, painter, context1);
+			con.addStatement(guernica, RDF.TYPE, painting, context1);
+			con.commit();
+			assertEquals(4, countAllElements());
+			con2.addStatement(RDF.NIL, RDF.TYPE, RDF.LIST);
+			String query = "SELECT S, P, O FROM {S} P {O}";
+			ParsedTupleQuery tupleQuery = QueryParserUtil.parseTupleQuery(QueryLanguage.SERQL, query, null);
+//			final int nexpected = 5; // No. This is openrdf "read-committed" semantics.
+			final int nexpected = 1; // Yes. This is bigdata snapshot isolation semantics.
+			assertEquals(nexpected, countElements(con2.evaluate(tupleQuery.getTupleExpr(), null,
+					EmptyBindingSet.getInstance(), false)));
+			Runnable clearer = new Runnable() {
+
+				public void run() {
+					try {
+						con.clear();
+						con.commit();
+					}
+					catch (SailException e) {
+						throw new RuntimeException(e);
+					}
+				}
+			};
+			Thread thread = new Thread(clearer);
+			thread.start();
+			Thread.yield();
+			Thread.yield();
+			con2.commit();
+			thread.join();
+		}
+		finally {
+			con2.close();
+		}
     }
     
+	private int countElements(Iteration<?, ?> iter) throws Exception {
+		int count = 0;
+
+		try {
+			while (iter.hasNext()) {
+				iter.next();
+				count++;
+			}
+		} finally {
+			Iterations.closeCloseable(iter);
+		}
+
+		return count;
+	}
+
 }

@@ -49,28 +49,32 @@ public class BigdataSailRepository extends SailRepository {
         }
         
     }
-    
-    /**
-     * Obtain a read-only connection to the database at the last commit point.
-     * This connection should be used for all pure-readers, as the connection
-     * will not be blocked by concurrent writers.
-     * 
-     * @return a read-only connection to the database
-     */
+
+	/**
+	 * Obtain a read-only connection to the database at the last commit point. A
+	 * read-only connection should be used for all pure-readers, as the
+	 * connection will not be blocked by concurrent writers.
+	 * 
+	 * @return a read-only connection to the database
+	 * 
+	 * @see BigdataSail#getReadOnlyConnection()
+	 */
     public BigdataSailRepositoryConnection getReadOnlyConnection() 
         throws RepositoryException {
         
         return new BigdataSailRepositoryConnection(this, 
             getSail().getReadOnlyConnection());
     }
-    
-    /**
-     * Obtain a read-only connection to the database from a historical commit 
-     * point. This connection should be used for all pure-readers, as the 
-     * connection will not be blocked by concurrent writers.
-     * 
-     * @return a read-only connection to the database
-     */
+
+	/**
+	 * Obtain a read-only connection to the database from a historical commit
+	 * point. A read-only connection should be used for all pure-readers, as the
+	 * connection will not be blocked by concurrent writers.
+	 * 
+	 * @return a read-only connection to the database
+	 * 
+	 * @see BigdataSail#getReadOnlyConnection(long)
+	 */
     public BigdataSailRepositoryConnection getReadOnlyConnection(long timestamp) 
         throws RepositoryException {
         
@@ -78,10 +82,12 @@ public class BigdataSailRepository extends SailRepository {
             getSail().getReadOnlyConnection(timestamp));
         
     }
-    
-    /**
-     * Return a connection backed by a read-write transaction.
-     */
+
+	/**
+	 * Return a connection backed by a read-write transaction.
+	 * 
+	 * @see BigdataSail#getReadWriteConnection()
+	 */
     public BigdataSailRepositoryConnection getReadWriteConnection() 
         throws RepositoryException {
         
@@ -103,6 +109,8 @@ public class BigdataSailRepository extends SailRepository {
      * allowed at a time.
      * 
      * @return unisolated connection to the database
+     * 
+     * @see BigdataSail#getUnisolatedConnection()
      */
     public BigdataSailRepositoryConnection getUnisolatedConnection() 
         throws RepositoryException {
