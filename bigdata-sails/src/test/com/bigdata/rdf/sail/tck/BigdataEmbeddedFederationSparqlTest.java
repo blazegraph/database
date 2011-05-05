@@ -178,6 +178,9 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
         properties.setProperty(
                 ResourceManager.Options.MAXIMUM_MOVES_PER_TARGET, "0");
         
+        // disable read/write transactions (not supported in scale-out).
+        properties.setProperty(Options.ISOLATABLE_INDICES, "false");
+
         return properties;
         
     }
