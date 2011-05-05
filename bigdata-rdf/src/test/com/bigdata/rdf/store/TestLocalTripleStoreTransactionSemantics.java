@@ -40,6 +40,24 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
 
     }
 
+    public void test_commit1() {
+
+        final LocalTripleStore store = (LocalTripleStore) getStore();
+        try {
+            final IV s = new TermId(VTE.URI, 1);
+            final IV p = new TermId(VTE.URI, 2);
+            final IV o = new TermId(VTE.URI, 3);
+
+            // add the statement.
+            store.addStatements(new SPO[] { //
+                    new SPO(s, p, o, StatementEnum.Explicit) //
+                    },//
+                    1);
+        } finally {
+        store.destroy();
+        }
+    }
+    
     /**
      * Test the commit semantics in the context of a read-committed view of the
      * database.
