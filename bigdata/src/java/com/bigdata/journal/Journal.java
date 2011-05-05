@@ -38,6 +38,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -1878,5 +1879,78 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         return t;
         
     }
+
+	/**
+	 * A Journal level semaphore used to restrict applications to a single
+	 * unisolated connection. The "unisolated" connection is an application
+	 * level construct which supports highly scalable ACID operations but only a
+	 * single such "connection" can exist at a time for a Journal. This
+	 * constraint arises from the need for the application to coordinate
+	 * operations on the low level indices and commit/abort processing while it
+	 * holds the permit.
+	 * <p>
+	 * Note: If by some chance the permit has become "lost" it can be rebalanced
+	 * by {@link Semaphore#release()}. However, uses of this {@link Semaphore}
+	 * should ensure that it is release along all code paths, including a
+	 * finalizer if necessary.
+	 */
     
+	private final Semaphore unisolatedSemaphore = new Semaphore(1/* permits */,
+			false/* fair */);
+
+	/**
+	 * Acquire a permit for the UNISOLATED connection.
+	 * 
+	 * @throws InterruptedException
+	 */
+	public void acquireUnisolatedConnection() throws InterruptedException {
+
+		unisolatedSemaphore.acquire();
+
+		if (log.isDebugEnabled())
+			log.debug("acquired semaphore: availablePermits="
+					+ unisolatedSemaphore.availablePermits());
+
+		if (unisolatedSemaphore.availablePermits() != 0) {
+			/*
+			 * Note: This test can not be made atomic with the Semaphore API. It
+			 * is possible unbalanced calls to release() could drive the #of
+			 * permits in the Semaphore above ONE (1) since the Semaphore
+			 * constructor does not place an upper bound on the #of permits, but
+			 * rather sets the initial #of permits available. An attempt to
+			 * acquire a permit which has a post-condition with additional
+			 * permits available will therefore "eat" a permit.
+			 */
+			throw new IllegalStateException();
+		}
+
+	}
+
+	/**
+	 * Release the permit for the UNISOLATED connection.
+	 * 
+	 * @throws IllegalStateException
+	 *             unless the #of permits available is zero.
+	 */
+	public void releaseUnisolatedConnection() {
+
+		if (log.isDebugEnabled())
+			log.debug("releasing semaphore: availablePermits="
+					+ unisolatedSemaphore.availablePermits());
+
+		if (unisolatedSemaphore.availablePermits() != 0) {
+			/*
+			 * Note: This test can not be made atomic with the Semaphore API. It
+			 * is possible that a concurrent call could drive the #of permits in
+			 * the Semaphore above ONE (1) since the Semaphore constructor does
+			 * not place an upper bound on the #of permits, but rather sets the
+			 * initial #of permits available.
+			 */
+			throw new IllegalStateException();
+		}
+
+		unisolatedSemaphore.release();
+
+	}
+
 }

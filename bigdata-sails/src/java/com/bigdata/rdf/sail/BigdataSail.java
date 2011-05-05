@@ -109,6 +109,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
@@ -1278,23 +1279,43 @@ public class BigdataSail extends SailBase implements Sail {
      */
     final private ReentrantReadWriteLock lock = new ReentrantReadWriteLock(false/*fair*/);
 
-    /**
-     * Return an unisolated connection to the database.  Only one of these
-     * allowed at a time.
-     * 
-     * @return unisolated connection to the database
-     */
+	/**
+	 * Return an unisolated connection to the database. The unisolated
+	 * connection supports fast, scalable updates against the database. The
+	 * unisolated connection is ACID when used with a local {@link Journal} and
+	 * shard-wise ACID when used with an {@link IBigdataFederation}.
+	 * <p>
+	 * In order to guarantee that operations against the unisolated connection
+	 * are ACID, only one of unisolated connection is permitted at a time for a
+	 * {@link Journal} and this method will block until the connection is
+	 * available. If there is an open unisolated connection against a local
+	 * {@link Journal}, then the open connection must be closed before a new
+	 * connection can be returned by this method.
+	 * <p>
+	 * This constraint that there can be only one unisolated connection is not
+	 * enforced in scale-out since unisolated operations in scale-out are only
+	 * shard-wise ACID.
+	 * 
+	 * @return The unisolated connection to the database
+	 */
     public BigdataSailConnection getUnisolatedConnection() 
             throws InterruptedException {
         
-        Lock writeLock = lock.writeLock();
-        writeLock.lock();
-        
-        // new writable connection.
-        final BigdataSailConnection conn = 
-            new BigdataSailConnection(database, writeLock);
-        
-        return conn;
+		if (getDatabase().getIndexManager() instanceof Journal) {
+			// acquire permit from Journal.
+			((Journal) getDatabase().getIndexManager())
+					.acquireUnisolatedConnection();
+		}
+
+		// acquire the write lock.
+		final Lock writeLock = lock.writeLock();
+		writeLock.lock();
+
+		// new writable connection.
+		final BigdataSailConnection conn = new BigdataSailConnection(database,
+				writeLock, true/* unisolated */);
+
+		return conn;
 
     }
     
@@ -1354,7 +1375,7 @@ public class BigdataSail extends SailBase implements Sail {
 
         final ITransactionService txService = getTxService();
         
-        return new BigdataSailConnection(null/*lock*/) {
+        return new BigdataSailConnection(null/*lock*/,false/*unisolated*/) {
 
             /**
              * The transaction id.
@@ -1434,10 +1455,14 @@ public class BigdataSail extends SailBase implements Sail {
         };
         
     }
-    
-    /**
-     * Return a connection backed by a read-write transaction.
-     */
+
+	/**
+	 * Return a connection backed by a read-write transaction.
+	 * 
+	 * @throws UnsupportedOperationException
+	 *             unless {@link Options#ISOLATABLE_INDICES} was specified when
+	 *             the backing triple store instance was provisioned.
+	 */
     public BigdataSailConnection getReadWriteConnection() throws IOException {
 
         if (!isolatable) {
@@ -1463,7 +1488,7 @@ public class BigdataSail extends SailBase implements Sail {
         final Lock readLock = lock.readLock();
         readLock.lock();
         
-        return new BigdataSailConnection(readLock) {
+        return new BigdataSailConnection(readLock,false/*unisolated*/) {
             
             /**
              * The transaction id.
@@ -1696,8 +1721,20 @@ public class BigdataSail extends SailBase implements Sail {
          * Used to coordinate between read/write transactions and the unisolated
          * view.
          */
-        private Lock lock;
+        private final Lock lock;
 
+		/**
+		 * <code>true</code> iff this is the UNISOLATED connection (only one of
+		 * those at a time).
+		 */
+        private final boolean unisolated;
+
+        public String toString() {
+        	
+			return getClass().getName() + "{timestamp="
+					+ TimestampUtility.toString(database.getTimestamp()) + "}";
+        	
+        }
         
         public BigdataSail getBigdataSail() {
             
@@ -1814,9 +1851,11 @@ public class BigdataSail extends SailBase implements Sail {
 
         }
         
-        protected BigdataSailConnection(final Lock lock) {
+        protected BigdataSailConnection(final Lock lock, final boolean unisolated) {
             
             this.lock = lock;
+            
+            this.unisolated = unisolated;
             
         }
         
@@ -1828,11 +1867,13 @@ public class BigdataSail extends SailBase implements Sail {
          *            {@link SailConnection} will not support update.
          */
         protected BigdataSailConnection(final AbstractTripleStore database, 
-                final Lock lock) {
+                final Lock lock, final boolean unisolated) {
             
             attach(database);
             
             this.lock = lock;
+            
+            this.unisolated = unisolated;
             
         }
         
@@ -2906,7 +2947,7 @@ public class BigdataSail extends SailBase implements Sail {
                 
             }
             
-            /*
+    		/*
              * Note: I have commented out the implicit [rollback]. It causes the
              * live indices to be discarded by the backing journal which is a
              * significant performance hit. This means that if you write on a
@@ -2934,20 +2975,34 @@ public class BigdataSail extends SailBase implements Sail {
                 // notify the SailBase that the connection is no longer in use.
                 BigdataSail.this.connectionClosed(this);
             } finally {
-                // release the reentrant lock
                 if (lock != null) {
+                    // release the reentrant lock
                     lock.unlock();
                 }
+        		if (unisolated && getDatabase().getIndexManager() instanceof Journal) {
+                    // release the permit.
+        			((Journal) getDatabase().getIndexManager())
+        					.releaseUnisolatedConnection();
+        		}
                 open = false;
             }
             
         }
         
         /**
-         * Invoke close, which will be harmless if we are already closed.
+         * Invoke close, which will be harmless if we are already closed. 
          */
         protected void finalize() throws Throwable {
             
+        	/*
+        	 * Note: Automatically closing the connection is vital for the
+        	 * UNISOLATED connection.  Otherwise, an application which forgets
+        	 * to close() the connection could "lose" the permit required to
+        	 * write on the UNISOLATED connection.  By invoking close() from
+        	 * within finalize(), we ensure that the permit will be returned
+        	 * if a connection is garbage collection without being explicitly
+        	 * closed.
+        	 */
             close();
             
             super.finalize();

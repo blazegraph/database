@@ -20,6 +20,7 @@ import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
@@ -42,6 +43,12 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 //	private static transient final Logger log = Logger
 //			.getLogger(BigdataSailRepositoryConnection.class);
 
+	public String toString() {
+		return getClass().getName() + "{timestamp="
+				+ TimestampUtility.toString(getTripleStore().getTimestamp())
+				+ "}";
+	}
+	
     public BigdataSailRepositoryConnection(BigdataSailRepository repository,
             SailConnection sailConnection) {
     
