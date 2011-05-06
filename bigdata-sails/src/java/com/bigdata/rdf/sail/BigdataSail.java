@@ -57,7 +57,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.bigdata.rdf.sail;
 
-import info.aduna.collections.iterators.EmptyIterator;
 import info.aduna.iteration.CloseableIteration;
 
 import java.io.IOException;
@@ -119,11 +118,9 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.changesets.StatementWriter;
-import com.bigdata.rdf.changesets.IChangeRecord.ChangeAction;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -643,54 +640,92 @@ public class BigdataSail extends SailBase implements Sail {
         
         // throws an exception if there are inconsistent properties
         checkProperties(properties);
-        
-        final LocalTripleStore lts = new LocalTripleStore(
-                journal, namespace, ITx.UNISOLATED, properties);
-        
+
         try {
             
-            final long tx0 = txService.newTx(ITx.READ_COMMITTED);
+//          final boolean create;
+//          final long tx0 = txService.newTx(ITx.READ_COMMITTED);
+//          try {
+//              // verify kb does not exist (can not be located).
+//              create = journal.getResourceLocator().locate(namespace, tx0) == null;
+//          } finally {
+//              txService.abort(tx0);
+//          }
+          
+          // Check for pre-existing instance.
+          {
 
-            // verify kb does not exist (can not be located).
-            final boolean create = 
-                journal.getResourceLocator().locate(namespace, tx0) == null;
+              final LocalTripleStore lts = (LocalTripleStore) journal
+                      .getResourceLocator().locate(namespace, ITx.UNISOLATED);
 
-            txService.abort(tx0);
-            
-//          if (!new SPORelation(journal, namespace + "."
-//                  + SPORelation.NAME_SPO_RELATION, ITx.UNISOLATED, properties).exists()) {
-            if (create) {
-            
-                if (Boolean.parseBoolean(properties.getProperty(
-                        BigdataSail.Options.ISOLATABLE_INDICES,
-                        BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES))) {
-                
-                    final long txCreate = txService.newTx(ITx.UNISOLATED);
-        
-                    final AbstractTripleStore txCreateView = new LocalTripleStore(
-                            journal, namespace, Long.valueOf(txCreate), properties);
-        
-                    // create the kb instance within the tx.
-                    txCreateView.create();
-        
-                    // commit the tx.
-                    txService.commit(txCreate);
-                    
-                } else {
-                    
-                    lts.create();
-                    
-                }
-                
-            }
-            
-        } catch (IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-        
-        return lts;
+              if (lts != null) {
+
+                  return lts;
+
+              }
+
+          }
+          
+          // Create a new instance.
+//          if (create) 
+          {
+          
+              final LocalTripleStore lts = new LocalTripleStore(
+                      journal, namespace, ITx.UNISOLATED, properties);
+              
+              if (Boolean.parseBoolean(properties.getProperty(
+                      BigdataSail.Options.ISOLATABLE_INDICES,
+                      BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES))) {
+              
+                  final long txCreate = txService.newTx(ITx.UNISOLATED);
+      
+                  final AbstractTripleStore txCreateView = new LocalTripleStore(
+                          journal, namespace, Long.valueOf(txCreate), properties);
+      
+                  // create the kb instance within the tx.
+                  txCreateView.create();
+      
+                  // commit the tx.
+                  txService.commit(txCreate);
+                  
+              } else {
+                  
+                  lts.create();
+                  
+              }
+              
+          }
+
+          /*
+           * Now that we have created the instance, either using a tx or the
+           * unisolated connection, locate the triple store resource and
+           * return it.
+           */
+          {
+
+              final LocalTripleStore lts = (LocalTripleStore) journal
+                      .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+
+              if (lts == null) {
+
+                  /*
+                   * This should only occur if there is a concurrent destroy,
+                   * which is highly unlikely to say the least.
+                   */
+                  throw new RuntimeException("Concurrent create/destroy: "
+                          + namespace);
+
+              }
+
+              return lts;
+              
+          }
+          
+      } catch (IOException ex) {
+          
+          throw new RuntimeException(ex);
+          
+      }
         
     }
 
