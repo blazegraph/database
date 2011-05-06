@@ -1301,7 +1301,17 @@ public class BigdataSail extends SailBase implements Sail {
     public BigdataSailConnection getUnisolatedConnection() 
             throws InterruptedException {
         
-		if (getDatabase().getIndexManager() instanceof Journal) {
+    	if(lock.writeLock().isHeldByCurrentThread()) {
+    		/*
+    		 * A thread which already holds this lock already has the open
+    		 * unisolated connection and will deadlock when it attempts to
+    		 * obtain the permit for that connection from the Journal.
+    		 */
+			throw new IllegalStateException(
+					"UNISOLATED connection is not reentrant.");
+    	}
+
+    	if (getDatabase().getIndexManager() instanceof Journal) {
 			// acquire permit from Journal.
 			((Journal) getDatabase().getIndexManager())
 					.acquireUnisolatedConnection();
