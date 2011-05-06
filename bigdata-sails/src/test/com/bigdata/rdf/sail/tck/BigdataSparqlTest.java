@@ -59,12 +59,14 @@ import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 
 /**
- * Test harness for running the SPARQL test suites.
+ * Test harness for running the SPARQL test suites. This version runs against
+ * a {@link Journal} without full read/write transaction support.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -411,8 +413,11 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
 //      Force identical unicode comparisons (assuming default COLLATOR setting).
 //        props.setProperty(Options.STRENGTH, StrengthEnum.Identical.toString());
         
-        // enable/disable read/write transactions
-        props.setProperty(Options.ISOLATABLE_INDICES, "true");
+		/*
+		 * disable read/write transactions since this class runs against the
+		 * unisolated connection.
+		 */
+		props.setProperty(Options.ISOLATABLE_INDICES, "false");
         
         // disable truth maintenance in the SAIL
         props.setProperty(Options.TRUTH_MAINTENANCE, "false");
@@ -486,6 +491,13 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
     protected void runTest()
         throws Exception
     {
+    	if(true) {
+			/*
+			 * Dump out some interesting things about the query, the parse tree,
+			 * and the state of the database *before* we run the unit test. This
+			 * uses the same logic that is used when the test is run by the base
+			 * class.
+			 */
         RepositoryConnection con = getQueryConnection(dataRep);
         try {
 
@@ -515,10 +527,30 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         finally {
             con.close();
         }
+    	}
         
         super.runTest();
     }
-    
-    
+
+	/**
+	 * Overridden to use {@link BigdataSail#getReadOnlyConnection()} as a
+	 * workaround to the test harness which invokes
+	 * {@link BigdataSail#getConnection()} multiple times from within the same
+	 * thread. When full transactions are not enabled, that will delegate to
+	 * {@link BigdataSail#getUnisolatedConnection()}. Only one unisolated
+	 * connection is permitted at a time. While different threads will block to
+	 * await the unisolated connection, that method will throw an exception if
+	 * there is an attempt by a single thread to obtain more than one instance
+	 * of the unisolated connection (since that operation would otherwise
+	 * deadlock).
+	 */
+	@Override
+	protected RepositoryConnection getQueryConnection(Repository dataRep)
+			throws Exception {
+
+		return ((BigdataSailRepository) ((DatasetRepository) dataRep)
+				.getDelegate()).getReadOnlyConnection();
+
+	}
 
 }

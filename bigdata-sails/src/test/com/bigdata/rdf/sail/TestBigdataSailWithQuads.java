@@ -35,6 +35,7 @@ import junit.framework.TestSuite;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.tck.BigdataConnectionTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlTest;
+import com.bigdata.rdf.sail.tck.BigdataSparqlFullRWTxTest;
 import com.bigdata.rdf.sail.tck.BigdataStoreTest;
 
 /**
@@ -128,7 +129,8 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
                  * filter out the dataset tests, which we don't need right now
                  */
 //                tckSuite.addTest(BigdataSparqlTest.suiteLTSWithPipelineJoins());
-                tckSuite.addTest(BigdataSparqlTest.suite());
+                tckSuite.addTest(BigdataSparqlTest.suite()); // w/ unisolated connection.
+                tckSuite.addTest(BigdataSparqlFullRWTxTest.suite()); // w/ full read/write tx.
 
             } catch (Exception ex) {
 
