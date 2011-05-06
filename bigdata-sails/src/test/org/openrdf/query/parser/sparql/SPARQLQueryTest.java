@@ -159,11 +159,23 @@ public abstract class SPARQLQueryTest extends TestCase {
 		}
 	}
 
+	/**
+	 * Return the connection which will be used to query the repository.
+	 * @param dataRep The repository.
+	 * @return The connection.
+	 * @throws Exception
+	 */
+    protected RepositoryConnection getQueryConnection(Repository dataRep)
+    	throws Exception
+	{
+    	return dataRep.getConnection();
+    }
+    
 	@Override
 	protected void runTest()
 		throws Exception
 	{
-		RepositoryConnection con = dataRep.getConnection();
+		RepositoryConnection con = getQueryConnection(dataRep);
 		try {
 			String queryString = readQueryString();
 			Query query = con.prepareQuery(QueryLanguage.SPARQL, queryString, queryFileURL);
@@ -361,8 +373,8 @@ public abstract class SPARQLQueryTest extends TestCase {
 	private void uploadDataset(Dataset dataset)
 		throws Exception
 	{
-		RepositoryConnection con = dataRep.getConnection();
-		try {
+//		RepositoryConnection con = dataRep.getConnection();
+//		try {
 			// Merge default and named graphs to filter duplicates
 			Set<URI> graphURIs = new HashSet<URI>();
 			graphURIs.addAll(dataset.getDefaultGraphs());
@@ -371,10 +383,10 @@ public abstract class SPARQLQueryTest extends TestCase {
 			for (Resource graphURI : graphURIs) {
 				upload(((URI)graphURI), graphURI);
 			}
-		}
-		finally {
-			con.close();
-		}
+//		}
+//		finally {
+//			con.close();
+//		}
 	}
 
 	private void upload(URI graphURI, Resource context)
