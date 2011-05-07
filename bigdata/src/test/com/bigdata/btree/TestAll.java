@@ -60,6 +60,8 @@ public class TestAll extends TestCase {
 
         // test low level variable length byte[] operations.
         suite.addTestSuite(TestBytesUtil.class);
+        suite.addTestSuite(TestGetBitsFromByteArray.class);
+        suite.addTestSuite(TestGetBitsFromInt32.class);
 
         // unsigned byte[] key encoding and decoding.
         suite.addTest(com.bigdata.btree.keys.TestAll.suite());

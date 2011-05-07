@@ -1138,6 +1138,58 @@ public class BytesUtil {
 	}
 
 	/**
+	 * Return the n-bit integer corresponding to the inclusive bit range of the
+	 * byte[]. Bit ZERO (0) is the Most Significant Bit (MSB). Bit positions
+	 * increase from zero up to <code>31</code>. The return value is an int32
+	 * and the bit range must not be greater than 32 bits.
+	 * <p>
+	 * For example, given the following data and the bit range (0,2)
+	 * 
+	 * <pre>
+	 * bit index: 01234567 
+	 * ---------+---------- 
+	 * bit value: 10110000
+	 * </pre>
+	 * 
+	 * TWO (2) bits starting at bit offset ZERO (0) would be extracted and
+	 * returned as a 2-bit integer. For those data, the return value would be an
+	 * int32 value whose binary representation was <code>10</code> (with leading
+	 * zeros suppressed).
+	 * <p>
+	 * Note: This method is design for use in a bigdata hash index having native
+	 * int32 keys rather than unsigned byte[] keys.
+	 * 
+	 * @param a
+	 *            An integer.
+	 * @param off
+	 *            The index of the first bit to be included.
+	 * @param len
+	 *            The number of bits to be returned in [0:32]. However, a bit
+	 *            length of zero will always return zero.
+	 * 
+	 * @return The integer extracted from the specified bit range.
+	 */
+	public static int getBits(final int a, final int off, final int len) {
+		if (off < 0)
+			throw new IllegalArgumentException();
+		if (len < 0 || len > 32)
+			throw new IllegalArgumentException();
+		if (len == 0) // zero length is always a zero.
+			return 0;
+		if (off + len > 32)
+			throw new IllegalArgumentException();
+	
+		final int last = off + len - 1; // index of the last bit (inclusive).
+		final int rshift = 31 - last; // right shift to word align.
+		int w = (int) (a >>> rshift); // int32 result.
+		int mask = masks32[32 - len]; // lookup mask with [len] LSB ZEROs.
+		mask = ~mask; // flip bits to get [len] LSB ONEs.
+		w &= mask; // mask off the lower [len] bits (handles sign extension and
+				   // starting offset within byte).
+		return w;
+	}
+	
+	/**
 	 * Return the binary representation of the unsigned byte[].
 	 * 
 	 * @param a
