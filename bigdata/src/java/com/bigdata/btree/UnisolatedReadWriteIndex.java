@@ -45,7 +45,6 @@ import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.btree.view.FusedView;
-import com.bigdata.concurrent.LockManager;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
@@ -112,22 +111,19 @@ import cutthecrap.utils.striterators.IFilter;
  * require a means to correctly interleave access to the unisolated index, which
  * is the purpose of this class.
  * <p>
- * While the {@link LockManager} could be modified to support Share vs Exclusive
- * locks and to use Share locks for readers and Exclusive locks for writers,
- * writers would still block until the next commit so the throughput (e.g., when
+ * While the lock manager could be modified to support Share vs Exclusive locks
+ * and to use Share locks for readers and Exclusive locks for writers, writers
+ * would still block until the next commit so the throughput (e.g., when
  * computing the fix point of a rule set) is significantly lower.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: UnisolatedReadWriteIndex.java 4054 2011-01-05 13:51:25Z
+ *          thompsonbry $
  */
 public class UnisolatedReadWriteIndex implements IIndex {
 
-    protected static final Logger log = Logger.getLogger(UnisolatedReadWriteIndex.class);
-
-//    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
-    
+    private static final Logger log = Logger.getLogger(UnisolatedReadWriteIndex.class);
+  
     /**
      * The #of milliseconds that the class will wait for a read or write lock. A
      * (wrapped) {@link InterruptedException} will be thrown if this timeout is
@@ -158,7 +154,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
         
         try {
             
-            if(DEBUG) {
+            if(log.isDebugEnabled()) {
                 
                 log.debug(ndx.toString());
                 
@@ -198,7 +194,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
         try {
 
-            if(DEBUG) {
+            if(log.isDebugEnabled()) {
                 
                 log.debug(ndx.toString()
 //                        , new RuntimeException()
@@ -233,7 +229,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
      *            
      * @return The acquired lock.
      */
-    private Lock lock(IIndexProcedure proc) {
+    private Lock lock(final IIndexProcedure proc) {
      
         if (proc == null)
             throw new IllegalArgumentException();
@@ -248,11 +244,11 @@ public class UnisolatedReadWriteIndex implements IIndex {
         
     }
 
-    private void unlock(Lock lock) {
+    private void unlock(final Lock lock) {
         
         lock.unlock();
         
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug(ndx.toString());
             
@@ -264,7 +260,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
      * The unisolated index partition. This is either a {@link BTree} or a
      * {@link FusedView}.
      */
-    final private IIndex ndx;
+    final private BTree ndx;
     
     /**
      * The {@link ReadWriteLock} used to permit concurrent readers on an
@@ -343,23 +339,41 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
         this.ndx = ndx;
 
-        synchronized (locks) {
+        this.readWriteLock = getReadWriteLock(ndx);
 
-            ReadWriteLock readWriteLock = locks.get(ndx);
-
-            if (readWriteLock == null) {
-
-                readWriteLock = new ReentrantReadWriteLock(false/* fair */);
-
-                locks.put(ndx, readWriteLock);
-
-            }
-
-            this.readWriteLock = readWriteLock;
-            
-        }
-        
     }
+
+	/**
+	 * Canonicalizing factory for the {@link ReadWriteLock} for a {@link BTree}.
+	 * 
+	 * @param btree
+	 *            The btree.
+	 * @return The lock.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if the argument is <code>null</code>.
+	 */
+	private ReadWriteLock getReadWriteLock(final BTree btree) {
+
+		if (ndx == null)
+			throw new IllegalArgumentException();
+		
+		synchronized (locks) {
+
+			ReadWriteLock readWriteLock = locks.get(ndx);
+
+			if (readWriteLock == null) {
+
+				readWriteLock = new ReentrantReadWriteLock(false/* fair */);
+
+				locks.put(ndx, readWriteLock);
+
+			}
+
+			return readWriteLock;
+		}
+
+	}   
     
     public String toString() {
         

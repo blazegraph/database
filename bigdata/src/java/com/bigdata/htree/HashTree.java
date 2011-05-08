@@ -295,19 +295,21 @@ implements ISimpleBTree // @todo rename ISimpleBTree interface
 		// Populate the array of masking values.
 		for (int i = 0; i < 32; i++) {
 
-			masks[i] = getMaskBits(i);
+			masks[i] = getMSBMask(i);
 
 		}
 	}
 
-	/**
-	 * Return a bit mask which reveals only the low N bits of an int32 value.
-	 * 
-	 * @param nbits
-	 *            The #of bits to be revealed.
-	 * @return The mask.
-	 */
-	static int getMaskBits(final int nbits) {
+    /**
+     * Return a bit mask which reveals only the MSB (Most Significant Bits) N
+     * bits of an int32 value.
+     * 
+     * @param nbits
+     *            The #of bits to be revealed.
+     * 
+     * @return The mask.
+     */
+	static int getMSBMask(final int nbits) {
 
 		if (nbits < 0 || nbits > 32)
 			throw new IllegalArgumentException();
