@@ -867,21 +867,21 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         return counterSet;
 
     }
-    
-    /**
-     * @param store
-     *            The persistence store.
-     * @param nodeFactory
-     *            Object that provides a factory for node and leaf objects.
-     * @param addrSer
-     *            Object that knows how to (de-)serialize the child addresses in
-     *            an {@link INodeData}.
-     * @param readOnly
-     *            <code>true</code> IFF it is <em>known</em> that the
-     *            {@link AbstractBTree} is read-only.
-     * @param metadata
-     *            The {@link IndexMetadata} object for this B+Tree.
-     */
+
+	/**
+	 * @param store
+	 *            The persistence store.
+	 * @param nodeFactory
+	 *            Object that provides a factory for node and leaf objects.
+	 * @param readOnly
+	 *            <code>true</code> IFF it is <em>known</em> that the
+	 *            {@link AbstractBTree} is read-only.
+	 * @param metadata
+	 *            The {@link IndexMetadata} object for this B+Tree.
+	 * @param recordCompressorFactory
+	 *            Object that knows how to (de-)compress the serialized data
+	 *            records.
+	 */
     protected AbstractBTree(//
             final IRawStore store,//
             final INodeFactory nodeFactory,//
@@ -3761,40 +3761,40 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (addr == IRawStore.NULL)
             throw new IllegalArgumentException();
         
-        final Long addr2 = Long.valueOf(addr); 
-
-        if (storeCache != null) {
-
-            // test cache : will touch global LRU iff found.
-            final IAbstractNodeData data = (IAbstractNodeData) storeCache
-                    .get(addr);
-
-            if (data != null) {
-
-                // Node and Leaf MUST NOT make it into the global LRU or store
-                // cache!
-                assert !(data instanceof AbstractNode<?>);
-                
-                final AbstractNode<?> node;
-                
-                if (data.isLeaf()) {
-
-                    node = nodeSer.nodeFactory.allocLeaf(this, addr,
-                            (ILeafData) data);
-
-                } else {
-
-                    node = nodeSer.nodeFactory.allocNode(this, addr,
-                            (INodeData) data);
-
-                }
-
-                // cache hit.
-                return node;
-                
-            }
-            
-        }
+//        final Long addr2 = Long.valueOf(addr); 
+//
+//        if (storeCache != null) {
+//
+//            // test cache : will touch global LRU iff found.
+//            final IAbstractNodeData data = (IAbstractNodeData) storeCache
+//                    .get(addr);
+//
+//            if (data != null) {
+//
+//                // Node and Leaf MUST NOT make it into the global LRU or store
+//                // cache!
+//                assert !(data instanceof AbstractNode<?>);
+//                
+//                final AbstractNode<?> node;
+//                
+//                if (data.isLeaf()) {
+//
+//                    node = nodeSer.nodeFactory.allocLeaf(this, addr,
+//                            (ILeafData) data);
+//
+//                } else {
+//
+//                    node = nodeSer.nodeFactory.allocNode(this, addr,
+//                            (INodeData) data);
+//
+//                }
+//
+//                // cache hit.
+//                return node;
+//                
+//            }
+//            
+//        }
         
         final ByteBuffer tmp;
         {
@@ -3851,20 +3851,20 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
             }
 
-            if (storeCache != null) {
-             
-                // update cache : will touch global LRU iff cache is modified.
-                final IAbstractNodeData data2 = (IAbstractNodeData) storeCache
-                        .putIfAbsent(addr2, data);
-
-                if (data2 != null) {
-
-                    // concurrent insert, use winner's value.
-                    data = data2;
-
-                } 
-                
-            }
+//            if (storeCache != null) {
+//             
+//                // update cache : will touch global LRU iff cache is modified.
+//                final IAbstractNodeData data2 = (IAbstractNodeData) storeCache
+//                        .putIfAbsent(addr2, data);
+//
+//                if (data2 != null) {
+//
+//                    // concurrent insert, use winner's value.
+//                    data = data2;
+//
+//                } 
+//                
+//            }
 
             // wrap as Node or Leaf.
             final AbstractNode<?> node = nodeSer.wrap(this, addr, data);

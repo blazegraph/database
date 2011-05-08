@@ -543,10 +543,6 @@ public class HashBucket extends AbstractHashPage<HashBucket>//
 	 *       utilization or handle buckets having large populations of identical
 	 *       keys (or keys with the same int32 hash code). [This decision must
 	 *       be made before we decide to split.]
-	 * 
-	 *       FIXME The caller should handle the promotion of large tuples to raw
-	 *       records when they are inserted, so we do not need to handle that
-	 *       here either.
 	 */
 	private void split(final int key, final HashBucket bold) {
 

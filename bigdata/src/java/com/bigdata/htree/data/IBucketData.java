@@ -51,13 +51,6 @@ import com.bigdata.btree.data.ILeafData;
  */
 public interface IBucketData extends ILeafData {
 
-//	/**
-//	 * The local depth of the hash bucket.
-//	 * <p>
-//	 * Note: This information is encoded by the parent hash directory.
-//	 */
-//	int getLocalDepth();
-
 	/**
 	 * {@inheritDoc}
 	 * <p>

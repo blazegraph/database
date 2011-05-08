@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.data;
 
-import com.bigdata.btree.raba.IRaba;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.IDataRecordAccess;
 
@@ -93,28 +92,28 @@ public interface IAbstractNodeData extends IDataRecordAccess {
      */
     long getMaximumVersionTimestamp();
     
-    /**
-     * The #of tuples spanned by this node or leaf. For a leaf this is always
-     * the #of keys.
-     * 
-     * @see INodeData#getChildEntryCounts()
-     */
-    int getSpannedTupleCount();
+//    /**
+//     * The #of tuples spanned by this node or leaf. For a leaf this is always
+//     * the #of keys.
+//     * 
+//     * @see INodeData#getChildEntryCounts()
+//     */
+//    int getSpannedTupleCount();
 
-    /**
-     * Return the #of keys in the node or leaf. A node has <code>nkeys+1</code>
-     * children. A leaf has <code>nkeys</code> keys and values. The maximum #of
-     * keys for a node is one less than the branching factor of the B+Tree. The
-     * maximum #of keys for a leaf is the branching factor of the B+Tree. For a
-     * hash bucket, this is the #of entries in the bucket.
-     * 
-     * @return The #of defined keys.
-     */
-    int getKeyCount();
-
-    /**
-     * The object used to contain and manage the keys.
-     */
-    IRaba getKeys();
+//    /**
+//     * Return the #of keys in the node or leaf. A node has <code>nkeys+1</code>
+//     * children. A leaf has <code>nkeys</code> keys and values. The maximum #of
+//     * keys for a node is one less than the branching factor of the B+Tree. The
+//     * maximum #of keys for a leaf is the branching factor of the B+Tree. For a
+//     * hash bucket, this is the #of entries in the bucket.
+//     * 
+//     * @return The #of defined keys.
+//     */
+//    int getKeyCount();
+//
+//    /**
+//     * The object used to contain and manage the keys.
+//     */
+//    IRaba getKeys();
 
 }

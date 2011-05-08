@@ -26,9 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.htree.data;
 
-import java.lang.ref.Reference;
-
-import com.bigdata.io.IDataRecordAccess;
+import com.bigdata.btree.data.IAbstractNodeData;
+import com.bigdata.btree.data.IChildData;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -70,52 +69,6 @@ import com.bigdata.rawstore.IRawStore;
  * we really need to use a compressed dictionary representation in order to have
  * efficient storage utilization with good fan out.]
  */
-public interface IDirectoryData extends IDataRecordAccess {
+public interface IDirectoryData extends IAbstractNodeData, IChildData {
 
-	/**
-	 * Return the storage address of the child page.
-	 * 
-	 * @param index
-	 *            The index into the hash directory.
-	 * 
-	 * @return The address of the page at that index -or- ZERO (0L) if the child
-	 *         is not persistent (including when the child has become dirty
-	 *         since it address will not be known until the next time the page
-	 *         is written out on the store).
-	 */
-	long getAddress(int index);
-
-	/**
-	 * Return <code>true</code> if the child page at the given index is a hash
-	 * bucket (versus a hash directory).
-	 * 
-	 * @param index
-	 *            The index into the hash directory.
-	 * 
-	 * @return <code>true</code> if the child page is a hash bucket and
-	 *         <code>false</code> if it is a hash directory.
-	 */
-	boolean isBucket(int index);
-
-	/**
-	 * Return the local depth of the child page. This may be used to decide the
-	 * #of directory entries which reference that child using the formula
-	 * <code>2 ^ (globalDepth - localDepth)</code>, where globalDepth is the
-	 * globalDepth of this directory page.
-	 * <p>
-	 * Note: If the hash directory is setup with the MSB as the first bit in the
-	 * hash prefix, then the local depth may be computed by a scan of the
-	 * directory counting the #of directory entries which point to the same
-	 * child page (when the child page is dirty, you instead must count the #of
-	 * entries having the same {@link Reference}). Thus using a MSB prefix
-	 * policy makes it possible to compute the local depth rather than storing
-	 * it.
-	 * 
-	 * @param index
-	 *            The child page.
-	 * 
-	 * @return The local depth of that child page.
-	 */
-	int getLocalDepth(int index);
-	
 }

@@ -937,19 +937,19 @@ public class TestBytesUtil extends TestCase2 {
     }
     
     /**
-     * Unit test for {@link BytesUtil#maskOff(int, int)}
+     * Unit test for {@link BytesUtil#maskOffMSB(int, int)}
      */
     public void test_maskOff() {
 
-        assertEquals(0x00000003, BytesUtil.maskOff(0xffffffff/* key */, 2/* nbits */));
+        assertEquals(0x00000003, BytesUtil.maskOffMSB(0xffffffff/* key */, 2/* nbits */));
         
-        assertEquals(0x00000003, BytesUtil.maskOff(0xc0000000/* key */, 2/* nbits */));
+        assertEquals(0x00000003, BytesUtil.maskOffMSB(0xc0000000/* key */, 2/* nbits */));
 
-        assertEquals(0x00000006, BytesUtil.maskOff(0xc0000000/* key */, 3/* nbits */));
+        assertEquals(0x00000006, BytesUtil.maskOffMSB(0xc0000000/* key */, 3/* nbits */));
         
-        assertEquals(0x0000000c, BytesUtil.maskOff(0xc0000000/* key */, 4/* nbits */));
+        assertEquals(0x0000000c, BytesUtil.maskOffMSB(0xc0000000/* key */, 4/* nbits */));
         
-        assertEquals(0x00000018, BytesUtil.maskOff(0xc0000000/* key */, 5/* nbits */));
+        assertEquals(0x00000018, BytesUtil.maskOffMSB(0xc0000000/* key */, 5/* nbits */));
         
     }
 

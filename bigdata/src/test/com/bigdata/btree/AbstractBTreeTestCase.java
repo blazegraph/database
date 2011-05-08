@@ -391,10 +391,10 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     }
 
     /**
-     * Verify all data accessible from {@link IAbstractNodeData}.
+     * Verify all data accessible from {@link AbstractNode}.
      */
     static protected void assertSameAbstractNodeData(
-            final IAbstractNodeData n1, final IAbstractNodeData n2) {
+            final AbstractNode n1, final AbstractNode n2) {
 
         assertEquals("isLeaf", n1.isLeaf(), n2.isLeaf());
 
@@ -427,7 +427,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      */
     static public void assertSameNodeData(final INodeData n1, final INodeData n2) {
 
-        assertSameAbstractNodeData(n1, n2);
+        assertSameAbstractNodeData((AbstractNode)n1, (AbstractNode)n2);
 
         assertEquals("childCount", n1.getChildCount(), n2.getChildCount());
 
@@ -467,7 +467,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      */
     static public void assertSameLeafData(final ILeafData n1, final ILeafData n2) {
 
-        assertSameAbstractNodeData(n1, n2);
+        assertSameAbstractNodeData((AbstractNode)n1, (AbstractNode)n2);
 
         assertEquals("#keys!=#vals", n1.getKeyCount(), n1.getValueCount());
 

@@ -57,7 +57,11 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("HTree");
 
-		suite.addTest(com.bigdata.htree.data.TestAll.suite());
+        suite.addTestSuite(TestHTreeUtil.class);
+
+        suite.addTest(com.bigdata.htree.data.TestAll.suite());
+
+        suite.addTestSuite(TestHTree.class);
 
 		suite.addTestSuite(TestExtensibleHashing.class);
 

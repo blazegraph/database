@@ -187,22 +187,22 @@ public class TestExtensibleHashing extends TestCase2 {
 	}
 
 	/**
-	 * Unit test for {@link HashTree#getMaskBits(int)}
+	 * Unit test for {@link HashTree#getMSBMask(int)}
 	 */
 	public void test_getMaskBits() {
 
-		assertEquals(0x00000001, HashTree.getMaskBits(1));
-		assertEquals(0x00000003, HashTree.getMaskBits(2));
-		assertEquals(0x00000007, HashTree.getMaskBits(3));
-		assertEquals(0x0000000f, HashTree.getMaskBits(4));
-		assertEquals(0x0000001f, HashTree.getMaskBits(5));
-		assertEquals(0x0000003f, HashTree.getMaskBits(6));
-		assertEquals(0x0000007f, HashTree.getMaskBits(7));
-		assertEquals(0x000000ff, HashTree.getMaskBits(8));
+		assertEquals(0x00000001, HashTree.getMSBMask(1));
+		assertEquals(0x00000003, HashTree.getMSBMask(2));
+		assertEquals(0x00000007, HashTree.getMSBMask(3));
+		assertEquals(0x0000000f, HashTree.getMSBMask(4));
+		assertEquals(0x0000001f, HashTree.getMSBMask(5));
+		assertEquals(0x0000003f, HashTree.getMSBMask(6));
+		assertEquals(0x0000007f, HashTree.getMSBMask(7));
+		assertEquals(0x000000ff, HashTree.getMSBMask(8));
 
-		assertEquals(0x0000ffff, HashTree.getMaskBits(16));
+		assertEquals(0x0000ffff, HashTree.getMSBMask(16));
 
-		assertEquals(0xffffffff, HashTree.getMaskBits(32));
+		assertEquals(0xffffffff, HashTree.getMSBMask(32));
 		
 	}
 
@@ -222,34 +222,6 @@ public class TestExtensibleHashing extends TestCase2 {
 		assertEquals(0x00000002, HashTree
 				.maskOff(18/* hash */, 2/* nbits */));
 
-	}
-	
-	/**
-	 * Extensible hashing data structure.
-	 * 
-	 * @todo allow duplicate tuples - caller can enforce distinct if they like.
-	 * 
-	 * @todo automatically promote large tuples into raw record references,
-	 *       leaving the hash code of the key and the address of the raw record
-	 *       in the hash bucket.
-	 * 
-	 * @todo initially manage the address table in an int[].
-	 * 
-	 * @todo use 4k buckets. split buckets when the sum of the data is GT 4k
-	 *       (reserve space for a 4byte checksum). use a compact record
-	 *       organization. if a tuple is deleted, bit flag it (but immediately
-	 *       delete the raw record if one is associated with the tuple). before
-	 *       splitting, compact the bucket to remove any deleted tuples.
-	 * 
-	 * @todo the tuple / raw record promotion logic should be shared with the
-	 *       B+Tree. The only catch is that large B+Tree keys will always remain
-	 *       a stress factor. For example, TERM2ID will have large B+Tree keys
-	 *       if TERM is large and promoting to a blob will not help. In that
-	 *       case, we actually need to hash the TERM and store the hash as the
-	 *       key (or index only the first N bytes of the term).
-	 */
-	public static class ExtensibleHashBag {
-		
 	}
 
 	/**

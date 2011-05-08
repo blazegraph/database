@@ -1034,8 +1034,8 @@ public class BytesUtil {
 	 * @return The hash value considering only the MSB <i>nbits</i> and shifted
 	 *         down into an <i>nbits</i> integer.
 	 */
-	public static int maskOff(final int h, final int nbits) {
-	
+	public static int maskOffMSB(final int h, final int nbits) {
+		
 	    if (nbits < 0 || nbits > 32)
 	        throw new IllegalArgumentException();
 	
@@ -1044,6 +1044,29 @@ public class BytesUtil {
 	    final int x = v >>> (32 - nbits);
 	
 	    return x;
+	
+	}
+
+	/**
+	 * Mask off all but the LSB <i>nbits</i> of the hash value.
+	 * 
+	 * @param h
+	 *            The hash value.
+	 * @param nbits
+	 *            The #of LSB bits to be retained.
+	 * 
+	 * @return The LSB <i>nbits</i>.
+	 * 
+	 * TODO unit test.
+	 */
+	public static int maskOffLSB(final int h, final int nbits) {
+		
+	    if (nbits < 0 || nbits > 32)
+	        throw new IllegalArgumentException();
+	
+	    final int v = h & ~masks32[nbits];
+	
+	    return v;
 	
 	}
 

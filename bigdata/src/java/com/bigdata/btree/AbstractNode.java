@@ -35,6 +35,8 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.data.IAbstractNodeData;
+import com.bigdata.btree.data.IKeysData;
+import com.bigdata.btree.data.ISpannedTupleCountData;
 import com.bigdata.btree.filter.EmptyTupleIterator;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
@@ -55,7 +57,7 @@ public abstract class AbstractNode<T extends AbstractNode
  * DO-NOT-USE-GENERIC-HERE. The compiler will fail under Linux (JDK 1.6.0_14,
  * _16).
  */
-> extends PO implements IAbstractNode, IAbstractNodeData {
+> extends PO implements IAbstractNode, IAbstractNodeData, IKeysData, ISpannedTupleCountData {
 
     /**
      * Log for node and leaf operations.

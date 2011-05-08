@@ -48,6 +48,7 @@ import com.bigdata.LRUNexus;
 import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
+import com.bigdata.btree.data.ISpannedTupleCountData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.MutableValueBuffer;
@@ -3284,7 +3285,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      *         Thompson</a>
      */
     abstract protected static class AbstractSimpleNodeData implements
-            IAbstractNodeData {
+            IAbstractNodeData, ISpannedTupleCountData {
 
         /**
          * The level in the output tree for this node or leaf (origin zero). The
