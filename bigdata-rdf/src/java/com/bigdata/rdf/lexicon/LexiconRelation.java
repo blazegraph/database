@@ -741,6 +741,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                          * full tx isolation. This is because we use an
                          * eventually consistent strategy to write on the
                          * lexicon indices.
+                         * 
+                         * Note: It appears that we have already ensured that
+                         * we will be using the unisolated view of the lexicon
+                         * relation in AbstractTripleStore#getLexiconRelation()
+                         * so this code path should not be evaluated.
                          */
                         term2id = AbstractRelation
                                 .getIndex(getIndexManager(),
@@ -781,6 +786,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                          * full tx isolation. This is because we use an
                          * eventually consistent strategy to write on the
                          * lexicon indices.
+                         * 
+                         * Note: It appears that we have already ensured that
+                         * we will be using the unisolated view of the lexicon
+                         * relation in AbstractTripleStore#getLexiconRelation()
+                         * so this code path should not be evaluated.
                          */
                         id2term = AbstractRelation
                                 .getIndex(getIndexManager(),

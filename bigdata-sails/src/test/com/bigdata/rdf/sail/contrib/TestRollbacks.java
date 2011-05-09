@@ -103,7 +103,9 @@ public class TestRollbacks extends QuadsTestCase {
                 NoVocabulary.class.getName());
         props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
         props.setProperty(BigdataSail.Options.JUSTIFY, "false");
-        props.setProperty(BigdataSail.Options.ISOLATABLE_INDICES, "true");
+
+        // transactions are off in the base version of this class.
+        props.setProperty(BigdataSail.Options.ISOLATABLE_INDICES, "false");
 
 //		props.setProperty(BigdataSail.Options.CREATE_TEMP_FILE, "true");
 //		props.setProperty(BigdataSail.Options.BUFFER_MODE, BufferMode.DiskRW
