@@ -3379,18 +3379,28 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         /*
          * Note: Synchronization appears to be necessary for the mutable BTree.
-         * Presumably this provides safe publication when the application is
-         * invoking operations on the same mutable BTree instance from different
-         * threads but it coordinating those threads in order to avoid
-         * concurrent operations, e.g., by using the UnisolatedReadWriteIndex
-         * wrapper class. The error which is prevented by synchronization is
-         * RingBuffer#add(ref) reporting that size == capacity, which indicates
-         * that the size was not updated consistently and hence is basically a
-         * concurrency problem.
+         * I believe that the underlying reason is the UnisolatedReadWriteIndex
+         * permits concurrent readers. Reads drive evictions so current calls of
+         * touch() are possible. When the B+Tree is mutable, those calls must be
+         * coordinated via a lock to prevent concurrent modification when
+         * touches drive the eviction of a dirty node or leaf.
          * 
-         * @todo Actually, I think that this is just a fence post in ringbuffer
-         * beforeOffer() method and the code might work without the synchronized
-         * block if the fence post was fixed.
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/71 (Concurrency
+         * problem with unisolated btree and memoizer)
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/201 (Hot spot
+         * in AbstractBTree#touch())
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/284
+         * (IndexOfOfBounds? in Node#getChild())
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/288 (Node
+         * already coded)
+         * 
+         * and possibly
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/149 (NULL
+         * passed to readNodeOrLeaf)
          */
 
         synchronized (this) {
