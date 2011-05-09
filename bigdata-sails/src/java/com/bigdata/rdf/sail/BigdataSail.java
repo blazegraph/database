@@ -1360,7 +1360,15 @@ public class BigdataSail extends SailBase implements Sail {
             @Override
             public synchronized void rollback() throws SailException {
 
-                super.rollback();
+				/*
+				 * Note: DO NOT invoke super.rollback(). That will cause a
+				 * database (Journal) level abort(). The Journal level abort()
+				 * will discard the writes buffered on the unisolated indices
+				 * (the lexicon indices). That will cause lost updates and break
+				 * the eventually consistent design for the TERM2ID and ID2TERM
+				 * indices.
+				 */
+//                super.rollback();
                 
                 try {
                 
