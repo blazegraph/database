@@ -58,8 +58,6 @@ public interface IChunkedIterator<E> extends ICloseableIterator<E> {
 
     /**
      * The default chunk size.
-     * 
-     * FIXME This is way too large.
      */
     int DEFAULT_CHUNK_SIZE = 100;//00;
     
