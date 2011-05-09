@@ -100,7 +100,10 @@ public class TestBigdataSailWithQuadsAndPipelineJoinsWithoutInlining extends Abs
         
         suite.addTestSuite(TestDescribe.class);
         
+        suite.addTestSuite(TestTxCreate.class);
+        
 		suite.addTestSuite(com.bigdata.rdf.sail.contrib.TestRollbacks.class);
+		suite.addTestSuite(com.bigdata.rdf.sail.contrib.TestRollbacksTx.class);
 
         // The Sesame TCK, including the SPARQL test suite.
         {
