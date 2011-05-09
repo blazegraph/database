@@ -1582,7 +1582,15 @@ public class BigdataSail extends SailBase implements Sail {
             @Override
             public synchronized void rollback() throws SailException {
 
-                super.rollback();
+				/*
+				 * Note: DO NOT invoke super.rollback(). That will cause a
+				 * database (Journal) level abort(). The Journal level abort()
+				 * will discard the writes buffered on the unisolated indices
+				 * (the lexicon indices). That will cause lost updates and break
+				 * the eventually consistent design for the TERM2ID and ID2TERM
+				 * indices.
+				 */
+//                super.rollback();
                 
                 try {
                 
@@ -3498,7 +3506,7 @@ public class BigdataSail extends SailBase implements Sail {
                  * native joins and the BigdataEvaluationStatistics rely on
                  * this.
                  */
-                Object[] newVals = replaceValues(dataset, tupleExpr, bindings);
+            	final Object[] newVals = replaceValues(dataset, tupleExpr, bindings);
                 dataset = (Dataset) newVals[0];
                 bindings = (BindingSet) newVals[1];
 
@@ -3541,8 +3549,6 @@ public class BigdataSail extends SailBase implements Sail {
                 return itr;
 
             } catch (QueryEvaluationException e) {
-
-//    			log.error("Remove log stmt"+e,e);// FIXME remove this - I am just looking for the root cause of something in the SAIL.
 
                 throw new SailException(e);
 
