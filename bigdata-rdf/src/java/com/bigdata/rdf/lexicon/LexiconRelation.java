@@ -2286,7 +2286,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *       Or perhaps this can be rolled into the {@link ValueFactory} impl
      *       along with the reverse bnodes mapping?
      */
-    private ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue> termCache;
+    final private ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue> termCache;
     
     /**
      * Factory used for {@link #termCache} for read-only views of the lexicon.
@@ -2431,11 +2431,18 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *         {@link BigdataValue} for that term identifier in the lexicon.
      */
     final public BigdataValue getTerm(final IV iv) {
-        
+
+//		if (false) { // alternative forces the standard code path.
+//			final Collection<IV> ivs = new LinkedList<IV>();
+//			ivs.add(iv);
+//			final Map<IV, BigdataValue> values = getTerms(ivs);
+//			return values.get(iv);
+//		}
+    	
         if (iv.isInline())
             return iv.asValue(this);
         
-        TermId tid = (TermId) iv;
+        final TermId tid = (TermId) iv;
         
         // handle NULL, bnodes, statement identifiers, and the termCache.
         BigdataValue value = _getTermId(tid);
@@ -2531,7 +2538,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * @return
      *          the term identifier for the value
      */
-    private TermId getTermId(Value value) {
+    private TermId getTermId(final Value value) {
         
         final IIndex ndx = getTerm2IdIndex();
 
