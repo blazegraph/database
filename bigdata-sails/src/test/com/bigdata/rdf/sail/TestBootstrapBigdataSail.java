@@ -37,6 +37,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 import junit.framework.TestCase2;
 
@@ -183,18 +186,16 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 
 	/**
 	 * Unit test verifies that a thread may not obtain more than one instance of
-	 * the unisolated connection at a time from the {@link BigdataSail}.
+	 * the unisolated connection at a time from the {@link BigdataSail} via a
+	 * reentrant invocation. The reentrant request should immediately throw an
+	 * exception to prevent an unbreakable deadlock (a thread can not wait on
+	 * itself).
 	 * 
 	 * @throws SailException
 	 * @throws InterruptedException
-	 * 
-	 *             FIXME Re-propagate test changes to the trunk along with the
-	 *             changes to Journal (the semaphore) and to BigdataSail (using
-	 *             the semaphore).
-	 *             
 	 * @throws ExecutionException
 	 */
-	public void test_getConnectionAllowedExactlyOnce1() throws SailException,
+	public void test_getConnectionAllowedExactlyOnce1_oneThread() throws SailException,
 			InterruptedException, ExecutionException {
 
 		final Properties properties = new Properties();
@@ -228,9 +229,14 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 
 							log.info("Requesting 2nd unisolated connection.");
 
-							conn2 = sail.getUnisolatedConnection();
-
-							fail("Not expecting a 2nd unisolated connection");
+							try {
+								conn2 = sail.getUnisolatedConnection();
+								fail("Not expecting a 2nd unisolated connection");
+							} catch (IllegalStateException ex) {
+								if (log.isInfoEnabled())
+									log.info("Ignoring expected exception: "
+											+ ex);
+							}
 
 							return (Void) null;
 
@@ -247,21 +253,12 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 
 				};
 
-				// run task. it should block when attempting to get the 2nd
-				// connection.
+				// run task.
 				f = service.submit(task);
 
-				// wait up to a timeout to verify that the task blocked rather
-				// than acquiring the 2nd connection.
-				f.get(250, TimeUnit.MILLISECONDS);
+				// should succeed quietly.
+				f.get();
 
-			} catch (TimeoutException e) {
-
-				/*
-				 * This is the expected outcome.
-				 */
-				log.info("timeout");
-								
 			} finally {
 
 				if (f != null) {
@@ -279,6 +276,135 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 				service.shutdownNow();
 			}
 			
+			sail.getDatabase().getIndexManager().destroy();
+
+		}
+
+	}
+
+	/**
+	 * Unit test verifies that a thread may not obtain more than one instance of
+	 * the unisolated connection at a time from the {@link BigdataSail} using
+	 * two threads. The second thread should block until the first thread
+	 * releases the connection, at which point the second thread should obtain
+	 * the connection.
+	 * 
+	 * @throws SailException
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 */
+	public void test_getConnectionAllowedExactlyOnce1_twoThreads() throws SailException,
+			InterruptedException, ExecutionException, TimeoutException {
+
+		final Properties properties = new Properties();
+
+		properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+
+		ExecutorService service = null;
+		final BigdataSail sail = new BigdataSail(properties);
+
+		try {
+
+			sail.initialize();
+			service = Executors.newFixedThreadPool(2/*nThreads*/);
+
+			Future<Void> f = null;
+			Future<Void> f2 = null;
+
+			final ReentrantLock lock = new ReentrantLock();
+			final AtomicBoolean haveFirst = new AtomicBoolean(false);
+			final AtomicBoolean releaseFirst = new AtomicBoolean(false);
+			final AtomicBoolean haveSecond = new AtomicBoolean(false);
+			final Condition haveFirstConnection = lock.newCondition();
+			final Condition releaseFirstConnection = lock.newCondition();
+			final Condition haveSecondConnection = lock.newCondition();
+			try {
+
+				final Callable<Void> task1 = new Callable<Void>() {
+					public Void call() throws Exception {
+						SailConnection conn1 = null;
+						try {
+							log.info("Requesting 1st unisolated connection.");
+							lock.lock();
+							try {
+								conn1 = sail.getUnisolatedConnection();
+								haveFirst.set(true);
+								haveFirstConnection.signal();
+								// Wait on condition to release connection.
+								while(!releaseFirst.get())
+									releaseFirstConnection.await();
+								log.info("Releasing 1st unisolated connection.");
+							} finally {
+								lock.unlock();
+							}
+							return (Void) null;
+						} finally {
+							if (conn1 != null)
+								conn1.close();
+						}
+					}
+				};
+
+				final Callable<Void> task2 = new Callable<Void>() {
+					public Void call() throws Exception {
+						SailConnection conn2 = null;
+						try {
+							log.info("Requesting 2nd unisolated connection.");
+							conn2 = sail.getUnisolatedConnection();
+							log.info("Have 2nd unisolated connection");
+							return (Void) null;
+						} finally {
+							if (conn2 != null)
+								conn2.close();
+						}
+					}
+				};
+
+				/*
+				 * Run task. It should obtain the unisolated connection and THEN
+				 * block wait on our signal.
+				 */
+				f = service.submit(task1);
+				lock.lock();
+				try {
+					while(!haveFirst.get()) {
+						haveFirstConnection.await();
+					}
+					// start task2
+					f2 = service.submit(task2);
+					log.info("Will instruct to release 1st connection.");
+					releaseFirst.set(true);
+					releaseFirstConnection.signal();
+				} finally {
+					lock.unlock();
+				}
+
+				// wait on both tasks and verify outcomes. they should terminate quickly.
+				f.get(1000,TimeUnit.MILLISECONDS);
+				f2.get(1000,TimeUnit.MILLISECONDS);
+
+			} finally {
+
+				if (f != null) {
+					// Cancel task.
+					f.cancel(true/* mayInterruptIfRunning */);
+				}
+
+				if (f2 != null) {
+					// Cancel task.
+					f2.cancel(true/* mayInterruptIfRunning */);
+				}
+
+				sail.shutDown();
+
+			}
+
+		} finally {
+
+			if (service != null) {
+				service.shutdownNow();
+			}
+
 			sail.getDatabase().getIndexManager().destroy();
 
 		}
