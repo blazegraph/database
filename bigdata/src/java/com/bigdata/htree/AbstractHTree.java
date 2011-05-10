@@ -1,11 +1,13 @@
 package com.bigdata.htree;
 
+import java.io.PrintStream;
 import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.Banner;
@@ -29,6 +31,7 @@ import com.bigdata.cache.HardReferenceQueueWithBatchingUpdates;
 import com.bigdata.cache.IHardReferenceQueue;
 import com.bigdata.cache.RingBuffer;
 import com.bigdata.htree.HTree.AbstractPage;
+import com.bigdata.htree.HTree.BucketPage;
 import com.bigdata.htree.HTree.DirectoryPage;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
@@ -127,16 +130,16 @@ abstract public class AbstractHTree {
 	 */
     protected final int addressBits;
 
-	/**
-	 * The #of entries in a directory bucket, which is 2^{@link #addressBits}
-	 * (aka <code>1<<addressBits</code>).
-	 */
-    protected final int branchingFactor;
+//	/**
+//	 * The #of entries in a directory bucket, which is 2^{@link #addressBits}
+//	 * (aka <code>1<<addressBits</code>).
+//	 */
+//    protected final int branchingFactor;
     
     /**
-     * The root node.
+     * The root directory.
      */
-    protected volatile AbstractPage root;
+    protected volatile DirectoryPage root;
 
     /**
      * Nodes (that is nodes or leaves) are added to a hard reference queue when
@@ -266,6 +269,23 @@ abstract public class AbstractHTree {
     	return addressBits;
     }
     
+	/**
+	 * The #of {@link DirectoryPage}s in the {@link HTree} (not buddy hash
+	 * tables, but the pages on which they appear).
+	 */
+	abstract public int getNodeCount();
+
+	/**
+	 * The #of {@link BucketPage}s in the {@link HTree} (not buddy hash buckets,
+	 * but the pages on which they appear).
+	 */
+    abstract public int getLeafCount();
+    
+    /**
+     * The #of tuples in the {@link HTree}.
+     */
+    abstract public int getEntryCount();
+    
     /**
 	 * @param store
 	 *            The persistence store.
@@ -317,7 +337,7 @@ abstract public class AbstractHTree {
         
         this.store = store;
         this.addressBits = addressBits;
-        this.branchingFactor = 1 << addressBits;
+//        this.branchingFactor = 1 << addressBits;
 
 //        /*
 //         * Compute the minimum #of children/values. This is the same whether
@@ -474,6 +494,51 @@ abstract public class AbstractHTree {
 
     }
 
+	/**
+	 * Recursive dump of the tree.
+	 * 
+	 * @param out
+	 *            The dump is written on this stream.
+	 * 
+	 * @return true unless an inconsistency is detected.
+	 */
+	public boolean dump(final PrintStream out) {
+
+		return dump(BTree.dumpLog.getEffectiveLevel(), out, false/* materialize */);
+
+    }
+
+	public boolean dump(final Level level, final PrintStream out,
+			final boolean materialize) {
+
+        // True iff we will write out the node structure.
+        final boolean info = level.toInt() <= Level.INFO.toInt();
+
+//        final IBTreeUtilizationReport utils = getUtilization();
+
+        if (info) {
+
+			out.print("addressBits=" + addressBits);
+			out.print(", (2^addressBits)=" + (1 << addressBits));
+			out.print(", #nodes=" + getNodeCount());
+			out.print(", #leaves=" + getLeafCount());
+			out.print(", #entries=" + getEntryCount());
+			out.println();
+//                    + ", nodeUtil="
+//                    + utils.getNodeUtilization() + "%, leafUtil="
+//                    + utils.getLeafUtilization() + "%, utilization="
+//                    + utils.getTotalUtilization() + "%"
+        }
+
+        if (root != null) {
+
+            return root.dump(level, out, 0, true, materialize);
+
+        } else
+            return true;
+
+    }
+
     /**
      * <p>
      * This method is responsible for putting the node or leaf onto the ring
@@ -494,7 +559,7 @@ abstract public class AbstractHTree {
      * </p>
      * <p>
      * In conjunction with {@link DefaultEvictionListener}, this method
-     * guarentees that the reference counter for the node will reflect the #of
+     * guarantees that the reference counter for the node will reflect the #of
      * times that the node is actually present on the
      * {@link #writeRetentionQueue}.
      * </p>

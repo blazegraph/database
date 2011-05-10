@@ -181,4 +181,30 @@ abstract public class PO implements IIdentityAccess, IDirty {
         }
 
     }
+
+    /**
+     * Returns a string that may be used to indent a dump of the nodes in
+     * the tree.
+     * 
+     * @param height
+     *            The height.
+     *            
+     * @return A string suitable for indent at that height.
+     */
+    protected static String indent(final int height) {
+
+        if( height == -1 ) {
+        
+            // The height is not defined.
+            
+            return "";
+            
+        }
+        
+        return ws.substring(0, height * 4);
+
+    }
+
+    private static final transient String ws = "                                                                                                                                                                                                                  ";
+
 }

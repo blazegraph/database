@@ -1,6 +1,9 @@
 package com.bigdata.htree;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.Node;
+import com.bigdata.htree.HTree.BucketPage;
+import com.bigdata.htree.HTree.DirectoryPage;
 import com.bigdata.htree.data.IDirectoryData;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 
@@ -16,27 +19,18 @@ import com.bigdata.io.AbstractFixedByteArrayBuffer;
  * @version $Id: MutableNodeData.java 2265 2009-10-26 12:51:06Z thompsonbry $
  */
 public class MutableDirectoryPageData implements IDirectoryData {
-	
+
 	/**
-	 * <p>
-	 * The persistent address of each child node (may be nodes or leaves). The
-	 * capacity of this array is m, where m is the {@link #branchingFactor}.
-	 * Valid indices are in [0:nkeys+1] since nchildren := nkeys+1 for a
-	 * {@link Node}. The key is {@link #NULL} until the child has been
-	 * persisted. The protocol for persisting child nodes requires that we use a
-	 * pre-order traversal (the general case is a directed graph) so that we can
-	 * update the keys on the parent before the parent itself is persisted.
-	 * </p>
-	 * <p>
-	 * Note: It is an error if there is an attempt to serialize a node having a
-	 * null entry in this array and a non-null entry in the {@link #keys} array.
-	 * </p>
-	 * <p>
-	 * This array is dimensioned to one more than the maximum capacity so that
-	 * the child reference corresponding to the key that causes overflow and
-	 * forces the split may be inserted. This greatly simplifies the logic for
-	 * computing the split point and performing the split.
-	 * </p>
+	 * The persistent address of each child page (each child may be either a
+	 * {@link DirectoryPage} or a {@link BucketPage}). The capacity of this
+	 * array is <code>1&lt;&lt;addressBits</code>. An entry in this array is
+	 * {@link #NULL} until the child has been persisted. The protocol for
+	 * persisting child nodes requires that we use a pre-order traversal (the
+	 * general case is a directed graph) so that we can update the addresses
+	 * record in the parent before the parent itself is persisted. Unlike the
+	 * {@link BTree}, a {@link IRawStore#NULL} entry is permitted in the array.
+	 * This is because the {@link HTree} is not balanced and empty paths may be
+	 * folded up.
 	 */
 	final long[] childAddr;
 
@@ -115,8 +109,8 @@ public class MutableDirectoryPageData implements IDirectoryData {
 	/**
 	 * Makes a mutable copy of the source data record.
 	 * 
-	 * @param branchingFactor
-	 *            The branching factor for the owning B+Tree. This is used to
+	 * @param addressBits
+	 *            The #of address bits owning {@link HTree}. This is used to
 	 *            initialize the various arrays to the correct capacity.
 	 * @param src
 	 *            The source data record.

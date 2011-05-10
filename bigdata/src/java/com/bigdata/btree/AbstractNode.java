@@ -163,7 +163,7 @@ public abstract class AbstractNode<T extends AbstractNode
      * Return the delegate {@link IAbstractNodeData} object.
      */
     abstract IAbstractNodeData getDelegate();
-    
+
     public void delete() {
         
         if( deleted ) {
@@ -1299,30 +1299,5 @@ public abstract class AbstractNode<T extends AbstractNode
      * @return True unless an inconsistency was detected.
      */
     abstract public boolean dump(Level level, PrintStream out, int height, boolean recursive);
-
-    /**
-     * Returns a string that may be used to indent a dump of the nodes in
-     * the tree.
-     * 
-     * @param height
-     *            The height.
-     *            
-     * @return A string suitable for indent at that height.
-     */
-    protected static String indent(final int height) {
-
-        if( height == -1 ) {
-        
-            // The height is not defined.
-            
-            return "";
-            
-        }
-        
-        return ws.substring(0, height * 4);
-
-    }
-
-    private static final transient String ws = "                                                                                                                                                                                                                  ";
 
 }

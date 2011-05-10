@@ -72,56 +72,60 @@ public class HTreeUtil {
         return 1 << n;
         
     }
-    
-    /**
-     * Return the #of entries in the address map for a page having the given
-     * local depth. This is <code>2^(globalHashBits - localHashBits)</code>. The
-     * following table shows the relationship between the global hash bits (gb),
-     * the local hash bits (lb) for a page, and the #of directory entries for
-     * that page (nentries).
-     * 
-     * <pre>
-     * gb  lb   nentries
-     * 1    0   2
-     * 1    1   1
-     * 2    0   4
-     * 2    1   2
-     * 2    2   1
-     * 3    0   8
-     * 3    1   4
-     * 3    2   2
-     * 3    3   1
-     * 4    0   16
-     * 4    1   8
-     * 4    2   4
-     * 4    3   2
-     * 4    4   1
-     * </pre>
-     * 
-     * @param localHashBits
-     *            The local depth of the page in [0:{@link #globalHashBits}].
-     * 
-     * @return The #of directory entries for that page.
-     * 
-     * @throws IllegalArgumentException
-     *             if either argument is less than ZERO (0).
-     * @throws IllegalArgumentException
-     *             if <i>localHashBits</i> is greater than
-     *             <i>globalHashBits</i>.
-     */
-    static int getSlotsForPage(final int globalHashBits, final int localHashBits) {
 
-        if(localHashBits < 0)
+	/**
+	 * Return the #of entries in the address map for a page having the given
+	 * local depth. This is <code>2^(globalHashBits - localHashBits)</code>. The
+	 * following table shows the relationship between the global hash bits (gb),
+	 * the local hash bits (lb) for a page, and the #of directory entries for
+	 * that page (nentries).
+	 * 
+	 * <pre>
+	 * gb  lb   nentries
+	 * 1    0   2
+	 * 1    1   1
+	 * 2    0   4
+	 * 2    1   2
+	 * 2    2   1
+	 * 3    0   8
+	 * 3    1   4
+	 * 3    2   2
+	 * 3    3   1
+	 * 4    0   16
+	 * 4    1   8
+	 * 4    2   4
+	 * 4    3   2
+	 * 4    4   1
+	 * </pre>
+	 * 
+	 * @param globalDepth
+	 *            The global depth of the parent.
+	 * @param localDepth
+	 *            The local depth of the child.
+	 * 
+	 * @return The #of directory entries for that child page.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if either argument is less than ZERO (0).
+	 * @throws IllegalArgumentException
+	 *             if <i>localHashBits</i> is greater than
+	 *             <i>globalHashBits</i>.
+	 * 
+	 *             TODO Unit tests.
+	 */
+	public static int getSlotsOnPage(final int globalDepth, final int localDepth) {
+
+        if(localDepth < 0)
             throw new IllegalArgumentException();
 
-        if(globalHashBits < 0)
+        if(globalDepth < 0)
             throw new IllegalArgumentException();
 
-        if(localHashBits > globalHashBits)
+        if(localDepth > globalDepth)
             throw new IllegalArgumentException();
 
-        // The #of address map entries for this page.
-        final int numSlotsForPage = pow2(globalHashBits - localHashBits);
+		// The #of slots entries for the child page.
+		final int numSlotsForPage = (1 << (globalDepth - localDepth));
 
         return numSlotsForPage;
 
@@ -248,55 +252,5 @@ public class HTreeUtil {
 		return childBuddyOffset;
 
 	}
-
-	// /**
-	// * Apply a heuristic to obtain the size of the #of global bits for the
-	// root
-	// * directory given the target page size (in bytes) and the average #of
-	// bytes
-	// * per tuple.
-	// * <p>
-	// * The backing store may use compression, which can reduce the size of the
-	// * record on the disk significantly, and may be able to efficiently
-	// allocate
-	// * either exact fit or best fit a given record. Therefore this method
-	// * computes the #of tuples which would fit in a page of the given size and
-	// * then finds the #of bits for an address space which could address those
-	// * tuples. Since the address map must always be a power of 2, we look at
-	// the
-	// * first power of 2 greater than the estimated best fit for the tuple and
-	// * page size.
-	// *
-	// * @return The #of bits in an address map which could address a page which
-	// * is the best fit for the given page size and tuple size. This
-	// * value is useful if you assume that the actual size of the record
-	// * on the disk will be less than the given size.
-	// */
-	// static int getGlobalBits(final int pageSize, final int tupleSize) {
-	//
-	// if (pageSize <= 0)
-	// throw new IllegalArgumentException();
-	// if (tupleSize <= 0)
-	// throw new IllegalArgumentException();
-	// if (pageSize <= tupleSize)
-	// throw new IllegalArgumentException();
-	//
-	// // final int pageSize = Bytes.kilobyte32 * 4;
-	//
-	// // final int KEY_SIZE = Bytes.SIZEOF_INT;
-	// //
-	// // final int ADDR_SIZE = Bytes.SIZEOF_LONG;
-	// //
-	// // final int tupleSize = (KEY_SIZE + ADDR_SIZE);
-	//        
-	// final int nentries = pageSize / tupleSize;
-	//        
-	// final int globalBits = HTreeUtil.getMapSize(nentries);
-	//
-	// final int branchingFactor = 1 << globalBits;
-	//        
-	// return globalBits;
-	//        
-	// }
 
 }
