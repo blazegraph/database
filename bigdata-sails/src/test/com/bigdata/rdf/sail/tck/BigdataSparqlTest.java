@@ -42,6 +42,7 @@ import org.openrdf.query.Dataset;
 import org.openrdf.query.parser.sparql.ManifestTest;
 import org.openrdf.query.parser.sparql.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
+import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.dataset.DatasetRepository;
 import org.openrdf.repository.sail.SailRepository;
@@ -293,8 +294,11 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
 //      Force identical unicode comparisons (assuming default COLLATOR setting).
         props.setProperty(Options.STRENGTH, StrengthEnum.Identical.toString());
         
-        // enable read/write transactions
-        props.setProperty(Options.ISOLATABLE_INDICES, "true");
+		/*
+		 * disable read/write transactions since this class runs against the
+		 * unisolated connection.
+		 */
+		props.setProperty(Options.ISOLATABLE_INDICES, "false");
         
         // disable truth maintenance in the SAIL
         props.setProperty(Options.TRUTH_MAINTENANCE, "false");
@@ -354,6 +358,25 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         return queryString;
     }
     
-    
+	/**
+	 * Overridden to use {@link BigdataSail#getReadOnlyConnection()} as a
+	 * workaround to the test harness which invokes
+	 * {@link BigdataSail#getConnection()} multiple times from within the same
+	 * thread. When full transactions are not enabled, that will delegate to
+	 * {@link BigdataSail#getUnisolatedConnection()}. Only one unisolated
+	 * connection is permitted at a time. While different threads will block to
+	 * await the unisolated connection, that method will throw an exception if
+	 * there is an attempt by a single thread to obtain more than one instance
+	 * of the unisolated connection (since that operation would otherwise
+	 * deadlock).
+	 */
+	@Override
+	protected RepositoryConnection getQueryConnection(Repository dataRep)
+			throws Exception {
+
+		return ((BigdataSailRepository) ((DatasetRepository) dataRep)
+				.getDelegate()).getReadOnlyConnection();
+
+	}
 
 }

@@ -45,22 +45,24 @@ import com.bigdata.relation.AbstractResource;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated Support for nested subquery has been dropped in the development branch.
  */
-public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
+public class TestBigdataSailWithQuadsAndNestedSubquery extends AbstractBigdataSailTestCase {
 
     /**
      * 
      */
-    public TestBigdataSailWithQuads() {
+    public TestBigdataSailWithQuadsAndNestedSubquery() {
     }
 
-    public TestBigdataSailWithQuads(String name) {
+    public TestBigdataSailWithQuadsAndNestedSubquery(String name) {
         super(name);
     }
     
     public static Test suite() {
         
-        final TestBigdataSailWithQuads delegate = new TestBigdataSailWithQuads(); // !!!! THIS CLASS !!!!
+        final TestBigdataSailWithQuadsAndNestedSubquery delegate = new TestBigdataSailWithQuadsAndNestedSubquery(); // !!!! THIS CLASS !!!!
 
         /*
          * Use a proxy test suite and specify the delegate.
@@ -95,7 +97,12 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
         suite.addTestSuite(TestUnions.class);
         
         suite.addTestSuite(TestDescribe.class);
+
+        suite.addTestSuite(TestTxCreate.class);
         
+		suite.addTestSuite(com.bigdata.rdf.sail.contrib.TestRollbacks.class);
+		suite.addTestSuite(com.bigdata.rdf.sail.contrib.TestRollbacksTx.class);
+
         // The Sesame TCK, including the SPARQL test suite.
         {
 
