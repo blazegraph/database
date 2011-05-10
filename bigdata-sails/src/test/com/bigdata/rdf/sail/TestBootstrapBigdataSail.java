@@ -30,8 +30,18 @@ import info.aduna.iteration.CloseableIteration;
 
 import java.io.File;
 import java.util.Properties;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
-import junit.framework.TestCase;
+import junit.framework.TestCase2;
 
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -41,8 +51,13 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
 import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSail.Options;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.LocalTripleStore;
 
 /**
  * Bootstrap test case for bringing up the {@link BigdataSail}.
@@ -50,7 +65,7 @@ import com.bigdata.rdf.sail.BigdataSail.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestBootstrapBigdataSail extends TestCase {
+public class TestBootstrapBigdataSail extends TestCase2 {
 
     /**
      * 
@@ -71,32 +86,18 @@ public class TestBootstrapBigdataSail extends TestCase {
      * @throws SailException
      */
     public void test_ctor_1() throws SailException {
-        
+
         final BigdataSail sail = new BigdataSail();
-        
-        sail.initialize();
         
         try {
 
+            sail.initialize();
+
             sail.shutDown();
+            
+		} finally {
 
-        }
-
-        finally {
-
-            String filename = sail.properties.getProperty(Options.FILE);
-
-            if (filename != null) {
-
-                File file = new File(filename);
-                
-                if(file.exists() && ! file.delete()) {
-                    
-                    fail("Could not delete file after test: "+filename);
-                    
-                }
-                
-            }
+			sail.getDatabase().getIndexManager().destroy();
 
         }
 
@@ -121,21 +122,19 @@ public class TestBootstrapBigdataSail extends TestCase {
             
         }
         
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
 
         properties.setProperty(Options.FILE, file.toString());
 
-        BigdataSail sail = new BigdataSail(properties);
+        final BigdataSail sail = new BigdataSail(properties);
 
-        sail.initialize();
-        
         try {
 
+            sail.initialize();
+            
             sail.shutDown();
 
-        }
-
-        finally {
+		} finally {
 
             if (!file.exists()) {
 
@@ -161,93 +160,525 @@ public class TestBootstrapBigdataSail extends TestCase {
      */
     public void test_getConnection() throws SailException {
 
-        final File file = new File(getName() + Options.JNL);
-        
-        if(file.exists()) {
-            
-            if(!file.delete()) {
-                
-                fail("Could not delete file before test: " + file);
-
-            }
-            
-        }
-
         final Properties properties = new Properties();
 
-        properties.setProperty(Options.FILE, file.toString());
+        properties.setProperty(Options.CREATE_TEMP_FILE, "true");
 
-        final BigdataSail sail = new BigdataSail(properties);
+		final BigdataSail sail = new BigdataSail(properties);
 
-        sail.initialize();
-        
-        try {
+		try {
 
-            final SailConnection conn = sail.getConnection();
-            
-            conn.close();
-            
-            sail.shutDown();
+			sail.initialize();
 
-        }
+			final SailConnection conn = sail.getConnection();
 
-        finally {
+			conn.close();
 
-            if (!file.exists()) {
+			sail.shutDown();
 
-                fail("Could not locate store: " + file);
+		} finally {
 
-                if (!file.delete()) {
+			sail.getDatabase().getIndexManager().destroy();
 
-                    fail("Could not delete file after test: " + file);
-
-                }
-
-            }
-
-        }
+		}
 
     }
 
-    /**
-     * Test creates a database, obtains a writable connection, writes some data
-     * on the store, verifies that the data can be read back from within the
-     * connection but that it is not visible in a read-committed view, commits
-     * the write set, and verifies that the data is now visible in a
-     * read-committed view.
-     * 
-     * @todo variant that writes, aborts the write, and verifies that the data
-     *       was not made restart safe.
-     * 
-     * @throws SailException
-     */
-    public void test_isolation() throws SailException {
+	/**
+	 * Unit test verifies that a thread may not obtain more than one instance of
+	 * the unisolated connection at a time from the {@link BigdataSail} via a
+	 * reentrant invocation. The reentrant request should immediately throw an
+	 * exception to prevent an unbreakable deadlock (a thread can not wait on
+	 * itself).
+	 * 
+	 * @throws SailException
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 */
+	public void test_getConnectionAllowedExactlyOnce1_oneThread() throws SailException,
+			InterruptedException, ExecutionException {
 
-        final File file = new File(getName() + Options.JNL);
-        
-        if(file.exists()) {
-            
-            if(!file.delete()) {
-                
-                fail("Could not delete file before test: " + file);
+		final Properties properties = new Properties();
 
-            }
-            
-        }
+		properties.setProperty(Options.CREATE_TEMP_FILE, "true");
 
-        final Properties properties = new Properties();
+		ExecutorService service = null;
+		final BigdataSail sail = new BigdataSail(properties);
 
-        properties.setProperty(Options.FILE, file.toString());
+		try {
 
-        final BigdataSail sail = new BigdataSail(properties);
+			sail.initialize();
+			service = Executors.newSingleThreadExecutor();
 
-        sail.initialize();
-        
-        final SailConnection conn = sail.getConnection();
-        
-        final SailConnection readConn = sail.getReadOnlyConnection();
-        
-        try {
+			Future<Void> f = null;
+			
+			try {
+
+				final Callable<Void> task = new Callable<Void>() {
+
+					public Void call() throws Exception {
+
+						SailConnection conn1 = null;
+						SailConnection conn2 = null;
+
+						try {
+
+							log.info("Requesting 1st unisolated connection.");
+
+							conn1 = sail.getUnisolatedConnection();
+
+							log.info("Requesting 2nd unisolated connection.");
+
+							try {
+								conn2 = sail.getUnisolatedConnection();
+								fail("Not expecting a 2nd unisolated connection");
+							} catch (IllegalStateException ex) {
+								if (log.isInfoEnabled())
+									log.info("Ignoring expected exception: "
+											+ ex);
+							}
+
+							return (Void) null;
+
+						} finally {
+
+							if (conn1 != null)
+								conn1.close();
+
+							if (conn2 != null)
+								conn2.close();
+
+						}
+					}
+
+				};
+
+				// run task.
+				f = service.submit(task);
+
+				// should succeed quietly.
+				f.get();
+
+			} finally {
+
+				if (f != null) {
+					// Cancel task.
+					f.cancel(true/* mayInterruptIfRunning */);
+				}
+				
+				sail.shutDown();
+
+			}
+
+		} finally {
+
+			if (service != null) {
+				service.shutdownNow();
+			}
+			
+			sail.getDatabase().getIndexManager().destroy();
+
+		}
+
+	}
+
+	/**
+	 * Unit test verifies that a thread may not obtain more than one instance of
+	 * the unisolated connection at a time from the {@link BigdataSail} using
+	 * two threads. The second thread should block until the first thread
+	 * releases the connection, at which point the second thread should obtain
+	 * the connection.
+	 * 
+	 * @throws SailException
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 */
+	public void test_getConnectionAllowedExactlyOnce1_twoThreads() throws SailException,
+			InterruptedException, ExecutionException, TimeoutException {
+
+		final Properties properties = new Properties();
+
+		properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+
+		ExecutorService service = null;
+		final BigdataSail sail = new BigdataSail(properties);
+
+		try {
+
+			sail.initialize();
+			service = Executors.newFixedThreadPool(2/*nThreads*/);
+
+			Future<Void> f = null;
+			Future<Void> f2 = null;
+
+			final ReentrantLock lock = new ReentrantLock();
+			final AtomicBoolean haveFirst = new AtomicBoolean(false);
+			final AtomicBoolean releaseFirst = new AtomicBoolean(false);
+			final AtomicBoolean haveSecond = new AtomicBoolean(false);
+			final Condition haveFirstConnection = lock.newCondition();
+			final Condition releaseFirstConnection = lock.newCondition();
+			final Condition haveSecondConnection = lock.newCondition();
+			try {
+
+				final Callable<Void> task1 = new Callable<Void>() {
+					public Void call() throws Exception {
+						SailConnection conn1 = null;
+						try {
+							log.info("Requesting 1st unisolated connection.");
+							lock.lock();
+							try {
+								conn1 = sail.getUnisolatedConnection();
+								haveFirst.set(true);
+								haveFirstConnection.signal();
+								// Wait on condition to release connection.
+								while(!releaseFirst.get())
+									releaseFirstConnection.await();
+								log.info("Releasing 1st unisolated connection.");
+							} finally {
+								lock.unlock();
+							}
+							return (Void) null;
+						} finally {
+							if (conn1 != null)
+								conn1.close();
+						}
+					}
+				};
+
+				final Callable<Void> task2 = new Callable<Void>() {
+					public Void call() throws Exception {
+						SailConnection conn2 = null;
+						try {
+							log.info("Requesting 2nd unisolated connection.");
+							conn2 = sail.getUnisolatedConnection();
+							log.info("Have 2nd unisolated connection");
+							return (Void) null;
+						} finally {
+							if (conn2 != null)
+								conn2.close();
+						}
+					}
+				};
+
+				/*
+				 * Run task. It should obtain the unisolated connection and THEN
+				 * block wait on our signal.
+				 */
+				f = service.submit(task1);
+				lock.lock();
+				try {
+					while(!haveFirst.get()) {
+						haveFirstConnection.await();
+					}
+					// start task2
+					f2 = service.submit(task2);
+					log.info("Will instruct to release 1st connection.");
+					releaseFirst.set(true);
+					releaseFirstConnection.signal();
+				} finally {
+					lock.unlock();
+				}
+
+				// wait on both tasks and verify outcomes. they should terminate quickly.
+				f.get(1000,TimeUnit.MILLISECONDS);
+				f2.get(1000,TimeUnit.MILLISECONDS);
+
+			} finally {
+
+				if (f != null) {
+					// Cancel task.
+					f.cancel(true/* mayInterruptIfRunning */);
+				}
+
+				if (f2 != null) {
+					// Cancel task.
+					f2.cancel(true/* mayInterruptIfRunning */);
+				}
+
+				sail.shutDown();
+
+			}
+
+		} finally {
+
+			if (service != null) {
+				service.shutdownNow();
+			}
+
+			sail.getDatabase().getIndexManager().destroy();
+
+		}
+
+	}
+
+	/**
+	 * Unit test verifies exactly one unisolated connection for two different
+	 * {@link BigdataSail} instances for the same {@link AbstractTripleStore} on
+	 * the same {@link Journal}.
+	 * 
+	 * @throws SailException
+	 * @throws InterruptedException
+	 */
+	public void test_getConnectionAllowedExactlyOnce2() throws SailException,
+			InterruptedException, ExecutionException {
+
+		final Properties properties = new Properties();
+
+		properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+
+		ExecutorService service = null;
+		final BigdataSail sail = new BigdataSail(properties);
+
+		try {
+
+			sail.initialize();
+			service = Executors.newSingleThreadExecutor();
+
+			// wrap a 2nd sail around the same tripleStore.
+			final BigdataSail sail2 = new BigdataSail(sail.getDatabase());
+			sail2.initialize();
+
+			Future<Void> f = null;
+
+			try {
+
+				final Callable<Void> task = new Callable<Void>() {
+
+					public Void call() throws Exception {
+
+						SailConnection conn1 = null;
+						SailConnection conn2 = null;
+
+						try {
+
+							log.info("Requesting 1st unisolated connection.");
+
+							conn1 = sail.getUnisolatedConnection();
+
+							log.info("Requesting 2nd unisolated connection.");
+
+							conn2 = sail2.getUnisolatedConnection();
+
+							fail("Not expecting a 2nd unisolated connection");
+
+							return (Void) null;
+
+						} finally {
+
+							if (conn1 != null)
+								conn1.close();
+
+							if (conn2 != null)
+								conn2.close();
+
+						}
+					}
+
+				};
+
+				// run task. it should block when attempting to get the 2nd
+				// connection.
+				f = service.submit(task);
+
+				// wait up to a timeout to verify that the task blocked rather
+				// than acquiring the 2nd connection.
+				f.get(250, TimeUnit.MILLISECONDS);
+
+			} catch (TimeoutException e) {
+
+				/*
+				 * This is the expected outcome.
+				 */
+				log.info("timeout");
+
+			} finally {
+
+				if (f != null) {
+					// Cancel task.
+					f.cancel(true/* mayInterruptIfRunning */);
+				}
+
+				if (sail2 != null)
+					sail2.shutDown();
+
+				sail.shutDown();
+
+			}
+
+		} finally {
+
+			if (service != null) {
+				service.shutdownNow();
+			}
+
+			sail.getDatabase().getIndexManager().destroy();
+
+		}
+
+	}
+
+	/**
+	 * Unit test verifying that exactly one unisolated connection is allowed at
+	 * a time for two sails wrapping different {@link AbstractTripleStore}
+	 * instances. (This guarantee is needed to preserve ACID semantics for the
+	 * unisolated connection when there is more than one
+	 * {@link AbstractTripleStore} on the same {@link Journal}. However,
+	 * scale-out should not enforce this constraint since it is shard-wise ACID
+	 * for unisolated operations.)
+	 * 
+	 * @throws SailException
+	 * @throws InterruptedException
+	 */
+	public void test_getConnectionAllowedExactlyOnce3() throws SailException,
+			InterruptedException, ExecutionException {
+
+		final Properties properties = new Properties();
+
+		properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+
+		ExecutorService service = null;
+		final BigdataSail sail = new BigdataSail(properties);
+
+		try {
+
+			sail.initialize();
+			service = Executors.newSingleThreadExecutor();
+
+			// wrap a 2nd sail around a different tripleStore.
+			final BigdataSail sail2;
+			{
+
+				// tunnel through to the Journal.
+				final Journal jnl = (Journal) sail.getDatabase()
+						.getIndexManager();
+
+				// describe another tripleStore with a distinct namespace.
+				final AbstractTripleStore tripleStore = new LocalTripleStore(
+						jnl, "foo", ITx.UNISOLATED, properties);
+				
+				// create that triple store.
+				tripleStore.create();
+
+				// wrap a 2nd sail around the 2nd tripleStore.
+				sail2 = new BigdataSail(tripleStore);
+				sail2.initialize();
+
+			}
+
+			Future<Void> f = null;
+
+			try {
+
+				final Callable<Void> task = new Callable<Void>() {
+
+					public Void call() throws Exception {
+
+						SailConnection conn1 = null;
+						SailConnection conn2 = null;
+
+						try {
+
+							log.info("Requesting 1st unisolated connection.");
+
+							conn1 = sail.getUnisolatedConnection();
+
+							log.info("Requesting 2nd unisolated connection.");
+
+							conn2 = sail2.getUnisolatedConnection();
+
+							fail("Not expecting a 2nd unisolated connection");
+
+							return (Void) null;
+
+						} finally {
+
+							if (conn1 != null)
+								conn1.close();
+
+							if (conn2 != null)
+								conn2.close();
+
+						}
+					}
+
+				};
+
+				// run task. it should block when attempting to get the 2nd
+				// connection.
+				f = service.submit(task);
+
+				// wait up to a timeout to verify that the task blocked rather
+				// than acquiring the 2nd connection.
+				f.get(250, TimeUnit.MILLISECONDS);
+
+			} catch (TimeoutException e) {
+
+				/*
+				 * This is the expected outcome.
+				 */
+				log.info("timeout");
+
+			} finally {
+
+				if (f != null) {
+					// Cancel task.
+					f.cancel(true/* mayInterruptIfRunning */);
+				}
+
+				if (sail2 != null)
+					sail2.shutDown();
+
+				sail.shutDown();
+
+			}
+
+		} finally {
+
+			if (service != null) {
+				service.shutdownNow();
+			}
+
+			sail.getDatabase().getIndexManager().destroy();
+
+		}
+
+	}
+
+	/**
+	 * Test creates a database, obtains a writable connection, writes some data
+	 * on the store, verifies that the data can be read back from within the
+	 * connection but that it is not visible in a read-committed view, commits
+	 * the write set, and verifies that the data is now visible in a
+	 * read-committed view.
+	 * 
+	 * TODO variant that writes, aborts the write, and verifies that the data
+	 * was not made restart safe.
+	 * 
+	 * @throws SailException
+	 * @throws InterruptedException
+	 */
+	public void test_isolationOfUnisolatedConnection() throws SailException,
+			InterruptedException {
+
+		final Properties properties = new Properties();
+
+		properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+
+		BigdataSailConnection conn = null;
+
+		BigdataSailConnection readConn = null;
+
+		final BigdataSail sail = new BigdataSail(properties);
+
+		try {
+
+			sail.initialize();
+
+			// the unisolated connection
+			conn = sail.getUnisolatedConnection();
+
+			// a read-only transaction.
+			readConn = sail.getReadOnlyConnection();
 
             final URI s = new URIImpl("http://www.bigdata.com/s");
 
@@ -348,9 +779,7 @@ public class TestBootstrapBigdataSail extends TestCase {
                 
             }
 
-        }
-
-        finally {
+        } finally {
 
             if (conn != null)
                 conn.close();
@@ -358,22 +787,18 @@ public class TestBootstrapBigdataSail extends TestCase {
             if (readConn != null)
                 readConn.close();
             
-            sail.shutDown();
-
-            if (!file.exists()) {
-
-                fail("Could not locate store: " + file);
-
-                if (!file.delete()) {
-
-                    fail("Could not delete file after test: " + file);
-
-                }
-
-            }
+			sail.getDatabase().getIndexManager().destroy();
 
         }
 
     }
 
+//	/**
+//	 * Unit test verifies that we can mix read/write transactions and the use
+//	 * of the unisolated connection.
+//	 */
+//	public void test_readWriteTxAndUnisolatedConnection() {
+//		fail("write this test");
+//	}
+	
 }

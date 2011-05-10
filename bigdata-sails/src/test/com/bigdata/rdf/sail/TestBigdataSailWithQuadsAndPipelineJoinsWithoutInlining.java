@@ -35,6 +35,7 @@ import junit.framework.TestSuite;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.tck.BigdataConnectionTest;
+import com.bigdata.rdf.sail.tck.BigdataSparqlFullRWTxTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlTest;
 import com.bigdata.rdf.sail.tck.BigdataStoreTest;
 import com.bigdata.relation.AbstractResource;
@@ -46,6 +47,8 @@ import com.bigdata.relation.AbstractResource;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated Support for inlining is non-optional in the development branch.
  */
 public class TestBigdataSailWithQuadsAndPipelineJoinsWithoutInlining extends AbstractBigdataSailTestCase {
 
@@ -97,6 +100,11 @@ public class TestBigdataSailWithQuadsAndPipelineJoinsWithoutInlining extends Abs
         
         suite.addTestSuite(TestDescribe.class);
         
+        suite.addTestSuite(TestTxCreate.class);
+        
+		suite.addTestSuite(com.bigdata.rdf.sail.contrib.TestRollbacks.class);
+		suite.addTestSuite(com.bigdata.rdf.sail.contrib.TestRollbacksTx.class);
+
         // The Sesame TCK, including the SPARQL test suite.
         {
 
@@ -113,7 +121,8 @@ public class TestBigdataSailWithQuadsAndPipelineJoinsWithoutInlining extends Abs
                  * filter out the dataset tests, which we don't need right now
                  */
 //                tckSuite.addTest(BigdataSparqlTest.suiteLTSWithPipelineJoins());
-                tckSuite.addTest(BigdataSparqlTest.suite());
+                tckSuite.addTest(BigdataSparqlTest.suite()); // unisolated conn.
+                tckSuite.addTest(BigdataSparqlFullRWTxTest.suite()); // full tx.
 
             } catch (Exception ex) {
 

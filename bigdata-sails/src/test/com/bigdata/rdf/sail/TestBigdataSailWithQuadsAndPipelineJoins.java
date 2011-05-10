@@ -32,9 +32,9 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 import junit.framework.TestSuite;
 
-import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.tck.BigdataConnectionTest;
+import com.bigdata.rdf.sail.tck.BigdataSparqlFullRWTxTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlTest;
 import com.bigdata.rdf.sail.tck.BigdataStoreTest;
 import com.bigdata.relation.AbstractResource;
@@ -97,7 +97,12 @@ public class TestBigdataSailWithQuadsAndPipelineJoins extends AbstractBigdataSai
         
         suite.addTestSuite(TestDescribe.class);
         
-        // The Sesame TCK, including the SPARQL test suite.
+        suite.addTestSuite(TestTxCreate.class);
+        
+		suite.addTestSuite(com.bigdata.rdf.sail.contrib.TestRollbacks.class);
+		suite.addTestSuite(com.bigdata.rdf.sail.contrib.TestRollbacksTx.class);
+
+		// The Sesame TCK, including the SPARQL test suite.
         {
 
             final TestSuite tckSuite = new TestSuite("Sesame 2.x TCK");
@@ -113,7 +118,8 @@ public class TestBigdataSailWithQuadsAndPipelineJoins extends AbstractBigdataSai
                  * filter out the dataset tests, which we don't need right now
                  */
 //                tckSuite.addTest(BigdataSparqlTest.suiteLTSWithPipelineJoins());
-                tckSuite.addTest(BigdataSparqlTest.suite());
+                tckSuite.addTest(BigdataSparqlTest.suite()); // unisolated conn.
+                tckSuite.addTest(BigdataSparqlFullRWTxTest.suite()); // full tx.
 
             } catch (Exception ex) {
 

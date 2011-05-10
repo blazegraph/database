@@ -1721,7 +1721,7 @@ abstract public class AbstractTripleStore extends
      * @throws IllegalStateException
      *             if the view is read only.
      */
-    public long commit() {
+    synchronized public long commit() {
         
         if (isReadOnly())
             throw new IllegalStateException();

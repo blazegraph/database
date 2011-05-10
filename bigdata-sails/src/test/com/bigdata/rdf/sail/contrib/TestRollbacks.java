@@ -32,6 +32,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.log4j.Logger;
 import org.openrdf.OpenRDFException;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -47,11 +48,12 @@ import org.openrdf.repository.sail.SailRepository;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.QuadsTestCase;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
- * Unit test template for use in submission of bugs.
+ * This is a stress test for abort/rollback semantics.
  * <p>
  * This test case will delegate to an underlying backing store. You can specify
  * this store via a JVM property as follows:
@@ -68,24 +70,28 @@ import com.bigdata.rdf.vocab.NoVocabulary;
  * to be on. If you would like to turn off inference, make sure to do so in
  * {@link #getProperties()}.
  * 
+ * @see https://sourceforge.net/apps/trac/bigdata/ticket/278
+ * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author <a href="mailto:gerdev@users.sourceforge.net">Gerjon</a>
  * @version $Id$
  */
 public class TestRollbacks extends QuadsTestCase {
-    public TestRollbacks() {
+
+    private static final Logger log = Logger.getLogger(TestRollbacks.class);
+
+	public TestRollbacks() {
     }
 
     public TestRollbacks(String arg0) {
         super(arg0);
     }
 
-    /**
-     * Please set your database properties here, except for your journal file,
-     * please DO NOT SPECIFY A JOURNAL FILE.
-     */
     @Override
     public Properties getProperties() {
-        Properties props = super.getProperties();
+        
+    	final Properties props = super.getProperties();
 
         /*
          * For example, here is a set of five properties that turns off
@@ -97,7 +103,14 @@ public class TestRollbacks extends QuadsTestCase {
                 NoVocabulary.class.getName());
         props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
         props.setProperty(BigdataSail.Options.JUSTIFY, "false");
-        props.setProperty(BigdataSail.Options.ISOLATABLE_INDICES, "true");
+
+        // transactions are off in the base version of this class.
+        props.setProperty(BigdataSail.Options.ISOLATABLE_INDICES, "false");
+
+//		props.setProperty(BigdataSail.Options.CREATE_TEMP_FILE, "true");
+//		props.setProperty(BigdataSail.Options.BUFFER_MODE, BufferMode.DiskRW
+//				.toString());
+        
 //        props.setProperty(BigdataSail.Options.EXACT_SIZE, "true");
 
         return props;
@@ -131,13 +144,42 @@ public class TestRollbacks extends QuadsTestCase {
         firstCause = null;
         super.tearDown();
     }
-    
-    public void testBug() throws Exception {
-        BigdataSail sail = getSail();
+
+    /**
+     * Stress test for abort/rollback semantics consisting of many short
+     * runs of the basic test.
+     * 
+     * @throws Exception
+     */
+	public void testManyShortRuns() throws Exception {
+		
+		for (int i = 0; i < 20; i++) {
+		
+			doTest(10);
+			
+		}
+		
+    }
+
+    /**
+     * Stress test for abort/rollback semantics consisting of one moderate
+     * duration run of the basic test.
+     * 
+     * @throws Exception
+     */
+    public void testModerateDuration() throws Exception {
+
+    	doTest(100);
+    	
+    }
+
+    private void doTest(final int maxCounter) throws InterruptedException, Exception {
+    	final BigdataSail sail = getSail();
         try {
-            SailRepository repo = new SailRepository(sail);
+        	// Note: Modified to use the BigdataSailRepository rather than the base SailRepository class.
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
             repo.initialize();
-            runConcurrentStuff(repo);
+            runConcurrentStuff(repo,maxCounter);
         } finally {
             final IIndexManager db = sail.getDatabase().getIndexManager();
             if (sail.isOpen())
@@ -146,14 +188,14 @@ public class TestRollbacks extends QuadsTestCase {
         }
     }
     
-    private void runConcurrentStuff(final SailRepository repo)
+    private void runConcurrentStuff(final SailRepository repo,final int maxCounter)
             throws Exception,
             InterruptedException {
         try {
             final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
-            tasks.add(new DoStuff(repo, true));
-            tasks.add(new DoStuff(repo, false));
-            tasks.add(new DoStuff(repo, false));
+            tasks.add(new DoStuff(repo, true/*writer*/, maxCounter));
+            tasks.add(new DoStuff(repo, false/*reader*/, maxCounter));
+            tasks.add(new DoStuff(repo, false/*reader*/, maxCounter));
             final List<Future<Void>> futures = executorService.invokeAll(tasks);
             // Look for the first cause.
             final Throwable t = firstCause.get();
@@ -170,16 +212,30 @@ public class TestRollbacks extends QuadsTestCase {
         }
     }
 
-    private class DoStuff implements Callable<Void> {
-      private SailRepository repo;
-        private boolean writer;
-        int counter = 0;
+	private class DoStuff implements Callable<Void> {
 
-        private DoStuff(SailRepository repo, boolean writer)
-                throws OpenRDFException {
-          this.repo = repo;
-            this.writer = writer;
-        }
+		private SailRepository repo;
+		private boolean writer;
+		private final int maxCounter;
+		int counter = 0;
+
+		/**
+		 * @param repo
+		 *            The repository.
+		 * @param writer
+		 *            <code>true</code> iff this is a writer.
+		 * @param maxCounter
+		 *            Sets a limit on the length of the stress test. A value of
+		 *            1000 results in a 26 second run. A value of 100-200 is
+		 *            more reasonable and is sufficient to readily identify any
+		 *            problems during CI.
+		 */
+		private DoStuff(final SailRepository repo, final boolean writer,
+				final int maxCounter) throws OpenRDFException {
+			this.repo = repo;
+			this.writer = writer;
+			this.maxCounter = maxCounter;
+		}
 
         public Void call() throws Exception {
 //            if (writer) {
@@ -188,26 +244,34 @@ public class TestRollbacks extends QuadsTestCase {
 //            }
             RepositoryConnection conn = null;
             try {
-                while (firstCause.get() == null) {
+				int counter2 = 0;
+				conn = repo.getConnection();
+				conn.setAutoCommit(false);           	
+                while (firstCause.get() == null&&counter<maxCounter) {
+                    if (writer)
+                        writer(conn);
+                    else
+                        reader(conn);
                     /*
                      * Note: If connection obtained/closed within the loop then
                      * the query is more likely to have some data to visit
                      * within its tx view.
                      */
-                    conn = repo.getConnection();
-                    conn.setAutoCommit(false);
-                    if (writer)
-                        writer(conn);
-                    else
-                        reader(conn);
-                    conn.close();
+					if (++counter2 % 4 == 0) {
+						conn.close();
+						conn = repo.getConnection();
+						conn.setAutoCommit(false);
+					}
+//					conn = repo.getConnection();
+//                    conn.setAutoCommit(false);
+//                    conn.close();
                 }
                 return (Void) null;
             } catch (Throwable t) {
                 firstCause.compareAndSet(null/* expect */, t);
                 throw new RuntimeException(t);
             } finally {
-                if (conn != null && conn.isOpen())
+                if (conn != null)
                     conn.close();
             }
         }

@@ -29,6 +29,7 @@ package com.bigdata.btree;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
@@ -1126,30 +1127,47 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         assertNotTransient();
         assertNotReadOnly();
 
-        if (/*autoCommit &&*/ needsCheckpoint()) {
+		/*
+		 * Note: Acquiring this lock provides for atomicity of the checkpoint of
+		 * the BTree during the commit protocol. Without this lock, users of the
+		 * UnisolatedReadWriteIndex could be concurrently modifying the BTree
+		 * while we are attempting to snapshot it for the commit.
+		 * 
+		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/288
+		 * 
+		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/278
+		 */
+		final Lock lock = new UnisolatedReadWriteIndex(this).writeLock();
+		try {
+			
+			if (/* autoCommit && */needsCheckpoint()) {
 
-            /*
-             * Flush the btree, write a checkpoint record, and return the
-             * address of that checkpoint record. The [checkpoint] reference is
-             * also updated.
-             */
+				/*
+				 * Flush the btree, write a checkpoint record, and return the
+				 * address of that checkpoint record. The [checkpoint] reference
+				 * is also updated.
+				 */
 
-            return writeCheckpoint();
+				return writeCheckpoint();
 
-        }
+			}
 
-        /*
-         * There have not been any writes on this btree or auto-commit is
-         * disabled.
-         * 
-         * Note: if the application has explicitly invoked writeCheckpoint()
-         * then the returned address will be the address of that checkpoint
-         * record and the BTree will have a new checkpoint address made restart
-         * safe on the backing store.
-         */
+			/*
+			 * There have not been any writes on this btree or auto-commit is
+			 * disabled.
+			 * 
+			 * Note: if the application has explicitly invoked writeCheckpoint()
+			 * then the returned address will be the address of that checkpoint
+			 * record and the BTree will have a new checkpoint address made
+			 * restart safe on the backing store.
+			 */
 
-        return checkpoint.addrCheckpoint;
-        
+			return checkpoint.addrCheckpoint;
+
+		} finally {
+			lock.unlock();
+		}
+
     }
     
     /**

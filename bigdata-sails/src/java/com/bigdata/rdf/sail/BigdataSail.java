@@ -57,7 +57,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.bigdata.rdf.sail;
 
-import info.aduna.collections.iterators.EmptyIterator;
 import info.aduna.iteration.CloseableIteration;
 
 import java.io.IOException;
@@ -119,11 +118,9 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.changesets.StatementWriter;
-import com.bigdata.rdf.changesets.IChangeRecord.ChangeAction;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -643,54 +640,92 @@ public class BigdataSail extends SailBase implements Sail {
         
         // throws an exception if there are inconsistent properties
         checkProperties(properties);
-        
-        final LocalTripleStore lts = new LocalTripleStore(
-                journal, namespace, ITx.UNISOLATED, properties);
-        
+
         try {
             
-            final long tx0 = txService.newTx(ITx.READ_COMMITTED);
+//          final boolean create;
+//          final long tx0 = txService.newTx(ITx.READ_COMMITTED);
+//          try {
+//              // verify kb does not exist (can not be located).
+//              create = journal.getResourceLocator().locate(namespace, tx0) == null;
+//          } finally {
+//              txService.abort(tx0);
+//          }
+          
+          // Check for pre-existing instance.
+          {
 
-            // verify kb does not exist (can not be located).
-            final boolean create = 
-                journal.getResourceLocator().locate(namespace, tx0) == null;
+              final LocalTripleStore lts = (LocalTripleStore) journal
+                      .getResourceLocator().locate(namespace, ITx.UNISOLATED);
 
-            txService.abort(tx0);
-            
-//          if (!new SPORelation(journal, namespace + "."
-//                  + SPORelation.NAME_SPO_RELATION, ITx.UNISOLATED, properties).exists()) {
-            if (create) {
-            
-                if (Boolean.parseBoolean(properties.getProperty(
-                        BigdataSail.Options.ISOLATABLE_INDICES,
-                        BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES))) {
-                
-                    final long txCreate = txService.newTx(ITx.UNISOLATED);
-        
-                    final AbstractTripleStore txCreateView = new LocalTripleStore(
-                            journal, namespace, Long.valueOf(txCreate), properties);
-        
-                    // create the kb instance within the tx.
-                    txCreateView.create();
-        
-                    // commit the tx.
-                    txService.commit(txCreate);
-                    
-                } else {
-                    
-                    lts.create();
-                    
-                }
-                
-            }
-            
-        } catch (IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-        
-        return lts;
+              if (lts != null) {
+
+                  return lts;
+
+              }
+
+          }
+          
+          // Create a new instance.
+//          if (create) 
+          {
+          
+              final LocalTripleStore lts = new LocalTripleStore(
+                      journal, namespace, ITx.UNISOLATED, properties);
+              
+              if (Boolean.parseBoolean(properties.getProperty(
+                      BigdataSail.Options.ISOLATABLE_INDICES,
+                      BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES))) {
+              
+                  final long txCreate = txService.newTx(ITx.UNISOLATED);
+      
+                  final AbstractTripleStore txCreateView = new LocalTripleStore(
+                          journal, namespace, Long.valueOf(txCreate), properties);
+      
+                  // create the kb instance within the tx.
+                  txCreateView.create();
+      
+                  // commit the tx.
+                  txService.commit(txCreate);
+                  
+              } else {
+                  
+                  lts.create();
+                  
+              }
+              
+          }
+
+          /*
+           * Now that we have created the instance, either using a tx or the
+           * unisolated connection, locate the triple store resource and
+           * return it.
+           */
+          {
+
+              final LocalTripleStore lts = (LocalTripleStore) journal
+                      .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+
+              if (lts == null) {
+
+                  /*
+                   * This should only occur if there is a concurrent destroy,
+                   * which is highly unlikely to say the least.
+                   */
+                  throw new RuntimeException("Concurrent create/destroy: "
+                          + namespace);
+
+              }
+
+              return lts;
+              
+          }
+          
+      } catch (IOException ex) {
+          
+          throw new RuntimeException(ex);
+          
+      }
         
     }
 
@@ -1111,9 +1146,14 @@ public class BigdataSail extends SailBase implements Sail {
     }
     
     /**
-     * Strengthens the return type.  This returns the unisolated view of the
-     * database, which because of truth maintenance means only one connection
-     * at a time.
+     * {@inheritDoc}
+     * <p>
+     * If the triple store was provisioned to support full read/write
+     * transactions then this is delegated to {@link #getReadWriteConnection()}.
+     * Otherwise, is delegated to {@link #getUnisolatedConnection()} which
+     * returns the unisolated view of the database. Note that truth maintenance
+     * requires only one connection at a time and is therefore not compatible
+     * with full read/write transactions.
      */
     @Override
     public BigdataSailConnection getConnection() throws SailException {
@@ -1150,13 +1190,29 @@ public class BigdataSail extends SailBase implements Sail {
      */
     public BigdataSailConnection getUnisolatedConnection() 
             throws InterruptedException {
-        
-        Lock writeLock = lock.writeLock();
+
+    	if(lock.writeLock().isHeldByCurrentThread()) {
+    		/*
+    		 * A thread which already holds this lock already has the open
+    		 * unisolated connection and will deadlock when it attempts to
+    		 * obtain the permit for that connection from the Journal.
+    		 */
+			throw new IllegalStateException(
+					"UNISOLATED connection is not reentrant.");
+    	}
+    	
+		if (getDatabase().getIndexManager() instanceof Journal) {
+			// acquire permit from Journal.
+			((Journal) getDatabase().getIndexManager())
+					.acquireUnisolatedConnection();
+		}
+		
+		final Lock writeLock = lock.writeLock();
         writeLock.lock();
         
         // new writable connection.
-        final BigdataSailConnection conn = 
-            new BigdataSailConnection(database, writeLock);
+		final BigdataSailConnection conn = new BigdataSailConnection(database,
+				writeLock, true/* unisolated */);
         
         return conn;
 
@@ -1192,7 +1248,7 @@ public class BigdataSail extends SailBase implements Sail {
                     database.getNamespace(),
                     TimestampUtility.asHistoricalRead(timestamp));
 
-        return new BigdataSailConnection(view, null);
+        return new BigdataSailConnection(view, null, false/*unisolated*/);
         
     }
     
@@ -1220,7 +1276,7 @@ public class BigdataSail extends SailBase implements Sail {
         final Lock readLock = lock.readLock();
         readLock.lock();
         
-        return new BigdataSailConnection(readLock) {
+        return new BigdataSailConnection(readLock,false/*unisolated*/) {
             
             /**
              * The transaction id.
@@ -1304,7 +1360,15 @@ public class BigdataSail extends SailBase implements Sail {
             @Override
             public synchronized void rollback() throws SailException {
 
-                super.rollback();
+				/*
+				 * Note: DO NOT invoke super.rollback(). That will cause a
+				 * database (Journal) level abort(). The Journal level abort()
+				 * will discard the writes buffered on the unisolated indices
+				 * (the lexicon indices). That will cause lost updates and break
+				 * the eventually consistent design for the TERM2ID and ID2TERM
+				 * indices.
+				 */
+//                super.rollback();
                 
                 try {
                 
@@ -1423,8 +1487,21 @@ public class BigdataSail extends SailBase implements Sail {
          * Used to coordinate between read/write transactions and the unisolated
          * view.
          */
-        private Lock lock;
+        final private Lock lock;
 
+		/**
+		 * <code>true</code> iff this is the UNISOLATED connection (only one of
+		 * those at a time).
+		 */
+        private final boolean unisolated;
+
+        public String toString() {
+        	
+			return getClass().getName() + "{timestamp="
+					+ TimestampUtility.toString(database.getTimestamp()) + "}";
+        	
+        }
+                
         /**
          * Return the assertion buffer.
          * <p>
@@ -1534,10 +1611,11 @@ public class BigdataSail extends SailBase implements Sail {
 
         }
         
-        protected BigdataSailConnection(final Lock lock) {
+        protected BigdataSailConnection(final Lock lock,final boolean unisolated) {
             
             this.lock = lock;
-            
+            this.unisolated = unisolated;
+
         }
         
         /**
@@ -1548,11 +1626,12 @@ public class BigdataSail extends SailBase implements Sail {
          *            {@link SailConnection} will not support update.
          */
         protected BigdataSailConnection(final AbstractTripleStore database, 
-                final Lock lock) {
+                final Lock lock, final boolean unisolated) {
             
             attach(database);
             
             this.lock = lock;
+            this.unisolated = unisolated;
             
         }
         
@@ -2658,6 +2737,11 @@ public class BigdataSail extends SailBase implements Sail {
                 if (lock != null) {
                     lock.unlock();
                 }
+        		if (unisolated && getDatabase().getIndexManager() instanceof Journal) {
+                    // release the permit.
+        			((Journal) getDatabase().getIndexManager())
+        					.releaseUnisolatedConnection();
+        		}
                 open = false;
             }
             
@@ -3466,7 +3550,7 @@ public class BigdataSail extends SailBase implements Sail {
          * @param log
          *          the change log
          */
-        public void setChangeLog(final IChangeLog changeLog) {
+        synchronized public void setChangeLog(final IChangeLog changeLog) {
             
             this.changeLog = changeLog;
             

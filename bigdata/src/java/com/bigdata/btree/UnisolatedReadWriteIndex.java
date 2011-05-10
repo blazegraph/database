@@ -293,7 +293,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
      * @throws IllegalArgumentException
      *             if the index is <code>null</code>.
      */
-    public UnisolatedReadWriteIndex(IIndex ndx) {
+    public UnisolatedReadWriteIndex(BTree ndx) {
         
         this(ndx, DEFAULT_CAPACITY);
         
@@ -329,7 +329,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
      *       the computed solutions onto the relations. It is likely that a
      *       read-write lock will do well for this situation.
      */
-    public UnisolatedReadWriteIndex(final IIndex ndx, final int capacity) {
+    public UnisolatedReadWriteIndex(final BTree ndx, final int capacity) {
 
         if (ndx == null)
             throw new IllegalArgumentException();
