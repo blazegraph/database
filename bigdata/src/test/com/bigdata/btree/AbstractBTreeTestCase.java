@@ -46,8 +46,10 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.data.IAbstractNodeData;
+import com.bigdata.btree.data.IKeysData;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
+import com.bigdata.btree.data.ISpannedTupleCountData;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KV;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -391,19 +393,29 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     }
 
     /**
-     * Verify all data accessible from {@link AbstractNode}.
+     * Verify all data accessible from {@link INodeData}.
      */
     static protected void assertSameAbstractNodeData(
-            final AbstractNode n1, final AbstractNode n2) {
+            final IAbstractNodeData n1, final IAbstractNodeData n2) {
 
         assertEquals("isLeaf", n1.isLeaf(), n2.isLeaf());
 
-        assertEquals("entryCount", n1.getSpannedTupleCount(), n2
-                .getSpannedTupleCount());
+        if(n1 instanceof ISpannedTupleCountData) {
+        
+			assertEquals("entryCount", ((ISpannedTupleCountData) n1)
+					.getSpannedTupleCount(), ((ISpannedTupleCountData) n2)
+					.getSpannedTupleCount());
 
-        assertEquals("keyCount", n1.getKeyCount(), n2.getKeyCount());
+        }
 
-        assertKeys(n1.getKeys(), n2.getKeys());
+		if (n1 instanceof IKeysData) {
+
+			assertEquals("keyCount", ((IKeysData) n1).getKeyCount(),
+					((IKeysData) n2).getKeyCount());
+
+			assertKeys(((IKeysData) n1).getKeys(), ((IKeysData) n2).getKeys());
+
+		}
 
         assertEquals("hasVersionTimestamps", n1.hasVersionTimestamps(), n2
                 .hasVersionTimestamps());
@@ -427,7 +439,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      */
     static public void assertSameNodeData(final INodeData n1, final INodeData n2) {
 
-        assertSameAbstractNodeData((AbstractNode)n1, (AbstractNode)n2);
+        assertSameAbstractNodeData(n1, n2);
 
         assertEquals("childCount", n1.getChildCount(), n2.getChildCount());
 
@@ -467,7 +479,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      */
     static public void assertSameLeafData(final ILeafData n1, final ILeafData n2) {
 
-        assertSameAbstractNodeData((AbstractNode)n1, (AbstractNode)n2);
+		assertSameAbstractNodeData((IAbstractNodeData) n1, (IAbstractNodeData) n2);
 
         assertEquals("#keys!=#vals", n1.getKeyCount(), n1.getValueCount());
 
