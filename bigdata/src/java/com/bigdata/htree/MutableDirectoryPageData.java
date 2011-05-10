@@ -228,7 +228,6 @@ public class MutableDirectoryPageData implements IDirectoryData {
 	 * 
 	 * TODO Alternatively, could report the #of non-null child addresses.
 	 */
-	@Override
 	final public int getChildCount() {
 
 		return childAddr.length;
