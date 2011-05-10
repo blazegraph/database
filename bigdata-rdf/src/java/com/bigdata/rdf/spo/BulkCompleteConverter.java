@@ -136,7 +136,7 @@ public class BulkCompleteConverter implements IChunkConverter<ISPO,ISPO> {
             
             if (val != null) {
                 
-                SPO.decodeValue(chunk[i], val);
+                tupleSer.decodeValue(chunk[i], val);
                 
             } else {
                 

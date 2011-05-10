@@ -27,9 +27,9 @@ package com.bigdata.rdf.model;
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 
-import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.internal.SidIV;
+import com.bigdata.rdf.spo.ModifiedEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 
@@ -282,30 +282,50 @@ public class BigdataStatementImpl implements BigdataStatement {
 
     }
 
-    public final void setStatementIdentifier(final IV sid) {
+    public final void setStatementIdentifier(final boolean sidable) {
 
-        if (sid == null)
-            throw new IllegalArgumentException();
-
-        if (!sid.isStatement())
-            throw new IllegalArgumentException("Not a statement identifier: "
-                    + sid);
-
-        if (type != StatementEnum.Explicit) {
+        if (sidable && type != StatementEnum.Explicit) {
 
             // Only allowed for explicit statements.
             throw new IllegalStateException();
 
         }
 
-        if (c != null && c.getIV() != sid)
-            throw new IllegalStateException(
-                    "Different statement identifier already defined: "
-                            + toString() + ", new=" + sid);
-
-        c.setIV(sid);
+        if (c == null) {
+        	
+        	// this SHOULD not ever happen
+        	throw new IllegalStateException();
+        	
+        }
+        
+        c.setIV(new SidIV(this));
 
     }
+
+//    public final void setStatementIdentifier(final IV sid) {
+//
+//        if (sid == null)
+//            throw new IllegalArgumentException();
+//
+//        if (!sid.isStatement())
+//            throw new IllegalArgumentException("Not a statement identifier: "
+//                    + sid);
+//
+//        if (type != StatementEnum.Explicit) {
+//
+//            // Only allowed for explicit statements.
+//            throw new IllegalStateException();
+//
+//        }
+//
+//        if (c != null && c.getIV() != sid)
+//            throw new IllegalStateException(
+//                    "Different statement identifier already defined: "
+//                            + toString() + ", new=" + sid);
+//
+//        c.setIV(sid);
+//
+//    }
 
     public final IV getStatementIdentifier() {
 
@@ -333,13 +353,6 @@ public class BigdataStatementImpl implements BigdataStatement {
         
         this.override = override;
         
-    }
-
-    public byte[] serializeValue(final ByteArrayBuffer buf) {
-
-        return SPO.serializeValue(buf, override, userFlag, type, 
-        	c != null ? c.getIV() : null);
-
     }
 
     /**

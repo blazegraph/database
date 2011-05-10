@@ -12,7 +12,7 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBufferHandler;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.rdf.inf.Justification;
-import com.bigdata.rdf.spo.ISPO.ModifiedEnum;
+import com.bigdata.rdf.spo.ModifiedEnum;
 
 /**
  * Class writes on a statement index, removing the specified statements (batch

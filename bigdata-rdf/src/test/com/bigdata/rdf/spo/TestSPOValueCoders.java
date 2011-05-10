@@ -136,7 +136,8 @@ public class TestSPOValueCoders extends TestCase2 {
                 spo = new SPO(getTermId(), getTermId(), getTermId(),
                         StatementEnum.Explicit);
                 
-                spo.setStatementIdentifier(getSID());
+//                spo.setStatementIdentifier(getSID());
+                spo.setStatementIdentifier(true);
                 
             } else if (inference) {
                
@@ -156,7 +157,8 @@ public class TestSPOValueCoders extends TestCase2 {
                         && r.nextInt(100) < 20) {
 
                     // explicit statement with SID.
-                    spo.setStatementIdentifier(getSID());
+//                    spo.setStatementIdentifier(getSID());
+                	spo.setStatementIdentifier(true);
 
                 }
                 
@@ -200,21 +202,21 @@ public class TestSPOValueCoders extends TestCase2 {
     public void test_FastRDFValueCoder2_001() {
 
         doRoundTripTest(new SPO[] { new SPO(_0, _0, _0, StatementEnum.Axiom) },
-                new FastRDFValueCoder2());
+                new FastRDFValueCoder2(), false);
 
         doRoundTripTest(new SPO[] { new SPO(_0, _0, _0, StatementEnum.Explicit) },
-                new FastRDFValueCoder2());
+                new FastRDFValueCoder2(), false);
 
         doRoundTripTest(new SPO[] { new SPO(_0, _0, _0, StatementEnum.Inferred) },
-                new FastRDFValueCoder2());
+                new FastRDFValueCoder2(), false);
 
         doRoundTripTest(new SPO[] { new SPO(_0, _0, _0, StatementEnum.Axiom),
                 new SPO(_0, _0, _0, StatementEnum.Inferred) },
-                new FastRDFValueCoder2());
+                new FastRDFValueCoder2(), false);
 
         doRoundTripTest(new SPO[] { new SPO(_0, _0, _0, StatementEnum.Explicit),
                 new SPO(_0, _0, _0, StatementEnum.Axiom) },
-                new FastRDFValueCoder2());
+                new FastRDFValueCoder2(), false);
 
     }
 
@@ -227,25 +229,25 @@ public class TestSPOValueCoders extends TestCase2 {
     protected void doRoundTripTests(final IRabaCoder rabaCoder,
             final boolean SIDs, final boolean inference) {
 
-        doRoundTripTest(getData(0, SIDs, inference), rabaCoder);
+        doRoundTripTest(getData(0, SIDs, inference), rabaCoder, SIDs);
 
-        doRoundTripTest(getData(1, SIDs, inference), rabaCoder);
+        doRoundTripTest(getData(1, SIDs, inference), rabaCoder, SIDs);
 
-        doRoundTripTest(getData(2, SIDs, inference), rabaCoder);
+        doRoundTripTest(getData(2, SIDs, inference), rabaCoder, SIDs);
 
-        doRoundTripTest(getData(10, SIDs, inference), rabaCoder);
+        doRoundTripTest(getData(10, SIDs, inference), rabaCoder, SIDs);
 
         for (int i = 0; i < 1000; i++) {
 
-            doRoundTripTest(getData(r.nextInt(64), SIDs, inference), rabaCoder);
+            doRoundTripTest(getData(r.nextInt(64), SIDs, inference), rabaCoder, SIDs);
 
         }
 
-        doRoundTripTest(getData(100, SIDs, inference), rabaCoder);
+        doRoundTripTest(getData(100, SIDs, inference), rabaCoder, SIDs);
 
-        doRoundTripTest(getData(1000, SIDs, inference), rabaCoder);
+        doRoundTripTest(getData(1000, SIDs, inference), rabaCoder, SIDs);
 
-        doRoundTripTest(getData(10000, SIDs, inference), rabaCoder);
+        doRoundTripTest(getData(10000, SIDs, inference), rabaCoder, SIDs);
 
 //        doRoundTripTest(getData(100000, SIDs, inference), rabaCoder);
 
@@ -261,14 +263,14 @@ public class TestSPOValueCoders extends TestCase2 {
      * 
      * @throws IOException
      */
-    protected void doRoundTripTest(final SPO[] a, final IRabaCoder rabaCoder) {
+    protected void doRoundTripTest(final SPO[] a, final IRabaCoder rabaCoder, final boolean sids) {
 
         /*
          * Generate keys from the SPOs.
          */
 
         final SPOTupleSerializer tupleSer = new SPOTupleSerializer(
-                SPOKeyOrder.SPO);
+                SPOKeyOrder.SPO, sids);
         
         final byte[][] vals = new byte[a.length][];
         {

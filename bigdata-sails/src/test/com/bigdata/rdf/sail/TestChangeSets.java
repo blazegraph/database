@@ -30,26 +30,23 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Properties;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.axioms.OwlAxioms;
 import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeRecord;
-import com.bigdata.rdf.changesets.InMemChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord.ChangeAction;
+import com.bigdata.rdf.changesets.InMemChangeLog;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.spo.ISPO.ModifiedEnum;
+import com.bigdata.rdf.spo.ModifiedEnum;
 import com.bigdata.rdf.store.BD;
-import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.vocab.NoVocabulary;
-import com.bigdata.rdf.vocab.RDFSVocabulary;
-import com.bigdata.striterator.ChunkedArrayIterator;
 
 /**
  * Test change sets. This is meant to be run in triples with SIDs mode.
@@ -353,6 +350,9 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                     new LinkedList<IChangeRecord>();
                 for (BigdataStatement stmt : add) {
                     expected.add(new ChangeRecord(stmt, ChangeAction.INSERTED));
+                    if (log.isInfoEnabled()) {
+                    	log.info(stmt);
+                    }
                 }
                 
                 compare(expected, changeLog.getLastCommit(sail.getDatabase()));
@@ -730,6 +730,15 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
         final Collection<IChangeRecord> extra = new LinkedList<IChangeRecord>();
         Collection<IChangeRecord> missing = new LinkedList<IChangeRecord>();
 
+        if (log.isInfoEnabled()) {
+        	for (IChangeRecord cr : expected) {
+        		log.info("expected: " + cr);
+        	}
+        	for (IChangeRecord cr : actual) {
+        		log.info("actual: " + cr);
+        	}
+        }
+        
         int resultCount = 0;
         int nmatched = 0;
         for (IChangeRecord rec : actual) {

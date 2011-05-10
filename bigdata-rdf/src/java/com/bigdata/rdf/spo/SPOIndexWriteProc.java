@@ -29,8 +29,9 @@ package com.bigdata.rdf.spo;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.util.Arrays;
+
 import org.apache.log4j.Logger;
+
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
@@ -40,12 +41,8 @@ import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.ISPO.ModifiedEnum;
-import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.rdf.spo.ModifiedEnum;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**
@@ -57,11 +54,11 @@ import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
  * <p>
  * The value for each statement is a byte that encodes the {@link StatementEnum}
  * and also encodes whether or not the "override" flag is set using - see
- * {@link StatementEnum#MASK_OVERRIDE} - followed by 8 bytes representing the
- * statement identifier IFF statement identifiers are enabled AND the
- * {@link StatementEnum} is {@link StatementEnum#Explicit}. The value requires
- * interpretation to determine the byte[] that will be written as the value on
- * the index - see the code for more details.
+ * {@link StatementEnum#MASK_OVERRIDE} - It also does something similar for sids
+ * by using the {@link StatementEnum#MASK_SID} IFF statement identifiers are
+ * enabled AND the {@link StatementEnum} is {@link StatementEnum#Explicit}. The
+ * value requires interpretation to determine the byte[] that will be written as
+ * the value on the index - see the code for more details.
  * <p>
  * Note: This needs to be a custom batch operation using a conditional insert so
  * that we do not write on the index when the data would not be changed and to
@@ -182,14 +179,14 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
         final int n = keys.size();//getKeyCount();
 
         // used to generate the values that we write on the index.
-        final ByteArrayBuffer tmp = new ByteArrayBuffer(1 + 8/* max size */);
+        final ByteArrayBuffer tmp = new ByteArrayBuffer(1);
 
+        final SPOTupleSerializer tupleSer = (SPOTupleSerializer) 
+        	ndx.getIndexMetadata().getTupleSerializer();
+        
         // true iff logging is enabled and this is the primary (SPO/SPOC) index.
-        final boolean isPrimaryIndex = INFO ? ((SPOTupleSerializer) ndx
-                .getIndexMetadata().getTupleSerializer()).getKeyOrder()
+        final boolean isPrimaryIndex = INFO ? tupleSer.getKeyOrder()
                 .isPrimaryIndex() : false;
-//        final boolean isPrimaryIndex = INFO ? ndx.getIndexMetadata().getName()
-//                .endsWith(SPOKeyOrder.SPO.getIndexName()) : false;
 
         // Array used to report by which statements were modified by this operation.
         final ModifiedEnum[] modified = reportMutation ? new ModifiedEnum[n] : null;
@@ -213,7 +210,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
              */
             final byte[] val = getValue(i);
             assert val != null;
-            assert val.length == 1 || val.length==9;
+            assert val.length == 1;
 
             // figure out if the override bit is set.
             final boolean override = StatementEnum.isOverride(val[0]);
@@ -221,15 +218,10 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
             final boolean userFlag = StatementEnum.isUserFlag(val[0]);
             
             /*
-             * Decode the new (proposed) statement type (override bit is
-             * masked off).
+             * Decode the new (proposed) statement type (override, userFlag, 
+             * and sid bits are masked off).
              */
             final StatementEnum newType = StatementEnum.decode(val[0]);
-
-            /*
-             * Decode the new (proposed) statement identifier.
-             */
-            final IV new_sid = decodeStatementIdentifier(newType, val);
 
             /*
              * The current value for the statement in this index partition (or
@@ -251,12 +243,11 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                  * Statement is NOT pre-existing.
                  */
 
-                ndx.insert(key, SPO.serializeValue(tmp, false/* override */,userFlag,
-                        newType, new_sid/* MAY be NULL */));
+                ndx.insert(key, tupleSer.serializeVal(
+                		tmp, false/* override */, userFlag, newType));
 
                 if (isPrimaryIndex && DEBUG) {
-                    log.debug("new SPO: key=" + BytesUtil.toString(key)
-                            + ", sid=" + new_sid);
+                    log.debug("new SPO: key=" + BytesUtil.toString(key));
                 }
                 
                 writeCount++;
@@ -284,10 +275,10 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
                         assert newType != StatementEnum.Explicit;
                         
-                        // Note: No statement identifier since statement is not
-                        // explicit.
-                        ndx.insert(key, SPO.serializeValue(tmp,
-                                false/* override */,userFlag, newType, null/* sid */));
+                        ndx.insert(key, tupleSer.serializeVal(
+                        		tmp, false/* override */, userFlag, 
+//                        		false /* no sid for type=inferred */, 
+                        		newType));
 
                         if (isPrimaryIndex && DEBUG) {
                             log.debug("Downgrading SPO: key="
@@ -305,40 +296,24 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                 } else {
 
                     // choose the max of the old and the proposed type.
-                    final StatementEnum maxType = StatementEnum.max(oldType,
-                            newType);
+                    final StatementEnum maxType = 
+                    	StatementEnum.max(oldType, newType);
 
                     if (oldType != maxType) {
 
-                        /*
-                         * Write on the index iff the type was actually changed.
-                         * 
-                         * Note: The [sid] will be NULL regardless of the code
-                         * path below if statement identifiers are not enabled.
-                         */
-
-                        final IV sid;
-
-                        if (maxType == oldType) {
-
-                            // If the old statement was explicit then use its sid.
-                            sid = decodeStatementIdentifier(oldType, oldval);
-                            
-                        } else {
-                            
-                            // Otherwise use the new sid.
-                            sid = new_sid;
-
-                        }
-
-                        ndx.insert(key, SPO.serializeValue(tmp,
-                                false/* override */,userFlag, maxType, sid));
+//                    	final boolean newSid = maxType == StatementEnum.Explicit;
+                    	
+                        ndx.insert(key, tupleSer.serializeVal(
+                        		tmp, false/* override */, 
+                        		userFlag, 
+//                        		newSid, 
+                        		maxType));
 
                         if (isPrimaryIndex && DEBUG) {
                             log.debug("Changing statement type: key="
                                     + BytesUtil.toString(key) + ", oldType="
                                     + oldType + ", newType=" + newType
-                                    + ", maxType=" + maxType + ", sid=" + sid);
+                                    + ", maxType=" + maxType);
                         }
 
                         writeCount++;
@@ -378,61 +353,6 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
             
         }
         
-    }
-
-    /**
-     * Decodes and validate the statement identifier from the value.
-     * 
-     * @param type
-     *            The statement type.
-     * @param val
-     *            The value.
-     * 
-     * @return The statement identifier if the statement is
-     *         {@link StatementEnum#Explicit} and statement identifiers are
-     *         enabled and otherwise {@link IRawTripleStore#NULL}.
-     * 
-     * @throws RuntimeException
-     *             if validation fails.
-     */
-    protected IV decodeStatementIdentifier(final StatementEnum type,
-            final byte[] val) {
-        
-        IV iv = null;
-
-        if (type == StatementEnum.Explicit && val.length == 9) {
-
-            /*
-             * An explicit statement with statement identifiers enabled.
-             */
-
-            vbuf.setBuffer(val, 1, 8);
-
-            try {
-
-                final long sid = vbuf.readLong();
-
-                iv = new TermId(VTE.STATEMENT, sid);
-                
-            } catch (IOException ex) {
-
-                throw new RuntimeException(ex);
-
-            }
-
-        } else {
-            
-            /*
-             * Any type of statement {axiom, inferred, or explicit} but
-             * statement identifiers must not be present.
-             */
-
-            assert val.length == 1 : "value length=" + val.length;
-
-        }
-
-        return iv;
-
     }
 
     /**
