@@ -31,7 +31,7 @@ import java.util.LinkedList;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.BNode;
+import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
@@ -198,27 +198,49 @@ public class TestSids extends ProxyBigdataSailTestCase {
         	final URI creator = vf.createURI("http://mynamespace.com#creator");
         	final URI src1 = vf.createURI("http://1.com");
         	final URI src2 = vf.createURI("http://2.com");
-        	final BNode sid1 = vf.createBNode("s1");
-        	final BNode sid2 = vf.createBNode("s2");
-        	final BNode sid3 = vf.createBNode("s3");
-        	final BNode sid4 = vf.createBNode("s4");
-        	final BNode sid5 = vf.createBNode("s5");
+//        	final BNode sid1 = vf.createBNode("s1");
+//        	final BNode sid2 = vf.createBNode("s2");
+//        	final BNode sid3 = vf.createBNode("s3");
+//        	final BNode sid4 = vf.createBNode("s4");
+//        	final BNode sid5 = vf.createBNode("s5");
+//        	
+//        	cxn.add(host1, RDF.TYPE, host, sid1);
+//        	cxn.add(sid1, creator, src1);
+//        	cxn.add(sid1, creator, src2);
+//        	
+//        	cxn.add(host1, connectedTo, swtch1, sid2);
+//        	cxn.add(sid2, creator, src1);
+//
+//        	cxn.add(host1, connectedTo, swtch2, sid3);
+//        	cxn.add(sid3, creator, src2);
+//
+//        	cxn.add(swtch1, RDF.TYPE, swtch, sid4);
+//        	cxn.add(sid4, creator, src1);
+//
+//        	cxn.add(swtch2, RDF.TYPE, swtch, sid5);
+//        	cxn.add(sid5, creator, src2);
         	
-        	cxn.add(host1, RDF.TYPE, host, sid1);
-        	cxn.add(sid1, creator, src1);
-        	cxn.add(sid1, creator, src2);
+        	final Statement s1 = vf.createStatement(host1, RDF.TYPE, host, vf.createBNode());
+        	final Statement s2 = vf.createStatement(host1, connectedTo, swtch1, vf.createBNode());
+        	final Statement s3 = vf.createStatement(host1, connectedTo, swtch2, vf.createBNode());
+        	final Statement s4 = vf.createStatement(swtch1, RDF.TYPE, swtch, vf.createBNode());
+        	final Statement s5 = vf.createStatement(swtch2, RDF.TYPE, swtch, vf.createBNode());
         	
-        	cxn.add(host1, connectedTo, swtch1, sid2);
-        	cxn.add(sid2, creator, src1);
+        	cxn.add(s1);
+        	cxn.add(s1.getContext(), creator, src1);
+        	cxn.add(s1.getContext(), creator, src2);
+        	
+        	cxn.add(s2);
+        	cxn.add(s2.getContext(), creator, src1);
 
-        	cxn.add(host1, connectedTo, swtch2, sid3);
-        	cxn.add(sid3, creator, src2);
+        	cxn.add(s3);
+        	cxn.add(s3.getContext(), creator, src2);
 
-        	cxn.add(swtch1, RDF.TYPE, swtch, sid4);
-        	cxn.add(sid4, creator, src1);
+        	cxn.add(s4);
+        	cxn.add(s4.getContext(), creator, src1);
 
-        	cxn.add(swtch2, RDF.TYPE, swtch, sid5);
-        	cxn.add(sid5, creator, src2);
+        	cxn.add(s5);
+        	cxn.add(s5.getContext(), creator, src2);
 
         	cxn.flush();//commit();
             
