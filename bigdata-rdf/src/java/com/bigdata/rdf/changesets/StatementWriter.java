@@ -1,14 +1,13 @@
 package com.bigdata.rdf.changesets;
 
 import java.util.Iterator;
-import java.util.Map;
+
 import org.apache.log4j.Logger;
+
 import com.bigdata.rdf.changesets.IChangeRecord.ChangeAction;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.ModifiedEnum;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.ISPO.ModifiedEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.striterator.ChunkedArrayIterator;

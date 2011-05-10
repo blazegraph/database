@@ -116,27 +116,12 @@ public enum StatementEnum {
 
     }
     
-//    static public StatementEnum deserialize(DataInputBuffer in) {
-//        
-//        try {
-//
-//            return decode(in.readByte());
-//            
-//        } catch(IOException ex) {
-//            
-//            throw new UnsupportedOperationException();
-//            
-//        }
-//        
-//    }
-
     static public StatementEnum deserialize(final byte[] val) {
 
-        if (val.length != 1 && val.length != (1 + 8)) {
+        if (val.length != 1) {
 
             throw new RuntimeException(
-                    "Expecting either one byte or nine bytes, not "
-                            + val.length);
+                    "Expecting one byte, not " + val.length);
             
         }
         
@@ -183,7 +168,6 @@ public enum StatementEnum {
     public static boolean isOverride(final byte b) {
 
         return (b & StatementEnum.MASK_OVERRIDE) != 0;
-//        return (b & StatementEnum.MASK_OVERRIDE) == 1;
         
     }
     

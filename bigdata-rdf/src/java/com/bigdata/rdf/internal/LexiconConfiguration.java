@@ -208,7 +208,7 @@ public class LexiconConfiguration<V extends BigdataValue>
             final BNode b = (BNode) value;
 
             final String id = b.getID();
-
+            
             final char c = id.charAt(0);
             
             if (c == 'u') {
@@ -270,12 +270,11 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     }
 
-    /**
-     * See {@link ILexiconConfiguration#isInline(VTE, DTE)}.
-     */
-    public boolean isInline(final VTE vte, final DTE dte) {
+    private boolean isInline(final VTE vte, final DTE dte) {
 
         switch (vte) {
+        	case STATEMENT:
+        		return true;
             case BNODE:
                 return inlineBNodes && isSupported(dte);
             case LITERAL:
