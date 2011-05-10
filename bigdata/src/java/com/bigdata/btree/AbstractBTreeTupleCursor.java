@@ -1492,7 +1492,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
         }
 
-        public Tuple<E> get(Tuple<E> tuple) {
+        public Tuple<E> get(final Tuple<E> tuple) {
 
             relocateLeaf();
             
