@@ -44,7 +44,6 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.Range;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.striterator.AbstractKeyOrder;
@@ -70,7 +69,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
      */
     private static final long serialVersionUID = 87501920529732159L;
     
-    private static Logger log = Logger.getLogger(SPOKeyOrder.class);
+    private static final transient Logger log = Logger.getLogger(SPOKeyOrder.class);
     
     /*
      * Note: these constants make it possible to use switch(index()) constructs.
@@ -608,14 +607,31 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
      * value. However, if the {@link SPOKeyOrder} is a quad order then the
      * {@link SPO#c()} will be bound.
      * 
-     * @param keyOrder
-     *            The natural order of the key.
      * @param key
      *            The key.
      * 
      * @return The decoded key.
      */
     final public SPO decodeKey(final byte[] key) {
+
+    	return decodeKey(key, 0 /* offset */);
+    	
+    }
+    	
+    /**
+     * Decode the key into an {@link SPO}. The {@link StatementEnum} and the
+     * optional SID will not be decoded, since it is carried in the B+Tree
+     * value. However, if the {@link SPOKeyOrder} is a quad order then the
+     * {@link SPO#c()} will be bound.
+     * 
+     * @param key
+     *            The key.
+     * @param offset
+     *            The offset into the key.
+     * 
+     * @return The decoded key.
+     */
+    final public SPO decodeKey(final byte[] key, final int offset) {
         
         /*
          * Note: GTE since the key is typically a reused buffer which may be
@@ -623,7 +639,13 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
          */
         final int keyArity = getKeyArity();
 
-        final IV[] ivs = IVUtility.decode(key, keyArity);
+        final IV[] ivs = IVUtility.decode(key, offset, keyArity);
+        
+        if (log.isDebugEnabled()) {
+        	log.debug("key: " + Arrays.toString(key));
+        	log.debug("keyArity: " + keyArity);
+        	log.debug(Arrays.toString(ivs));
+        }
 
         final IV _0 = ivs[0];
         

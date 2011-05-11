@@ -30,26 +30,25 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Properties;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
 import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeRecord;
-import com.bigdata.rdf.changesets.InMemChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord.ChangeAction;
+import com.bigdata.rdf.changesets.InMemChangeLog;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.spo.ISPO.ModifiedEnum;
+import com.bigdata.rdf.spo.ModifiedEnum;
 import com.bigdata.rdf.store.BD;
-import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.RDFSVocabulary;
-import com.bigdata.striterator.ChunkedArrayIterator;
 
 /**
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>

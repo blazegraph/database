@@ -87,7 +87,8 @@ public class TestSPOTupleSerializer extends TestCase2 {
 
     public void test_statementOrder() {
 
-        SPOTupleSerializer fixture = new SPOTupleSerializer(SPOKeyOrder.SPO);
+        SPOTupleSerializer fixture = new SPOTupleSerializer(
+        		SPOKeyOrder.SPO, false/* sids */);
         
         byte[] k_1 = fixture.serializeKey(new SPO(_1, _2, _3));
         byte[] k_2 = fixture.serializeKey(new SPO(_2, _2, _3));
@@ -117,18 +118,11 @@ public class TestSPOTupleSerializer extends TestCase2 {
     
     public void test_encodeDecodeTripleWithSID() {
 
-        /*
-         * Note: [sid] is a legal statement identifier.
-         * 
-         * Note: Only explicit statements may have statement identifiers.
-         */
-        final TermId sid = new TermId(VTE.STATEMENT, 1);
-
         {
 
             final SPO spo = new SPO(_3, _1, _2, StatementEnum.Explicit);
 
-            spo.setStatementIdentifier(sid);
+            spo.setStatementIdentifier(true);
 
             doEncodeDecodeTest(spo, SPOKeyOrder.SPO);
 
@@ -138,7 +132,7 @@ public class TestSPOTupleSerializer extends TestCase2 {
 
             final SPO spo = new SPO(_3, _1, _2, StatementEnum.Explicit);
 
-            spo.setStatementIdentifier(sid);
+            spo.setStatementIdentifier(true);
 
             doEncodeDecodeTest(spo, SPOKeyOrder.POS);
 
@@ -148,7 +142,7 @@ public class TestSPOTupleSerializer extends TestCase2 {
 
             final SPO spo = new SPO(_3, _1, _2, StatementEnum.Explicit);
 
-            spo.setStatementIdentifier(sid);
+            spo.setStatementIdentifier(true);
             
             doEncodeDecodeTest(spo, SPOKeyOrder.OSP);
             
@@ -178,7 +172,7 @@ public class TestSPOTupleSerializer extends TestCase2 {
     protected void doEncodeDecodeTest(final SPO expected, SPOKeyOrder keyOrder) {
         
         final SPOTupleSerializer fixture = new SPOTupleSerializer(
-                keyOrder);
+                keyOrder, expected.hasStatementIdentifier());
 
         // encode key
         final byte[] key = fixture.serializeKey(expected);

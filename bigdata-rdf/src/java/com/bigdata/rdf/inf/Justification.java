@@ -921,7 +921,7 @@ public class Justification implements Comparable<Justification> {
 //            assert arity == 3;
             
             // Note: keys are SPOs; no values stored for the tuples.
-            tupleSer = new SPOTupleSerializer(SPOKeyOrder.SPO,
+            tupleSer = new SPOTupleSerializer(SPOKeyOrder.SPO, false/* sids */,
                     DefaultTupleSerializer.getDefaultLeafKeysCoder(),
                     EmptyRabaValueCoder.INSTANCE);
             

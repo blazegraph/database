@@ -80,6 +80,8 @@ public class TestAll extends TestCase {
         
         suite.addTest(com.bigdata.util.httpd.TestAll.suite());
 
+        suite.addTestSuite( TestBits.class );
+        
         return suite;
         
     }

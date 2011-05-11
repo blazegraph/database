@@ -50,16 +50,17 @@ package com.bigdata.rdf.store;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
+
+import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
+
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -84,6 +85,8 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  */
 public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
+	private static final transient Logger log = Logger.getLogger(TestStatementIdentifiers.class);
+	
     /**
      * 
      */

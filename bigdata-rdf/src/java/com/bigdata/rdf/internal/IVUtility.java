@@ -32,12 +32,17 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.UUID;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 
 
 /**
@@ -45,6 +50,8 @@ import com.bigdata.rdf.model.BigdataLiteral;
  */
 public class IVUtility {
 
+	private static final transient Logger log = Logger.getLogger(IVUtility.class);
+	
     public static boolean equals(IV iv1, IV iv2) {
         
         // same IV or both null
@@ -421,23 +428,42 @@ public class IVUtility {
      */
     public static IV[] decode(final byte[] key, final int numTerms) {
 
+    	return decode(key, 0 /* offset */, numTerms);
+    	
+    }
+    
+    /**
+     * Decodes up to numTerms {@link IV}s from a byte[].
+     * 
+     * @param key
+     *            The byte[].
+     * @param offset
+     *            The offset into the byte[] key.
+     * @param numTerms
+     *            The number of terms to decode.
+     *            
+     * @return The set of {@link IV}s.
+     */
+    public static IV[] decode(final byte[] key, final int offset, 
+    		final int numTerms) {
+        	
         if (numTerms <= 0)
             return new IV[0];
         
         final IV[] ivs = new IV[numTerms];
         
-        int offset = 0;
+        int o = offset;
         
         for (int i = 0; i < numTerms; i++) {
 
-            if (offset >= key.length)
+            if (o >= key.length)
                 throw new IllegalArgumentException(
                         "key is not long enough to decode " 
                         + numTerms + " terms.");
             
-            ivs[i] = decodeFromOffset(key, offset);
+            ivs[i] = decodeFromOffset(key, o);
             
-            offset += ivs[i] == null 
+            o += ivs[i] == null 
                     ? NullIV.INSTANCE.byteLength() : ivs[i].byteLength();
             
         }
@@ -502,6 +528,22 @@ public class IVUtility {
         // The value type (URI, Literal, BNode, SID)
         final VTE vte = AbstractIV.getInternalValueTypeEnum(flags);
 
+        // handle inline sids
+        if (vte == VTE.STATEMENT) {
+        	
+        	// spo is directly decodable from key
+        	final ISPO spo = SPOKeyOrder.SPO.decodeKey(key, o);
+        	
+        	// all spos that have a sid are explicit
+        	spo.setStatementType(StatementEnum.Explicit);
+        	spo.setStatementIdentifier(true);
+        	
+        	// create a sid iv and return it
+        	final SidIV sid = new SidIV(spo);
+        	return sid;
+        	
+        }
+        
         // The data type
         final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
         
