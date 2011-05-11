@@ -3204,8 +3204,6 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             long chunksOut = 0;
             long elementsOut = 0;
 
-            final ByteArrayBuffer vbuf = new ByteArrayBuffer(1 + 8/* max length */);
-
             latch.inc();
 
             try {
@@ -3233,7 +3231,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                         final byte[] key = tupleSer.serializeKey(spo);
 
                         // generate value for the index.
-                        final byte[] val = spo.serializeValue(vbuf);
+                        final byte[] val = tupleSer.serializeVal(spo);
 
                         /*
                          * Note: The SPO is deliberately not provided to the KVO

@@ -50,6 +50,8 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.SPO;
 
 /**
  * Unit tests for encoding and decoding compound keys (such as are used by the
@@ -890,5 +892,24 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         assertEquals(expectedStr, lit2.stringValue());
 
     }
+    
+    public void test_SPO_encodeDecodeSids() {
+        
+    	final SPO spo = new SPO(
+    			new TermId(VTE.URI, 1L), 
+    			new TermId(VTE.URI, 2L), 
+    			new TermId(VTE.URI, 4L),
+    			StatementEnum.Explicit);
+    	
+        final IV<?, ?>[] e = {//
+                new SidIV(spo),//
+                new TermId(VTE.URI, 8L),//
+                new TermId(VTE.URI, 16L) //
+        };
+
+        doEncodeDecodeTest(e);
+
+    }
+
 
 }

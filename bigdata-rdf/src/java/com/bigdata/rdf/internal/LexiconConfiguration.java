@@ -318,6 +318,8 @@ public class LexiconConfiguration<V extends BigdataValue>
     public boolean isInline(final VTE vte, final DTE dte) {
 
         switch (vte) {
+	        case STATEMENT:
+	            return true;
             case BNODE:
                 return inlineBNodes && isSupported(dte);
             case LITERAL:

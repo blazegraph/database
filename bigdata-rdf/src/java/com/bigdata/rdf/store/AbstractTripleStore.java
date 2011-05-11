@@ -2133,8 +2133,8 @@ abstract public class AbstractTripleStore extends
 
         }
 
-        final ISPO spo = spoKeyArity == 4 ? new SPO(s, p, o) : new SPO(s, p, o,
-                c);
+        final SPO spo = spoKeyArity == 4 ? 
+        		new SPO(s, p, o) : new SPO(s, p, o, c);
 
         final IIndex ndx = getSPORelation().getPrimaryIndex();
 
@@ -2160,7 +2160,7 @@ abstract public class AbstractTripleStore extends
          * identifier on the SID if it is an explicit statement.
          */
         
-        return SPO.decodeValue(spo, val);
+        return tupleSer.decodeValue(spo, val);
         
     }
 
@@ -2614,7 +2614,7 @@ abstract public class AbstractTripleStore extends
 
         final SPORelation r = getSPORelation();
         final SPOPredicate p = new SPOPredicate(
-        		quads?
+        		quads ?
                 new BOp[]{//
                       Var.var("s"),//
                       Var.var("p"),//
@@ -2781,12 +2781,12 @@ abstract public class AbstractTripleStore extends
         if (iv == null)
             return IRawTripleStore.NULLSTR;
 
-        if(iv.isStatement()){
-
-            // Note: SIDs are not stored in the reverse lexicon.
-            return Long.toString(iv.getTermId()) + "S";
-        
-        }
+//        if(iv.isStatement()){
+//
+//            // Note: SIDs are not stored in the reverse lexicon.
+//            return Long.toString(iv.getTermId()) + "S";
+//        
+//        }
 
         final BigdataValue v = getTerm(iv);
 
@@ -3403,7 +3403,7 @@ abstract public class AbstractTripleStore extends
 
         try {
 
-            final LexiconRelation lexiconRelation = getLexiconRelation();
+//            final LexiconRelation lexiconRelation = getLexiconRelation();
 
             final SPORelation spoRelation = statementStore.getSPORelation();
             
@@ -3430,17 +3430,31 @@ abstract public class AbstractTripleStore extends
 
                     final long begin = System.currentTimeMillis();
 
+//                    /*
+//                     * Note: the statement identifiers are always assigned by
+//                     * the database. During truth maintenance, the
+//                     * [statementStore] is NOT the database but the statement
+//                     * identifiers are still assigned by the database. The
+//                     * situation is exactly parallel to the manner in which term
+//                     * identifiers are always assigned by the database. This is
+//                     * done to ensure that they remain consistent between the
+//                     * focusStore using by truth maintenance and the database.
+//                     */
+//                    lexiconRelation.addStatementIdentifiers(a, numStmts);
+
                     /*
-                     * Note: the statement identifiers are always assigned by
-                     * the database. During truth maintenance, the
-                     * [statementStore] is NOT the database but the statement
-                     * identifiers are still assigned by the database. The
-                     * situation is exactly parallel to the manner in which term
-                     * identifiers are always assigned by the database. This is
-                     * done to ensure that they remain consistent between the
-                     * focusStore using by truth maintenance and the database.
+                     * No more statement identifiers in the lexicon - they are
+                     * now inlined directly into the statement indices using
+                     * the SidIV class.
+                     * 
+                     * Mark explicit statements as "sidable". The actual sid
+                     * will be produced on-demand to reduce heap pressure.
                      */
-                    lexiconRelation.addStatementIdentifiers(a, numStmts);
+                    for (ISPO spo : a) {
+                    	if (spo.isExplicit()) {
+                    		spo.setStatementIdentifier(true);
+                    	}
+                    }
 
                     statementIdentifierTime = System.currentTimeMillis()
                             - begin;

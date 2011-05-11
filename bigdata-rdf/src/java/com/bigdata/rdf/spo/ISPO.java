@@ -28,10 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.spo;
 
-import org.openrdf.model.Value;
-
 import com.bigdata.bop.IElement;
-import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.internal.IV;
@@ -179,20 +176,30 @@ public interface ISPO extends IElement {
      */
     boolean isAxiom();
 
+//    /**
+//     * Set the statement identifier. This sets the 4th position of the quad, but
+//     * some constraints are imposed on its argument.
+//     * 
+//     * @param sid
+//     *            The statement identifier.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if <i>sid</i> is {@link #NULL}.
+//     * @throws IllegalStateException
+//     *             if the statement identifier is already set.
+//     */
+//    void setStatementIdentifier(final IV sid);
+
     /**
      * Set the statement identifier. This sets the 4th position of the quad, but
      * some constraints are imposed on its argument.
      * 
      * @param sid
-     *            The statement identifier.
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>sid</i> is {@link #NULL}.
-     * @throws IllegalStateException
-     *             if the statement identifier is already set.
+     *            If sid is true, this ISPO will produce a sid on-demand when
+     *            requested.
      */
-    void setStatementIdentifier(final IV sid);
-
+    void setStatementIdentifier(final boolean sidable);
+    
     /**
      * The statement identifier (optional). This has nearly identical semantics
      * to {@link #c()}, but will throw an exception if the 4th position is not
@@ -272,25 +279,6 @@ public interface ISPO extends IElement {
     public boolean isModified();
 
     /**
-     * Return the byte[] that would be written into a statement index for this
-     * {@link ISPO}, including the optional {@link StatementEnum#MASK_OVERRIDE}
-     * bit. If the {@link #hasStatementIdentifier()} would return
-     * <code>true</code>, then the SID will be included in the returned byte[].
-     * Note that {@link #hasStatementIdentifier()} is defined in terms of the
-     * bit pattern of the SID identifiers and therefore will be
-     * <code>true</code> ONLY for a statement identifier and NOT for an RDF
-     * {@link Value} identifier.
-     * 
-     * @param buf
-     *            A buffer supplied by the caller. The buffer will be reset
-     *            before the value is written on the buffer.
-     * 
-     * @return The value that would be written into a statement index for this
-     *         {@link ISPO}.
-     */
-    public byte[] serializeValue(ByteArrayBuffer buf);
-
-    /**
      * Method may be used to externalize the {@link BigdataValue}s in the
      * {@link ISPO}.
      * 
@@ -299,59 +287,4 @@ public interface ISPO extends IElement {
      */
     public String toString(IRawTripleStore db);
     
-    public enum ModifiedEnum {
-        
-        INSERTED, REMOVED, UPDATED, NONE;
-        
-        public static boolean[] toBooleans(final ModifiedEnum[] modified, final int n) {
-            
-            final boolean[] b = new boolean[n*2];
-            for (int i = 0; i < n; i++) {
-                switch(modified[i]) {
-                case INSERTED:
-                    b[i*2] = true;
-                    b[i*2+1] = false;
-                    break;
-                case REMOVED:
-                    b[i*2] = false;
-                    b[i*2+1] = true;
-                    break;
-                case UPDATED:
-                    b[i*2] = true;
-                    b[i*2+1] = true;
-                    break;
-                case NONE:
-                default:
-                    b[i*2] = false;
-                    b[i*2+1] = false;
-                    break;
-                }
-            }
-            
-            return b;
-            
-        }
-        
-        public static ModifiedEnum[] fromBooleans(final boolean[] b, final int n) {
-            
-            assert n <= b.length && n % 2 == 0 : "n="+n+", b.length="+b.length;
-            
-            final ModifiedEnum[] m = new ModifiedEnum[n/2];
-            for (int i = 0; i < n; i+=2) {
-                if (b[i] && !b[i+1])
-                    m[i/2] = INSERTED;
-                else if (!b[i] && b[i+1])
-                    m[i/2] = REMOVED;
-                else if (b[i] && b[i+1])
-                    m[i/2] = UPDATED;
-                else
-                    m[i/2] = NONE;
-            }
-            
-            return m;
-            
-        }
-        
-    }
-
 }

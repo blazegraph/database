@@ -77,6 +77,7 @@ import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.SidIV;
 import com.bigdata.rdf.lexicon.ITermIVFilter;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.StatementEnum;
@@ -85,11 +86,13 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.relation.AbstractRelation;
+import com.bigdata.relation.accesspath.ArrayAccessPath;
 import com.bigdata.relation.accesspath.ElementFilter;
+import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffer;
+import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.EmptyChunkedIterator;
@@ -628,8 +631,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
         final IRabaCoder leafValSer = EmptyRabaValueCoder.INSTANCE;
         
         // setup the tuple serializer.
-        metadata.setTupleSerializer(new SPOTupleSerializer(SPOKeyOrder.SPO,
-                leafKeySer, leafValSer));
+        metadata.setTupleSerializer(new SPOTupleSerializer(
+        		SPOKeyOrder.SPO, false/* sids */, leafKeySer, leafValSer));
 
         if(bloomFilter) {
 
@@ -655,37 +658,44 @@ public class SPORelation extends AbstractRelation<ISPO> {
         final IRabaCoder leafKeySer = DefaultTupleSerializer
                 .getDefaultLeafKeysCoder();
 
-        final IRabaCoder leafValSer;
-        if (!statementIdentifiers) {
-
-            /*
-             * Note: this value coder does not know about statement identifiers.
-             * Therefore it is turned off if statement identifiers are enabled.
-             */
-
-            leafValSer = new FastRDFValueCoder2();
-//            leafValSer = SimpleRabaCoder.INSTANCE;
-
-        } else {
-
-            /*
-             * The default is canonical huffman coding, which is relatively slow
-             * and does not achieve very good compression on term identifiers.
-             */
-            leafValSer = DefaultTupleSerializer.getDefaultValuesCoder();
-
-            /*
-             * @todo This is much faster than huffman coding, but less space
-             * efficient. However, it appears that there are some cases where
-             * SIDs are enabled but only the flag bits are persisted. What
-             * gives?
-             */
-//            leafValSer = new FixedLengthValueRabaCoder(1 + 8);
-            
-        }
+//        final IRabaCoder leafValSer;
+//        if (!statementIdentifiers) {
+//
+//            /*
+//             * Note: this value coder does not know about statement identifiers.
+//             * Therefore it is turned off if statement identifiers are enabled.
+//             */
+//
+//            leafValSer = new FastRDFValueCoder2();
+////            leafValSer = SimpleRabaCoder.INSTANCE;
+//
+//        } else {
+//
+//            /*
+//             * The default is canonical huffman coding, which is relatively slow
+//             * and does not achieve very good compression on term identifiers.
+//             */
+//            leafValSer = DefaultTupleSerializer.getDefaultValuesCoder();
+//
+//            /*
+//             * @todo This is much faster than huffman coding, but less space
+//             * efficient. However, it appears that there are some cases where
+//             * SIDs are enabled but only the flag bits are persisted. What
+//             * gives?
+//             */
+////            leafValSer = new FixedLengthValueRabaCoder(1 + 8);
+//            
+//        }
         
-        metadata.setTupleSerializer(new SPOTupleSerializer(keyOrder,
-                leafKeySer, leafValSer));
+        /*
+         * We can just always use the FastRDFValueCoder now that sids are
+         * inlined into the statement indices and we don't store a term id
+         * for them in the SPO tuple value.
+         */
+        final IRabaCoder leafValSer = new FastRDFValueCoder2();
+        
+        metadata.setTupleSerializer(new SPOTupleSerializer(
+        		keyOrder, statementIdentifiers, leafKeySer, leafValSer));
 
         if ((getIndexManager() instanceof IBigdataFederation<?>)
                 && ((IBigdataFederation<?>) getIndexManager()).isScaleOut()
@@ -980,7 +990,9 @@ public class SPORelation extends AbstractRelation<ISPO> {
         switch (keyArity) {
 
         case 3:
-            if (!statementIdentifiers && c != null) {
+            if (statementIdentifiers) {
+                C = (c == null ? Var.var("c") : new Constant<IV>(c));
+            } else if (c != null) {
                 /*
                  * The 4th position should never become bound for a triple store
                  * without statement identifiers.
@@ -997,8 +1009,9 @@ public class SPORelation extends AbstractRelation<ISPO> {
         }
 
         Predicate<ISPO> pred = new SPOPredicate(
-				keyArity == 4 ? new BOp[] { S,
-								P, O, C } : new BOp[] { S, P, O },
+//				keyArity == 4 ?
+        		(keyArity == 4 || statementIdentifiers) ?
+						new BOp[] { S, P, O, C } : new BOp[] { S, P, O },
                 new NV(IPredicate.Annotations.RELATION_NAME,
                         new String[] { getNamespace() }));
 
@@ -1317,7 +1330,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 //    }
 
     @Override
-    public SPOAccessPath newAccessPath(
+    public IAccessPath<ISPO> newAccessPath(
 //            final IRelation<ISPO> relation,
             final IIndexManager localIndexManager, 
 //            final long timestamp,
@@ -1330,6 +1343,61 @@ public class SPORelation extends AbstractRelation<ISPO> {
 //            final int fullyBufferedReadThreshold
             ) {
 
+    	if (statementIdentifiers && predicate.arity() == 4) {
+    		
+        	/*
+        	 * Since sids are inlined into the statement indices and the SidIV
+        	 * can materialize the SPO to which it refers directly, we may be
+        	 * able to avoid going to the indices altogether in the case when
+        	 * the C position is bound in the predicate. 
+        	 */
+            final IVariableOrConstant<IV> sid = predicate.get(3);
+            
+            if (sid != null && sid.isConstant() && sid.get() instanceof SidIV) {
+            	
+        		final SidIV sidIV = (SidIV) sid.get();
+        		
+        		final ISPO spo = sidIV.getInlineValue();
+        		
+        		/*
+        		 * We need to check the inline SPO against the predicate to
+        		 * make sure it matches the triple pattern implied by the
+        		 * predicate.  Usually in this case s, p, and o are unbound
+        		 * (reverse lookup from SID to spo), but occasionally there
+        		 * will be a bound term inside the predicate.  In this case
+        		 * we should return an empty access path if the SPO does not
+        		 * match the triple pattern.
+        		 */
+        		for (int i = 0; i <= 2; i++) {
+        			
+        			final IVariableOrConstant<IV> t = predicate.get(i);
+        			
+        			if (t != null && t.isConstant()) {
+        				
+        				final IV iv = t.get();
+        				
+        				if (!spo.get(i).equals(iv)) {
+        					
+        					return new EmptyAccessPath<ISPO>(
+        							predicate, SPOKeyOrder.SPO);
+        					
+        				}
+        				
+        			}
+        			
+        		}
+        		
+        		if (log.isDebugEnabled()) {
+        			log.debug("materializing an inline SID access path: " + spo);
+        		}
+        		
+        		return new ArrayAccessPath<ISPO>(new ISPO[] { spo }, 
+        				predicate, SPOKeyOrder.SPO);
+
+            }
+    		
+    	}
+    	
         return new SPOAccessPath(this/*relation*/, localIndexManager, //timestamp,
                 predicate, keyOrder
 //                , ndx, flags, chunkOfChunksCapacity,
