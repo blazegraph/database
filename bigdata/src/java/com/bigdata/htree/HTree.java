@@ -515,14 +515,19 @@ public class HTree extends AbstractHTree
 					// TODO if(parent.isReadOnly()) parent = copyOnWrite();
 					
 					if (current.globalDepth == child.globalDepth) {
-					
+
 						/*
 						 * There is only one buddy hash bucket on the page. To
 						 * split the page, we have to introduce a new directory
 						 * page above it.
 						 * 
-						 * TODO Introduce new directory page if sole buddy
-						 * bucket is full.
+						 * TODO This code path is to introduce new directory
+						 * page if sole buddy bucket is full. However, we might
+						 * also need a code path to split the buddy hash table
+						 * in the directory. The way things are falling out
+						 * right now I do not see how this would happen as the
+						 * global depth of a directory is always the same as
+						 * address bits, but maybe I am missing something....
 						 */
 						addDirectoryPageAndSplitBucketPage(current,
 								buddyOffset, bucketPage);
