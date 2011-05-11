@@ -74,6 +74,18 @@ public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
      * 
      * @param a
      *            The array of elements.
+     */
+    public ChunkedArrayIterator(final E[] a) {
+    	
+    	this(a.length, a, null);
+    	
+    }
+    
+    /**
+     * An iterator that visits the elements in the given array.
+     * 
+     * @param a
+     *            The array of elements.
      * @param n
      *            The #of entries in <i>a</i> that are valid.
      * @param keyOrder
