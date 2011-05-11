@@ -479,28 +479,43 @@ public class HTree extends AbstractHTree
 	 *         method signature to pass an insert enum {ALLDUPS,DUPKEYS,NODUPS}.
 	 */
 	public byte[] insert(final byte[] key, final byte[] value) {
+		
 		if (key == null)
 			throw new IllegalArgumentException();
+		
+		// the current directory page.
 		DirectoryPage current = getRoot(); // start at the root.
+		
+		// #of prefix bits already consumed.
 		int prefixLength = 0;// prefix length of the root is always zero.
+		
+		// buddyOffset into [current].
 		int buddyOffset = 0; // buddyOffset of the root is always zero.
+		
 		while (true) {
+
 			// skip prefixLength bits and then extract globalDepth bits. 
 			final int hashBits = current.getLocalHashCode(key, prefixLength);
+			
 			// find the child directory page or bucket page.
 			final AbstractPage child = current.getChild(hashBits, buddyOffset);
+			
 			if (child.isLeaf()) {
+
 				/*
 				 * Found the bucket page, update it.
 				 */
+
 				final BucketPage bucketPage = (BucketPage) child;
+				
 				// attempt to insert the tuple into the bucket.
+				
 				if(!bucketPage.insert(key, value, current, buddyOffset)) {
-
+				
 					// TODO if(parent.isReadOnly()) parent = copyOnWrite();
-
+					
 					if (current.globalDepth == child.globalDepth) {
-
+					
 						/*
 						 * There is only one buddy hash bucket on the page. To
 						 * split the page, we have to introduce a new directory
@@ -509,8 +524,12 @@ public class HTree extends AbstractHTree
 						 * TODO Introduce new directory page if sole buddy
 						 * bucket is full.
 						 */
+						addDirectoryPageAndSplitBucketPage(current,
+								buddyOffset, bucketPage);
 						
-						throw new UnsupportedOperationException();
+						// The children of [current] have changed so we will
+						// search current again.
+						continue;
 						
 					}
 
@@ -519,21 +538,35 @@ public class HTree extends AbstractHTree
 					
 					// Try again. The children have changed.
 					continue;
+		
 				}
+				
 				return null; // TODO should be Void return? or depends on enum controlling dups behavior?
+				
 			}
+
 			/*
 			 * Recursive descent into a child directory page. We have to update
 			 * the prefixLength and compute the offset of the buddy hash table
 			 * within the child before descending into the child.
 			 */
+			
+			// increase prefix length by the #of address bits consumed by the
+			// buddy hash table. TODO child.globalDepth might always be
+			// [addressBits] for a directory page...
 			prefixLength = prefixLength + child.globalDepth;
+			
+			// find the offset of the buddy hash table in the child.
 			buddyOffset = HTreeUtil
 					.getBuddyOffset(hashBits, current.globalDepth,
 							child.globalDepth/* localDepthOfChild */);
+			
+			// update current so we can search in the child.
 			current = (DirectoryPage) child;
+			
 		}
-	}
+
+	} // insert()
 
 	public byte[] remove(final byte[] key) {
 		// TODO Remove 1st match, returning value.
@@ -622,85 +655,10 @@ public class HTree extends AbstractHTree
 
 		nleaves++; // One more bucket page in the hash tree. 
 
-		/*
-		 * Update pointers in buddy hash table in the parent.
-		 * 
-		 * There will be [npointers] slots in the appropriate buddy hash table
-		 * in the parent directory which point to the old bucket page. The upper
-		 * 1/2 of those pointers will be modified to point to the new bucket
-		 * page. The lower 1/2 of the pointers will be unchanged.
-		 */
-		{
-
-			// #of address slots in the parent buddy hash table.
-			final int slotsPerBuddy = (1 << parent.globalDepth);
-
-			// #of pointers in the parent buddy hash table to the old bucket.
-			final int npointers = 1 << (parent.globalDepth - oldDepth);
-			
-			// Must be at least two slots since we will change at least one.
-			assert slotsPerBuddy > 1 : "slotsPerBuddy=" + slotsPerBuddy;
-
-			// Must be at least two pointers since we will change at least one.
-			assert npointers > 1 : "npointers=" + npointers;
-			
-			// The first slot in the buddy hash table in the parent.
-			final int firstSlot = buddyOffset;
-			
-			// The last slot in the buddy hash table in the parent.
-			final int lastSlot = buddyOffset + slotsPerBuddy;
-
-			/*
-			 * Count pointers to the old bucket page. There should be
-			 * [npointers] of them and they should be contiguous.
-			 * 
-			 * Note: We can test References here rather than comparing addresses
-			 * because we know that the parent and the old bucket are both
-			 * mutable. This means that their childRef is defined and their
-			 * storage address is NULL.
-			 * 
-			 * TODO This logic should be in DirectoryPage#dump()
-			 */
-			int firstPointer = -1;
-			int nfound = 0;
-			boolean discontiguous = false;
-			for (int i = firstSlot; i < lastSlot; i++) {
-				if (parent.childRefs[i] == oldBucket.self) {
-					if (firstPointer == -1)
-						firstPointer = i;
-					nfound++;
-					if (((MutableDirectoryPageData) parent.data).childAddr[i] != IRawStore.NULL) {
-						throw new RuntimeException(
-								"Child address should be NULL since child is dirty");
-					}
-				} else {
-					if (firstPointer != -1 && nfound != npointers) {
-						discontiguous = true;
-					}
-				}
-			}
-			if (firstPointer == -1)
-				throw new RuntimeException("No pointers to child");
-			if (nfound != npointers)
-				throw new RuntimeException("Expected " + npointers
-						+ " pointers to child, but found=" + nfound);
-			if (discontiguous)
-				throw new RuntimeException(
-						"Pointers to child are discontiguous in parent's buddy hash table.");
-
-			// Update the upper 1/2 of the pointers to the new bucket.
-			for (int i = firstPointer + (npointers >> 1); i < npointers; i++) {
-
-				if (parent.childRefs[i] != oldBucket.self)
-					throw new RuntimeException("Does not point to old child.");
-				
-				// update the references to the new bucket.
-				parent.childRefs[i] = (Reference) newBucket.self;
-				
-			}
-			
-		}
-
+		// update the pointers in the parent.
+		updatePointersInParent(parent, buddyOffset, oldDepth, oldBucket,
+				newBucket);
+		
 		// redistribute buddy buckets between old and new pages.
 		redistributeBuddyBuckets(oldDepth, newDepth, oldBucket, newBucket);
 
@@ -709,16 +667,123 @@ public class HTree extends AbstractHTree
 	}
 
 	/**
+	 * Update pointers in buddy hash table in the parent in order to link the
+	 * new {@link BucketPage} into the parent {@link DirectoryPage}.
+	 * <p>
+	 * There will be [npointers] slots in the appropriate buddy hash table in
+	 * the parent {@link DirectoryPage} which point to the old
+	 * {@link BucketPage}. The upper 1/2 of those pointers will be modified to
+	 * point to the new {@link BucketPage}. The lower 1/2 of the pointers will
+	 * be unchanged.
+	 * 
+	 * @param parent
+	 *            The parent {@link DirectoryPage}.
+	 * @param buddyOffset
+	 *            The buddyOffset within the <i>parent</i>. This identifies
+	 *            which buddy hash table in the parent must be its pointers
+	 *            updated such that it points to both the original child and new
+	 *            child.
+	 * @param oldDepth
+	 *            The depth of the oldBucket before the split.
+	 * @param oldBucket
+	 *            The old {@link BucketPage}.
+	 * @param newBucket
+	 *            The new {@link BucketPage}.
+	 */
+	private void updatePointersInParent(final DirectoryPage parent,
+			final int buddyOffset, final int oldDepth,
+			final BucketPage oldBucket, final BucketPage newBucket) {
+
+		// #of address slots in the parent buddy hash table.
+		final int slotsPerBuddy = (1 << parent.globalDepth);
+
+		// #of pointers in the parent buddy hash table to the old bucket.
+		final int npointers = 1 << (parent.globalDepth - oldDepth);
+		
+		// Must be at least two slots since we will change at least one.
+		assert slotsPerBuddy > 1 : "slotsPerBuddy=" + slotsPerBuddy;
+
+		// Must be at least two pointers since we will change at least one.
+		assert npointers > 1 : "npointers=" + npointers;
+		
+		// The first slot in the buddy hash table in the parent.
+		final int firstSlot = buddyOffset;
+		
+		// The last slot in the buddy hash table in the parent.
+		final int lastSlot = buddyOffset + slotsPerBuddy;
+
+		/*
+		 * Count pointers to the old bucket page. There should be
+		 * [npointers] of them and they should be contiguous.
+		 * 
+		 * Note: We can test References here rather than comparing addresses
+		 * because we know that the parent and the old bucket are both
+		 * mutable. This means that their childRef is defined and their
+		 * storage address is NULL.
+		 * 
+		 * TODO This logic should be in DirectoryPage#dump()
+		 */
+		int firstPointer = -1;
+		int nfound = 0;
+		boolean discontiguous = false;
+		for (int i = firstSlot; i < lastSlot; i++) {
+			if (parent.childRefs[i] == oldBucket.self) {
+				if (firstPointer == -1)
+					firstPointer = i;
+				nfound++;
+				if (((MutableDirectoryPageData) parent.data).childAddr[i] != IRawStore.NULL) {
+					throw new RuntimeException(
+							"Child address should be NULL since child is dirty");
+				}
+			} else {
+				if (firstPointer != -1 && nfound != npointers) {
+					discontiguous = true;
+				}
+			}
+		}
+		if (firstPointer == -1)
+			throw new RuntimeException("No pointers to child");
+		if (nfound != npointers)
+			throw new RuntimeException("Expected " + npointers
+					+ " pointers to child, but found=" + nfound);
+		if (discontiguous)
+			throw new RuntimeException(
+					"Pointers to child are discontiguous in parent's buddy hash table.");
+
+		// Update the upper 1/2 of the pointers to the new bucket.
+		for (int i = firstPointer + (npointers >> 1); i < npointers; i++) {
+
+			if (parent.childRefs[i] != oldBucket.self)
+				throw new RuntimeException("Does not point to old child.");
+			
+			// update the references to the new bucket.
+			parent.childRefs[i] = (Reference) newBucket.self;
+			
+		}
+			
+	}
+
+	/**
 	 * Redistribute the buddy buckets.
 	 * <p>
-	 * Note: We are not changing the #of buddy buckets, just their size and
-	 * the page on which they are found. Any tuples in a source bucket will
-	 * wind up in the same bucket afterwards, but the page and offset on the
-	 * page of the buddy bucket may have been changed.
+	 * Note: We are not changing the #of buddy buckets, just their size and the
+	 * page on which they are found. Any tuples in a source bucket will wind up
+	 * in the same bucket afterwards, but the page and offset on the page of the
+	 * buddy bucket may have been changed.
 	 * <p>
-	 * We proceed backwards, moving the upper half of the buddy buckets to
-	 * the new bucket page first and then spreading out the lower half of
-	 * the source page among the new bucket boundaries on the page.
+	 * We proceed backwards, moving the upper half of the buddy buckets to the
+	 * new bucket page first and then spreading out the lower half of the source
+	 * page among the new bucket boundaries on the page.
+	 * 
+	 * @param oldDepth
+	 *            The depth of the old {@link BucketPage} before the split.
+	 * @param newDepth
+	 *            The depth of the old and new {@link BucketPage} after the
+	 *            split (this is just oldDepth+1).
+	 * @param oldBucket
+	 *            The old {@link BucketPage}.
+	 * @param newBucket
+	 *            The new {@link BucketPage}.
 	 */
 	private void redistributeBuddyBuckets(final int oldDepth,
 			final int newDepth, final BucketPage oldBucket,
@@ -867,6 +932,24 @@ public class HTree extends AbstractHTree
 			}
 
 		}
+
+	}
+
+	/**
+	 * Split when <code>globalDepth == localDepth</code>. This case requires the
+	 * introduction of a new {@link DirectoryPage}.
+	 * 
+	 * @param parent
+	 *            The parent.
+	 * @param buddyOffset
+	 *            The offset of the buddy hash table within the parent.
+	 * @param oldBucket
+	 *            The {@link BucketPage} to be split.
+	 */
+	private void addDirectoryPageAndSplitBucketPage(final DirectoryPage parent,
+			final int buddyOffset, final BucketPage oldBucket) {
+
+		throw new UnsupportedOperationException();
 
 	}
 	
