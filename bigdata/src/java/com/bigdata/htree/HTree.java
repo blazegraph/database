@@ -602,11 +602,15 @@ public class HTree extends AbstractHTree
 		if (oldBucket.parent != parent.self) // must be same Reference.
 			throw new IllegalStateException();
 		
+		if (log.isDebugEnabled())
+			log.debug("parent=" + parent.toShortString() + ", buddyOffset="
+					+ buddyOffset + ", child=" + oldBucket);
+
 		final int oldDepth = oldBucket.globalDepth;
 		final int newDepth = oldDepth + 1;
 
 		// Allocate a new bucket page (globalDepth is increased by one).
-		final BucketPage newBucket = new BucketPage(this, oldBucket.globalDepth + 1);
+		final BucketPage newBucket = new BucketPage(this, newDepth);
 
 		assert newBucket.isDirty();
 		
@@ -614,201 +618,256 @@ public class HTree extends AbstractHTree
 		newBucket.parent = (Reference) parent.self;
 		
 		// Increase global depth on the old page also.
-		oldBucket.globalDepth++;
+		oldBucket.globalDepth = newDepth;
 
 		nleaves++; // One more bucket page in the hash tree. 
-
-		// #of slots on the bucket page (invariant given addressBits).
-		final int slotsOnPage = (1 << addressBits);
 
 		/*
 		 * Update pointers in buddy hash table in the parent.
 		 * 
-		 * Note: The upper 1/2 of the pointers in the buddy hash table in the
-		 * parent are rewritten to point to the new child.
+		 * There will be [npointers] slots in the appropriate buddy hash table
+		 * in the parent directory which point to the old bucket page. The upper
+		 * 1/2 of those pointers will be modified to point to the new bucket
+		 * page. The lower 1/2 of the pointers will be unchanged.
 		 */
 		{
 
 			// #of address slots in the parent buddy hash table.
 			final int slotsPerBuddy = (1 << parent.globalDepth);
 
-			// Must be at least two slots per buddy for us to redistribute
-			// pointers.
+			// #of pointers in the parent buddy hash table to the old bucket.
+			final int npointers = 1 << (parent.globalDepth - oldDepth);
+			
+			// Must be at least two slots since we will change at least one.
 			assert slotsPerBuddy > 1 : "slotsPerBuddy=" + slotsPerBuddy;
-			
-			// The first slot in the upper 1/2 of the buddy hash table.
-			final int firstSlot = buddyOffset + (slotsPerBuddy >> 1);
-			
-			// The last slot in the buddy hash table.
-			final int lastSlot = buddyOffset + slotsPerBuddy;
-			
-			for (int i = firstSlot; i < lastSlot; i++) {
 
+			// Must be at least two pointers since we will change at least one.
+			assert npointers > 1 : "npointers=" + npointers;
+			
+			// The first slot in the buddy hash table in the parent.
+			final int firstSlot = buddyOffset;
+			
+			// The last slot in the buddy hash table in the parent.
+			final int lastSlot = buddyOffset + slotsPerBuddy;
+
+			/*
+			 * Count pointers to the old bucket page. There should be
+			 * [npointers] of them and they should be contiguous.
+			 * 
+			 * Note: We can test References here rather than comparing addresses
+			 * because we know that the parent and the old bucket are both
+			 * mutable. This means that their childRef is defined and their
+			 * storage address is NULL.
+			 * 
+			 * TODO This logic should be in DirectoryPage#dump()
+			 */
+			int firstPointer = -1;
+			int nfound = 0;
+			boolean discontiguous = false;
+			for (int i = firstSlot; i < lastSlot; i++) {
+				if (parent.childRefs[i] == oldBucket.self) {
+					if (firstPointer == -1)
+						firstPointer = i;
+					nfound++;
+					if (((MutableDirectoryPageData) parent.data).childAddr[i] != IRawStore.NULL) {
+						throw new RuntimeException(
+								"Child address should be NULL since child is dirty");
+					}
+				} else {
+					if (firstPointer != -1 && nfound != npointers) {
+						discontiguous = true;
+					}
+				}
+			}
+			if (firstPointer == -1)
+				throw new RuntimeException("No pointers to child");
+			if (nfound != npointers)
+				throw new RuntimeException("Expected " + npointers
+						+ " pointers to child, but found=" + nfound);
+			if (discontiguous)
+				throw new RuntimeException(
+						"Pointers to child are discontiguous in parent's buddy hash table.");
+
+			// Update the upper 1/2 of the pointers to the new bucket.
+			for (int i = firstPointer + (npointers >> 1); i < npointers; i++) {
+
+				if (parent.childRefs[i] != oldBucket.self)
+					throw new RuntimeException("Does not point to old child.");
+				
 				// update the references to the new bucket.
 				parent.childRefs[i] = (Reference) newBucket.self;
 				
-				// clear address since newBucket is dirty.
-				((MutableDirectoryPageData) parent.data).childAddr[i] = 0L;
-				
 			}
 			
 		}
 
+		// redistribute buddy buckets between old and new pages.
+		redistributeBuddyBuckets(oldDepth, newDepth, oldBucket, newBucket);
+
+		// TODO assert invariants?
+		
+	}
+
+	/**
+	 * Redistribute the buddy buckets.
+	 * <p>
+	 * Note: We are not changing the #of buddy buckets, just their size and
+	 * the page on which they are found. Any tuples in a source bucket will
+	 * wind up in the same bucket afterwards, but the page and offset on the
+	 * page of the buddy bucket may have been changed.
+	 * <p>
+	 * We proceed backwards, moving the upper half of the buddy buckets to
+	 * the new bucket page first and then spreading out the lower half of
+	 * the source page among the new bucket boundaries on the page.
+	 */
+	private void redistributeBuddyBuckets(final int oldDepth,
+			final int newDepth, final BucketPage oldBucket,
+			final BucketPage newBucket) {
+
+		// #of slots on the bucket page (invariant given addressBits).
+		final int slotsOnPage = (1 << addressBits);
+
+		// #of address slots in each old buddy hash bucket.
+		final int slotsPerOldBuddy = (1 << oldDepth);
+
+		// #of address slots in each new buddy hash bucket.
+		final int slotsPerNewBuddy = (1 << newDepth);
+
+		// #of buddy tables on the old bucket page.
+		final int oldBuddyCount = (slotsOnPage) / slotsPerOldBuddy;
+
+		// #of buddy tables on the bucket pages after the split.
+		final int newBuddyCount = (slotsOnPage) / slotsPerNewBuddy;
+
+		final BucketPage srcPage = oldBucket;
+		final MutableKeyBuffer srcKeys = (MutableKeyBuffer) oldBucket.getKeys();
+		final MutableValueBuffer srcVals = (MutableValueBuffer) oldBucket
+				.getValues();
+
 		/*
-		 * Redistribute the buddy buckets.
-		 * 
-		 * Note: We are not changing the #of buddy buckets, just their size and
-		 * the page on which they are found. Any tuples in a source bucket will
-		 * wind up in the same bucket afterwards, but the page and offset on the
-		 * page of the buddy bucket may have been changed.
-		 * 
-		 * TODO So we could proceed backwards, moving the upper half of the
-		 * buddy buckets to the new bucket page first and then spreading out the
-		 * lower half of the source page among the new bucket boundaries on the
-		 * page. Again, we have to move backwards through the buddy buckets on
-		 * the source page to avoid overwrites of data which has not yet been
-		 * copied.
+		 * Move top 1/2 of the buddy buckets from the child to the new page.
 		 */
 		{
 
-			// #of address slots in each old buddy hash bucket.
-			final int slotsPerOldBuddy = (1 << oldDepth);
+			// target is the new page.
+			final BucketPage dstPage = newBucket;
+			final MutableKeyBuffer dstKeys = (MutableKeyBuffer) dstPage
+					.getKeys();
+			final MutableValueBuffer dstVals = (MutableValueBuffer) dstPage
+					.getValues();
 
-			// #of address slots in each new buddy hash bucket.
-			final int slotsPerNewBuddy = (1 << newDepth);
+			// index (vs offset) of first buddy in upper half of src page.
+			final int firstSrcBuddyIndex = (oldBuddyCount >> 1);
 
-			// #of buddy tables on the old bucket page.
-			final int oldBuddyCount = (slotsOnPage) / slotsPerOldBuddy;
+			// exclusive upper bound for index (vs offset) of last buddy in
+			// upper half of src page.
+			final int lastSrcBuddyIndex = oldBuddyCount;
 
-			// #of buddy tables on the bucket pages after the split.
-			final int newBuddyCount = (slotsOnPage) / slotsPerNewBuddy;
+			// exclusive upper bound for index (vs offset) of last buddy in
+			// upper half of target page.
+			final int lastDstBuddyIndex = newBuddyCount;
 
-			final BucketPage srcPage = oldBucket;
-			final MutableKeyBuffer srcKeys = (MutableKeyBuffer)oldBucket.getKeys();
-			final MutableValueBuffer srcVals = (MutableValueBuffer)oldBucket.getValues();
+			// work backwards over buddy buckets to avoid stomping data!
+			for (int srcBuddyIndex = lastSrcBuddyIndex - 1, dstBuddyIndex = lastDstBuddyIndex - 1; //
+			srcBuddyIndex >= firstSrcBuddyIndex; //
+			srcBuddyIndex--, dstBuddyIndex--//
+			) {
 
-			/*
-			 * Move top 1/2 of the buddy buckets from the child to the new page.
-			 */
-			{
+				final int firstSrcSlot = srcBuddyIndex * slotsPerOldBuddy;
 
-				// target is the new page.
-				final BucketPage dstPage = newBucket;
-				final MutableKeyBuffer dstKeys = (MutableKeyBuffer)dstPage.getKeys();
-				final MutableValueBuffer dstVals = (MutableValueBuffer)dstPage.getValues();
-				
-				// index (vs offset) of first buddy in upper half of src page.
-				final int firstSrcBuddyIndex = (oldBuddyCount >> 1);
+				final int lastSrcSlot = (srcBuddyIndex + 1) * slotsPerOldBuddy;
 
-				// exclusive upper bound for index (vs offset) of last buddy in
-				// upper half of src page.
-				final int lastSrcBuddyIndex = oldBuddyCount;
+				final int firstDstSlot = dstBuddyIndex * slotsPerNewBuddy;
 
-				// exclusive upper bound for index (vs offset) of last buddy in
-				// upper half of target page.
-				final int lastDstBuddyIndex = newBuddyCount;
+				for (int srcSlot = firstSrcSlot, dstSlot = firstDstSlot; srcSlot < lastSrcSlot; srcSlot++, dstSlot++) {
 
-				// work backwards over buddy buckets to avoid stomping data!
-				for (int srcBuddyIndex = lastSrcBuddyIndex - 1, dstBuddyIndex = lastDstBuddyIndex - 1; //
-					 srcBuddyIndex >= firstSrcBuddyIndex; //
-					 srcBuddyIndex--, dstBuddyIndex--//
-					 ) {
+					if (log.isTraceEnabled())
+						log.trace("moving: page(" + srcPage.toShortString()
+								+ "=>" + dstPage.toShortString() + ")"
+								+ ", buddyIndex(" + srcBuddyIndex + "=>"
+								+ dstBuddyIndex + ")" + ", slot(" + srcSlot
+								+ "=>" + dstSlot + ")");
 
-					final int firstSrcSlot = srcBuddyIndex * slotsPerOldBuddy;
-
-					final int lastSrcSlot = (srcBuddyIndex + 1)
-							* slotsPerOldBuddy;
-
-					final int firstDstSlot = dstBuddyIndex * slotsPerNewBuddy;
-
-					for (int srcSlot = firstSrcSlot, dstSlot = firstDstSlot; srcSlot < lastSrcSlot; srcSlot++, dstSlot++) {
-
-						if (log.isTraceEnabled())
-							log.trace("moving: page(" + srcPage.toShortString()
-									+ "=>" + dstPage.toShortString() + ")"
-									+ ", buddyIndex(" + srcBuddyIndex + "=>"
-									+ dstBuddyIndex + ")" + ", slot(" + srcSlot
-									+ "=>" + dstSlot + ")");
-						
-						// Move the tuple at that slot TODO move metadata also.
-						dstKeys.keys[dstSlot] = srcKeys.keys[srcSlot];
-						dstVals.values[dstSlot] = srcVals.values[srcSlot];
-						srcKeys.keys[srcSlot] = null;
-						srcVals.values[srcSlot] = null;
-
-					}
+					// Move the tuple at that slot TODO move metadata also.
+					dstKeys.keys[dstSlot] = srcKeys.keys[srcSlot];
+					dstVals.values[dstSlot] = srcVals.values[srcSlot];
+					srcKeys.keys[srcSlot] = null;
+					srcVals.values[srcSlot] = null;
 
 				}
-				
-			}
 
-			/*
-			 * Reposition the bottom 1/2 of the buddy buckets on the old page.
-			 */
-			{
-
-				// target is the old page.
-				final BucketPage dstPage = oldBucket;
-				final MutableKeyBuffer dstKeys = (MutableKeyBuffer)dstPage.getKeys();
-				final MutableValueBuffer dstVals = (MutableValueBuffer)dstPage.getValues();
-				
-				// index (vs offset) of first buddy in lower half of src page.
-				final int firstSrcBuddyIndex = 0;
-
-				// exclusive upper bound for index (vs offset) of last buddy in
-				// lower half of src page.
-				final int lastSrcBuddyIndex = (oldBuddyCount >> 1);
-
-				// exclusive upper bound for index (vs offset) of last buddy in
-				// upper half of target page (which is also the source page).
-				final int lastDstBuddyIndex = newBuddyCount;
-
-				/*
-				 * Work backwards over buddy buckets to avoid stomping data!
-				 * 
-				 * Note: The slots for first buddy in the lower half of the
-				 * source page DO NOT MOVE. The offset of that buddy in the
-				 * first page remains unchanged. Only the size of the buddy is
-				 * changed (it is doubled, just like all the other buddies on
-				 * the page).
-				 */
-				for (int srcBuddyIndex = lastSrcBuddyIndex - 1, dstBuddyIndex = lastDstBuddyIndex - 1; //
-					 srcBuddyIndex > firstSrcBuddyIndex; //
-					 srcBuddyIndex--, dstBuddyIndex--//
-					 ) {
-
-					final int firstSrcSlot = srcBuddyIndex * slotsPerOldBuddy;
-
-					final int lastSrcSlot = (srcBuddyIndex + 1)
-							* slotsPerOldBuddy;
-
-					final int firstDstSlot = dstBuddyIndex * slotsPerNewBuddy;
-
-					for (int srcSlot = firstSrcSlot, dstSlot = firstDstSlot; srcSlot < lastSrcSlot; srcSlot++, dstSlot++) {
-
-						if (log.isTraceEnabled())
-							log.trace("moving: page(" + srcPage.toShortString()
-									+ "=>" + dstPage.toShortString() + ")"
-									+ ", buddyIndex(" + srcBuddyIndex + "=>"
-									+ dstBuddyIndex + ")" + ", slot(" + srcSlot
-									+ "=>" + dstSlot + ")");
-
-						// Move the tuple at that slot TODO move metadata also.
-						dstKeys.keys[dstSlot] = srcKeys.keys[srcSlot];
-						dstVals.values[dstSlot] = srcVals.values[srcSlot];
-						srcKeys.keys[srcSlot] = null;
-						srcVals.values[srcSlot] = null;
-
-					}
-
-				}
-				
 			}
 
 		}
 
-		// TODO assert invariants?
-		
+		/*
+		 * Reposition the bottom 1/2 of the buddy buckets on the old page.
+		 * 
+		 * Again, we have to move backwards through the buddy buckets on the
+		 * source page to avoid overwrites of data which has not yet been
+		 * copied. Also, notice that the buddy bucket at index ZERO does not
+		 * move - it is already in place even though it's size has doubled.
+		 */
+		{
+
+			// target is the old page.
+			final BucketPage dstPage = oldBucket;
+			final MutableKeyBuffer dstKeys = (MutableKeyBuffer) dstPage
+					.getKeys();
+			final MutableValueBuffer dstVals = (MutableValueBuffer) dstPage
+					.getValues();
+
+			// index (vs offset) of first buddy in lower half of src page.
+			final int firstSrcBuddyIndex = 0;
+
+			// exclusive upper bound for index (vs offset) of last buddy in
+			// lower half of src page.
+			final int lastSrcBuddyIndex = (oldBuddyCount >> 1);
+
+			// exclusive upper bound for index (vs offset) of last buddy in
+			// upper half of target page (which is also the source page).
+			final int lastDstBuddyIndex = newBuddyCount;
+
+			/*
+			 * Work backwards over buddy buckets to avoid stomping data!
+			 * 
+			 * Note: The slots for first buddy in the lower half of the source
+			 * page DO NOT MOVE. The offset of that buddy in the first page
+			 * remains unchanged. Only the size of the buddy is changed (it is
+			 * doubled, just like all the other buddies on the page).
+			 */
+			for (int srcBuddyIndex = lastSrcBuddyIndex - 1, dstBuddyIndex = lastDstBuddyIndex - 1; //
+			srcBuddyIndex > firstSrcBuddyIndex; // DO NOT move 1st buddy bucket!
+			srcBuddyIndex--, dstBuddyIndex--//
+			) {
+
+				final int firstSrcSlot = srcBuddyIndex * slotsPerOldBuddy;
+
+				final int lastSrcSlot = (srcBuddyIndex + 1) * slotsPerOldBuddy;
+
+				final int firstDstSlot = dstBuddyIndex * slotsPerNewBuddy;
+
+				for (int srcSlot = firstSrcSlot, dstSlot = firstDstSlot; srcSlot < lastSrcSlot; srcSlot++, dstSlot++) {
+
+					if (log.isTraceEnabled())
+						log.trace("moving: page(" + srcPage.toShortString()
+								+ "=>" + dstPage.toShortString() + ")"
+								+ ", buddyIndex(" + srcBuddyIndex + "=>"
+								+ dstBuddyIndex + ")" + ", slot(" + srcSlot
+								+ "=>" + dstSlot + ")");
+
+					// Move the tuple at that slot TODO move metadata also.
+					dstKeys.keys[dstSlot] = srcKeys.keys[srcSlot];
+					dstVals.values[dstSlot] = srcVals.values[srcSlot];
+					srcKeys.keys[srcSlot] = null;
+					srcVals.values[srcSlot] = null;
+
+				}
+
+			}
+
+		}
+
 	}
 	
 	/**
@@ -897,7 +956,7 @@ public class HTree extends AbstractHTree
 
 		/**
 		 * The size of the address space (in bits) for each buddy hash table on
-		 * a directory page. The legal range is <code>[0:addressBits]</code>.
+		 * a directory page. The legal range is <code>[0:addressBits-1]</code>.
 		 * <p>
 		 * When the global depth is increased, the hash table requires twice as
 		 * many slots on the page. This forces the split of the directory page
@@ -907,8 +966,9 @@ public class HTree extends AbstractHTree
 		 * minimum global depth is ZERO (0), at which point the buddy hash table
 		 * has a single slot.
 		 * <p>
-		 * The global depth of a directory page is just the local depth of the
-		 * directory page in its parent.
+		 * The global depth of a child page is just the local depth of the
+		 * directory page in its parent. The global depth of the child page
+		 * is often called its <em>local depth</em>.
 		 * 
 		 * TODO Since the root directory does not have a parent, its global
 		 * depth is recorded in the checkpoint record [actually, the global
@@ -1959,6 +2019,20 @@ public class HTree extends AbstractHTree
 
 	    }
 
+		/*
+		 * TODO We should dump each bucket page once. This could be done either
+		 * by dumping each buddy bucket on the page separately or by skipping
+		 * through the directory page until we get to the next bucket page and
+		 * then dumping that.
+		 * 
+		 * TODO The directory page validation should include checks on the
+		 * bucket references and addresses. For a given buddy hash table, the
+		 * reference and address should pairs should be consistent if either the
+		 * reference or the address appears in another slot of that table. Also,
+		 * there can not be "gaps" between observations of a reference to a
+		 * given bucket - once you see another bucket reference a previously
+		 * observed reference can not then appear.
+		 */
 	    @Override
 		protected boolean dump(Level level, PrintStream out,
 			int height, boolean recursive, boolean materialize) {
