@@ -296,7 +296,109 @@ public class TestHTree extends TestCase2 {
 							.lookupAll(new byte[] { 0x01 }));
 			AbstractBTreeTestCase.assertSameIterator(//
 					new byte[][] {}, htree.lookupAll(new byte[] { 0x02 }));
-			
+
+			/*
+			 * 4. Insert another duplicate key. The buddy bucket is now full
+			 * again. It is only the only buddy bucket on the page.
+			 * 
+			 * Note: At this point if we insert another duplicate key the page
+			 * size will be doubled because all keys on the page are duplicates
+			 * and there is only one buddy bucket on the page.
+			 * 
+			 * However, rather than test the doubling of the page size, this
+			 * example is written to test a split where global depth == local
+			 * depth, which will cause the introduction of a new directory page
+			 * in the htree.
+			 */
+			htree.insert(new byte[] { 0x01 }, new byte[] { 0x01 });
+			assertEquals("nnodes", 1, htree.getNodeCount());
+			assertEquals("nleaves", 3, htree.getLeafCount());
+			assertEquals("nentries", 4, htree.getEntryCount());
+			htree.dump(Level.ALL, System.err, true/* materialize */);
+			assertTrue(root == htree.getRoot());
+			assertEquals(4, root.childRefs.length);
+			assertTrue(a == (BucketPage) root.childRefs[0].get());
+			assertTrue(c == (BucketPage) root.childRefs[1].get());
+			assertTrue(b == (BucketPage) root.childRefs[2].get());
+			assertTrue(b == (BucketPage) root.childRefs[3].get());
+			assertEquals(2, root.getGlobalDepth());
+			assertEquals(2, a.getGlobalDepth());// localDepth has increased.
+			assertEquals(1, b.getGlobalDepth());// 
+			assertEquals(2, c.getGlobalDepth());// localDepth is same as [a].
+			assertTrue(htree.contains(new byte[] { 0x01 }));
+			assertFalse(htree.contains(new byte[] { 0x02 }));
+			assertEquals(new byte[] { 0x01 }, htree
+					.lookupFirst(new byte[] { 0x01 }));
+			assertNull(htree.lookupFirst(new byte[] { 0x02 }));
+			AbstractBTreeTestCase.assertSameIterator(
+			//
+					new byte[][] { new byte[] { 0x01 }, new byte[] { 0x01 },
+							new byte[] { 0x01 }, new byte[] { 0x01 } }, htree
+							.lookupAll(new byte[] { 0x01 }));
+			AbstractBTreeTestCase.assertSameIterator(//
+					new byte[][] {}, htree.lookupAll(new byte[] { 0x02 }));
+
+			/*
+			 * 4. Insert 0x20. This key is directed into the same buddy bucket
+			 * as the 0x01 keys that we have been inserting. That buddy bucket
+			 * is already full and, further, it is the only buddy bucket on the
+			 * page. Since we are not inserting a duplicate key we can split the
+			 * buddy bucket. However, since global depth == local depth (i.e.,
+			 * only one buddy bucket on the page), this split will introduce a
+			 * new directory page. The new directory page basically codes for
+			 * the additional prefix bits required to differentiate the two
+			 * distinct keys such that they are directed into the appropriate
+			 * buckets.
+			 * 
+			 * Note: The #of new directory levels which have to be introduced
+			 * here is a function of the #of prefix bits which have to be
+			 * consumed before a distinction can be made between the existing
+			 * key (0x01) and the new key (0x20). With an address space of 2
+			 * bits, each directory level examines the next 2-bits of the key.
+			 * The key (x20) was chosen since the distinction can be made by
+			 * adding only one directory level (the keys differ in the first 4
+			 * bits).
+			 * 
+			 * TODO At this point we should also prune the buckets [b] and [c]
+			 * since they are empty and replace them with null references.
+			 */
+			htree.insert(new byte[] { 0x20 }, new byte[] { 0x20 });
+			assertEquals("nnodes", 2, htree.getNodeCount());
+			assertEquals("nleaves", 4, htree.getLeafCount());
+			assertEquals("nentries", 5, htree.getEntryCount());
+			htree.dump(Level.ALL, System.err, true/* materialize */);
+			assertTrue(root == htree.getRoot());
+			assertEquals(4, root.childRefs.length);
+			final DirectoryPage d = (DirectoryPage)root.childRefs[0].get();
+			assertTrue(d == (DirectoryPage) root.childRefs[0].get());
+			assertTrue(d == (DirectoryPage) root.childRefs[1].get());
+			assertTrue(b == (BucketPage) root.childRefs[2].get());
+			assertTrue(b == (BucketPage) root.childRefs[3].get());
+			assertEquals(4, d.childRefs.length);
+			final BucketPage e = (BucketPage)d.childRefs[1].get();
+			assertTrue(a == (BucketPage) d.childRefs[0].get());
+			assertTrue(e == (BucketPage) d.childRefs[1].get());
+			assertTrue(c == (BucketPage) d.childRefs[2].get());
+			assertTrue(c == (BucketPage) d.childRefs[3].get());
+			assertEquals(2, root.getGlobalDepth());
+			assertEquals(2, d.getGlobalDepth());
+			assertEquals(2, a.getGlobalDepth());// unchanged
+			assertEquals(2, e.getGlobalDepth());// same as [a].
+			assertEquals(1, b.getGlobalDepth());// unchanged.
+			assertEquals(2, c.getGlobalDepth());// unchanged.
+			assertTrue(htree.contains(new byte[] { 0x01 }));
+			assertFalse(htree.contains(new byte[] { 0x02 }));
+			assertEquals(new byte[] { 0x01 }, htree
+					.lookupFirst(new byte[] { 0x01 }));
+			assertNull(htree.lookupFirst(new byte[] { 0x02 }));
+			AbstractBTreeTestCase.assertSameIterator(
+			//
+					new byte[][] { new byte[] { 0x01 }, new byte[] { 0x01 },
+							new byte[] { 0x01 }, new byte[] { 0x01 } }, htree
+							.lookupAll(new byte[] { 0x01 }));
+			AbstractBTreeTestCase.assertSameIterator(//
+					new byte[][] {}, htree.lookupAll(new byte[] { 0x02 }));
+
 			// TODO REMOVE (or test suite for remove).
 			
 			// TODO Continue progression here? 
