@@ -278,8 +278,9 @@ public class AllocBlock {
 	 * of non-committed storage.
 	 */
 	public void deshadow() {
-		m_commit = m_saveCommit;
-		m_saveCommit = null;
+		// defer until commit
+		// m_commit = m_saveCommit;
+		// m_saveCommit = null;
 	}
 
 	/**
@@ -296,6 +297,10 @@ public class AllocBlock {
 	 * L 1100	0110	AC	0111	AB	0110
 	 * T 1100	1110		1111		1110	
 	 * C 1100	1100		1110		1100
+	 * 
+	 * BUT the shadow abort must not undo transients bits that were deleted
+	 * from other contexts.  This issue is resolved with the deferred free mechanism
+	 * linked to the ContextAllocation.
 	 */
 	public void abortshadow(final RWWriteCacheService cache) {
 		for (int i = 0; i < m_live.length; i++) {
@@ -303,10 +308,17 @@ public class AllocBlock {
 			final int chkbits = m_live[i] & ~m_commit[i];
 			clearCacheBits(cache, startBit, chkbits);
 			
+			// remove transient allocations by anding with "old" transients
 			m_live[i] &= m_commit[i];
-			m_transients[i] = m_live[i] | m_saveCommit[i];
+			
+			// The transients must be the OR of the live and the "old transients"
+			// Since we have just removed any extra live allocations by ANDing
+			// with the "old transients" (saved as m_commit) we can just assign
+			// directly
+			m_transients[i] = m_commit[i];
 		}
 		m_commit = m_saveCommit;
+		m_saveCommit = null;
 	}
 	
 	private int clearCacheBits(RWWriteCacheService cache, final int startBit, final int chkbits) {

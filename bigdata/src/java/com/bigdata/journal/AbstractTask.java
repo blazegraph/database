@@ -272,7 +272,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * track whether an index has been registered or dropped by the task.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      * 
      * @todo are these bits (combined with the replacement of the {@link Entry}
      *       in {@link #n2a}) sufficiently flexible to allow a task to do a
@@ -420,7 +419,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * to do the commit.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private class DirtyListener implements IDirtyListener {
         
@@ -1112,6 +1110,17 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     private void abortTask() {
         
         ((IsolatedActionJournal) getJournal()).abortContext();
+        
+    }
+
+    /**
+     * Hook invoked by group commit on success/failure. It is invoked from
+     * within the group commit for each task which joins the commit group along
+     * either the code path where the commit succeeds or the code path where it
+     * fails. The boolean argument indicates whether or not the group commit
+     * succeeded. Throws exceptions are trapped and logged.
+     */
+    void afterTaskHook(boolean abort) {
         
     }
     
@@ -1924,7 +1933,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * {@link ITask} interface to the {@link AbstractTask} object.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     static abstract protected class DelegateTask<T> implements ITask<T> {
         
@@ -2055,7 +2063,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * @todo javadoc update to reflect the {@link NonBlockingLockManager}
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     static protected class InnerWriteServiceCallable<T> extends DelegateTask<T> {
 
@@ -2148,7 +2155,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * {@link AbstractTask} instance.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class ResubmitException extends RejectedExecutionException {
 
@@ -2186,7 +2192,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * interrupted.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     class IsolatedActionJournal implements IJournal, IAllocationContext {
         
@@ -2227,6 +2232,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                     source.getResourceLocator()// delegate locator
             );
 
+            final IBufferStrategy bufferStrategy = source.getBufferStrategy();
+            if (bufferStrategy instanceof RWStrategy) {
+                ((RWStrategy) bufferStrategy).getRWStore().registerContext(this);
+            }
         }
 
         /*
@@ -2600,7 +2609,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * an {@link UnsupportedOperationException}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private class ReadOnlyJournal implements IJournal {
 
@@ -2982,7 +2990,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * Delegate pattern for {@link IIndexManager}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class DelegateIndexManager implements IIndexManager {
      
