@@ -156,7 +156,7 @@ public class IndexSegmentCheckpoint {
     /**
      * The current serialization version.
      */
-    static transient final public int currentVersion = VERSION0;
+    static transient final public int currentVersion = VERSION2;
     
     /**
      * UUID for this {@link IndexSegment} (it is a unique identifier for the
