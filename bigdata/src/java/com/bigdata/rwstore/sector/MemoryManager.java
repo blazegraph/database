@@ -454,25 +454,54 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 				 * For Blob allocation call the normal allocate and retrieve
 				 * the allocation address to store in the blob header.
 				 */
-				final int nblocks = SectorAllocator.getBlobBlockCount(nbytes);
-				final ByteBuffer hdrbuf = ByteBuffer.allocate(nblocks * 4);
-				for (int i = 0; i < nblocks; i++) {
-					final int pos = SectorAllocator.BLOB_SIZE * i;
-					final int bsize = i < (nblocks-1) ? SectorAllocator.BLOB_SIZE : nbytes - pos;
-
-					/*
-					 * BLOB RECURSION
-					 */
-					final long bpaddr = allocate(bsize, blocks);
-					final int bprwaddr = getAllocationAddress(bpaddr);
-					hdrbuf.putInt(bprwaddr);
+				int nblocks = 0;
+				ByteBuffer hdrbuf = null;
+				int[] addrs = null;
+				try {
+					nblocks = SectorAllocator.getBlobBlockCount(nbytes);
+					hdrbuf = ByteBuffer.allocate(nblocks * 4);
+					addrs = new int[nblocks];
+					
+					for (int i = 0; i < nblocks; i++) {
+						final int pos = SectorAllocator.BLOB_SIZE * i;
+						final int bsize = i < (nblocks-1) ? SectorAllocator.BLOB_SIZE : nbytes - pos;
+	
+						/*
+						 * BLOB RECURSION
+						 */
+						final long bpaddr = allocate(bsize, blocks);
+						final int bprwaddr = getAllocationAddress(bpaddr);
+						hdrbuf.putInt(bprwaddr);
+						addrs[i] = bprwaddr;
+					}
+					
+					// now allocate the blob header and fix the return address size
+					hdrbuf.flip();
+					final int retaddr = getAllocationAddress(allocate(hdrbuf,blocks));
+					
+					return makeAddr(retaddr, nbytes);
+				} catch (MemoryManagerOutOfMemory oom) {
+					// We could have failed to allocate any of the blob parts or the header
+					try {
+						hdrbuf.position(0);
+						hdrbuf.limit(nblocks*4);
+						for (int i = 0; i < nblocks; i++) {
+							int addr = hdrbuf.getInt();
+							if (addr == 0) {
+								break;
+							} else {
+								long laddr = makeAddr(addr, SectorAllocator.BLOB_SIZE);
+								
+								free(laddr);
+							}
+						}
+					} catch (Throwable t) {
+						log.warn("Problem trying to release partial allocations after MemoryManagerOutOfMemory", t);
+					}
+					
+					throw oom;
 				}
-				
-				// now allocate the blob header and fix the return address size
-				hdrbuf.flip();
-				final int retaddr = getAllocationAddress(allocate(hdrbuf,blocks));
-				
-				return makeAddr(retaddr, nbytes);
+
 			}
 			
 		} finally {

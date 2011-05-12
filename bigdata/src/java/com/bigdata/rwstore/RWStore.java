@@ -1126,26 +1126,29 @@ public class RWStore implements IStore, IBufferedWriter {
 	private FixedAllocator establishFreeFixedAllocator(final int block) {
 		
 	    final ArrayList<FixedAllocator> list = m_freeFixed[block];
+	    for (int i = 0; i < list.size(); i++) {
+	    	FixedAllocator f = list.get(i);
+	    	if (!m_commitList.contains(f)) {
+	    		list.remove(i);
+	    		return f;
+	    	}
+	    }
 
-		if (list.size() == 0) {
-			
-		    final int allocSize = 64 * m_allocSizes[block];
-	
-            final FixedAllocator allocator = new FixedAllocator(this,
-                    allocSize);//, m_writeCache);
+	    // no valid free allocators, so create a new one
+	    final int allocSize = 64 * m_allocSizes[block];
 
-			allocator.setIndex(m_allocs.size());
-			
-			m_allocs.add(allocator);
-			
-			if (m_storageStats != null) {
-				m_storageStats.register(allocator, true);
-			}
+        final FixedAllocator allocator = new FixedAllocator(this,
+                allocSize);//, m_writeCache);
 
-			return allocator;
-		} else {
-			return list.remove(0);
+		allocator.setIndex(m_allocs.size());
+		
+		m_allocs.add(allocator);
+		
+		if (m_storageStats != null) {
+			m_storageStats.register(allocator, true);
 		}
+
+		return allocator;
 	}
 
 //	// Root interface
@@ -1574,20 +1577,6 @@ public class RWStore implements IStore, IBufferedWriter {
 				freeBlob(addr, sze, context);
 			} else {
 				final FixedAllocator alloc = getBlockByAddress(addr);
-
-				/**
-				 * If a request is made to free storage associated with some other
-				 *  allocation context, then it is unsafe to recycle.
-				 */
-				if (alloc.isUnsafeFree(context)) {
-					if ((++m_unsafeFrees % 5000) == 0 && log.isDebugEnabled()) {
-						log.debug("Unsafe frees : " + m_unsafeFrees + ", allocations: " + m_allocations + ", frees: " + m_frees);
-						StringBuilder sb = new StringBuilder();
-						m_storageStats.showStats(sb);
-						log.debug(sb);
-					}
-					return;
-				}
 				
 				/*
                  * There are a few conditions here. If the context owns the
@@ -1612,8 +1601,17 @@ public class RWStore implements IStore, IBufferedWriter {
 					 * transaction protection and isolated AllocationContexts.
 					 */
 					if (this.isSessionProtected()) {
+						final boolean overrideSession = context != null && alloc.canImmediatelyFree(addr, sze, context);
 						
-						immediateFree(addr, sze, context != null && alloc.canImmediatelyFree(addr, sze, context));
+						if (context != null) {
+							if (alloc.canImmediatelyFree(addr, sze, context)) {
+								immediateFree(addr, sze, true);
+							} else {
+								establishContextAllocation(context).deferFree(encodeAddr(addr, sze));
+							}
+						} else {
+							immediateFree(addr, sze, false);
+						}
 					} else {
 						immediateFree(addr, sze);
 					}
@@ -1641,6 +1639,13 @@ public class RWStore implements IStore, IBufferedWriter {
 		
 	}
 	
+	private long encodeAddr(long alloc, final int nbytes) {
+		alloc <<= 32;
+		alloc += nbytes;
+
+		return alloc;
+	}
+
 	long getHistoryRetention() {
 		return m_minReleaseAge;
 	}
@@ -1676,6 +1681,8 @@ public class RWStore implements IStore, IBufferedWriter {
 	 * unwritten allocations.
 	 */
 	void releaseSessions() {
+		assert(m_activeTxCount == 0 && m_contexts.isEmpty());
+		
 		if (m_minReleaseAge == 0) {
 			for (FixedAllocator fa : m_allocs) {
 				fa.releaseSession(m_writeCache);
@@ -1755,7 +1762,7 @@ public class RWStore implements IStore, IBufferedWriter {
 			if (alloc.isAllocated(addrOffset))
 				throw new IllegalStateException("Reallocation problem with WriteCache");
 
-			if (!m_commitList.contains(alloc)) {
+			if (alloc.m_context == null && !m_commitList.contains(alloc)) {
 				m_commitList.add(alloc);
 			}
 			
@@ -1856,7 +1863,7 @@ public class RWStore implements IStore, IBufferedWriter {
 				
 				final int addr = allocator.alloc(this, size, context);
 
-				if (!m_commitList.contains(allocator)) {
+				if (allocator.m_context == null && !m_commitList.contains(allocator)) {
 					m_commitList.add(allocator);
 				}
 
@@ -3507,7 +3514,23 @@ public class RWStore implements IStore, IBufferedWriter {
         return totalFreed;
 	}
 
+
     /**
+     * When a new context is started it must be registered to ensure it is
+     * protected.
+     * 
+     * @param context
+     */
+	public void registerContext(IAllocationContext context) {
+		m_allocationLock.lock();
+		try {
+			establishContextAllocation(context);
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
+	
+	/**
      * The ContextAllocation object manages a freeList of associated allocators
      * and an overall list of allocators. When the context is detached, all
      * allocators must be released and any that has available capacity will be
@@ -3526,6 +3549,10 @@ public class RWStore implements IStore, IBufferedWriter {
 			if (alloc != null) {
 				m_contextRemovals++;
 				alloc.release();			
+			}
+			
+			if (m_contexts.isEmpty() && this.m_activeTxCount == 0) {
+				releaseSessions();
 			}
 		} finally {
 			m_allocationLock.unlock();
@@ -3573,6 +3600,8 @@ public class RWStore implements IStore, IBufferedWriter {
 		
 		private final ArrayList<FixedAllocator> m_allFixed;
 		
+		private final ArrayList<Long> m_deferredFrees;
+		
 		// lists of free blob allocators
 //		private final ArrayList<BlobAllocator> m_freeBlobs;
 		
@@ -3599,11 +3628,24 @@ public class RWStore implements IStore, IBufferedWriter {
 			
 			m_allFixed = new ArrayList<FixedAllocator>();
 			
+			m_deferredFrees = new ArrayList<Long>();
+			
 //			m_freeBlobs = new ArrayList<BlobAllocator>();
 			
 		}
 		
         /**
+         * For frees made against a shadowed FixedAlocator that is NOT owned
+         * by the context, the physical free must be deferred until the
+         * context is deshadowed or aborted.
+         * 
+         * @param encodeAddr
+         */
+        public void deferFree(long encodeAddr) {
+			m_deferredFrees.add(encodeAddr);
+		}
+
+		/**
          * Must return the shadowed allocators to the parent/global
          * environment, resetting the freeList association.
          */
@@ -3625,8 +3667,21 @@ public class RWStore implements IStore, IBufferedWriter {
 //			}
 			
 //			freeBlobs.addAll(m_freeBlobs);
+			
+			// now free all deferred frees made within this context for other
+			// allocators
+			if (log.isDebugEnabled())
+				log.debug("Releasing " + m_deferredFrees.size() + " deferred frees");
+			
+			for (Long l : m_deferredFrees) {
+				m_store.immediateFree((int) (l >> 32), l.intValue());
+			}
+			m_deferredFrees.clear();
 		}
 		
+        /**
+         * TODO
+         */
         void abort() {
             final ArrayList<FixedAllocator> freeFixed[] = m_parent != null ? m_parent.m_freeFixed
                     : m_store.m_freeFixed;
@@ -3639,11 +3694,10 @@ public class RWStore implements IStore, IBufferedWriter {
 				f.setFreeList(freeFixed[m_store.fixedAllocatorIndex(f.m_size)]);
 			}
 			
-//			for (int i = 0; i < m_freeFixed.length; i++) {
-//				freeFixed[i].addAll(m_freeFixed[i]);
-//			}
+			if (log.isDebugEnabled())
+				log.debug("Aborting " + m_deferredFrees.size() + " deferred frees");
 			
-//			freeBlobs.addAll(m_freeBlobs);
+			m_deferredFrees.clear();
 		}
 		
 		FixedAllocator getFreeFixed(final int i) {
@@ -4412,7 +4466,7 @@ public class RWStore implements IStore, IBufferedWriter {
             if(log.isInfoEnabled())
                 log.info("#activeTx="+m_activeTxCount);
             
-            if (m_activeTxCount == 0) {
+            if (m_activeTxCount == 0 && m_contexts.isEmpty()) {
             	releaseSessions();
             }
         } finally {
@@ -4473,5 +4527,6 @@ public class RWStore implements IStore, IBufferedWriter {
 			m_allocationLock.unlock();
 		}
 	}
+
     
 }
