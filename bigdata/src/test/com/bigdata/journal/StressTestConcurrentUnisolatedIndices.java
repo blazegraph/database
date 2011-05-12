@@ -109,15 +109,15 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
 
         try {
 
-            if(journal.getBufferStrategy() instanceof RWStrategy) {
-
-                /*
-                 * FIXME I've been seeing CI deadlocks so I am going to disable
-                 * this test for the RWStrategy for a bit while we work on that.
-                 */
-                fail("Test disabled for the RWStrategy for the moment");
-                
-            }
+//            if(journal.getBufferStrategy() instanceof RWStrategy) {
+//
+//                /*
+//                 * FIXME I've been seeing CI deadlocks so I am going to disable
+//                 * this test for the RWStrategy for a bit while we work on that.
+//                 */
+//                fail("Test disabled for the RWStrategy for the moment");
+//                
+//            }
             
 //        if(journal.getBufferStrategy() instanceof MappedBufferStrategy) {
 //            
