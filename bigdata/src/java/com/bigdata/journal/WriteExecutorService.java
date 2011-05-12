@@ -2387,6 +2387,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
                     task.commitTime = timestamp;
                     
+                    try {
+                        task.afterTaskHook(false/* abort */);
+                    } catch (Throwable t) {
+                        log.error(t, t);
+                    }
+                    
                 }
                 
             }
@@ -2512,7 +2518,13 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 // set flag to deny access to resources.
                 
                 entry.getValue().aborted = true;
-                
+
+                try {
+                    entry.getValue().afterTaskHook(true/* abort */);
+                } catch (Throwable t) {
+                    log.error(t, t);
+                }
+
                 // interrupt the thread running the task (do not interrupt this thread).
                 
                 if (thread != entry.getKey()) {

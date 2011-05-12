@@ -1112,6 +1112,17 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         ((IsolatedActionJournal) getJournal()).abortContext();
         
     }
+
+    /**
+     * Hook invoked by group commit on success/failure. It is invoked from
+     * within the group commit for each task which joins the commit group along
+     * either the code path where the commit succeeds or the code path where it
+     * fails. The boolean argument indicates whether or not the group commit
+     * succeeded. Throws exceptions are trapped and logged.
+     */
+    void afterTaskHook(boolean abort) {
+        
+    }
     
     /*
      * End isolation support for name2addr.
