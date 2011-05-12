@@ -459,9 +459,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         for (int i = 0; i < n1.getChildCount(); i++) {
 
-            final int expectedChildEntryCount = n1.getChildEntryCount(i);
+            final long expectedChildEntryCount = n1.getChildEntryCount(i);
 
-            final int actualChildEntryCount = n2.getChildEntryCount(i);
+            final long actualChildEntryCount = n2.getChildEntryCount(i);
 
             if (expectedChildEntryCount != actualChildEntryCount) {
 
@@ -1234,7 +1234,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          * Do inserts.
          */
         
-        int lastLeafCount = btree.nleaves;
+        long lastLeafCount = btree.getLeafCount();
         
         for (int i = 0; i < keys.length; i++) {
 
@@ -1249,7 +1249,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                 
             }
 
-            assertEquals("#entries",i,btree.nentries);
+			assertEquals("#entries", i, btree.getEntryCount());
             
             final byte[] key = TestKeyBuilder.asSortKey(ikey);
             
@@ -1259,7 +1259,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             assertEquals(entry,btree.lookup(key));
 
-            assertEquals("#entries",i+1,btree.nentries);
+            assertEquals("#entries",i+1,btree.getEntryCount());
 
             if (btree.nleaves > lastLeafCount) {
 
@@ -1273,7 +1273,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         }
 
         // Note: The height, #of nodes, and #of leaves is path dependent.
-        assertEquals("#entries", keys.length, btree.nentries);
+        assertEquals("#entries", keys.length, btree.getEntryCount());
 
         assertTrue(btree.dump(/*Level.DEBUG,*/System.err));
 
@@ -1353,7 +1353,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             }
         }
 
-        int lastLeafCount = btree.nleaves;
+        long lastLeafCount = btree.getLeafCount();
         
         for (int i = 0; i < keys.length; i++) {
 
@@ -1634,7 +1634,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         try {
             
-            int lastLeafCount = btree.nleaves;
+            long lastLeafCount = btree.getLeafCount();
 
             for (int i = 0; i < keys.length; i++) {
 
@@ -1649,7 +1649,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                     
                 }
 
-                assertEquals("#entries", i, btree.nentries);
+                assertEquals("#entries", i, btree.getEntryCount());
 
                 final byte[] key = TestKeyBuilder.asSortKey(ikey);
                 
@@ -1676,7 +1676,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
                 assertEquals(entry, btree.lookup(key));
 
-                assertEquals("#entries", i + 1, btree.nentries);
+                assertEquals("#entries", i + 1, btree.getEntryCount());
 
                 if (btree.nleaves > lastLeafCount) {
 
@@ -1703,7 +1703,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             }
 
             // Note: The height, #of nodes, and #of leaves is path dependent.
-            assertEquals("#entries", keys.length, btree.nentries);
+            assertEquals("#entries", keys.length, btree.getEntryCount());
 
             assertTrue(btree.dump(System.err));
 
@@ -1825,7 +1825,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          * Insert keys into the tree.
          */
 
-        int lastLeafCount = btree.nleaves;
+        long lastLeafCount = btree.getLeafCount();
         
         for (int i = 0; i < keys.length; i++) {
 
@@ -1839,7 +1839,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                 
             }
 
-            assertEquals("#entries",i,btree.nentries);
+			assertEquals("#entries", i, btree.getEntryCount());
 
             final byte[] key = TestKeyBuilder.asSortKey(ikey);
             
@@ -1849,7 +1849,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             assertEquals(entry,btree.lookup(key));
 
-            assertEquals("#entries",i+1,btree.nentries);
+			assertEquals("#entries", i + 1, btree.getEntryCount());
 
             if (btree.nleaves > lastLeafCount) {
 
@@ -2161,31 +2161,38 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         /*
          * Extract the ground truth mapping from the input btree.
          */
-        final byte[][] keys = new byte[expected.getEntryCount()][];
-        
-        final byte[][] vals = new byte[expected.getEntryCount()][];
-        
-        getKeysAndValues(expected, keys, vals);
-        
-        /*
-         * Verify lookup against the segment with random keys choosen from
-         * the input btree. This vets the separatorKeys. If the separator
-         * keys are incorrect then lookup against the index segment will
-         * fail in various interesting ways.
-         */
-        doRandomLookupTest("actual", actual, keys, vals);
- 
-        /*
-         * Verify lookup by entry index with random keys. This vets the
-         * childEntryCounts[] on the nodes of the generated index segment.
-         * If the are wrong then this test will fail in various interesting
-         * ways.
-         */
-        if(actual instanceof AbstractBTree) {
+		if (expected.getEntryCount() <= Integer.MAX_VALUE) {
 
-            doRandomIndexOfTest("actual", ((AbstractBTree) actual), keys, vals);
-            
-        }
+			final int entryCount = (int) expected.getEntryCount();
+
+			final byte[][] keys = new byte[entryCount][];
+
+			final byte[][] vals = new byte[entryCount][];
+
+			getKeysAndValues(expected, keys, vals);
+
+			/*
+			 * Verify lookup against the segment with random keys choosen from
+			 * the input btree. This vets the separatorKeys. If the separator
+			 * keys are incorrect then lookup against the index segment will
+			 * fail in various interesting ways.
+			 */
+			doRandomLookupTest("actual", actual, keys, vals);
+
+			/*
+			 * Verify lookup by entry index with random keys. This vets the
+			 * childEntryCounts[] on the nodes of the generated index segment.
+			 * If the are wrong then this test will fail in various interesting
+			 * ways.
+			 */
+			if (actual instanceof AbstractBTree) {
+
+				doRandomIndexOfTest("actual", ((AbstractBTree) actual), keys,
+						vals);
+
+			}
+
+		}
 
         /*
          * Examine the btree for inconsistencies (we also examine the ground
@@ -2767,5 +2774,40 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         return data;
         
     }
+
+	/**
+	 * Utility method for random long integers within a range.
+	 * 
+	 * @param r
+	 *            The random number.
+	 * @param n
+	 *            The range.
+	 * 
+	 * @return The random number in that range.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if <i>n</i> is negative.
+	 * 
+	 * @see Random#nextInt(int)
+	 */
+	public static long nextLong(final Random r, final long n) {
+
+		if (n < 0)
+			throw new IllegalArgumentException();
+		
+		if (n > Integer.MAX_VALUE && r.nextBoolean()) {
+			
+			/*
+			 * 50% of the time when the range is greater than MAX_VALUE return a
+			 * random value GT MAX_VALUE.
+			 */
+
+			return Integer.MAX_VALUE + r.nextInt((int) (n - Integer.MAX_VALUE));
+
+		}
+		
+		return r.nextInt((int) (n));
+		
+	}
 
 }

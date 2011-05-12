@@ -267,10 +267,10 @@ public class MutableBucketData implements IBucketData {
 		return 0;
 	}
 
-	public int getSpannedTupleCount() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
+//	public int getSpannedTupleCount() {
+//		// TODO Auto-generated method stub
+//		return 0;
+//	}
 
 	public boolean isCoded() {
 		// TODO Auto-generated method stub

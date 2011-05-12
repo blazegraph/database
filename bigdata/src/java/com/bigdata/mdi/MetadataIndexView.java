@@ -64,7 +64,7 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
      */
     final private boolean readOnly; 
     
-    public MetadataIndexView(AbstractBTree delegate) {
+    public MetadataIndexView(final AbstractBTree delegate) {
         
         super(delegate);
     
@@ -146,9 +146,9 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
      * This implementation depends on the {@link ILinearList} API and therefore
      * can not be used with a key-range partitioned metadata index.
      */
-    private PartitionLocator find_with_indexOf(byte[] key) {
+    private PartitionLocator find_with_indexOf(final byte[] key) {
 
-        final int index;
+        final long index;
 
         if (key == null) {
             
@@ -168,9 +168,9 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
             
         }
 
-        if(readOnly)
-            return getAndCacheLocatorAtIndex(index);
-        else 
+		if (readOnly && index < Integer.MAX_VALUE)
+			return getAndCacheLocatorAtIndex((int) index);
+		else
             return getLocatorAtIndex(index);
         
     }
@@ -204,15 +204,20 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
    
     }
 
-    /**
-     * {@link #find(byte[])} was a hot spot with the costs being primarily the
-     * the de-serialization of the {@link PartitionLocator} from the
-     * {@link ITuple} so I setup this {@link LRUCache}. The keys are the index
-     * position in the B+Tree. The values are de-serialized
-     * {@link PartitionLocator}s. That seems to do the trick for now, but a
-     * different approach may be required if {@link #find(byte[])} is changed to
-     * use an iterator.
-     */
+	/**
+	 * {@link #find(byte[])} was a hot spot with the costs being primarily the
+	 * the de-serialization of the {@link PartitionLocator} from the
+	 * {@link ITuple} so I setup this {@link LRUCache}. The keys are the index
+	 * position in the B+Tree. The values are de-serialized
+	 * {@link PartitionLocator}s. That seems to do the trick for now, but a
+	 * different approach may be required if {@link #find(byte[])} is changed to
+	 * use an iterator.
+	 * <p>
+	 * Note: This exploits the fact that the indexOf the tuple in the metadata
+	 * index is also its partition identifier. This is true because the
+	 * partition identifier is based on a one-up index local counter. This means
+	 * that the index partition tuples are created in strict order.
+	 */
     private LRUCache<Integer, PartitionLocator> locatorCache = new LRUCache<Integer, PartitionLocator>(
             1000);
 
@@ -234,7 +239,7 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
      * 
      * @return
      */
-    private PartitionLocator getLocatorAtIndex(int index) {
+    private PartitionLocator getLocatorAtIndex(final long index) {
 
         final ITuple<PartitionLocator> tuple = delegate.valueAt(index,
                 delegate.getLookupTuple());
@@ -256,9 +261,9 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
      *                key. In this case the {@link MetadataIndex} lacks an entry
      *                for the key <code>new byte[]{}</code>.
      */
-    private int findIndexOf(byte[] key) {
+    private long findIndexOf(final byte[] key) {
         
-        int pos = delegate.indexOf(key);
+        long pos = delegate.indexOf(key);
         
         if (pos < 0) {
 

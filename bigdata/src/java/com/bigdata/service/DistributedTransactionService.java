@@ -408,7 +408,7 @@ public abstract class DistributedTransactionService extends
                     
                 }
 
-                final int entryCount;
+                final long entryCount;
                 synchronized (commitTimeIndex) {
 
                     entryCount = SnapshotHelper.write(commitTimeIndex, file);
@@ -495,7 +495,7 @@ public abstract class DistributedTransactionService extends
             
         }
 
-        static public int write(CommitTimeIndex ndx, File file)
+        static public long write(final CommitTimeIndex ndx, final File file)
                 throws IOException {
 
             final FileOutputStream os = new FileOutputStream(file);
@@ -507,7 +507,7 @@ public abstract class DistributedTransactionService extends
                 final DataOutputStream dos = new DataOutputStream(bos);
 
                 // write the image on the file.
-                final int entryCount = SnapshotHelper.write(ndx, dos);
+                final long entryCount = SnapshotHelper.write(ndx, dos);
 
                 dos.flush();
                 
@@ -523,12 +523,12 @@ public abstract class DistributedTransactionService extends
 
         }
         
-        static public int write(CommitTimeIndex ndx, DataOutputStream os)
-                throws IOException {
+		static public long write(final CommitTimeIndex ndx,
+				final DataOutputStream os) throws IOException {
 
-            final int entryCount = ndx.getEntryCount();
+            final long entryCount = ndx.getEntryCount();
             
-            os.writeInt(entryCount);
+            os.writeLong(entryCount);
             
             final ITupleIterator itr = ndx.rangeIterator();
 
@@ -2119,7 +2119,7 @@ public abstract class DistributedTransactionService extends
              * The #of commit times that are currently accessible.
              */
             countersRoot.addCounter("commitTimesCount",
-                    new Instrument<Integer>() {
+                    new Instrument<Long>() {
                         protected void sample() {
                             synchronized (commitTimeIndex) {
                                 setValue(commitTimeIndex.getEntryCount());

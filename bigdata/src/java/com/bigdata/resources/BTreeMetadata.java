@@ -196,7 +196,7 @@ class BTreeMetadata {
     /**
      * The entry count for the {@link BTree} itself NOT the view.
      */
-    public final int entryCount;
+    public final long entryCount;
 
     /**
      * The counters for the index partition view.

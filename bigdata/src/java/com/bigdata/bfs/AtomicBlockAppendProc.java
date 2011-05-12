@@ -274,7 +274,7 @@ public class AtomicBlockAppendProc implements ISimpleIndexProcedure,
          * key. Otherwise this will be the first block written for that
          * file.
          */
-        int toIndex = tmp.indexOf(toKey);
+        long toIndex = tmp.indexOf(toKey);
 
         assert toIndex < 0 : "Expecting insertion point: id=" + id
                 + ", version=" + version + ", toIndex=" + toIndex;
@@ -285,7 +285,7 @@ public class AtomicBlockAppendProc implements ISimpleIndexProcedure,
         toIndex = -(toIndex + 1); // convert to an index.
 
         // #of entries in the index.
-        final int entryCount = ((AbstractBTree) ndx).getEntryCount();
+        final long entryCount = ((AbstractBTree) ndx).getEntryCount();
 
         if (log.isDebugEnabled())
             log.debug("toIndex=" + toIndex + ", entryCount=" + entryCount);

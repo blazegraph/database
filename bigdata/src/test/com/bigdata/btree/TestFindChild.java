@@ -73,7 +73,7 @@ public class TestFindChild extends AbstractBTreeTestCase {
         final int m2 = (m+1)/2;
         final int nentries = m2*4;
         final long[] childAddrs = new long[] { 1, 2, 3, 4, 0 };
-        final int[] childEntryCounts = new int[]{m2,m2,m2,m2,0};
+        final long[] childEntryCounts = new long[]{m2,m2,m2,m2,0};
         
         final IRaba keys = new MutableKeyBuffer(3, new byte[][] {//
                 new byte[] { 5 }, //

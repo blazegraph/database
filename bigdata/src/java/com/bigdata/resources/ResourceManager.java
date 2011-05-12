@@ -497,14 +497,14 @@ abstract public class ResourceManager extends OverflowManager implements
                 tmp.addCounter(IStoreManagerCounters.ManagedJournalCount,
                         new Instrument<Long>() {
                             public void sample() {
-                                setValue((long) getManagedJournalCount());
+                                setValue(getManagedJournalCount());
                             }
                         });
 
                 tmp.addCounter(IStoreManagerCounters.ManagedSegmentStoreCount,
                         new Instrument<Long>() {
                             public void sample() {
-                                setValue((long) getManagedSegmentCount());
+                                setValue(getManagedSegmentCount());
                             }
                         });
 

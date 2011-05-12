@@ -74,7 +74,7 @@ abstract public class AbstractNodeDataRecordTestCase extends
         final byte[][] keys = new byte[m][];
         final int spannedTupleCount = 0;
         final long[] childAddr = new long[m + 1];
-        final int[] childEntryCount = new int[m + 1];
+        final long[] childEntryCount = new long[m + 1];
         final boolean hasVersionTimestamps = false;
         final long minimumVersionTimestamp = 0L;
         final long maximumVersionTimestamp = 0L;
@@ -99,7 +99,7 @@ abstract public class AbstractNodeDataRecordTestCase extends
         final byte[][] keys = new byte[m][];
         final int spannedTupleCount = 0;
         final long[] childAddr = new long[m + 1];
-        final int[] childEntryCount = new int[m + 1];
+        final long[] childEntryCount = new long[m + 1];
         final boolean hasVersionTimestamps = true;
         final long minimumVersionTimestamp = System.currentTimeMillis();
         final long maximumVersionTimestamp = System.currentTimeMillis() + 20;
@@ -123,14 +123,14 @@ abstract public class AbstractNodeDataRecordTestCase extends
         final int nkeys = 1; // 1 key so 2 children.
         final byte[][] keys = new byte[m][];
         final long[] childAddr = new long[] { 10, 20, 0, 0 };
-        final int childEntryCount[] = new int[] { 4, 7, 0, 0 };
+        final long childEntryCount[] = new long[] { 4, 7, 0, 0 };
         final boolean hasVersionTimestamps = false;
         final long minimumVersionTimestamp = 0L;
         final long maximumVersionTimestamp = 0L;
 
         keys[0] = new byte[] { 1, 2, 3 };
 
-        int entryCount = 0;
+        long entryCount = 0;
         for (int i = 0; i <= nkeys; i++) {
 
             entryCount += childEntryCount[i];
@@ -156,14 +156,14 @@ abstract public class AbstractNodeDataRecordTestCase extends
         final int nkeys = 1; // 1 key so 2 children.
         final byte[][] keys = new byte[m][];
         final long[] childAddr = new long[] { 10, 20, 0, 0 };
-        final int childEntryCount[] = new int[] { 4, 7, 0, 0 };
+        final long childEntryCount[] = new long[] { 4, 7, 0, 0 };
         final boolean hasVersionTimestamps = true;
         final long minimumVersionTimestamp = System.currentTimeMillis();
         final long maximumVersionTimestamp = System.currentTimeMillis() + 20;
 
         keys[0] = new byte[] { 1, 2, 3 };
 
-        int entryCount = 0;
+        long entryCount = 0;
         for (int i = 0; i <= nkeys; i++) {
 
             entryCount += childEntryCount[i];

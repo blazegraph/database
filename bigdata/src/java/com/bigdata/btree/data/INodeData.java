@@ -33,40 +33,7 @@ package com.bigdata.btree.data;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface INodeData extends IAbstractNodeData, IKeysData, IChildData, ISpannedTupleCountData {
-
-//    /**
-//     * The #of children of this node. Either all children will be nodes or all
-//     * children will be leaves. The #of children of a node MUST be
-//     * <code>{@link IAbstractNodeData#getKeyCount()}+1</code>
-//     * 
-//     * @return The #of children of this node.
-//     */
-//    public int getChildCount();
-//
-//    /**
-//     * Return the persistent addresses of the specified child node.
-//     * 
-//     * @param index
-//     *            The index of the child in [0:nkeys].
-//     * 
-//     * @return The persistent child address -or- zero(0L) if the child is not
-//     *         persistent.
-//     */
-//    public long getChildAddr(int index);
-
-    /**
-     * Return the #of tuples spanned by the indicated child of this node. The
-     * sum of the values returned by this method across the children of the node
-     * should always equal the value returned by {@link #getSpannedTupleCount()}
-     * . These data are used to support fast computation of the index at which a
-     * key occurs and the #of entries in a given key range.
-     * 
-     * @param index
-     *            The index of the child in [0:nkeys].
-     * 
-     * @return The #of tuples spanned by that child.
-     */
-    public int getChildEntryCount(int index);
+public interface INodeData extends IAbstractNodeData, IKeysData, IChildData,
+		ISpannedTupleCountData {
 
 }

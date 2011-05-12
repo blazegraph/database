@@ -151,7 +151,7 @@ class BuildViewMetadata {
                  * Values for this source (2nd+ source only).
                  */
                 final AbstractBTree s = sources[i];
-                final int entryCount = s.getEntryCount();
+                final long entryCount = s.getEntryCount();
                 final boolean isJournal = !(s instanceof IndexSegment);
                 final long segBytes = (isJournal ? 0L : s.getStore().size());
 

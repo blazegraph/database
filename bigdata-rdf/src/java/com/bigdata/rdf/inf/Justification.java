@@ -27,8 +27,10 @@ package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
 import java.util.UUID;
+
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
@@ -42,7 +44,6 @@ import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ISPO;
@@ -643,9 +644,11 @@ public class Justification implements Comparable<Justification> {
 
             boolean ret = isGrounded(inf, focusStore, db, head, testHead, testFocusStore, visited);
 
-            if(log.isInfoEnabled()) log.info("head=" + head + " is " + (ret ? "" : "NOT ")
-                    + "grounded : testHead=" + testHead + ", testFocusStore="
-                    + testFocusStore + ", #visited=" + visited.size());
+			if (log.isInfoEnabled())
+				log.info("head=" + head + " is " + (ret ? "" : "NOT ")
+						+ "grounded : testHead=" + testHead
+						+ ", testFocusStore=" + testFocusStore + ", #visited="
+						+ visited.size());
 
 			/*
 			 * FIXME we could also memoize goals that have been proven false at
@@ -915,7 +918,7 @@ public class Justification implements Comparable<Justification> {
             
             final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
             
-            metadata.setBranchingFactor(32);
+//            metadata.setBranchingFactor(32); // Use default. Could be store specific.
 
             // FIXME quads : use different tupleSerializer IFF cross graph TM is supported.
 //            assert arity == 3;
@@ -957,7 +960,7 @@ public class Justification implements Comparable<Justification> {
 
         }
 
-        public int size() {
+        public long size() {
 
             return btree.getEntryCount();
 

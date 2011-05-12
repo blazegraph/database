@@ -58,7 +58,31 @@ import com.bigdata.util.concurrent.ExecutionExceptions;
  */
 public class SplitUtility {
 
-    protected static final Logger log = Logger.getLogger(SplitUtility.class);
+    private static final Logger log = Logger.getLogger(SplitUtility.class);
+
+	/**
+	 * Dynamic sharding operations are not currently supported for indices with
+	 * more than MAX_INT tuples. It is not really a use case for scale-out, and
+	 * that is what the SplitUtility is designed to support. Various methods in
+	 * this class therefore will cast to an int32 value.
+	 * 
+	 * @param entryCount
+	 *            The entry count of some index.
+	 *            
+	 * @return The int32 entry count.
+	 * 
+	 * @throws UnsupportedOperationException
+	 *             if entryCount is GT MAX_INT.
+	 */
+	static private int assertEntryCount(final long entryCount) {
+		
+		if (entryCount >= Integer.MAX_VALUE)
+			throw new UnsupportedOperationException(
+					"More than GT MAX_INT tuples: n=" + entryCount);
+		
+		return (int) entryCount;
+		
+	}
     
     /**
      * Validate splits, including: that the separator keys are strictly
@@ -364,7 +388,7 @@ public class SplitUtility {
         }
         
         // The index within the btree of the tuple associated with that key.
-        final int separatorIndex = btree.indexOf(separatorKey);
+        final int separatorIndex = assertEntryCount(btree.indexOf(separatorKey));
 
         /*
          * The key must exist since we just discovered it. even if the tuple is
@@ -452,7 +476,7 @@ public class SplitUtility {
              * the tail split.
              */
             
-            splits[1] = new Split(pmd, separatorIndex, btree.getEntryCount());
+            splits[1] = new Split(pmd, separatorIndex, (int)btree.getEntryCount());
 
         }
 
@@ -769,7 +793,7 @@ public class SplitUtility {
          * Note: These will all be non-deleted tuples since we verified that
          * this is a compact segment above.
          */
-        final int entryCount = seg.getEntryCount();
+        final int entryCount = assertEntryCount(seg.getEntryCount());
 
         /*
          * This adjusts the #of splits if there are not enough tuples to
@@ -939,7 +963,7 @@ public class SplitUtility {
                     } else {
 
                         // Lookup key in the index.
-                        final int pos = seg.indexOf(chosenKey);
+                        final int pos = assertEntryCount(seg.indexOf(chosenKey));
 
                         // If key not found, convert pos to the insertion point.
                         toIndex = pos < 0 ? -(pos + 1) : pos;

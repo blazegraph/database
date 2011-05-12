@@ -2490,7 +2490,7 @@ abstract public class OverflowManager extends IndexManager {
                  * Otherwise we will let the asynchronous post-processing figure
                  * out what it wants to do with this index partition.
                  */
-                final int entryCount = bm.entryCount;
+                final long entryCount = bm.entryCount;
                 final boolean copyIndex = (entryCount == 0)
                         || ((copyIndexThreshold > 0 && entryCount <= copyIndexThreshold) //
                                 && numIndicesNonZeroCopy < maxNonZeroCopy //

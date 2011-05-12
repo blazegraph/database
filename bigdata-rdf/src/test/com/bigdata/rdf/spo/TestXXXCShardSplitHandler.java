@@ -310,11 +310,11 @@ public class TestXXXCShardSplitHandler extends AbstractTestSegSplitter {
                  */
                 
                 // Get insertion point (there are no 8-byte keys in the ndx).
-                final int pos = seg.indexOf(separatorKey);
+                final long pos = seg.indexOf(separatorKey);
                 assertTrue(pos < 0);
                 
                 // Convert to a tuple index.
-                final int index = -(pos) - 1;
+                final long index = -(pos) - 1;
 
                 if (log.isInfoEnabled())
                     log.info("index=" + index);

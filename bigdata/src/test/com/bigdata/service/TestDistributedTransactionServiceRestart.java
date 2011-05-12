@@ -147,7 +147,11 @@ public class TestDistributedTransactionServiceRestart extends TestCase2 {
         
         synchronized(ndx) {
             
-            final long[] a = new long[ndx.getEntryCount()];
+			if (ndx.getEntryCount() > Integer.MAX_VALUE) {
+				fail("Test case can not handle massive indices");
+			}
+        	
+            final long[] a = new long[(int)ndx.getEntryCount()];
             
             final ITupleIterator<?> itr = ndx.rangeIterator();
             

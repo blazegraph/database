@@ -1511,10 +1511,11 @@ public class AccessPath<R> implements IAccessPath<R> {
 
                 final long extentLeaves = seg.getStore().getCheckpoint().extentLeaves;
 
-                final int leafCount = stats.getLeafCount();
+                final long leafCount = stats.getLeafCount();
 
-                final int bytesPerLeaf = (int) Math
-                        .ceil(((double) extentLeaves) / leafCount);
+                // Note: bytesPerLeaf is never more than an int32 value!
+				final int bytesPerLeaf = (int) Math
+						.ceil(((double) extentLeaves) / leafCount);
 
                 cost += new IndexSegmentCostModel(diskCostModel).rangeScan(
                         (int) sourceRangeCount, stats.getBranchingFactor(),
