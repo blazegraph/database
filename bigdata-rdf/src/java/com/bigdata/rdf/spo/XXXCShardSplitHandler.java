@@ -111,7 +111,7 @@ public class XXXCShardSplitHandler implements ISimpleSplitHandler, Serializable 
          * indexOf() will return an insertion point which we convert to an
          * index. That index will be a quad actually present in the B+Tree.
          */
-        final int fromKeyAt = -(seg.indexOf(fromKey)) - 1;
+        final long fromKeyAt = -(seg.indexOf(fromKey)) - 1;
 
         // obtain the successor of the key (next possible triple prefix).
         final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
@@ -124,7 +124,7 @@ public class XXXCShardSplitHandler implements ISimpleSplitHandler, Serializable 
          * index. That index will be a quad actually present in the B+Tree
          * unless it is beyond the end of the B+Tree.
          */
-        final int toKeyAt = -(seg.indexOf(toKey)) - 1;
+        final long toKeyAt = -(seg.indexOf(toKey)) - 1;
 
         /*
          * [splitAt] is the index of a quad.  fromKey must be LTE that quad.
@@ -133,9 +133,9 @@ public class XXXCShardSplitHandler implements ISimpleSplitHandler, Serializable 
         assert fromKeyAt <= splitAt;
         assert splitAt < toKeyAt;
         
-        final int nbefore = splitAt - fromKeyAt;
+        final long nbefore = splitAt - fromKeyAt;
 
-        final int nafter = toKeyAt - splitAt;
+        final long nafter = toKeyAt - splitAt;
 
         final boolean useFromKey = nbefore < nafter && fromKeyAt >= fromIndex;
         

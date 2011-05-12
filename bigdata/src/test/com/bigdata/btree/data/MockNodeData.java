@@ -14,14 +14,14 @@ public class MockNodeData extends AbstractMockNodeData implements INodeData {
     /**
      * The #of tuples spanned by this node.
      */
-    private int spannedTupleCount;
+    private long spannedTupleCount;
 
     private final long[] childAddr;
 
     /**
      * The #of tuples spanned by each child of this node.
      */
-    private final int[] childEntryCount;
+    private final long[] childEntryCount;
 
     private final boolean hasVersionTimestamps;
 
@@ -29,7 +29,7 @@ public class MockNodeData extends AbstractMockNodeData implements INodeData {
 
     private final long maxVersionTimestamp;
     
-    final public int getSpannedTupleCount() {
+    final public long getSpannedTupleCount() {
 
         return spannedTupleCount;
 
@@ -60,7 +60,7 @@ public class MockNodeData extends AbstractMockNodeData implements INodeData {
         
     }
 
-    final public int getChildEntryCount(final int index) {
+    final public long getChildEntryCount(final int index) {
 
         assertChildIndex(index);
         
@@ -101,8 +101,8 @@ public class MockNodeData extends AbstractMockNodeData implements INodeData {
         
     }
 
-    public MockNodeData(final IRaba keys, final int spannedTupleCount,
-            final long[] childAddr, final int[] childEntryCount,
+    public MockNodeData(final IRaba keys, final long spannedTupleCount,
+            final long[] childAddr, final long[] childEntryCount,
             boolean hasVersionTimestamps, long minVersionTimestamp,
             long maxVersionTimestamp) {
 

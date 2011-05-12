@@ -226,7 +226,7 @@ public class TestIndexSegmentPlan extends AbstractBTreeTestCase {
         assertEquals("nnodes",3,plan.nnodes);
         assertEquals("height",2,plan.height);
         assertEquals("numInLeaf[]",new int[]{3,3,2,2},plan.numInLeaf);
-        assertEquals("numInLevel[]",new int[]{1,2,4},plan.numInLevel);
+        assertEquals("numInLevel[]",new long[]{1,2,4},plan.numInLevel);
         assertEquals("numInNode[][]",plan.height+1,plan.numInNode.length);
         assertEquals("numInNode[0][]",new int[]{2},plan.numInNode[0]);
         assertEquals("numInNode[1][]",new int[]{2,2},plan.numInNode[1]);
@@ -249,7 +249,7 @@ public class TestIndexSegmentPlan extends AbstractBTreeTestCase {
         assertEquals("nnodes",1,plan.nnodes);
         assertEquals("height",1,plan.height);
         assertEquals("numInLeaf[]",new int[]{4,4,2},plan.numInLeaf);
-        assertEquals("numInLevel[]",new int[]{1,3},plan.numInLevel);
+        assertEquals("numInLevel[]",new long[]{1,3},plan.numInLevel);
         assertEquals("numInNode[][]",plan.height+1,plan.numInNode.length);
         assertEquals("numInNode[0][]",new int[]{3},plan.numInNode[0]);
         assertEquals("numInNode[1][]",new int[]{4,4,2},plan.numInNode[1]);
@@ -271,7 +271,7 @@ public class TestIndexSegmentPlan extends AbstractBTreeTestCase {
         assertEquals("nnodes",1,plan.nnodes);
         assertEquals("height",1,plan.height);
         assertEquals("numInLeaf[]",new int[]{5,5},plan.numInLeaf);
-        assertEquals("numInLevel[]",new int[]{1,2},plan.numInLevel);
+        assertEquals("numInLevel[]",new long[]{1,2},plan.numInLevel);
         assertEquals("numInNode[][]",plan.height+1,plan.numInNode.length);
         assertEquals("numInNode[0][]",new int[]{2},plan.numInNode[0]);
         assertEquals("numInNode[1][]",new int[]{5,5},plan.numInNode[1]);
@@ -293,7 +293,7 @@ public class TestIndexSegmentPlan extends AbstractBTreeTestCase {
         assertEquals("nnodes",1,plan.nnodes);
         assertEquals("height",1,plan.height);
         assertEquals("numInLeaf[]",new int[]{6,4},plan.numInLeaf);
-        assertEquals("numInLevel[]",new int[]{1,2},plan.numInLevel);
+        assertEquals("numInLevel[]",new long[]{1,2},plan.numInLevel);
         assertEquals("numInNode[][]",plan.height+1,plan.numInNode.length);
         assertEquals("numInNode[0][]",new int[]{2},plan.numInNode[0]);
         assertEquals("numInNode[1][]",new int[]{6,4},plan.numInNode[1]);
@@ -315,7 +315,7 @@ public class TestIndexSegmentPlan extends AbstractBTreeTestCase {
         assertEquals("nnodes",1,plan.nnodes);
         assertEquals("height",1,plan.height);
         assertEquals("numInLeaf[]",new int[]{6,4},plan.numInLeaf);
-        assertEquals("numInLevel[]",new int[]{1,2},plan.numInLevel);
+        assertEquals("numInLevel[]",new long[]{1,2},plan.numInLevel);
         assertEquals("numInNode[][]",plan.height+1,plan.numInNode.length);
         assertEquals("numInNode[0][]",new int[]{2},plan.numInNode[0]);
         assertEquals("numInNode[1][]",new int[]{6,4},plan.numInNode[1]);
@@ -337,7 +337,7 @@ public class TestIndexSegmentPlan extends AbstractBTreeTestCase {
         assertEquals("nnodes",1,plan.nnodes);
         assertEquals("height",1,plan.height);
         assertEquals("numInLeaf[]",new int[]{6,4},plan.numInLeaf);
-        assertEquals("numInLevel[]",new int[]{1,2},plan.numInLevel);
+        assertEquals("numInLevel[]",new long[]{1,2},plan.numInLevel);
         assertEquals("numInNode[][]",plan.height+1,plan.numInNode.length);
         assertEquals("numInNode[0][]",new int[]{2},plan.numInNode[0]);
         assertEquals("numInNode[1][]",new int[]{6,4},plan.numInNode[1]);
@@ -359,7 +359,7 @@ public class TestIndexSegmentPlan extends AbstractBTreeTestCase {
         assertEquals("nnodes",1,plan.nnodes);
         assertEquals("height",1,plan.height);
         assertEquals("numInLeaf[]",new int[]{5,5},plan.numInLeaf);
-        assertEquals("numInLevel[]",new int[]{1,2},plan.numInLevel);
+        assertEquals("numInLevel[]",new long[]{1,2},plan.numInLevel);
         assertEquals("numInNode[][]",plan.height+1,plan.numInNode.length);
         assertEquals("numInNode[0][]",new int[]{2},plan.numInNode[0]);
         assertEquals("numInNode[1][]",new int[]{5,5},plan.numInNode[1]);
@@ -381,7 +381,7 @@ public class TestIndexSegmentPlan extends AbstractBTreeTestCase {
         assertEquals("nnodes",4,plan.nnodes);
         assertEquals("height",2,plan.height);
         assertEquals("numInLeaf[]",new int[]{3,3,3,3,3,3,2},plan.numInLeaf);
-        assertEquals("numInLevel[]",new int[]{1,3,7},plan.numInLevel);
+        assertEquals("numInLevel[]",new long[]{1,3,7},plan.numInLevel);
         assertEquals("numInNode[][]",plan.height+1,plan.numInNode.length);
         assertEquals("numInNode[0][]",new int[]{3},plan.numInNode[0]);
         assertEquals("numInNode[1][]",new int[]{3,2,2},plan.numInNode[1]);

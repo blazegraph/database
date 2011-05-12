@@ -182,11 +182,11 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         
     }
 
-    final public int getSpannedTupleCount() {
-        
-        return data.getSpannedTupleCount();
-        
-    }
+//    final public int getSpannedTupleCount() {
+//        
+//        return data.getSpannedTupleCount();
+//        
+//    }
 
     final public int getValueCount() {
         
@@ -866,32 +866,44 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
     }
 
     @Override
-    public int indexOf(final byte[] key) {
+    public long indexOf(final byte[] key) {
 
         btree.touch(this);
         
-        return getKeys().search(key);
+		return (long) getKeys().search(key);
 
-    }
+	}
 
-    @Override
-    public byte[] keyAt(final int entryIndex) {
+	@Override
+	public byte[] keyAt(final long entryIndex) {
 
-        rangeCheck(entryIndex);
+		rangeCheck2(entryIndex);
 
-        return getKeys().get(entryIndex);
-        
-    }
+		return getKeys().get((int) entryIndex);
 
-    @Override
-    public void valueAt(final int entryIndex, final Tuple tuple) {
+	}
 
-        rangeCheck(entryIndex);
-        
-        tuple.copy(entryIndex, this);
+	@Override
+	public void valueAt(final long entryIndex, final Tuple tuple) {
 
-    }
+		rangeCheck2(entryIndex);
 
+		tuple.copy((int) entryIndex, this);
+
+	}
+
+    /** Used for the {@link ILinearList} methods. */
+	final protected boolean rangeCheck2(final long index)
+			throws IndexOutOfBoundsException {
+
+		if (index > Integer.MAX_VALUE)
+			throw new IndexOutOfBoundsException();
+		
+		return rangeCheck((int) index);
+		
+	}
+    
+	/** Used for methods which have an index into the leaf. */
     final protected boolean rangeCheck(final int index)
             throws IndexOutOfBoundsException {
 
@@ -1505,7 +1517,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
             // reallocate spanned entries from the sibling to this node.
             // FIXME Update min/max on the parent for this leaf.
-            pdata.childEntryCounts[index] += s.getSpannedTupleCount();
+            pdata.childEntryCounts[index] += s.getKeyCount();
             
             if(btree.debug) assertInvariants();
             
@@ -1566,7 +1578,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
             // FIXME update min/max on the parent for this leaf.
             // reallocate spanned entries from the sibling to this node.
-            pdata.childEntryCounts[index] += s.getSpannedTupleCount();
+            pdata.childEntryCounts[index] += s.getKeyCount();
 
             if(btree.debug) assertInvariants();
             

@@ -205,6 +205,7 @@ public class TestSampleIndex extends TestCase2 {
 			// 10% seed is 0L (which gets turned into random anyway)
 			final long seed = r.nextDouble() < .1 ? 0 : r.nextLong();
 
+			// Note: entryCount an int32. That assumption is used in this test.
 			final int entryCount = r.nextInt(100000);
 			
 			// 10% fromIndex is zero.
@@ -228,7 +229,8 @@ public class TestSampleIndex extends TestCase2 {
 
 					final long begin = System.currentTimeMillis(); 
 					
-					final int[] offsets = sampler.getOffsets(seed, limit, fromIndex, toIndex);
+					final long[] offsets = sampler.getOffsets(seed, limit,
+							fromIndex, toIndex);
 					
 					final long elapsed = System.currentTimeMillis() - begin;
 					
@@ -248,10 +250,10 @@ public class TestSampleIndex extends TestCase2 {
 						assertTrue(noffsets == limit);
 
 					// check offsets ordered, within range, and w/o dups.
-					int lastOffset = -1;
+					long lastOffset = -1;
 					for (int j = 0; j < offsets.length; j++) {
 
-						final int offset = offsets[j];
+						final long offset = offsets[j];
 
 						if (offset < fromIndex)
 							fail("index=" + j

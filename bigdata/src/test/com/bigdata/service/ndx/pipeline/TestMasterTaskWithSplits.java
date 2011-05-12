@@ -645,9 +645,12 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
                 try {
                     
                     // the #of existing partitions.
-                    final int npartitions = master.mdi.getEntryCount();
-                    
-                    assert npartitions != 0;
+					final long npartitions2 = master.mdi.getEntryCount();
+
+					assertTrue(npartitions2 != 0);
+					assertTrue(npartitions2 <= Integer.MAX_VALUE);
+
+					final int npartitions = (int) npartitions2;
                     
                     // choose which one to split.
                     final int index = r.nextInt(npartitions);
@@ -691,10 +694,13 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
                 try {
                     
                     // the #of existing partitions.
-                    final int npartitions = master.mdi.getEntryCount();
-                    
-                    assert npartitions != 0;
-                    
+					final long npartitions2 = master.mdi.getEntryCount();
+
+					assertTrue(npartitions2 != 0);
+					assertTrue(npartitions2 <= Integer.MAX_VALUE);
+
+					final int npartitions = (int) npartitions2;
+					
                     // choose which one to split.
                     final int index = r.nextInt(npartitions);
                     

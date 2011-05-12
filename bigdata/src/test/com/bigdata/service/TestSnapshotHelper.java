@@ -141,8 +141,15 @@ public class TestSnapshotHelper extends TestCase2 {
         
         synchronized(ndx) {
             
-            long[] a = new long[ndx.getEntryCount()];
-            
+        	final long entryCount = ndx.getEntryCount();
+        	
+			if (entryCount > Integer.MAX_VALUE) {
+				// The test depends on materializing the data in an array.
+				throw new RuntimeException();
+			}
+
+			final long[] a = new long[(int) entryCount];
+
             final ITupleIterator itr = ndx.rangeIterator();
             
             int i = 0;

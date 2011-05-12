@@ -44,22 +44,22 @@ public class BTreeStatistics implements IBTreeStatistics, Serializable {
 
     private final int m;
 
-    private final int entryCount;
-
     private final int height;
 
-    private final int leafCount;
+    private final long nodeCount;
 
-    private final int nodeCount;
+    private final long leafCount;
+
+    private final long entryCount;
 
     private final IBTreeUtilizationReport utilReport;
 
     public BTreeStatistics(final AbstractBTree btree) {
         this.m = btree.getBranchingFactor();
-        this.entryCount = btree.getEntryCount();
         this.height = btree.getHeight();
-        this.leafCount = btree.getLeafCount();
         this.nodeCount = btree.getNodeCount();
+        this.leafCount = btree.getLeafCount();
+        this.entryCount = btree.getEntryCount();
         this.utilReport = btree.getUtilization();
     }
 
@@ -67,20 +67,20 @@ public class BTreeStatistics implements IBTreeStatistics, Serializable {
         return m;
     }
 
-    public int getEntryCount() {
-        return entryCount;
-    }
-
     public int getHeight() {
         return height;
     }
 
-    public int getLeafCount() {
+    public long getNodeCount() {
+        return nodeCount;
+    }
+
+    public long getLeafCount() {
         return leafCount;
     }
 
-    public int getNodeCount() {
-        return nodeCount;
+    public long getEntryCount() {
+        return entryCount;
     }
 
     public IBTreeUtilizationReport getUtilization() {

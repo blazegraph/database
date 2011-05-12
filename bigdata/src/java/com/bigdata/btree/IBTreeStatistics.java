@@ -59,20 +59,20 @@ public interface IBTreeStatistics {
      * The #of non-leaf nodes in the {@link AbstractBTree}. This is zero (0)
      * for a new btree.
      */
-    int getNodeCount();
+    long getNodeCount();
 
     /**
      * The #of leaf nodes in the {@link AbstractBTree}. This is one (1) for a
      * new btree.
      */
-    int getLeafCount();
+    long getLeafCount();
 
     /**
      * The #of entries (aka tuples) in the {@link AbstractBTree}. This is zero
      * (0) for a new B+Tree. When the B+Tree supports delete markers, this value
      * also includes tuples which have been marked as deleted.
      */
-    int getEntryCount();
+    long getEntryCount();
 
     /**
      * Computes and returns the utilization of the tree. The utilization figures

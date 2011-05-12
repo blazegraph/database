@@ -129,15 +129,7 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
 
     }
 
-    final public int getLeafCount() {
-
-        reopen();
-
-        return fileStore.getCheckpoint().nleaves;
-
-    }
-
-    final public int getNodeCount() {
+    final public long getNodeCount() {
 
         reopen();
 
@@ -145,7 +137,15 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
 
     }
 
-    final public int getEntryCount() {
+    final public long getLeafCount() {
+
+        reopen();
+
+        return fileStore.getCheckpoint().nleaves;
+
+    }
+
+    final public long getEntryCount() {
 
         reopen();
 
@@ -718,10 +718,7 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
             /**
              * @param btree
              * @param addr
-             * @param branchingFactor
-             * @param nentries
-             * @param keys
-             * @param childKeys
+             * @param data
              */
             protected ImmutableNode(final AbstractBTree btree, final long addr,
                     final INodeData data) {
@@ -843,9 +840,9 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
                 return Long.MAX_VALUE;
             }
 
-            final public int getSpannedTupleCount() {
-                return 0;
-            }
+//            final public int getSpannedTupleCount() {
+//                return 0;
+//            }
 
             final public boolean isLeaf() {
                 return true;

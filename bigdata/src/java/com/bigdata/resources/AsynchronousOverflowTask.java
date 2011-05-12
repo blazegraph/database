@@ -1113,9 +1113,17 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                 // keys := leftSeparator; value := LocalPartitionMetadata
                 final BTree tmp = entry.getValue();
 
-                // #of underutilized index partitions for that scale-out index.
-                final int ncandidates = tmp.getEntryCount();
+				if (tmp.getEntryCount() > Integer.MAX_VALUE) {
+					/*
+					 * This should never happen....
+					 */
+					log.error("Rediculous size for temp index.");
+					continue;
+				}
                 
+                // #of underutilized index partitions for that scale-out index.
+				final int ncandidates = (int) tmp.getEntryCount();
+
                 assert ncandidates > 0 : "Expecting at least one candidate";
                 
                 final ITupleIterator titr = tmp.rangeIterator();

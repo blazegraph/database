@@ -36,8 +36,6 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexMetadata;
@@ -62,10 +60,15 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
      */
     private static final long serialVersionUID = -2225107318522852096L;
 
-    protected static final Logger log = Logger
-            .getLogger(DefaultLeafCoder.class);
+//    private static final transient Logger log = Logger
+//            .getLogger(DefaultLeafCoder.class);
 
-    protected static final byte VERSION0 = 0x00;
+	/**
+	 * The initial version of the serialized representation of the
+	 * {@link DefaultLeafCoder} class (versus the serializer representation of
+	 * the node or leaf).
+	 */
+    private static final transient byte VERSION0 = 0x00;
     
     private IRabaCoder keysCoder;
     private IRabaCoder valsCoder;
@@ -186,7 +189,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
             
         }
 
-        buf.putShort(AbstractReadOnlyNodeData.VERSION0);
+        buf.putShort(AbstractReadOnlyNodeData.currentVersion);
         
         short flags = 0;
         final boolean hasDeleteMarkers = leaf.hasDeleteMarkers();
@@ -299,12 +302,6 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
             // int64
             buf.putLong(max);
 
-            /*
-             * FIXME pre-extend the buffer and use slice ctor for obs for less
-             * allocation and copying.
-             * 
-             * FIXME Use pluggable coding for version timestamps.
-             */
             if (versionTimestampBits > 0) {
                 /*
                  * Note: We only write the deltas if there is more than one
@@ -551,7 +548,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
          * The #of bits used to code the version timestamps -or- ZERO (0) if
          * they are not present.
          */
-        private final int versionTimestampBits;
+        private final byte versionTimestampBits;
 
 		/**
 		 * Offset of the bit flags in the buffer encoding the presence of tuples
@@ -559,25 +556,6 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 		 * those data.
 		 */
         private final int O_rawRecords;
-        
-//		/**
-//		 * Offset of the int32 hash values in the buffer encoding hash value of
-//		 * the tuple keys -or- <code>-1</code> if the leaf does not report those
-//		 * data.
-//		 */
-//        private final int O_hashKeys;
-
-//		/**
-//		 * The #of bits used to code the hash keys -or- ZERO (0) if they are not
-//		 * present. (The length of the MSB hash prefix is 32-lengthLSB.)
-//		 */
-//        private final int lengthLSB;
-//        
-//		/**
-//		 * The MSB hash prefix shared by all hash codes on this page -or- ZERO
-//		 * (0) if hash codes are not present in the page.
-//		 */
-//        private final int hashMSB;
         
         public final AbstractFixedByteArrayBuffer data() {
 
@@ -632,7 +610,8 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
             pos += SIZEOF_VERSION;
             switch (version) {
             case VERSION0:
-                break;
+            case VERSION1:
+            	break;
             default:
                 throw new AssertionError("version=" + version);
             }
@@ -806,6 +785,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
             pos += SIZEOF_VERSION;
             switch (version) {
             case VERSION0:
+            case VERSION1:
                 break;
             default:
                 throw new AssertionError("version=" + version);
@@ -975,14 +955,14 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 
         }
 
-        /**
-         * For a leaf the #of tuples is always the #of keys.
-         */
-        final public int getSpannedTupleCount() {
-            
-            return nkeys;
-            
-        }
+//        /**
+//         * For a leaf the #of tuples is always the #of keys.
+//         */
+//        final public long getSpannedTupleCount() {
+//            
+//            return nkeys;
+//            
+//        }
 
         /**
          * For a leaf, the #of values is always the #of keys.

@@ -106,9 +106,39 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData> {
     }
 
     /**
-     * Version zero is the only version defined at this time.
+     * The initial version.
      */
     protected static final short VERSION0 = 0;
+    
+	/**
+	 * This version introduces:
+	 * <dl>
+	 * <dt>spannedTupleCount</dt>
+	 * <dd>Both the #of children spanned by the node (<code>nentries</code>) and
+	 * the #of children spanned by each child of the node (
+	 * <code>childEntryCount</code>) are int64 integers in this version. The
+	 * manner in which those integers are coded within the record has also
+	 * changed.</dd>
+	 * </dl>
+	 */
+//    FIXME ADD THIS STUFF INT64_BRANCH!
+//	 * <dt>Index UUID</dt>
+//	 * <dd>The UUID of the owning B+Tree is written into the record. This makes
+//	 * possible certain forensic analysis and data recovery which rely on
+//	 * scanning a file to identify records for a specific index.</dd>
+//	 * <dt>Record version number</dt>
+//	 * <dd>A version number has been introduced into each node record. The
+//	 * record version number is strictly sequential. The next record version
+//	 * number to be assigned is recorded in the {@link Checkpoint} record. The
+//	 * record version number makes possible some forensic analysis and data
+//	 * recovery which relies on the record version numbers to select among
+//	 * multiple versions of a tuple.</dd>
+    protected final static transient short VERSION1 = 0x01;
+
+    /**
+     * The current version.
+     */
+    protected final static transient short currentVersion = VERSION1;
 
     /**
      * Bit flag for a leaf carrying delete markers for each tuple.
@@ -120,14 +150,23 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData> {
      */
     protected static final short FLAG_VERSION_TIMESTAMPS = 1 << 1;
 
-    /**
-     * Bit flag indicating that the tuple revision timestamps have been written
-     * out using an array n-bit deltas computed as
-     * <code>maxTimestamp - minTimestamp</code>, where n is the number of bits
-     * required to code (maxTimestamp - minTimestamp). This is a relatively
-     * compact coding.
-     */
-    protected static final short DELTA_VERSION_TIMESTAMPS = 1 << 2;
+	/**
+	 * Bit flag for a node or leaf on the RWStore using native int32 addresses
+	 * for persistence.
+	 * 
+	 * FIXME Integrate this!  Also, make sure that we test with this mode of
+	 * data storage in the coder test suite. 
+	 */
+    protected static final short FLAG_RWSTORE_ADDRS = 1 << 2;
+
+//    /**
+//     * Bit flag indicating that the tuple revision timestamps have been written
+//     * out using an array n-bit deltas computed as
+//     * <code>maxTimestamp - minTimestamp</code>, where n is the number of bits
+//     * required to code (maxTimestamp - minTimestamp). This is a relatively
+//     * compact coding.
+//     */
+//    protected static final short DELTA_VERSION_TIMESTAMPS = 1 << 2;
 
 //	/**
 //	 * Bit flag indicating that the int32 hash of the key should be stored in
@@ -178,15 +217,18 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData> {
      */
     static protected final int SIZEOF_KEYS_SIZE = Bytes.SIZEOF_INT;
 
-    /**
-     * The size of the field in the data record which encodes the #of tuples
-     * spanned by a node.
-     */
-    static protected final int SIZEOF_ENTRY_COUNT = Bytes.SIZEOF_INT;
+	// Note: This was int32 for VERSION0 and is now int64 (in principle) and a
+	// variable length coding is used when it is written out so this field is
+    // no longer a constant.
+//    /**
+//     * The size of the field in the data record which encodes the #of tuples
+//     * spanned by a node.
+//     */
+//    static protected final int SIZEOF_ENTRY_COUNT = Bytes.SIZEOF_INT;
 
     /**
      * The size of a field in the data record which encodes the address of a
-     * child node or leaf.
+     * child node or leaf. TODO Handle int32 addresses natively with FLAG_RWSTORE_ADDRS
      */
     static protected final int SIZEOF_ADDR = Bytes.SIZEOF_LONG;
 

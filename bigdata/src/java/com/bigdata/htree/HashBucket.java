@@ -615,9 +615,9 @@ public class HashBucket extends AbstractHashPage<HashBucket>//
 		return data.getMinimumVersionTimestamp();
 	}
 
-	public int getSpannedTupleCount() {
-		return data.getKeyCount();
-	}
+//	public int getSpannedTupleCount() {
+//		return data.getKeyCount();
+//	}
 
 	public boolean isCoded() {
 		return data.isCoded();

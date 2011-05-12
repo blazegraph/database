@@ -36,12 +36,14 @@ public class Checkpoint implements Externalizable {
     private long addrMetadata;
     private long addrRoot; // of root node/leaf for BTree; rootDir for HTree.
     private int height; // height for BTree; globalDepth for HTree.
-    private int nnodes; // #of directories for HTree
-    private int nleaves; // #of buckets for HTree.
-    private int nentries; // #of tuples in the index.
-    private long counter;
+    private long nnodes; // #of directories for HTree
+    private long nleaves; // #of buckets for HTree.
+    private long nentries; // #of tuples in the index.
+    private long counter; // B+Tree local counter.
 
     private long addrBloomFilter;
+
+    private long recordVersion; // #of node or leaf records written to date.
 
 	/**
 	 * Added in {@link #VERSION1}. This is a short field allowing for 65536
@@ -181,7 +183,7 @@ public class Checkpoint implements Externalizable {
     /**
      * The #of non-leaf nodes (B+Tree) or directories (HTree).
      */
-    public final int getNodeCount() {
+    public final long getNodeCount() {
         
         return nnodes;
         
@@ -190,7 +192,7 @@ public class Checkpoint implements Externalizable {
     /**
      * The #of leaves (B+Tree) or hash buckets (HTree).
      */
-    public final int getLeafCount() {
+    public final long getLeafCount() {
         
         return nleaves;
         
@@ -199,17 +201,29 @@ public class Checkpoint implements Externalizable {
     /**
      * The #of index entries (aka tuple count).
      */
-    public final int getEntryCount() {
+    public final long getEntryCount() {
         
         return nentries;
         
     }
 
-    /**
-     * Return the value of the counter stored in the {@link Checkpoint}
-     * record.
-     */
+	/**
+	 * Return the value of the B+Tree local counter stored in the
+	 * {@link Checkpoint} record.
+	 */
     public final long getCounter() {
+        
+        return counter;
+        
+    }
+
+	/**
+	 * Return the value of the next record version number to be assigned that is
+	 * stored in the {@link Checkpoint} record. This number is incremented each
+	 * time a node or leaf is written onto the backing store. The initial value
+	 * is ZERO (0). The first value assigned to a node or leaf will be ZERO (0).
+	 */
+    public final long getRecordVersion() {
         
         return counter;
         
@@ -262,10 +276,11 @@ public class Checkpoint implements Externalizable {
                 0L,// No root yet.
                 0L,// No bloom filter yet.
                 0, // height 
-                0, // nnodes
-                0, // nleaves
-                0, // nentries
+                0L, // nnodes
+                0L, // nleaves
+                0L, // nentries
                 0L, // counter
+                0L, // recordVersion
                 IndexTypeEnum.BTree // indexType
                 
         );
@@ -292,10 +307,11 @@ public class Checkpoint implements Externalizable {
                 0L,// No root yet.
                 0L,// No bloom filter yet.
                 0, // height 
-                0, // nnodes
-                0, // nleaves
-                0, // nentries
+                0L, // nnodes
+                0L, // nleaves
+                0L, // nentries
                 oldCheckpoint.counter,//
+                0L, // recordVersion 
                 IndexTypeEnum.BTree//
         );
         
@@ -350,14 +366,16 @@ public class Checkpoint implements Externalizable {
                 btree.nleaves,//
                 btree.nentries,//
                 btree.counter.get(),//
+                btree.recordVersion,//
                 IndexTypeEnum.BTree//
                 );
            
     }
 
 	private Checkpoint(final long addrMetadata, final long addrRoot,
-			final long addrBloomFilter, final int height, final int nnodes,
-			final int nleaves, final int nentries, final long counter,
+			final long addrBloomFilter, final int height, final long nnodes,
+			final long nleaves, final long nentries, final long counter,
+			final long recordVersion,
 			final IndexTypeEnum indexType) {
 
 		assert indexType != null;
@@ -389,7 +407,9 @@ public class Checkpoint implements Externalizable {
         this.nentries = nentries;
 
         this.counter = counter;
-        
+
+		this.recordVersion = recordVersion;
+
         this.indexType = indexType;
         
     }
@@ -412,11 +432,36 @@ public class Checkpoint implements Externalizable {
 	 * which is present only for {@link IndexTypeEnum#HTree}.
 	 */
     private static transient final int VERSION1 = 0x1;
+
+	/**
+	 * Adds and/or modifies the following fields.
+	 * <dl>
+	 * <dt>nodeCount</dt>
+	 * <dd>Changed from int32 to int64.</dd>
+	 * <dt>leafCount</dt>
+	 * <dd>Changed from int32 to int64.</dd>
+	 * <dt>entryCount</dt>
+	 * <dd>Changed from int32 to int64.</dd>
+	 * <dt>recordVersion</dt>
+	 * <dd>Added a new field which record the <em>next</em> record version
+	 * identifier to be used when the next node or leaf data record is written
+	 * onto the backing store. The field provides sequential numbering of those
+	 * data record which can facilitate certain kinds of forensics. For example,
+	 * all updated records falling between two checkpoints may be identified by
+	 * a file scan filtering for the index UUID and a record version number GT
+	 * the last record version written for the first checkpoint and LTE the last
+	 * record version number written for the second checkpoint. The initial
+	 * value is ZERO (0).</dd>
+	 * </dl>
+	 * In addition, the <strong>size</strong> of the checkpoint record has been
+	 * increased in order to provide room for future expansions.
+	 */
+    private static transient final int VERSION2 = 0x2;
     
     /**
      * The current version.
      */
-    private static transient final int VERSION = VERSION1;
+    private static transient final int currentVersion = VERSION2;
 
     /**
      * Write the {@link Checkpoint} record on the store, setting
@@ -474,24 +519,41 @@ public class Checkpoint implements Externalizable {
 		switch (version) {
 		case VERSION0:
 		case VERSION1:
+		case VERSION2:
 			break;
 		default:
 			throw new IOException("Unknown version: " + version);
 		}
 
-        this.addrMetadata = in.readLong();
+		this.addrMetadata = in.readLong();
 
-        this.addrRoot = in.readLong();
+		this.addrRoot = in.readLong();
 
-        this.addrBloomFilter = in.readLong();
-        
-        this.height = in.readInt();
+		this.addrBloomFilter = in.readLong();
 
-        this.nnodes = in.readInt();
+		this.height = in.readInt();
 
-        this.nleaves = in.readInt();
+		if (version <= VERSION1) {
 
-        this.nentries = in.readInt();
+			this.nnodes = in.readInt();
+
+			this.nleaves = in.readInt();
+
+			this.nentries = in.readInt();
+
+			this.recordVersion = 0L;
+			
+		} else {
+
+			this.nnodes = in.readLong();
+
+			this.nleaves = in.readLong();
+
+			this.nentries = in.readLong();
+
+			this.recordVersion = in.readLong();
+
+		}
 
         this.counter = in.readLong();
 
@@ -501,6 +563,7 @@ public class Checkpoint implements Externalizable {
 			indexType = IndexTypeEnum.BTree;
 			break;
 		case VERSION1:
+		case VERSION2:
 			this.indexType = IndexTypeEnum.valueOf(in.readShort());
 			in.readShort();// ignored.
 			in.readInt();// ignored.
@@ -510,12 +573,23 @@ public class Checkpoint implements Externalizable {
         }
         
         in.readLong(); // unused.
+
+		if (version >= VERSION2) {
+
+			// Read some additional padding added to the record in VERSION2.
+			for (int i = 0; i < 10; i++) {
+
+				in.readLong();
+				
+			}
+
+        }
         
     }
 
     public void writeExternal(final ObjectOutput out) throws IOException {
 
-        out.writeInt(VERSION);
+        out.writeInt(currentVersion);
 
         out.writeLong(addrMetadata);
 
@@ -525,11 +599,32 @@ public class Checkpoint implements Externalizable {
 
         out.writeInt(height);
 
-        out.writeInt(nnodes);
+		if (currentVersion <= VERSION1) {
 
-        out.writeInt(nleaves);
+			if (nnodes > Integer.MAX_VALUE)
+				throw new RuntimeException();
+			if (nleaves > Integer.MAX_VALUE)
+				throw new RuntimeException();
+			if (nentries > Integer.MAX_VALUE)
+				throw new RuntimeException();
+			
+			out.writeInt((int)nnodes);
 
-        out.writeInt(nentries);
+			out.writeInt((int)nleaves);
+
+			out.writeInt((int)nentries);
+
+		} else {
+
+			out.writeLong(nnodes);
+
+			out.writeLong(nleaves);
+
+			out.writeLong(nentries);
+
+			out.writeLong(recordVersion);
+
+		}
 
         out.writeLong(counter);
 
@@ -541,12 +636,21 @@ public class Checkpoint implements Externalizable {
 		out.writeShort(0/* unused */);
 		out.writeInt(0/* unused */);
 
-        /*
-         * 8 bytes follow. 
-         */
+		/*
+		 * 8 bytes follow.
+		 */
 
 		out.writeLong(0L/* unused */);
 
+		/*
+		 * Additional space added in VERSION2.
+		 */
+		for (int i = 0; i < 10; i++) {
+
+			out.writeLong(0L/* unused */);
+
+		}
+		
 	}
 
 }

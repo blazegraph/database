@@ -31,9 +31,6 @@ import java.text.NumberFormat;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BTreeUtilizationReport;
-import com.bigdata.btree.IBTreeStatistics;
-import com.bigdata.btree.IBTreeUtilizationReport;
 import com.bigdata.journal.Journal;
 
 /**
@@ -235,54 +232,55 @@ public class BTreeCostModel implements Serializable {
 
     }
 
-    private static class MockBTreeStatistics implements IBTreeStatistics {
-
-        private final int m;
-
-        private final int entryCount;
-
-        private final int height;
-
-        private final int leafCount;
-
-        private final int nodeCount;
-
-        private final IBTreeUtilizationReport utilReport;
-
-        public MockBTreeStatistics(final int m, final int entryCount,
-                final int height, final int leafCount, final int nodeCount) {
-            this.m = m;
-            this.entryCount = entryCount;
-            this.height = height;
-            this.leafCount = leafCount;
-            this.nodeCount = nodeCount;
-            this.utilReport = new BTreeUtilizationReport(this);
-        }
-
-        public int getBranchingFactor() {
-            return m;
-        }
-
-        public int getEntryCount() {
-            return entryCount;
-        }
-
-        public int getHeight() {
-            return height;
-        }
-
-        public int getLeafCount() {
-            return leafCount;
-        }
-
-        public int getNodeCount() {
-            return nodeCount;
-        }
-
-        public IBTreeUtilizationReport getUtilization() {
-            return utilReport;
-        }
-
-    }
+//    private static class MockBTreeStatistics implements IBTreeStatistics {
+//
+//        private final int m;
+//
+//        private final int height;
+//
+//        private final long leafCount;
+//
+//        private final long nodeCount;
+//
+//        private final long entryCount;
+//
+//        private final IBTreeUtilizationReport utilReport;
+//
+//		public MockBTreeStatistics(final int m, final int height,
+//				final long nodeCount, final long leafCount,
+//				final long entryCount) {
+//			this.m = m;
+//            this.height = height;
+//            this.nodeCount = nodeCount;
+//            this.leafCount = leafCount;
+//            this.entryCount = entryCount;
+//            this.utilReport = new BTreeUtilizationReport(this);
+//        }
+//
+//        public int getBranchingFactor() {
+//            return m;
+//        }
+//
+//        public int getHeight() {
+//            return height;
+//        }
+//
+//        public long getNodeCount() {
+//            return nodeCount;
+//        }
+//
+//        public long getLeafCount() {
+//            return leafCount;
+//        }
+//
+//        public long getEntryCount() {
+//            return entryCount;
+//        }
+//
+//        public IBTreeUtilizationReport getUtilization() {
+//            return utilReport;
+//        }
+//
+//    } // MockBTreeStatistics
 
 }

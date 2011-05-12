@@ -86,15 +86,20 @@ public class IndexSegmentCheckpoint {
     static final int SIZEOF_TIMESTAMP = Bytes.SIZEOF_LONG;
     static final int SIZEOF_CHECKSUM = Bytes.SIZEOF_INT;
 
-    /**
-     * The #of unused bytes in the checkpoint record format. Note that the
-     * unused space occurs <em>before</em> the final timestamp in the record.
-     * As the unused bytes are allocated in new versions the value in this field
-     * MUST be adjusted down from its original value of 256.
-     */
-    static final int SIZEOF_UNUSED = 256 - (
-            Bytes.SIZEOF_BYTE // useChecksums [VERSION1]
-            );
+	/**
+	 * The #of unused bytes in the checkpoint record format for various versions
+	 * of the record format. Note that the unused space occurs <em>before</em>
+	 * the final timestamp in the record. As the unused bytes are allocated in
+	 * new versions the value in this field MUST be adjusted down from its
+	 * original value of 256.
+	 */
+    static final int SIZEOF_UNUSED_VERSION0 = 256;
+    static final int SIZEOF_UNUSED_VERSION1 = SIZEOF_UNUSED_VERSION0 -
+    ( Bytes.SIZEOF_BYTE // useChecksums
+    );
+    static final int SIZEOF_UNUSED_VERSION2 = SIZEOF_UNUSED_VERSION1-
+    ( Bytes.SIZEOF_LONG // int64 value for [entries]
+    );
 
     /**
      * The #of bytes required by the current {@link IndexSegmentCheckpoint}
@@ -106,14 +111,15 @@ public class IndexSegmentCheckpoint {
             Bytes.SIZEOF_LONG + // timestamp0
             Bytes.SIZEOF_UUID + // segment UUID.
             SIZEOF_OFFSET_BITS + // #of bits used to represent a byte offset.
-            SIZEOF_COUNTS * 4 + // height, #leaves, #nodes, #entries
+            SIZEOF_COUNTS * 4 + // height, #leaves, #nodes, (nentries:int32 now unused) 
             SIZEOF_NBYTES + // max record length
             Bytes.SIZEOF_LONG * 6 + // {offset,extent} tuples for the {leaves, nodes, blobs} regions.
             SIZEOF_ADDR * 5 + // address of the {root node/leaf, indexMetadata, bloomFilter, {first,last}Leaf}.
             Bytes.SIZEOF_LONG + // file size in bytes.
             Bytes.SIZEOF_BYTE + // compactingMerge flag (0 | 1).
             Bytes.SIZEOF_BYTE + // useChecksums flag (0 | 1) [VERSION1]
-            SIZEOF_UNUSED + // available bytes for future versions.
+            Bytes.SIZEOF_LONG + // nentries:int64 as of VERSION2
+            SIZEOF_UNUSED_VERSION2 + // available bytes for future versions.
             SIZEOF_CHECKSUM+ // the checksum for the proceeding bytes in the checkpoint record.
             Bytes.SIZEOF_LONG // timestamp1
     ;
@@ -141,10 +147,16 @@ public class IndexSegmentCheckpoint {
      */
     static transient final public int VERSION1 = 0x1;
 
+	/**
+	 * Version 2 of the serialization format replaced the int32 value for
+	 * nentries with an int64 value.
+	 */
+	static transient final public int VERSION2 = 0x2;
+
     /**
      * The current serialization version.
      */
-    static transient final public int currentVersion = VERSION1;
+    static transient final public int currentVersion = VERSION0;
     
     /**
      * UUID for this {@link IndexSegment} (it is a unique identifier for the
@@ -170,15 +182,22 @@ public class IndexSegmentCheckpoint {
      * there is only a root leaf in the tree).
      */
     final public int height;
-    
-    /**
-     * The #of leaves serialized in the file.
-     */
+
+	/**
+	 * The #of leaves serialized in the file.
+	 * <p>
+	 * Note: {@link IndexSegmentBuilder} is restricted to MAX_INT leaves in
+	 * its build plan.
+	 */
     final public int nleaves;
 
     /**
      * The #of nodes serialized in the file. If zero, then {@link #nleaves} MUST
      * be ONE (1) and the index consists solely of a root leaf.
+	 * <p>
+	 * Note: {@link IndexSegmentBuilder} is restricted to MAX_INT leaves in
+	 * its build plan and there are always more leaves than nodes in a BTree
+	 * so this is also an int32 value.
      */
     final public int nnodes;
 
@@ -186,7 +205,7 @@ public class IndexSegmentCheckpoint {
      * The #of index entries serialized in the file (non-negative and MAY be
      * zero).
      */
-    final public int nentries;
+    final public long nentries;
 
     /**
      * The maximum #of bytes in any node or leaf stored on the
@@ -403,8 +422,13 @@ public class IndexSegmentCheckpoint {
         nleaves = buf.getInt();
         
         nnodes = buf.getInt();
-        
-        nentries = buf.getInt();
+
+        long nentries = -1;
+		if (version < VERSION2) {
+			nentries = buf.getInt();
+		} else {
+			buf.getInt();
+        }
 
         maxNodeOrLeafLength = buf.getInt();
         
@@ -440,14 +464,31 @@ public class IndexSegmentCheckpoint {
         if (version >= VERSION1) {
             useChecksums = buf.get() != 0;
         } else {
-            // skip unused byte for prior versions.
-            buf.get();
+//            // skip unused byte for prior versions.
+//            buf.get();
             // record checksums were not used for prior versions.
             useChecksums = false;
         }
 
+		if (version >= VERSION2) {
+			nentries = buf.getLong();
+		}
+		this.nentries = nentries;
+        
         // advance to beyond the end of the unused section.
-        buf.position(buf.position() + SIZEOF_UNUSED);
+		switch (version) {
+		case VERSION0:
+			buf.position(buf.position() + SIZEOF_UNUSED_VERSION0);
+			break;
+		case VERSION1:
+			buf.position(buf.position() + SIZEOF_UNUSED_VERSION1);
+			break;
+		case VERSION2:
+			buf.position(buf.position() + SIZEOF_UNUSED_VERSION2);
+			break;
+		default:
+			throw new AssertionError();
+		}
         
         // Note: this sets the instance field to the checksum read from the record!
         checksum = buf.getInt();
@@ -518,7 +559,7 @@ public class IndexSegmentCheckpoint {
             final int height, //
             final int nleaves,//
             final int nnodes,//
-            final int nentries,//
+            final long nentries,//
             //
             final int maxNodeOrLeafLength,//
             // region extents
@@ -855,8 +896,14 @@ public class IndexSegmentCheckpoint {
         buf.putInt(nleaves);
 
         buf.putInt(nnodes);
-        
-        buf.putInt(nentries);
+
+		if (currentVersion < VERSION2) {
+			if (nentries > Integer.MAX_VALUE)
+				throw new RuntimeException();
+			buf.putInt((int) nentries);
+		} else {
+			buf.putInt(0/* unused */);
+		}
 
         buf.putInt(maxNodeOrLeafLength);
         
@@ -889,10 +936,28 @@ public class IndexSegmentCheckpoint {
 
         buf.put((byte) (compactingMerge ? 1 : 0));
 
-        buf.put((byte) (useChecksums ? 1 : 0));
+		if (currentVersion >= VERSION1) {
+			buf.put((byte) (useChecksums ? 1 : 0));
+		}
 
-        // skip over this many bytes.
-        buf.position(buf.position() + SIZEOF_UNUSED);
+		if (currentVersion >= VERSION2) {
+			buf.putLong(nentries);
+        }
+
+		// skip over the unused bytes.
+		switch (currentVersion) {
+		case VERSION0:
+			buf.position(buf.position() + SIZEOF_UNUSED_VERSION0);
+			break;
+		case VERSION1:
+			buf.position(buf.position() + SIZEOF_UNUSED_VERSION1);
+			break;
+		case VERSION2:
+			buf.position(buf.position() + SIZEOF_UNUSED_VERSION2);
+			break;
+		default:
+			throw new AssertionError();
+		}
         
         // Note: this sets the instance field! 
         checksum = new ChecksumUtility().checksum(buf, 0, SIZE

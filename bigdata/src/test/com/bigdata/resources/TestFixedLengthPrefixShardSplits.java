@@ -752,11 +752,11 @@ public class TestFixedLengthPrefixShardSplits extends AbstractTestSegSplitter {
                  */
                 
                 // Get insertion point (there are no 8-byte keys in the ndx).
-                final int pos = seg.indexOf(prefix);
+                final long pos = seg.indexOf(prefix);
                 assertTrue(pos < 0);
                 
                 // Convert to a tuple index.
-                final int index = -(pos) - 1;
+                final long index = -(pos) - 1;
 
                 // The actual key before the separator key.
                 final byte[] keyBefore = seg.keyAt(index - 1);

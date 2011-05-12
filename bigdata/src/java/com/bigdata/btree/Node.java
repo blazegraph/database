@@ -42,6 +42,7 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.btree.AbstractBTree.ChildMemoizer;
 import com.bigdata.btree.AbstractBTree.LoadChildRequest;
 import com.bigdata.btree.data.DefaultNodeCoder;
+import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
@@ -276,7 +277,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
     }
 
-    public final int getSpannedTupleCount() {
+    public final long getSpannedTupleCount() {
 
         return data.getSpannedTupleCount();
 
@@ -288,7 +289,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
     }
 
-    final public int getChildEntryCount(final int index) {
+    final public long getChildEntryCount(final int index) {
 
         return data.getChildEntryCount(index);
 
@@ -503,7 +504,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      */
     @SuppressWarnings("unchecked")
     protected Node(final BTree btree, final AbstractNode oldRoot,
-            final int nentries) {
+            final long nentries) {
 
         super(btree, true /* dirty */);
 
@@ -558,7 +559,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
         // childRefs[0] = btree.newRef(oldRoot);
 
         // #of entries from the old root _after_ the split.
-        data.childEntryCounts[0] = oldRoot.getSpannedTupleCount();
+		data.childEntryCounts[0] = (oldRoot.isLeaf() ? ((Leaf) oldRoot)
+				.getKeyCount() : ((Node) oldRoot).getSpannedTupleCount());
 
         // dirtyChildren.add(oldRoot);
 
@@ -952,12 +954,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
     }
 
-    /**
-     * {@inheritDoc}
-     * @todo convert to batch api and handle searchKeyOffset.
-     */
     @Override
-    public int indexOf(final byte[] key) {
+    public long indexOf(final byte[] key) {
 
         assert !deleted;
 
@@ -973,7 +971,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * pass n down.
          */
 
-        int offset = 0;
+        long offset = 0;
 
         for (int i = 0; i < childIndex; i++) {
 
@@ -982,7 +980,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         }
 
         // recursive invocation, eventually grounds out on a leaf.
-        int ret = child.indexOf(key);
+        long ret = child.indexOf(key);
 
         if (ret < 0) {
 
@@ -1017,9 +1015,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
      *             if the index is LT ZERO (0) -or- GTE the
      *             {@link #getSpannedTupleCount()}
      */
-    protected boolean rangeCheckSpannedTupleIndex(final int entryIndex) {
+    protected boolean rangeCheckSpannedTupleIndex(final long entryIndex) {
 
-        final int nentries = data.getSpannedTupleCount();
+        final long nentries = data.getSpannedTupleCount();
 
         if (entryIndex < 0)
             throw new IndexOutOfBoundsException("negative: " + entryIndex);
@@ -1045,7 +1043,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * @return The key at that entry index.
      */
     @Override
-    final public byte[] keyAt(final int entryIndex) {
+    final public byte[] keyAt(final long entryIndex) {
 
         /* assert */rangeCheckSpannedTupleIndex(entryIndex);
 
@@ -1053,14 +1051,14 @@ public class Node extends AbstractNode<Node> implements INodeData {
         int childIndex = 0;
 
         // corrects the #of spanned entries by #skipped over.
-        int remaining = entryIndex;
+        long remaining = entryIndex;
 
         final int nkeys = getKeyCount();
 
         // search for child spanning the desired entry index.
         for (; childIndex <= nkeys; childIndex++) {
 
-            final int nspanned = getChildEntryCount(childIndex);
+            final long nspanned = getChildEntryCount(childIndex);
 
             if (remaining < nspanned) {
 
@@ -1091,7 +1089,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * @return The value at that entry index.
      */
     @Override
-    final public void valueAt(final int entryIndex, final Tuple tuple) {
+    final public void valueAt(final long entryIndex, final Tuple tuple) {
 
         // Note: Made non-conditional since unit tests verify this.
         /* assert */rangeCheckSpannedTupleIndex(entryIndex);
@@ -1100,14 +1098,14 @@ public class Node extends AbstractNode<Node> implements INodeData {
         int childIndex = 0;
 
         // corrects the #of spanned entries by #skipped over.
-        int remaining = entryIndex;
+        long remaining = entryIndex;
 
         final int nkeys = getKeyCount();
 
         // search for child spanning the desired entry index.
         for (; childIndex <= nkeys; childIndex++) {
 
-            final int nspanned = getChildEntryCount(childIndex);
+            final long nspanned = getChildEntryCount(childIndex);
 
             if (remaining < nspanned) {
 
@@ -1259,7 +1257,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         /*
          * The #of entries spanned by this node _before_ the split.
          */
-        final int nentriesBeforeSplit = getSpannedTupleCount();
+        final long nentriesBeforeSplit = getSpannedTupleCount();
 
         /*
          * The #of child references. (this is +1 since the node is over capacity
@@ -1325,7 +1323,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
             sdata.childAddr[j] = data.childAddr[i];
 
-            final int childEntryCount = data.childEntryCounts[i];
+            final long childEntryCount = data.childEntryCounts[i];
 
             sdata.childEntryCounts[j] = childEntryCount;
 
@@ -1525,7 +1523,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
             childRefs[nkeys + 1] = s.childRefs[0]; // copy the child from the
                                                    // rightSibling.
             data.childAddr[nkeys + 1] = sdata.childAddr[0];
-            final int siblingChildCount = sdata.childEntryCounts[0]; // #of
+            final long siblingChildCount = sdata.childEntryCounts[0]; // #of
                                                                      // spanned
                                                                      // entries
                                                                      // being
@@ -1603,7 +1601,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
                                                            // separatorKey
             childRefs[0] = s.childRefs[snkeys];
             data.childAddr[0] = sdata.childAddr[snkeys];
-            final int siblingChildCount = sdata.childEntryCounts[snkeys];
+            final long siblingChildCount = sdata.childEntryCounts[snkeys];
             data.childEntryCounts[0] = siblingChildCount;
             final AbstractNode child = childRefs[0] == null ? null
                     : childRefs[0].get();
@@ -1689,7 +1687,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
             // }
         }
 
-        final int siblingEntryCount = s.getSpannedTupleCount();
+        final long siblingEntryCount = s.getSpannedTupleCount();
 
         /*
          * The index of this node in its parent. we note this before we start
@@ -1975,7 +1973,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         data.childAddr[childIndex + 1] = NULL;
 
-        final int childEntryCount = child.getSpannedTupleCount();
+		final long childEntryCount = // child.getSpannedTupleCount();
+		(child.isLeaf() ? ((Leaf) child).getKeyCount() : ((Node) child)
+				.getSpannedTupleCount());
 
         data.childEntryCounts[childIndex + 1] = childEntryCount;
 
@@ -3578,9 +3578,13 @@ public class Node extends AbstractNode<Node> implements INodeData {
                         }
                     }
 
-                    if (getChildEntryCount(i) != child.getSpannedTupleCount()) {
+					final long childSpannedEntryCount = (child.isLeaf() ? ((Leaf) child)
+							.getKeyCount()
+							: ((Node) child).getSpannedTupleCount());
+
+                    if (getChildEntryCount(i) != childSpannedEntryCount) {
                         out.println(indent(height) + "  ERROR child[" + i
-                                + "] spans " + child.getSpannedTupleCount()
+                                + "] spans " + childSpannedEntryCount
                                 + " entries, but childEntryCount[" + i + "]="
                                 + getChildEntryCount(i));
                         ok = false;

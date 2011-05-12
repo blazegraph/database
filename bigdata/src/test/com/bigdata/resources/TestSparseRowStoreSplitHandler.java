@@ -263,11 +263,11 @@ public class TestSparseRowStoreSplitHandler extends AbstractTestSegSplitter {
                  */
                 
                 // Get insertion point (per above, this is not an actual key).
-                final int pos = seg.indexOf(prefix);
+                final long pos = seg.indexOf(prefix);
                 assertTrue(pos < 0);
                 
                 // Convert to a tuple index.
-                final int index = -(pos) - 1;
+                final long index = -(pos) - 1;
 
                 // The actual key before the separator key.
                 final byte[] keyBefore = seg.keyAt(index - 1);

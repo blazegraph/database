@@ -105,7 +105,7 @@ public class MutableNodeData implements INodeData {
      * <p>
      * This field is initialized by the various {@link Node} constructors.
      */
-    int nentries;
+    long nentries;
 
     /**
      * The #of entries spanned by each direct child of this node.
@@ -117,7 +117,7 @@ public class MutableNodeData implements INodeData {
      * able to traverse the {@link AbstractNode#parent} reference in a straight
      * forward manner.
      */
-    final int[] childEntryCounts;
+    final long[] childEntryCounts;
 
     /**
      * <code>true</code> iff the B+Tree is maintaining per tuple revision
@@ -156,7 +156,7 @@ public class MutableNodeData implements INodeData {
 
         childAddr = new long[branchingFactor + 1];
 
-        childEntryCounts = new int[branchingFactor + 1];
+        childEntryCounts = new long[branchingFactor + 1];
 
         this.hasVersionTimestamps = hasVersionTimestamps;
         
@@ -184,7 +184,7 @@ public class MutableNodeData implements INodeData {
         
         childAddr = new long[branchingFactor + 1];
 
-        childEntryCounts = new int[branchingFactor + 1];
+        childEntryCounts = new long[branchingFactor + 1];
         
         final int nkeys = keys.size();
 
@@ -194,7 +194,7 @@ public class MutableNodeData implements INodeData {
 
             childAddr[i] = src.getChildAddr(i);
 
-            final int tmp = childEntryCounts[i] = src.getChildEntryCount(i);
+            final long tmp = childEntryCounts[i] = src.getChildEntryCount(i);
 
             sum += tmp;
             
@@ -222,8 +222,8 @@ public class MutableNodeData implements INodeData {
      * @param childAddr
      * @param childEntryCounts
      */
-    public MutableNodeData(final int nentries, final IRaba keys,
-            final long[] childAddr, final int[] childEntryCounts,
+    public MutableNodeData(final long nentries, final IRaba keys,
+            final long[] childAddr, final long[] childEntryCounts,
             final boolean hasVersionTimestamps,
             final long minimumVersionTimestamp,
             final long maximumVersionTimestamp) {
@@ -274,7 +274,7 @@ public class MutableNodeData implements INodeData {
         
     }
 
-    public final int getSpannedTupleCount() {
+    public final long getSpannedTupleCount() {
         
         return nentries;
         
@@ -307,7 +307,7 @@ public class MutableNodeData implements INodeData {
 
     }
 
-    final public int getChildEntryCount(final int index) {
+    final public long getChildEntryCount(final int index) {
 
         assert rangeCheckChildIndex(index);
         
