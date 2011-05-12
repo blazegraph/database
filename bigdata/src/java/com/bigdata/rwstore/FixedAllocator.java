@@ -154,6 +154,7 @@ public class FixedAllocator implements Allocator {
 	}
 
 	volatile IAllocationContext m_context;
+	volatile Thread m_contextThread;
 
 	/**
 	 * Indicates whether session protection has been used to protect
@@ -188,6 +189,12 @@ public class FixedAllocator implements Allocator {
 			// NO! m_store.removeFromCommit(this);
 		}
 		m_context = context;
+		
+		if (m_context != null) {
+			m_contextThread = Thread.currentThread();
+		} else {
+			m_contextThread = null;
+		}
 	}
 
 	/**
@@ -227,6 +234,9 @@ public class FixedAllocator implements Allocator {
 			try {
                 str.writeInt(m_size);
 
+//                if (!m_sessionActive)
+//                	System.out.println("Committing allocator, protection: " + m_sessionActive + ", transient frees: " + m_freeTransients);
+
                 final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
                 while (iter.hasNext()) {
                     final AllocBlock block = iter.next();
@@ -245,13 +255,17 @@ public class FixedAllocator implements Allocator {
                      * state to m_saveCommit
                      */
                     if (m_context != null) {
-                        assert block.m_saveCommit != null;
-
-                        block.m_saveCommit = block.m_live.clone();
+                        throw new IllegalStateException("Must not commit shadowed FixedAllocator!");
 //                    } else if (m_store.isSessionPreserved()) {
 //                        block.m_commit = block.m_transients.clone();
                     } else {
                         block.m_commit = block.m_live.clone();
+                        // if m_saveCommit is set then it must be m_pendingContextCommit
+                        if (block.m_saveCommit != null) {
+                        	if (!m_pendingContextCommit)
+                        		throw new IllegalStateException("Unexpected m_saveCommit when no pending commit");
+                        	block.m_saveCommit = null;
+                        }
                     }
                 }
                 // add checksum
@@ -539,9 +553,18 @@ public class FixedAllocator implements Allocator {
 			final int block = offset/nbits;
 			
 			m_sessionActive = m_store.isSessionProtected();
+//			if (!m_sessionActive) {
+//				System.out.println("Freeing " + addr + " without protection");
+//			}
 			try {
+//				if (!m_sessionActive) {
+//					System.out.println("NO SESSION PROTECT FOR " + addr + "[" + size + "]");
+//				}
 				if (((AllocBlock) m_allocBlocks.get(block))
 						.freeBit(offset % nbits, m_sessionActive && !overideSession)) { // bit adjust
+					
+					if (m_contextThread != null && m_contextThread != Thread.currentThread())
+						throw new IllegalStateException("Check thread context");
 					
 					m_freeBits++;
 					checkFreeList();
@@ -824,17 +847,16 @@ public class FixedAllocator implements Allocator {
 
 			final boolean ret = !isCommitted(offset);
 
+//			if (ret) {
+//				System.out.println("CAN FREE " + addr + "[" + size + "]");				
+//			}
+
 			return ret;
 		} else {
 			return false;
 		}
 	}
     
-    public boolean isUnsafeFree(final IAllocationContext context) {
-    	// return m_context != null || context != null; // m_context != context;
-    	return m_context != context;
-    }
-
 	public void setBucketStats(Bucket b) {
 		m_statsBucket = b;
 	}
@@ -854,6 +876,7 @@ public class FixedAllocator implements Allocator {
 			
 			checkFreeList();
 			
+			m_sessionActive = false;
 		}
 	}
 }
