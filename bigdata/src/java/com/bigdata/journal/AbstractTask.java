@@ -2227,6 +2227,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                     source.getResourceLocator()// delegate locator
             );
 
+            final IBufferStrategy bufferStrategy = source.getBufferStrategy();
+            if (bufferStrategy instanceof RWStrategy) {
+                ((RWStrategy) bufferStrategy).getRWStore().registerContext(this);
+            }
         }
 
         /*

@@ -1681,6 +1681,8 @@ public class RWStore implements IStore, IBufferedWriter {
 	 * unwritten allocations.
 	 */
 	void releaseSessions() {
+		assert(m_activeTxCount == 0 && m_contexts.isEmpty());
+		
 		if (m_minReleaseAge == 0) {
 			for (FixedAllocator fa : m_allocs) {
 				fa.releaseSession(m_writeCache);
@@ -3512,7 +3514,23 @@ public class RWStore implements IStore, IBufferedWriter {
         return totalFreed;
 	}
 
+
     /**
+     * When a new context is started it must be registered to ensure it is
+     * protected.
+     * 
+     * @param context
+     */
+	public void registerContext(IAllocationContext context) {
+		m_allocationLock.lock();
+		try {
+			establishContextAllocation(context);
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
+	
+	/**
      * The ContextAllocation object manages a freeList of associated allocators
      * and an overall list of allocators. When the context is detached, all
      * allocators must be released and any that has available capacity will be
@@ -3531,6 +3549,10 @@ public class RWStore implements IStore, IBufferedWriter {
 			if (alloc != null) {
 				m_contextRemovals++;
 				alloc.release();			
+			}
+			
+			if (m_contexts.isEmpty() && this.m_activeTxCount == 0) {
+				releaseSessions();
 			}
 		} finally {
 			m_allocationLock.unlock();
@@ -4444,7 +4466,7 @@ public class RWStore implements IStore, IBufferedWriter {
             if(log.isInfoEnabled())
                 log.info("#activeTx="+m_activeTxCount);
             
-            if (m_activeTxCount == 0) {
+            if (m_activeTxCount == 0 && m_contexts.isEmpty()) {
             	releaseSessions();
             }
         } finally {
@@ -4505,5 +4527,6 @@ public class RWStore implements IStore, IBufferedWriter {
 			m_allocationLock.unlock();
 		}
 	}
+
     
 }

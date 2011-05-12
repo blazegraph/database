@@ -862,6 +862,10 @@ public class FixedAllocator implements Allocator {
 	}
 
 	public void releaseSession(RWWriteCacheService cache) {
+		if (m_context != null) {
+			throw new IllegalStateException("Calling releaseSession on shadowed allocator");
+		}
+		
 		if (this.m_sessionActive) {
 			if (log.isTraceEnabled())
 				log.trace("Allocator: #" + m_index + " releasing session protection");
