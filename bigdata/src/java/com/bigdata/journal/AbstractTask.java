@@ -1119,6 +1119,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * either the code path where the commit succeeds or the code path where it
      * fails. The boolean argument indicates whether or not the group commit
      * succeeded. Throws exceptions are trapped and logged.
+	 * <p>
+	 * Note: This method is NOT invoked if a task fails before joining the group
+	 * commit. In that case, {@link #abortTask()} will be invoked. If the task
+	 * succeeds then {@link #checkpointTask()} will be called and the task will
+	 * eventually join a commit group. When the commit runs for that commit
+	 * group, this method will be invoked on either the success or failure path
+	 * for the group commit.
      */
     void afterTaskHook(boolean abort) {
         
