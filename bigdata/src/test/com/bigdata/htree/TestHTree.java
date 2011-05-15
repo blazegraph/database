@@ -339,65 +339,132 @@ public class TestHTree extends TestCase2 {
 					new byte[][] {}, htree.lookupAll(new byte[] { 0x02 }));
 
 			/*
-			 * 4. Insert 0x20. This key is directed into the same buddy bucket
+			 * FIXME We MUST NOT decrease the localDepth of (a) since that would
+			 * place duplicate keys into different buckets (lost retrival).
+			 * Since (a) can not have its localDepth decreased, we need to have
+			 * localDepth(d=2) with one pointer to (a) to get localDepth(a:=2).
+			 * That makes this a very complicated example. It would be a lot
+			 * easier if we started with distinct keys such that the keys in (a)
+			 * could be redistributed. This case should be reserved for later
+			 * once the structural mutations are better understood.
+			 * 
+			 * 5. Insert 0x20. This key is directed into the same buddy bucket
 			 * as the 0x01 keys that we have been inserting. That buddy bucket
 			 * is already full and, further, it is the only buddy bucket on the
 			 * page. Since we are not inserting a duplicate key we can split the
-			 * buddy bucket. However, since global depth == local depth (i.e.,
-			 * only one buddy bucket on the page), this split will introduce a
-			 * new directory page. The new directory page basically codes for
-			 * the additional prefix bits required to differentiate the two
-			 * distinct keys such that they are directed into the appropriate
-			 * buckets.
+			 * buddy bucket (rather than doubling the size of the bucket).
+			 * However, since global depth == local depth (i.e., only one buddy
+			 * bucket on the page), this split will introduce a new directory
+			 * page. The new directory page basically codes for the additional
+			 * prefix bits required to differentiate the two distinct keys such
+			 * that they are directed into the appropriate buckets.
 			 * 
-			 * Note: The #of new directory levels which have to be introduced
+			 * The new directory page (d) is inserted one level below the root
+			 * on the path leading to (a). The new directory must have a local
+			 * depth of ONE (1), since it will add a one bit distinction. Since
+			 * we know the global depth of the root and the local depth of the
+			 * new directory page, we solve for npointers := 1 << (globalDepth -
+			 * localDepth). This tells us that we will have 2 pointers in the
+			 * root to the new directory page.
+			 * 
+			 * The precondition state of root is {a,c,b,b}. Since we know that
+			 * we need npointers:=2 pointers to (d), this means that we will
+			 * copy the {a,c} references into (d) and replace those references
+			 * in the root with references to (d). The root is now {d,d,b,b}. d
+			 * is now {a,a;c,c}. Since d has a local depth of 1 and address bits
+			 * of 2, it is comprised of two buddy hash tables {a,a} and {c,c}.
+			 * 
+			 * Linking in (d) has also changes the local depths of (a) and (c).
+			 * Since they each now have npointers:=2, their localDepth is has
+			 * been reduced from TWO (2) to ONE (1) (and their transient cached
+			 * depth values must be either invalidated or recomputed). Note that
+			 * the local depth of (d) and its children (a,c)) are ONE after this
+			 * operation so if we force another split in (a) that will force a
+			 * split in (d).
+			 * 
+			 * Having introduced a new directory page into the hash tree, we now
+			 * retry the insert. Once again, the insert is directed into (a).
+			 * Since (a) is still full it is split. (d) is now the parent of
+			 * (a). Once again, we have globalDepth(d=1)==localDepth(a=1) so we
+			 * need to split (d). However, since localDepth(d=1) is less than
+			 * globalDepth(root=2) we can split the buddy hash tables in (d).
+			 * This will require us to allocate a new page (f) which will be the
+			 * right sibling of (d). There are TWO (2) buddy hash tables in (d).
+			 * They are now redistributed between (d) and (f). We also have to
+			 * update the pointers to (d) in the parent such that 1/2 of them
+			 * point to the new right sibling of (d). Since we have changed the
+			 * #of pointers to (d) (from 2 to 1) the local depth of (d) (and of
+			 * f) is now TWO (2). Since globalDepth(d=2) is greater than
+			 * localDepth(a=1) we can now split (a) into (a,e), redistribute the
+			 * tuples in the sole buddy page (a) between (a,e) and update the
+			 * pointers in (d) to (a,a,e,e).
+			 * 
+			 * Having split (d) into (d,f), we now retry the insert. This time
+			 * the insert is directed into (e). There is room in (e) (it is
+			 * empty) and the tuple is inserted without further mutation to the
+			 * structure of the hash tree.
+			 * 
+			 * TODO At this point we should also prune the buckets [b] and [c]
+			 * since they are empty and replace them with null references.
+			 * 
+			 * TODO The #of new directory levels which have to be introduced
 			 * here is a function of the #of prefix bits which have to be
 			 * consumed before a distinction can be made between the existing
 			 * key (0x01) and the new key (0x20). With an address space of 2
 			 * bits, each directory level examines the next 2-bits of the key.
 			 * The key (x20) was chosen since the distinction can be made by
 			 * adding only one directory level (the keys differ in the first 4
-			 * bits).
+			 * bits). [Do an alternative example which requires recursive splits
+			 * in order to verify that we reenter the logic correctly each time.
+			 * E.g., by inserting 0x02 rather than 0x20.]
 			 * 
-			 * TODO At this point we should also prune the buckets [b] and [c]
-			 * since they are empty and replace them with null references.
+			 * TODO Do an example in which we explore an insert which introduces
+			 * a new directory level in a 3-level tree. This should be a driven
+			 * by a single insert so we can examine in depth how the new
+			 * directory is introduced and verify whether it is introduced below
+			 * the root or above the bucket. [I believe that it is introduced
+			 * immediately below below the root. Note that a balanced tree,
+			 * e.g., a B-Tree, introduces the new level above the root. However,
+			 * the HTree is intended to be unbalanced in order to optimize
+			 * storage and access times to the parts of the index which
+			 * correspond to unequal distributions in the hash codes.]
 			 */
-			htree.insert(new byte[] { 0x20 }, new byte[] { 0x20 });
-			assertEquals("nnodes", 2, htree.getNodeCount());
-			assertEquals("nleaves", 4, htree.getLeafCount());
-			assertEquals("nentries", 5, htree.getEntryCount());
-			htree.dump(Level.ALL, System.err, true/* materialize */);
-			assertTrue(root == htree.getRoot());
-			assertEquals(4, root.childRefs.length);
-			final DirectoryPage d = (DirectoryPage)root.childRefs[0].get();
-			assertTrue(d == (DirectoryPage) root.childRefs[0].get());
-			assertTrue(d == (DirectoryPage) root.childRefs[1].get());
-			assertTrue(b == (BucketPage) root.childRefs[2].get());
-			assertTrue(b == (BucketPage) root.childRefs[3].get());
-			assertEquals(4, d.childRefs.length);
-			final BucketPage e = (BucketPage)d.childRefs[1].get();
-			assertTrue(a == (BucketPage) d.childRefs[0].get());
-			assertTrue(e == (BucketPage) d.childRefs[1].get());
-			assertTrue(c == (BucketPage) d.childRefs[2].get());
-			assertTrue(c == (BucketPage) d.childRefs[3].get());
-			assertEquals(2, root.getGlobalDepth());
-			assertEquals(2, d.getGlobalDepth());
-			assertEquals(2, a.getGlobalDepth());// unchanged
-			assertEquals(2, e.getGlobalDepth());// same as [a].
-			assertEquals(1, b.getGlobalDepth());// unchanged.
-			assertEquals(2, c.getGlobalDepth());// unchanged.
-			assertTrue(htree.contains(new byte[] { 0x01 }));
-			assertFalse(htree.contains(new byte[] { 0x02 }));
-			assertEquals(new byte[] { 0x01 }, htree
-					.lookupFirst(new byte[] { 0x01 }));
-			assertNull(htree.lookupFirst(new byte[] { 0x02 }));
-			AbstractBTreeTestCase.assertSameIterator(
-			//
-					new byte[][] { new byte[] { 0x01 }, new byte[] { 0x01 },
-							new byte[] { 0x01 }, new byte[] { 0x01 } }, htree
-							.lookupAll(new byte[] { 0x01 }));
-			AbstractBTreeTestCase.assertSameIterator(//
-					new byte[][] {}, htree.lookupAll(new byte[] { 0x02 }));
+//			htree.insert(new byte[] { 0x20 }, new byte[] { 0x20 });
+//			assertEquals("nnodes", 2, htree.getNodeCount());
+//			assertEquals("nleaves", 4, htree.getLeafCount());
+//			assertEquals("nentries", 5, htree.getEntryCount());
+//			htree.dump(Level.ALL, System.err, true/* materialize */);
+//			assertTrue(root == htree.getRoot());
+//			assertEquals(4, root.childRefs.length);
+//			final DirectoryPage d = (DirectoryPage)root.childRefs[0].get();
+//			assertTrue(d == (DirectoryPage) root.childRefs[0].get());
+//			assertTrue(d == (DirectoryPage) root.childRefs[1].get());
+//			assertTrue(b == (BucketPage) root.childRefs[2].get());
+//			assertTrue(b == (BucketPage) root.childRefs[3].get());
+//			assertEquals(4, d.childRefs.length);
+//			final BucketPage e = (BucketPage)d.childRefs[1].get();
+//			assertTrue(a == (BucketPage) d.childRefs[0].get());
+//			assertTrue(e == (BucketPage) d.childRefs[1].get());
+//			assertTrue(c == (BucketPage) d.childRefs[2].get());
+//			assertTrue(c == (BucketPage) d.childRefs[3].get());
+//			assertEquals(2, root.getGlobalDepth());
+//			assertEquals(2, d.getGlobalDepth());
+//			assertEquals(2, a.getGlobalDepth());// unchanged
+//			assertEquals(2, e.getGlobalDepth());// same as [a].
+//			assertEquals(1, b.getGlobalDepth());// unchanged.
+//			assertEquals(2, c.getGlobalDepth());// unchanged.
+//			assertTrue(htree.contains(new byte[] { 0x01 }));
+//			assertFalse(htree.contains(new byte[] { 0x02 }));
+//			assertEquals(new byte[] { 0x01 }, htree
+//					.lookupFirst(new byte[] { 0x01 }));
+//			assertNull(htree.lookupFirst(new byte[] { 0x02 }));
+//			AbstractBTreeTestCase.assertSameIterator(
+//			//
+//					new byte[][] { new byte[] { 0x01 }, new byte[] { 0x01 },
+//							new byte[] { 0x01 }, new byte[] { 0x01 } }, htree
+//							.lookupAll(new byte[] { 0x01 }));
+//			AbstractBTreeTestCase.assertSameIterator(//
+//					new byte[][] {}, htree.lookupAll(new byte[] { 0x02 }));
 
 			// TODO REMOVE (or test suite for remove).
 			
