@@ -156,7 +156,7 @@
 	</target>
 
 	<target name="start-nano-qual-server" depends="compile" description="Start a small http server for the qualification data set.">
-		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
+		<java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
 			<arg line="${bsbm.nanoServerPort} ${bsbm.qualNamespace} ${bsbm.journalPropertyFile}" />
 			<!-- specify/override the journal file name. -->
 			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.qualJournal}" />
@@ -176,17 +176,6 @@
 			</classpath>
 		</java>
 	</target>
-
-	<!--
-	<target name="stop-nano-server" depends="compile" description="Stop the small http server running at the configured port (either qualification or normal trials).">
-		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
-			<arg line="${bsbm.nanoServerPort} -stop" />
-			<classpath>
-				<path refid="runtime.classpath" />
-			</classpath>
-		</java>
-	</target>
-	-->
 
 	<target name="rampup" depends="compile" description="Runs the benchmark queries against the loaded data until system performance reaches a steady state as defined by the benchmark.">
 		<java classname="benchmark.testdriver.TestDriver" fork="true" failonerror="true" dir="${build.dir}/bin">
