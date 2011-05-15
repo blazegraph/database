@@ -98,6 +98,12 @@ public class TestHTreeUtil extends TestCase2 {
 	 * range is [0:addressBits]. This depends solely on the <i>globalDepth</i>
 	 * of a directory page and the #of pointers to child (<i>npointers</i>) in
 	 * that directory page.</dd>
+	 * <dt>nbits</dt>
+	 * <dd>This is <code>(globalDepth-localDepth)</code>. It is the #of bits of
+	 * the hash code which will be used to compute the <i>buddyOffset</i>.</dd>
+	 * <dt>hashBits</dt>
+	 * <dd>The LSB <code>globalDepth-localDepth</code> bits of the hash code.
+	 * This is used to compute the <i>buddyOffset</i>.</dd>
 	 * <dt>buddyOffset</dt>
 	 * <dd>The offset of the buddy hash table or buddy bucket within the child.</dd>
 	 * </dl>
