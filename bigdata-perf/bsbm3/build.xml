@@ -152,27 +152,6 @@
 		</java>
 	</target>
 
-	<!--
-	<target name="start-nano-server" depends="prepare" description="Start a small http server fronting for a bigdata database instance.">
-		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
-			<arg line="${bsbm.nanoServerPort} ${bsbm.namespace} ${bsbm.journalPropertyFile}" />
-			<jvmarg line="${queryJvmArgs} -Dom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}" />
-			<classpath>
-				<path refid="runtime.classpath" />
-			</classpath>
-		</java>
-	</target>
-
-	<target name="stop-nano-server" depends="prepare" description="Stop the small http server running at the configured port (either qualification or normal trials).">
-		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
-			<arg line="${bsbm.nanoServerPort} -stop" />
-			<classpath>
-				<path refid="runtime.classpath" />
-			</classpath>
-		</java>
-	</target>
-	-->
-
 	<target name="start-sparql-server" depends="compile" description="Start a small http server fronting for a bigdata database instance.">
 		<java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
 			<arg line="${bsbm.nanoServerPort} ${bsbm.namespace} ${bsbm.journalPropertyFile}" />
@@ -184,19 +163,8 @@
 		</java>
 	</target>
 	
-	<!--
-	<target name="stop-sparql-server" depends="compile" description="Stop the small http server running at the configured port (either qualification or normal trials).">
-		<java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
-			<arg line="${bsbm.nanoServerPort} -stop" />
-			<classpath>
-				<path refid="runtime.classpath" />
-			</classpath>
-		</java>
-	</target>
-	-->
-	
 	<target name="run-sparql-query" depends="prepare" description="Run a single query read from a file..">
-		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlClient" fork="true" failonerror="true">
+		<java classname="com.bigdata.rdf.sail.webapp.NanoSparqlClient" fork="true" failonerror="true">
 			<arg line="-f query5-instance01-keyRangeVersion.sparql http://localhost:${bsbm.nanoServerPort}/" />
 			<classpath>
 				<path refid="runtime.classpath" />
