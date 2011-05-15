@@ -14,7 +14,7 @@ echo "port=$port namespace=$namespace config=$BIGDATA_CONFIG"
 
 java ${JAVA_OPTS} \
     -cp ${CLASSPATH} \
-    com.bigdata.rdf.sail.bench.NanoSparqlServer \
+    com.bigdata.rdf.sail.webapp.NanoSparqlServer \
     $port \
     $namespace \
     ${BIGDATA_CONFIG} ${BIGDATA_CONFIG_OVERRIDES}
