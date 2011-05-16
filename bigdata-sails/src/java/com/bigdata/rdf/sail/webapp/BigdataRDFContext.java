@@ -584,14 +584,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
              * bullet proof!
              * 
              * This may be related to queryId2. That should be imposed on the
-             * IRunningQuery via a query hint such that the QueryEngine assigns
-             * that UUID to the query. We can then correlate the queryId to the
-             * IRunningQuery, which is important for some of the status pages.
-             * This will also let us INTERRUPT the IRunningQuery if there is an
-             * error during evaluation, which might be necessary. For example,
-             * if the client dies while the query is running.  Look at the old
-             * NSS code and see what it was doing and whether this was logic was
-             * lost of simply never implemented.
+             * IRunningQuery via QueryHints.QUERYID such that the QueryEngine
+             * assigns that UUID to the query. We can then correlate the queryId
+             * to the IRunningQuery, which is important for some of the status
+             * pages. This will also let us INTERRUPT the IRunningQuery if there
+             * is an error during evaluation, which might be necessary. For
+             * example, if the client dies while the query is running. Look at
+             * the old NSS code and see what it was doing and whether this was
+             * logic was lost of simply never implemented.
              * 
              * However, I do not see how that would explain the failure of the
              * ft.get() method to return.
