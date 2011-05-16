@@ -332,7 +332,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      *            The change in the #of spanned children.
      */
     final protected void updateEntryCount(final AbstractNode<?> child,
-            final int delta) {
+            final long delta) {
 
         final int index = getIndexOf(child);
 
@@ -342,11 +342,17 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         data.childEntryCounts[index] += delta;
 
-        data.nentries += delta;
+		data.nentries += delta;
 
-        assert data.childEntryCounts[index] > 0;
+		if (data.childEntryCounts[index] <= 0) {
+			// There must be at least one tuple spanned by the child.
+			throw new RuntimeException();
+		}
 
-        assert data.nentries > 0;
+		if (data.nentries <= 0) {
+			// There must be at least one tuple spanned by this node.
+			throw new RuntimeException();
+        }
 
         if (child.hasVersionTimestamps()) {
 
@@ -1423,7 +1429,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * that separatorKey is brought down into this node. The child corresponding
      * to the key is simply moved from the sibling into this node (rather than
      * rotating it through the parent).
-     * 
+     * <p>
      * While redistribution changes the #of entries spanned by the node and the
      * sibling and therefore must update {@link #childEntryCounts} on the shared
      * parent, it does not change the #of entries spanned by the parent.
