@@ -27,8 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
+import java.util.UUID;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.controller.SubqueryHashJoinOp;
+import com.bigdata.bop.engine.IRunningQuery;
+import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.fed.QueryEngineFactory;
 
 /**
  * Query hint directives understood by a bigdata SPARQL end point.
@@ -116,4 +121,36 @@ public interface QueryHints {
      */
     String DEFAULT_HASH_JOIN = "false";
 
+    /**
+     * The {@link UUID} to be assigned to the {@link IRunningQuery} (optional).
+     * This query hint makes it possible for the application to assign the
+     * {@link UUID} under which the query will run. This can be used to locate
+     * the {@link IRunningQuery} using its {@link UUID} and gather metadata
+     * about the query during its evaluation. The {@link IRunningQuery} may be
+     * used to monitor the query or even cancel a query.
+     * <p>
+     * The {@link UUID} of each query MUST be distinct. When using this query
+     * hint the application assumes responsibility for applying
+     * {@link UUID#randomUUID()} to generate a unique {@link UUID} for the
+     * query. The application may then discover the {@link IRunningQuery} using
+     * {@link QueryEngineFactory#getQueryController(com.bigdata.journal.IIndexManager)}
+     * and {@link QueryEngine#getQuery(UUID)}.
+     * <p>
+     * Note: The openrdf iteration interface has a close() method, but this can
+     * not be invoked until hasNext() has run and the first solution has been
+     * materialized. For queries which use an "at-once" operator, such as ORDER
+     * BY, the query will run to completion before hasNext() returns. This means
+     * that it is effectively impossible to interrupt a running query which uses
+     * an ORDER BY clause from the SAIL. However, applications MAY use this
+     * query hint to discovery the {@link IRunningQuery} interface and cancel
+     * the query.
+     * 
+     * <pre>
+     * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sail.QueryHints.queryId=36cff615-aaea-418a-bb47-006699702e45&gt;
+     * </pre>
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/283
+     */
+    String QUERYID = QueryHints.class.getName() + ".queryId";
+    
 }
