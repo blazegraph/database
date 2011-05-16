@@ -1,0 +1,68 @@
+This is a bigdata (R) release.  This release is capable of loading 1B triples in
+under one hour on a 15 node cluster.  JDK 1.6 is required.
+
+See [1,2] for instructions on installing bigdata(R), [4] for the javadoc, and
+[3,5,6] for news, questions, and the latest developments. For more information
+about SYSTAP, LLC and bigdata, see [7].
+
+Please note that we recommend checking out the code from SVN using the tag for
+this release.  The code will build automatically under eclipse.  You can also
+build the code using the ant script.  The cluster installer requires the use of
+the ant script.  You can checkout this release from the following URL:
+
+https://bigdata.svn.sourceforge.net/svnroot/bigdata/branches/BIGDATA_RELEASE_0_84_0
+
+New features:
+
+- Inlining provenance metadata into the statement indices and fast reverse
+  lookup of provenance metadata using statement identifiers (SIDs).
+  
+Significant bug fixes:
+
+- The journal size could double in some cases following a restart due to a type
+  in the WORMStrategy constructor.
+
+  See https://sourceforge.net/apps/trac/bigdata/ticket/236
+  
+- Fixed a concurrency hole in the commit protocol for the Journal which could
+  result in a concurrent modification to the B+Tree during the commit protocol.
+
+- Fixed a problem in the abort protocol for the BigdataSail:
+
+- Fixed a problem where the BigdataSail would permit the same thread to obtain
+  more than one UNISOLATED connection:
+
+  See https://sourceforge.net/apps/trac/bigdata/ticket/278
+  See https://sourceforge.net/apps/trac/bigdata/ticket/284
+  See https://sourceforge.net/apps/trac/bigdata/ticket/288
+  See https://sourceforge.net/apps/trac/bigdata/ticket/289
+
+The road map [3] for the next releases includes:
+
+- Single machine data storage to 10B+ triples;
+- Simple embedded and/or webapp deployment;
+- 100% native SPARQL evaluation with lots of query optimizations;
+- High-volume analytic query and SPARQL 1.1 query, including aggregations;
+- Simplified deployment, configuration, and administration for clusters.
+- High availability for the journal and the cluster;
+
+For more information, please see the following links:
+
+[1] https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=Main_Page
+[2] https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=GettingStarted
+[3] https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=Roadmap
+[4] http://www.bigdata.com/bigdata/docs/api/
+[5] http://sourceforge.net/projects/bigdata/
+[6] http://www.bigdata.com/blog 
+[7] http://www.systap.com/bigdata.htm
+
+About bigdata: 
+
+Bigdata® is a horizontally-scaled, general purpose storage and computing fabric
+for ordered data (B+Trees), designed to operate on either a single server or a
+cluster of commodity hardware. Bigdata® uses dynamically partitioned key-range
+shards in order to remove any realistic scaling limits - in principle, bigdata®
+may be deployed on 10s, 100s, or even thousands of machines and new capacity may
+be added incrementally without requiring the full reload of all data. The bigdata®
+RDF database supports RDFS and OWL Lite reasoning, high-level query (SPARQL),
+and datum level provenance. 
