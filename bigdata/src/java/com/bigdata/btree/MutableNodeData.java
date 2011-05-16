@@ -182,19 +182,25 @@ public class MutableNodeData implements INodeData {
         
         nentries = src.getSpannedTupleCount();
         
+		if (nentries <= 0)
+			throw new RuntimeException();
+        
         childAddr = new long[branchingFactor + 1];
 
         childEntryCounts = new long[branchingFactor + 1];
         
         final int nkeys = keys.size();
 
-        int sum = 0;
-        
-        for (int i = 0; i <= nkeys; i++) {
+		long sum = 0;
 
-            childAddr[i] = src.getChildAddr(i);
+		for (int i = 0; i <= nkeys; i++) {
 
-            final long tmp = childEntryCounts[i] = src.getChildEntryCount(i);
+			childAddr[i] = src.getChildAddr(i);
+
+			final long tmp = childEntryCounts[i] = src.getChildEntryCount(i);
+
+			if (tmp <= 0)
+				throw new RuntimeException();
 
             sum += tmp;
             
@@ -210,7 +216,8 @@ public class MutableNodeData implements INodeData {
             
         }
         
-        assert sum == nentries;
+        if(sum != nentries)
+        	throw new RuntimeException();
 
     }
 

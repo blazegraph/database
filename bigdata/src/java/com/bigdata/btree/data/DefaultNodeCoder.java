@@ -180,8 +180,14 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
 
 		buf.putInt(nkeys);
 
-		if (nentries < 0)
-			throw new AssertionError();
+		if (nentries < 0) {
+			/*
+			 * Note: This allows ZERO entries in order to support some unit
+			 * tests an empty node. However, an empty node is not a legal
+			 * data structure in a btree. Only the root leaf may be empty.
+			 */
+			throw new RuntimeException();
+		}
 		if (version == ReadOnlyNodeData.VERSION0) {
 			if (nentries > Integer.MAX_VALUE)
 				throw new UnsupportedOperationException();
@@ -248,8 +254,13 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
 			for (int i = 0; i <= nkeys; i++) {
 				final long nchildren = node.getChildEntryCount(i);
 				sum += nchildren;
-				if (nchildren < 0)
-					throw new AssertionError();
+				if (nchildren < 0) {
+					/*
+					 * Note: ZERO is permitted for a test case, but is not legal
+					 * in live data.
+					 */
+					throw new RuntimeException();
+				}
 				if (min > nchildren)
 					min = nchildren;
 				if (max < nchildren)
@@ -456,6 +467,13 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
 				this.nentries = buf.getLong(pos);
 				pos += Bytes.SIZEOF_LONG;
 			}
+			if (nentries < 0) {
+				/*
+				 * Note: ZERO (0) is permitted for a test case but is not legal
+				 * in live data.
+				 */
+				throw new RuntimeException();
+			}
             
             final int keysSize = buf.getInt(pos);
             pos += SIZEOF_KEYS_SIZE;
@@ -539,7 +557,14 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
 				this.nentries = buf.getLong(pos);
 				pos += Bytes.SIZEOF_LONG;
 			}
-            
+			if (nentries < 0) {
+				/*
+				 * Note: ZERO (0) is allowed for a unit test, but it is not
+				 * legal in live data.
+				 */
+				throw new RuntimeException();
+			}
+
             final int keysSize = buf.getInt(pos);
             pos += SIZEOF_KEYS_SIZE;
 
