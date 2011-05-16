@@ -72,9 +72,6 @@ public class QueryServlet extends BigdataRDFServlet {
     
     /**
      * Run a SPARQL query.
-     * 
-     * FIXME Does not handle default-graph-uri or named-graph-uri query
-     * parameters.
      */
     private void doQuery(final HttpServletRequest req,
                 final HttpServletResponse resp) throws IOException {
