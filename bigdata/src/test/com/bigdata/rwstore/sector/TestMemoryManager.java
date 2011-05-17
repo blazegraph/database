@@ -197,6 +197,8 @@ public class TestMemoryManager extends TestCase2 {
 	public void test_largeBlobAllocation() {
 
 		final int sectorSize = manager.getSectorSize();
+		
+		assertTrue(manager.getSlotBytes() == 0L);
 
 		final long addr = manager.allocate(sectorSize, false/* blocks */);
 		
@@ -207,6 +209,10 @@ public class TestMemoryManager extends TestCase2 {
 
 		assertEquals("allocationSize", sectorSize, manager.allocationSize(addr));
 		
+		manager.free(addr);
+		
+		assertTrue(manager.getSlotBytes() == 0L);
+
 	}
 
 	/**
@@ -225,11 +231,11 @@ public class TestMemoryManager extends TestCase2 {
 	public void test_blockingAllocation() throws InterruptedException,
 			ExecutionException, TimeoutException {
 
-		final int sectorSize = manager.getSectorSize();
+		final int sectorSize = manager.getSectorSize(); // allow for blob
 
 		// grab all the memory (for this size of allocation).
 		final List<Long> addrs = new LinkedList<Long>();
-		while(true) {
+		while (true) {
 			try {
 				final long addr = manager.allocate(sectorSize, false/* blocks */);
 				addrs.add(addr);
@@ -319,6 +325,8 @@ public class TestMemoryManager extends TestCase2 {
 			log.info("freeing: addr=" + addr + ", sizeof(addr)="
 					+ manager.allocationSize(addr) + ", slotBytes="
 					+ manager.getSlotBytes());
+			
+			assertTrue(manager.getSlotBytes() == 0);
 
 		} finally {
 
@@ -340,6 +348,12 @@ public class TestMemoryManager extends TestCase2 {
 		if (log.isInfoEnabled())
 			log.info("Manager slotBytes: " + manager.getSlotBytes());
 
+	}
+	
+	public void test_stressBlockingAllocation() throws InterruptedException, ExecutionException, TimeoutException {
+		for (int i = 0; i < 50; i++) {
+			test_blockingAllocation();			
+		}
 	}
 
 	/**

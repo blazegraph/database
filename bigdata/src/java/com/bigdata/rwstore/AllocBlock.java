@@ -140,8 +140,8 @@ public class AllocBlock {
 	public boolean freeBit(final int bit, final boolean sessionProtect) {
 		if (!RWStore.tstBit(m_live, bit)) {
 			
-			if (sessionProtect && RWStore.tstBit(m_transients, bit)) 
-				return false;
+//			if (sessionProtect && RWStore.tstBit(m_transients, bit)) 
+//				return false;
 			
 			throw new IllegalArgumentException("Freeing bit not set");
 		}
