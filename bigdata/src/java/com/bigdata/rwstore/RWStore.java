@@ -1684,6 +1684,8 @@ public class RWStore implements IStore, IBufferedWriter {
 		assert(m_activeTxCount == 0 && m_contexts.isEmpty());
 		
 		if (m_minReleaseAge == 0) {
+			if (log.isDebugEnabled())
+				log.debug("RELEASE SESSIONS");
 			for (FixedAllocator fa : m_allocs) {
 				fa.releaseSession(m_writeCache);
 			}
@@ -1990,7 +1992,7 @@ public class RWStore implements IStore, IBufferedWriter {
 			directWrite(pa, buf, 0, size, chk);
 		} else {
 			try {
-				m_writeCache.write(pa, ByteBuffer.wrap(buf,  0, size), chk);
+				m_writeCache.write(pa, ByteBuffer.wrap(buf, 0, size), chk);
 			} catch (InterruptedException e) {
 	            throw new RuntimeException("Closed Store?", e);
 			}
@@ -3549,6 +3551,8 @@ public class RWStore implements IStore, IBufferedWriter {
 			if (alloc != null) {
 				m_contextRemovals++;
 				alloc.release();			
+			} else {
+				throw new IllegalStateException("Multiple call to detachContext");
 			}
 			
 			if (m_contexts.isEmpty() && this.m_activeTxCount == 0) {
@@ -3578,6 +3582,7 @@ public class RWStore implements IStore, IBufferedWriter {
 				m_contextRemovals++;
 				alloc.abort();			
 			}
+			
 		} finally {
 			m_allocationLock.unlock();
 		}
@@ -4462,6 +4467,9 @@ public class RWStore implements IStore, IBufferedWriter {
     public void deactivateTx() {
         m_allocationLock.lock();
         try {
+        	if (m_activeTxCount == 0) {
+        		throw new IllegalStateException("Tx count must be positive!");
+        	}
             m_activeTxCount--;
             if(log.isInfoEnabled())
                 log.info("#activeTx="+m_activeTxCount);
@@ -4526,6 +4534,10 @@ public class RWStore implements IStore, IBufferedWriter {
 		} finally {
 			m_allocationLock.unlock();
 		}
+	}
+
+	public void showWriteCacheDebug(long paddr) {
+		log.warn("WriteCacheDebug: " + paddr + " - " + m_writeCache.addrDebugInfo(paddr));
 	}
 
     
