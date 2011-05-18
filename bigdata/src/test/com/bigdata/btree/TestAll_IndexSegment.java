@@ -82,6 +82,8 @@ public class TestAll_IndexSegment extends TestCase {
         suite.addTestSuite(TestIndexSegmentBuilderWithIncrementalBuild.class);
         // test fence posts for compacting merges with deleted index entries.
         suite.addTestSuite(TestIndexSegmentBuilderWithCompactingMerge.class);
+        // test when blobs are used in the source B+Tree.
+        suite.addTestSuite(TestIndexSegmentBuilderWithBlobCapacity.class);
         // test multi-block iterators for the index segment.
         suite.addTestSuite(TestIndexSegmentMultiBlockIterators.class);
         // test iterators for the index segment.
