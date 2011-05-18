@@ -51,13 +51,13 @@ public class BTreeUtilizationReport implements IBTreeUtilizationReport,
 
     public BTreeUtilizationReport(final IBTreeStatistics stats) {
 
-        final int nnodes = stats.getNodeCount();
+        final long nnodes = stats.getNodeCount();
 
-        final int nleaves = stats.getLeafCount();
+        final long nleaves = stats.getLeafCount();
 
-        final int nentries = stats.getEntryCount();
+        final long nentries = stats.getEntryCount();
 
-        final int numNonRootNodes = nnodes + nleaves - 1;
+        final long numNonRootNodes = nnodes + nleaves - 1;
 
         final int branchingFactor = stats.getBranchingFactor();
 

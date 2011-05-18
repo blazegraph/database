@@ -412,7 +412,7 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
         
         final long[] children = new long[branchingFactor+1];
 
-        final int[] childEntryCounts = new int[branchingFactor+1];
+        final long[] childEntryCounts = new long[branchingFactor+1];
         
         final boolean hasVersionTimestamp = r.nextBoolean();
         
@@ -425,7 +425,7 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
 
         // node with some valid keys and corresponding child refs.
 
-        int nentries = 0;
+        long nentries = 0;
         
         for (int i = 0; i < nchildren; i++) {
 

@@ -48,7 +48,6 @@ import com.bigdata.LRUNexus;
 import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
-import com.bigdata.btree.data.ISpannedTupleCountData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.MutableValueBuffer;
@@ -261,7 +260,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     /**
      * The value specified to the ctor.
      */
-    final public int entryCount;
+    final public long entryCount;
     
     /**
      * The iterator specified to the ctor. This is the source for the keys and
@@ -557,7 +556,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     /**
      * The #of tuples written for the output tree.
      */
-    int ntuplesWritten;
+    long ntuplesWritten;
     
     /**
      * The #of nodes written for the output tree. This will be zero if all
@@ -1106,7 +1105,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     public static IndexSegmentBuilder newInstance(//
             final File outFile,//
             final File tmpDir,//
-            final int entryCount,//
+            final long entryCount,//
             final ITupleIterator<?> entryIterator, //
             final int m,//
             final IndexMetadata metadata,//
@@ -1196,7 +1195,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     protected IndexSegmentBuilder(//
             final File outFile,//
             final File tmpDir,//
-            final int entryCount,//
+            final long entryCount,//
             final ITupleIterator<?> entryIterator, //
             final int m,//
             IndexMetadata metadata,//
@@ -1415,21 +1414,26 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
             stack[plan.height] = leaf;
 
-            /*
-             * Setup optional bloom filter.
-             * 
-             * Note: For read-only {@link IndexSegment} we always know the #of
-             * keys exactly at the time that we provision the bloom filter. This
-             * makes it easy for us to tune the filter for a desired false
-             * positive rate.
-             */
-            if (metadata.getBloomFilterFactory() != null && plan.nentries > 0) {
+			/*
+			 * Setup optional bloom filter.
+			 * 
+			 * Note: For read-only {@link IndexSegment} we always know the #of
+			 * keys exactly at the time that we provision the bloom filter. This
+			 * makes it easy for us to tune the filter for a desired false
+			 * positive rate.
+			 * 
+			 * Note: The bloom filter can not be used with very large indices
+			 * due to the space requirements of the filter. However, very large
+			 * in this case is MAX_INT tuples!
+			 */
+			if (metadata.getBloomFilterFactory() != null && plan.nentries > 0
+					&& plan.nentries < Integer.MAX_VALUE) {
 
                 // the desired error rate for the bloom filter.
                 final double p = metadata.getBloomFilterFactory().p;
 
-                // create the bloom filter.
-                bloomFilter = new BloomFilter(plan.nentries, p);
+				// create the bloom filter.
+				bloomFilter = new BloomFilter((int) plan.nentries, p);
 
             } else {
                 
@@ -2065,7 +2069,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             final AbstractSimpleNodeData child) {
 
         // #of entries spanned by this node.
-        final int nentries = child.getSpannedTupleCount();
+		final long nentries = (child.isLeaf() ? child.getKeyCount()
+				: ((INodeData) child).getSpannedTupleCount());
 
         if (parent.nchildren == parent.max) {
 
@@ -3238,11 +3243,21 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
             outChannel.position(0);
 
+			/*
+			 * Note: The build plan is restricted to MAX_INT leaves and there
+			 * are always more leaves than nodes in a B+Tree both nnodes and
+			 * nleaves are int32 values.
+			 */
+            if(nnodesWritten>Integer.MAX_VALUE)
+            	throw new AssertionError();
+            if(nleavesWritten>Integer.MAX_VALUE)
+            	throw new AssertionError();
+            
             final IndexSegmentCheckpoint md = new IndexSegmentCheckpoint(
                     addressManager.getOffsetBits(), //
                     plan.height, // will always be correct.
-                    nleavesWritten, // actual #of leaves written.
-                    nnodesWritten, // actual #of nodes written.
+                    (int)nleavesWritten, // actual #of leaves written.
+                    (int)nnodesWritten, // actual #of nodes written.
                     ntuplesWritten, // actual #of tuples written.
                     maxNodeOrLeafLength,//
                     offsetLeaves, extentLeaves, offsetNodes, extentNodes,
@@ -3292,7 +3307,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      *         Thompson</a>
      */
     abstract protected static class AbstractSimpleNodeData implements
-            IAbstractNodeData, ISpannedTupleCountData {
+            IAbstractNodeData {
 
         /**
          * The level in the output tree for this node or leaf (origin zero). The
@@ -3478,11 +3493,11 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
         
-        final public int getSpannedTupleCount() {
-            
-            return keys.size();
-            
-        }
+//        final public int getSpannedTupleCount() {
+//            
+//            return keys.size();
+//            
+//        }
 
         final public int getValueCount() {
             
@@ -3632,12 +3647,12 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         /**
          * The #of entries spanned by this node.
          */
-        int nentries;
+        long nentries;
         
         /**
          * The #of entries spanned by each child of this node.
          */
-        final int[] childEntryCount;
+        final long [] childEntryCount;
 
         /**
          * <code>true</code> iff the node is tracking the min/max tuple revision
@@ -3645,7 +3660,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          */
         final boolean hasVersionTimestamps;
         
-        final public int getSpannedTupleCount() {
+        final public long getSpannedTupleCount() {
             
             return nentries;
             
@@ -3660,7 +3675,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
 
-        final public int getChildEntryCount(final int index) {
+        final public long getChildEntryCount(final int index) {
 
             if (index < 0 || index > keys.size() + 1)
                 throw new IllegalArgumentException();
@@ -3676,7 +3691,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
             this.childAddr = new long[m];
             
-            this.childEntryCount = new int[m];
+            this.childEntryCount = new long[m];
             
             this.hasVersionTimestamps = hasVersionTimestamps;
             

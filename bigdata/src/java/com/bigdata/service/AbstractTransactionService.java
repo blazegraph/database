@@ -999,7 +999,7 @@ abstract public class AbstractTransactionService extends AbstractService
 
 			// Note: ZERO (0) is the first tuple in the B+Tree.
         	// Note: MINUS ONE (-1) means that the B+Tree is empty.
-			final int indexOf = startTimeIndex.findIndexOf(timestamp);
+			final long indexOf = startTimeIndex.findIndexOf(timestamp);
 			
 			isEarliestTx = indexOf == 0;
 
@@ -1020,7 +1020,7 @@ abstract public class AbstractTransactionService extends AbstractService
                  * The start time associated with the earliest remaining tx.
                  */
                 earliestTxStartTime = startTimeIndex.decodeKey(startTimeIndex
-                        .keyAt(0));
+                        .keyAt(0L));
                 
             } else {
 

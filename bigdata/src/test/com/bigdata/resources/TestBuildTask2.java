@@ -285,7 +285,12 @@ public class TestBuildTask2 extends AbstractResourceManagerTestCase {
                     for (int i = 0; i < maxentries
                             && groundTruth.getEntryCount() > 0; i++) {
 
-                        final int entryCount = groundTruth.getEntryCount();
+						final long entryCount2 = groundTruth.getEntryCount();
+
+						if (entryCount2 > Integer.MAX_VALUE)
+							fail("Test case does not handle massive indices");
+
+						final int entryCount = (int) entryCount2;
 
                         // any existing key.
                         final int j = r.nextInt(entryCount);

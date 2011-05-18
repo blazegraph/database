@@ -1321,13 +1321,13 @@ public class DumpFederation {
          * The #of journals that are currently under management for the data
          * service on which the index partition resides.
          */
-        public final int managedJournalCount;
+        public final long managedJournalCount;
 
         /**
          * The #of index segments that are currently under management for the
          * data service on which the index partition resides.
          */
-        public final int managedSegmentCount;
+        public final long managedSegmentCount;
 
         /**
          * The #of overflow events.

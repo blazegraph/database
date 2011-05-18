@@ -1166,19 +1166,19 @@ public class ResultSet implements ILeafData, Externalizable {
         
     }
 
-    /**
-     * The #of tuples visited by the iterator.
-     * <p>
-     * Note: This is is the same as the values returned by
-     * {@link #getKeyCount()} or {@link #getValueCount()}. It DOES NOT report
-     * the #of tuples spanned by the key range. Use
-     * {@link IRangeQuery#rangeCount(byte[], byte[])} for that purpose.
-     */
-    public int getSpannedTupleCount() {
-
-        return ntuples;
-        
-    }
+//    /**
+//     * The #of tuples visited by the iterator.
+//     * <p>
+//     * Note: This is is the same as the values returned by
+//     * {@link #getKeyCount()} or {@link #getValueCount()}. It DOES NOT report
+//     * the #of tuples spanned by the key range. Use
+//     * {@link IRangeQuery#rangeCount(byte[], byte[])} for that purpose.
+//     */
+//    public int getSpannedTupleCount() {
+//
+//        return ntuples;
+//        
+//    }
 
     /**
      * Yes (this data structure logically corresponds to a leaf since it

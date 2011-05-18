@@ -412,12 +412,12 @@ public class TestIndexSegmentMultiBlockIterators extends
     	
         final Random r = new Random();
         
-        final int n = groundTruth.getEntryCount();
+        final long n = groundTruth.getEntryCount();
 
         // point query beyond the last tuple in the index segment.
         {
             
-            final int fromIndex = n - 1;
+            final long fromIndex = n - 1;
 
             final byte[] fromKey = groundTruth.keyAt(fromIndex);
 
@@ -438,7 +438,8 @@ public class TestIndexSegmentMultiBlockIterators extends
         // random point queries.
         for (int i = 0; i < ntests; i++) {
 
-            final int fromIndex = r.nextInt(n);
+			final long fromIndex = n > Integer.MAX_VALUE ? Integer.MAX_VALUE
+					+ r.nextInt((int)(n - Integer.MAX_VALUE)) : r.nextInt((int) (n));
 
             final byte[] fromKey = groundTruth.keyAt(fromIndex);
 
@@ -459,7 +460,7 @@ public class TestIndexSegmentMultiBlockIterators extends
         // random range queries with small range of spanned keys (0 to 10).
         for (int i = 0; i < ntests; i++) {
 
-            final int fromIndex = r.nextInt(n);
+			final long fromIndex = nextLong(r, n);
 
             final byte[] fromKey = groundTruth.keyAt(fromIndex);
 
@@ -481,9 +482,9 @@ public class TestIndexSegmentMultiBlockIterators extends
         // random range queries with random #of spanned keys.
         for (int i = 0; i < ntests; i++) {
 
-            final int fromIndex = r.nextInt(n);
+            final long fromIndex = nextLong(r,n);
 
-            final int toIndex = fromIndex + r.nextInt(n - fromIndex + 1);
+			final long toIndex = fromIndex + nextLong(r, n - fromIndex + 1);
 
             final byte[] fromKey = groundTruth.keyAt(fromIndex);
 

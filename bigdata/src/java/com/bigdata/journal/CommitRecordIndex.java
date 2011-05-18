@@ -248,7 +248,7 @@ public class CommitRecordIndex extends BTree {
         }
         
         // find (first less than or equal to).
-        final int index = findIndexOf(Math.abs(timestamp));
+        final long index = findIndexOf(Math.abs(timestamp));
         
         if(index == -1) {
             
@@ -286,7 +286,7 @@ public class CommitRecordIndex extends BTree {
         }
         
         // find first strictly greater than.
-        final int index = findIndexOf(Math.abs(timestamp)) + 1;
+        final long index = findIndexOf(Math.abs(timestamp)) + 1;
         
         if (index == nentries) {
 
@@ -309,7 +309,7 @@ public class CommitRecordIndex extends BTree {
      * 
      * @see #findIndexOf(long)
      */
-    private ICommitRecord valueAtIndex(final int index) {
+    private ICommitRecord valueAtIndex(final long index) {
         
         /*
          * Retrieve the entry for the commit record from the index.  This
@@ -371,9 +371,9 @@ public class CommitRecordIndex extends BTree {
      *         <code>-1</code> iff there are no {@link ICommitRecord}s
      *         defined.
      */
-    synchronized public int findIndexOf(long timestamp) {
+    synchronized public long findIndexOf(long timestamp) {
         
-        int pos = super.indexOf(getKey(timestamp));
+        long pos = super.indexOf(getKey(timestamp));
         
         if (pos < 0) {
 

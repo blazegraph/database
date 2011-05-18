@@ -29,7 +29,18 @@ package com.bigdata.btree;
 
 /**
  * Interface for methods that return or accept an ordinal index into the entries
- * in the B+-TRee.
+ * in the B+-Tree. The semantics of this interface are build over the #of
+ * spanned tuples for each child as recorded within each node of the B+Tree.
+ * This provides a fast means to compute the linear index into the B+Tree of any
+ * given tuple. However, this interface is only available for a local B+Tree
+ * object (versus scale-out) since the spanned tuple count metadata is not exact
+ * across shards. Further, when delete markers are used, the deleted tuples
+ * remain in the B+Tree and the {@link ILinearList} interface will continue to
+ * count them until they have been purged. Thus deleting a tuple does not change
+ * the {@link #indexOf(byte[])} keys after that tuple, {@link #keyAt(long)} can
+ * return the key for a deleted tuple, and {@link #valueAt(long)} will return
+ * <code>null</code> if the tuple at that index is marked as deleted within the
+ * B+Tree.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -59,10 +70,10 @@ public interface ILinearList {
      *         in the index.
      * 
      * 
-     * @see #keyAt(int)
-     * @see #valueAt(int)
+     * @see #keyAt(long)
+     * @see #valueAt(long)
      */
-    public int indexOf(byte[] key);
+    public long indexOf(byte[] key);
 
     /**
      * Return the key for the identified entry. This performs an efficient
@@ -72,17 +83,17 @@ public interface ILinearList {
      * @param index
      *            The index position of the entry (origin zero).
      * 
-     * @return The key at that index position (not a copy).
+     * @return The key at that index position.
      * 
      * @exception IndexOutOfBoundsException
      *                if index is less than zero.
      * @exception IndexOutOfBoundsException
      *                if index is greater than or equal to the #of entries.
      * 
-     * @see #indexOf(Object)
-     * @see #valueAt(int)
+     * @see #indexOf(byte[])
+     * @see #valueAt(long)
      */
-    public byte[] keyAt(int index);
+    public byte[] keyAt(long index);
 
     /**
      * Return the value for the identified entry. This performs an efficient
@@ -100,9 +111,9 @@ public interface ILinearList {
      * @exception IndexOutOfBoundsException
      *                if index is greater than or equal to the #of entries.
      * 
-     * @see #indexOf(Object)
-     * @see #keyAt(int)
+     * @see #indexOf(byte[])
+     * @see #keyAt(long)
      */
-    public byte[] valueAt(int index);
+    public byte[] valueAt(long index);
     
 }

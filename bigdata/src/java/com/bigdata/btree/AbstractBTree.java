@@ -802,13 +802,13 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 			tmp.addCounter("height",
 					new OneShotInstrument<Integer>(getHeight()));
 
-			tmp.addCounter("nodeCount", new OneShotInstrument<Integer>(
+			tmp.addCounter("nodeCount", new OneShotInstrument<Long>(
 					getNodeCount()));
 
-			tmp.addCounter("leafCount", new OneShotInstrument<Integer>(
+			tmp.addCounter("leafCount", new OneShotInstrument<Long>(
 					getLeafCount()));
 
-			tmp.addCounter("tupleCount", new OneShotInstrument<Integer>(
+			tmp.addCounter("tupleCount", new OneShotInstrument<Long>(
 					getEntryCount()));
 
 			/*
@@ -842,15 +842,15 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 			 * to avoid dragging in the B+Tree reference.
 			 */
 
-			final int entryCount = getEntryCount();
+			final long entryCount = getEntryCount();
 
 			final long bytes = btreeCounters.bytesOnStore_nodesAndLeaves.get()
 					+ btreeCounters.bytesOnStore_rawRecords.get();
 
-			final int bytesPerTuple = (int) (entryCount == 0 ? 0d
+			final long bytesPerTuple = (long) (entryCount == 0 ? 0d
 					: (bytes / entryCount));
 
-			tmp.addCounter("bytesPerTuple", new OneShotInstrument<Integer>(
+			tmp.addCounter("bytesPerTuple", new OneShotInstrument<Long>(
 					bytesPerTuple));
 
 		}
@@ -1606,24 +1606,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     abstract public int getHeight();
 
-    abstract public int getNodeCount();
+    abstract public long getNodeCount();
 
-    abstract public int getLeafCount();
+    abstract public long getLeafCount();
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @todo this could be re-defined as the exact entry count if we tracked the
-     *       #of deleted index entries and subtracted that from the total #of
-     *       index entries before returning the result. The #of deleted index
-     *       entries would be stored in the index {@link Checkpoint} record.
-     *       <p>
-     *       Since {@link #getEntryCount()} is also used to give the total #of
-     *       index enties (and we need that feature) so we need to either add
-     *       another method with the appropriate semantics, add a boolean flag,
-     *       or add a method returning the #of deleted entries, etc.
-     */
-    abstract public int getEntryCount();
+    abstract public long getEntryCount();
 
     /**
      * Return a statistics snapshot of the B+Tree.
@@ -2343,7 +2330,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
-    public int indexOf(final byte[] key) {
+    public long indexOf(final byte[] key) {
 
         if (key == null)
             throw new IllegalArgumentException();
@@ -2357,7 +2344,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
-    public byte[] keyAt(final int index) {
+    public byte[] keyAt(final long index) {
 
         if (index < 0)
             throw new IndexOutOfBoundsException(ERROR_LESS_THAN_ZERO);
@@ -2371,7 +2358,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
-    public byte[] valueAt(final int index) {
+    public byte[] valueAt(final long index) {
 
         final Tuple tuple = getLookupTuple();
         
@@ -2381,7 +2368,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
-    final public Tuple valueAt(final int index, final Tuple tuple) {
+    final public Tuple valueAt(final long index, final Tuple tuple) {
 
         if (index < 0)
             throw new IndexOutOfBoundsException(ERROR_LESS_THAN_ZERO);
@@ -2516,9 +2503,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (toKey != null)
             assert rangeCheck(toKey,true);
 
-        int fromIndex = (fromKey == null ? 0 : root.indexOf(fromKey));
+        long fromIndex = (fromKey == null ? 0 : root.indexOf(fromKey));
 
-        int toIndex = (toKey == null ? getEntryCount() : root.indexOf(toKey));
+        long toIndex = (toKey == null ? getEntryCount() : root.indexOf(toKey));
 
         // Handle case when fromKey is not found.
         if (fromIndex < 0)
@@ -3183,22 +3170,22 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         if (info) {
 
+        	final int branchingFactor = getBranchingFactor();
+
             final int height = getHeight();
 
-            final int nnodes = getNodeCount();
+            final long nnodes = getNodeCount();
 
-            final int nleaves = getLeafCount();
+            final long nleaves = getLeafCount();
 
-            final int nentries = getEntryCount();
+            final long nentries = getEntryCount();
 
-            final int branchingFactor = getBranchingFactor();
-
-            out.println("height=" + height + ", branchingFactor="
-                    + branchingFactor + ", #nodes=" + nnodes + ", #leaves="
-                    + nleaves + ", #entries=" + nentries + ", nodeUtil="
-                    + utils.getNodeUtilization() + "%, leafUtil="
-                    + utils.getLeafUtilization() + "%, utilization="
-                    + utils.getTotalUtilization() + "%");
+			out.println("branchingFactor=" + branchingFactor + ", height="
+					+ height + ", #nodes=" + nnodes + ", #leaves=" + nleaves
+					+ ", #entries=" + nentries + ", nodeUtil="
+					+ utils.getNodeUtilization() + "%, leafUtil="
+					+ utils.getLeafUtilization() + "%, utilization="
+					+ utils.getTotalUtilization() + "%");
         }
 
         if (root != null) {

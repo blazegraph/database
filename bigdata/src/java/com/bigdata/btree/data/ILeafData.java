@@ -37,7 +37,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ILeafData extends IAbstractNodeData, IKeysData, ISpannedTupleCountData {
+public interface ILeafData extends IAbstractNodeData, IKeysData {
 
     /**
      * The #of values in the leaf (this MUST be equal to the #of keys for a

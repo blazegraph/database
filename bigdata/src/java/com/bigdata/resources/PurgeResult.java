@@ -60,27 +60,27 @@ public class PurgeResult implements Serializable, Params {
      * for index views from the {@link #commitTimeToPreserve} until the
      * {@link #lastCommitTime}.
      */
-    final public int resourcesInUseCount;
+    final public long resourcesInUseCount;
 
     /**
      * The #of journals before the purge.
      */
-    final public int journalBeforeCount;
+    final public long journalBeforeCount;
 
     /**
      * The #of journals after the purge.
      */
-    final public int journalAfterCount;
+    final public long journalAfterCount;
 
     /**
      * The #of index segments before the purge.
      */
-    final public int segmentBeforeCount;
+    final public long segmentBeforeCount;
 
     /**
      * The #of index segments after the purge.
      */
-    final public int segmentAfterCount;
+    final public long segmentAfterCount;
     
     /**
      * The #of bytes under management before the purge.
@@ -119,11 +119,11 @@ public class PurgeResult implements Serializable, Params {
             final long indexRetentionTime,
             final long choosenReleaseTime,
             final long commitTimeToPreserve,
-            final int resourcesInUseCount,
-            final int journalBeforeCount,
-            final int journalAfterCount,
-            final int segmentBeforeCount,
-            final int segmentAfterCount,
+            final long resourcesInUseCount,
+            final long journalBeforeCount,
+            final long journalAfterCount,
+            final long segmentBeforeCount,
+            final long segmentAfterCount,
             final long bytesBeforeCount,
             final long bytesAfterCount,
             final long elapsedScanCommitIndicesTime,

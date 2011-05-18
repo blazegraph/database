@@ -36,12 +36,25 @@ package com.bigdata.btree.data;
  */
 public interface ISpannedTupleCountData {
 
+	/**
+	 * The #of tuples spanned by this node. For a leaf, the corresponding value
+	 * is reported by {@link ILeafData#getKeyCount()} or
+	 * {@link ILeafData#getValueCount()}.
+	 */
+    long getSpannedTupleCount();
+
     /**
-     * The #of tuples spanned by this node or leaf. For a leaf this is always
-     * the #of keys.
+     * Return the #of tuples spanned by the indicated child of this node. The
+     * sum of the values returned by this method across the children of the node
+     * should always equal the value returned by {@link #getSpannedTupleCount()}
+     * . These data are used to support fast computation of the index at which a
+     * key occurs and the #of entries in a given key range.
      * 
-     * @see INodeData#getChildEntryCounts()
+     * @param index
+     *            The index of the child in [0:nkeys].
+     * 
+     * @return The #of tuples spanned by that child.
      */
-    int getSpannedTupleCount();
+    long getChildEntryCount(int index);
 
 }

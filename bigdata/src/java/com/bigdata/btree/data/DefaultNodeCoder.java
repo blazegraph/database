@@ -27,17 +27,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.data;
 
+import it.unimi.dsi.bits.Fast;
+import it.unimi.dsi.io.InputBitStream;
+import it.unimi.dsi.io.OutputBitStream;
+
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.MutableNodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.ICodedRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.rawstore.Bytes;
 
 /**
  * Default implementation for immutable {@link INodeData} records.
@@ -60,7 +66,13 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
      */
     private static final long serialVersionUID = 3998574101917337169L;
 
-    protected static final byte VERSION0 = 0x00;
+	/**
+	 * The initial version of the serialized representation of the
+	 * {@link DefaultNodeCoder} class (versus the serializer representation of
+	 * the node or leaf).
+	 */
+    private final static transient byte VERSION0 = 0x00;
+    
     private IRabaCoder keysCoder;
 
     public void readExternal(final ObjectInput in) throws IOException,
@@ -145,39 +157,44 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
         if (buf == null)
             throw new IllegalArgumentException();
 
+        final short version = ReadOnlyNodeData.currentVersion;
+        
         // cache some fields.
         final int nkeys = node.getKeyCount();
-        final int nentries = node.getSpannedTupleCount();
+        final long nentries = node.getSpannedTupleCount();
 
         // The byte offset of the start of the coded data in the buffer.
         final int O_origin = buf.pos();
         
         buf.putByte(ReadOnlyNodeData.NODE);
 
-        buf.putShort(ReadOnlyNodeData.VERSION0);
+        buf.putShort(version);
 
-        final boolean hasVersionTimestamps =node.hasVersionTimestamps();
-        short flags = 0;
-        if (hasVersionTimestamps) {
-            flags |= AbstractReadOnlyNodeData.FLAG_VERSION_TIMESTAMPS;
-        }
+		final boolean hasVersionTimestamps = node.hasVersionTimestamps();
+		short flags = 0;
+		if (hasVersionTimestamps) {
+			flags |= AbstractReadOnlyNodeData.FLAG_VERSION_TIMESTAMPS;
+		}
 
         buf.putShort(flags);
 
-//        @todo pack (must unpack in decode).
-        buf.putInt(nkeys);
-        buf.putInt(nentries);
-//        try {
-//
-//            buf.packLong(nkeys);
-//
-//            buf.packLong(nentries);
-//            
-//        } catch (IOException ex) {
-//         
-//            throw new RuntimeException(ex);
-//            
-//        }
+		buf.putInt(nkeys);
+
+		if (nentries < 0) {
+			/*
+			 * Note: This allows ZERO entries in order to support some unit
+			 * tests an empty node. However, an empty node is not a legal
+			 * data structure in a btree. Only the root leaf may be empty.
+			 */
+			throw new RuntimeException();
+		}
+		if (version == ReadOnlyNodeData.VERSION0) {
+			if (nentries > Integer.MAX_VALUE)
+				throw new UnsupportedOperationException();
+			buf.putInt((int) nentries);
+		} else {
+			buf.putLong(nentries);
+		}
 
         // The offset at which the byte length of the keys will be recorded.
         final int O_keysSize = buf.pos();
@@ -200,19 +217,121 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
             
         }
         
-        // childEntryCount[] : @todo code childEntryCount[]
 //        final int O_childEntryCount = buf.pos();
-		{ // Note: sanity checks [nentries] during coding.
-			int sum = 0;
+		if (version == ReadOnlyNodeData.VERSION0) {
+			long sum = 0;
 			for (int i = 0; i <= nkeys; i++) {
-				final int nchildren = node.getChildEntryCount(i);
-				buf.putInt(nchildren);
+				final long nchildren = node.getChildEntryCount(i);
+				if (nchildren < 0)
+					throw new AssertionError();
+				if (nchildren > Integer.MAX_VALUE)
+					throw new UnsupportedOperationException();
+				buf.putInt((int) nchildren);
 				sum += nchildren;
 			}
 			if (sum != nentries)
 				throw new RuntimeException("spannedTupleCount=" + nentries
 						+ ", but sum over children=" + sum);
-		}
+		} else {
+			/*
+			 * The min is written out as a full length long value. The per child
+			 * entry counts are written out using the minimum #of bits required
+			 * to code the data.
+			 * 
+			 * Note: If min==max then ZERO bits are used per child!
+			 * 
+			 * The encoding takes:
+			 * 
+			 * nbits := 1 byte
+			 * min   := 8 bytes
+			 * array := BytesUtil.bitFlagByteLength((nkeys + 1)* nbits)
+			 * 
+			 * The encoding is byte aligned so the next data will begin on an
+			 * even byte boundary.
+			 */
+			long min = Long.MAX_VALUE, max = Long.MIN_VALUE;
+			long sum = 0;
+			for (int i = 0; i <= nkeys; i++) {
+				final long nchildren = node.getChildEntryCount(i);
+				sum += nchildren;
+				if (nchildren < 0) {
+					/*
+					 * Note: ZERO is permitted for a test case, but is not legal
+					 * in live data.
+					 */
+					throw new RuntimeException();
+				}
+				if (min > nchildren)
+					min = nchildren;
+				if (max < nchildren)
+					max = nchildren;
+			}
+			if (sum != nentries)
+				throw new RuntimeException("spannedTupleCount=" + nentries
+						+ ", but sum over children=" + sum);
+			if (sum == 0)
+				min = max = 0;
+			
+            final long delta = max - min;
+            assert delta >= 0;
+
+            // will be in [1:64]
+			final byte nbits = (byte) (Fast.mostSignificantBit(delta) + 1);
+
+            // one byte.
+            buf.putByte((byte) nbits);
+
+            // offset of minVersionTimestamp.
+//            O_versionTimestamps = buf.pos();
+
+            // int64
+            buf.putLong(min);
+
+//            // int64
+//            buf.putLong(max);
+
+            if (nbits > 0) {
+                /*
+                 * Note: We only write the deltas if 
+                 * (min!=max). When min==max, the
+                 * deltas are coded in zero bits, so this would be a NOP anyway.
+                 */
+				final int byteLength = BytesUtil.bitFlagByteLength((nkeys + 1)
+						* nbits/* nbits */);
+                final byte[] a = new byte[byteLength];
+                final OutputBitStream obs = new OutputBitStream(a);
+                try {
+
+                    // array of [deltaBits] length fields.
+					for (int i = 0; i <= nkeys; i++) {
+
+						final long d = node.getChildEntryCount(i) - min;
+
+						assert d >= 0;
+
+						obs.writeLong(d, nbits);
+
+					}
+
+                    obs.flush();
+
+                    // copy onto the buffer.
+                    buf.put(a);
+
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                    // Note: close is not necessary if flushed and backed by
+                    // byte[].
+                    // } finally {
+                    // try {
+                    // obs.close();
+                    // } catch (IOException e) {
+                    // log.error(e);
+                    // }
+                }
+            }
+
+        }
         
         if(hasVersionTimestamps) {
             
@@ -252,11 +371,14 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
         
         /** The backing buffer */
         private final AbstractFixedByteArrayBuffer b;
+
+        /** The record serialization version. */
+        private final short version;
         
         // fields which are cached by the ctor.
         private final short flags;
         private final int nkeys;
-        private final int nentries;
+        private final long nentries;
 
         /**
          * Offset of the encoded keys in the buffer.
@@ -273,14 +395,17 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
          */
         private final int O_childAddr;
 
-        /**
-         * Offset of the encoded childEntryCount[] in the buffer.
-         * 
-         * @todo could be computed at runtime as
-         *       <code>O_childAddr + (nkeys + 1) * SIZEOF_ADDR</code>.
-         */
+		/**
+		 * Offset of the encoded childEntryCount[] in the buffer.
+		 * 
+		 * TODO Compute at runtime to save space as
+		 * <code>O_childAddr + (nkeys + 1) * SIZEOF_ADDR</code>?
+		 */
         private final int O_childEntryCount;
-                
+        
+        /** The #of bits in the delta encoding of the childEntryCount[]. */
+        private final byte childEntryCountBits;
+        
         final public AbstractFixedByteArrayBuffer data() {
             
             return b;
@@ -318,10 +443,11 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
                 throw new AssertionError("type=" + type);
             }
 
-            final int version = buf.getShort(pos);
+            version = buf.getShort(pos);
             pos += SIZEOF_VERSION;
             switch (version) {
             case VERSION0:
+            case VERSION1:
                 break;
             default:
                 throw new AssertionError("version=" + version);
@@ -331,13 +457,23 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
             flags = buf.getShort(pos);
             pos += SIZEOF_FLAGS;
 
-            // @todo unpack - must wrap buf as DataInputStream for this, so updating internal pos.
             this.nkeys = buf.getInt(pos);
             pos += SIZEOF_NKEYS;
-            
-            // @todo unpack - must wrap buf as DataInputStream for this.
-            this.nentries = buf.getInt(pos);
-            pos += SIZEOF_ENTRY_COUNT;
+
+			if (version == ReadOnlyNodeData.VERSION0) {
+				this.nentries = buf.getInt(pos);
+				pos += Bytes.SIZEOF_INT;
+			} else {
+				this.nentries = buf.getLong(pos);
+				pos += Bytes.SIZEOF_LONG;
+			}
+			if (nentries < 0) {
+				/*
+				 * Note: ZERO (0) is permitted for a test case but is not legal
+				 * in live data.
+				 */
+				throw new RuntimeException();
+			}
             
             final int keysSize = buf.getInt(pos);
             pos += SIZEOF_KEYS_SIZE;
@@ -352,8 +488,15 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
 						+ keys.size());
             
             O_childAddr = pos;
-            
+
             O_childEntryCount = O_childAddr + (nkeys + 1) * SIZEOF_ADDR;
+            
+			if (version >= ReadOnlyNodeData.VERSION1) {
+				childEntryCountBits = buf.getByte(O_childEntryCount);
+			} else {
+				// Not used in this version.
+				childEntryCountBits = -1;
+			}
 
             // save reference to buffer
             this.b = buf;
@@ -390,11 +533,12 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
                 throw new AssertionError("type=" + type);
             }
 
-            final int version = buf.getShort(pos);
+            version = buf.getShort(pos);
             pos += SIZEOF_VERSION;
             switch (version) {
-            case VERSION0:
-                break;
+			case VERSION0:
+			case VERSION1:
+				break;
             default:
                 throw new AssertionError("version=" + version);
             }
@@ -403,14 +547,24 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
             flags = buf.getShort(pos);
             pos += SIZEOF_FLAGS;
 
-            // @todo unpack - must wrap buf as DataInputStream for this, so updating internal pos.
             this.nkeys = buf.getInt(pos);
             pos += SIZEOF_NKEYS;
-            
-            // @todo unpack - must wrap buf as DataInputStream for this.
-            this.nentries = buf.getInt(pos);
-            pos += SIZEOF_ENTRY_COUNT;
-            
+
+			if (version == ReadOnlyNodeData.VERSION0) {
+				this.nentries = buf.getInt(pos);
+				pos += Bytes.SIZEOF_INT;
+			} else {
+				this.nentries = buf.getLong(pos);
+				pos += Bytes.SIZEOF_LONG;
+			}
+			if (nentries < 0) {
+				/*
+				 * Note: ZERO (0) is allowed for a unit test, but it is not
+				 * legal in live data.
+				 */
+				throw new RuntimeException();
+			}
+
             final int keysSize = buf.getInt(pos);
             pos += SIZEOF_KEYS_SIZE;
 
@@ -427,7 +581,14 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
             
             O_childEntryCount = O_childAddr + (nkeys + 1) * SIZEOF_ADDR;
 
-            // save reference to buffer
+			if (version >= ReadOnlyNodeData.VERSION1) {
+				childEntryCountBits = buf.getByte(O_childEntryCount);
+			} else {
+				// Not used in this version.
+				childEntryCountBits = -1;
+			}
+
+			// save reference to buffer
             this.b = buf;
 
         }
@@ -440,10 +601,29 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
          */
         private int getVersionTimestampOffset() {
 
-            return O_childEntryCount + ((nkeys + 1) * SIZEOF_ENTRY_COUNT);
+			if (version == ReadOnlyNodeData.VERSION0) {
+
+				return O_childEntryCount + ((nkeys + 1) * Bytes.SIZEOF_INT);
+            
+        	} else {
+        		/* Compute the offset to the version timestamps based on the
+        		 * #of bits required to encode each entry in the child entry
+        		 * count array.
+        		 * 
+        		 * nbits := 1 byte
+        		 * min   := 8 bytes (Long)
+        		 * array := BytesUtil.bitFlagByteLength((nkeys + 1)* nbits)
+        		 */
+				return O_childEntryCount//
+						+ 1 // one byte whose value is [nbits]
+						+ Bytes.SIZEOF_LONG // min
+						+ BytesUtil.bitFlagByteLength((nkeys + 1)
+								* childEntryCountBits);
+        		
+        	}
             
         }
-
+        
         final public boolean hasVersionTimestamps() {
             
             return ((flags & FLAG_VERSION_TIMESTAMPS) != 0);
@@ -522,7 +702,7 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
         /**
          * {@inheritDoc}. This field is cached.
          */
-        final public int getSpannedTupleCount() {
+        final public long getSpannedTupleCount() {
             
             return nentries;
             
@@ -552,13 +732,47 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
 
             return b.getLong(O_childAddr + index * SIZEOF_ADDR);
 
-        }
+		}
 
-        final public int getChildEntryCount(final int index) {
+		final public long getChildEntryCount(final int index) {
 
-            assert assertChildIndex(index);
+			assert assertChildIndex(index);
 
-            return b.getInt(O_childEntryCount + index * SIZEOF_ENTRY_COUNT);
+			if (version == ReadOnlyNodeData.VERSION0) {
+
+				return b.getInt(O_childEntryCount + index * Bytes.SIZEOF_INT);
+
+            } else {
+            	// Note: O_childEntryCount is [nbits], which is one byte.
+				final long min = b.getLong(O_childEntryCount + 1/*nbits*/);
+
+                final InputBitStream ibs = b.getInputBitStream();
+                try {
+
+					final long bitpos = ((O_childEntryCount + 1 + Bytes.SIZEOF_LONG) << 3)
+							+ ((long) index * childEntryCountBits);
+
+                    ibs.position(bitpos);
+
+                    final long deltat = ibs
+                            .readLong(childEntryCountBits/* nbits */);
+
+                    return min + deltat;
+                    
+                } catch(IOException ex) {
+                    
+                    throw new RuntimeException(ex);
+                    
+    // close not required for IBS backed by byte[] and has high overhead.
+//                } finally {
+//                    try {
+//                        ibs.close();
+//                    } catch (IOException ex) {
+//                        log.error(ex);
+//                    }
+                }
+            	
+            }
 
         }
 

@@ -556,7 +556,7 @@ abstract public class MetadataService extends DataService implements
              */
             {
                 
-                final int indexOf = mdi.indexOf(leftSeparator);
+                final long indexOf = mdi.indexOf(leftSeparator);
                 byte[] rightSeparator;
                 try {
 

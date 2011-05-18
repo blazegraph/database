@@ -168,19 +168,19 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
         
     }
 
-    final public int getNodeCount() {
+    final public long getNodeCount() {
         
         return nnodes;
         
     }
 
-    final public int getLeafCount() {
+    final public long getLeafCount() {
         
         return nleaves;
         
     }
 
-    final public int getEntryCount() {
+    final public long getEntryCount() {
         
         return nentries;
         
@@ -252,18 +252,27 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
     /**
      * The #of non-leaf nodes in the btree. The is zero (0) for a new btree.
      */
-    protected int nnodes;
+    protected long nnodes;
 
     /**
      * The #of leaf nodes in the btree. This is one (1) for a new btree.
      */
-    protected int nleaves;
+    protected long nleaves;
 
     /**
      * The #of entries in the btree. This is zero (0) for a new btree.
      */
-    protected int nentries;
+    protected long nentries;
 
+	/**
+	 * The value of the record version number that will be assigned to the next
+	 * node or leaf written onto the backing store. This number is incremented
+	 * each time a node or leaf is written onto the backing store. The initial
+	 * value is ZERO (0). The first value assigned to a node or leaf will be
+	 * ZERO (0).
+	 */
+    protected long recordVersion;
+    
     /**
      * The mutable counter exposed by #getCounter()}.
      * <p>
@@ -417,6 +426,8 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
         
         this.counter = new AtomicLong( checkpoint.getCounter() );
 
+        this.recordVersion = checkpoint.getRecordVersion();
+        
     }
 
     /**

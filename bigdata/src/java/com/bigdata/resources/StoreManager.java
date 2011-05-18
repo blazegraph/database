@@ -2281,7 +2281,7 @@ abstract public class StoreManager extends ResourceEvents implements
     /**
      * The #of journals on hand.
      */
-    synchronized public int getManagedJournalCount() {
+    synchronized public long getManagedJournalCount() {
 
         assertOpen();
 
@@ -2292,7 +2292,7 @@ abstract public class StoreManager extends ResourceEvents implements
     /**
      * The #of index segments on hand.
      */
-    synchronized public int getManagedSegmentCount() {
+    synchronized public long getManagedSegmentCount() {
 
         assertOpen();
 
@@ -3521,8 +3521,8 @@ abstract public class StoreManager extends ResourceEvents implements
                 }
             }
 
-            final int journalBeforeCount = getManagedJournalCount();
-            final int segmentBeforeCount = getManagedSegmentCount();
+            final long journalBeforeCount = getManagedJournalCount();
+            final long segmentBeforeCount = getManagedSegmentCount();
             final long bytesBeforeCount = getBytesUnderManagement();
 
             /*
@@ -3539,8 +3539,8 @@ abstract public class StoreManager extends ResourceEvents implements
                 elapsedDeleteResourcesTime = System.currentTimeMillis() - begin;
             }
 
-            final int journalAfterCount = getManagedJournalCount();
-            final int segmentAfterCount = getManagedSegmentCount();
+            final long journalAfterCount = getManagedJournalCount();
+            final long segmentAfterCount = getManagedSegmentCount();
             final long bytesAfterCount = getBytesUnderManagement();
             
             final long elapsedPurgeResourcesTime = System.currentTimeMillis() - beginPurgeTime;
