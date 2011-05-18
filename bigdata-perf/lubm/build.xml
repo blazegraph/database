@@ -114,17 +114,6 @@
 		</java>
 	</target>
 
-	<!--
-	<target name="stop-nano-server" depends="compile" description="Stop the small http server running at the configured port (either qualification or normal trials).">
-		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
-			<arg line="${lubm.nanoServerPort} -stop" />
-			<classpath>
-				<path refid="runtime.classpath" />
-			</classpath>
-		</java>
-	</target>
-	-->
-
 	<target name="run-query" depends="compile" description="Runs the benchmark queries against the loaded data.">
 		<java classname="edu.lehigh.swat.bench.ubt.Test" fork="true" failonerror="true" dir="${build.dir}/bin">
 			<jvmarg value="-Dlubm.warmUp=false" />

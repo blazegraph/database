@@ -826,6 +826,43 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			}
 		}
 		
+		public void testAllocationContexts() {
+			
+			Journal store = (Journal) getStore();
+
+			try {
+
+				RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+
+				RWStore rw = bufferStrategy.getRWStore();
+				
+				IAllocationContext cntxt1 = new IAllocationContext() {};
+				
+				IAllocationContext cntxt2 = new IAllocationContext() {};
+				
+				// allocate a global address
+				int gaddr = rw.alloc(412, null);
+				
+				store.commit();
+				
+				// allocate a context address grabbing previous global allocation
+				int c1addr = rw.alloc(412, cntxt1);
+				// imagine we are re-allocating the original address
+				rw.free(gaddr, 412, cntxt1);				
+				// now abort context
+				rw.abortContext(cntxt1);
+				
+				store.commit();
+
+				long paddr = rw.physicalAddress(gaddr);
+				
+				assertTrue("Global allocation must be protected", paddr != 0);
+
+			} finally {
+				store.destroy();
+			}
+		}
+		
 		void showStore(Journal store) {
 			RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
 

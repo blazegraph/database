@@ -40,8 +40,8 @@ public class JustificationWriter implements Callable<Long>{
      *            Incremented as a side-effect for each justification
      *            actually written on the justification index.
      */
-    public JustificationWriter(AbstractTripleStore dst,
-            IChunkedIterator<Justification> src, AtomicLong nwritten) {
+    public JustificationWriter(final AbstractTripleStore dst,
+            final IChunkedIterator<Justification> src, final AtomicLong nwritten) {
 
         this.dst = dst;
 

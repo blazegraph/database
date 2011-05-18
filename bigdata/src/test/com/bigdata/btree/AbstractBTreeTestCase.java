@@ -963,7 +963,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
 
-		if (r.nextBoolean()) {
+		if (useRawRecords()) {
 			/*
 			 * Randomly test with raw records enabled, using a small value for
 			 * the maximum record length to force heavy use of raw records when
@@ -989,6 +989,15 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     }
     
     /**
+     * Provide hook to allow specific test cases to determine if rawRecords
+     * should be used, failing any overide the value is random.
+     * @return whether to use raw records
+     */
+    protected boolean useRawRecords() {
+		return r.nextBoolean();
+	}
+
+	/**
      * Specifies a {@link NoEvictionListener}.
      *  
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

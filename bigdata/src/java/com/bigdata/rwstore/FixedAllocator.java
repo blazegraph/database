@@ -120,9 +120,15 @@ public class FixedAllocator implements Allocator {
 		 * where committed data is accessed even if has been marked as ready to
 		 * be recycled after the next commit
 		 */
+		final long paddr = RWStore.convertAddr(block.m_addr) + ((long) m_size * bit);
 		if (RWStore.tstBit(block.m_transients, bit)) {		
-			return RWStore.convertAddr(block.m_addr) + ((long) m_size * bit);
+			return paddr;
 		} else {
+			if (RWStore.tstBit(block.m_commit, bit)) {
+				throw new IllegalStateException("Address committed but not set in transients");
+			}
+			m_store.showWriteCacheDebug(paddr);			
+			
 			return 0L;
 		}
 	}
@@ -234,9 +240,8 @@ public class FixedAllocator implements Allocator {
 			try {
                 str.writeInt(m_size);
 
-//                if (!m_sessionActive)
-//                	System.out.println("Committing allocator, protection: " + m_sessionActive + ", transient frees: " + m_freeTransients);
-
+    			boolean protectTransients = m_sessionActive || m_store.isSessionProtected();
+    			
                 final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
                 while (iter.hasNext()) {
                     final AllocBlock block = iter.next();
@@ -246,7 +251,7 @@ public class FixedAllocator implements Allocator {
                     	str.writeInt(block.m_live[i]);
                     }
 
-                    if (!m_sessionActive) {
+                    if (!protectTransients) {
                         block.m_transients = block.m_live.clone();
                     }
 
@@ -553,13 +558,8 @@ public class FixedAllocator implements Allocator {
 			final int block = offset/nbits;
 			
 			m_sessionActive = m_store.isSessionProtected();
-//			if (!m_sessionActive) {
-//				System.out.println("Freeing " + addr + " without protection");
-//			}
+
 			try {
-//				if (!m_sessionActive) {
-//					System.out.println("NO SESSION PROTECT FOR " + addr + "[" + size + "]");
-//				}
 				if (((AllocBlock) m_allocBlocks.get(block))
 						.freeBit(offset % nbits, m_sessionActive && !overideSession)) { // bit adjust
 					
@@ -847,10 +847,6 @@ public class FixedAllocator implements Allocator {
 
 			final boolean ret = !isCommitted(offset);
 
-//			if (ret) {
-//				System.out.println("CAN FREE " + addr + "[" + size + "]");				
-//			}
-
 			return ret;
 		} else {
 			return false;
@@ -880,7 +876,7 @@ public class FixedAllocator implements Allocator {
 			
 			checkFreeList();
 			
-			m_sessionActive = false;
+			m_sessionActive = m_store.isSessionProtected();
 		}
 	}
 }

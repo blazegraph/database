@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -29,7 +30,6 @@ import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.And;
 import org.openrdf.query.algebra.Bound;
 import org.openrdf.query.algebra.Compare;
-import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Group;
 import org.openrdf.query.algebra.IsBNode;
@@ -51,17 +51,17 @@ import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.Regex;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
-import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
 import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
+import org.openrdf.query.algebra.Compare.CompareOp;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
-import org.openrdf.query.impl.MapBindingSet;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
@@ -70,16 +70,17 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.engine.IRunningQuery;
+import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.solutions.ISortOrder;
 import com.bigdata.btree.IRangeQuery;
@@ -95,21 +96,21 @@ import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.IsLiteralBOp;
 import com.bigdata.rdf.internal.constraints.IsURIBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
-import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.sop.SOp;
 import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree;
-import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
 import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
+import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
@@ -122,6 +123,7 @@ import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IQueryOptions;
@@ -892,20 +894,44 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 
     }
     
+    /**
+     * Return an {@link IAsynchronousIterator} that will read a single, empty
+     * {@link IBindingSet}.
+     * 
+     * @param bindingSet
+     *            the binding set.
+     */
+    private ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+            final IBindingSet bindingSet) {
+
+        return new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
+
+    }
+
     CloseableIteration<BindingSet, QueryEvaluationException> 
 		doEvaluateNatively(final PipelineOp query, final BindingSet bs,
 			final QueryEngine queryEngine, final IVariable[] required
 			) 
 			throws QueryEvaluationException {
 	    
+        // Use either the caller's UUID or a random UUID.
+        final String queryIdStr = queryHints == null ? null : queryHints
+                .getProperty(QueryHints.QUERYID);
+
+        final UUID queryId = queryIdStr == null ? UUID.randomUUID() : UUID
+                .fromString(queryIdStr);
+
+        // Wrap the input binding sets (or an empty binding set if there is no
+        // input).
+        final IAsynchronousIterator<IBindingSet[]> source = newBindingSetIterator(bs != null ? toBindingSet(bs)
+                : new ListBindingSet());
+
 	    IRunningQuery runningQuery = null;
     	try {
-    		
-    		// Submit query for evaluation.
-    		if (bs != null)
-    			runningQuery = queryEngine.eval(query, toBindingSet(bs));
-    		else
-    			runningQuery = queryEngine.eval(query);
+
+            // Submit query for evaluation.
+            runningQuery = queryEngine.eval(queryId, query, source);
 
 			/*
 			 * Wrap up the native bigdata query solution iterator as Sesame

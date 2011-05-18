@@ -586,6 +586,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                 throw new NoSuchIndexException(name);
 
             }
+            
+            long checkpointAddr = entry.checkpointAddr;
 
             /*
              * Note: At this point we have an exclusive lock on the named
@@ -628,14 +630,22 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                  * isolated. [Also, we do not want N2A to cache references to a
                  * B+Tree backed by a different shadow journal.]
                  */
-                
+                            	
                 if ((resourceManager.getLiveJournal().getBufferStrategy() instanceof RWStrategy)) {
                     /*
                      * Note: Do NOT use the name2Addr cache for the RWStore.
                      * Each unisolated index view MUST be backed by a shadow
                      * journal!
+                     * 
+                     * But, fetch the btree from the cache to ensure we use the
+                     * most recent checkpoint
                      */
                     btree = null;
+
+                    final BTree tmpbtree = name2Addr.getIndexCache(name);
+                    if (tmpbtree != null)
+                    	checkpointAddr = tmpbtree.getCheckpoint().getCheckpointAddr();
+                    
                 } else {
                     // recover from unisolated index cache.
                     btree = name2Addr.getIndexCache(name);
@@ -650,7 +660,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                     // re-load btree from the store.
                     btree = BTree.load(//
                             tmp, // backing store.
-                            entry.checkpointAddr,//
+                            checkpointAddr,//
                             false// readOnly
                             );
 
@@ -1086,8 +1096,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         // clear the commit list.
         commitList.clear();
 
-        // Detach the allocation context used by the operation.
-        ((IsolatedActionJournal) getJournal()).detachContext();
+        // Detach the allocation context used by the operation, but increment
+        //	txCount
+        
+        ((IsolatedActionJournal) getJournal()).prepareCommit();
         
         final long elapsed = System.nanoTime() - begin;
         
@@ -1121,7 +1133,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * succeeded. Throws exceptions are trapped and logged.
      */
     void afterTaskHook(boolean abort) {
-        
+        ((IsolatedActionJournal) getJournal()).completeTask();
     }
     
     /*
@@ -2204,7 +2216,23 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         }
         
-        /**
+        public void prepareCommit() {
+//            final IBufferStrategy bufferStrategy = delegate.getBufferStrategy();
+//            if (bufferStrategy instanceof RWStrategy) {
+//                ((RWStrategy) bufferStrategy).getRWStore().activateTx();
+//            }
+            // now detach!
+            detachContext();
+		}
+
+		public void completeTask() {
+            final IBufferStrategy bufferStrategy = delegate.getBufferStrategy();
+            if (bufferStrategy instanceof RWStrategy) {
+                ((RWStrategy) bufferStrategy).getRWStore().deactivateTx();
+            }
+		}
+
+		/**
          * This class prevents {@link ITx#UNISOLATED} tasks from having direct
          * access to the {@link AbstractJournal} using
          * {@link AbstractTask#getJournal()}.
@@ -2234,6 +2262,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
             final IBufferStrategy bufferStrategy = source.getBufferStrategy();
             if (bufferStrategy instanceof RWStrategy) {
+            	// must grab the tx BEFORE registering the context to correctly
+            	//	bracket, since the tx count is decremented AFTER the
+            	//	context is released
+                ((RWStrategy) bufferStrategy).getRWStore().activateTx();
                 ((RWStrategy) bufferStrategy).getRWStore().registerContext(this);
             }
         }
@@ -2580,6 +2612,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         public void abortContext() {
             delegate.abortContext(this);
+            
+            completeTask();
         }
 
 		public ScheduledFuture<?> addScheduledTask(final Runnable task,
