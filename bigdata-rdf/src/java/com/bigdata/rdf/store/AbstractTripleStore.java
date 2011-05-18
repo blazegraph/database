@@ -3208,8 +3208,9 @@ abstract public class AbstractTripleStore extends
                 if (justify) {
 
                     final IJustificationIterator jitr = new JustificationIterator(
+                            getIndexManager(),
                             getSPORelation().getJustificationIndex(),
-                            0/* capacity */, true/* async */);
+                            0/* capacity */);
 
                     tasks.add(new JustificationWriter(dst, jitr, nwrittenj));
 

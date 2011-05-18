@@ -26,6 +26,8 @@ package com.bigdata.btree;
 import java.io.File;
 import java.io.IOException;
 
+import junit.framework.TestSuite;
+
 import org.apache.log4j.Level;
 
 import com.bigdata.LRUNexus;
@@ -41,11 +43,11 @@ import com.bigdata.btree.keys.TestKeyBuilder;
 public class TestIndexSegmentBuilderWithSmallTree extends
         AbstractIndexSegmentTestCase {
 
-    File outFile;
+    private File outFile;
 
-    File tmpDir;
+    private File tmpDir;
 
-    final boolean bufferNodes = true;
+    private boolean bufferNodes;
 
     public TestIndexSegmentBuilderWithSmallTree() {
     }
@@ -57,6 +59,9 @@ public class TestIndexSegmentBuilderWithSmallTree extends
     public void setUp() throws Exception {
 
         super.setUp();
+        
+        // random choice.
+        bufferNodes = r.nextBoolean();
         
         outFile = new File(getName() + ".seg");
 
@@ -79,6 +84,10 @@ public class TestIndexSegmentBuilderWithSmallTree extends
         }
 
         super.tearDown();
+        
+        // clear references.
+        outFile = null;
+        tmpDir = null;
         
     }
 

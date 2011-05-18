@@ -3091,8 +3091,15 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         /*
          * Direct copy the optional blobBuffer onto the output file.
+         * 
+         * Note: The backing BufferStrategy for the blobBuffer is allocated
+         * eagerly if there is an indication that blobs *might* be in use by the
+         * index. However, if nothing ever gets written onto the temporary store
+         * then the backing file is never created and there will be nothing to
+         * transfer. We look for this case an opt out of the transfer when
+         * nothing has been written onto the blobBuffer.
          */
-        if (blobBuffer == null) {
+        if (blobBuffer == null || blobBuffer.getBufferStrategy().size() == 0L) {
 
             // No blobs region.
             offsetBlobs = extentBlobs = 0L;
