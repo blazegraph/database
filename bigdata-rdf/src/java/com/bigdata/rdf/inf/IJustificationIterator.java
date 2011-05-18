@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.inf;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.striterator.IChunkedIterator;
 
 /**
@@ -38,7 +36,5 @@ import com.bigdata.striterator.IChunkedIterator;
  * @version $Id$
  */
 public interface IJustificationIterator extends IChunkedIterator<Justification> {
-
-    final Logger log = Logger.getLogger(IJustificationIterator.class);
 
 }
