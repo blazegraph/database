@@ -1520,9 +1520,9 @@ public class HTree extends AbstractHTree
             return data.getRawRecord(index);
         }
 
-        public int getSpannedTupleCount() {
-            return data.getSpannedTupleCount();
-        }
+//        public int getSpannedTupleCount() {
+//            return data.getSpannedTupleCount();
+//        }
 
         public int getValueCount() {
             return data.getValueCount();

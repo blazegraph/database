@@ -59,6 +59,24 @@ public class TestIndexSegmentCheckpoint extends TestCase {
         super(arg0);
     }
 
+    public void test_size() {
+
+    	System.err.println("SIZE: " + IndexSegmentCheckpoint.SIZE);
+
+		System.err.println("UNUSED VERSION0: "
+				+ IndexSegmentCheckpoint.SIZEOF_UNUSED_VERSION0);
+
+		System.err.println("UNUSED VERSION1: "
+				+ IndexSegmentCheckpoint.SIZEOF_UNUSED_VERSION1);
+		
+		System.err.println("UNUSED VERSION2: "
+				+ IndexSegmentCheckpoint.SIZEOF_UNUSED_VERSION2);
+
+		// Verify that the size of the record has not changed over time.
+		assertEquals("size",421,IndexSegmentCheckpoint.SIZE);
+		
+    }
+    
     /**
      * Test the ability to create an {@link IndexSegmentCheckpoint} record, write
      * it on a file, and read back the same data from the file. The data for

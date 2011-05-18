@@ -35,12 +35,7 @@ import com.bigdata.btree.keys.NoSuccessorException;
 import com.bigdata.btree.keys.TestKeyBuilder;
 
 /**
- * Test suite for the "linear list" access methods.
- * 
- * @see AbstractBTree#indexOf(Object)
- * @see AbstractBTree#keyAt(int)
- * @see AbstractBTree#valueAt(int)
- * @see AbstractBTree#rangeCount(Object, Object)
+ * Test suite for the {@link ILinearList} access methods.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

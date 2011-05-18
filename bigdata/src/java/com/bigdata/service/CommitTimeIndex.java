@@ -118,7 +118,7 @@ public class CommitTimeIndex extends BTree {
             throw new IllegalArgumentException();
         
         // find (first less than or equal to).
-        final int index = findIndexOf(timestamp);
+        final long index = findIndexOf(timestamp);
         
         if(index == -1) {
             
@@ -152,7 +152,7 @@ public class CommitTimeIndex extends BTree {
             throw new IllegalArgumentException();
         
         // find first strictly greater than.
-        final int index = findIndexOf(Math.abs(timestamp)) + 1;
+        final long index = findIndexOf(Math.abs(timestamp)) + 1;
         
         if (index == nentries) {
 
@@ -174,9 +174,9 @@ public class CommitTimeIndex extends BTree {
      *         equal to the given timestamp -or- <code>-1</code> iff there
      *         are no index entries.
      */
-    synchronized public int findIndexOf(final long timestamp) {
+    synchronized public long findIndexOf(final long timestamp) {
         
-        int pos = super.indexOf(encodeKey(timestamp));
+        long pos = super.indexOf(encodeKey(timestamp));
         
         if (pos < 0) {
 
@@ -190,7 +190,7 @@ public class CommitTimeIndex extends BTree {
             
             pos = -(pos+1);
 
-            if(pos == 0) {
+			if (pos == 0) {
 
                 // No entry is less than or equal to this timestamp.
                 return -1;

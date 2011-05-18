@@ -55,11 +55,7 @@ import com.bigdata.rawstore.IRawStore;
  */
 public class BloomFilter implements IBloomFilter, Externalizable {
 
-    protected static final transient Logger log = Logger.getLogger(BloomFilter.class);
-
-//    protected static final transient boolean INFO = log.isInfoEnabled();
-//
-//    protected static final transient boolean DEBUG = log.isDebugEnabled();
+	private static final transient Logger log = Logger.getLogger(BloomFilter.class);
     
     /**
      * 

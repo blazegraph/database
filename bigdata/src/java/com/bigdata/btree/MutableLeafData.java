@@ -384,14 +384,14 @@ public class MutableLeafData implements ILeafData {
 
     }
 
-    /**
-     * For a leaf the #of entries is always the #of keys.
-     */
-    final public int getSpannedTupleCount() {
-        
-        return getKeys().size();
-        
-    }
+//    /**
+//     * For a leaf the #of entries is always the #of keys.
+//     */
+//    final public int getSpannedTupleCount() {
+//        
+//        return getKeys().size();
+//        
+//    }
     
     final public int getValueCount() {
         

@@ -35,11 +35,11 @@ public class MockLeafData extends AbstractMockNodeData implements ILeafData {
 
     }
 
-    final public int getSpannedTupleCount() {
-
-        return vals.size();
-
-    }
+//    final public int getSpannedTupleCount() {
+//
+//        return vals.size();
+//
+//    }
 
     final public int getValueCount() {
 

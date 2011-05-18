@@ -368,13 +368,13 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 		 */
 		
 		/** The #of tuples to be skipped after every tuple visited. */
-		private transient int skipCount;
+		private transient long skipCount;
 		/** The #of tuples accepted so far. */
 		private transient int nread = 0;
 		/** The inclusive lower bound of the first tuple actually visited. */
-		private transient int fromIndex;
+		private transient long fromIndex;
 		/** The exclusive upper bound of the last tuple which could be visited. */
-		private transient int toIndex;
+		private transient long toIndex;
 		
 		/**
 		 * 
@@ -393,7 +393,7 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 
 			final AbstractBTree ndx = (AbstractBTree) src.getIndex();
 
-			final int currentIndex = ndx.indexOf(tuple.getKey());
+			final long currentIndex = ndx.indexOf(tuple.getKey());
 
 			if (nread == 0) {
 
@@ -409,9 +409,9 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 					toIndex = -toIndex + 1;
 				}
 
-				final int rangeCount = (toIndex - fromIndex);
+				final long rangeCount = (toIndex - fromIndex);
 
-				skipCount = Math.max(1, rangeCount / limit);
+				skipCount = Math.max(1L, rangeCount / limit);
 				
 				// minus one since src.next() already consumed one tuple.
 				skipCount -= 1;
@@ -429,7 +429,7 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 				 * If the skip count is positive, then skip over N tuples.
 				 */
 
-				final int nextIndex = Math.min(ndx.getEntryCount() - 1,
+				final long nextIndex = Math.min(ndx.getEntryCount() - 1,
 						currentIndex + skipCount);
 
 				src.seek(ndx.keyAt(nextIndex));
@@ -474,13 +474,13 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 		 */
 		
 		/** The offset of each tuple to be sampled. */
-		private transient int[] offsets;
+		private transient long[] offsets;
 		/** The #of tuples accepted so far. */
 		private transient int nread = 0;
 		/** The inclusive lower bound of the first tuple actually visited. */
-		private transient int fromIndex;
+		private transient long fromIndex;
 		/** The exclusive upper bound of the last tuple which could be visited. */
-		private transient int toIndex;
+		private transient long toIndex;
 		
 		/**
 		 * 
@@ -539,7 +539,7 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 				 * Skip to the next tuple.
 				 */
 
-				final int nextIndex = offsets[nread];
+				final long nextIndex = offsets[nread];
 
 //				System.err.println("limit=" + limit + ", rangeCount="
 //						+ (toIndex - fromIndex) + ", fromIndex=" + fromIndex
@@ -688,8 +688,8 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 		 * @throws IllegalArgumentException
 		 *             unless <i>toIndex</i> is GT <i>fromIndex</i>.
 		 */
-		int[] getOffsets(final long seed, int limit, final int fromIndex,
-				final int toIndex);
+		long[] getOffsets(long seed, int limit, long fromIndex, long toIndex);
+
 	}
 
 	/**
@@ -703,8 +703,8 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 		/**
 		 * {@inheritDoc}
 		 */
-		public int[] getOffsets(final long seed, int limit,
-				final int fromIndex, final int toIndex) {
+		public long[] getOffsets(final long seed, int limit,
+				final long fromIndex, final long toIndex) {
 
 			if (limit < 1)
 				throw new IllegalArgumentException();
@@ -715,10 +715,15 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 			if (toIndex <= fromIndex)
 				throw new IllegalArgumentException();
 			
-			final int rangeCount = (toIndex - fromIndex);
+			final long rangeCount = (toIndex - fromIndex);
 
-			if (limit > rangeCount)
-				limit = rangeCount;
+			if (limit > rangeCount) {
+				/*
+				 * Note: cast valid since limit is int32 and limit LT rangeCount
+				 * so rangeCount may be cast to int32.
+				 */
+				limit = (int) rangeCount;
+			}
 
 			if (limit == rangeCount) {
 
@@ -782,8 +787,8 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 		 *             if <i>limit!=rangeCount</i> (after adjusting for limits
 		 *             greater than the rangeCount).
 		 */
-		public int[] getOffsets(final long seed, int limit,
-				final int fromIndex, final int toIndex) {
+		public long[] getOffsets(final long seed, int limit,
+				final long fromIndex, final long toIndex) {
 
 			if (limit < 1)
 				throw new IllegalArgumentException();
@@ -794,16 +799,21 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 			if (toIndex <= fromIndex)
 				throw new IllegalArgumentException();
 
-			final int rangeCount = (toIndex - fromIndex);
+			final long rangeCount = (toIndex - fromIndex);
 
-			if (limit > rangeCount)
-				limit = rangeCount;
+			if (limit > rangeCount) {
+				/*
+				 * Note: cast valid since limit is int32 and limit LT rangeCount
+				 * so rangeCount may be cast to int32.
+				 */
+				limit = (int) rangeCount;
+			}
 
 			if (limit != rangeCount)
 				throw new UnsupportedOperationException();
 
 			// offsets of tuples to visit.
-			final int[] offsets = new int[limit];
+			final long[] offsets = new long[limit];
 
 			for (int i = 0; i < limit; i++) {
 
@@ -832,8 +842,18 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 	 */
 	static public class BitVectorOffsetSampler implements IOffsetSampler {
 
-		public int[] getOffsets(final long seed, int limit,
-				final int fromIndex, final int toIndex) {
+		/**
+		 * {@inheritDoc}
+		 * <p>
+		 * Note: The utility of this class is limited to smaller range counts
+		 * (32k is fine, 2x or 4k that is also Ok) so it will reject anything
+		 * with a very large range count.
+		 * 
+		 * @throws UnsupportedOperationException
+		 *             if the rangeCount is GT {@link Integer#MAX_VALUE}
+		 */
+		public long[] getOffsets(final long seed, int limit,
+				final long fromIndex, final long toIndex) {
 
 			if (limit < 1)
 				throw new IllegalArgumentException();
@@ -844,13 +864,25 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 			if (toIndex <= fromIndex)
 				throw new IllegalArgumentException();
 
-			final int rangeCount = (toIndex - fromIndex);
+			final long rangeCount2 = (toIndex - fromIndex);
 
-			if (limit > rangeCount)
+			if (rangeCount2 > Integer.MAX_VALUE) {
+				/*
+				 * The utility of this class is limited to smaller range counts
+				 * so it will reject anything with a very large range count. 
+				 */
+				throw new UnsupportedOperationException();
+			}
+			
+			// known to be an int32 value.
+			final int rangeCount = (int) rangeCount2;
+			
+			if (limit > rangeCount) {
 				limit = rangeCount;
+			}
 
 			// offsets of tuples to visit.
-			final int[] offsets = new int[limit];
+			final long [] offsets = new long [limit];
 
 			// create a cleared bit vector of the stated capacity.
 			final BitVector v = LongArrayBitVector.ofLength(//
@@ -921,8 +953,17 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 	 */
 	static public class AcceptanceSetOffsetSampler implements IOffsetSampler {
 
-		public int[] getOffsets(final long seed, int limit,
-				final int fromIndex, final int toIndex) {
+		/**
+		 * {@inheritDoc}
+		 * <p>
+		 * Note: The utility of this class is limited to moderate range counts
+		 * (~100k) so it will reject anything with a very large range count.
+		 * 
+		 * @throws UnsupportedOperationException
+		 *             if the rangeCount is GT {@link Integer#MAX_VALUE}
+		 */
+		public long[] getOffsets(final long seed, int limit,
+				final long fromIndex, final long toIndex) {
 
 			if (limit < 1)
 				throw new IllegalArgumentException();
@@ -933,13 +974,19 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 			if (toIndex <= fromIndex)
 				throw new IllegalArgumentException();
 
-			final int rangeCount = (toIndex - fromIndex);
+			final long rangeCount2 = (toIndex - fromIndex);
 
-			if (limit > rangeCount)
+			if (rangeCount2 > Integer.MAX_VALUE)
+				throw new UnsupportedOperationException();
+
+			final int rangeCount = (int) rangeCount2;
+			
+			if (limit > rangeCount) {
 				limit = rangeCount;
+			}
 
 			// offsets of tuples to visit.
-			final int[] offsets = new int[limit];
+			final long [] offsets = new long[limit];
 
 			// hash set of accepted offsets.
 			final IntOpenHashSet v = new IntOpenHashSet(

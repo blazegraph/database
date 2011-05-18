@@ -231,7 +231,8 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         /*
          * Build the index segment with a bloom filter.
          */
-        System.err.println("Building index segment (w/ bloom): in(m="
+		if (log.isInfoEnabled())
+			log.info("Building index segment (w/ bloom): in(m="
                 + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()
                 + "), out(m=" + m + ")");
 
@@ -277,14 +278,16 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
          * case and not, for example, those aspects that depend on the
          * specifics of the length of serialized nodes or leaves).
          */
-        System.err.println("Opening index segment w/ bloom filter.");
+		if (log.isInfoEnabled())
+			log.info("Opening index segment w/ bloom filter.");
         final IndexSegment seg2 = new IndexSegmentStore(outFile2).loadIndexSegment();
         try {
         
         /*
          * Verify the total index order.
          */
-        System.err.println("Verifying index segments.");
+		if (log.isInfoEnabled())
+			log.info("Verifying index segments.");
         assertSameBTree(btree, seg2);
 
         // the bloom filter instance that was de-serialized.
@@ -298,8 +301,9 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         assertFalse("4",bloomFilter.contains(i2k(4)));
         assertFalse("9",bloomFilter.contains(i2k(9)));
         
-        byte[][] keys = new byte[btree.getEntryCount()][];
-        byte[][] vals = new byte[btree.getEntryCount()][];
+        // Note: this is a very small index (3 keys) so the cast is safe.
+        byte[][] keys = new byte[(int)btree.getEntryCount()][];
+        byte[][] vals = new byte[(int)btree.getEntryCount()][];
 
         getKeysAndValues(btree,keys,vals);
 
@@ -307,8 +311,9 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         doRandomLookupTest("w/ bloom", seg2, keys, vals);
         
         } finally {
-        System.err.println("Closing index segments.");
-        seg2.close();
+			if (log.isInfoEnabled())
+				log.info("Closing index segments.");
+			seg2.close();
         
         }
 
@@ -330,6 +335,16 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
     public void doBuildIndexSegmentAndCompare(final BTree btree)
             throws Exception {
 
+    	try {
+		if (btree.getEntryCount() > Integer.MAX_VALUE) {
+			/*
+			 * This code can not validate a B+Tree with more than MAX_INT keys
+			 * since it relies on materialization of the data in RAM within
+			 * arrays and Java does not support int64 array indices.
+			 */
+			throw new RuntimeException();
+    	}
+    	
         // branching factors used for the index segment.
         final int branchingFactors[] = new int[] { 3, 4, 5, 10, 20, 60, 100,
                 256, 1024, 4096, 8192 };
@@ -359,7 +374,8 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
             
             {
                 
-                System.err.println("Building index segment (w/o bloom): in(m="
+    			if (log.isInfoEnabled())
+    				log.info("Building index segment (w/o bloom): in(m="
                         + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()
                         + "), out(m=" + m + ")");
                 
@@ -378,7 +394,8 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
             final IndexSegmentBuilder builder2;
             {
 
-                System.err.println("Building index segment (w/ bloom): in(m="
+    			if (log.isInfoEnabled())
+    				log.info("Building index segment (w/ bloom): in(m="
                         + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()
                         + "), out(m=" + m + ")");
             
@@ -411,7 +428,8 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
              * case and not, for example, those aspects that depend on the
              * specifics of the length of serialized nodes or leaves).
              */
-            System.err.println("Opening index segment w/o bloom filter.");
+			if (log.isInfoEnabled())
+				log.info("Opening index segment w/o bloom filter.");
             final IndexSegment seg = new IndexSegmentStore(outFile).loadIndexSegment();
 
             /*
@@ -421,15 +439,17 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
              * case and not, for example, those aspects that depend on the
              * specifics of the length of serialized nodes or leaves).
              */
-            System.err.println("Opening index segment w/ bloom filter.");
+			if (log.isInfoEnabled())
+				log.info("Opening index segment w/ bloom filter.");
             final IndexSegment seg2 = new IndexSegmentStore(outFile2).loadIndexSegment();
 
             /*
              * Explicitly test the bloom filter against ground truth. 
              */
             
-            byte[][] keys = new byte[btree.getEntryCount()][];
-            byte[][] vals = new byte[btree.getEntryCount()][];
+            // Note: cast is safe - we check entryCount above.
+            final byte[][] keys = new byte[(int)btree.getEntryCount()][];
+            final byte[][] vals = new byte[(int)btree.getEntryCount()][];
 
             getKeysAndValues(btree,keys,vals);
 
@@ -449,13 +469,15 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
              * Verify index segments against the source btree and against one
              * another.
              */
-            System.err.println("Verifying index segments.");
+			if (log.isInfoEnabled())
+				log.info("Verifying index segments.");
             assertSameBTree(btree, seg);
             assertSameBTree(btree, seg2);
             seg2.close(); // close seg w/ bloom filter and the verify with implicit reopen.
             assertSameBTree(seg, seg2);
 
-            System.err.println("Closing index segments.");
+			if (log.isInfoEnabled())
+				log.info("Closing index segments.");
             seg.close();
             seg2.close();
 
@@ -473,12 +495,14 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
 
         } // build index segment with the next branching factor.
 
-        /*
-         * Closing the journal.
-         */
-        System.err.println("Closing journal.");
-        btree.getStore().destroy();
-        
+    	} finally {
+            /*
+             * Closing the journal.
+             */
+    		if (log.isInfoEnabled())
+    			log.info("Closing journal.");
+    		btree.getStore().destroy();        
+    	}
     }
 
     /**
@@ -492,7 +516,11 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
      */
     protected void doBloomFilterTest(String label, IBloomFilter bloomFilter, byte[][] keys) {
         
-        System.err.println("\ncondition: "+label);//+", size="+bloomFilter.size());
+        /*
+         * Closing the journal.
+         */
+		if (log.isInfoEnabled())
+			log.info("\ncondition: "+label);//+", size="+bloomFilter.size());
 
         final int[] order = getRandomOrder(keys.length);
 

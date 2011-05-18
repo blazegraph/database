@@ -135,7 +135,7 @@ public class JournalIndex extends BTree {
             throw new IllegalArgumentException();
         
         // find (first less than or equal to).
-        final int index = findIndexOf(timestamp);
+        final long index = findIndexOf(timestamp);
         
         if(index == -1) {
             
@@ -152,7 +152,7 @@ public class JournalIndex extends BTree {
     /**
      * Retrieve the entry from the index.
      */
-    private JournalMetadata valueAtIndex(final int index) {
+    private JournalMetadata valueAtIndex(final long index) {
 
         final JournalMetadata entry = (JournalMetadata) SerializerUtil
                 .deserialize(super.valueAt(index));
@@ -182,7 +182,7 @@ public class JournalIndex extends BTree {
             throw new IllegalArgumentException();
         
         // find first strictly greater than.
-        final int index = findIndexOf(Math.abs(timestamp)) + 1;
+        final long index = findIndexOf(Math.abs(timestamp)) + 1;
         
         if (index == nentries) {
 
@@ -205,9 +205,9 @@ public class JournalIndex extends BTree {
      *         <code>-1</code> iff there are no {@link ICommitRecord}s
      *         defined.
      */
-    synchronized public int findIndexOf(final long timestamp) {
+    synchronized public long findIndexOf(final long timestamp) {
         
-        int pos = super.indexOf(getKey(timestamp));
+        long pos = super.indexOf(getKey(timestamp));
         
         if (pos < 0) {
 

@@ -57,7 +57,7 @@ public abstract class AbstractNode<T extends AbstractNode
  * DO-NOT-USE-GENERIC-HERE. The compiler will fail under Linux (JDK 1.6.0_14,
  * _16).
  */
-> extends PO implements IAbstractNode, IAbstractNodeData, IKeysData, ISpannedTupleCountData {
+> extends PO implements IAbstractNode, IAbstractNodeData, IKeysData {
 
     /**
      * Log for node and leaf operations.
@@ -1214,7 +1214,7 @@ public abstract class AbstractNode<T extends AbstractNode
      *         this guarantees that the return value will be >= 0 if and only if
      *         the key is found.
      */
-    abstract public int indexOf(byte[] searchKey);
+    abstract public long indexOf(byte[] searchKey);
     
     /**
      * Recursive search locates the entry at the specified index position in the
@@ -1231,7 +1231,7 @@ public abstract class AbstractNode<T extends AbstractNode
      * @exception IndexOutOfBoundsException
      *                if index is greater than the #of entries.
      */
-    abstract public byte[] keyAt(int index);
+    abstract public byte[] keyAt(long index);
     
     /**
      * Recursive search locates the entry at the specified index position in the
@@ -1249,7 +1249,7 @@ public abstract class AbstractNode<T extends AbstractNode
      * @exception IndexOutOfBoundsException
      *                if index is greater than the #of entries.
      */
-    abstract public void valueAt(int index, Tuple tuple);
+    abstract public void valueAt(long index, Tuple tuple);
     
     /**
      * Dump the data onto the {@link PrintStream} (non-recursive).
