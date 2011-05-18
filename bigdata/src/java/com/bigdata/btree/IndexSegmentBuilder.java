@@ -3094,7 +3094,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          * transfer. We look for this case an opt out of the transfer when
          * nothing has been written onto the blobBuffer.
          */
-        if (blobBuffer == null || blobBuffer.getBufferStrategy().size() > 0L) {
+        if (blobBuffer == null || blobBuffer.getBufferStrategy().size() == 0L) {
 
             // No blobs region.
             offsetBlobs = extentBlobs = 0L;
