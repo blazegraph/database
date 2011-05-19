@@ -120,7 +120,8 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
         
         try {
         
-        if (! (store.getBufferStrategy() instanceof AbstractBufferStrategy)) return;
+            if (!(store.getBufferStrategy() instanceof AbstractBufferStrategy))
+                return;
         
         final AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
             .getBufferStrategy();

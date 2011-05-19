@@ -61,6 +61,7 @@ import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
+import com.bigdata.journal.TestHelper;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -148,6 +149,8 @@ abstract public class AbstractTestCase
         log.info("\n================:END:" + testCase.getName()
                 + " ("+elapsed+"ms):END:====================\n");
 
+        TestHelper.checkJournalsClosed(testCase, this);
+        
     }
     
     private long begin;

@@ -29,6 +29,8 @@ package com.bigdata.io;
 
 import java.nio.ByteBuffer;
 
+import com.bigdata.journal.TestHelper;
+
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
 
@@ -56,6 +58,14 @@ public class TestCase3 extends TestCase2 {
      
     }
 
+    protected void tearDown() throws Exception {
+
+        super.tearDown();
+
+        TestHelper.checkJournalsClosed(this);
+        
+    }
+    
     /**
      * Helper method verifies that the contents of <i>actual</i> from
      * position() to limit() are consistent with the expected byte[]. A

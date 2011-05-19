@@ -433,7 +433,7 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
             
         } finally {
 
-            store.destroy();
+            store.__tearDownUnitTest();
 
         }
 

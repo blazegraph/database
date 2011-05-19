@@ -28,10 +28,10 @@ public class TestBSBM {
 	private static final Logger log = Logger.getLogger(TestBSBM.class);
 	
 	private static final String PROPS =
-		"/Users/mikepersonick/Documents/workspace/bigdata-query-branch/bigdata-perf/bsbm/RWStore.properties";
+		"bigdata-perf/bsbm/RWStore.properties";
 
 	private static final String JNL =
-    	"/Users/mikepersonick/Documents/systap/bsbm/bsbm-qual/bigdata-bsbm.RW.jnl";
+    	"d:/bigdata-perf-analysis/bsbm/bsbm-qual/bigdata-bsbm.RW.jnl";
     
 	private static final String NS = "qual";
     

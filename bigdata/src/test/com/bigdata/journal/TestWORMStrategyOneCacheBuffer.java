@@ -250,7 +250,7 @@ public class TestWORMStrategyOneCacheBuffer extends AbstractJournalTestCase {
             properties.setProperty(Options.WRITE_CACHE_BUFFER_COUNT, ""
                     + writeCacheBufferCount);
 
-            return new Journal(properties).getBufferStrategy();
+            return new Journal(properties);//.getBufferStrategy();
 
         }
 
@@ -289,7 +289,7 @@ public class TestWORMStrategyOneCacheBuffer extends AbstractJournalTestCase {
             properties.setProperty(Options.WRITE_CACHE_BUFFER_COUNT, ""
                     + writeCacheBufferCount);
 
-            return new Journal(properties).getBufferStrategy();
+            return new Journal(properties);//.getBufferStrategy();
 
         }
 
@@ -349,7 +349,7 @@ public class TestWORMStrategyOneCacheBuffer extends AbstractJournalTestCase {
                     "" + (long) (DirectBufferPool.INSTANCE
                                     .getBufferCapacity() * 1.1));
 
-            return new Journal(properties).getBufferStrategy();
+            return new Journal(properties);//.getBufferStrategy();
 
         }
 

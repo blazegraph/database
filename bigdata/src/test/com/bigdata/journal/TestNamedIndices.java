@@ -80,7 +80,7 @@ public class TestNamedIndices extends ProxyTestCase<Journal> {
             BTree btree;
             {
 
-                IndexMetadata metadata = new IndexMetadata(indexUUID);
+                final IndexMetadata metadata = new IndexMetadata(indexUUID);
 
                 metadata.setBranchingFactor(3);
 

@@ -2227,11 +2227,11 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     private final void releaseWriteCache() {
 
         if (writeCacheService != null) {
-            try {
+//            try {
                 writeCacheService.close();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+//            } catch (InterruptedException e) {
+//                throw new RuntimeException(e);
+//            }
         }
             
     }

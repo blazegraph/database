@@ -41,6 +41,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
@@ -167,7 +168,8 @@ abstract public class WriteCacheService implements IWriteCache {
 	/**
 	 * <code>true</code> until the service is {@link #close() closed}.
 	 */
-	private volatile boolean open = true;
+//	private volatile boolean open = true;
+	private final AtomicBoolean open = new AtomicBoolean(true);
 
 	/**
 	 * <code>true</code> iff record level checksums are enabled.
@@ -656,6 +658,13 @@ abstract public class WriteCacheService implements IWriteCache {
                      * write cache service is closing down.
                      */
 					return null;
+				} catch(AsynchronousCloseException ex) {
+                    /*
+                     * The service was shutdown. We do not want to log an error
+                     * here since this is normal shutdown. close() will handle
+                     * all of the Condition notifies.
+                     */
+				    return null;
 				} catch (Throwable t) {
 					/*
 					 * Anything else is an error and halts processing. Error
@@ -844,9 +853,9 @@ abstract public class WriteCacheService implements IWriteCache {
 		final WriteLock writeLock = lock.writeLock();
 		writeLock.lockInterruptibly();
 		try {
-			if (!open) {
+			if (!open.get()) {
 				// Reset can not recover from close().
-				throw new IllegalStateException();
+				throw new IllegalStateException(firstCause.get());
 			}
 
 			// cancel the current WriteTask.
@@ -945,102 +954,104 @@ abstract public class WriteCacheService implements IWriteCache {
 		}
 	}
 
-	public void close() throws InterruptedException {
-		/*
-		 * Note: The write lock prevents concurrent close by another thread and
-		 * is also required for the operations we take on the dirtyList, the
-		 * cleanList, and current.
-		 */
-		final WriteLock writeLock = lock.writeLock();
-		writeLock.lockInterruptibly();
-		try {
+	public void close() { //throws InterruptedException {
 
-			if (!open) {
-				// Already closed, so this is a NOP.
-				return;
+        if (!open.compareAndSet(true/* expect */, false/* update */)) {
+            // Already closed, so this is a NOP.
+            return;
+		}
+
+        /*
+         * Set [firstCause] and [halt] to ensure that other threads report
+         * errors.
+         * 
+         * Note: If the firstCause has not yet been set, then we set it now to a
+         * stack trace which will indicate that the WriteCacheService was
+         * asynchronously closed (that is, it was closed by another thread).
+         */
+        if (firstCause.compareAndSet(null/* expect */,
+                new AsynchronousCloseException()/* update */)) {
+            halt = true;
+        }
+		
+		// Interrupt the write task.
+		localWriteFuture.cancel(true/* mayInterruptIfRunning */);
+		final Future<?> rwf = remoteWriteFuture;
+		if (rwf != null) {
+			// Note: Cancel of remote Future is RMI!
+			try {
+				rwf.cancel(true/* mayInterruptIfRunning */);
+			} catch (Throwable t) {
+				log.warn(t, t);
 			}
+		}
 
-            // Closed.
-            open = false;
-
-			// Interrupt the write task.
-			localWriteFuture.cancel(true/* mayInterruptIfRunning */);
-			final Future<?> rwf = remoteWriteFuture;
-			if (rwf != null) {
-				// Note: Cancel of remote Future is RMI!
-				try {
-					rwf.cancel(true/* mayInterruptIfRunning */);
-				} catch (Throwable t) {
-					log.warn(t, t);
-				}
-			}
-//			/*
-//			 * If there is an HAConnect running, then interrupt it so it will
-//			 * terminate.
-//			 */
-//			{
-//				final HAConnect cxn = haConnect.getAndSet(null/* clear */);
-//				if (cxn != null) {
-//					cxn.interrupt();
-//				}
-//			}
-
-			// Immediate shutdown of the write service.
-			localWriteService.shutdownNow();
+		// Immediate shutdown of the write service.
+		localWriteService.shutdownNow();
 
 //			// Immediate shutdown of the remote write service (if running).
 //			if (remoteWriteService != null) {
 //				remoteWriteService.shutdownNow();
 //			}
 
-			/*
-			 * Ensure that the WriteCache buffers are close()d in a timely
-			 * manner.
-			 */
+		/*
+		 * Ensure that the WriteCache buffers are close()d in a timely
+		 * manner.
+		 */
 
-			// reset buffers on the dirtyList.
-			dirtyListLock.lockInterruptibly();
-			try {
-				dirtyList.drainTo(new LinkedList<WriteCache>());
-				dirtyListEmpty.signalAll();
-				dirtyListNotEmpty.signalAll();
-			} finally {
-				dirtyListLock.unlock();
-			}
-
-			// close() buffers on the cleanList.
-			cleanListLock.lockInterruptibly();
-			try {
-				cleanList.drainTo(new LinkedList<WriteCache>());
-			} finally {
-				cleanListLock.unlock();
-			}
-
-			// close all buffers.
-			for (WriteCache t : buffers) {
-				t.close();
-			}
-
-			// clear reference to the current buffer.
-			current.getAndSet(null);
-
-			// clear the service record map.
-			recordMap.clear();
-
-			// clear the file extent to an illegal value.
-			fileExtent.set(-1L);
-
-//			/*
-//			 * Stop the HAServer instance if one is running.
-//			 */
-//			final HAServer haServer = this.haServer.get();
-//			if (haServer != null)
-//				haServer.interrupt();
-
+		// reset buffers on the dirtyList.
+		dirtyListLock.lock/*Interruptibly*/();
+		try {
+			dirtyList.drainTo(new LinkedList<WriteCache>());
+			dirtyListEmpty.signalAll();
+			dirtyListNotEmpty.signalAll();
 		} finally {
+			dirtyListLock.unlock();
+		}
+
+		// close() buffers on the cleanList.
+		cleanListLock.lock/*Interruptibly*/();
+		try {
+			cleanList.drainTo(new LinkedList<WriteCache>());
+		} finally {
+			cleanListLock.unlock();
+		}
+
+        /*
+         * Note: The lock protects the [current] reference.
+         */
+        final WriteLock writeLock = lock.writeLock();
+        writeLock.lock/*Interruptibly*/();
+        try {
+
+            // close all buffers.
+            boolean interrupted = false;
+            for (WriteCache t : buffers) {
+                try {
+                    t.close();
+                } catch (InterruptedException ex) {
+                    interrupted = true;
+                    continue;
+                }
+            }
+
+            // clear reference to the current buffer.
+            current.getAndSet(null);
+
+            // clear the service record map.
+            recordMap.clear();
+
+            // clear the file extent to an illegal value.
+            fileExtent.set(-1L);
+
+            if(interrupted)
+                Thread.currentThread().interrupt();
+
+        } finally {
 			writeLock.unlock();
 		}
-	}
+	
+    }
 
 	/**
 	 * Ensures that {@link #close()} is eventually invoked so the buffers can be
@@ -1073,8 +1084,8 @@ abstract public class WriteCacheService implements IWriteCache {
 	 */
 	private void assertOpenForWriter() {
 
-		if (!open)
-			throw new IllegalStateException();
+		if (!open.get())
+			throw new IllegalStateException(firstCause.get());
 
 		if (halt)
 			throw new RuntimeException(firstCause.get());
@@ -1415,8 +1426,8 @@ abstract public class WriteCacheService implements IWriteCache {
                     + ", chk=" + chk + ", useChecksum=" + useChecksum);
         }
         
-        if (!open)
-        	throw new IllegalStateException("WriteCacheService has been closed");
+        if (!open.get())
+            throw new IllegalStateException(firstCause.get());
 
         if (offset < 0)
             throw new IllegalArgumentException();
@@ -1911,7 +1922,7 @@ abstract public class WriteCacheService implements IWriteCache {
     public ByteBuffer read(final long offset) throws InterruptedException,
             ChecksumError {
 
-        if (!open) {
+        if (!open.get()) {
             /*
              * Not open. Return [null] rather than throwing an exception per the
              * contract for this implementation.
@@ -1945,7 +1956,7 @@ abstract public class WriteCacheService implements IWriteCache {
              * The write cache was closed. Per the API for this method, return
              * [null] so that the caller will read through to the backing store.
              */
-            assert !open;
+            assert !open.get();
             return null;
         }
 
@@ -2165,4 +2176,17 @@ abstract public class WriteCacheService implements IWriteCache {
 
 	}
 
+    /**
+     * An instance of this exception is thrown if a thread notices that the
+     * {@link WriteCacheService} was closed by a concurrent process.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+	public static class AsynchronousCloseException extends IllegalStateException {
+
+        private static final long serialVersionUID = 1L;
+	    
+	}
+	
 }

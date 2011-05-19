@@ -32,7 +32,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -58,20 +57,52 @@ public class TestJournalShutdown extends TestCase2 {
     }
 
     /**
-     * Look for a memory leak in the {@link QueryEngineFactory}.
+     * Look for a memory leak when the test calls {@link Journal#close()}
+     * explicitly.
      * 
-     * @throws InterruptedException 
+     * @throws InterruptedException
      */
-    public void test_memoryLeak() throws InterruptedException {
+    public void test_memoryLeakWithExplicitClose() throws InterruptedException {
 
-        if (true) {
-            /*
-             * FIXME Disabled for now since causing CI to fail.
-             */
-            fail("Enable test.");
+        doMemoryLeakTest(true);
+    }
 
-//            return;
-        }
+    /**
+     * Look for a memory leak when the test DOES NOT call
+     * {@link Journal#close()} explicitly and instead relies on the JVM to
+     * invoke finalized() on the {@link Journal}.
+     * <p>
+     * Note: You SHOULD NOT need to close the Journal. Once it is no longer
+     * strongly referenced it SHOULD get finalized(). This MAY be set to [true]
+     * to verify that the journal is properly shutting down all of its thread
+     * pools, but it MUST be [false] for CI since the whole purpose of this test
+     * is to verify that Journals are eventually finalized() if the application
+     * no longer holds a strong reference to the journal.
+     * 
+     * @throws InterruptedException
+     */
+    public void test_memoryLeakWithoutExplicitClose()
+            throws InterruptedException {
+
+        // This test currently fails....
+        fail("See https://sourceforge.net/apps/trac/bigdata/ticket/196.");
+        
+        doMemoryLeakTest(false);
+        
+    }
+
+    /**
+     * Test helper looks for a memory leak in the {@link Journal}.
+     * 
+     * @param closeJournal
+     *            when <code>true</code> the test will close each
+     *            {@link Journal} that it creates. Otherwise, it relies on the
+     *            finalized() method to close() the {@link Journal}.
+     * 
+     * @throws InterruptedException
+     */
+    private void doMemoryLeakTest(final boolean closeJournal)
+            throws InterruptedException {
 
         final int limit = 200;
 
@@ -92,31 +123,60 @@ public class TestJournalShutdown extends TestCase2 {
                 + Bytes.megabyte * 10);
 
         final AtomicInteger ncreated = new AtomicInteger();
+        final AtomicInteger nunfinalized = new AtomicInteger();
 
-        final AtomicInteger nalive = new AtomicInteger();
-        
         try {
 
             for (int i = 0; i < limit; i++) {
 
-                Journal jnl = new Journal(properties) {
+                final Journal jnl = new Journal(properties) {
                     protected void finalize() throws Throwable {
                         super.finalize();
-                        nalive.decrementAndGet();
-                        System.err.println("Journal was finalized: ncreated="
-                                + ncreated + ", nalive=" + nalive);
+                        nunfinalized.decrementAndGet();
+                        if (log.isDebugEnabled())
+                            log.debug("Journal was finalized: ncreated="
+                                    + ncreated + ", nalive=" + nunfinalized);
                     }
                 };
 
-                nalive.incrementAndGet();
+                nunfinalized.incrementAndGet();
                 ncreated.incrementAndGet();
+
+                if (closeJournal) {
+                    /*
+                     * Exercise each of the ways in which we can close the
+                     * journal.
+                     * 
+                     * Note: The Journal will not be finalized() unless it is
+                     * closed. It runs a variety of services which have
+                     * references back to the Journal and which will keep it
+                     * from being finalized until those services are shutdown.
+                     */
+                    switch (i % 4) {
+                    case 0:
+                        jnl.shutdown();
+                        break;
+                    case 1:
+                        jnl.shutdownNow();
+                        break;
+                    case 2:
+                        jnl.close();
+                        break;
+                    case 3:
+                        jnl.destroy();
+                        break;
+                    default:
+                        throw new AssertionError();
+                    }
+
+                }
 
             }
 
         } catch (OutOfMemoryError err) {
 
-            System.err.println("Out of memory after creating " + ncreated
-                    + " journals.");
+            log.error("Out of memory after creating " + ncreated
+                            + " journals.");
 
         }
 
@@ -124,14 +184,18 @@ public class TestJournalShutdown extends TestCase2 {
         System.gc();
 
         // Wait for it.
-        Thread.sleep(1000/*ms*/);
-        
-        System.err.println("Created " + ncreated + " journals.");
+        Thread.sleep(1000/* ms */);
 
-        System.err.println("There are " + nalive
-                + " journals which are still alive.");
+        if (log.isInfoEnabled()) {
 
-        if (nalive.get() == ncreated.get()) {
+            log.info("Created " + ncreated + " journals.");
+
+            log.info("There are " + nunfinalized
+                    + " journals which are still alive.");
+
+        }
+
+        if (nunfinalized.get() == ncreated.get()) {
 
             fail("Created " + ncreated
                     + " journals.  No journals were finalized.");

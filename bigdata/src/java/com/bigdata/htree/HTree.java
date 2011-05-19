@@ -75,6 +75,11 @@ import com.bigdata.rawstore.IRawStore;
  *          implementation for int32 keys. This optimization is likely to be
  *          quite worth while as the majority of use cases for the hash tree use
  *          int32 keys.
+ * 
+ *          TODO It is quite possible to define a range query interface for the
+ *          hash tree. You have to use an order preserving hash function, which
+ *          is external to the HTree implementation. Internally, the HTree must
+ *          either double-link the pages or crawl the directory structure.
  */
 public class HTree extends AbstractHTree 
 //	implements 
@@ -97,33 +102,33 @@ public class HTree extends AbstractHTree
 	 * The #of {@link DirectoryPage} in the {@link HTree}. This is ONE (1) for a
 	 * new {@link HTree}.
 	 */
-	protected int nnodes;
+	protected long nnodes;
 
 	/**
 	 * The #of {@link BucketPage}s in the {@link HTree}. This is one (1) for a
 	 * new {@link HTree} (one directory page and one bucket page).
 	 */
-	protected int nleaves;
+	protected long nleaves;
 
 	/**
 	 * The #of entries in the {@link HTree}. This is ZERO (0) for a new
 	 * {@link HTree}.
 	 */
-	protected int nentries;
+	protected long nentries;
     
-    final public int getNodeCount() {
+    final public long getNodeCount() {
         
         return nnodes;
         
     }
 
-    final public int getLeafCount() {
+    final public long getLeafCount() {
         
         return nleaves;
         
     }
 
-    final public int getEntryCount() {
+    final public long getEntryCount() {
         
         return nentries;
         
@@ -558,9 +563,8 @@ public class HTree extends AbstractHTree
 			 */
 			
 			// increase prefix length by the #of address bits consumed by the
-			// buddy hash table. TODO child.globalDepth might always be
-			// [addressBits] for a directory page...
-			prefixLength = prefixLength + child.globalDepth;
+			// buddy hash table in the current directory page as we descend.
+			prefixLength = prefixLength + current.globalDepth;
 			
 			// find the offset of the buddy hash table in the child.
 			buddyOffset = HTreeUtil
@@ -726,8 +730,6 @@ public class HTree extends AbstractHTree
 		 * because we know that the parent and the old bucket are both
 		 * mutable. This means that their childRef is defined and their
 		 * storage address is NULL.
-		 * 
-		 * TODO This logic should be in DirectoryPage#dump()
 		 */
 		int firstPointer = -1;
 		int nfound = 0;
@@ -772,10 +774,10 @@ public class HTree extends AbstractHTree
 	/**
 	 * Redistribute the buddy buckets.
 	 * <p>
-	 * Note: We are not changing the #of buddy buckets, just their size and the
+	 * Note: We are not changing the #of buckets, just their size and the
 	 * page on which they are found. Any tuples in a source bucket will wind up
-	 * in the same bucket afterwards, but the page and offset on the page of the
-	 * buddy bucket may have been changed.
+	 * in the "same" bucket afterwards, but the page and offset on the page of the
+	 * bucket may have been changed and the size of the bucket will have doubled.
 	 * <p>
 	 * We proceed backwards, moving the upper half of the buddy buckets to the
 	 * new bucket page first and then spreading out the lower half of the source
@@ -805,10 +807,10 @@ public class HTree extends AbstractHTree
 		final int slotsPerNewBuddy = (1 << newDepth);
 
 		// #of buddy tables on the old bucket page.
-		final int oldBuddyCount = (slotsOnPage) / slotsPerOldBuddy;
+		final int oldBuddyCount = slotsOnPage / slotsPerOldBuddy;
 
 		// #of buddy tables on the bucket pages after the split.
-		final int newBuddyCount = (slotsOnPage) / slotsPerNewBuddy;
+		final int newBuddyCount = slotsOnPage / slotsPerNewBuddy;
 
 		final BucketPage srcPage = oldBucket;
 		final MutableKeyBuffer srcKeys = (MutableKeyBuffer) oldBucket.getKeys();
@@ -941,23 +943,189 @@ public class HTree extends AbstractHTree
 
 	}
 
-	/**
-	 * Split when <code>globalDepth == localDepth</code>. This case requires the
-	 * introduction of a new {@link DirectoryPage}.
-	 * 
-	 * @param parent
-	 *            The parent.
-	 * @param buddyOffset
-	 *            The offset of the buddy hash table within the parent.
-	 * @param oldBucket
-	 *            The {@link BucketPage} to be split.
-	 */
-	private void addDirectoryPageAndSplitBucketPage(final DirectoryPage parent,
-			final int buddyOffset, final BucketPage oldBucket) {
+    /**
+     * Introduce a new directory level when we need to split a child but
+     * <code>globalDepth == localDepth</code>. The caller must retry the insert
+     * after this method makes the structural change.
+     * 
+     * @param oldParent
+     *            The parent {@link DirectoryPage}.
+     * @param buddyOffset
+     *            The buddyOffset within the <i>parent</i>. This identifies
+     *            which buddy hash table in the parent must be its pointers
+     *            updated such that it points to both the original child and new
+     *            child.
+     * @param child
+     *            The child.
+     * 
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>.
+     * @throws IllegalStateException
+     *             if the depth of the child is GTE the depth of the parent.
+     * @throws IllegalStateException
+     *             if the <i>parent<i/> is read-only.
+     * @throws IllegalStateException
+     *             if the <i>oldBucket</i> is read-only.
+     * @throws IllegalStateException
+     *             if the parent of the <oldBucket</i> is not the given
+     *             <i>parent</i>.
+     */
+	private void addDirectoryPageAndSplitBucketPage(final DirectoryPage oldParent,
+			final int buddyOffset, final AbstractPage child) {
+        if (oldParent == null)
+            throw new IllegalArgumentException();
+        if (child == null)
+            throw new IllegalArgumentException();
+        if (child.globalDepth != oldParent.globalDepth) {
+            /*
+             * We only create a new directory page when the global and local
+             * depth are equal.
+             */
+            throw new IllegalStateException();
+        }
+        if (buddyOffset < 0)
+            throw new IllegalArgumentException();
+        if (buddyOffset >= (1 << addressBits)) {
+            /*
+             * Note: This check is against the maximum possible slot index. The
+             * actual max buddyOffset depends on parent.globalBits also since
+             * (1<<parent.globalBits) gives the #of slots per buddy and the
+             * allowable buddyOffset values must fall on an buddy hash table
+             * boundary.
+             */
+            throw new IllegalArgumentException();
+        }
+        if (oldParent.isReadOnly()) // must be mutable.
+            throw new IllegalStateException();
+        if (child.isReadOnly()) // must be mutable.
+            throw new IllegalStateException();
+        if (child.parent != oldParent.self) // must be same Reference.
+            throw new IllegalStateException();
 
-		throw new UnsupportedOperationException();
+        if (log.isDebugEnabled())
+            log.debug("parent=" + oldParent.toShortString() + ", buddyOffset="
+                    + buddyOffset + ", child=" + child);
 
-	}
+        // Allocate a new directory page. The global depth will be ONE (1).
+        final DirectoryPage newParent = new DirectoryPage(this, 1/* globalDepth */);
+
+        // Set the parent Reference on the new dir page to the old dir page.
+        newParent.parent = (Reference) oldParent.self;
+
+        // One more directory page.
+        nnodes++;
+
+//        /*
+//         * Compute the #of pointers (aka slots) that we need to copy from the
+//         * old parent. There will be one such pointer for each buddy on the
+//         * child page. Since global depth (of the parent) == local depth (of the
+//         * child), we know that there is only one buddy on the child page and
+//         * hence that we will copy ONE pointer.
+//         */
+//        final int npointersToCopy = 1 << (oldParent.globalDepth - child.globalDepth);
+//        assert oldParent.globalDepth == child.globalDepth;
+//        assert npointersToCopy == 1;
+
+        /*
+         * 1. Locate the slot for the pointer in the old parent to the child
+         * which is to be split.
+         * 
+         * Note: Since there is only one pointer in the old parent page to the
+         * child page, a scan will always find the right slot.
+         * 
+         * Note: Another way to look at this is that we are locating all
+         * pointers in the old parent for the child which needs to be split plus
+         * the buddies of that child. This amounts to all pointers to the child
+         * since the buddies are (by definition) on the same page as the child.
+         * 
+         * FIXME Can we do this by indexing using the hash bits? That would be 
+         * faster than scanning for the reference.  We could then just validate
+         * that we have the right reference by testing that slot.
+         */
+        final int slotInParentToUpdate;
+        {
+            
+            // #of address slots in each buddy hash table.
+            final int slotsPerBuddy = (1 << oldParent.globalDepth);
+
+            // locate the slot for the pointer to be copied
+            int slot = -1;
+            for (int i = buddyOffset; i < slotsPerBuddy; i++) {
+
+                if (oldParent.childRefs[i] == child.self) {
+                    slot = i;
+                    break;
+                }
+
+            }
+
+            if (slot == -1) {
+                // The child was not found in the parent's buddy bucket.
+                throw new AssertionError();
+            }
+
+            slotInParentToUpdate = slot;
+
+            assert oldParent.childRefs[slot] == child.self;
+            
+        }
+
+        /*
+         * Copy the pointer to the child page into each slot of the new
+         * directory page.
+         */
+        {
+
+            // #of slots on the new directory page.
+            final int nslots = 1 << addressBits;
+
+            for (int i = 0; i < nslots; i++) {
+
+                newParent.childRefs[i] = (Reference) child.self;
+
+            }
+
+        }
+
+        /*
+         * Replace the pointer to the child page in the old parent with the
+         * pointer to the new directory page.
+         */
+        oldParent.childRefs[slotInParentToUpdate] = (Reference) newParent.self;
+
+        // Update the parent reference on the child.
+        child.parent = (Reference) newParent.self;
+
+        /*
+         * Recompute the global depth of the child page whose pointer was just
+         * moved. It will have changed since the #of pointers to that page just
+         * changed. This can be done by counting the #of pointers in any buddy
+         * hash table of the new parent to the child. Since all buddy hash
+         * tables on the new parent point to the child page, the #of pointers in
+         * a hash table in the new parent is just the #of slots in a buddy hash
+         * table for the new parent. Since all the buddies that we are moving
+         * are on the same child page, we can do this just once.
+         */
+        {
+
+            // #of address slots in each buddy hash table for the new
+            // parent.
+            final int slotsPerBuddyInNewParent = (1 << newParent.globalDepth);
+
+            // #of pointers to child in a buddy hash table of the new
+            // parent.
+            final int npointers = slotsPerBuddyInNewParent;
+
+            // recompute the local depth of the child page.
+            final int localDepth = HTreeUtil.getLocalDepth(addressBits,
+                    newParent.globalDepth, npointers);
+
+            // update the cached local depth on the child page.
+            child.globalDepth = localDepth;
+
+        }
+
+    }
 
 	/**
 	 * Validate pointers in buddy hash table in the parent against the global
@@ -1899,10 +2067,10 @@ public class HTree extends AbstractHTree
 	        final DirectoryPage p = (parent == null ? null : parent.get());
 
 	        sb.append(", parent=" + (p == null ? "N/A" : p.toShortString()));
-
-	        sb.append(", globalDepth=" + getGlobalDepth());
-
-	        if (data == null) {
+            sb.append(", globalDepth=" + getGlobalDepth());
+            sb.append(", nbuddies=" + (1 << htree.addressBits) / (1 << globalDepth));
+            sb.append(", slotsPerBuddy="+(1 << globalDepth));
+            if (data == null) {
 
 	            // No data record? (Generally, this means it was stolen by copy on
 	            // write).
@@ -2211,9 +2379,9 @@ public class HTree extends AbstractHTree
 	            return sb.toString();
 
 	        }
-
 	        sb.append(", globalDepth=" + getGlobalDepth());
-
+            sb.append(", nbuddies=" + (1 << htree.addressBits) / (1 << globalDepth));
+            sb.append(", slotsPerBuddy="+(1 << globalDepth));
 //	        sb.append(", minKeys=" + minKeys());
 //
 //	        sb.append(", maxKeys=" + maxKeys());

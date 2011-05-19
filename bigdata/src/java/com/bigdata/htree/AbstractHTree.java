@@ -273,18 +273,58 @@ abstract public class AbstractHTree {
 	 * The #of {@link DirectoryPage}s in the {@link HTree} (not buddy hash
 	 * tables, but the pages on which they appear).
 	 */
-	abstract public int getNodeCount();
+	abstract public long getNodeCount();
 
 	/**
 	 * The #of {@link BucketPage}s in the {@link HTree} (not buddy hash buckets,
 	 * but the pages on which they appear).
 	 */
-    abstract public int getLeafCount();
+    abstract public long getLeafCount();
     
     /**
      * The #of tuples in the {@link HTree}.
      */
-    abstract public int getEntryCount();
+    abstract public long getEntryCount();
+    
+    /**
+     * Fast summary information about the B+Tree.
+     */
+    public String toString() {
+        
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(getClass().getSimpleName());
+        
+        sb.append("{ ");
+        
+        // TODO restore.
+//        if (metadata.getName() != null) {
+//
+//            sb.append("name=" + metadata.getName());
+//
+//        } else {
+//
+//            sb.append("uuid=" + metadata.getIndexUUID());
+//            
+//        }
+        
+        sb.append(", addressBits=" + getAddressBits());
+
+//        sb.append(", height=" + getHeight());
+
+        sb.append(", entryCount=" + getEntryCount());
+
+        sb.append(", nodeCount=" + getNodeCount());
+
+        sb.append(", leafCount=" + getLeafCount());
+
+//        sb.append(", lastCommitTime=" + getLastCommitTime()); TODO restore
+
+        sb.append("}");
+        
+        return sb.toString();
+        
+    }
     
     /**
 	 * @param store
