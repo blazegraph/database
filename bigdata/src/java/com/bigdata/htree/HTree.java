@@ -89,6 +89,14 @@ public class HTree extends AbstractHTree
 
     private static final transient Logger log = Logger.getLogger(HTree.class);
 
+    /**
+     * The #of bits of distinction to be made each time we split a directory
+     * page in the {@link HTree}. See
+     * {@link #splitDirectoryPage(DirectoryPage, int, AbstractPage)} for a write
+     * up on this.
+     */
+    private final int splitBits;
+    
     /*
      * metadata about the index.
      * 
@@ -180,7 +188,9 @@ public class HTree extends AbstractHTree
 
 //    	super(store, nodeFactory, readOnly, addressBits, metadata, recordCompressorFactory);
 		super(store, false/*readOnly*/, addressBits);
-    	
+
+		this.splitBits = addressBits;
+		
 //        if (pageSize <= 0)
 //            throw new IllegalArgumentException("pageSize must be positive.");
 //
@@ -535,9 +545,9 @@ public class HTree extends AbstractHTree
 						 * global depth of a directory is always the same as
 						 * address bits, but maybe I am missing something....
 						 */
-						addDirectoryPageAndSplitBucketPage(current,
-								buddyOffset, bucketPage);
-						
+                        splitDirectoryPage(current, buddyOffset, splitBits,
+                                bucketPage);
+
 						// The children of [current] have changed so we will
 						// search current again.
 						continue;
@@ -944,9 +954,102 @@ public class HTree extends AbstractHTree
 	}
 
     /**
-     * Introduce a new directory level when we need to split a child but
+     * Splits a {@link DirectoryPage} when we need to split a child but
      * <code>globalDepth == localDepth</code>. The caller must retry the insert
      * after this method makes the structural change.
+     * 
+     * <h2>Design discussion</h2>
+     * 
+     * This method must maintain the invariant that the tree of page references
+     * for the hash tree is a strict tree. That is, you can not have two
+     * different pages each of which points to the same child. This would be a
+     * concurrency nightmare as, e.g., splitting the child could require us to
+     * propagate updates to multiple parents. However, even with that constraint
+     * we have two options.
+     * <p>
+     * Given addressBits := 2, the following hash tree state is induced by
+     * inserting the key sequence (0x01, 0x02, 0x03, 0x04).
+     * 
+     * <pre>
+     * root := [2] (a,c,b,b)
+     * a    := [2]   (1,2,3,4)
+     * c    := [2]   (-,-,-,-)
+     * b    := [1]   (-,-;-,-)
+     * </pre>
+     * 
+     * where [x] is the depth of the buddies on the corresponding page and ";"
+     * indicates a buddy bucket boundary while "," indicates a tuple boundary.
+     * <p>
+     * If we then attempt to insert a key which would be directed into (a)
+     * 
+     * <pre>
+     * insert(0x20,...)
+     * </pre>
+     * 
+     * then we must split (a) since depth(a):=2 and depth(root):=2. This will
+     * introduce a new directory page (d).
+     * 
+     * <h3>depth(d) := 1</h3>
+     * 
+     * This gives us the following post-condition.
+     * 
+     * <pre>
+     * root := [2] (d,d,b,b)
+     * d    := [1]   (a,a;c,c)   // two ptrs to (d) so 2 buddies on the page
+     * a    := [1]     (1,2;3,4) // depth changes since now 2 ptrs to (a)
+     * c    := [1]     (-,-;-,-) // depth changes since now 2 ptrs to (c)
+     * b    := [1]   (-,-;-,-)
+     * </pre>
+     * 
+     * Regardless of the value of [addressBits], this design gives us
+     * [addressBits] buddies on (d) and each buddy has two slots (since the
+     * depth of (d) is ONE, each buddy on (d) has a one bit address space and
+     * hence uses two slots). The depth(a) will always be reset to ONE by this
+     * design since there will always be TWO pointers to (a) in (d). This design
+     * provides ONE (1) bit of additional distinctions along the path for which
+     * we have exhausted the hash tree address space.
+     * 
+     * <h3>depth(d) := addressBits</h3>
+     * 
+     * This gives us the following post-condition.
+     * 
+     * <pre>
+     * root := [2] (a,c,b,b)
+     * d    := [2]   (a,a,a,a)   // one ptr to (d) so 1 buddy on the page
+     * a    := [0]     (1;2;3;4) // depth changes since now 4 ptrs to (a).
+     * c    := [2]   (-,-,-,-)
+     * b    := [1]   (-,-;-,-)
+     * </pre>
+     * 
+     * In this design, we always wind up with ONE buddy on (d), the depth(d) is
+     * [addressBits], and the depth(a) is reset to ZERO(0). This design focuses
+     * the expansion in the address space of the hash tree narrowly on the
+     * specific key prefix for which we have run out of distinctions and gives
+     * us [addressBits] of additional distinctions along that path.
+     * 
+     * <h3>Conclusion</h3>
+     * 
+     * Both designs would appear to be valid. Neither one can lead to a
+     * situation in which we have multiple parents for a child. In the first
+     * design, the one-bit expansion means that we never have pointers to the
+     * same child in more than one buddy bucket, and hence they will all be on
+     * the same page. In the second design, the depth of the new directory page
+     * is already at the maximum possible value so it can not be split again and
+     * thus the pointers to the child will always remain on the same page.
+     * <p>
+     * It seems that the first design has the advantage of growing the #of
+     * distinctions more slowly and sharing the new directory page among
+     * multiple such distinctions (all keys having the same leading bit). In the
+     * second design, we add a full [addressBits] at once to keys having the
+     * same [addressBits] leading bits).
+     * <p>
+     * It would appear that any choice in the inclusive range (1:addressBits) is
+     * permissible as in all cases the pointers to (a) will lie within a single
+     * buddy bucket. By factoring out the #of additional bits of distinction to
+     * be made when we split a directory page, we can defer this design either
+     * to construction time (or perhaps even to runtime) decision. I have
+     * therefore introduced an additional parameter on the {@link HTree} for
+     * this purpose.
      * 
      * @param oldParent
      *            The parent {@link DirectoryPage}.
@@ -956,10 +1059,15 @@ public class HTree extends AbstractHTree
      *            updated such that it points to both the original child and new
      *            child.
      * @param child
-     *            The child.
+     *            The child, which can be a {@link DirectoryPage} or a
+     *            {@link BucketPage}.
      * 
      * @throws IllegalArgumentException
      *             if any argument is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if <i>splitBits</i> is non-positive.
+     * @throws IllegalArgumentException
+     *             if <i>splitBits</i> is GT {@link #getAddressBits()}.
      * @throws IllegalStateException
      *             if the depth of the child is GTE the depth of the parent.
      * @throws IllegalStateException
@@ -970,8 +1078,9 @@ public class HTree extends AbstractHTree
      *             if the parent of the <oldBucket</i> is not the given
      *             <i>parent</i>.
      */
-	private void addDirectoryPageAndSplitBucketPage(final DirectoryPage oldParent,
-			final int buddyOffset, final AbstractPage child) {
+    // Note: package private for unit tests.
+    void splitDirectoryPage(final DirectoryPage oldParent,
+            final int buddyOffset, final int splitBits, final AbstractPage child) {
         if (oldParent == null)
             throw new IllegalArgumentException();
         if (child == null)
@@ -995,6 +1104,10 @@ public class HTree extends AbstractHTree
              */
             throw new IllegalArgumentException();
         }
+        if (splitBits <= 0)
+            throw new IllegalArgumentException();
+        if (splitBits > addressBits)
+            throw new IllegalArgumentException();
         if (oldParent.isReadOnly()) // must be mutable.
             throw new IllegalStateException();
         if (child.isReadOnly()) // must be mutable.
@@ -1006,8 +1119,10 @@ public class HTree extends AbstractHTree
             log.debug("parent=" + oldParent.toShortString() + ", buddyOffset="
                     + buddyOffset + ", child=" + child);
 
-        // Allocate a new directory page. The global depth will be ONE (1).
-        final DirectoryPage newParent = new DirectoryPage(this, 1/* globalDepth */);
+        assert splitBits == addressBits : "FIXME Handle splitBits NE addressBits.";
+        
+        // Allocate a new directory page. .
+        final DirectoryPage newParent = new DirectoryPage(this, splitBits/* globalDepth */);
 
         // Set the parent Reference on the new dir page to the old dir page.
         newParent.parent = (Reference) oldParent.self;
