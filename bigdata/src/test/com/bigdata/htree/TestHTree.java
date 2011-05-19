@@ -179,6 +179,7 @@ public class TestHTree extends TestCase2 {
             final byte[] k8 = new byte[]{0x08};
             final byte[] k9 = new byte[]{0x09};
             final byte[] k10 = new byte[]{0x0a};
+            final byte[] k20 = new byte[]{0x20};
 
             final byte[] v1 = new byte[]{0x01};
             final byte[] v2 = new byte[]{0x02};
@@ -190,6 +191,7 @@ public class TestHTree extends TestCase2 {
             final byte[] v8 = new byte[]{0x08};
             final byte[] v9 = new byte[]{0x09};
             final byte[] v10 = new byte[]{0x0a};
+            final byte[] v20 = new byte[]{0x20};
             
             // a key which we never insert and which should never be found by lookup.
             final byte[] unused = new byte[]{-127};
@@ -385,13 +387,98 @@ public class TestHTree extends TestCase2 {
                     .lookupAll(unused));
 
             /*
-             * 5. Insert 0x05. This goes into the same buddy bucket. The buddy
-             * bucket is full again. It is only the only buddy bucket on the
-             * page, e.g., global depth == local depth. Therefore, before we can
-             * split the buddy bucket we have first introduce a new directory
-             * page into the hash tree.
+             * 5. Insert 0x20 (32). This goes into the same buddy bucket. The
+             * buddy bucket is full from the previous insert. It is the only
+             * buddy bucket on the page, e.g., global depth == local depth.
+             * Therefore, before we can split the buddy bucket we have first
+             * introduce a new directory page into the hash tree.
              * 
-             * FIXME Update comments to reflect the example (and update the
+             * Note: The key 0x20 was chosen since it has one bit in the high
+             * nibble which is set (the 3th bit in the byte). The root directory
+             * page has globalDepth :=2, so it will consume the first two bits.
+             * The new directory page has globalDepth := 1 so it will examine
+             * the next bit in the key. Therefore, based on the 3th bit this
+             * will select bucket page (e) rather than bucket page (a).
+             * 
+             * If we were to insert 0x05 (or even 0x10) at this point instead
+             * then we would have to introduce more than one directory level
+             * before the insert could succeed. Choosing 0x20 thus minimizes the
+             * #of unobserved intermediate states of the hash tree.
+             * 
+             * FIXME This is causing a repeated introduction of a new directory
+             * level and giving me a hash tree structure which differs from my
+             * expectations. Work through the example on paper. Make sure that
+             * the prefixLength gets us into the right bits in the new key such
+             * that we go to the right bucket page. Also, verify whether or not
+             * a directory page can have pointers to a child which are not
+             * contiguous -- I am seeing that in the directory after the second
+             * split and it looks wrong to me. [Now the directory structure
+             * looks good, but it is attempting to insert into the wrong bucket
+             * after a split. I am also seeing some child pages which are not
+             * loaded, which is wrong since everything should be wired into
+             * memory]
+             * 
+             * TODO Do an alternative example where we insert 0x05 at this step
+             * instead of 0x10.
+             */
+            htree.insert(k20, v20);
+            assertEquals("nnodes", 2, htree.getNodeCount());
+            assertEquals("nleaves", 4, htree.getLeafCount());
+            assertEquals("nentries", 5, htree.getEntryCount());
+            htree.dump(Level.ALL, System.err, true/* materialize */);
+            assertTrue(root == htree.getRoot());
+            assertEquals(4, root.childRefs.length);
+            final DirectoryPage d = (DirectoryPage) root.childRefs[0].get();
+            assertTrue(d == (DirectoryPage) root.childRefs[0].get());
+            assertTrue(c == (BucketPage) root.childRefs[1].get());
+            assertTrue(b == (BucketPage) root.childRefs[2].get());
+            assertTrue(b == (BucketPage) root.childRefs[3].get());
+            assertEquals(4, d.childRefs.length);
+            final BucketPage e = (BucketPage) d.childRefs[1].get();
+            assertTrue(a == (BucketPage) d.childRefs[0].get()); // FIXME This shows that the buddy references do not have to be contiguous!
+            assertTrue(e == (BucketPage) d.childRefs[1].get());
+            assertTrue(a == (BucketPage) d.childRefs[2].get());
+            assertTrue(a == (BucketPage) d.childRefs[3].get());
+            assertEquals(2, root.getGlobalDepth());
+            assertEquals(1, d.getGlobalDepth());
+            assertEquals(1, a.getGlobalDepth());// recomputed!
+            assertEquals(1, e.getGlobalDepth());// same as [a] (recomputed).
+            assertEquals(1, b.getGlobalDepth());// unchanged.
+            assertEquals(2, c.getGlobalDepth());// recomputed!
+            assertEquals(2, a.getKeyCount());
+            assertEquals(2, a.getValueCount());
+            assertEquals(3, e.getKeyCount());
+            assertEquals(3, e.getValueCount());
+            assertEquals(0, b.getKeyCount());
+            assertEquals(0, b.getValueCount());
+            assertEquals(0, c.getKeyCount());
+            assertEquals(0, c.getValueCount());
+            assertTrue(htree.contains(k1));
+            assertTrue(htree.contains(k2));
+            assertTrue(htree.contains(k3));
+            assertTrue(htree.contains(k4));
+            assertTrue(htree.contains(k20));
+            assertFalse(htree.contains(unused));
+            assertEquals(v1, htree.lookupFirst(k1));
+            assertEquals(v2, htree.lookupFirst(k2));
+            assertEquals(v3, htree.lookupFirst(k3));
+            assertEquals(v4, htree.lookupFirst(k4));
+            assertEquals(v20, htree.lookupFirst(k20));
+            assertNull(htree.lookupFirst(unused));
+            AbstractBTreeTestCase.assertSameIterator(new byte[][] { v1 }, htree
+                    .lookupAll(k1));
+            AbstractBTreeTestCase.assertSameIterator(new byte[][] { v2 }, htree
+                    .lookupAll(k2));
+            AbstractBTreeTestCase.assertSameIterator(new byte[][] { v3 }, htree
+                    .lookupAll(k3));
+            AbstractBTreeTestCase.assertSameIterator(new byte[][] { v4 }, htree
+                    .lookupAll(k4));
+            AbstractBTreeTestCase.assertSameIterator(new byte[][] { v20 }, htree
+                    .lookupAll(k20));
+            AbstractBTreeTestCase.assertSameIterator(new byte[][] {}, htree
+                    .lookupAll(unused));
+
+            /* FIXME Update comments to reflect the example (and update the
              * worksheet as well).
              * 
              * FIXME We MUST NOT decrease the localDepth of (a) since that would

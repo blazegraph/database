@@ -207,7 +207,7 @@ public class TestMappedJournal extends AbstractJournalTestCase {
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped
                     .toString());
             
-            return new Journal(properties).getBufferStrategy();
+            return new Journal(properties);//.getBufferStrategy();
             
         }
 
@@ -240,7 +240,7 @@ public class TestMappedJournal extends AbstractJournalTestCase {
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped
                     .toString());
             
-            return new Journal(properties).getBufferStrategy();
+            return new Journal(properties);//.getBufferStrategy();
             
         }
         
@@ -273,7 +273,7 @@ public class TestMappedJournal extends AbstractJournalTestCase {
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Mapped
                     .toString());
             
-            return new Journal(properties).getBufferStrategy();
+            return new Journal(properties);//.getBufferStrategy();
             
         }
 

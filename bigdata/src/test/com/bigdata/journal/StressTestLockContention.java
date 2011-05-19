@@ -89,7 +89,9 @@ public class StressTestLockContention extends ProxyTestCase {
         final int ntasks = 500;
 
         final List<Future> futures;
-        
+     
+        {
+            
         final Properties properties = getProperties();
         
         final Journal journal = new Journal(properties);
@@ -145,10 +147,10 @@ public class StressTestLockContention extends ProxyTestCase {
              * serialized, there is one commit per task.
              */
 
-            journal.shutdownNow();
-
-            journal.deleteResources();
+            journal.destroy();
             
+        }
+
         }
 
         final Iterator<Future> itr = futures.iterator();
@@ -206,7 +208,8 @@ public class StressTestLockContention extends ProxyTestCase {
             
         }
         
-        System.err.println("#tasks=" + ntasks + " : ncancelled=" + ncancelled
+        if(log.isInfoEnabled())
+            log.info("#tasks=" + ntasks + " : ncancelled=" + ncancelled
                 + ", ncomplete=" + ncomplete + ", ninterrupt=" + ninterrupt
                 + ", nretry=" + nretry + ", nerror=" + nerror);
         
@@ -218,5 +221,5 @@ public class StressTestLockContention extends ProxyTestCase {
         assertEquals("nerror", 0, nerror);
         
     }
-    
+
 }

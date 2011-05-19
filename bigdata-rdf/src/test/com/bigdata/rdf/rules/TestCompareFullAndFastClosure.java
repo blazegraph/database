@@ -52,7 +52,6 @@ import java.util.Properties;
 
 import org.openrdf.rio.RDFFormat;
 
-import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
@@ -108,14 +107,16 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
     protected void doCompareEntailments(final String resource[],
             final String baseURL[], final RDFFormat[] format) throws Exception {
 
-        final AbstractTripleStore store1;
-        final AbstractTripleStore store2;
-        
         final Properties properties = new Properties(getProperties());
         
         // close each set of resources after it has been loaded.
         properties.setProperty(DataLoader.Options.CLOSURE,
                 DataLoader.ClosureEnum.Batch.toString());
+
+        AbstractTripleStore store1 = null;
+        AbstractTripleStore store2 = null;
+        
+        try {
 
         { // use the "full" forward closure.
 
@@ -142,18 +143,18 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
 
         }
         
-        try {
-
             {
 
-                LoadStats loadStats = store1.getDataLoader().loadData(resource,
+                final LoadStats loadStats = store1.getDataLoader().loadData(resource,
                         baseURL, format);
                 
                 // store1.getInferenceEngine().computeClosure(null);
                 
-                System.err.println("Full forward closure: " + loadStats);
-                
-                System.err.println(store1.dumpStore(store1, true, true, false, true));
+                if (log.isInfoEnabled())
+                    log.info("Full forward closure: " + loadStats);
+
+                if (log.isInfoEnabled())
+                    log.info(store1.dumpStore(store1, true, true, false, true));
                 
             }
             
@@ -164,9 +165,11 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
 
                 // store2.getInferenceEngine().computeClosure(null);
                 
-                System.err.println("Fast forward closure: " + loadStats);
+                if (log.isInfoEnabled())
+                    log.info("Fast forward closure: " + loadStats);
                 
-                System.err.println(store2.dumpStore(store2, true, true, false, true));
+                if (log.isInfoEnabled())
+                    log.info(store2.dumpStore(store2, true, true, false, true));
                 
             }
         
@@ -179,19 +182,21 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
 
         } finally {
 
-//            store1.__tearDownUnitTest();
-//            store2.__tearDownUnitTest();
-            
-            // both stores are using the same index manager.
-            final IIndexManager indexManager = store1.getIndexManager();
+            if (store1 != null)
+                store1.__tearDownUnitTest();
+            if (store2 != null)
+                store2.__tearDownUnitTest();
 
-            if(store1.isOpen())
-                store1.destroy();
-            
-            if(store2.isOpen())
-                store2.destroy();
-            
-            indexManager.destroy();
+//            // both stores are using the same index manager.
+//            final IIndexManager indexManager = store1.getIndexManager();
+//
+//            if(store1.isOpen())
+//                store1.destroy();
+//            
+//            if(store2.isOpen())
+//                store2.destroy();
+//            
+//            indexManager.destroy();
 
         }
         

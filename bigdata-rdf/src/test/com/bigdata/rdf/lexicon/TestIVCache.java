@@ -88,7 +88,7 @@ public class TestIVCache extends AbstractTripleStoreTestCase {
 			
     	} finally {
     		
-    		store.destroy();
+    		store.__tearDownUnitTest();
     		
     	}
     	

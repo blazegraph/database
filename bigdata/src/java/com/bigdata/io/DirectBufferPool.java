@@ -14,7 +14,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IndexSegment;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -59,7 +58,7 @@ import com.bigdata.rawstore.Bytes;
  */
 public class DirectBufferPool {
 
-    protected static final Logger log = Logger
+    private static final Logger log = Logger
             .getLogger(DirectBufferPool.class);
 
     /**
@@ -332,19 +331,19 @@ public class DirectBufferPool {
      * be set.
      * <p>
      * Note: This method will block if there are no free buffers in the pool and
-     * the pool was configured with a maximum capacity. In addition it MAY block
-     * if there is not enough free memory to fulfill the request. It WILL log an
-     * error if it blocks. While blocking is not very safe, using a heap
-     * ByteBuffer is not very safe either since Java NIO will allocate a
-     * temporary direct {@link ByteBuffer} for IOs and that can both run out of
-     * memory and leak memory.
+     * the pool was configured with a maximum capacity. It WILL log an error if
+     * it blocks. While blocking is not very safe, using a heap ByteBuffer is
+     * not very safe either since Java NIO will allocate a temporary direct
+     * {@link ByteBuffer} for IOs and that can both run out of memory and leak
+     * memory.
      * 
      * @return A direct {@link ByteBuffer}.
      * 
      * @throws InterruptedException
      *             if the caller's {@link Thread} is interrupted awaiting a
      *             buffer.
-     * @throws TimeoutException
+     * @throws OutOfMemoryError
+     *             if there is not enough free memory to fulfill the request.
      */
     public ByteBuffer acquire() throws InterruptedException {
 
@@ -538,12 +537,17 @@ public class DirectBufferPool {
 
         } catch (OutOfMemoryError err) {
 
+            /*
+             * Note: It is dangerous wait if the JVM is out of memory since this
+             * could deadlock even when there is an unlimited capacity on the
+             * pool. It is much safer to throw out an exception.
+             */
 
-            log.error("Not enough native memory - will await a free buffer: "
-                    + err, err);
-
-            awaitFreeBuffer(timeout, unit);
-
+//            log.error("Not enough native memory - will await a free buffer: "
+//                    + err, err);
+//
+//            awaitFreeBuffer(timeout, unit);
+            throw err;
         }
 
     }

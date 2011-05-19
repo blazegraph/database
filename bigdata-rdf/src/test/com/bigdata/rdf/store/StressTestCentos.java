@@ -122,7 +122,7 @@ public class StressTestCentos extends AbstractTripleStoreTestCase {
 
         } finally {
 
-            store.destroy();
+            store.__tearDownUnitTest();
 
         }
         

@@ -248,7 +248,7 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
             properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
                     + writeCacheEnabled);
 
-            return new Journal(properties).getBufferStrategy();
+            return new Journal(properties);//.getBufferStrategy();
 //            return new Journal(properties);
 
         }
@@ -271,7 +271,7 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
             super(name);
         }
         
-        protected IRawStore getStore() {
+        protected Journal getStore() {
 
             final Properties properties = getProperties();
 
@@ -285,7 +285,7 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
             properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
                     + writeCacheEnabled);
 
-            return new Journal(properties).getBufferStrategy();
+            return new Journal(properties);//.getBufferStrategy();
 
         }
 
@@ -342,7 +342,7 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
                     "" + (long) (DirectBufferPool.INSTANCE
                                     .getBufferCapacity() * 1.1));
 
-            return new Journal(properties).getBufferStrategy();
+            return new Journal(properties);//.getBufferStrategy();
 
         }
 

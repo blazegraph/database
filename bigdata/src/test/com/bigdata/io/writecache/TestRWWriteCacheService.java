@@ -143,11 +143,11 @@ public class TestRWWriteCacheService extends TestCase3 {
 
 		} finally {
             if (writeCache != null)
-                try {
+//                try {
                     writeCache.close();
-                } catch (InterruptedException e) {
-                    log.error(e, e);
-                }
+//                } catch (InterruptedException e) {
+//                    log.error(e, e);
+//                }
             if (opener != null) {
                 opener.destroy();
             }
@@ -210,11 +210,11 @@ public class TestRWWriteCacheService extends TestCase3 {
 			fail("Unexpected  Exception", e);
 		} finally {
             if (writeCache != null)
-                try {
+//                try {
                     writeCache.close();
-                } catch (InterruptedException e) {
-                    log.error(e, e);
-                }
+//                } catch (InterruptedException e) {
+//                    log.error(e, e);
+//                }
             if (opener != null) {
                 opener.destroy();
             }
@@ -394,11 +394,11 @@ public class TestRWWriteCacheService extends TestCase3 {
             }
         } finally {
             if (writeCache != null)
-                try {
+//                try {
                     writeCache.close();
-                } catch (InterruptedException e) {
-                    log.error(e, e);
-                }
+//                } catch (InterruptedException e) {
+//                    log.error(e, e);
+//                }
             if (opener != null) {
                 opener.destroy();
             }

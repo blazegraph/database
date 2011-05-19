@@ -389,7 +389,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         /*
          * Create the tasks.
          */
-        Collection<AbstractTask> tasks = new HashSet<AbstractTask>(ntasks);
+        final Collection<AbstractTask> tasks = new HashSet<AbstractTask>(ntasks);
 
         // updated by each task that runs.
         final AtomicLong nrun = new AtomicLong(0);
@@ -517,7 +517,8 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         result.put("maxCommitLatency", ""+journal.getConcurrencyManager().writeService.getMaxCommitServiceTime());
         result.put("poolSize",""+journal.getConcurrencyManager().writeService.getPoolSize());
         
-        System.err.println(result.toString(true/*newline*/));
+        if (log.isInfoEnabled())
+            log.info(result.toString(true/* newline */));
 
         return result;
 
@@ -530,8 +531,8 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
              */
             
             journal.shutdownNow();
-
-            journal.deleteResources();
+            
+            journal.destroy();
             
         }
 

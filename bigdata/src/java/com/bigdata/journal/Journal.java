@@ -41,6 +41,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
@@ -97,6 +98,11 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  */
 public class Journal extends AbstractJournal implements IConcurrencyManager,
         /*ILocalTransactionManager,*/ IResourceManager {
+
+    /**
+     * Logger.
+     */
+    private static final Logger log = Logger.getLogger(Journal.class);
 
     /**
      * Object used to manage local transactions. 
