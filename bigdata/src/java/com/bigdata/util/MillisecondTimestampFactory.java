@@ -58,7 +58,7 @@ import org.apache.log4j.Logger;
  */
 public class MillisecondTimestampFactory {
 
-    protected static final Logger log = Logger
+    private static final Logger log = Logger
             .getLogger(MillisecondTimestampFactory.class);
 
     /**
@@ -101,7 +101,7 @@ public class MillisecondTimestampFactory {
      * @throws IllegalArgumentException
      *             if the given timestamp is non-positive.
      */
-    synchronized static public void setLowerBound(long lowerBound) {
+    synchronized static public void setLowerBound(final long lowerBound) {
 
         assertPositive(lowerBound);
 
@@ -132,7 +132,7 @@ public class MillisecondTimestampFactory {
      * @throws IllegalStateException
      *             if <i>t</i> is non-positive.
      */
-    private static void assertPositive(long t) {
+    private static void assertPositive(final long t) {
 
         if (t <= 0L) {
 
@@ -161,7 +161,6 @@ public class MillisecondTimestampFactory {
 
         // current time.
         long timestamp = System.currentTimeMillis();
-        ;
 
         if (_autoIncMode) {
 
