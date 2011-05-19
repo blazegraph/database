@@ -453,11 +453,14 @@ public interface Options {
      * application data. In this situation a hard failure during the root block
      * write could result in the loss of application data since the updated root
      * blocks represent the atomic commit point but not all application data was
-     * successfully made stable on disk. However, note that there are often
-     * multiple cache layers in use by the operating system, the disk
-     * controller, and the disk. Therefore durability is thus best achieved
-     * through a mixture of methods, which can include battery powered hardware
-     * write cache and/or replication.
+     * successfully made stable on disk.
+     * <p>
+     * However, note that there are often multiple cache layers in use by the
+     * operating system, the disk controller, and the disk and it can be
+     * difficult to have an assurance that the various cache layers are all
+     * correctly configured so as to obey a "sync" command. Durability,
+     * therefore, is best achieved through a mixture of methods, which can
+     * include battery powered hardware write cache and/or replication.
      * 
      * @see #DEFAULT_DOUBLE_SYNC
      */
