@@ -409,6 +409,12 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 
     }
 
+    final public boolean isResource() {
+
+        return isURI() || isBNode();
+
+    }
+
     /**
      * {@inheritDoc}
      * <p>
@@ -663,7 +669,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 	 *            
 	 * @return The argument.
 	 */
-	protected V setValue(final V v) {
+	public V setValue(final V v) {
 
 		return (this.cache = v);
 		
@@ -682,6 +688,15 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 	final public void dropValue() {
 		
 		this.cache = null;
+		
+	}
+	
+	/**
+	 * Return <code>true</code> if cached or <code>false</code> if not.
+	 */
+	final public boolean hasValue() {
+		
+		return this.cache != null;
 		
 	}
 	

@@ -55,14 +55,18 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
     /**
      * Required deep copy constructor.
      */
-    public IVValueExpression(final IVValueExpression op) {
+    public IVValueExpression(final IVValueExpression<T> op) {
         super(op);
     }
 
+    /**
+     * The presumption with IVValueExpression is that its operands are always
+     * themselves IVs.
+     */
     @Override
-    public IValueExpression<T> get(final int i) {
+    public IValueExpression<? extends IV> get(final int i) {
     	try {
-    		return (IValueExpression<T>) super.get(i);
+    		return (IValueExpression<? extends IV>) super.get(i);
     	} catch (ClassCastException ex) {
     		throw new SparqlTypeErrorException();
     	}

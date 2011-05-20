@@ -32,17 +32,17 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
- * A StrIV is used by the StrBOp to create an alternate "view" of a Literal or
- * URI IV, one where the {@link BigdataValue} is transormed into a simple
- * literal (no datatype, no language tag) using the URI's toString() or the
- * Literal's label.
+ * This is used by certain IVValueExpressions to create an alternate "view" of a
+ * Literal or URI IV, such as one where the {@link BigdataValue} is transformed
+ * into a simple literal (no datatype, no language tag) using the URI's
+ * toString() or the Literal's label.
  * 
  * TODO Mike, I'd advise handling this as a TermId standing in for a Literal
  * whose datatype is xsd:string and whose termId is ZERO. That will basically
  * look like a Literal which has not been inserted into (or looked up against)
  * the database. At a minimum, I would extend {@link AbstractIV}. Bryan
  */
-public class StrIV implements IV {
+public class WrappedIV implements IV {
 
 	/**
 	 * 
@@ -51,11 +51,11 @@ public class StrIV implements IV {
 	
 	private final IV iv;
 	
-	private final BigdataValue strVal;
+	private volatile transient BigdataValue altVal;
 	
-    public StrIV(final IV iv, final BigdataValue strVal) {
+    public WrappedIV(final IV iv, final BigdataValue altVal) {
         this.iv = iv;
-        this.strVal = strVal;
+        this.altVal = altVal;
     }
 
     public String toString() {
@@ -63,9 +63,27 @@ public class StrIV implements IV {
     }
     
     public BigdataValue asValue(final LexiconRelation lex) {
-        return strVal;
+        return altVal;
     }
 
+	public BigdataValue setValue(final BigdataValue altVal) {
+		return (this.altVal = altVal);
+	}
+
+	public BigdataValue getValue() throws NotMaterializedException {
+		return altVal;
+	}
+
+	public boolean hasValue() {
+		return altVal != null;
+	}
+
+	public void dropValue() {
+		altVal = null;
+	}
+
+	// delegate everything else
+	
 	public int compareTo(Object o) {
 		return iv.compareTo(o);
 	}
@@ -100,6 +118,10 @@ public class StrIV implements IV {
 
 	public boolean isStatement() {
 		return iv.isStatement();
+	}
+
+	public boolean isResource() {
+		return iv.isResource();
 	}
 
 	public DTE getDTE() {
@@ -145,15 +167,5 @@ public class StrIV implements IV {
 	public boolean isFloatingPointNumeric() {
 		return iv.isFloatingPointNumeric();
 	}
-
-	public void dropValue() {
-		// TODO Auto-generated method stub
-		
-	}
-
-	public BigdataValue getValue() throws NotMaterializedException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
+	
 }

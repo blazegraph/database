@@ -61,6 +61,7 @@ import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.bop.solutions.SliceOp;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sail.FreeTextSearchExpander;
 import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.rdf.sail.Rule2BOpUtility;
@@ -283,22 +284,39 @@ public class SOp2BOpUtility {
 	    			continue;
 	    		
 	    		if (isSingleOptional(child)) {
+	    			boolean requiresMaterialization = false;
 	    			Predicate pred = null;
-	    			final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
+	    			final Collection<IConstraint> constraints = 
+	    				new LinkedList<IConstraint>();
 	    			for (SOp sop : child) {
 	    				final BOp bop = sop.getBOp();
 	    				if (bop instanceof IConstraint) {
-	    					constraints.add((IConstraint) bop);
+	    					final IConstraint c = (IConstraint) bop;
+	    					constraints.add(c);
+	    					requiresMaterialization |= 
+	    						Rule2BOpUtility.requiresMaterialization(c);
 	    				} else if (bop instanceof Predicate) {
 	    					pred = (Predicate) bop;
 	    				}
 	    			}
-					pred = (Predicate) pred.setProperty(
-							IPredicate.Annotations.OPTIONAL, Boolean.TRUE);
-					pred = pred.setBOpId(idFactory.incrementAndGet());
-					left = Rule2BOpUtility.join(
-							queryEngine, left, pred, constraints, 
-							idFactory, queryHints);
+	    			if (requiresMaterialization) {
+			    		final PipelineOp subquery = convert(
+			    				child, idFactory, db, queryEngine, queryHints);
+			    		final boolean optional = isOptional(child);
+			    		final int subqueryId = idFactory.incrementAndGet();
+			    		left = new SubqueryOp(new BOp[]{left}, 
+			                    new NV(Predicate.Annotations.BOP_ID, subqueryId),//
+			                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
+			                    new NV(SubqueryOp.Annotations.OPTIONAL,optional)//
+			            );
+	    			} else {
+						pred = (Predicate) pred.setProperty(
+								IPredicate.Annotations.OPTIONAL, Boolean.TRUE);
+						pred = pred.setBOpId(idFactory.incrementAndGet());
+						left = Rule2BOpUtility.join(
+								db, queryEngine, left, pred, constraints, 
+								idFactory, queryHints);
+	    			}
 	    		} else {
 		    		if (useHashJoin(queryHints)) {
 		    			
@@ -335,27 +353,61 @@ public class SOp2BOpUtility {
 			                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
 			                    new NV(SubqueryOp.Annotations.OPTIONAL,optional)//
 			            );
-		    		}
-		    		if (log.isInfoEnabled()) {
-		    			log.info("adding a subquery:\n" + BOpUtility.toString2(left));
+			    		if (log.isInfoEnabled()) {
+			    			log.info("adding a subquery:\n" + BOpUtility.toString2(subquery));
+			    		}
 		    		}
 	    		}
 	    	}
     	}
     
-	    for (IConstraint c : postConditionals) {
-    		final int condId = idFactory.incrementAndGet();
-            final PipelineOp condOp = 
-            	new ConditionalRoutingOp(new BOp[]{left},
-                    NV.asMap(new NV[]{//
-                        new NV(BOp.Annotations.BOP_ID,condId),
-                        new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
-                    }));
-            left = condOp;
-            if (log.isDebugEnabled()) {
-            	log.debug("adding post-conditional routing op: " + condOp);
-            }
-	    }
+		if (postConditionals.size() > 0) {
+			
+			final Set<IVariable<IV>> toMaterialize = 
+				new LinkedHashSet<IVariable<IV>>();
+			
+			for (IConstraint c : postConditionals) {
+				Rule2BOpUtility.gatherTermsToMaterialize(c, toMaterialize);
+			}
+			
+			final int right = idFactory.incrementAndGet();
+
+			if (toMaterialize.size() > 0) {
+				
+				left = Rule2BOpUtility.addMaterializationSteps(
+						db, queryEngine, left, right, 
+						toMaterialize, idFactory, queryHints);
+				
+		        if (log.isDebugEnabled()) {
+		      	    log.debug("added materialization steps:\n" + left);
+		        }
+		        
+			}
+			
+			boolean first = true;
+
+			for (IConstraint c : postConditionals) {
+				
+	    		final int condId = first ? right : idFactory.incrementAndGet();
+	            
+	    		final PipelineOp condOp = 
+	            	new ConditionalRoutingOp(new BOp[]{left},
+	                    NV.asMap(new NV[]{//
+	                        new NV(BOp.Annotations.BOP_ID,condId),
+	                        new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
+	                    }));
+
+	    		left = condOp;
+	            
+	            if (log.isDebugEnabled()) {
+	            	log.debug("adding post-conditional routing op: " + condOp);
+	            }
+	            
+	            first = false;
+	            
+		    }
+			
+		}
     	
 		if (!left.getEvaluationContext()
 				.equals(BOpEvaluationContext.CONTROLLER)) {
@@ -576,19 +628,51 @@ public class SOp2BOpUtility {
 			        })),queryHints);
 
 		if (preConditionals != null) { // @todo lift into CONDITION on SubqueryOp
+			
+			final Set<IVariable<IV>> toMaterialize = 
+				new LinkedHashSet<IVariable<IV>>();
+			
 			for (IConstraint c : preConditionals) {
-				final int condId = idFactory.incrementAndGet();
-		      final PipelineOp condOp = Rule2BOpUtility.applyQueryHints(
-		      	new ConditionalRoutingOp(new BOp[]{left},
-		              NV.asMap(new NV[]{//
-		                  new NV(BOp.Annotations.BOP_ID,condId),
-		                  new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
-		              })), queryHints);
-		      left = condOp;
-		      if (log.isDebugEnabled()) {
-		      	log.debug("adding conditional routing op: " + condOp);
-		      }
+				Rule2BOpUtility.gatherTermsToMaterialize(c, toMaterialize);
 			}
+			
+			final int right = idFactory.incrementAndGet();
+
+			if (toMaterialize.size() > 0) {
+				
+				left = Rule2BOpUtility.addMaterializationSteps(
+						db, queryEngine, left, right, 
+						toMaterialize, idFactory, queryHints);
+				
+		        if (log.isDebugEnabled()) {
+		      	    log.debug("added materialization steps:\n" + left);
+		        }
+		        
+			}
+			
+			boolean first = true;
+			
+			for (IConstraint c : preConditionals) {
+				
+				final int condId = first ? right : idFactory.incrementAndGet();
+				
+		        final PipelineOp condOp = Rule2BOpUtility.applyQueryHints(
+		      	    new ConditionalRoutingOp(new BOp[]{left},
+		                NV.asMap(new NV[]{//
+		                    new NV(BOp.Annotations.BOP_ID,condId),
+		                    new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
+		                })), queryHints);
+		        
+		        left = condOp;
+		        
+		        if (log.isDebugEnabled()) {
+		      	    log.debug("adding conditional routing op: " + condOp);
+		        }
+		        
+	            first = false;
+	            
+			}
+			
 		}
 
 		if (hashJoins.size() > 0) {
@@ -704,7 +788,7 @@ public class SOp2BOpUtility {
          */
 		int i = 0;
         for (Predicate<?> pred : preds) {
-            left = Rule2BOpUtility.join(queryEngine, left, pred,//
+            left = Rule2BOpUtility.join(db, queryEngine, left, pred,//
                     Arrays.asList(assignedConstraints[i++]), //
                     context, idFactory, queryHints);
 

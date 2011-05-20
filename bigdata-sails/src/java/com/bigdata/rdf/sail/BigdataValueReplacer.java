@@ -49,6 +49,7 @@ import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.query.impl.MapBindingSet;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -144,21 +145,30 @@ public class BigdataValueReplacer {
             @Override
             public void meet(final ValueConstant constant) {
                 
-                if (constant.getParentNode() instanceof LangMatches) {
-                    /* Don't try to resolve for lang matches.
-                     * 
-                     * Note: Sesame will sometimes use a Literal to represent
-                     * a constant parameter to a function, such as LangMatches.
-                     * For such uses, we DO NOT want to attempt to resolve the
-                     * Literal against the lexicon.  Instead, it should just be
-                     * passed through.  BigdataSailEvaluationStrategy is then
-                     * responsible for recognizing cases where the lack of an
-                     * IV on a constant is associated with such function calls
-                     * rather than indicating that the Value is not known to
-                     * the KB. 
-                     */
-                    return;
-                }
+            	/*
+            	 * I fixed this over in BigdataEvaluationStrategyImpl3.
+            	 * ValueExpr nodes used in constraints are allowed to use
+            	 * values not actually in the database. MP
+            	 */
+//                if (constant.getParentNode() instanceof LangMatches) {
+//                    /* Don't try to resolve for lang matches.
+//                     * 
+//                     * Note: Sesame will sometimes use a Literal to represent
+//                     * a constant parameter to a function, such as LangMatches.
+//                     * For such uses, we DO NOT want to attempt to resolve the
+//                     * Literal against the lexicon.  Instead, it should just be
+//                     * passed through.  BigdataSailEvaluationStrategy is then
+//                     * responsible for recognizing cases where the lack of an
+//                     * IV on a constant is associated with such function calls
+//                     * rather than indicating that the Value is not known to
+//                     * the KB. 
+//                     */
+//                    return;
+//                }
+            	
+            	if (log.isInfoEnabled()) {
+            		log.info("meeting: " + constant);
+            	}
 
                 final Value val = constant.getValue();
 
@@ -199,6 +209,29 @@ public class BigdataValueReplacer {
 
              database.getLexiconRelation().addTerms(terms, terms.length,
                      true/* readOnly */);
+             
+             // cache the BigdataValues on the IVs for later
+             for (BigdataValue term : terms) {
+            	 
+            	 final IV iv = term.getIV();
+            	 
+                 if (iv == null) {
+
+                     /*
+                      * Since the term identifier is NULL this value is
+                      * not known to the kb.
+                      */
+                     
+                     if(log.isInfoEnabled())
+                         log.info("Not in knowledge base: " + term);
+                     
+                 } else {
+                 
+                	 iv.setValue(term);
+                	 
+                 }
+            	 
+             }
 
         }
         
@@ -246,12 +279,12 @@ public class BigdataValueReplacer {
             @Override
             public void meet(ValueConstant constant) {
                 
-                if (constant.getParentNode() instanceof LangMatches) {
-                    /* Note: This is parallel to the meet in the visit
-                     * pattern above.
-                     */
-                   return;
-                }
+//                if (constant.getParentNode() instanceof LangMatches) {
+//                    /* Note: This is parallel to the meet in the visit
+//                     * pattern above.
+//                     */
+//                   return;
+//                }
 
                  // the Sesame Value object.
                 final Value val = constant.getValue();

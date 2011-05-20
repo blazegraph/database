@@ -376,6 +376,15 @@ public class IVUtility {
     }
 
     /**
+     * Convenience method.  Return true if both operands return true.
+     */
+    public static final boolean canNumericalCompare(final IV iv1, final IV iv2) {
+    	
+    	return canNumericalCompare(iv1) && canNumericalCompare(iv2);
+    	
+    }
+    
+    /**
      * Encode an RDF value into a key for one of the statement indices.  Handles
      * null {@link IV} references gracefully.
      * 

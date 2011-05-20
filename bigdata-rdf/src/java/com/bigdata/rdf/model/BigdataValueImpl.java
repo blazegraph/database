@@ -29,6 +29,7 @@ package com.bigdata.rdf.model;
 
 import java.io.IOException;
 
+import com.bigdata.bop.IElement;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 
@@ -153,6 +154,29 @@ public abstract class BigdataValueImpl implements BigdataValue {
 		final String namespace = in.readUTF();
 		
 		valueFactory = BigdataValueFactoryImpl.getInstance(namespace);
+		
+	}
+	
+	/**
+	 * Implements {@link IElement}.  BigdataValue acts as a lexicon element,
+	 * with the term in the 0th index position and the IV in the 1st index
+	 * position.
+	 */
+	public Object get(int index) {
+		
+		if (index == 0) {
+			
+			return this;
+			
+		} else if (index == 1) {
+			
+			return getIV();
+			
+		} else {
+		
+			throw new IllegalArgumentException();
+			
+		}
 		
 	}
 

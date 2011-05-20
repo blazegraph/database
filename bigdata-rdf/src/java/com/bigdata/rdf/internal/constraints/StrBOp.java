@@ -24,34 +24,48 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal.constraints;
 
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.StrIV;
-import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.internal.WrappedIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
  * Convert the {@link IV} to a <code>xsd:string</code>.
  */
-public class StrBOp extends IVValueExpression<IV> {
+public class StrBOp extends IVValueExpression<IV> 
+		implements INeedsMaterialization {
 
     /**
 	 * 
 	 */
 	private static final long serialVersionUID = 3125106876006900339L;
+	
+	private static final transient Logger log = Logger.getLogger(StrBOp.class);
+	
 
-    public StrBOp(final IVariable<IV> x) {
+	public interface Annotations extends BOp.Annotations {
+
+		String NAMESPACE = (StrBOp.class.getName() + ".namespace").intern();
+
+    }
+	
+    public StrBOp(final IVariable<IV> x, final String lex) {
         
-        this(new BOp[] { x }, null/*annocations*/);
+        this(new BOp[] { x }, 
+        		NV.asMap(new NV(Annotations.NAMESPACE, lex)));
         
     }
     
@@ -65,6 +79,9 @@ public class StrBOp extends IVValueExpression<IV> {
         if (args.length != 1 || args[0] == null)
             throw new IllegalArgumentException();
 
+		if (getProperty(Annotations.NAMESPACE) == null)
+			throw new IllegalArgumentException();
+		
     }
 
     /**
@@ -78,26 +95,28 @@ public class StrBOp extends IVValueExpression<IV> {
         
         final IV iv = get(0).get(bs);
         
+        if (log.isDebugEnabled()) {
+        	log.debug(iv);
+        }
+
         // not yet bound
         if (iv == null)
         	throw new SparqlTypeErrorException();
-
-        // uh oh how the heck do I get my hands on this? big change
-        final AbstractTripleStore db = null;
         
-        // use to materialize my terms
-        final LexiconRelation lex = db.getLexiconRelation();
+        final String namespace = (String)
+        	getRequiredProperty(Annotations.NAMESPACE);
         
         // use to create my simple literals
-        final BigdataValueFactory vf = db.getValueFactory();
+        final BigdataValueFactory vf = 
+        	BigdataValueFactoryImpl.getInstance(namespace);
         
         if (iv.isURI()) {
         	// return new simple literal using URI label
-        	final URI uri = (URI) iv.asValue(lex);
+        	final URI uri = (URI) iv.getValue();
         	final BigdataLiteral str = vf.createLiteral(uri.toString());
-        	return new StrIV(iv, str);
+        	return new WrappedIV(iv, str);
         } else if (iv.isLiteral()) {
-        	final BigdataLiteral lit = (BigdataLiteral) iv.asValue(lex);
+        	final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
         	if (lit.getDatatype() == null && lit.getLanguage() == null) {
             	// if simple literal return it
         		return iv;
@@ -105,12 +124,27 @@ public class StrBOp extends IVValueExpression<IV> {
         	else {
             	// else return new simple literal using Literal.getLabel
             	final BigdataLiteral str = vf.createLiteral(lit.getLabel());
-            	return new StrIV(iv, str);
+            	return new WrappedIV(iv, str);
         	}
         } else {
         	throw new SparqlTypeErrorException();
         }
         
+    }
+    
+    private volatile transient Set<IVariable<IV>> terms;
+    
+    public Set<IVariable<IV>> getTermsToMaterialize() {
+    
+    	if (terms == null) {
+    		
+    		terms = new LinkedHashSet<IVariable<IV>>(1);
+    		terms.add((IVariable<IV>) get(0));
+    		
+    	}
+    	
+    	return terms;
+    	
     }
     
 }
