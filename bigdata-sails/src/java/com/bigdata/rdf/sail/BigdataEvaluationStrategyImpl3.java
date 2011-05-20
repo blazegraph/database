@@ -22,24 +22,37 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.impl.BooleanLiteralImpl;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.And;
+import org.openrdf.query.algebra.BNodeGenerator;
 import org.openrdf.query.algebra.Bound;
 import org.openrdf.query.algebra.Compare;
+import org.openrdf.query.algebra.Compare.CompareOp;
+import org.openrdf.query.algebra.CompareAll;
+import org.openrdf.query.algebra.CompareAny;
+import org.openrdf.query.algebra.Datatype;
+import org.openrdf.query.algebra.Exists;
 import org.openrdf.query.algebra.Filter;
+import org.openrdf.query.algebra.FunctionCall;
 import org.openrdf.query.algebra.Group;
+import org.openrdf.query.algebra.In;
 import org.openrdf.query.algebra.IsBNode;
 import org.openrdf.query.algebra.IsLiteral;
 import org.openrdf.query.algebra.IsResource;
 import org.openrdf.query.algebra.IsURI;
 import org.openrdf.query.algebra.Join;
+import org.openrdf.query.algebra.Label;
+import org.openrdf.query.algebra.Lang;
+import org.openrdf.query.algebra.LangMatches;
 import org.openrdf.query.algebra.LeftJoin;
+import org.openrdf.query.algebra.Like;
+import org.openrdf.query.algebra.LocalName;
 import org.openrdf.query.algebra.MathExpr;
 import org.openrdf.query.algebra.MultiProjection;
+import org.openrdf.query.algebra.Namespace;
 import org.openrdf.query.algebra.Not;
 import org.openrdf.query.algebra.Or;
 import org.openrdf.query.algebra.Order;
@@ -51,14 +64,14 @@ import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.Regex;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
+import org.openrdf.query.algebra.StatementPattern.Scope;
+import org.openrdf.query.algebra.Str;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
 import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
-import org.openrdf.query.algebra.Compare.CompareOp;
-import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
@@ -70,24 +83,24 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.solutions.ISortOrder;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.internal.DummyIV;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSDBooleanIV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.AndBOp;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.EBVBOp;
@@ -96,21 +109,23 @@ import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.IsLiteralBOp;
 import com.bigdata.rdf.internal.constraints.IsURIBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
+import com.bigdata.rdf.internal.constraints.RegexBOp;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
-import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
+import com.bigdata.rdf.internal.constraints.StrBOp;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.sop.SOp;
 import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree;
+import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
 import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
-import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
@@ -1780,14 +1795,10 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     /**
      * Takes a ValueExpression from a sesame Filter or LeftJoin and turns it
      * into a bigdata {@link IConstraint}.
-	 * <p>
-	 * This method will throw an exception if the Sesame term is bound and the
-	 * value does not exist in the lexicon.
      */
     private IConstraint toConstraint(final ValueExpr ve) {
 
-    	final IValueExpression<? extends IV> veBOp = toVE(ve);
-    	return SPARQLConstraint.wrap(veBOp);
+    	return new SPARQLConstraint(toVE(ve));
     	
     }
 
@@ -1804,29 +1815,59 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         	return toVE((Var) ve);
         } else if (ve instanceof ValueConstant) {
         	return toVE((ValueConstant) ve);
-        } else if (ve instanceof MathExpr) {
-        	return toVE((MathExpr) ve);
-        } else if (ve instanceof Or) {
-            return toVE((Or) ve);
+        } else if (ve instanceof BNodeGenerator) {
+        	throw new UnsupportedOperatorException(ve);
+        } else if (ve instanceof Bound) {
+            return toVE((Bound) ve);
+        } else if (ve instanceof Str) {
+        	return toVE((Str) ve);
+        } else if (ve instanceof Label) {
+        	throw new UnsupportedOperatorException(ve);
+        } else if (ve instanceof Lang) {
+        	throw new UnsupportedOperatorException(ve);
+        } else if (ve instanceof LangMatches) {
+        	throw new UnsupportedOperatorException(ve);
+        } else if (ve instanceof Datatype) {
+        	throw new UnsupportedOperatorException(ve);
+        } else if (ve instanceof Namespace) {
+        	throw new UnsupportedOperatorException(ve);
+        } else if (ve instanceof LocalName) {
+        	throw new UnsupportedOperatorException(ve);
+        } else if (ve instanceof IsResource) {
+        	return toVE((IsResource) ve);
+        } else if (ve instanceof IsURI) {
+        	return toVE((IsURI) ve);
+        } else if (ve instanceof IsBNode) {
+        	return toVE((IsBNode) ve);
+        } else if (ve instanceof IsLiteral) {
+        	return toVE((IsLiteral) ve);
+        } else if (ve instanceof Regex) {
+        	return toVE((Regex) ve);
+        } else if (ve instanceof Like) {
+        	throw new UnsupportedOperatorException(ve);
+        } else if (ve instanceof FunctionCall) {
+        	throw new UnsupportedOperatorException(ve);
         } else if (ve instanceof And) {
             return toVE((And) ve);
+        } else if (ve instanceof Or) {
+            return toVE((Or) ve);
         } else if (ve instanceof Not) {
             return toVE((Not) ve);
         } else if (ve instanceof SameTerm) {
             return toVE((SameTerm) ve);
         } else if (ve instanceof Compare) {
             return toVE((Compare) ve);
-        } else if (ve instanceof Bound) {
-            return toVE((Bound) ve);
-        } else if (ve instanceof IsLiteral) {
-        	return toVE((IsLiteral) ve);
-        }  else if (ve instanceof IsBNode) {
-        	return toVE((IsBNode) ve);
-        } else if (ve instanceof IsResource) {
-        	return toVE((IsResource) ve);
-        } else if (ve instanceof IsURI) {
-        	return toVE((IsURI) ve);
-        }
+        } else if (ve instanceof MathExpr) {
+        	return toVE((MathExpr) ve);
+        } else if (ve instanceof In) {
+        	throw new UnsupportedOperatorException(ve);
+        } else if (ve instanceof CompareAny) {
+        	throw new UnsupportedOperatorException(ve);
+        } else if (ve instanceof CompareAll) {
+        	throw new UnsupportedOperatorException(ve);
+        } else if (ve instanceof Exists) {
+        	throw new UnsupportedOperatorException(ve);
+        } 
         
         throw new UnsupportedOperatorException(ve);
     }
@@ -1891,9 +1932,6 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     }
 
     private IValueExpression<? extends IV> toVE(final Compare compare) {
-    	if (!database.isInlineLiterals()) {
-    		throw new UnsupportedOperatorException(compare);
-    	}
     	final IValueExpression<? extends IV> iv1 = 
     		toVE(compare.getLeftArg());
     	final IValueExpression<? extends IV> iv2 = 
@@ -1928,6 +1966,22 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	return new IsURIBOp(var);
     }
 
+    private IValueExpression<? extends IV> toVE(final Str str) {
+    	final IVariable<IV> var = (IVariable<IV>) toVE(str.getArg());
+    	return new StrBOp(var, database.getLexiconRelation().getNamespace());
+    }
+
+    private IValueExpression<? extends IV> toVE(final Regex regex) {
+    	final IValueExpression<? extends IV> var = toVE(regex.getArg());
+    	final IValueExpression<? extends IV> pattern = toVE(regex.getPatternArg());
+    	if (regex.getFlagsArg() != null) {
+        	final IValueExpression<? extends IV> flags = toVE(regex.getFlagsArg());
+        	return new RegexBOp(var, pattern, flags);
+    	} else {
+    		return new RegexBOp(var, pattern);
+    	}
+    }
+
 	/**
 	 * Generate a bigdata term from a Sesame term.
 	 * <p>
@@ -1955,25 +2009,54 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	/**
 	 * Generate a bigdata term from a Sesame term.
 	 * <p>
-	 * This method will throw an exception if the Sesame term is bound and the
-	 * value does not exist in the lexicon.
+	 * This method will allow unrecognized values by default, since values
+	 * inside of constraints are not always values in the database (language
+	 * tages, etc).
 	 */
     private IConstant<IV> toVE(final ValueConstant vc) {
-    	IV iv;
-    	final Value v = vc.getValue();
-    	if (v instanceof BooleanLiteralImpl) {
-    		final BooleanLiteralImpl bl = (BooleanLiteralImpl) v;
-    		iv = XSDBooleanIV.valueOf(bl.booleanValue());
-    	} else {
-    		iv = ((BigdataValue) v).getIV();
-//    		if (iv instanceof XSDIntegerIV)
-//    			iv = new XSDIntIV(((XSDIntegerIV) iv).intValue());
-//    		else if (iv instanceof XSDDecimalIV)
-//    			iv = new XSDDoubleIV(((XSDDecimalIV) iv).doubleValue());
-    	}
-        if (iv == null)
-        	throw new UnrecognizedValueException(v);
-    	return new Constant<IV>(iv);
+    	
+    	return toVE(vc, true/* allow unrecongized values */);
+    	
+    }
+
+	/**
+	 * Generate a bigdata term from a Sesame term.
+	 * <p>
+	 * If allowUnrecognizedValue is false, this method will throw an exception
+	 * if the Sesame term is bound and the value does not exist in the lexicon.
+	 * Otherwise, a "dummy IV" will be created and attached to the BigdataValue
+	 * inside the ValueConstant. The dummy IV will be a TermId with a 0L term id
+	 * and a VTE corresponding to the BigdataValue type (URI, BNode, Literal).
+	 */
+    private IConstant<IV> toVE(final ValueConstant vc, 
+    		final boolean allowUnrecognizedValue) {
+    	
+    	final BigdataValue v = (BigdataValue) vc.getValue();
+    	
+    	// unrecognized value (no IV in the database)
+        if (v.getIV() == null) {
+        	
+        	if (!allowUnrecognizedValue) {
+        		
+            	throw new UnrecognizedValueException(v);
+            	
+        	} else {
+        		
+        		// create a phony TermId
+        		final IV iv = new TermId(VTE.valueOf(v), TermId.NULL);
+        		
+        		// cache the BigdataValue on the IV
+        		iv.setValue(v);
+        		
+        		// cache the IV on the BigdataValue
+        		v.setIV(iv);
+        		
+        	}
+        	
+        }
+        
+    	return new Constant<IV>(v.getIV());
+    	
     }
 
     /**

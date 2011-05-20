@@ -49,6 +49,7 @@ package com.bigdata.rdf.model;
 
 import org.openrdf.model.Value;
 
+import com.bigdata.bop.IElement;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
@@ -62,7 +63,7 @@ import com.bigdata.rdf.store.TempTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface BigdataValue extends Value {//, Comparable<BigdataValue> {
+public interface BigdataValue extends Value, IElement {//, Comparable<BigdataValue> {
 
 	/**
 	 * Return the factory which produced this object. This is guaranteed to be a

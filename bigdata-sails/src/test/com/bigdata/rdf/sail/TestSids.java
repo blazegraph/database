@@ -33,6 +33,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryLanguage;
@@ -42,7 +43,16 @@ import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.vocab.NoVocabulary;
+import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Test case for reverse lookup from SID to statement.
@@ -312,5 +322,118 @@ public class TestSids extends ProxyBigdataSailTestCase {
 
     }
     
+//    public void testSids3() throws Exception {
+//
+//        final BigdataSail sail = getSail();
+//        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+//        final BigdataSailRepositoryConnection cxn = 
+//            (BigdataSailRepositoryConnection) repo.getUnisolatedConnection();
+//        cxn.setAutoCommit(false);
+//        
+//        try {
+//    
+//        	final ValueFactory vf = sail.getValueFactory();
+//        	
+//        	final URI mike = vf.createURI("http://mynamespace.com/Mike");
+//        	final URI likes = vf.createURI("http://mynamespace.com/likes");
+//        	final URI rdf = vf.createURI("http://mynamespace.com/RDF");
+//        	final URI source = vf.createURI("http://mynamespace.com/source");
+//        	final URI src1 = vf.createURI("http://bigdata.com");
+//        	
+//        	final Statement s1 = 
+//        		vf.createStatement(mike, likes, rdf, vf.createBNode());
+//        	
+//        	cxn.add(s1);
+//        	cxn.add(s1.getContext(), source, src1);
+//
+//        	cxn.commit();
+//            
+//            if (log.isInfoEnabled()) {
+//                log.info(sail.getDatabase().dumpStore());
+//            }
+//
+//        } finally {
+//            cxn.close();
+//        }
+//
+//    }
+//
+//    public void testTM() throws Exception {
+//
+//        final BigdataSail sail = getSail();
+//        sail.initialize();
+//        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+//        final BigdataSailRepositoryConnection cxn = 
+//            (BigdataSailRepositoryConnection) repo.getUnisolatedConnection();
+//        cxn.setAutoCommit(false);
+//        
+//        if (!sail.getTruthMaintenance()) {
+//        	throw new RuntimeException("TM not enabled");
+//        }
+//        
+//        try {
+//    
+//        	final ValueFactory vf = sail.getValueFactory();
+//        	
+//        	final URI s1 = vf.createURI(BD.NAMESPACE+"s1");
+//        	final URI s2 = vf.createURI(BD.NAMESPACE+"s2");
+//        	final URI p1 = vf.createURI(BD.NAMESPACE+"p1");
+//        	final URI p2 = vf.createURI(BD.NAMESPACE+"p2");
+//        	
+//            cxn.add(p1, RDFS.SUBPROPERTYOF, p2);
+//            cxn.add(s1, p1, s2);
+//
+//            cxn.commit();
+//
+//            /*
+//             * Here you will see:
+//             * (s1 p1 s2): Explicit
+//             * (p1 subPropertyOf p2): Explicit
+//             * (s1 p2 s2): Inferred
+//             * plus a few more inferences and all the axioms
+//             */
+//            if (log.isInfoEnabled()) {
+//                log.info("\n" + sail.getDatabase().dumpStore());
+//            }
+//            
+//            cxn.remove(s1, p1, null);
+//
+//            cxn.commit();
+//            
+//            /*
+//             * Here you will see the automatic removal of (s1 p2 s2)
+//             */
+//            if (log.isInfoEnabled()) {
+//                log.info("\n" + sail.getDatabase().dumpStore());
+//            }
+//            
+//        } finally {
+//            cxn.close();
+//        }
+//      
+//        {
+//        	final AbstractTripleStore db = sail.getDatabase();
+//        	final BigdataURI baz = db.getLexiconRelation().resolve(new URIImpl("baz"));
+//        	final BigdataStatementIterator it = db.getStatements(null, null, baz);
+//        	while (it.hasNext()) {
+//        	    final BigdataStatement stmt = it.next();
+//        	    log.info(stmt);
+//        	}
+//        	it.close();
+//        	}
+//        	{
+//        	final AbstractTripleStore db = sail.getDatabase();
+//        	final BigdataURI baz = db.getLexiconRelation().resolve(new URIImpl("baz"));
+//        	assert(baz.getIV() != null);
+//        	final IAccessPath<ISPO> ap = db.getAccessPath(null, null, baz.getIV());
+//        	final ICloseableIterator<ISPO> it = ap.iterator();
+//        	while (it.hasNext()) {
+//        	    final ISPO spo = it.next();
+//        	    log.info(spo);
+//        	}
+//        	it.close();
+//    	}
+//        
+//    }
     
 }

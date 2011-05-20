@@ -39,7 +39,7 @@ import com.bigdata.rdf.internal.IVUtility;
  * operation to be applied to the operands is specified by the
  * {@link Annotations#OP} annotation.
  */
-final public class MathBOp extends IVValueExpression<IV> { 
+final public class MathBOp extends IVValueExpression { 
 
     /**
 	 * 
@@ -145,11 +145,11 @@ final public class MathBOp extends IVValueExpression<IV> {
 
     }
 
-    public IValueExpression<IV> left() {
+    public IValueExpression<? extends IV> left() {
     	return get(0);
     }
     
-    public IValueExpression<IV> right() {
+    public IValueExpression<? extends IV> right() {
     	return get(1);
     }
     
@@ -180,7 +180,7 @@ final public class MathBOp extends IVValueExpression<IV> {
 
     }
     
-    final public boolean equals(final IValueExpression<IV> o) {
+    final public boolean equals(final IVValueExpression o) {
 
     	if(!(o instanceof MathBOp)) {
             // incomparable types.

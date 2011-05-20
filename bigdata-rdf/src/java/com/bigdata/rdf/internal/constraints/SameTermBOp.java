@@ -31,7 +31,6 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSDBooleanIV;
 
 /**
  * Compare two terms for exact equality. 

@@ -43,10 +43,24 @@ public class OrBOp extends XSDBooleanIVValueExpression {
 	 */
 	private static final long serialVersionUID = 610253427197564102L;
 
-	public OrBOp(final IValueExpression<? extends IV> x, 
+	/**
+	 * Each operand of this operator must evaluate to a boolean. If the operand
+	 * is not known to evaluate to a boolean, wrap it with an {@link EBVBOp}.
+	 */
+	private static final XSDBooleanIVValueExpression wrap(
+			final IValueExpression<? extends IV> ve) {
+		
+		return ve instanceof XSDBooleanIVValueExpression  ? 
+				(XSDBooleanIVValueExpression) ve :
+					new EBVBOp(ve);
+		
+	}
+	
+	public OrBOp(
+			final IValueExpression<? extends IV> x, 
 			final IValueExpression<? extends IV> y) {
 
-        this(new BOp[] { x, y }, null/*annocations*/);
+        this(new BOp[] { wrap(x), wrap(y) }, null/*annocations*/);
 
     }
 
@@ -59,6 +73,12 @@ public class OrBOp extends XSDBooleanIVValueExpression {
     	
         if (args.length != 2 || args[0] == null || args[1] == null)
 			throw new IllegalArgumentException();
+        
+        if (!(args[0] instanceof XSDBooleanIVValueExpression))
+			throw new IllegalArgumentException();
+
+        if (!(args[1] instanceof XSDBooleanIVValueExpression))
+			throw new IllegalArgumentException();
 
     }
 
@@ -67,6 +87,11 @@ public class OrBOp extends XSDBooleanIVValueExpression {
      */
     public OrBOp(final OrBOp op) {
         super(op);
+    }
+    
+    @Override
+    public IValueExpression<? extends XSDBooleanIV> get(final int i) {
+		return (IValueExpression<? extends XSDBooleanIV>) super.get(i);
     }
 
     /**

@@ -29,6 +29,7 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSDBooleanIV;
 
@@ -42,9 +43,22 @@ public class NotBOp extends XSDBooleanIVValueExpression {
 	 */
 	private static final long serialVersionUID = -5701967329003122236L;
 
-    public NotBOp(final IValueExpression<? extends IV> x) {
+	/**
+	 * The operand of this operator must evaluate to a boolean. If the operand
+	 * is not known to evaluate to a boolean, wrap it with an {@link EBVBOp}.
+	 */
+	private static final XSDBooleanIVValueExpression wrap(
+			final IValueExpression<? extends IV> ve) {
+		
+		return ve instanceof XSDBooleanIVValueExpression  ? 
+				(XSDBooleanIVValueExpression) ve :
+					new EBVBOp(ve);
+		
+	}
+	
+	public NotBOp(final IValueExpression<? extends IV> x) {
 
-        this(new BOp[] { x }, null/*Annotations*/);
+        this(new BOp[] { wrap(x) }, null/*annocations*/);
 
     }
 
@@ -58,6 +72,9 @@ public class NotBOp extends XSDBooleanIVValueExpression {
         if (args.length != 1 || args[0] == null)
             throw new IllegalArgumentException();
 
+        if (!(args[0] instanceof XSDBooleanIVValueExpression))
+			throw new IllegalArgumentException();
+
     }
 
     /**
@@ -70,6 +87,10 @@ public class NotBOp extends XSDBooleanIVValueExpression {
     public boolean accept(final IBindingSet bs) {
 
     	final XSDBooleanIV iv = (XSDBooleanIV) get(0).get(bs);
+    	
+        // not yet bound
+        if (iv == null)
+        	throw new SparqlTypeErrorException();
     	
         return !iv.booleanValue();
 

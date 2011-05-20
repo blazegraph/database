@@ -41,6 +41,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.journal.ITx;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IAccessPathExpander;
@@ -70,8 +71,8 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
     /**
      * Required shallow copy constructor.
      */
-    public Predicate(final BOp[] values, final Map<String, Object> annotations) {
-        super(values, annotations);
+    public Predicate(final BOp[] args, final Map<String, Object> annotations) {
+        super(args, annotations);
     }
 
     /**
@@ -86,9 +87,9 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
      * @param vars
      * @param annotations
      */
-    public Predicate(final BOp[] vars, final NV... annotations) {
+    public Predicate(final BOp[] args, final NV... annotations) {
         
-        super(vars, NV.asMap(annotations));
+        super(args, NV.asMap(annotations));
         
     }
     
@@ -104,21 +105,21 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 		}
 	}
     
-//    /**
-//     * Simplified ctor.
-//     * 
-//     * @param values
-//     *            The values (order is important!).
-//     * @param relationName
-//     *            Identifies the relation to be queried.
-//     */
-//    public Predicate(final IVariableOrConstant<?>[] values,
-//            final String relationName) {
-//
-//        this(values, relationName, -1/* partitionId */, false/* optional */,
-//                null/* constraint */, null/* expander */, ITx.READ_COMMITTED);
-//
-//    }
+	/**
+	 * Simplified ctor (for lex predicates).
+	 * 
+	 * @param values
+	 *            The values (order is important!).
+	 * @param relationName
+	 *            Identifies the relation to be queried.
+	 */
+	public Predicate(final IVariableOrConstant<?>[] values,
+			final String relationName, final long timestamp) {
+
+		this(values, relationName, -1/* partitionId */, false/* optional */,
+				null/* constraint */, null/* expander */, ITx.READ_COMMITTED);
+
+	}
 
     /**
      * 
