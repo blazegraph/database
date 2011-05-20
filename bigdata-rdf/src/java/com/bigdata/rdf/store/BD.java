@@ -165,40 +165,63 @@ public interface BD {
      * }
      * 
      * </pre>
+     * 
+     * The default is {@value #DEFAULT_MAX_HITS}.
      */
     final URI MAX_HITS = new URIImpl(SEARCH_NAMESPACE+"maxHits");
-    
-    /**
-     * Magic predicate used to query for free text search metadata.  Use 
-     * in conjunction with {@link #SEARCH} as follows:
-     * <p>
-     * <pre>
-     * 
-     * select ?s
-     * where {
-     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:minRelevance "0.5"^^xsd:double .
-     * }
-     * 
-     * </pre>
-     */
-    final URI MIN_RELEVANCE = new URIImpl(SEARCH_NAMESPACE+"minRelevance");
 
     /**
-     * Magic predicate used to query for free text search metadata.  Use 
-     * in conjunction with {@link #SEARCH} as follows:
-     * <p>
-     * <pre>
-     * 
-     * select ?s
-     * where {
-     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:maxRelevance "0.9"^^xsd:double .
-     * }
-     * 
-     * </pre>
+     * The default for {@link #MAX_HITS}.
      */
+    final int DEFAULT_MAX_HITS = Integer.MAX_VALUE;
+    
+	/**
+	 * Magic predicate used to query for free text search metadata. Use in
+	 * conjunction with {@link #SEARCH} as follows:
+	 * <p>
+	 * 
+	 * <pre>
+	 * 
+	 * select ?s
+	 * where {
+	 *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
+	 *   ?s bd:minRelevance "0.5"^^xsd:double .
+	 * }
+	 * 
+	 * </pre>
+	 * 
+	 * The relevance scores are in [0.0:1.0]. You should NOT specify a minimum
+	 * relevance of ZERO (0.0) as this can drag in way too many unrelated
+	 * results. The default is {@value #DEFAULT_MIN_RELEVANCE}.
+	 */
+    final URI MIN_RELEVANCE = new URIImpl(SEARCH_NAMESPACE+"minRelevance");
+
+    final double DEFAULT_MIN_RELEVANCE = 0.25d;
+
+	/**
+	 * Magic predicate used to query for free text search metadata. Use in
+	 * conjunction with {@link #SEARCH} as follows:
+	 * <p>
+	 * 
+	 * <pre>
+	 * 
+	 * select ?s
+	 * where {
+	 *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
+	 *   ?s bd:maxRelevance "0.9"^^xsd:double .
+	 * }
+	 * 
+	 * </pre>
+	 * 
+	 * The relevance scores are in [0.0:1.0]. The default maximum relevance is
+	 * {@value #DEFAULT_MAX_RELEVANCE}.
+	 */
     final URI MAX_RELEVANCE = new URIImpl(SEARCH_NAMESPACE+"maxRelevance");
+
+    /**
+     * The default value for {@link #MAX_RELEVANCE} unless overridden. 
+     */
+    final double DEFAULT_MAX_RELEVANCE = 1.0d;
 
     /**
      * Magic predicate used to query for free text search metadata.  Use 
@@ -216,6 +239,15 @@ public interface BD {
      */
     final URI MATCH_ALL_TERMS = new URIImpl(SEARCH_NAMESPACE+"matchAllTerms");
 
+    final boolean DEFAULT_MATCH_ALL_TERMS = false;
+    
+    final boolean DEFAULT_PREFIX_MATCH = false;
+    
+    /**
+     * The default timeout for a free text search (milliseconds).
+     */
+    final long DEFAULT_TIMEOUT = Long.MAX_VALUE;
+    
     /**
      * Sesame has the notion of a "null" graph. Any time you insert a statement
      * into a quad store and the context position is not specified, it is

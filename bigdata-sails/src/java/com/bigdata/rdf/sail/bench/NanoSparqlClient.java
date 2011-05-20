@@ -866,7 +866,7 @@ public class NanoSparqlClient {
 		public final String queryStr;
 
 		/** Metadata about each query presentation. */
-		public LinkedBlockingQueue<QueryTrial> trials = new LinkedBlockingQueue<QueryTrial>(/* unbounded */);
+		public final LinkedBlockingQueue<QueryTrial> trials = new LinkedBlockingQueue<QueryTrial>(/* unbounded */);
 
 		/**
 		 * Total elapsed nanoseconds over all {@link QueryTrial}s for this
@@ -939,7 +939,7 @@ public class NanoSparqlClient {
 		/**
 		 * Order by increasing elapsed time (slowest queries are last).
 		 */
-		public int compareTo(Score o) {
+		public int compareTo(final Score o) {
 			if (elapsedNanos < o.elapsedNanos)
 				return -1;
 			if (elapsedNanos > o.elapsedNanos)
