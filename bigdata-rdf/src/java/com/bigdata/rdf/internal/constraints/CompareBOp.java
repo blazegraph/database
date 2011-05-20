@@ -24,27 +24,30 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.constraints;
 
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.Compare.CompareOp;
+import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.XSDBooleanIV;
+import com.bigdata.rdf.model.BigdataValue;
 
 /**
- * Use inline terms to perform numerical comparison operations.
- * 
- * @see IVUtility#numericalCompare(IV, IV) 
+ * Perform open-world value comparison operations per the SPARQL spec.
  */
-public class CompareBOp extends XSDBooleanIVValueExpression {
+public class CompareBOp extends XSDBooleanIVValueExpression
+		implements INeedsMaterialization {
 
 	/**
 	 * 
@@ -83,6 +86,10 @@ public class CompareBOp extends XSDBooleanIVValueExpression {
 			throw new IllegalArgumentException();
 		
 		}
+        
+        if (log.isDebugEnabled()) {
+        	log.debug(toString());
+        }
 
     }
 
@@ -105,40 +112,62 @@ public class CompareBOp extends XSDBooleanIVValueExpression {
         // not yet bound
     	if (left == null || right == null)
         	throw new SparqlTypeErrorException();
+    	
+    	if (log.isDebugEnabled()) {
+    		log.debug("left: " + left);
+    		log.debug("right: " + right);
+    		
+    		log.debug("left value: " + (left.hasValue() ? left.getValue() : null));
+    		log.debug("right value: " + (right.hasValue() ? right.getValue() : null));
+    	}
 
     	final CompareOp op = op();
     	
-    	if (left.isTermId() && right.isTermId()) {
-    		if (op == CompareOp.EQ || op == CompareOp.NE) {
-    			return _accept(left.compareTo(right));
-    		} else {
-    			if (log.isInfoEnabled())
-    				log.info("cannot compare: " 
-    					+ left + " " + op + " " + right);
-    			
-    			throw new SparqlTypeErrorException();
-    		}
+    	if (left.isStatement() || right.isStatement()) {
+    		
+    		throw new SparqlTypeErrorException();
+    		
     	}
     	
-    	/*
-    	 * This code is bad.
-    	 */
-    	if (!IVUtility.canNumericalCompare(left) ||
-    			!IVUtility.canNumericalCompare(right)) {
-    		if (op == CompareOp.EQ) {
-    			return false;
-    		} else if (op == CompareOp.NE) {
+    	// handle the special case where we have exact termId equality
+    	// probably would never hit this because of SameTermOp
+    	if (op == CompareOp.EQ && left.isTermId() && right.isTermId()) {
+    		
+    		if (left.getTermId() == right.getTermId())
     			return true;
-    		} else {
-    			if (log.isInfoEnabled())
-    				log.info("cannot numerical compare: " 
-    					+ left + " " + op + " " + right);
-    			
-    			throw new SparqlTypeErrorException();
-    		}
+    		
     	}
     	
-		return _accept(IVUtility.numericalCompare(left, right));
+    	// handle inlines: booleans, numerics, and dateTimes (if inline) 
+    	if (IVUtility.canNumericalCompare(left, right)) {
+    		
+    		return _accept(IVUtility.numericalCompare(left, right));
+    		
+    	}
+
+    	final BigdataValue val1 = left.getValue();
+    	final BigdataValue val2 = right.getValue();
+    	
+    	try {
+    	
+    		// use the Sesame implementation directly
+    		final boolean accept = QueryEvaluationUtil.compare(val1, val2, op);
+    		
+    		if (log.isDebugEnabled()) {
+    			log.debug(accept);
+    		}
+    		
+    		return accept;
+    		
+    	} catch (Exception ex) {
+    		
+    		if (log.isDebugEnabled()) {
+    			log.debug("exception: " + ex);
+    		}
+    		
+    		throw new SparqlTypeErrorException();
+    		
+    	}
     	
     }
     
@@ -162,6 +191,28 @@ public class CompareBOp extends XSDBooleanIVValueExpression {
     	default:
     		throw new UnsupportedOperationException();
     	}
+    	
+    }
+    
+    private volatile transient Set<IVariable<IV>> terms;
+    
+    public Set<IVariable<IV>> getTermsToMaterialize() {
+    	
+    	if (terms == null) {
+    		
+    		terms = new LinkedHashSet<IVariable<IV>>();
+    		
+    		final IValueExpression<? extends IV> left = get(0);
+    		if (left instanceof IVariable)
+    			terms.add((IVariable<IV>) left);
+    		
+    		final IValueExpression<? extends IV> right = get(1);
+    		if (right instanceof IVariable)
+    			terms.add((IVariable<IV>) right);
+    		
+    	}
+    	
+    	return terms;
     	
     }
 

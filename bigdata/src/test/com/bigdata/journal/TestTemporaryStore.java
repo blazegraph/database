@@ -203,36 +203,42 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
      * an overflow.
      */
     public void test_overflow() {
-        
-        TemporaryRawStore store = (TemporaryRawStore) getStore();
-        
-        AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
-                .getBufferStrategy();
 
-        final long userExtent = bufferStrategy.getUserExtent();
-        
-        final long extent = bufferStrategy.getExtent();
-        
-        final long initialExtent = bufferStrategy.getInitialExtent();
-        
-        final long nextOffset = bufferStrategy.getNextOffset();
-        
-        assertEquals("extent",initialExtent, extent);
-        
-        final long needed = Bytes.kilobyte32;
+        final TemporaryRawStore store = (TemporaryRawStore) getStore();
 
-        bufferStrategy.force(true);
-        
-        assertTrue("overflow()", bufferStrategy.overflow(needed));
+        try {
 
-        assertTrue("extent", extent + needed <= bufferStrategy.getExtent());
+            final AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
+                    .getBufferStrategy();
 
-        assertTrue("userExtent", userExtent + needed <= bufferStrategy
-                .getUserExtent());
+            final long userExtent = bufferStrategy.getUserExtent();
 
-        assertEquals(nextOffset, bufferStrategy.getNextOffset());
+            final long extent = bufferStrategy.getExtent();
 
-        store.close();
+            final long initialExtent = bufferStrategy.getInitialExtent();
+
+            final long nextOffset = bufferStrategy.getNextOffset();
+
+            assertEquals("extent", initialExtent, extent);
+
+            final long needed = Bytes.kilobyte32;
+
+            bufferStrategy.force(true);
+
+            assertTrue("overflow()", bufferStrategy.overflow(needed));
+
+            assertTrue("extent", extent + needed <= bufferStrategy.getExtent());
+
+            assertTrue("userExtent", userExtent + needed <= bufferStrategy
+                    .getUserExtent());
+
+            assertEquals(nextOffset, bufferStrategy.getNextOffset());
+
+        } finally {
+
+            store.close();
+            
+        }
             
     }
 
@@ -248,7 +254,8 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
      * 
      * @return The address of the last record written.
      */
-    protected long writeRandomData(TemporaryRawStore store,final long nbytesToWrite) {
+    protected long writeRandomData(final TemporaryRawStore store,
+            final long nbytesToWrite) {
 
         final int maxRecordSize = store.getMaxRecordSize();
         
@@ -305,32 +312,39 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
      */
     public void test_writeNoExtend() {
 
-        TemporaryRawStore store = (TemporaryRawStore) getStore();
-        
-        AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
-                .getBufferStrategy();
+        final TemporaryRawStore store = (TemporaryRawStore) getStore();
 
-        final long userExtent = bufferStrategy.getUserExtent();
-        
-        final long extent = bufferStrategy.getExtent();
-        
-        final long initialExtent = bufferStrategy.getInitialExtent();
-        
-        final long nextOffset = bufferStrategy.getNextOffset();
-        
-        assertEquals("extent",initialExtent, extent);
+        try {
 
-        long remaining = userExtent - nextOffset;
-        
-        writeRandomData(store, remaining);
+            final AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
+                    .getBufferStrategy();
 
-        // no change in extent.
-        assertEquals("extent",extent, bufferStrategy.getExtent());
-        
-        // no change in user extent.
-        assertEquals("userExtent",userExtent, bufferStrategy.getUserExtent());
+            final long userExtent = bufferStrategy.getUserExtent();
 
-        store.close();
+            final long extent = bufferStrategy.getExtent();
+
+            final long initialExtent = bufferStrategy.getInitialExtent();
+
+            final long nextOffset = bufferStrategy.getNextOffset();
+
+            assertEquals("extent", initialExtent, extent);
+
+            final long remaining = userExtent - nextOffset;
+
+            writeRandomData(store, remaining);
+
+            // no change in extent.
+            assertEquals("extent", extent, bufferStrategy.getExtent());
+
+            // no change in user extent.
+            assertEquals("userExtent", userExtent, bufferStrategy
+                    .getUserExtent());
+
+        } finally {
+
+            store.close();
+
+        }
 
     }
     
@@ -342,78 +356,86 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
      */
     public void test_writeWithExtend() {
 
-        TemporaryRawStore store = (TemporaryRawStore) getStore();
-        
-        AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
-                .getBufferStrategy();
+        final TemporaryRawStore store = (TemporaryRawStore) getStore();
 
-        final long userExtent = bufferStrategy.getUserExtent();
-        
-        final long extent = bufferStrategy.getExtent();
-        
-        final long initialExtent = bufferStrategy.getInitialExtent();
-        
-        final long nextOffset = bufferStrategy.getNextOffset();
-        
-        assertEquals("extent",initialExtent, extent);
+        try {
 
-        /*
-         * now write random bytes that exactly fill the remaining space and
-         * verify that write.
-         */
-        long remaining = userExtent - nextOffset;
-        
-//        assertTrue(remaining<Integer.MAX_VALUE);
-//        
-//        final byte[] b = new byte[(int)remaining];
-//        
-//        Random r = new Random();
-//        
-//        r.nextBytes(b);
-//        
-//        ByteBuffer tmp = ByteBuffer.wrap(b);
-//        
-//        final long addr = bufferStrategy.write(tmp);
+            final AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
+                    .getBufferStrategy();
 
-        final long addr = writeRandomData(store, remaining);
-        
-        // no change in extent.
-        assertEquals("extent",extent, bufferStrategy.getExtent());
-        
-        // no change in user extent.
-        assertEquals("userExtent",userExtent, bufferStrategy.getUserExtent());
+            final long userExtent = bufferStrategy.getUserExtent();
 
-        ByteBuffer b = bufferStrategy.read(addr);
-        
-        /*
-         * now write some more random bytes forcing an extension of the buffer.
-         * we verify both the original write on the buffer and the new write.
-         * this helps to ensure that data was copied correctly into the extended
-         * buffer.
-         */
-        
-        final byte[] b2 = new byte[Bytes.kilobyte32];
-        
-        new Random().nextBytes(b2);
-        
-        ByteBuffer tmp2 = ByteBuffer.wrap(b2);
-        
-        final long addr2 = bufferStrategy.write(tmp2);
-        
-        // verify extension of buffer.
-        assertTrue("extent", extent + b2.length <= bufferStrategy.getExtent());
+            final long extent = bufferStrategy.getExtent();
 
-        // verify extension of buffer.
-        assertTrue("userExtent", userExtent + b2.length <= bufferStrategy
-                .getUserExtent());
+            final long initialExtent = bufferStrategy.getInitialExtent();
 
-        // verify data written before we overflowed the buffer.
-        assertEquals(b, bufferStrategy.read(addr));
+            final long nextOffset = bufferStrategy.getNextOffset();
 
-        // verify data written after we overflowed the buffer.
-        assertEquals(b2, bufferStrategy.read(addr2));
-    
-        store.close();
+            assertEquals("extent", initialExtent, extent);
+
+            /*
+             * now write random bytes that exactly fill the remaining space and
+             * verify that write.
+             */
+            final long remaining = userExtent - nextOffset;
+
+            // assertTrue(remaining<Integer.MAX_VALUE);
+            //        
+            // final byte[] b = new byte[(int)remaining];
+            //        
+            // Random r = new Random();
+            //        
+            // r.nextBytes(b);
+            //        
+            // ByteBuffer tmp = ByteBuffer.wrap(b);
+            //        
+            // final long addr = bufferStrategy.write(tmp);
+
+            final long addr = writeRandomData(store, remaining);
+
+            // no change in extent.
+            assertEquals("extent", extent, bufferStrategy.getExtent());
+
+            // no change in user extent.
+            assertEquals("userExtent", userExtent, bufferStrategy
+                    .getUserExtent());
+
+            final ByteBuffer b = bufferStrategy.read(addr);
+
+            /*
+             * now write some more random bytes forcing an extension of the
+             * buffer. we verify both the original write on the buffer and the
+             * new write. this helps to ensure that data was copied correctly
+             * into the extended buffer.
+             */
+
+            final byte[] b2 = new byte[Bytes.kilobyte32];
+
+            new Random().nextBytes(b2);
+
+            final ByteBuffer tmp2 = ByteBuffer.wrap(b2);
+
+            final long addr2 = bufferStrategy.write(tmp2);
+
+            // verify extension of buffer.
+            assertTrue("extent", extent + b2.length <= bufferStrategy
+                    .getExtent());
+
+            // verify extension of buffer.
+            assertTrue("userExtent", userExtent + b2.length <= bufferStrategy
+                    .getUserExtent());
+
+            // verify data written before we overflowed the buffer.
+            assertEquals(b, bufferStrategy.read(addr));
+
+            // verify data written after we overflowed the buffer.
+            assertEquals(b2, bufferStrategy.read(addr2));
+
+        } finally {
+
+            store.close();
+
+        }
 
     }
     

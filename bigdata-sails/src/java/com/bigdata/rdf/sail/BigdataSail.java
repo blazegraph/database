@@ -3423,10 +3423,10 @@ public class BigdataSail extends SailBase implements Sail {
              * native joins and the BigdataEvaluationStatistics rely on
              * this.
              */
-                Object[] newVals = replaceValues(dataset, tupleExpr, bindings);
-                dataset = (Dataset) newVals[0];
-                bindings = (BindingSet) newVals[1];
-
+            Object[] newVals = replaceValues(dataset, tupleExpr, bindings);
+            dataset = (Dataset) newVals[0];
+            bindings = (BindingSet) newVals[1];
+            
             final BigdataTripleSource tripleSource = 
             	new BigdataTripleSource(this, includeInferred);
 
@@ -3455,6 +3455,10 @@ public class BigdataSail extends SailBase implements Sail {
             if (log.isInfoEnabled())
                 log.info("Optimized query: " + tupleExpr);
 
+        	final Object[] newVals2 = replaceValues(dataset, tupleExpr, bindings);
+            dataset = (Dataset) newVals2[0];
+            bindings = (BindingSet) newVals2[1];
+            
             return tupleExpr;
 
         }
@@ -3538,6 +3542,10 @@ public class BigdataSail extends SailBase implements Sail {
                 if (log.isInfoEnabled())
                     log.info("Optimized query: " + tupleExpr);
 
+            	final Object[] newVals2 = replaceValues(dataset, tupleExpr, bindings);
+                dataset = (Dataset) newVals2[0];
+                bindings = (BindingSet) newVals2[1];
+                
                 // Note: evaluation begins with an empty binding set NOT the
                 // caller's bindingSet.
                 final CloseableIteration<BindingSet, QueryEvaluationException> itr = strategy

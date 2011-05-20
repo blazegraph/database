@@ -137,6 +137,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
         IAtomicStore store = (IAtomicStore) getStore();
 
         try {
+            
             assertTrue(store.isStable());
 
             final Random r = new Random();
@@ -212,58 +213,58 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
         IAtomicStore store = (IAtomicStore)getStore();
         
         try {
-        
-        assertTrue(store.isStable());
-        
-        Random r = new Random();
-        
-        final int len = 100;
-        
-        byte[] expected = new byte[len];
-        
-        r.nextBytes(expected);
-        
-        ByteBuffer tmp = ByteBuffer.wrap(expected);
-        
-        long addr1 = store.write(tmp);
 
-        // verify that the position is advanced to the limit.
-        assertEquals(len,tmp.position());
-        assertEquals(tmp.position(),tmp.limit());
+            assertTrue(store.isStable());
 
-        // read the data back.
-        ByteBuffer actual = store.read(addr1);
-        
-        assertEquals(expected,actual);
-        
-        /*
-         * verify the position and limit after the read.
-         */
-        assertEquals(0,actual.position());
-        assertEquals(expected.length,actual.limit());
+            final Random r = new Random();
 
-        /*
-         * Commit the changes - if you do not commit the changes then the root
-         * blocks are not updated and your data is lost on restart.
-         */
-        store.commit();
-        
-        // re-open the store.
-        store = (IAtomicStore)reopenStore(store);
-        
-        assertTrue( store.isStable() );
-        
-        // read the data back.
-        actual = store.read(addr1);
-        
-        assertEquals(expected,actual);
+            final int len = 100;
+
+            final byte[] expected = new byte[len];
+
+            r.nextBytes(expected);
+
+            final ByteBuffer tmp = ByteBuffer.wrap(expected);
+
+            final long addr1 = store.write(tmp);
+
+            // verify that the position is advanced to the limit.
+            assertEquals(len, tmp.position());
+            assertEquals(tmp.position(), tmp.limit());
+
+            // read the data back.
+            ByteBuffer actual = store.read(addr1);
+
+            assertEquals(expected, actual);
+
+            /*
+             * verify the position and limit after the read.
+             */
+            assertEquals(0, actual.position());
+            assertEquals(expected.length, actual.limit());
+
+            /*
+             * Commit the changes - if you do not commit the changes then the
+             * root blocks are not updated and your data is lost on restart.
+             */
+            store.commit();
+
+            // re-open the store.
+            store = (IAtomicStore) reopenStore(store);
+
+            assertTrue(store.isStable());
+
+            // read the data back.
+            actual = store.read(addr1);
+
+            assertEquals(expected, actual);
 
         } finally {
 
             store.destroy();
-            
+
         }
-        
+
     }
     
     /**

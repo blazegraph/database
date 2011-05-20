@@ -68,10 +68,10 @@ abstract public class AbstractJournalTestCase
     /**
      * Invoked from {@link TestCase#setUp()} for each test in the suite.
      */
-    public void setUp(ProxyTestCase testCase) throws Exception {
+    public void setUp(final ProxyTestCase testCase) throws Exception {
 
         super.setUp(testCase);
-        
+
 //        if(log.isInfoEnabled())
 //        log.info("\n\n================:BEGIN:" + testCase.getName()
 //                + ":BEGIN:====================");
@@ -81,11 +81,13 @@ abstract public class AbstractJournalTestCase
     /**
      * Invoked from {@link TestCase#tearDown()} for each test in the suite.
      */
-    public void tearDown(ProxyTestCase testCase) throws Exception {
+    public void tearDown(final ProxyTestCase testCase) throws Exception {
 
         super.tearDown(testCase);
 
-        deleteTestFile();
+        TestHelper.checkJournalsClosed(testCase, this);
+        
+//        deleteTestFile();
         
     }
     
@@ -97,48 +99,48 @@ abstract public class AbstractJournalTestCase
 //        
 //    }
 
-    /**
-     * Note: your unit must close the store for delete to work.
-     */
-    protected void deleteTestFile() {
-
-        if(m_properties==null) return; // never requested.
-        
-        String val;
-        
-        val = (String) m_properties.getProperty(Options.FILE);
-        
-        if(val!= null) {
-        
-            File file = new File(val);
-            
-            if(file.exists()) {
-
-                val = (String) m_properties.getProperty(Options.DELETE_ON_EXIT);
-        
-                if(val==null) {
-                    
-                    val = (String) m_properties.getProperty(Options.DELETE_ON_CLOSE);
-                    
-                }
-                
-                if(Boolean.parseBoolean(val)) {
-                    
-                    System.err.println("Attempting to delete file: "+file);
-                    
-                    if(!file.delete()) {
-                    
-                        log.warn("Could not delete file: "+file);
-
-                    }
-                    
-                }
-            
-            }
-            
-        }
-
-    }
+//    /**
+//     * Note: your unit must close the store for delete to work.
+//     */
+//    protected void deleteTestFile() {
+//
+//        if(m_properties==null) return; // never requested.
+//        
+//        String val;
+//        
+//        val = (String) m_properties.getProperty(Options.FILE);
+//        
+//        if(val!= null) {
+//        
+//            File file = new File(val);
+//            
+//            if(file.exists()) {
+//
+//                val = (String) m_properties.getProperty(Options.DELETE_ON_EXIT);
+//        
+//                if(val==null) {
+//                    
+//                    val = (String) m_properties.getProperty(Options.DELETE_ON_CLOSE);
+//                    
+//                }
+//                
+//                if(Boolean.parseBoolean(val)) {
+//                    
+//                    System.err.println("Attempting to delete file: "+file);
+//                    
+//                    if(!file.delete()) {
+//                    
+//                        log.warn("Could not delete file: "+file);
+//
+//                    }
+//                    
+//                }
+//            
+//            }
+//            
+//        }
+//
+//    }
 
     //
     // Properties

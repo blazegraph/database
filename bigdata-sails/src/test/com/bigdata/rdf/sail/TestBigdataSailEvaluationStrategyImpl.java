@@ -706,12 +706,14 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                 System.err.println("\"Mike\" = " + sail.getDatabase().getIV(new LiteralImpl("Mike")));
                 System.err.println("\"Jane\" = " + sail.getDatabase().getIV(new LiteralImpl("Jane")));
                 
-                String query = 
+                final double minRelevance = 0d;
+                final String query = 
                     "select ?s ?label " +
                     "where { " +
                     "  ?s <"+RDF.TYPE+"> <"+person+"> . " +   // [160, 8, 164], [156, 8, 164]
                     "  ?s <"+RDFS.LABEL+"> ?label . " +       // [160, 148, 174], [156, 148, 170] 
                     "  ?label <"+search+"> \"Mi*\" . " +     // [174, 0, 0]
+                    "  ?label <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
                     "}";
                 
                 { // evalute it once so i can see it

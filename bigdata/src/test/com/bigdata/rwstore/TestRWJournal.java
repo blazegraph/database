@@ -67,10 +67,6 @@ import com.bigdata.util.InnerCause;
 /**
  * Test suite for {@link BufferMode#DiskRW} journals.
  * 
- * TODO: must modify RWStore to use DirectBufferPool to allocate and release
- * buffers, Once done then ensure the write cache is enabled when running test
- * suite
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -1648,7 +1644,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			properties.setProperty(Options.WRITE_CACHE_ENABLED, "" + writeCacheEnabled);
 
-			return new Journal(properties).getBufferStrategy();
+			return new Journal(properties);//.getBufferStrategy();
 			// return new Journal(properties);
 
 		}
@@ -1685,7 +1681,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			properties.setProperty(Options.WRITE_CACHE_ENABLED, "" + writeCacheEnabled);
 
-			return new Journal(properties).getBufferStrategy();
+			return new Journal(properties);//.getBufferStrategy();
 
 		}
 
@@ -1721,7 +1717,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			properties.setProperty(Options.WRITE_CACHE_ENABLED, "" + writeCacheEnabled);
 
-			return new Journal(properties).getBufferStrategy();
+			return new Journal(properties);//.getBufferStrategy();
 
 		}
 

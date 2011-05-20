@@ -86,7 +86,9 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      */
     boolean isLiteral();
 
-    /** Return <code>true</code> iff this is an RDF BlankNode. */
+    /** 
+     * Return <code>true</code> iff this is an RDF BlankNode. 
+     */
     boolean isBNode();
 
     /**
@@ -99,6 +101,11 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      * is enabled with {@link Options#STATEMENT_IDENTIFIERS}).
      */
     boolean isStatement();
+    
+    /**
+     * Return <code>true</code> iff this is a URI or a bnode.
+     */
+    boolean isResource();
 
     /*
      * Data type methods.
@@ -226,6 +233,14 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
     V asValue(final LexiconRelation lex) 
         throws UnsupportedOperationException;
 
+    /**
+     * Cache the materialized value.
+     * 
+     * @param val
+     * 			   The {@link BigdataValue}.
+     */
+    V setValue(final V val);
+    
 	/**
 	 * Return a pre-materialized RDF {@link BigdataValue} which has been cached
 	 * on this {@link IV} by a previous invocation of
@@ -243,5 +258,11 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
 	 * empty.
 	 */
 	void dropValue();
+	
+	/**
+	 * Returns true if the RDF {@link BigdataValue} has been pre-materialized
+	 * and cached on this {@link IV}.
+	 */
+	boolean hasValue();
 	
 }

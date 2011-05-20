@@ -1593,6 +1593,7 @@ public class TestNamedGraphs extends QuadsTestCase {
     
     public void testSearchQuery() throws Exception {
         
+    	final double minRelevance = 0d;
         final BigdataSail sail = getSail();
         try {
         sail.initialize();
@@ -1638,6 +1639,7 @@ public class TestNamedGraphs extends QuadsTestCase {
                     "where {  " +
                     "    ?y <"+ BD.SEARCH+"> \"Chris*\" . " +
                     "    ?x <"+ RDFS.LABEL.stringValue() + "> ?y . " +
+                    "    ?y <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
                     "}";
 
                 final TupleQuery tupleQuery = cxn.prepareTupleQuery(
@@ -1671,6 +1673,7 @@ public class TestNamedGraphs extends QuadsTestCase {
                     "    graph <http://example.org> { " +
                     "        ?y <"+ BD.SEARCH+"> \"Chris*\" . " +
                     "        ?x <"+ RDFS.LABEL.stringValue() + "> ?y ." +
+                    "        ?y <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
                     "    } . " +
                     "}";
                 

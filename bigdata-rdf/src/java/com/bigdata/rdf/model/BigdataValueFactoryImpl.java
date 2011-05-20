@@ -39,6 +39,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
+import org.openrdf.model.impl.BooleanLiteralImpl;
 
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -452,10 +453,16 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
         }
 
-        if (v instanceof URI) {
+        if (v instanceof BooleanLiteralImpl) {
+        	
+    		final BooleanLiteralImpl bl = (BooleanLiteralImpl) v;
+    		
+            return createLiteral(bl.booleanValue());
 
+        } else if (v instanceof URI) {
+        	
             return createURI(((URI) v).stringValue());
-
+            
         } else if (v instanceof BNode) {
 
             return createBNode(((BNode) v).stringValue());

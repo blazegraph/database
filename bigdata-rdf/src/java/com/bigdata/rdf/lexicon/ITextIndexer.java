@@ -79,40 +79,42 @@ public interface ITextIndexer<A extends IHit> {
      */
     public boolean getIndexDatatypeLiterals();
 
-    /**
-     * Do free text search
-     * 
-     * @param query
-     *            The query (it will be parsed into tokens).
-     * @param languageCode
-     *            The language code that should be used when tokenizing the
-     *            query -or- <code>null</code> to use the default {@link Locale}
-     *            ).
-     * @param prefixMatch
-     *            When <code>true</code>, the matches will be on tokens which
-     *            include the query tokens as a prefix. This includes exact
-     *            matches as a special case when the prefix is the entire token,
-     *            but it also allows longer matches. For example,
-     *            <code>free</code> will be an exact match on <code>free</code>
-     *            but a partial match on <code>freedom</code>. When
-     *            <code>false</code>, only exact matches will be made.
-     * @param minCosine
-     *            The minimum cosine that will be returned.
-     * @param maxCosine
-     *            The maximum cosine that will be returned.  Useful for 
-     *            evaluating in relevance ranges.
-     * @param maxRank
-     *            The upper bound on the #of hits in the result set.
-     * @param matchAllTerms
-     * 			  if true, return only hits that match all search terms
-     * @param timeout
-     *            The timeout -or- ZERO (0) for NO timeout (this is equivalent
-     *            to using {@link Long#MAX_VALUE}).
-     * @param unit
-     *            The unit in which the timeout is expressed.
-     * 
-     * @return The result set.
-     */
+	/**
+	 * Do free text search
+	 * 
+	 * @param query
+	 *            The query (it will be parsed into tokens).
+	 * @param languageCode
+	 *            The language code that should be used when tokenizing the
+	 *            query -or- <code>null</code> to use the default {@link Locale}
+	 *            ).
+	 * @param prefixMatch
+	 *            When <code>true</code>, the matches will be on tokens which
+	 *            include the query tokens as a prefix. This includes exact
+	 *            matches as a special case when the prefix is the entire token,
+	 *            but it also allows longer matches. For example,
+	 *            <code>free</code> will be an exact match on <code>free</code>
+	 *            but a partial match on <code>freedom</code>. When
+	 *            <code>false</code>, only exact matches will be made.
+	 * @param minCosine
+	 *            The minimum cosine that will be returned (in [0:maxCosine]).
+	 *            If you specify a minimum cosine of ZERO (0.0) you can drag in
+	 *            a lot of basically useless search results.
+	 * @param maxCosine
+	 *            The maximum cosine that will be returned (in [minCosine:1.0]).
+	 *            Useful for evaluating in relevance ranges.
+	 * @param maxRank
+	 *            The upper bound on the #of hits in the result set.
+	 * @param matchAllTerms
+	 *            if true, return only hits that match all search terms
+	 * @param timeout
+	 *            The timeout -or- ZERO (0) for NO timeout (this is equivalent
+	 *            to using {@link Long#MAX_VALUE}).
+	 * @param unit
+	 *            The unit in which the timeout is expressed.
+	 * 
+	 * @return The result set.
+	 */
     public Hiterator<A> search(final String query, final String languageCode,
             final boolean prefixMatch, 
             final double minCosine, final double maxCosine,

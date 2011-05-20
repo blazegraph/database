@@ -2109,11 +2109,11 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         } finally {
             if (writeCacheService != null)
-                try {
+//                try {
                     writeCacheService.close();
-                } catch (InterruptedException e) {
-                    log.error(e, e);
-                }
+//                } catch (InterruptedException e) {
+//                    log.error(e, e);
+//                }
             if (opener != null) {
                 opener.destroy();
             }

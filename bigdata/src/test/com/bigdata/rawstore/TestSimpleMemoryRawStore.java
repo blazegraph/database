@@ -70,7 +70,8 @@ public class TestSimpleMemoryRawStore extends AbstractRawStoreTestCase {
                 
         } catch(IllegalArgumentException ex) {
             
-            System.err.println("Ignoring expected exception: "+ex);
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
             
         }
         

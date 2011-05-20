@@ -58,6 +58,7 @@ import org.openrdf.model.Value;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
@@ -87,6 +88,7 @@ import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.LexiconConfiguration;
+import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -99,6 +101,8 @@ import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.AbstractRelation;
+import com.bigdata.relation.accesspath.ArrayAccessPath;
+import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
@@ -1807,11 +1811,21 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         final Collection<TermId> termIds = new LinkedList<TermId>();
         
         /*
-         * Filter out the inline values first.
+         * Filter out the inline values first and those that have already
+         * been materialized and cached.
          */
         for (IV iv : ivs) {
             
-            if (iv.isInline()) {
+    		if (iv.hasValue()) {
+                
+            	if (log.isDebugEnabled()) {
+            		log.debug("already materialized: " + iv.getValue());
+            	}
+            	
+            	// already materialized
+            	ret.put(iv, iv.getValue());
+            	
+            } else if (iv.isInline()) {
                 
                 // translate it into a value directly
                 ret.put(iv, iv.asValue(this));
@@ -2883,5 +2897,74 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         }
         return null;
     }
+    
+    /**
+     * Necessary for lexicon joins. Use a LexPredicate to perform either a
+     * forward (term2id) or reverse (id2term) lookup.  Either lookup will
+     * cache the BigdataValue on the IV as a side effect.  This has the effect
+     * of caching materialized BigdataValues on IVs for use in downstream
+     * operators that need materialized values to evaluate properly.
+     */
+    @Override
+    public IAccessPath<BigdataValue> newAccessPath(
+            final IIndexManager localIndexManager, 
+            final IPredicate<BigdataValue> predicate, 
+            final IKeyOrder<BigdataValue> keyOrder 
+            ) {
+
+    	if (keyOrder == LexiconKeyOrder.TERM2ID) {
+    		
+        	final IVariableOrConstant<BigdataValue> term = predicate.get(0);
+        	
+        	if (term.isVar()) {
+        		
+        		throw new IllegalArgumentException();
+        		
+        	}
+        	
+        	final BigdataValue val = term.get();
+        	
+        	final IV iv = getIV(val);
+        	
+        	// cache the IV on the value
+        	val.setIV(iv);
+        	
+        	// cache the value on the IV
+        	iv.setValue(val);
+        	
+        	return new ArrayAccessPath<BigdataValue>(new BigdataValue[] { val }, 
+    				predicate, keyOrder);
+        	
+    	} else if (keyOrder == LexiconKeyOrder.ID2TERM) {
+    		
+        	final IVariableOrConstant<IV> term = predicate.get(1);
+        	
+        	if (term.isVar()) {
+        		
+        		throw new IllegalArgumentException();
+        		
+        	}
+        	
+        	final IV iv = term.get();
+        	
+        	final BigdataValue val = getTerm(iv);
+        	
+        	// cache the IV on the value
+        	val.setIV(iv);
+        	
+        	// cache the value on the IV
+        	iv.setValue(val);
+        	
+        	return new ArrayAccessPath<BigdataValue>(new BigdataValue[] { val }, 
+    				predicate, keyOrder);
+        	
+    	} else {
+    	
+			throw new IllegalArgumentException();
+			
+    	}
+    	
+    }
+
 
 }

@@ -488,7 +488,7 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
             // the constraints on the join graph.
             constraints = new IConstraint[ves.length];
             for (int i = 0; i < ves.length; i++) {
-            	constraints[i] = SPARQLConstraint.wrap(ves[i]);
+            	constraints[i] = new SPARQLConstraint(ves[i]);
             }
 
         }
@@ -792,17 +792,17 @@ test_bsbm_q5 : Total times: static=7312, runtime=3305, delta(static-runtime)=400
             preds = new IPredicate[] { p0, p1, p2, p3, p4, p5, p6 };
 
             // FILTER ( ?p1 > %x% )
-            c0 = SPARQLConstraint.wrap(new CompareBOp(new BOp[] { p1Var,
+            c0 = new SPARQLConstraint(new CompareBOp(new BOp[] { p1Var,
                     new Constant(x.getIV()) }, NV.asMap(new NV[] { new NV(
                     CompareBOp.Annotations.OP, CompareOp.GT) })));
 
             // FILTER (?p3 < %y% )
-            c1 = SPARQLConstraint.wrap(new CompareBOp(new BOp[] { p3Var,
+            c1 = new SPARQLConstraint(new CompareBOp(new BOp[] { p3Var,
                     new Constant(y.getIV()) }, NV.asMap(new NV[] { new NV(
                     CompareBOp.Annotations.OP, CompareOp.LT) })));
 
             // FILTER (!bound(?testVar))
-            c2 = SPARQLConstraint.wrap(new NotBOp(new IsBoundBOp(testVar)));
+            c2 = new SPARQLConstraint(new NotBOp(new IsBoundBOp(testVar)));
             
             // the constraints on the join graph.
             constraints = new IConstraint[] { c0, c1, c2 };

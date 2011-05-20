@@ -212,7 +212,7 @@ public class TestAsynchronousStatementBufferFactory extends
             
         } finally {
             
-            store.destroy();
+            store.__tearDownUnitTest();
             
         }
 
@@ -292,6 +292,8 @@ public class TestAsynchronousStatementBufferFactory extends
     protected void doLoadAndVerifyTest(final String resource) throws Exception {
 
         final AbstractTripleStore store = getStore();
+
+        try {
         
         if (!(store.getIndexManager() instanceof AbstractScaleOutFederation)) {
 
@@ -309,8 +311,6 @@ public class TestAsynchronousStatementBufferFactory extends
 //            
 //        }
         
-        try {
-
             doLoad(store, resource, parallel);
 
             if (log.isDebugEnabled()) {

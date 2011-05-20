@@ -78,13 +78,13 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    public void test_channelOpenAfterInterrupt()
-            throws InterruptedException, ExecutionException {
-        
-        for(int i=0; i<10; i++) {
-            
+    public void test_channelOpenAfterInterrupt() throws InterruptedException,
+            ExecutionException {
+
+        for (int i = 0; i < 10; i++) {
+
             doChannelOpenAfterInterrupt();
-            
+
         }
         
     }
@@ -106,11 +106,14 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
         
         try {
 
-        // Note: This test requires a journal backed by stable storage.
-        
-        if(store.isStable() && store instanceof IJournal) {
+            if (!store.isStable() || !(store instanceof IJournal)) {
 
-            final Journal journal = (Journal)store;
+                // Note: This test requires a journal backed by stable storage.
+                return;
+
+            }
+
+            final Journal journal = (Journal) store;
             
             final String[] resource = new String[]{"foo"};//,"bar","baz"};
             
@@ -145,7 +148,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
              * "get()" this task since that will block and the 'interrupt' task
              * will not run.
              */
-            final long maxWaitMillis = 5*1000;
+            final long maxWaitMillis = 5 * 1000;
             journal.submit(new AbstractTask(journal,ITx.UNISOLATED,new String[]{}){
 
                 protected Object doTask() throws Exception {
@@ -214,8 +217,6 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             journal.write(ByteBuffer.wrap(new byte[]{1,2,3}));
             
             journal.force(true);
-            
-        }
 
         } finally {
 
@@ -311,8 +312,11 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
         final IRawStore store = getStore();
 
         try {
-        
-        if (store.isStable()) {
+
+            if (!store.isStable()) {
+                // This test requires storage having a backing FileChannel.
+                return;
+            }
 
             final ByteBuffer rec1 = getRandomData();
 
@@ -366,8 +370,6 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             
             AbstractRawStoreTestCase.assertEquals(rec1.array(),actual);
             
-        }
-
         } finally {
 
             store.destroy();
@@ -397,15 +399,21 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
      * <p>
      * Note: This test is only for {@link IDiskBasedStrategy} implementations.
      * Note: This test is not relevant for RWStrategy since it does not buffer
-     * writes in a reliable way, and furthermore will invalidate the store after
-     * an interrupt.
+     * writes in a reliable way.
      */
     public void test_reopenAfterInterrupt_checkWriteBuffer() {
         
         final IRawStore store = getStore();
         try {
-        if (store.isStable() && !(store instanceof RWStrategy)) {
 
+            if(!store.isStable()) return;
+            
+            if(!(store instanceof Journal)) return;
+            
+            if(((Journal)store).getBufferStrategy() instanceof RWStrategy) {
+                return;
+            }
+            
             final ByteBuffer rec1 = getRandomData();
 
             final long addr1 = store.write(rec1);
@@ -446,8 +454,6 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             final ByteBuffer actual = store.read(addr1);
             
             AbstractRawStoreTestCase.assertEquals(rec1.array(),actual);
-            
-        }
         
         } finally {
 

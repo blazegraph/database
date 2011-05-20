@@ -30,7 +30,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
@@ -51,19 +50,27 @@ public class SPARQLConstraint extends com.bigdata.bop.constraint.Constraint {
 	protected static final Logger log = Logger.getLogger(SPARQLConstraint.class);
 	
 	/**
-	 * Convenience method to generate a constraint from a value expression.
+	 * The operand of this operator must evaluate to a boolean. If the operand
+	 * is not known to evaluate to a boolean, wrap it with an {@link EBVBOp}.
 	 */
-	public static IConstraint wrap(final IValueExpression<? extends IV> ve) {
-		if (ve instanceof EBVBOp)
-			return new SPARQLConstraint((EBVBOp) ve);
-		else
-			return new SPARQLConstraint(new EBVBOp(ve));
+	private static XSDBooleanIVValueExpression wrap(
+			final IValueExpression<? extends IV> ve) {
+		
+		return ve instanceof XSDBooleanIVValueExpression ?
+			(XSDBooleanIVValueExpression) ve :
+				new EBVBOp(ve);
+		
 	}
 	
 	
-	public SPARQLConstraint(final EBVBOp x) {
+	/**
+	 * Construct a SPARQL constraint using the specified value expression.
+	 * The value expression will be automatically wrapped inside an
+	 * {@link EBVBOp} if it does not itself evaluate to a boolean.
+	 */
+	public SPARQLConstraint(final IValueExpression<? extends IV> x) {
 
-		this(new BOp[] { x }, null/*annocations*/);
+		this(new BOp[] { wrap(x) }, null/*annocations*/);
 		
     }
 
@@ -72,7 +79,12 @@ public class SPARQLConstraint extends com.bigdata.bop.constraint.Constraint {
      */
     public SPARQLConstraint(final BOp[] args, 
     		final Map<String, Object> anns) {
+    	
         super(args, anns);
+        
+        if (args.length != 1 || args[0] == null)
+        	throw new IllegalArgumentException();
+        
     }
 
     /**
@@ -83,12 +95,12 @@ public class SPARQLConstraint extends com.bigdata.bop.constraint.Constraint {
     }
 
     @Override
-    public EBVBOp get(final int i) {
-    	return (EBVBOp) super.get(i);
+    public IValueExpression<? extends XSDBooleanIV> get(final int i) {
+    	return (IValueExpression<? extends XSDBooleanIV>) super.get(i);
     }
     
-	public IValueExpression<XSDBooleanIV> getValueExpression() {
-		return get(0).get(0);
+	public IValueExpression<? extends XSDBooleanIV> getValueExpression() {
+		return get(0);
 	}
     	
 	public boolean accept(final IBindingSet bs) {
@@ -96,7 +108,9 @@ public class SPARQLConstraint extends com.bigdata.bop.constraint.Constraint {
 		try {
 
 			// evaluate the EBV operator
-			return get(0).get(bs).booleanValue();
+			final XSDBooleanIV iv = get(0).get(bs);
+			
+			return iv.booleanValue();
 
 		} catch (Throwable t) {
 

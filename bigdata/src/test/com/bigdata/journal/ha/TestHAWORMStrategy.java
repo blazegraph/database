@@ -269,7 +269,7 @@ public class TestHAWORMStrategy extends AbstractHAJournalTestCase {
             properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
                     + writeCacheEnabled);
 
-            return new Journal(properties).getBufferStrategy();
+            return new Journal(properties);//.getBufferStrategy();
 
         }
 
@@ -305,7 +305,7 @@ public class TestHAWORMStrategy extends AbstractHAJournalTestCase {
             properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
                     + writeCacheEnabled);
 
-            return new Journal(properties).getBufferStrategy();
+            return new Journal(properties);//.getBufferStrategy();
 
         }
 
@@ -362,7 +362,7 @@ public class TestHAWORMStrategy extends AbstractHAJournalTestCase {
                     "" + (long) (DirectBufferPool.INSTANCE
                                     .getBufferCapacity() * 1.1));
 
-            return new Journal(properties).getBufferStrategy();
+            return new Journal(properties);//.getBufferStrategy();
 
         }
 
