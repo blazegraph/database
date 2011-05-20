@@ -30,7 +30,6 @@ import org.openrdf.query.algebra.And;
 import org.openrdf.query.algebra.BNodeGenerator;
 import org.openrdf.query.algebra.Bound;
 import org.openrdf.query.algebra.Compare;
-import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.CompareAll;
 import org.openrdf.query.algebra.CompareAny;
 import org.openrdf.query.algebra.Datatype;
@@ -64,7 +63,6 @@ import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.Regex;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
-import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.Str;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
@@ -72,6 +70,8 @@ import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
+import org.openrdf.query.algebra.Compare.CompareOp;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
@@ -83,12 +83,12 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.constraint.INBinarySearch;
@@ -109,7 +109,6 @@ import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.IsLiteralBOp;
 import com.bigdata.rdf.internal.constraints.IsURIBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
-import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
@@ -117,15 +116,16 @@ import com.bigdata.rdf.internal.constraints.RegexBOp;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
 import com.bigdata.rdf.internal.constraints.StrBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.sop.SOp;
 import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree;
-import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
 import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
+import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
@@ -2181,12 +2181,12 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         
         final Iterator<IHit> itr = (Iterator)database.getLexiconRelation()
                 .getSearchEngine().search(label, languageCode,
-                        false/* prefixMatch */, 
-                        0d/* minCosine */,
-                        1.0d/* maxCosine */,
-                        Integer.MAX_VALUE/* maxRank */, 
-                        false/* matchAllTerms */,
-                        0L/* timeout */,
+                        BD.DEFAULT_PREFIX_MATCH,//false/* prefixMatch */, 
+                        BD.DEFAULT_MIN_RELEVANCE,//0d/* minCosine */,
+                        BD.DEFAULT_MAX_RELEVANCE,//1.0d/* maxCosine */,
+                        BD.DEFAULT_MAX_HITS,//Integer.MAX_VALUE/* maxRank */, 
+                        BD.DEFAULT_MATCH_ALL_TERMS,//false/* matchAllTerms */,
+                        BD.DEFAULT_TIMEOUT,//0/* timeout */,
                         TimeUnit.MILLISECONDS);
         
         // ensure that named graphs are handled correctly for quads

@@ -136,8 +136,9 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
                 		minCosine, 1.0d/* maxCosine */,
                         Integer.MAX_VALUE/* maxRank */,
                         false/* matchAllTerms */,
-                        2L/* timeout */,
-                        TimeUnit.SECONDS);
+                        Long.MAX_VALUE,//2L/* timeout */,
+                        TimeUnit.MILLISECONDS// TimeUnit.SECONDS
+                        );
 
         // assertEquals("#hits", (long) expected.length, itr.size());
 
