@@ -169,23 +169,15 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
                 	prefixMatch = false;
                 }
 
-                /*
-                 * FIXME This is using a constant (1000ms) for the timeout on
-                 * the free text search. That needs to be passed down from the
-                 * SAIL.
-                 * 
-                 * @todo Rather than explicitly passing in all of these as
-                 * parameters to the constructor, why not pass them through as
-                 * annotations on the magic predicate?
-                 */
                 hiterator = textNdx.search(s,
                                 query.getLanguage(), 
                                 prefixMatch,
-                                minRelevance == null ? 0d : minRelevance.doubleValue()/* minCosine */, 
-                                maxRelevance == null ? 1.0d : maxRelevance.doubleValue()/* maxCosine */, 
-                                maxHits == null ? Integer.MAX_VALUE : maxHits.intValue()+1/* maxRank */,
+                                minRelevance == null ? BD.DEFAULT_MIN_RELEVANCE : minRelevance.doubleValue()/* minCosine */, 
+                                maxRelevance == null ? BD.DEFAULT_MAX_RELEVANCE : maxRelevance.doubleValue()/* maxCosine */, 
+                                maxHits == null ? BD.DEFAULT_MAX_HITS/*Integer.MAX_VALUE*/ : maxHits.intValue()+1/* maxRank */,
                                 matchAllTerms,
-                                0L/* timeout */, TimeUnit.MILLISECONDS);
+                                BD.DEFAULT_TIMEOUT/*0L*//* timeout */,
+                                TimeUnit.MILLISECONDS);
             }
 
             return hiterator;

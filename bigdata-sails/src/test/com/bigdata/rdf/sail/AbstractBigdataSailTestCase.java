@@ -33,6 +33,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.TestHelper;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 
 /**
@@ -94,11 +95,13 @@ abstract public class AbstractBigdataSailTestCase extends TestCase2 {
      */
     protected void tearDown(ProxyBigdataSailTestCase testCase) throws Exception {
 
-        long elapsed = System.currentTimeMillis() - begin;
+        final long elapsed = System.currentTimeMillis() - begin;
         
         if (log.isInfoEnabled())
             log.info("\n================:END:" + testCase.getName() + " ("
                     + elapsed + "ms):END:====================\n");
+
+        TestHelper.checkJournalsClosed(testCase, this);
 
     }
     

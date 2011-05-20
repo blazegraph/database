@@ -207,7 +207,7 @@ public class TestTransientJournal extends AbstractJournalTestCase {
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
                     .toString());
             
-            return new Journal(properties).getBufferStrategy();
+            return new Journal(properties);//.getBufferStrategy();
             
         }
         
@@ -236,7 +236,7 @@ public class TestTransientJournal extends AbstractJournalTestCase {
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
                     .toString());
             
-            return new Journal(properties).getBufferStrategy();
+            return new Journal(properties);//.getBufferStrategy();
             
         }
         

@@ -45,6 +45,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
@@ -167,7 +168,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	/**
 	 * Logger.
 	 */
-	protected static final Logger log = Logger.getLogger(IJournal.class);
+	private static final Logger log = Logger.getLogger(AbstractJournal.class);
 
 	/**
 	 * The index of the root address containing the address of the persistent
@@ -200,6 +201,26 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 */
 	final protected Properties properties;
 
+    /**
+     * The #of open journals (JVM wide). This is package private. It is used to
+     * chase down unit tests which are not closing() the Journal.
+     */
+    final static AtomicInteger nopen = new AtomicInteger();
+
+    /**
+     * The #of closed journals (JVM wide). This is package private. It is used
+     * to chase down unit tests which are not {@link #close() closing} the
+     * Journal.
+     */
+    final static AtomicInteger nclose = new AtomicInteger();
+
+    /**
+     * The #of destroyed journals (JVM wide). This is package private. It is
+     * used to chase down unit tests which are not {@link #destroy() destroying}
+     * the journal.
+     */
+    final static AtomicInteger ndestroy = new AtomicInteger();
+    
 	/**
 	 * The directory that should be used for temporary files.
 	 */
@@ -1051,6 +1072,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		}
 
+		nopen.incrementAndGet();
+		
 	}
 
 	/**
@@ -1337,6 +1360,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			deleteResources();
 
 		}
+
+        nclose.incrementAndGet();
 
 	}
 
@@ -1712,6 +1737,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		}
 
+		ndestroy.incrementAndGet();
+		
 	}
 
 	/**

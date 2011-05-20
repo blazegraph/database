@@ -31,9 +31,8 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.XSDBooleanIV;
 
 /**
- * Base class for RDF value expression BOps.  Value expressions perform some
- * evaluation on one or more value expressions as input and produce one
- * value expression as output (boolean, numeric value, etc.)
+ * Base class for RDF value expression BOps that happen to evaluate to an
+ * XSDBooleanIV.  These are operators such as Compare, Is*, And, Or, etc. 
  */
 public abstract class XSDBooleanIVValueExpression 
 		extends IVValueExpression<XSDBooleanIV> {
@@ -57,12 +56,10 @@ public abstract class XSDBooleanIVValueExpression
         super(op);
     }
 
-    public boolean accept(final IBindingSet bs) {
-    	return false;
-    }
-    
     public XSDBooleanIV get(final IBindingSet bs) {
     	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
     }
-
+    
+    protected abstract boolean accept(final IBindingSet bs);
+    
 }

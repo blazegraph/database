@@ -27,6 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import org.openrdf.model.BNode;
+import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
+
 import com.bigdata.rdf.lexicon.TermIdEncoder;
 
 /**
@@ -124,6 +129,20 @@ public enum VTE {
         default:
             throw new IllegalArgumentException();
         }
+    }
+
+    /**
+     * Determine the VTE based on the type of Value - URI, Literal, or BNode.
+     */
+    static public final VTE valueOf(final Value v) {
+    	if (v instanceof URI)
+            return URI;
+    	if (v instanceof Literal)
+            return LITERAL;
+    	if (v instanceof BNode)
+            return BNODE;
+
+    	throw new IllegalArgumentException();
     }
 
 }

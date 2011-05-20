@@ -98,7 +98,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         } finally {
 
-            journal.deleteResources();
+            journal.destroy();
 
         }
         
@@ -114,7 +114,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         } finally {
 
-            journal.deleteResources();
+            journal.destroy();
             
         }
 
@@ -172,9 +172,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         } finally {
 
-            journal.shutdown();
-
-            journal.deleteResources();
+            journal.destroy();
 
         }
 
@@ -234,10 +232,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         } finally {
 
-            journal.shutdown();
-
-            journal.deleteResources();
-
+            journal.destroy();
+            
         }
 
     }
@@ -309,9 +305,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         } finally {
 
-            journal.shutdown();
-
-            journal.deleteResources();
+            journal.destroy();
 
         }
 
@@ -387,9 +381,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         } finally {
 
-            journal.shutdown();
-
-            journal.deleteResources();
+            journal.destroy();
 
         }
 
@@ -459,9 +451,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         } finally {
 
-            journal.shutdown();
-
-            journal.deleteResources();
+            journal.destroy();
 
         }
 
@@ -572,9 +562,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         } finally {
 
-            journal.shutdown();
-
-            journal.deleteResources();
+            journal.destroy();
 
         }
 
@@ -687,9 +675,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         } finally {
 
-            journal.shutdown();
-
-            journal.deleteResources();
+            journal.destroy();
 
         }
 
@@ -963,9 +949,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         } finally {
 
-            journal.shutdown();
-
-            journal.deleteResources();
+            journal.destroy();
 
         }
 

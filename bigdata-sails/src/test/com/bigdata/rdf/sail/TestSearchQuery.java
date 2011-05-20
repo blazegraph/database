@@ -300,7 +300,9 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 final Set<Value> expected = new HashSet<Value>();
 
-                expected.add(new LiteralImpl("Yellow Rose"));
+				// Note: Whether or not this solution is present depends on the
+				// default value for minCosine.
+//                expected.add(new LiteralImpl("Yellow Rose"));
 
                 expected.add(new LiteralImpl("Old Yellow House"));
 
@@ -316,11 +318,13 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                     final BindingSet solution = itr.next();
 
-                    System.out.println("solution[" + i + "] : " + solution);
+					if (log.isInfoEnabled())
+						log.info("solution[" + i + "] : " + solution);
 
                     final Value actual = solution.getValue("X");
 
-                    System.out.println("X[" + i + "] = " + actual + " ("
+					if (log.isInfoEnabled())
+						log.info("X[" + i + "] = " + actual + " ("
                             + actual.getClass().getName() + ")");
 
                     assertTrue("Not expecting X=" + actual, expected
@@ -364,6 +368,15 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
         
         final URI ENTITY = new URIImpl("http://bigdata.com/system#Entity");
         
+        final String query = "construct {"+//
+		"?s <" + RDF.TYPE + "> <" + ENTITY + "> ."+//
+		" } " + "where { "+//
+		" ?s <" + RDF.TYPE + "> <" + ENTITY + "> ."+//
+		" ?s ?p ?lit ."+//
+		" ?lit <" + BD.SEARCH + "> \"systap\" ."+//
+		" ?lit <" + BD.MIN_RELEVANCE + "> \"0.0\"^^<http://www.w3.org/2001/XMLSchema#double> ."+//
+		" }";
+
         // the ontology (nothing is indexed for full text search).
         final Graph test_restart_1 = new GraphImpl(); {
 
@@ -446,10 +459,6 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 }
 
                 { // run the query (free text search)
-                    final String query = "construct { ?s <" + RDF.TYPE + "> <"
-                            + ENTITY + "> . } " + "where     { ?s <" + RDF.TYPE
-                            + "> <" + ENTITY + "> . ?s ?p ?lit . ?lit <"
-                            + BD.SEARCH + "> \"systap\" . }";
                     final RepositoryConnection cxn = repo.getConnection();
                     try {
                         // silly construct queries, can't guarantee distinct
@@ -459,13 +468,9 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                                 QueryLanguage.SPARQL, query);
                         graphQuery.evaluate(new StatementCollector(results));
                         for (Statement stmt : results) {
-                            log.info(stmt);
+                        	if(log.isInfoEnabled())
+                        		log.info(stmt);
                         }
-                        /*
-                         * @todo this test is failing : review with MikeP and
-                         * figure out if it is the test or the system under
-                         * test.
-                         */
                         assertTrue(results.contains(new StatementImpl(SYSTAP,
                                 RDF.TYPE, ENTITY)));
                     } finally {
@@ -489,10 +494,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 repo.initialize();
 
                 { // run the query again
-                    final String query = "construct { ?s <" + RDF.TYPE + "> <"
-                            + ENTITY + "> . } " + "where     { ?s <" + RDF.TYPE
-                            + "> <" + ENTITY + "> . ?s ?p ?lit . ?lit <"
-                            + BD.SEARCH + "> \"systap\" . }";
+//                    final String query = "construct { ?s <" + RDF.TYPE + "> <"
+//                            + ENTITY + "> . } " + "where     { ?s <" + RDF.TYPE
+//                            + "> <" + ENTITY + "> . ?s ?p ?lit . ?lit <"
+//                            + BD.SEARCH + "> \"systap\" . }";
                     final RepositoryConnection cxn = repo.getConnection();
                     try {
                         // silly construct queries, can't guarantee distinct
@@ -502,7 +507,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                                 QueryLanguage.SPARQL, query);
                         graphQuery.evaluate(new StatementCollector(results));
                         for (Statement stmt : results) {
-                            log.info(stmt);
+                            if(log.isInfoEnabled())
+                            	log.info(stmt);
                         }
                         assertTrue("Lost commit?", results
                                 .contains(new StatementImpl(SYSTAP, RDF.TYPE,
@@ -782,9 +788,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 int i = 0;
                 while (result.hasNext()) {
-                	System.err.println(i++ + ": " + result.next().toString());
+                	if(log.isInfoEnabled())
+                		log.info(i++ + ": " + result.next().toString());
                 }
-                assertTrue("wrong # of results", i == 7);
+                assertEquals("wrong # of results", 7, i);
                 
                 result = tupleQuery.evaluate();
 
@@ -795,12 +802,12 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final Hiterator<IHit> hits = 
                 	search.search(searchQuery, 
                             null, // languageCode
-                            false, // prefixMatch
-                            0d, // minCosine
-                            1.0d, // maxCosine
-                            10000, // maxRank (=maxResults + 1)
-                            false, // matchAllTerms
-                            1000L, // timeout 
+                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            BD.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
+                            BD.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
+                            BD.DEFAULT_MAX_HITS,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
                 
@@ -814,7 +821,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     		new BindingImpl("s", s),
                     		new BindingImpl("o", o),
                     		new BindingImpl("score", score));
-                	System.err.println(bs);
+                	if(log.isInfoEnabled())
+                		log.info(bs);
                     answer.add(bs);
                 }
                 
@@ -845,9 +853,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 int i = 0;
                 while (result.hasNext()) {
-                	System.err.println(i++ + ": " + result.next().toString());
+                	if(log.isInfoEnabled())
+                		log.info(i++ + ": " + result.next().toString());
                 }
-                assertTrue("wrong # of results", i == 5);
+                assertEquals("wrong # of results", 5, i);
                 
                 result = tupleQuery.evaluate();
 
@@ -858,12 +867,12 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final Hiterator<IHit> hits = 
                 	search.search(searchQuery, 
                             null, // languageCode
-                            false, // prefixMatch
-                            0d, // minCosine
-                            1.0d, // maxCosine
+                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            BD.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
+                            BD.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
                             maxHits+1, // maxRank (=maxResults + 1)
-                            false, // matchAllTerms
-                            1000L, // timeout 
+                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
                 
@@ -877,7 +886,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     		new BindingImpl("s", s),
                     		new BindingImpl("o", o),
                     		new BindingImpl("score", score));
-                	System.err.println(bs);
+                    if(log.isInfoEnabled())
+                		log.info(bs);
                     answer.add(bs);
                 }
                 
@@ -910,9 +920,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 int i = 0;
                 while (result.hasNext()) {
-                	System.err.println(i++ + ": " + result.next().toString());
+                	if(log.isInfoEnabled())
+                		log.info(i++ + ": " + result.next().toString());
                 }
-                assertTrue("wrong # of results", i == 2);
+                assertEquals("wrong # of results", 2, i);
                 
                 result = tupleQuery.evaluate();
 
@@ -923,12 +934,12 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final Hiterator<IHit> hits = 
                 	search.search(searchQuery, 
                             null, // languageCode
-                            false, // prefixMatch
+                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            10000, // maxRank (=maxResults + 1)
-                            false, // matchAllTerms
-                            1000L, // timeout 
+                            BD.DEFAULT_MAX_HITS,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
                 
@@ -942,7 +953,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     		new BindingImpl("s", s),
                     		new BindingImpl("o", o),
                     		new BindingImpl("score", score));
-                	System.err.println(bs);
+                    if(log.isInfoEnabled())
+                		log.info(bs);
                     answer.add(bs);
                 }
                 
@@ -969,7 +981,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "} " +
                     "order by desc(?score)";
                 
-                log.info("\n"+query);
+                if(log.isInfoEnabled())
+            		log.info("\n"+query);
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
@@ -978,9 +991,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 int i = 0;
                 while (result.hasNext()) {
-                	log.info(i++ + ": " + result.next().toString());
+                	if(log.isInfoEnabled())
+                		log.info(i++ + ": " + result.next().toString());
                 }
-                assertTrue("wrong # of results: " + i, i == 2);
+                assertEquals("wrong # of results: " + i, 2, i);
                 
                 result = tupleQuery.evaluate();
 
@@ -991,12 +1005,12 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final Hiterator<IHit> hits = 
                 	search.search(searchQuery, 
                             null, // languageCode
-                            false, // prefixMatch
+                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            10000, // maxRank (=maxResults + 1)
-                            false, // matchAllTerms
-                            1000L, // timeout 
+                            BD.DEFAULT_MAX_HITS,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
                 
@@ -1039,7 +1053,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "} " +
                     "order by desc(?score)";
                 
-                log.info("\n"+query);
+                if(log.isInfoEnabled())
+            		log.info("\n"+query);
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
@@ -1048,9 +1063,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 int i = 0;
                 while (result.hasNext()) {
-                	log.info(i++ + ": " + result.next().toString());
+                	if(log.isInfoEnabled())
+                		log.info(i++ + ": " + result.next().toString());
                 }
-                assertTrue("wrong # of results: " + i, i == 3);
+                assertEquals("wrong # of results: " + i, 3, i);
                 
                 result = tupleQuery.evaluate();
 
@@ -1064,9 +1080,9 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             true, // prefixMatch
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            10000, // maxRank (=maxResults + 1)
-                            false, // matchAllTerms
-                            1000L, // timeout 
+                            BD.DEFAULT_MAX_HITS,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
                 
@@ -1092,7 +1108,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             	
             	final String searchQuery = "to*";
             	final double minRelevance = 0.0d;
-            	final double maxRelevance = 1.0d;
+            	final double maxRelevance = BD.DEFAULT_MAX_RELEVANCE;//1.0d;
             	
                 final String query = 
                     "select ?s ?o ?score " + 
@@ -1101,13 +1117,14 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "    ?s <"+RDFS.LABEL+"> ?o . " +
                     "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
                     "    ?o <"+BD.RELEVANCE+"> ?score . " +
-//                    "    ?o <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
+                    "    ?o <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
 //                    "    ?o <"+BD.MAX_HITS+"> \"5\" . " +
 //                    "    filter regex(?o, \""+searchQuery+"\") " +
                     "} " +
                     "order by desc(?score)";
                 
-                log.info("\n"+query);
+            	if(log.isInfoEnabled())
+            		log.info("\n"+query);
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
@@ -1116,9 +1133,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 int i = 0;
                 while (result.hasNext()) {
-                	log.info(i++ + ": " + result.next().toString());
+                	if(log.isInfoEnabled())
+                		log.info(i++ + ": " + result.next().toString());
                 }
-                assertTrue("wrong # of results: " + i, i == 1);
+                assertEquals("wrong # of results: " + i, 1, i);
                 
                 result = tupleQuery.evaluate();
 
@@ -1132,9 +1150,9 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             true, // prefixMatch
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            10000, // maxRank (=maxResults + 1)
-                            false, // matchAllTerms
-                            1000L, // timeout 
+                            BD.DEFAULT_MAX_HITS,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
                 
@@ -1180,7 +1198,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 int i = 0;
                 while (result.hasNext()) {
-                	log.info(i++ + ": " + result.next().toString());
+                	if(log.isInfoEnabled())
+                		log.info(i++ + ": " + result.next().toString());
                 }
 //                assertTrue("wrong # of results: " + i, i == 1);
                 
@@ -1196,9 +1215,9 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             true, // prefixMatch
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MAX_HITS,//10000, // maxRank (=maxResults + 1)
                             true, // matchAllTerms
-                            1000L, // timeout 
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
                 

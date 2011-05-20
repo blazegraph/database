@@ -43,10 +43,23 @@ public class AndBOp extends XSDBooleanIVValueExpression {
 	 */
 	private static final long serialVersionUID = -1217715173822304819L;
 
+	/**
+	 * Each operand of this operator must evaluate to a boolean. If the operand
+	 * is not known to evaluate to a boolean, wrap it with an {@link EBVBOp}.
+	 */
+	private static final XSDBooleanIVValueExpression wrap(
+			final IValueExpression<? extends IV> ve) {
+		
+		return ve instanceof XSDBooleanIVValueExpression  ? 
+				(XSDBooleanIVValueExpression) ve :
+					new EBVBOp(ve);
+		
+	}
+	
 	public AndBOp(final IValueExpression<? extends IV> x, 
 			final IValueExpression<? extends IV> y) {
 
-        this(new BOp[] { x, y }, null/*annocations*/);
+        this(new BOp[] { wrap(x), wrap(y) }, null/*annocations*/);
 
     }
 
@@ -59,6 +72,12 @@ public class AndBOp extends XSDBooleanIVValueExpression {
     	
         if (args.length != 2 || args[0] == null || args[1] == null)
 			throw new IllegalArgumentException();
+        
+        if (!(args[0] instanceof XSDBooleanIVValueExpression))
+			throw new IllegalArgumentException();
+
+        if (!(args[1] instanceof XSDBooleanIVValueExpression))
+			throw new IllegalArgumentException();
 
     }
 
@@ -67,6 +86,11 @@ public class AndBOp extends XSDBooleanIVValueExpression {
      */
     public AndBOp(final AndBOp op) {
         super(op);
+    }
+    
+    @Override
+    public XSDBooleanIVValueExpression get(final int i) {
+		return (XSDBooleanIVValueExpression) super.get(i);
     }
 
     /**

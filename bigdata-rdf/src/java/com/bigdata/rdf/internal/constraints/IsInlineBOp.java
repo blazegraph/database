@@ -26,15 +26,15 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSDBooleanIV;
 
 /**
  * Imposes the constraint <code>isInline(x)</code>.
@@ -45,6 +45,9 @@ public class IsInlineBOp extends XSDBooleanIVValueExpression {
 	 * 
 	 */
 	private static final long serialVersionUID = 3125106876006900339L;
+	
+	private static final transient Logger log = Logger.getLogger(IsInlineBOp.class);
+	
 
     public interface Annotations extends PipelineOp.Annotations {
 
@@ -59,6 +62,12 @@ public class IsInlineBOp extends XSDBooleanIVValueExpression {
     	
     }
 
+    public IsInlineBOp(final IVariable<IV> x) {
+        
+        this(x, true);
+        
+    }
+    
     public IsInlineBOp(final IVariable<IV> x, final boolean inline) {
         
         this(new BOp[] { x }, NV.asMap(new NV(Annotations.INLINE, inline)));
@@ -75,6 +84,9 @@ public class IsInlineBOp extends XSDBooleanIVValueExpression {
         if (args.length != 1 || args[0] == null)
             throw new IllegalArgumentException();
 
+		if (getProperty(Annotations.INLINE) == null)
+			throw new IllegalArgumentException();
+		
     }
 
     /**
@@ -90,6 +102,12 @@ public class IsInlineBOp extends XSDBooleanIVValueExpression {
         	(Boolean) getRequiredProperty(Annotations.INLINE); 
         
         final IV iv = get(0).get(bs);
+        
+        if (log.isDebugEnabled()) {
+        	log.debug(iv);
+        	if (iv != null) 
+        		log.debug("inline?: " + iv.isInline());
+        }
        
         // not yet bound
         if (iv == null)

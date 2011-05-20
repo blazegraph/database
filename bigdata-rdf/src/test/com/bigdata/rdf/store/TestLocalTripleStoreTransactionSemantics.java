@@ -54,7 +54,7 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
                     },//
                     1);
         } finally {
-        store.destroy();
+            store.__tearDownUnitTest();
         }
     }
     

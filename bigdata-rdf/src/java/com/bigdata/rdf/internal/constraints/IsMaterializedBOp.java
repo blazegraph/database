@@ -26,56 +26,93 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 
 /**
- * Imposes the constraint <code>isURI(x)</code>.
+ * Imposes the constraint <code>isMaterialized(x)</code>.
  */
-public class IsURIBOp extends XSDBooleanIVValueExpression {
+public class IsMaterializedBOp extends XSDBooleanIVValueExpression {
 
     /**
 	 * 
 	 */
-	private static final long serialVersionUID = 3125106876006900339L;
+	private static final long serialVersionUID = -7552628930845996572L;
 
-    public IsURIBOp(final IVariable<IV> x) {
+	private static final transient Logger log = Logger.getLogger(IsMaterializedBOp.class);
+	
+	
+    public interface Annotations extends PipelineOp.Annotations {
+
+    	/**
+    	 * If true, only accept variable bindings for {@link #x} that have a
+    	 * materialized RDF {@link BigdataValue}.  If false, only accept those
+    	 * that don't. 
+    	 */
+    	String MATERIALIZED = (IsMaterializedBOp.class.getName() + ".materialized").intern();
+    	
+    }
+    
+	public IsMaterializedBOp(final IVariable<IV> x) {
         
-        this(new BOp[] { x }, null/*annocations*/);
+        this(x, true);
+        
+    }
+	
+	public IsMaterializedBOp(final IVariable<IV> x, final boolean materialized) {
+        
+        this(new BOp[] { x }, 
+        		NV.asMap(new NV(Annotations.MATERIALIZED, materialized)));
         
     }
     
     /**
      * Required shallow copy constructor.
      */
-    public IsURIBOp(final BOp[] args, final Map<String, Object> anns) {
+    public IsMaterializedBOp(final BOp[] args, final Map<String, Object> anns) {
 
     	super(args, anns);
     	
         if (args.length != 1 || args[0] == null)
             throw new IllegalArgumentException();
 
+		if (getProperty(Annotations.MATERIALIZED) == null)
+			throw new IllegalArgumentException();
+		
     }
 
     /**
      * Required deep copy constructor.
      */
-    public IsURIBOp(final IsURIBOp op) {
+    public IsMaterializedBOp(final IsMaterializedBOp op) {
         super(op);
     }
 
     public boolean accept(final IBindingSet bs) {
         
+        final boolean materialized = 
+        	(Boolean) getRequiredProperty(Annotations.MATERIALIZED); 
+        
         final IV iv = get(0).get(bs);
+        
+        if (log.isDebugEnabled()) {
+        	log.debug(iv);
+        	if (iv != null) 
+        		log.debug("materialized?: " + iv.hasValue());
+        }
         
         // not yet bound
         if (iv == null)
         	throw new SparqlTypeErrorException();
 
-    	return iv.isURI(); 
+    	return iv.hasValue() == materialized;
 
     }
     
