@@ -114,16 +114,16 @@ public class TestInlineConstraints extends ProxyTestCase {
     public void testGT() {
         
         // store with no owl:sameAs closure
-        AbstractTripleStore db = getStore();
+        final AbstractTripleStore db = getStore();
 
-        // do not run if we are not inlining
-        if (!db.getLexiconRelation().isInlineLiterals()) {
-            return;
-        }
-        
         try {
 
-            BigdataValueFactory vf = db.getValueFactory();
+            // do not run if we are not inlining
+            if (!db.getLexiconRelation().isInlineLiterals()) {
+                return;
+            }
+            
+            final BigdataValueFactory vf = db.getValueFactory();
             
             final BigdataURI A = vf.createURI("http://www.bigdata.com/A");
             final BigdataURI B = vf.createURI("http://www.bigdata.com/B");
@@ -220,16 +220,16 @@ public class TestInlineConstraints extends ProxyTestCase {
     public void testGE() {
         
         // store with no owl:sameAs closure
-        AbstractTripleStore db = getStore();
-        
-        // do not run if we are not inlining
-        if (!db.getLexiconRelation().isInlineLiterals()) {
-            return;
-        }
+        final AbstractTripleStore db = getStore();
         
         try {
 
-            BigdataValueFactory vf = db.getValueFactory();
+            // do not run if we are not inlining
+            if (!db.getLexiconRelation().isInlineLiterals()) {
+                return;
+            }
+            
+            final BigdataValueFactory vf = db.getValueFactory();
             
             final BigdataURI A = vf.createURI("http://www.bigdata.com/A");
             final BigdataURI B = vf.createURI("http://www.bigdata.com/B");
@@ -327,16 +327,16 @@ public class TestInlineConstraints extends ProxyTestCase {
     public void testLT() {
         
         // store with no owl:sameAs closure
-        AbstractTripleStore db = getStore();
-        
-        // do not run if we are not inlining
-        if (!db.getLexiconRelation().isInlineLiterals()) {
-            return;
-        }
+        final AbstractTripleStore db = getStore();
         
         try {
 
-            BigdataValueFactory vf = db.getValueFactory();
+            // do not run if we are not inlining
+            if (!db.getLexiconRelation().isInlineLiterals()) {
+                return;
+            }
+            
+            final BigdataValueFactory vf = db.getValueFactory();
             
             final BigdataURI A = vf.createURI("http://www.bigdata.com/A");
             final BigdataURI B = vf.createURI("http://www.bigdata.com/B");
@@ -435,16 +435,16 @@ public class TestInlineConstraints extends ProxyTestCase {
     public void testLE() {
         
         // store with no owl:sameAs closure
-        AbstractTripleStore db = getStore();
-        
-        // do not run if we are not inlining
-        if (!db.getLexiconRelation().isInlineLiterals()) {
-            return;
-        }
+        final AbstractTripleStore db = getStore();
         
         try {
 
-            BigdataValueFactory vf = db.getValueFactory();
+            // do not run if we are not inlining
+            if (!db.getLexiconRelation().isInlineLiterals()) {
+                return;
+            }
+            
+            final BigdataValueFactory vf = db.getValueFactory();
             
             final BigdataURI A = vf.createURI("http://www.bigdata.com/A");
             final BigdataURI B = vf.createURI("http://www.bigdata.com/B");
@@ -545,16 +545,16 @@ public class TestInlineConstraints extends ProxyTestCase {
     public void testMath() {
         
         // store with no owl:sameAs closure
-        AbstractTripleStore db = getStore();
+        final AbstractTripleStore db = getStore();
 
-        // do not run if we are not inlining
-        if (!db.getLexiconRelation().isInlineLiterals()) {
-            return;
-        }
-        
         try {
 
-            BigdataValueFactory vf = db.getValueFactory();
+            // do not run if we are not inlining
+            if (!db.getLexiconRelation().isInlineLiterals()) {
+                return;
+            }
+            
+            final BigdataValueFactory vf = db.getValueFactory();
             
             final BigdataURI A = vf.createURI("http://www.bigdata.com/A");
             final BigdataURI B = vf.createURI("http://www.bigdata.com/B");
@@ -657,16 +657,16 @@ public class TestInlineConstraints extends ProxyTestCase {
     public void testCompareDates() {
         
         // store with no owl:sameAs closure
-        AbstractTripleStore db = getStore();
+        final AbstractTripleStore db = getStore();
 
-        // do not run if we are not inlining
-        if (!db.getLexiconRelation().isInlineLiterals()) {
-            return;
-        }
-        
         try {
 
-            BigdataValueFactory vf = db.getValueFactory();
+            // do not run if we are not inlining
+            if (!db.getLexiconRelation().isInlineLiterals()) {
+                return;
+            }
+            
+            final BigdataValueFactory vf = db.getValueFactory();
             
             final BigdataURI A = vf.createURI("http://www.bigdata.com/A");
             final BigdataURI B = vf.createURI("http://www.bigdata.com/B");
