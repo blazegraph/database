@@ -81,33 +81,33 @@ public class TestKeyBuilder extends TestCase2 {
         {
             KeyBuilder keyBuilder = new KeyBuilder();
             
-            assertNotNull(keyBuilder.buf);
-            assertEquals(KeyBuilder.DEFAULT_INITIAL_CAPACITY,keyBuilder.buf.length);
-            assertEquals(0,keyBuilder.len);
+            assertNotNull(keyBuilder.array());
+            assertEquals(KeyBuilder.DEFAULT_INITIAL_CAPACITY,keyBuilder.array().length);
+            assertEquals(0,keyBuilder.len());
 
         }
         
         {
             KeyBuilder keyBuilder = new KeyBuilder(0);
-            assertNotNull(keyBuilder.buf);
-            assertEquals(KeyBuilder.DEFAULT_INITIAL_CAPACITY,keyBuilder.buf.length);
-            assertEquals(0,keyBuilder.len);
+            assertNotNull(keyBuilder.array());
+            assertEquals(KeyBuilder.DEFAULT_INITIAL_CAPACITY,keyBuilder.array().length);
+            assertEquals(0,keyBuilder.len());
         }
         
         {
             KeyBuilder keyBuilder = new KeyBuilder(20);
-            assertNotNull(keyBuilder.buf);
-            assertEquals(20,keyBuilder.buf.length);
-            assertEquals(0,keyBuilder.len);
+            assertNotNull(keyBuilder.array());
+            assertEquals(20,keyBuilder.array().length);
+            assertEquals(0,keyBuilder.len());
         }
         
         {
             final byte[] expected = new byte[]{1,2,3,4,5,6,7,8,9,10};
             KeyBuilder keyBuilder = new KeyBuilder(4,expected);
-            assertNotNull(keyBuilder.buf);
-            assertEquals(4,keyBuilder.len);
-            assertEquals(10,keyBuilder.buf.length);
-            assertTrue(expected==keyBuilder.buf);
+            assertNotNull(keyBuilder.array());
+            assertEquals(4,keyBuilder.len());
+            assertEquals(10,keyBuilder.array().length);
+            assertTrue(expected==keyBuilder.array());
         }
 
         /*
@@ -148,11 +148,11 @@ public class TestKeyBuilder extends TestCase2 {
         
         KeyBuilder keyBuilder = new KeyBuilder(initialCapacity);
 
-        assertEquals(0,keyBuilder.len);
-        assertNotNull( keyBuilder.buf);
-        assertEquals(initialCapacity,keyBuilder.buf.length);
+        assertEquals(0,keyBuilder.len());
+        assertNotNull( keyBuilder.array());
+        assertEquals(initialCapacity,keyBuilder.array().length);
 
-        final byte[] originalBuffer = keyBuilder.buf;
+        final byte[] originalBuffer = keyBuilder.array();
         
         // correct rejection.
         try {
@@ -161,14 +161,14 @@ public class TestKeyBuilder extends TestCase2 {
         } catch(IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: "+ex);
         }
-        assertTrue(originalBuffer==keyBuilder.buf); // same buffer.
+        assertTrue(originalBuffer==keyBuilder.array()); // same buffer.
         
         // no change.
         keyBuilder.ensureCapacity(initialCapacity);
-        assertEquals(0,keyBuilder.len);
-        assertNotNull( keyBuilder.buf);
-        assertEquals(initialCapacity,keyBuilder.buf.length);
-        assertTrue(originalBuffer==keyBuilder.buf); // same buffer.
+        assertEquals(0,keyBuilder.len());
+        assertNotNull( keyBuilder.array());
+        assertEquals(initialCapacity,keyBuilder.array().length);
+        assertTrue(originalBuffer==keyBuilder.array()); // same buffer.
     }
     
     public void test_keyBuilder_ensureCapacity02() {
@@ -177,18 +177,18 @@ public class TestKeyBuilder extends TestCase2 {
         
         KeyBuilder keyBuilder = new KeyBuilder(initialCapacity);
 
-        assertEquals(0,keyBuilder.len);
-        assertNotNull( keyBuilder.buf);
-        assertEquals(initialCapacity,keyBuilder.buf.length);
+        assertEquals(0,keyBuilder.len());
+        assertNotNull( keyBuilder.array());
+        assertEquals(initialCapacity,keyBuilder.array().length);
 
-        final byte[] originalBuffer = keyBuilder.buf;
+        final byte[] originalBuffer = keyBuilder.array();
         
         // extends buffer.
         keyBuilder.ensureCapacity(100);
-        assertEquals(0,keyBuilder.len);
-        assertNotNull( keyBuilder.buf);
-        assertEquals(100,keyBuilder.buf.length);
-        assertTrue(originalBuffer!=keyBuilder.buf); // different buffer.
+        assertEquals(0,keyBuilder.len());
+        assertNotNull( keyBuilder.array());
+        assertEquals(100,keyBuilder.array().length);
+        assertTrue(originalBuffer!=keyBuilder.array()); // different buffer.
     }
     
     /**
@@ -202,20 +202,20 @@ public class TestKeyBuilder extends TestCase2 {
 
         KeyBuilder keyBuilder = new KeyBuilder(20,expected);
 
-        assertEquals(20,keyBuilder.len);
-        assertNotNull( keyBuilder.buf);
-        assertTrue(expected==keyBuilder.buf);
+        assertEquals(20,keyBuilder.len());
+        assertNotNull( keyBuilder.array());
+        assertTrue(expected==keyBuilder.array());
 
         keyBuilder.ensureCapacity(30);
-        assertEquals(20,keyBuilder.len);
-        assertEquals(30,keyBuilder.buf.length);
+        assertEquals(20,keyBuilder.len());
+        assertEquals(30,keyBuilder.array().length);
 
         assertEquals(0, BytesUtil.compareBytesWithLenAndOffset(0,
-                expected.length, expected, 0, expected.length, keyBuilder.buf));
+                expected.length, expected, 0, expected.length, keyBuilder.array()));
         
         for (int i = 21; i < 30; i++) {
 
-            assertEquals(0, keyBuilder.buf[i]);
+            assertEquals(0, keyBuilder.array()[i]);
 
         }
         
@@ -227,15 +227,15 @@ public class TestKeyBuilder extends TestCase2 {
         
         KeyBuilder keyBuilder = new KeyBuilder(initialCapacity);
 
-        assertEquals(0,keyBuilder.len);
-        assertNotNull( keyBuilder.buf);
-        assertEquals(initialCapacity,keyBuilder.buf.length);
+        assertEquals(0,keyBuilder.len());
+        assertNotNull( keyBuilder.array());
+        assertEquals(initialCapacity,keyBuilder.array().length);
     
         keyBuilder.ensureFree(2);
         
-        assertEquals(0,keyBuilder.len);
-        assertNotNull( keyBuilder.buf);
-        assertTrue(keyBuilder.buf.length>=2);
+        assertEquals(0,keyBuilder.len());
+        assertNotNull( keyBuilder.array());
+        assertTrue(keyBuilder.array().length>=2);
         
     }
     
@@ -254,26 +254,26 @@ public class TestKeyBuilder extends TestCase2 {
          * internal buffer (it is not reallocated).
          */
         byte[] tmp = new byte[]{4,5,6,7,8,9};
-        keyBuilder.append(2,2,tmp);
-        assertEquals(7,keyBuilder.len);
-        assertEquals(new byte[]{1,2,3,4,5,6,7}, keyBuilder.buf);
-        assertEquals(0,BytesUtil.compareBytes(new byte[]{1,2,3,4,5,6,7}, keyBuilder.buf));
+        keyBuilder.append(tmp,2,2);
+        assertEquals(7,keyBuilder.len());
+        assertEquals(new byte[]{1,2,3,4,5,6,7}, keyBuilder.array());
+        assertEquals(0,BytesUtil.compareBytes(new byte[]{1,2,3,4,5,6,7}, keyBuilder.array()));
         
         // overflow capacity (new capacity is not known in advance).
         tmp = new byte[] { 8, 9, 10 };
         byte[] expected = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
         keyBuilder.append(tmp);
-        assertEquals(10, keyBuilder.len);
+        assertEquals(10, keyBuilder.len());
         assertEquals(0, BytesUtil.compareBytesWithLenAndOffset(0, expected.length, expected, 0,
-                keyBuilder.len, keyBuilder.buf));
+                keyBuilder.len(), keyBuilder.array()));
 
         // possible overflow (old and new capacity are unknown).
         tmp = new byte[] { 11, 12 };
         expected = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
         keyBuilder.append(tmp);
-        assertEquals(12, keyBuilder.len);
+        assertEquals(12, keyBuilder.len());
         assertEquals(0, BytesUtil.compareBytesWithLenAndOffset(0, expected.length, expected, 0,
-                keyBuilder.len, keyBuilder.buf));
+                keyBuilder.len(), keyBuilder.array()));
         
     }
 
@@ -314,13 +314,13 @@ public class TestKeyBuilder extends TestCase2 {
     
         KeyBuilder keyBuilder = new KeyBuilder(5,expected);
         
-        assertEquals(5,keyBuilder.len);
-        assertTrue(expected==keyBuilder.buf);
+        assertEquals(5,keyBuilder.len());
+        assertTrue(expected==keyBuilder.array());
         
         assertTrue(keyBuilder == keyBuilder.reset());
         
-        assertEquals(0,keyBuilder.len);
-        assertTrue(expected==keyBuilder.buf);
+        assertEquals(0,keyBuilder.len());
+        assertTrue(expected==keyBuilder.array());
 
     }
     
@@ -347,11 +347,11 @@ public class TestKeyBuilder extends TestCase2 {
         final byte bp1  = (byte) 1;
         final byte bmax = Byte.MAX_VALUE;
         
-        byte[] kmin = keyBuilder.reset().append(bmin).getKey();
-        byte[] km1 = keyBuilder.reset().append(bm1).getKey();
-        byte[] k0 = keyBuilder.reset().append(b0).getKey();
-        byte[] kp1 = keyBuilder.reset().append(bp1).getKey();
-        byte[] kmax = keyBuilder.reset().append(bmax).getKey();
+        byte[] kmin = keyBuilder.reset().appendSigned(bmin).getKey();
+        byte[] km1 = keyBuilder.reset().appendSigned(bm1).getKey();
+        byte[] k0 = keyBuilder.reset().appendSigned(b0).getKey();
+        byte[] kp1 = keyBuilder.reset().appendSigned(bp1).getKey();
+        byte[] kmax = keyBuilder.reset().appendSigned(bmax).getKey();
 
         assertEquals(1,kmin.length);
         assertEquals(1,km1.length);
@@ -1419,7 +1419,7 @@ public class TestKeyBuilder extends TestCase2 {
     /**
      * Unit test for {@link KeyBuilder#encodeByte(byte)} and
      * {@link KeyBuilder#decodeByte(byte)}. The former should have the same
-     * behavior as {@link KeyBuilder#append(byte)} while the latter should
+     * behavior as {@link KeyBuilder#appendSigned(byte)} while the latter should
      * reverse the mapping.
      * 
      * @todo It fact, it appears that the operation is symmetric. So perhaps get

@@ -65,6 +65,7 @@ import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
 import com.bigdata.btree.raba.codec.FixedLengthValueRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.compression.RecordCompressor;
@@ -97,7 +98,7 @@ import com.bigdata.util.concurrent.Latch;
  * 
  * 8B triple bioinformatics data set.
  * 
- * BTC data (some very large literals, also fix nxparser to not drop/truncate)
+ * BTC data (some very large literals)
  * 
  * </pre>
  * 
@@ -714,10 +715,14 @@ public class HashCollisionUtility {
 		 * The <code>unsigned byte[]</code> key.
 		 */
 		public final byte[] key;
-		
-		/**
-		 * The list of addresses for this bucket.
-		 */
+
+        /**
+         * The list of addresses for this bucket.
+         * 
+         * TODO Collisions in a bucket are very rare given an int32 hash code,
+         * so this should be optimized for the common case with a single
+         * address.
+         */
 		public final List<Long> addrs = new LinkedList<Long>();
 		
 		public Bucket(final byte[] key) {
@@ -1684,6 +1689,9 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		/** Used to serialize RDF Values as byte[]s. */
     	private final DataOutputBuffer out = new DataOutputBuffer();
 
+        /** Used to serialize RDF Values as byte[]s. */
+    	private final ByteArrayBuffer tbuf = new ByteArrayBuffer();
+    	
 		/** Used to serialize RDF Values as byte[]s. */
     	private final BigdataValueSerializer<BigdataValue> valSer;
 
@@ -2017,8 +2025,9 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 							// We've already seen this Value.
 							
-							if (log.isDebugEnabled())
-								log.debug("Duplicate value in chunk: " + t.val);
+                            if (log.isDebugEnabled())
+                                log.debug("Duplicate value in chunk: "
+                                        + Arrays.toString(t.val));
 							
 							return;
 							
@@ -2082,14 +2091,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 		private KV makeKV(final BigdataValue r) {
 
-			/*
-			 * TODO This can not handle very large UTF strings. To do that
-			 * we need to either explore ICU support for that feature or
-			 * serialize the data using "wide" characters (java uses 2-byte
-			 * characters). [Use ICU binary Unicode compression plus gzip.]
-			 */
-//			final byte[] val = SerializerUtil.serialize(r);
-			byte[] val = valSer.serialize(r, out.reset()); 
+			byte[] val = valSer.serialize(r, out.reset(), tbuf); 
 
 			 /* 
 			 * FIXME In order support conditional compression  we will have to
@@ -2399,7 +2401,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				 * index for the value before inserting the value into the
 				 * index.
 				 */
-				final byte[] key = keyBuilder.reset().append(fromKey).append(
+				final byte[] key = keyBuilder.reset().append(fromKey).appendSigned(
 						counter).getKey();
 
 				if (termsIndex.insert(key, val) != null) {
@@ -2480,7 +2482,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 			}
 			
-			final byte[] key = keyBuilder.reset().append(fromKey).append(
+			final byte[] key = keyBuilder.reset().append(fromKey).appendSigned(
 					counter).getKey();
 
 			// Insert into the index.
@@ -2580,8 +2582,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		properties.setProperty(Journal.Options.INITIAL_EXTENT, ""
 				+ (Bytes.megabyte * 200));
 
-		properties.setProperty(Journal.Options.COLLECT_PLATFORM_STATISTICS,"true");
-		properties.setProperty(Journal.Options.COLLECT_QUEUE_STATISTICS,"true");
+//		properties.setProperty(Journal.Options.COLLECT_PLATFORM_STATISTICS,"true");
+//		properties.setProperty(Journal.Options.COLLECT_QUEUE_STATISTICS,"true");
 		properties.setProperty(Journal.Options.HTTPD_PORT,"8081");
 		
 		// The caller MUST specify the filename using -D on the command line.
@@ -2671,4 +2673,22 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 	}
 
+//    /**
+//     * A simple order preserving hash code (or at least locality preserving).
+//     * 
+//     * @param a
+//     *            The data.
+//     * @return The hash code.
+//     * 
+//     *         TODO Much faster against {@link MutableString}.
+//     */
+//    static private long hash(final char[] a) {
+//        long v = 0;
+//        for (int i = 0; i < a.length; i++) {
+//            final char ch = a[i];
+//            v = ((v << 6) | (v >> 58)) ^ ch;
+//        }
+//        return v;
+//    }
+    
 }

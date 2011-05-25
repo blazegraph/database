@@ -554,7 +554,6 @@ public class TestSuccessorUtil extends TestCase2 {
                 if (v == Short.MAX_VALUE) {
                     // no successor.
                     try {
-//                        b = KeyBuilder.asSortKey(v); // @todo remove.
                         SuccessorUtil.successor(b.clone());
                         fail("Expecting: " + NoSuccessorException.class);
                     } catch (NoSuccessorException ex) {

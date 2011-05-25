@@ -30,6 +30,7 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +61,6 @@ import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.httpd.AbstractHTTPD;
-import com.ibm.icu.impl.LinkedHashMap;
 
 /**
  * Unit tests for the {@link EventReceiver}.

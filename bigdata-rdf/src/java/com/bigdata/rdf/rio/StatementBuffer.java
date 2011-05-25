@@ -85,10 +85,10 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  */
 public class StatementBuffer<S extends Statement> implements IStatementBuffer<S> {
 
-    final protected static Logger log = Logger.getLogger(StatementBuffer.class);
+    final private static Logger log = Logger.getLogger(StatementBuffer.class);
    
-    final protected boolean INFO = log.isInfoEnabled();
-    final protected boolean DEBUG = log.isDebugEnabled();
+//    final protected boolean INFO = log.isInfoEnabled();
+//    final protected boolean DEBUG = log.isDebugEnabled();
     
     /**
      * Buffer for parsed RDF {@link Value}s.
@@ -425,8 +425,6 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * If there are remaining deferred statements then they contain cycles. This
      * is an error and an exception is thrown.
      * 
-     * FIXME write unit tests for the edge cases.
-     * 
      * @todo on each {@link #flush()}, scan the deferred statements for those
      *       which are fully determined (bnodes are flagged as statement
      *       identifiers) to minimize the build up for long documents?
@@ -474,7 +472,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                             && ((BigdataBNode) stmt.getObject()).isStatementIdentifier())
                         continue;
 
-                    if(DEBUG) {
+                    if(log.isDebugEnabled()) {
                         log.debug("grounded: "+stmt);
                     }
 
@@ -531,7 +529,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                                 && stmt.o() == null)
                             continue;
 
-                        if(DEBUG) {
+                        if (log.isDebugEnabled()) {
                             log.debug("round="+nrounds+", grounded: "+stmt);
                         }
                         
@@ -680,7 +678,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
         // Insert terms (batch operation).
         if (numValues > 0) {
-            if (DEBUG) {
+            if (log.isDebugEnabled()) {
                 for (int i = 0; i < numValues; i++) {
                     log
                             .debug("adding term: "
@@ -694,7 +692,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                 }
             }
             addTerms(values, numValues);
-            if (DEBUG) {
+            if (log.isDebugEnabled()) {
                 for (int i = 0; i < numValues; i++) {
                     log
                             .debug(" added term: "
@@ -711,13 +709,13 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
         // Insert statements (batch operation).
         if (numStmts > 0) {
-            if(DEBUG) {
+            if (log.isDebugEnabled()) {
                 for(int i=0; i<numStmts; i++) {
                     log.debug("adding stmt: "+stmts[i]);
                 }
             }
             addStatements(stmts, numStmts);
-            if(DEBUG) {
+            if (log.isDebugEnabled()) {
                 for(int i=0; i<numStmts; i++) {
                     log.debug(" added stmt: "+stmts[i]);
                 }
@@ -845,7 +843,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
             final SPO spo = new SPO(stmt);
 
-            if (DEBUG)
+            if (log.isDebugEnabled()) 
                 log.debug("adding: " + stmt.toString() + " (" + spo + ")");
             
             if(!spo.isFullyBound()) {
@@ -935,7 +933,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                         // assign the statement identifier.
                         c.setIV(sid);
                         
-                        if(DEBUG) {
+                        if (log.isDebugEnabled()) {
                             
                             log.debug("Assigned statement identifier: " + c
                                     + "=" + sid);
@@ -1226,7 +1224,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
                 deferredStmts.add(stmt);
 
-                if (DEBUG)
+                if (log.isDebugEnabled()) 
                     log.debug("deferred: "+stmt);
                 
             } else {

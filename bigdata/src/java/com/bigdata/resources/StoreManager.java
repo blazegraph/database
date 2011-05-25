@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -110,7 +111,6 @@ import com.bigdata.service.MetadataService;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.config.NicUtil;
-import com.ibm.icu.impl.ByteBuffer;
 
 /**
  * Class encapsulates logic for managing the store files (journals and index

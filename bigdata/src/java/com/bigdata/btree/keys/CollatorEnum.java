@@ -20,15 +20,15 @@ public enum CollatorEnum {
      * compressed sort keys, which can be a big savings in an index.
      */
     ICU,
-    
-    /**
-     * A JNI plugin for ICU (native code for faster generation of sort
-     * keys).
-     * 
-     * @todo this is notionally faster but I have never made it work myself,
-     *       or at least I have not found it to be stable in my experience.
-     */
-    ICU4JNI,
+
+//    /**
+//     * A JNI plugin for ICU (native code for faster generation of sort keys).
+//     * 
+//     * @deprecated ICU4JNI is no longer being developed. The ICU project has
+//     *             provided high performance pure Java code for all aspects of
+//     *             ICU which were historically optimized only in ICU4C.
+//     */
+//    ICU4JNI,
 
     /**
      * A configuration option to force the interpretation of Unicode text as

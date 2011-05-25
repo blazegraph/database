@@ -190,7 +190,7 @@ public class SidIV<V extends BigdataBNode> extends
     public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
 
         // First emit the flags byte.
-        keyBuilder.append(flags());
+        keyBuilder.appendSigned(flags());
 		
 		// Then append the SPO's key in SPOKeyOrder.SPO
         keyBuilder.append(key());

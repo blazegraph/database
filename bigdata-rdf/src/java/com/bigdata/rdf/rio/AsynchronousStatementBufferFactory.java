@@ -98,7 +98,6 @@ import com.bigdata.rdf.lexicon.Term2IdWriteProc;
 import com.bigdata.rdf.lexicon.Id2TermWriteProc.Id2TermWriteProcConstructor;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
 import com.bigdata.rdf.lexicon.Term2IdWriteTask.AssignTermId;
-import com.bigdata.rdf.load.ConcurrentDataLoader;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataResource;
@@ -1527,10 +1526,6 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      *            on the RAM of the parsers. The RAM demand of the asynchronous
      *            index write buffers is controlled by their master and sink
      *            queue capacity and chunk size.
-     * 
-     * @todo CDL still used for validation by some unit tests. Do a variant of
-     *       this that does read-only TERM2ID requests and then validates the
-     *       indices so we can drop the {@link ConcurrentDataLoader} class.
      */
     public AsynchronousStatementBufferFactory(//
             final ScaleOutTripleStore tripleStore,//
@@ -3062,6 +3057,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
             // buffer is reused for each serialized term.
             final DataOutputBuffer out = new DataOutputBuffer();
+            final ByteArrayBuffer tbuf = new ByteArrayBuffer();
 
             latch.inc();
 
@@ -3103,7 +3099,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                                 .getKey();
 
                         // Serialize the term.
-                        final byte[] val = ser.serialize((BigdataValueImpl)v, out.reset());
+                        final byte[] val = ser.serialize((BigdataValueImpl) v,
+                                out.reset(), tbuf);
 
                         /*
                          * Note: The BigdataValue instance is NOT supplied to

@@ -3,7 +3,6 @@ package com.bigdata.rdf.load;
 import java.beans.Statement;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
@@ -16,7 +15,6 @@ import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
@@ -37,24 +35,8 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  */
 public class VerifyStatementBuffer extends StatementBuffer {
 
-    final protected static Logger log = Logger.getLogger(VerifyStatementBuffer.class);
+    final private static Logger log = Logger.getLogger(VerifyStatementBuffer.class);
     
-    /**
-     * True iff the {@link #log} level is WARN or less.
-     */
-    final protected  static boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
-            .toInt();
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected  static boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
-
     final AtomicLong nterms, ntermsNotFound, ntriples, ntriplesNotFound;
     
     /**
@@ -86,7 +68,7 @@ public class VerifyStatementBuffer extends StatementBuffer {
      */
     protected void incrementalWrite() {
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
             log.info("numValues=" + numValues + ", numStmts=" + numStmts);
         }
 
@@ -106,7 +88,7 @@ public class VerifyStatementBuffer extends StatementBuffer {
 
             if (v.getIV() == null) {
                 
-                if(WARN) log.warn("Unknown term: "+v);
+                log.warn("Unknown term: "+v);
 
                 ntermsNotFound.incrementAndGet();
 
@@ -131,7 +113,6 @@ public class VerifyStatementBuffer extends StatementBuffer {
 
                 if (!stmt.isFullyBound()) {
 
-                    if (WARN)
                         log
                                 .warn("Unknown statement (one or more unknown terms) "
                                         + stmt);
@@ -175,7 +156,6 @@ public class VerifyStatementBuffer extends StatementBuffer {
 
                     ntriplesNotFound.incrementAndGet();
 
-                    if(WARN)
                     log.warn("Statement not in database: " + b[i]+" ("+spo+")");
 
                     continue;
@@ -186,7 +166,6 @@ public class VerifyStatementBuffer extends StatementBuffer {
                     
                     ntriplesNotFound.incrementAndGet();
 
-                    if(WARN)
                     log.warn("Statement not explicit database: "+b[i]+" is marked as "+spo.getStatementType());
                     
                     continue;

@@ -36,6 +36,7 @@ import java.util.UUID;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.KeyBuilder.Options;
+import com.bigdata.io.IManagedByteArray;
 
 /**
  * <p>
@@ -97,27 +98,25 @@ import com.bigdata.btree.keys.KeyBuilder.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IKeyBuilder extends ISortKeyBuilder<Object> {
+public interface IKeyBuilder extends ISortKeyBuilder<Object>, IManagedByteArray {
+    
+    /**
+     * The backing byte[] WILL be transparently replaced if the buffer capacity
+     * is extended. {@inheritDoc}
+     */
+    byte[] array();
 
     /**
-     * The #of bytes of data in the key.
+     * The offset of the slice into the backing byte[] is always zero.
+     * {@inheritDoc}
      */
-    public int getLength();
+    int off();
 
     /**
-     * Append <i>len</i> bytes starting at <i>off</i> in <i>a</i> to the key
-     * buffer.
-     * 
-     * @param off
-     *            The offset.
-     * @param len
-     *            The #of bytes to append.
-     * @param a
-     *            The array containing the bytes to append.
-     *            
-     * @return <i>this</i>
+     * The length of the slice is number of bytes written onto the backing
+     * byte[]. This is set to ZERO (0) by {@link #reset()}. {@inheritDoc}
      */
-    public IKeyBuilder append(int off, int len, byte[] a);
+    int len();
 
     /**
      * Return the encoded key. Comparison of keys returned by this method MUST
@@ -133,6 +132,13 @@ public interface IKeyBuilder extends ISortKeyBuilder<Object> {
      */
     public byte[] getKey();
 
+    /**
+     * An alias for {@link #getKey()}.
+     * 
+     * {@inheritDoc}
+     */
+    public byte[] toByteArray();
+    
     /**
      * Reset the key length to zero before building another key.
      * 
@@ -313,6 +319,16 @@ public interface IKeyBuilder extends ISortKeyBuilder<Object> {
     public IKeyBuilder appendASCII(String s);
 
     /**
+     * Appends a byte - the byte is treated as an <code>unsigned</code> value.
+     * 
+     * @param b
+     *            The byte.
+     * 
+     * @return <i>this</i>
+     */
+    public IKeyBuilder append(byte b);
+
+    /**
      * Appends an array of bytes - the bytes are treated as
      * <code>unsigned</code> values.
      * 
@@ -322,6 +338,21 @@ public interface IKeyBuilder extends ISortKeyBuilder<Object> {
      * @return <i>this</i>
      */
     public IKeyBuilder append(byte[] a);
+
+    /**
+     * Append <i>len</i> bytes starting at <i>off</i> in <i>a</i> to the key
+     * buffer - the bytes are treated as <code>unsigned</code> values.
+     * 
+     * @param off
+     *            The offset.
+     * @param len
+     *            The #of bytes to append.
+     * @param a
+     *            The array containing the bytes to append.
+     * 
+     * @return <i>this</i>
+     */
+    public IKeyBuilder append(byte[] a, int off, int len);
 
     /**
      * Appends a double precision floating point value by first converting it
@@ -421,7 +452,7 @@ public interface IKeyBuilder extends ISortKeyBuilder<Object> {
      *            
      * @return <i>this</i>
      */
-    public IKeyBuilder append(final byte v);
+    public IKeyBuilder appendSigned(final byte v);
 
     /**
      * Append an unsigned zero byte to the key.

@@ -366,18 +366,18 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 
                         }
 
-                        try {
+//                        try {
 
                             final byte[] bytes = iv.encode(
                                     KeyBuilder.newInstance()).getKey();
                             
                             idbuf.reset().write(bytes);
                             
-                        } catch (IOException ex) {
-
-                            throw new RuntimeException(ex);
-
-                        }
+//                        } catch (IOException ex) {
+//
+//                            throw new RuntimeException(ex);
+//
+//                        }
 
                         // insert into index.
                         if (ndx.insert(key, idbuf.toByteArray()) != null) {

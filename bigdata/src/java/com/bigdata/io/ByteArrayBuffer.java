@@ -72,14 +72,13 @@ import com.bigdata.btree.BytesUtil;
 public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
         RepositionableStream {
 
-    protected static final Logger log = Logger.getLogger(ByteArrayBuffer.class);
-    
-    protected static final boolean INFO = log.isInfoEnabled();
+    private static final transient Logger log = Logger
+            .getLogger(ByteArrayBuffer.class);
 
     /**
      * The default capacity of the buffer.
      */
-    final public static int DEFAULT_INITIAL_CAPACITY = 1024;
+    final public static int DEFAULT_INITIAL_CAPACITY = 128;//1024;
 
     /**
      * The backing byte[]. This is re-allocated whenever the capacity of the
@@ -171,7 +170,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * <i>pos</i>. The {@link #buf buffer} may be grown by this operation but
      * it will not be truncated.
      * <p>
-     * This operation is equivilent to
+     * This operation is equivalent to
      * 
      * <pre>
      * ensureCapacity(pos + len)
@@ -191,12 +190,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
     }
 
     /**
-     * Ensure that the buffer capacity is a least <i>capacity</i> total bytes.
-     * The {@link #buf buffer} may be grown by this operation but it will not be
-     * truncated.
-     * 
-     * @param capacity
-     *            The minimum #of bytes in the buffer.
+     * {@inheritDoc}
      * 
      * @todo this can be potentially overridden in a derived class to only copy
      *       those bytes up to the current position, which would be somewhat
@@ -248,7 +242,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
 
         final int capacity = Math.max(required, buf.length * 2);
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("Extending buffer to capacity=" + capacity + " bytes.");
 
         return capacity;
@@ -628,22 +622,6 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
         
     }
 
-    /**
-     * Ensure that at least <i>len</i> bytes are free in the buffer. The
-     * {@link #buf buffer} may be grown by this operation but it will not be
-     * truncated.
-     * <p>
-     * This operation is equivalent to
-     * 
-     * <pre>
-     * ensureCapacity(this.len + len)
-     * </pre>
-     * 
-     * and the latter is often used as an optimization.
-     * 
-     * @param len
-     *            The minimum #of free bytes.
-     */
     final public void ensureFree(final int len) {
         
         ensureCapacity(this.pos + len);
@@ -1282,7 +1260,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * position as a post-condition (they are treated as relative puts).
      */
     
-    final public void write(final int b) throws IOException {
+    final public void write(final int b) {
 
         if (pos + 1 > buf.length)
             ensureCapacity(pos + 1);
@@ -1293,14 +1271,32 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
 
     }
 
-    final public void write(final byte[] b) throws IOException {
+    final public void write(final byte[] b) {
 
         write(b, 0, b.length);
 
     }
 
-    final public void write(final byte[] b, final int off, final int len)
-            throws IOException {
+    public ByteArrayBuffer append(final byte b) {
+        
+        if (pos + 1 > buf.length)
+            ensureCapacity(pos + 1);
+
+        buf[pos++] = b;//(byte) (b & 0xff);
+        
+        limit = pos;
+        
+        return this;
+        
+    }
+    
+    public ByteArrayBuffer append(final byte[] b) {
+        
+        return append(b, 0, b.length);
+        
+    }
+    
+    final public void write(final byte[] b, final int off, final int len) {
 
         if (len == 0)
             return;
@@ -1311,10 +1307,18 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
 
         this.pos += len;
 
-        this.limit = this.pos;
-
+        this.limit = this.pos;        
+        
     }
 
+    public ByteArrayBuffer append(final byte[] b, final int off, final int len) {
+
+        write(b, off, len);
+
+        return this;
+
+    }
+    
     /*
      * RepositionableStream.
      * 

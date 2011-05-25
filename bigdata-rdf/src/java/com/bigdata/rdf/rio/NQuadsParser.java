@@ -53,7 +53,6 @@ import org.openrdf.rio.helpers.RDFParserBase;
 import org.semanticweb.yars.nx.Node;
 import org.semanticweb.yars.nx.parser.NxParser;
 
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 
 /**
@@ -263,19 +262,19 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
                 o = f.createBNode(nodes[2].toString());
             } else if (nodes[2] instanceof org.semanticweb.yars.nx.Literal) {
                 final org.semanticweb.yars.nx.Literal tmp = (org.semanticweb.yars.nx.Literal) nodes[2];
-                final int len = tmp.getData().length();
-                if (len > (Bytes.kilobyte32 * 64)) {
-                    log
-                            .warn("Dropping statement with long literal: length="
-                                    + len
-                                    + (tmp.getDatatype() != null ? ",datatype="
-                                            + tmp.getDatatype() : "")
-                                    + ", begins="
-                                    + tmp
-                                            .getData()
-                                            .substring(0/* beginIndex */, 100/* endIndex */));
-                    continue;
-                }
+//                final int len = tmp.getData().length();
+//                if (len > (Bytes.kilobyte32 * 64)) {
+//                    log
+//                            .warn("Dropping statement with long literal: length="
+//                                    + len
+//                                    + (tmp.getDatatype() != null ? ",datatype="
+//                                            + tmp.getDatatype() : "")
+//                                    + ", begins="
+//                                    + tmp
+//                                            .getData()
+//                                            .substring(0/* beginIndex */, 100/* endIndex */));
+//                    continue;
+//                }
                 o = f.createLiteral(nodes[2].toString());
             } else
                 throw new RuntimeException();

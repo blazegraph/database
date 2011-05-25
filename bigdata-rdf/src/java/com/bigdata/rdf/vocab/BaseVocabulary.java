@@ -46,6 +46,7 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
@@ -62,7 +63,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 abstract public class BaseVocabulary implements Vocabulary, Externalizable {
 
-    final static public Logger log = Logger.getLogger(BaseVocabulary.class);
+    final static private transient Logger log = Logger
+            .getLogger(BaseVocabulary.class);
 
     /**
      * The serialVersionUID as reported by the trunk on Oct 6, 2010.
@@ -340,7 +342,8 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
         out.writeInt(nvalues);
         
         // reused for each serialized term.
-        final DataOutputBuffer buf = new DataOutputBuffer(256);
+        final DataOutputBuffer buf = new DataOutputBuffer();
+        final ByteArrayBuffer tbuf = new ByteArrayBuffer();
         
         final BigdataValueSerializer<Value> valueSer = new BigdataValueSerializer<Value>(
                 new ValueFactoryImpl());
@@ -365,7 +368,7 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
             buf.reset();
             
             // serialize the Value onto the buffer.
-            valueSer.serialize(value, buf);
+            valueSer.serialize(value, buf, tbuf);
             
             // #of bytes in the serialized value.
             final int nbytes = buf.limit();

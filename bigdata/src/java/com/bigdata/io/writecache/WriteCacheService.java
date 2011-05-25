@@ -71,6 +71,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.util.ChecksumError;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -658,14 +659,16 @@ abstract public class WriteCacheService implements IWriteCache {
                      * write cache service is closing down.
                      */
 					return null;
-				} catch(AsynchronousCloseException ex) {
-                    /*
-                     * The service was shutdown. We do not want to log an error
-                     * here since this is normal shutdown. close() will handle
-                     * all of the Condition notifies.
-                     */
-				    return null;
 				} catch (Throwable t) {
+                    if (InnerCause.isInnerCause(t,
+                            AsynchronousCloseException.class)) {
+                        /*
+                         * The service was shutdown. We do not want to log an
+                         * error here since this is normal shutdown. close()
+                         * will handle all of the Condition notifies.
+                         */
+                        return null;
+                    }
 					/*
 					 * Anything else is an error and halts processing. Error
 					 * processing MUST a high-level abort() and MUST do a

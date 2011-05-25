@@ -62,31 +62,14 @@ import com.ibm.icu.text.RuleBasedCollator;
  * ICU libraries when they are not required.
  * </p>
  * 
- * FIXME verify runtime with ICU4JNI, optimize generation of collation keys ( by
- * using lower level iterators over the collation groups), and make sure that
- * the code will run against both the ICU4JNI and ICU4J interfaces.
- * 
- * FIXME there appears to be an issue between ICU4JNI and jrockit under win xp
- * professional. try the icu4jni 3.6.1 patch (done, but does not fix the
- * problem) and ask on the mailing list.
- * 
- * FIXME TestAvailableCharsets Charset.availableCharsets() returned a number
- * less than the number returned by icu -- is this a serious error? - it
- * prevents the test suite from completing correctly. check on the mailing list.
- * 
- * @todo try out the ICU boyer-moore search implementation and see if it is
- *       defined for sort keys (more generally, for unsigned byte[]s) not just
- *       char[]s.
- * 
- * @see http://icu.sourceforge.net
- * @see http://icu.sourceforge.net/userguide/Collate_ServiceArchitecture.html#Versioning
+ * @see http://site.icu-project.org/
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
 
-    protected static final Logger log = Logger.getLogger(ICUSortKeyGenerator.class);
+    private static final Logger log = Logger.getLogger(ICUSortKeyGenerator.class);
     
     /**
      * Used to encode unicode strings into compact byte[]s that have the same
@@ -208,8 +191,10 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
         
         collator.getRawCollationKey(s, raw);
 
-        keyBuilder.append(0, raw.size - 1/* do not include the nul byte */,
-                raw.bytes);
+        keyBuilder.append(raw.bytes, 0, raw.size - 1/*
+                                                     * do not include the nul
+                                                     * byte
+                                                     */);
 
     }
 

@@ -88,7 +88,6 @@ import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.LexiconConfiguration;
-import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;

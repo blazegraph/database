@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.io;
 
+import com.bigdata.btree.keys.KeyBuilder;
+
 /**
  * Interface for a slice of a backing byte[].
  * 
@@ -50,7 +52,21 @@ public interface IByteArraySlice {
 
     /**
      * The length of the slice in the {@link #array()}.
+     * 
+     * Note: {@link IByteArraySlice#len()} has different semantics for some
+     * concrete implementations. {@link ByteArrayBuffer#len()} always returns
+     * the capacity of the backing byte[] while {@link ByteArrayBuffer#pos()}
+     * returns the #of bytes written onto the backing buffer. In contrast,
+     * {@link KeyBuilder#len()} is always the #of bytes written onto the backing
+     * buffer.
      */
     public int len();
 
+    /**
+     * Return a copy of the data in the slice.
+     * 
+     * @return A new array containing data in the slice.
+     */
+    byte[] toByteArray();
+    
 }

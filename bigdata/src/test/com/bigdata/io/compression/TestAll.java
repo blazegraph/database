@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.io.compression;
 
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -57,6 +58,9 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite(TestAll.class.getPackage()
                 .getName());
 
+        // tests for Unicode compression.
+        suite.addTestSuite(TestUnicodeCompressor.class);
+        
         suite.addTestSuite(TestNOPRecordCompressor.class);
 
         // tests some assumptions for Deflate and Inflate.

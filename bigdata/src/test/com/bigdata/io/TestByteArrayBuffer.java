@@ -67,30 +67,30 @@ public class TestByteArrayBuffer extends TestCase2 {
 
         {
             final ByteArrayBuffer buf = new ByteArrayBuffer();
-            assertNotNull(buf.buf);
+            assertNotNull(buf.array());
             assertEquals(0, buf.pos());
             assertEquals(0, buf.limit());
             assertEquals(ByteArrayBuffer.DEFAULT_INITIAL_CAPACITY,
-                    buf.buf.length);
+                    buf.array().length);
             assertEquals(ByteArrayBuffer.DEFAULT_INITIAL_CAPACITY, buf
                     .capacity());
         }
 
         {
             final ByteArrayBuffer buf = new ByteArrayBuffer(0);
-            assertNotNull(buf.buf);
+            assertNotNull(buf.array());
             assertEquals(0, buf.pos());
             assertEquals(0, buf.limit());
-            assertEquals(0, buf.buf.length);
+            assertEquals(0, buf.array().length);
             assertEquals(0, buf.capacity());
         }
 
         {
             final ByteArrayBuffer buf = new ByteArrayBuffer(20);
-            assertNotNull(buf.buf);
+            assertNotNull(buf.array());
             assertEquals(0, buf.pos());
             assertEquals(0, buf.limit());
-            assertEquals(20, buf.buf.length);
+            assertEquals(20, buf.array().length);
             assertEquals(20, buf.capacity());
         }
 
@@ -119,10 +119,10 @@ public class TestByteArrayBuffer extends TestCase2 {
         final ByteArrayBuffer buf = new ByteArrayBuffer(0);
 
 //        assertEquals(0, buf.len);
-        assertNotNull(buf.buf);
-        assertEquals(0, buf.buf.length);
+        assertNotNull(buf.array());
+        assertEquals(0, buf.array().length);
 
-        final byte[] originalBuffer = buf.buf;
+        final byte[] originalBuffer = buf.array();
 
         // correct rejection.
         try {
@@ -131,14 +131,14 @@ public class TestByteArrayBuffer extends TestCase2 {
         } catch (IllegalArgumentException ex) {
             if(log.isInfoEnabled()) log.info("Ignoring expected exception: " + ex);
         }
-        assertTrue(originalBuffer == buf.buf); // same buffer.
+        assertTrue(originalBuffer == buf.array()); // same buffer.
 
         // no change.
         buf.ensureCapacity(0);
 //        assertEquals(0, buf.len);
-        assertNotNull(buf.buf);
-        assertEquals(0, buf.buf.length);
-        assertTrue(originalBuffer == buf.buf); // same buffer.
+        assertNotNull(buf.array());
+        assertEquals(0, buf.array().length);
+        assertTrue(originalBuffer == buf.array()); // same buffer.
     }
 
     public void test_ensureCapacity02() {
@@ -146,17 +146,17 @@ public class TestByteArrayBuffer extends TestCase2 {
         ByteArrayBuffer buf = new ByteArrayBuffer(0);
 
 //        assertEquals(0, buf.len);
-        assertNotNull(buf.buf);
-        assertEquals(0, buf.buf.length);
+        assertNotNull(buf.array());
+        assertEquals(0, buf.array().length);
 
-        final byte[] originalBuffer = buf.buf;
+        final byte[] originalBuffer = buf.array();
 
         // extends buffer.
         buf.ensureCapacity(100);
 //        assertEquals(0, buf.len);
-        assertNotNull(buf.buf);
-        assertEquals(100, buf.buf.length);
-        assertTrue(originalBuffer != buf.buf); // same buffer.
+        assertNotNull(buf.array());
+        assertEquals(100, buf.array().length);
+        assertTrue(originalBuffer != buf.array()); // same buffer.
     }
 
     /**
@@ -176,11 +176,11 @@ public class TestByteArrayBuffer extends TestCase2 {
         {
         assertEquals(0, BytesUtil.compareBytesWithLenAndOffset(0,
                 expected.length, expected, 0, expected.length,
-                buf.buf));
+                buf.array()));
 
 //        assertEquals(20, buf.len);
-        assertNotNull(buf.buf);
-        assertTrue(expected != buf.buf); // data was copied.
+        assertNotNull(buf.array());
+        assertTrue(expected != buf.array()); // data was copied.
         }
         
         // extend capacity.
@@ -189,14 +189,14 @@ public class TestByteArrayBuffer extends TestCase2 {
         // verify buffer state.
         {
 //        assertEquals(20, buf.len);
-        assertTrue(buf.buf.length >= 30);
+        assertTrue(buf.array().length >= 30);
 
         assertEquals(0, BytesUtil.compareBytesWithLenAndOffset(0,
                 expected.length, expected, 0, expected.length,
-                buf.buf));
+                buf.array()));
 
         for (int i = 21; i < 30; i++) {
-            assertEquals(0, buf.buf[i]);
+            assertEquals(0, buf.array()[i]);
         }
         }
         
@@ -297,7 +297,7 @@ public class TestByteArrayBuffer extends TestCase2 {
             
             assertEquals(0, BytesUtil.compareBytesWithLenAndOffset(0,
                     expected.length, expected, pos, expected.length,
-                    buf.buf));
+                    buf.array()));
 
             final byte[] actual = new byte[expected.length];
 
@@ -342,7 +342,7 @@ public class TestByteArrayBuffer extends TestCase2 {
             buf.put(pos, expected, off, len);
 
             assertEquals(0, BytesUtil.compareBytesWithLenAndOffset(off, len,
-                    expected, pos, len, buf.buf));
+                    expected, pos, len, buf.array()));
 
             final int dstoff = r.nextInt(10);
 

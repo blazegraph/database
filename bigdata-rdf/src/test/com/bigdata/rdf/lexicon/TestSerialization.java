@@ -27,31 +27,29 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.lexicon;
 
-import java.io.Externalizable;
 import java.util.Locale;
 import java.util.Properties;
 
 import junit.framework.TestCase2;
 
-import org.openrdf.model.Literal;
-import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.impl.LiteralImpl;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
-import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.rdf.model.BigdataValueSerializer;
+import com.bigdata.rdf.model.TestBigdataValueSerialization;
 
 /**
- * Test of the {@link BigdataValueSerializer}.
+ * Tests of the {@link LexiconKeyBuilder}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @see TestBigdataValueSerialization
+ * 
+ * @deprecated by the TERMS refactor along with {@link LexiconKeyBuilder}.
  */
 public class TestSerialization extends TestCase2 {
 
@@ -67,112 +65,6 @@ public class TestSerialization extends TestCase2 {
     public TestSerialization(String arg0) {
         super(arg0);
     }
-
-    /**
-     * Fixture under test.
-     */
-    protected final BigdataValueSerializer<Value> fixture = new BigdataValueSerializer<Value>(
-            ValueFactoryImpl.getInstance());
-    
-    /**
-     * Performs round trip using the {@link Externalizable} implementation on
-     * {@link Value}.
-     * 
-     * @param o
-     *            The {@link Value}.
-     * 
-     * @return The de-serialized {@link Value}.
-     * 
-     * @deprecated The {@link Externalizable} iface is disabled since we can't
-     *             write a stand-off deserializer for {@link Externalizable}.
-     */
-    protected Value roundTrip_externalizable(Value o) {
-        
-        // Note: Externalizable is disabled. 
-        
-        return o;
-        
-//        return (_Value) SerializerUtil.deserialize(SerializerUtil.serialize(o));
-        
-    }
-    
-    /**
-     * Performs round trip (de-)serialization using {@link BigdataValueSerializer#serialize()}
-     * and {@link BigdataValueSerializer#deserialize(byte[])}.
-     * 
-     * @param o The {@link Value}
-     * 
-     * @return The de-serialized {@link Value}.
-     */
-    protected Value roundTrip_tuned(Value o) {
-        
-        return fixture.deserialize(fixture.serialize(o));
-        
-    }
-    
-    /**
-     * Test round trip of some URIs.
-     */
-    public void test_URIs() {
-
-        final URI a = new URIImpl("http://www.bigdata.com");
-        
-//        assertEquals(a, roundTrip_externalizable(a));
-        assertEquals(a, roundTrip_tuned(a));
-        
-    }
-    
-    /**
-     * Test round trip of some plain literals.
-     */
-    public void test_plainLiterals() {
-
-        final Literal a = new LiteralImpl("bigdata");
-        
-//        assertEquals(a, roundTrip_externalizable(a));
-        assertEquals(a, roundTrip_tuned(a));
-        
-    }
-    
-    /**
-     * Test round trip of some language code literals.
-     */
-    public void test_langCodeLiterals() {
-
-        final Literal a = new LiteralImpl("bigdata","en");
-        
-//        assertEquals(a, roundTrip_externalizable(a));
-        assertEquals(a, roundTrip_tuned(a));
-        
-    }
-
-    /**
-     * Test round trip of some datatype literals.
-     */
-    public void test_dataTypeLiterals() {
-
-        final Literal a = new LiteralImpl("bigdata", XMLSchema.INT);
-        
-//        assertEquals(a, roundTrip_externalizable(a));
-        assertEquals(a, roundTrip_tuned(a));
-        
-    }
-
-    /*
-     * Note: BNode serialization has been disabled since we never write
-     * them on the database.
-     */
-//    /**
-//     * Test round trip of some bnodes.
-//     */
-//    public void test_bnodes() {
-//
-//        _BNode a = new _BNode(UUID.randomUUID().toString());
-//        
-//        assertEquals(a, roundTrip_externalizable(a));
-//        assertEquals(a, roundTrip_tuned(a));
-//        
-//    }
 
     /**
      * This is an odd issue someone reported for the trunk. There are two
@@ -205,9 +97,13 @@ public class TestSerialization extends TestCase2 {
 
         final Value oldValue = fixture.deserialize(oldValBytes);
 
-        System.err.println("new=" + newValue);
+        if (log.isInfoEnabled()) {
+            
+            log.info("new=" + newValue);
 
-        System.err.println("old=" + oldValue);
+            log.info("old=" + oldValue);
+            
+        }
 
         /*
          * Note: This uses the default Locale and the implied Unicode collation
@@ -240,9 +136,13 @@ public class TestSerialization extends TestCase2 {
 
         final byte[] oldValKey = lexKeyBuilder.value2Key(oldValue);
 
-        System.err.println("newValKey=" + BytesUtil.toString(newValKey));
-        
-        System.err.println("oldValKey=" + BytesUtil.toString(oldValKey));
+        if (log.isInfoEnabled()) {
+
+            log.info("newValKey=" + BytesUtil.toString(newValKey));
+
+            log.info("oldValKey=" + BytesUtil.toString(oldValKey));
+
+        }
 
         /*
          * Note: if this assert fails then the two distinct Literals were mapped

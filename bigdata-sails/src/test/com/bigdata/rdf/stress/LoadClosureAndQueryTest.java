@@ -50,7 +50,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 import org.CognitiveWeb.util.PropertyUtil;
 import org.apache.log4j.Logger;
@@ -71,18 +70,13 @@ import com.bigdata.btree.BloomFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.load.ConcurrentDataLoader;
-import com.bigdata.rdf.load.FileSystemLoader;
-import com.bigdata.rdf.load.RDFLoadTaskFactory;
 import com.bigdata.rdf.rio.RDFParserOptions;
-import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
@@ -924,9 +918,11 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
                      */
                     
                     didTruthMaintenance = false;
-            
-                    loadConcurrent(nthreads, nclients, clientNum,
-                            bufferCapacity, dataDir, parserOptions);
+
+                    loadSingleThreaded(sail.getDatabase(), dataDir);
+
+//                    loadConcurrent(nthreads, nclients, clientNum,
+//                            bufferCapacity, dataDir, parserOptions);
 
                 } else {
 
@@ -1102,93 +1098,93 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         
     }
     
-    /**
-     * Loads files concurrently into the configured {@link AbstractTripleStore}.
-     * 
-     * @param nthreads
-     *            The #of threads in which files will be loaded.
-     * @param bufferCapacity
-     *            The capacity of the {@link StatementBuffer} used by each
-     *            thread.
-     * @param dataDir
-     *            The directory from which the filters will be loaded.
-     * 
-     * @throws InterruptedException
-     *             if interrupted.
-     */
-    protected void loadConcurrent(int nthreads, int nclients, int clientNum,
-            int bufferCapacity, File dataDir, RDFParserOptions parserOptions)
-            throws InterruptedException {
-
-        System.out.println("Will load files: dataDir=" + dataDir);
-
-        final IBigdataFederation fed = (IBigdataFederation) sail.getDatabase()
-                .getIndexManager();
-
-        final RDFFormat fallback = RDFFormat.RDFXML;
-
-        final AbstractTripleStore db = sail.getDatabase();
-
-        final RDFLoadTaskFactory loadTaskFactory = //
-        new RDFLoadTaskFactory(db, bufferCapacity, parserOptions,
-                false/* deleteAfter */, fallback);
-
-        final ConcurrentDataLoader service = new ConcurrentDataLoader(fed,
-                nthreads);
-
-        final FileSystemLoader scanner = new FileSystemLoader(service,
-                nclients, clientNum);
-
-        try {
-
-            /*
-             * Note: Add the counters to be reported to the client's counter
-             * set. The added counters will be reported when the client reports its
-             * own counters.
-             */
-            final CounterSet serviceRoot = fed.getServiceCounterSet();
-
-            final String relPath = "Concurrent Data Loader";
-
-            synchronized (serviceRoot) {
-
-                if (serviceRoot.getPath(relPath) == null) {
-
-                    // Create path to CDL counter set.
-                    final CounterSet tmp = serviceRoot.makePath(relPath);
-
-                    // Attach CDL counters.
-                    tmp.attach(service.getCounters());
-
-                    // Attach task factory counters.
-                    tmp.attach(loadTaskFactory.getCounters());
-
-                }
-                
-            }
-
-            // notify will run tasks.
-            loadTaskFactory.notifyStart();
-
-            // read files and run tasks : baseURI will be the filename.
-            scanner.process(dataDir, filter, loadTaskFactory);
-
-            // await completion of all tasks.
-            service.awaitCompletion(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
-
-        } finally {
-            
-            // shutdown the load service (a memory leak otherwise!)
-            service.shutdown();
-            
-        }
-
-        // notify did run tasks.
-        loadTaskFactory.notifyEnd();
-
-        System.out.println(loadTaskFactory.reportTotals());
-
-    }
+//    /**
+//     * Loads files concurrently into the configured {@link AbstractTripleStore}.
+//     * 
+//     * @param nthreads
+//     *            The #of threads in which files will be loaded.
+//     * @param bufferCapacity
+//     *            The capacity of the {@link StatementBuffer} used by each
+//     *            thread.
+//     * @param dataDir
+//     *            The directory from which the filters will be loaded.
+//     * 
+//     * @throws InterruptedException
+//     *             if interrupted.
+//     */
+//    protected void loadConcurrent(int nthreads, int nclients, int clientNum,
+//            int bufferCapacity, File dataDir, RDFParserOptions parserOptions)
+//            throws InterruptedException {
+//
+//        System.out.println("Will load files: dataDir=" + dataDir);
+//
+//        final IBigdataFederation fed = (IBigdataFederation) sail.getDatabase()
+//                .getIndexManager();
+//
+//        final RDFFormat fallback = RDFFormat.RDFXML;
+//
+//        final AbstractTripleStore db = sail.getDatabase();
+//
+//        final RDFLoadTaskFactory loadTaskFactory = //
+//        new RDFLoadTaskFactory(db, bufferCapacity, parserOptions,
+//                false/* deleteAfter */, fallback);
+//
+//        final ConcurrentDataLoader service = new ConcurrentDataLoader(fed,
+//                nthreads);
+//
+//        final FileSystemLoader scanner = new FileSystemLoader(service,
+//                nclients, clientNum);
+//
+//        try {
+//
+//            /*
+//             * Note: Add the counters to be reported to the client's counter
+//             * set. The added counters will be reported when the client reports its
+//             * own counters.
+//             */
+//            final CounterSet serviceRoot = fed.getServiceCounterSet();
+//
+//            final String relPath = "Concurrent Data Loader";
+//
+//            synchronized (serviceRoot) {
+//
+//                if (serviceRoot.getPath(relPath) == null) {
+//
+//                    // Create path to CDL counter set.
+//                    final CounterSet tmp = serviceRoot.makePath(relPath);
+//
+//                    // Attach CDL counters.
+//                    tmp.attach(service.getCounters());
+//
+//                    // Attach task factory counters.
+//                    tmp.attach(loadTaskFactory.getCounters());
+//
+//                }
+//                
+//            }
+//
+//            // notify will run tasks.
+//            loadTaskFactory.notifyStart();
+//
+//            // read files and run tasks : baseURI will be the filename.
+//            scanner.process(dataDir, filter, loadTaskFactory);
+//
+//            // await completion of all tasks.
+//            service.awaitCompletion(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+//
+//        } finally {
+//            
+//            // shutdown the load service (a memory leak otherwise!)
+//            service.shutdown();
+//            
+//        }
+//
+//        // notify did run tasks.
+//        loadTaskFactory.notifyEnd();
+//
+//        System.out.println(loadTaskFactory.reportTotals());
+//
+//    }
     
     /**
      * Loads the file(s).

@@ -30,8 +30,7 @@ import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Class for inline RDF blank nodes. Blank nodes MUST be based on UUIDs or
- * some other numeric in order to be inlined.
+ * Class for inline RDF blank nodes. 
  * <p>
  * {@inheritDoc}
  * 

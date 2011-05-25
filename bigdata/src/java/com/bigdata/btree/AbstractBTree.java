@@ -4028,7 +4028,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 	}
 
     /**
-     * Decodes a signed long value as encoded by {@link #append(long)}.
+     * Decodes a signed long value as encoded by {@link #appendSigned(long)}.
      * 
      * @param buf
      *            The buffer containing the encoded record address.

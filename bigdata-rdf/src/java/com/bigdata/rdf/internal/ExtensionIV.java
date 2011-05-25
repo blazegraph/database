@@ -1,6 +1,5 @@
 package com.bigdata.rdf.internal;
 
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -15,14 +14,19 @@ public class ExtensionIV<V extends BigdataLiteral>
 
     private final AbstractLiteralIV delegate;
     
-    private final TermId datatype;
+    private final TermId datatype; // FIXME TERMS Refactor : TermId => TermIV.
     
-    public ExtensionIV(final AbstractLiteralIV delegate, 
-            final TermId datatype) {
+    public ExtensionIV(final AbstractLiteralIV delegate, final TermId datatype) {
+        
         super(VTE.LITERAL, true, delegate.getDTE());
         
+        if (datatype == null)
+            throw new IllegalArgumentException();
+        
         this.delegate = delegate;
+        
         this.datatype = datatype;
+        
     }
     
     public AbstractLiteralIV getDelegate() {
@@ -69,13 +73,13 @@ public class ExtensionIV<V extends BigdataLiteral>
         return delegate._compareTo(((ExtensionIV) o).delegate);
         
     }
-    
+
     /**
-     * Return the normal length of the delegate plus 8 bytes for the term ID
-     * of the extension datatype.
+     * Return the length of the datatype IV plus the length of the delegate IV.
      */
     public int byteLength() {
-        return delegate.byteLength() + Bytes.SIZEOF_LONG;
+        return datatype.byteLength() + delegate.byteLength();
+//        return delegate.byteLength() + Bytes.SIZEOF_LONG;
     }
 
 	/**

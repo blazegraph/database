@@ -38,17 +38,6 @@ import com.ibm.icu.text.Collator;
 /**
  * Tests for Unicode support in {@link KeyBuilder}.
  * 
- * @todo test w/ and w/o the ICU integration (can be chosen at run time via
- *       concrete subclasses). Note that some tests are specific to the ICU
- *       libraries at this time.
- * 
- * @todo write performance test for encoding strings, possibly in the context of
- *       parsed rdf data, and see if there are any easy wins in how the encoding
- *       to a sort key is handled or in alignment of the apis.
- * 
- * @todo compare performance of the ICU and JDK libraries in some application
- *       contexts. compare performance of the JNI ICU library as well.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
