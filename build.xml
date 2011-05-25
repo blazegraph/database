@@ -204,10 +204,6 @@
 		<include name="**/*.jar" />
 		<include name="**/*.so" />
 		<include name="**/*.dll" />
-		<!-- ICU4JNI is not a supported configuration at this time. -->
-		<exclude name="**/icu4jni.jar" />
-		<exclude name="**/icu*.dll" />
-		<exclude name="**/ICU*.dll" />
 		<!-- The BytesUtil JNI class is not recommended at this time (no performance gain). -->
 		<exclude name="**/*BytesUtil*" />
 	</fileset>
@@ -812,8 +808,10 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/lgplutils.jar" />
       <copy file="${bigdata.lib}/unimi/fastutil-5.1.5.jar"
             tofile="${dist.lib}/fastutil.jar" />
-      <copy file="${bigdata.lib}/icu/icu4j-3_6.jar"
+      <copy file="${bigdata.lib}/icu/icu4j-${icu.version}.jar"
             tofile="${dist.lib}/icu4j.jar" />
+      <copy file="${bigdata.lib}/icu/icu4j-charset-${icu.version}.jar"
+            tofile="${dist.lib}/icu4j-charset.jar" />
       <copy file="${bigdata.lib}/apache/log4j-1.2.15.jar"
             tofile="${dist.lib}/log4j.jar" />
       <copy file="${bigdata.lib}/lucene/lucene-analyzers-3.0.0.jar"
@@ -1375,7 +1373,7 @@ ${postInstallMessage}</echo>
       <mkdir dir="${bigdata-test.lib}" />
       <property name="bigdata-test.jar" location="${bigdata-test.lib}/bigdata-test.jar" />
 
-      <property name="javac.test.classpath" value="${classes.dir}${path.separator}${junit.jar}${path.separator}${cweb-junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/cweb-commons.jar${path.separator}${dist.lib}/cweb-extser.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar" />
+      <property name="javac.test.classpath" value="${classes.dir}${path.separator}${junit.jar}${path.separator}${cweb-junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/cweb-commons.jar${path.separator}${dist.lib}/cweb-extser.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar" />
 
       <echo>javac
 </echo>
@@ -1678,6 +1676,7 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/lgplutils.jar" />
         <pathelement location="${dist.lib}/fastutil.jar" />
         <pathelement location="${dist.lib}/icu4j.jar" />
+        <pathelement location="${dist.lib}/icu4j-charset.jar" />
         <pathelement location="${dist.lib}/iris.jar" />
         <pathelement location="${dist.lib}/jgrapht.jar" />
         <pathelement location="${dist.lib}/jsk-lib.jar" />
@@ -1704,7 +1703,7 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/servlet-api.jar" />
       </path>
 
-      <property name="run.class.path" value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${cweb-junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/cweb-commons.jar${path.separator}${dist.lib}/cweb-extser.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar" />
+      <property name="run.class.path" value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${cweb-junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/cweb-commons.jar${path.separator}${dist.lib}/cweb-extser.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar" />
 
       <echo>    classpath:    ${run.class.path}
 </echo>
@@ -1811,6 +1810,7 @@ ${postInstallMessage}</echo>
         <sysproperty key="lgplutils.jar" value="${dist.lib}/lgplutils.jar" />
         <sysproperty key="fastutil.jar" value="${dist.lib}/fastutil.jar" />
         <sysproperty key="icu4j.jar" value="${dist.lib}/icu4j.jar" />
+        <sysproperty key="icu4j-charset.jar" value="${dist.lib}/icu4j-charset.jar" />
         <sysproperty key="jsk-lib.jar" value="${dist.lib}/jsk-lib.jar" />
         <sysproperty key="jsk-platform.jar" value="${dist.lib}/jsk-platform.jar" />
         <sysproperty key="log4j.jar" value="${dist.lib}/log4j.jar" />
@@ -1933,7 +1933,8 @@ ${postInstallMessage}</echo>
 	<pathelement location="${dist.lib}/dsiutils.jar" />
 	<pathelement location="${dist.lib}/lgplutils.jar" />
 	<pathelement location="${dist.lib}/fastutil.jar" />
-	<pathelement location="${dist.lib}/icu4j.jar" />
+    <pathelement location="${dist.lib}/icu4j.jar" />
+	<pathelement location="${dist.lib}/icu4j-charset.jar" />
 	<pathelement location="${dist.lib}/iris.jar" />
 	<pathelement location="${dist.lib}/jgrapht.jar" />
 	<pathelement location="${dist.lib}/jsk-lib.jar" />
@@ -1957,7 +1958,7 @@ ${postInstallMessage}</echo>
     <pathelement location="${dist.lib}/jetty-xml.jar" />
     <pathelement location="${dist.lib}/servlet-api.jar" />
 </path>
-<property name="run.class.path" value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${cweb-junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/cweb-commons.jar${path.separator}${dist.lib}/cweb-extser.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar" />
+<property name="run.class.path" value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${cweb-junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/cweb-commons.jar${path.separator}${dist.lib}/cweb-extser.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar" />
 <!-- Generate the LUBM dataset. 
 		<mkdir dir="${data}"/>
 		<java classname="edu.lehigh.swat.bench.uba.Generator" dir="${data}" fork="yes">
