@@ -100,14 +100,8 @@ public class TestQueryEngineFactory extends TestCase2 {
      */
     public void test_memoryLeak() throws InterruptedException {
 
-        if (true) {
-            /*
-             * FIXME Disabled for now since causing CI to fail.
-             */
-            log.error("Enable test.");
-
-            return;
-        }
+//      // This test currently fails....
+//      fail("See https://sourceforge.net/apps/trac/bigdata/ticket/196.");
 
         final int limit = 200;
         
@@ -144,9 +138,9 @@ public class TestQueryEngineFactory extends TestCase2 {
 
         } catch (OutOfMemoryError err) {
             
-            System.err.println("Out of memory after creating " + ncreated
+            log.error("Out of memory after creating " + ncreated
                     + " query controllers.");
-            
+
         }
 
         // Demand a GC.
@@ -155,12 +149,14 @@ public class TestQueryEngineFactory extends TestCase2 {
         // Wait for it.
         Thread.sleep(1000/*ms*/);
         
-        System.err.println("Created " + ncreated + " query controllers.");
+        if(log.isInfoEnabled())
+            log.info("Created " + ncreated + " query controllers.");
 
         final int nalive = QueryEngineFactory.getQueryControllerCount();
 
-        System.err.println("There are " + nalive
-                + " query controllers which are still alive.");
+        if (log.isInfoEnabled())
+            log.info("There are " + nalive
+                    + " query controllers which are still alive.");
 
         if (nalive == ncreated) {
 

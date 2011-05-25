@@ -83,6 +83,8 @@ public class TestAll extends TestCase {
          * trigger a quorum break, a leader leave, etc.
          */
         suite.addTestSuite(TestHA3QuorumSemantics.class);
+
+        suite.addTest(StressTestHA3.suite());
         
         return suite;
         

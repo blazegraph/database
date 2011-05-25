@@ -73,6 +73,22 @@ public class TestHTreeUtil extends TestCase2 {
 
     }
 
+    /** Unit test for {@link HTreeUtil#isPowerOf2(int)}. */
+    public void test_isPowerOf2() {
+
+        for (int i = 0; i < 32; i++) {
+
+            final int v = 1<<i;
+            
+            assertTrue(HTreeUtil.isPowerOf2(v));
+
+            if (v > 1)
+                assertFalse(HTreeUtil.isPowerOf2(v + 1));
+            
+        }
+        
+    }
+    
 	/**
 	 * Prints various tables and runs consistency tests on the htree math
 	 * operations dealing with addressBits, globalDepth, localDepth, etc.

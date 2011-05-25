@@ -229,7 +229,7 @@
 	from colt and fastutil which are required by the proceeding jars.  The
 	main advantage of the resulting jar is that the vast majority of fastutil
 	is not necessary, and it is a 13M jar.
-	-->
+	
 	<target name="autojar" 
 		description="Produce an expanded version of the bigdata jar which 
 		includes the data from the dsi-util and lgpl-utils jars and only
@@ -244,14 +244,23 @@
 				${bigdata.dir}/bigdata/lib/lgpl-utils*.jar
 				" />
 		</java>
+	</target> -->
+	<!-- java autojar.jar -vo fastutil-stripped.jar -c fastutil.jar -Y bigdata.jar -->
+	<target name="autojar-strip-fastutil" depends="prepare" 
+			description="Strip unused classes from fastutil.">
+			<java jar="src/build/autojar/autojar.jar" fork="true" failonerror="true">
+				<arg line="-o ${build.dir}/fastutil-stripped.jar
+					-c ${bigdata.dir}/bigdata/lib/unimi/fastutil*.jar
+					--
+					-Y ${build.dir}/lib/${version}.jar
+					-Y ${bigdata.dir}/bigdata/lib/dsi-util*.jar
+					-Y ${bigdata.dir}/bigdata/lib/lgpl-utils*.jar
+					" />
+			</java>
 	</target>
 
 	<!--depends="bundleJar"-->
-	<!--
-	TODO 13M of the resulting WAR is fastutils. We need to slim down that JAR to
-	just the classes that we actually use before deploying it.
-	-->
-	<target name="war" depends="autojar" 
+	<target name="war" depends="bundleJar, autojar-strip-fastutil" 
 		description="Generates a WAR artifact.">
 		<delete file="${build.dir}/bigdata.war"/>
 		<echo message="Building WAR"/>
@@ -262,15 +271,17 @@
 		  <fileset dir="bigdata-war/src/jsp"/>
 		  <fileset dir="bigdata-war/src/images"/>
 		  <file file="bigdata-war/src/resources/RWStore.properties"/>
-		  <!-- bigdata jar plus some dependencies as filtered by autojar. -->
-		  <lib file="${build.dir}/bigdataPlus.jar"/>
+		  <!-- bigdata jar plus some dependencies as filtered by autojar.
+		  <lib file="${build.dir}/bigdataPlus.jar"/> -->
+		  <!-- The stripped version of fasutil. -->
+		  <lib file="${build.dir}/fastutil-stripped.jar"/>
 		  <lib dir="${build.dir}/lib">
-		  	<!-- jars bundled into "bigdata-plus" by autojar. -->
 		  	<exclude name="fastutil*.jar"/>
+		  	<!-- jars bundled into "bigdata-plus" by autojar. 
 		  	<exclude name="colt*.jar"/>
 		  	<exclude name="dsi-util*.jar"/>
 		  	<exclude name="lgpl-utils*.jar"/>
-		  	<exclude name="bigdata*.jar"/>
+		  	<exclude name="bigdata*.jar"/>-->
 		  	<!-- jars which are not currently used. -->
 		  	<exclude name="iris*.jar"/>
 		  	<exclude name="jgrapht*.jar"/>

@@ -17,6 +17,7 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.util.HTMLUtility;
 
 /**
  * A status page for the service.
@@ -26,7 +27,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public class StatusServlet extends BigdataRDFServlet {
 
-	/**
+    /**
      * 
      */
     private static final long serialVersionUID = 1L;
@@ -94,7 +95,7 @@ public class StatusServlet extends BigdataRDFServlet {
 
             for (String s : namespaces) {
 
-                current.node("p", s);
+                current.node("p", HTMLUtility.escapeForXHTML(s));
 
             }
 
@@ -103,16 +104,18 @@ public class StatusServlet extends BigdataRDFServlet {
         if (showKBInfo) {
 
             // General information on the connected kb.
-            current.node("pre", getBigdataRDFContext().getKBInfo(
-                    getNamespace(req), getTimestamp(req)).toString());
+            current.node("pre", HTMLUtility
+                    .escapeForXHTML(getBigdataRDFContext().getKBInfo(
+                            getNamespace(req), getTimestamp(req)).toString()));
 
         }
 
         if (getBigdataRDFContext().getSampleTask() != null) {
 
             // Performance counters for the NSS queries.
-            current.node("pre", getBigdataRDFContext().getSampleTask()
-                    .getCounters().toString());
+            current.node("pre", HTMLUtility
+                    .escapeForXHTML(getBigdataRDFContext().getSampleTask()
+                            .getCounters().toString()));
 
         }
 
@@ -160,7 +163,7 @@ public class StatusServlet extends BigdataRDFServlet {
                                     + java.util.concurrent.TimeUnit.NANOSECONDS
                                             .toMillis(age) + "ms, queryId="
                                     + query.queryId + "\n").node("p",
-                            query.query + "\n");
+                            HTMLUtility.escapeForXHTML(query.query) + "\n");
 
                 }
 
@@ -218,8 +221,10 @@ public class StatusServlet extends BigdataRDFServlet {
                     current = current.node("p",
                             "age=" + query.getElapsed() + "ms").node("p",
                             "queryId=" + query.getQueryId()).node("p",
-                            query.toString()).node("p",
-                            BOpUtility.toString(query.getQuery()));
+                            HTMLUtility.escapeForXHTML(query.toString())).node(
+                            "p",
+                            HTMLUtility.escapeForXHTML(BOpUtility
+                                    .toString(query.getQuery())));
 
                 }
 

@@ -165,7 +165,7 @@
 	
 	<target name="run-sparql-query" depends="prepare" description="Run a single query read from a file..">
 		<java classname="com.bigdata.rdf.sail.webapp.NanoSparqlClient" fork="true" failonerror="true">
-			<arg line="-f query5-instance01-keyRangeVersion.sparql http://localhost:${bsbm.nanoServerPort}/" />
+			<arg line="-f query5-instance01-keyRangeVersion.sparql http://localhost:${bsbm.nanoServerPort}/sparql/" />
 			<classpath>
 				<path refid="runtime.classpath" />
 			</classpath>

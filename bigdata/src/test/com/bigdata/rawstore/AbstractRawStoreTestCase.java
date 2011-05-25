@@ -69,44 +69,46 @@ abstract public class AbstractRawStoreTestCase extends TestCase3 {
     public void test_write_correctRejection_emptyRecord() {
         
         final IRawStore store = getStore();
-        
-        try {
-        
+
         try {
 
-            store.write( ByteBuffer.wrap(new byte[]{}));
-            
-            fail("Expecting: "+IllegalArgumentException.class);
-                
-        } catch(IllegalArgumentException ex) {
-            
-            System.err.println("Ignoring expected exception: "+ex);
-            
-        }   
-        
-        try {
+            try {
 
-            ByteBuffer buf = ByteBuffer.wrap(new byte[2]);
-            
-            // advance the position to the limit so that no bytes remain.
-            buf.position(buf.limit());
-            
-            store.write( buf );
-            
-            fail("Expecting: "+IllegalArgumentException.class);
-                
-        } catch(IllegalArgumentException ex) {
-            
-            System.err.println("Ignoring expected exception: "+ex);
-            
-        }   
-        
+                store.write(ByteBuffer.wrap(new byte[] {}));
+
+                fail("Expecting: " + IllegalArgumentException.class);
+
+            } catch (IllegalArgumentException ex) {
+
+                if (log.isInfoEnabled())
+                    log.info("Ignoring expected exception: " + ex);
+
+            }
+
+            try {
+
+                final ByteBuffer buf = ByteBuffer.wrap(new byte[2]);
+
+                // advance the position to the limit so that no bytes remain.
+                buf.position(buf.limit());
+
+                store.write(buf);
+
+                fail("Expecting: " + IllegalArgumentException.class);
+
+            } catch (IllegalArgumentException ex) {
+
+                if (log.isInfoEnabled())
+                    log.info("Ignoring expected exception: " + ex);
+
+            }
+
         } finally {
 
-        store.destroy();
-        
+            store.destroy();
+
         }
-        
+
     }
 
     /**

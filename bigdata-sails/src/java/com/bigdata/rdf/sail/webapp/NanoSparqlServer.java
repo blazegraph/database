@@ -23,11 +23,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.webapp;
 
-import java.io.File;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.handler.DefaultHandler;
+import org.eclipse.jetty.server.handler.HandlerList;
+import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.openrdf.rio.RDFParser;
@@ -212,31 +215,32 @@ public class NanoSparqlServer {
          */
         namespace = args[i++];
 
-        /*
-         * Property file.
-         */
+        // Note: This is checked by the ServletContextListener.
+//        /*
+//         * Property file.
+//         */
         final String propertyFile = args[i++];
-        final File file = new File(propertyFile);
-        if (!file.exists()) {
-            throw new RuntimeException("Could not find file: " + file);
-        }
-        boolean isJini = false;
-        if (propertyFile.endsWith(".config")) {
-            // scale-out.
-            isJini = true;
-        } else if (propertyFile.endsWith(".properties")) {
-            // local journal.
-            isJini = false;
-        } else {
-            /*
-             * Note: This is a hack, but we are recognizing the jini
-             * configuration file with a .config extension and the journal
-             * properties file with a .properties extension.
-             */
-            usage(1/* status */,
-                    "File should have '.config' or '.properties' extension: "
-                            + file);
-        }
+//        final File file = new File(propertyFile);
+//        if (!file.exists()) {
+//            throw new RuntimeException("Could not find file: " + file);
+//        }
+//        boolean isJini = false;
+//        if (propertyFile.endsWith(".config")) {
+//            // scale-out.
+//            isJini = true;
+//        } else if (propertyFile.endsWith(".properties")) {
+//            // local journal.
+//            isJini = false;
+//        } else {
+//            /*
+//             * Note: This is a hack, but we are recognizing the jini
+//             * configuration file with a .config extension and the journal
+//             * properties file with a .properties extension.
+//             */
+//            usage(1/* status */,
+//                    "File should have '.config' or '.properties' extension: "
+//                            + file);
+//        }
 
         /*
          * Setup the ServletContext properties.
@@ -290,14 +294,22 @@ public class NanoSparqlServer {
     static public Server newInstance(final int port, final IIndexManager indexManager,
             final Map<String, String> initParams) {
 
-        final ServletContextHandler context = getContext(initParams);
+        final ServletContextHandler context = getContextHandler(initParams);
 
         // Force the use of the caller's IIndexManager.
         context.setAttribute(IIndexManager.class.getName(), indexManager);
         
+        final HandlerList handlers = new HandlerList();
+
+        handlers.setHandlers(new Handler[] {
+                context,//
+                getResourceHandler(initParams),//
+//                new DefaultHandler()//
+                });
+
         final Server server = new Server(port);
 
-        server.setHandler(context);
+        server.setHandler(handlers);
 
         return server;
         
@@ -322,11 +334,19 @@ public class NanoSparqlServer {
     static public Server newInstance(final int port, final String propertyFile,
             final Map<String, String> initParams) {
 
-        final ServletContextHandler context = getContext(initParams);
+        final ServletContextHandler context = getContextHandler(initParams);
         
+        final HandlerList handlers = new HandlerList();
+
+        handlers.setHandlers(new Handler[] {
+                context,//
+                getResourceHandler(initParams),//
+//                new DefaultHandler()//
+                });
+
         final Server server = new Server(port);
 
-        server.setHandler(context);
+        server.setHandler(handlers);
 
         return server;
         
@@ -338,7 +358,7 @@ public class NanoSparqlServer {
      * @param initParams
      *            The init parameters, per the web.xml definition.
      */
-    static private ServletContextHandler getContext(
+    static private ServletContextHandler getContextHandler(
             final Map<String, String> initParams) {
 
         if (initParams == null)
@@ -365,23 +385,6 @@ public class NanoSparqlServer {
             
         }
 
-        // final ResourceHandler resource_handler = new ResourceHandler();
-        //
-        // resource_handler.setDirectoriesListed(false); // Nope!
-        //
-        // resource_handler.setWelcomeFiles(new String[] { "index.html" });
-        //
-        // final HandlerList handlers = new HandlerList();
-        //          
-        // handlers.setHandlers(new Handler[] { resource_handler, new
-        // DefaultHandler() });
-        //
-        // setHandler(handlers);
-
-        // FIXME Set to locate the flot files as part of the CountersServlet
-        // setup.
-        // resource_handler.setResourceBase(config.resourceBase);
-
         // Performance counters.
         context.addServlet(new ServletHolder(new CountersServlet()),
                 "/counters");
@@ -390,10 +393,39 @@ public class NanoSparqlServer {
         context.addServlet(new ServletHolder(new StatusServlet()), "/status");
 
         // Core RDF REST API, including SPARQL query and update.
-        context.addServlet(new ServletHolder(new RESTServlet()), "/");
+        context.addServlet(new ServletHolder(new RESTServlet()), "/sparql");
 
+//        context.setResourceBase("bigdata-war/src/html");
+//        
+//        context.setWelcomeFiles(new String[]{"index.html"});
+        
         return context;
         
+    }
+
+    private static ResourceHandler getResourceHandler(
+            final Map<String, String> initParams) {
+        
+        if (initParams == null)
+            throw new IllegalArgumentException();
+
+        final ResourceHandler resourceHandler = new ResourceHandler();
+
+        resourceHandler.setDirectoriesListed(false); // Nope!
+
+        // FIXME Set to locate the flot files as part of the CountersServlet
+        // setup.
+        // resource_handler.setResourceBase(config.resourceBase);
+
+        // Note: FileResource or ResourceCollection.
+//        resourceHandler.setBaseResource(new FileResource(...));
+        
+        resourceHandler.setResourceBase("bigdata-war/src/html");
+        
+        resourceHandler.setWelcomeFiles(new String[]{"index.html"});
+      
+        return resourceHandler;
+
     }
 
     /**

@@ -73,6 +73,20 @@ public class HTreeUtil {
         
     }
 
+    /**
+     * Return <code>true</code> if the argument is a power of TWO (2).
+     * 
+     * @param v
+     *            The argument.
+     *            
+     * @return <code>true</code> if the argument is a power of TWO (2).
+     */
+    static public boolean isPowerOf2(final int v) {
+
+        return ((v & -v) == v);
+
+    }
+    
 	/**
 	 * Return the #of entries in the address map for a page having the given
 	 * local depth. This is <code>2^(globalHashBits - localHashBits)</code>. The
@@ -202,33 +216,34 @@ public class HTreeUtil {
 		
     }
 
-	/**
-	 * Find the offset of the buddy hash table or buddy bucket in the child.
-	 * Each page of the hash tree is logically an ordered array of "buddies"
-	 * sharing the same physical page. When the page is a directory page, the
-	 * buddies are buddy hash tables. When the page is a bucket page, the
-	 * buddies are buddy hash buckets. The returned value is the offset required
-	 * to index into the appropriate buddy hash table or buddy hash bucket in
-	 * the child page.
-	 * 
-	 * @param hashBits
-	 *            The relevant bits of the hash code used to lookup the child
-	 *            within the parent.
-	 * @param globalDepth
-	 *            The global depth of the parent.
-	 * @param localDepth
-	 *            The local depth of the child page within the parent.
-	 * 
-	 * @return The offset of the start of the buddy hash table or buddy hash
-	 *         bucket within the child. This is an index into the slots of the
-	 *         child.
-	 * 
-	 * @throws IllegalArgumentException
-	 *             if the <i>globalDepth</i> is negative.
-	 * @throws IllegalArgumentException
-	 *             if the <i>localDepth</i> is greater than the
-	 *             <i>globalDepth</i>.
-	 */
+    /**
+     * Find the offset of the buddy hash table or buddy bucket in the child.
+     * Each page of the hash tree is logically an ordered array of "buddies"
+     * sharing the same physical page. When the page is a directory page, the
+     * buddies are buddy hash tables. When the page is a bucket page, the
+     * buddies are buddy hash buckets. The returned value is the offset required
+     * to index into the appropriate buddy hash table or buddy hash bucket in
+     * the child page.
+     * 
+     * @param hashBits
+     *            The relevant bits of the hash code used to lookup the child
+     *            within the parent.
+     * @param globalDepth
+     *            The global depth of the parent.
+     * @param localDepth
+     *            The local depth of the child page within the parent.
+     * 
+     * @return The offset of the start of the buddy hash table or buddy hash
+     *         bucket within the child. This is an index into the slots of the
+     *         child. There are m:=(2^addressBits)-1 slots in the child, so the
+     *         returned index is in the half open range [0:m).
+     * 
+     * @throws IllegalArgumentException
+     *             if the <i>globalDepth</i> is negative.
+     * @throws IllegalArgumentException
+     *             if the <i>localDepth</i> is greater than the
+     *             <i>globalDepth</i>.
+     */
 	public static int getBuddyOffset(final int hashBits, final int globalDepth,
 			final int localDepth) {
 

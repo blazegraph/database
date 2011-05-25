@@ -81,10 +81,8 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.XSDDoubleIV;
 import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.BD;
@@ -100,7 +98,7 @@ import com.bigdata.search.IHit;
  */
 public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
-	protected static final Logger log = Logger.getLogger(TestSearchQuery.class);
+    private static final Logger log = Logger.getLogger(TestSearchQuery.class);
 	
     public TestSearchQuery() {
         
@@ -291,7 +289,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
             try {
 
-            log.info("Verifying query.");
+                log.info("Verifying query.");
 
                 /*
                  * These are the expected results for the query (the bindings
@@ -788,8 +786,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 int i = 0;
                 while (result.hasNext()) {
-                	if(log.isInfoEnabled())
-                		log.info(i++ + ": " + result.next().toString());
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
                 }
                 assertEquals("wrong # of results", 7, i);
                 
@@ -853,8 +853,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 int i = 0;
                 while (result.hasNext()) {
-                	if(log.isInfoEnabled())
-                		log.info(i++ + ": " + result.next().toString());
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
                 }
                 assertEquals("wrong # of results", 5, i);
                 
@@ -920,8 +922,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 int i = 0;
                 while (result.hasNext()) {
-                	if(log.isInfoEnabled())
-                		log.info(i++ + ": " + result.next().toString());
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
                 }
                 assertEquals("wrong # of results", 2, i);
                 
@@ -991,8 +995,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 int i = 0;
                 while (result.hasNext()) {
-                	if(log.isInfoEnabled())
-                		log.info(i++ + ": " + result.next().toString());
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
                 }
                 assertEquals("wrong # of results: " + i, 2, i);
                 
@@ -1026,7 +1032,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     		new BindingImpl("s", s),
                     		new BindingImpl("o", o),
                     		new BindingImpl("score", score));
-                    log.info(bs);
+                    if(log.isInfoEnabled())
+                        log.info(bs);
                     answer.add(bs);
                 }
                 
@@ -1063,8 +1070,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 int i = 0;
                 while (result.hasNext()) {
-                	if(log.isInfoEnabled())
-                		log.info(i++ + ": " + result.next().toString());
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
                 }
                 assertEquals("wrong # of results: " + i, 3, i);
                 
@@ -1096,7 +1105,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     		new BindingImpl("s", s),
                     		new BindingImpl("o", o),
                     		new BindingImpl("score", score));
-                    log.info(bs);
+                    if(log.isInfoEnabled())
+                        log.info(bs);
                     answer.add(bs);
                 }
                 
@@ -1133,8 +1143,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 int i = 0;
                 while (result.hasNext()) {
-                	if(log.isInfoEnabled())
-                		log.info(i++ + ": " + result.next().toString());
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
                 }
                 assertEquals("wrong # of results: " + i, 1, i);
                 
@@ -1166,7 +1178,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     		new BindingImpl("s", s),
                     		new BindingImpl("o", o),
                     		new BindingImpl("score", score));
-                    log.info(bs);
+                    if(log.isInfoEnabled())
+                        log.info(bs);
                     answer.add(bs);
                 }
                 
@@ -1189,7 +1202,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "    ?o <"+BD.MATCH_ALL_TERMS+"> \"true\" . " +
                     "}";
                 
-                log.info("\n"+query);
+                if(log.isInfoEnabled())
+                    log.info("\n"+query);
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
@@ -1198,8 +1212,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 int i = 0;
                 while (result.hasNext()) {
-                	if(log.isInfoEnabled())
-                		log.info(i++ + ": " + result.next().toString());
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
                 }
 //                assertTrue("wrong # of results: " + i, i == 1);
                 
@@ -1229,7 +1245,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     final BindingSet bs = createBindingSet(
                     		new BindingImpl("s", s),
                     		new BindingImpl("o", o));
-                    log.info(bs);
+                    if(log.isInfoEnabled())
+                        log.info(bs);
                     answer.add(bs);
                 }
                 

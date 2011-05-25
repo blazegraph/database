@@ -196,7 +196,7 @@
 			<arg value="${bsbm.resultsDir}/benchmark_result_pc${bsbm.pc}_runs${bsbm.runs}_mt${bsbm.mt}.xml" />
 
 			<!-- The SPARQL endpoint. -->
-			<arg value="http://localhost:${bsbm.nanoServerPort}/" />
+			<arg value="http://localhost:${bsbm.nanoServerPort}/sparql/" />
 
 			<classpath>
 				<path refid="runtime.classpath" />

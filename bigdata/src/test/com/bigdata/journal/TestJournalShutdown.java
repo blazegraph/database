@@ -84,8 +84,8 @@ public class TestJournalShutdown extends TestCase2 {
     public void test_memoryLeakWithoutExplicitClose()
             throws InterruptedException {
 
-        // This test currently fails....
-        fail("See https://sourceforge.net/apps/trac/bigdata/ticket/196.");
+//        // This test currently fails....
+//        fail("See https://sourceforge.net/apps/trac/bigdata/ticket/196.");
         
         doMemoryLeakTest(false);
         

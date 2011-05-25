@@ -1225,7 +1225,9 @@ public class NanoSparqlClient {
 	 *            default seed is based on the System clock.</dd>
 	 *            <dt>-seed seed</dt>
 	 *            <dd>Randomize the presentation of the queries, optionally
-	 *            using the specified seed for the random number generator.</dd>
+	 *            using the specified seed for the random number generator -or-
+	 *            ZERO (0L) if the queries will be evaluated in the given
+	 *            order.</dd>
 	 *            <dt>-defaultGraph</dt>
 	 *            <dd>The URI of the default graph to use for the query.</dd>
 	 *            <dt>-baseURI</dt>

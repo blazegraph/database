@@ -122,9 +122,11 @@ public class TestTransientJournal extends AbstractJournalTestCase {
 
         final Properties properties = getProperties();
 
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(properties);
 
-        TransientBufferStrategy bufferStrategy = (TransientBufferStrategy) journal.getBufferStrategy();
+        try {
+        
+        final TransientBufferStrategy bufferStrategy = (TransientBufferStrategy) journal.getBufferStrategy();
 
         assertFalse("isStable",bufferStrategy.isStable());
         assertTrue("isFullyBuffered",bufferStrategy.isFullyBuffered());
@@ -136,6 +138,12 @@ public class TestTransientJournal extends AbstractJournalTestCase {
                 .getBufferMode());
         assertEquals("userExtent", bufferStrategy.getExtent(), bufferStrategy
                 .getUserExtent());
+        
+        } finally {
+            
+            journal.destroy();
+            
+        }
         
     }
             
