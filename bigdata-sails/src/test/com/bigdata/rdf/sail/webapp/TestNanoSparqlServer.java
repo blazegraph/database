@@ -114,7 +114,7 @@ public class TestNanoSparqlServer extends TestCase2 {
 	/**
 	 * The request path for the REST API under test.
 	 */
-	final private static String requestPath = "/";
+	final private static String requestPath = "/sparql";
 
 	protected void setUp() throws Exception {
 	    
@@ -1032,7 +1032,7 @@ public class TestNanoSparqlServer extends TestCase2 {
 
         assertEquals(23, countResults(doSparqlQuery(opts, requestPath)));
 
-        doDeleteWithBody("", 23, format);
+        doDeleteWithBody(requestPath, 23, format);
 
         // No solutions (assuming a told triple kb or quads kb w/o axioms).
         assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
@@ -1077,9 +1077,9 @@ public class TestNanoSparqlServer extends TestCase2 {
         HttpURLConnection conn = null;
 		try {
 
-			final URL url = new URL(m_serviceURL + "/" + servlet+"?delete");
-			conn = (HttpURLConnection) url.openConnection();
-			conn.setRequestMethod("POST");
+            final URL url = new URL(m_serviceURL + servlet + "?delete");
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
 			conn.setDoOutput(true);
 			conn.setDoInput(true);
 			conn.setUseCaches(false);

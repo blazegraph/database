@@ -776,8 +776,8 @@ public class TestHTree extends TestCase2 {
             assertTrue(c == d.childRefs[3].get());
             assertEquals(2, root.globalDepth);
             assertEquals(1, d.globalDepth);
-            assertEquals(1, a.globalDepth);
-            assertEquals(1, c.globalDepth);
+            assertEquals(0, a.globalDepth);
+            assertEquals(0, c.globalDepth);
             assertEquals(1, b.globalDepth);
 
         } finally {

@@ -292,8 +292,10 @@ public class MockQuorumFixture {
                     runOnce();
                 } catch (InterruptedException t) {
                     log.warn("Dispatcher exiting : " + t);
+                    break;
                 } catch (Throwable t) {
                     log.error(t, t);
+                    break;
                 }
             }
         }
@@ -328,7 +330,7 @@ public class MockQuorumFixture {
                     // signal that an event is ready.
                     watcher.eventReady.signalAll();
                     // wait until the event has been drained.
-                    while (!watcher.queue.isEmpty()) {
+                    while (listeners.contains(watcher)&&!watcher.queue.isEmpty()) {
                         // yield until the watcher is done.
                         eventDone.await();
                     }
@@ -755,6 +757,7 @@ public class MockQuorumFixture {
                         runOnce();
                     } catch (InterruptedException e) {
                         log.warn("Shutdown : " + e);
+                        break;
                     }
                 }
             }

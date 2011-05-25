@@ -42,11 +42,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
@@ -56,7 +54,6 @@ import com.bigdata.journal.AbstractTask.ResubmitException;
 import com.bigdata.journal.ConcurrencyManager.Options;
 import com.bigdata.service.DataService;
 import com.bigdata.service.ndx.DataServiceTupleIterator;
-import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -458,7 +455,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
     }
 
     /**
-     * Submits an unisolated task to the read service. The task just sleeps. We
+     * Submits an unisolated task to the write service. The task just sleeps. We
      * then verify that we can interrupt that task using
      * {@link Future#cancel(boolean)} with
      * <code>mayInterruptWhileRunning := true</code> and that an appropriate
@@ -499,7 +496,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
                         if (Thread.interrupted()) {
 
-                            System.err.println("Interrupted.");
+                            if (log.isInfoEnabled())
+                                log.info("Interrupted.");
 
                             /*
                              * Note: If you simply continue processing rather
@@ -550,7 +548,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             } catch (CancellationException ex) {
 
-                System.err.println("Ignoring expected exception: " + ex);
+                if (log.isInfoEnabled())
+                    log.info("Ignoring expected exception: " + ex);
 
             }
 
@@ -569,7 +568,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
     }
 
     /**
-     * Submits an unisolated task to the read service. The task just sleeps. We
+     * Submits an unisolated task to the write service. The task just sleeps. We
      * then verify that we can terminate that task using
      * {@link Future#cancel(boolean)} with
      * <code>mayInterruptWhileRunning := false</code> and that an appropriate
@@ -582,15 +581,10 @@ public class TestConcurrentJournal extends ProxyTestCase {
      * thread reaches {@link Journal#shutdown()} it awaits the termination of
      * the {@link WriteExecutorService}. However that service does NOT
      * terminate because that worker thread is still running an infinite loop.
-     * Eventually, we time out while waiting for the write service to terminate
-     * and then shutdown the store. You can see what is going on in the log
-     * files or using a debugger, where you can notice that the thread running
-     * the task never terminates (it is a daemon thread so it does not keep the
-     * JVM from terminating).
      * <p>
-     * Note: For this test we explicitly set the
-     * {@link Options#SHUTDOWN_TIMEOUT} so that we do not wait forever for the
-     * uninterruptable task.
+     * Eventually, we interrupt the thread directly using a reference to it we
+     * obtained when setting up the task.  This allows the journal to terminate
+     * and the test to complete.
      * 
      * @throws InterruptedException
      * @throws ExecutionException
@@ -604,6 +598,9 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         final Journal journal = new Journal(properties);
 
+        // the thread that we need to eventually interrupt.
+        final AtomicReference<Thread> t = new AtomicReference<Thread>(null);
+        
         try {
 
             final String[] resource = new String[] { "foo" };
@@ -622,14 +619,17 @@ public class TestConcurrentJournal extends ProxyTestCase {
                  */
                 protected Object doTask() throws Exception {
 
-                    ran.compareAndSet(false, true);
+                    t.set(Thread.currentThread());
 
+                    ran.compareAndSet(false, true);
+                    
                     while (true) {
                         try {
                             Thread.sleep(Long.MAX_VALUE);
                         } catch (InterruptedException ex) {
                             /* ignore */
-                            System.err.println("Ignoring interrupt: " + ex);
+                            if (log.isInfoEnabled())
+                                log.info("Ignoring interrupt: " + ex);
                         }
                     }
 
@@ -648,7 +648,10 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             }
 
-            // this aggressively terminates the task.
+            // we have a reference to the thread running the task.
+            assertNotNull(t.get());
+            
+            // this terminates the task, but does NOT interrupt it.
             assertTrue(future.cancel(false/* mayInterruptWhileRunning */));
 
             // the task was cancelled.
@@ -663,7 +666,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             } catch (CancellationException ex) {
 
-                System.err.println("Ignoring expected exception: " + ex);
+                if (log.isInfoEnabled())
+                    log.info("Ignoring expected exception: " + ex);
 
             }
 
@@ -673,6 +677,18 @@ public class TestConcurrentJournal extends ProxyTestCase {
             assertEquals("commit counter changed?", commitCounterBefore,
                     journal.getRootBlockView().getCommitCounter());
 
+            // Verify that the thread was not interupted.
+            assertFalse(t.get().isInterrupted());
+            
+            // Sleep a bit
+            Thread.sleep(250);
+            
+            // Verify that the thread is not interrupted.
+            assertFalse(t.get().isInterrupted());
+
+            // Interrupt the thread so the Journal will terminate.
+            t.get().interrupt();
+            
         } finally {
 
             journal.destroy();
@@ -937,7 +953,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
                 if (ex.getCause() instanceof ResubmitException) {
 
-                    System.err.println("Ignoring expected exception: " + ex);
+                    if (log.isInfoEnabled())
+                        log.info("Ignoring expected exception: " + ex);
 
                 } else {
 

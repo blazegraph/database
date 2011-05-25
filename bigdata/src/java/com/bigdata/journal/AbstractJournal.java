@@ -1213,8 +1213,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 				public void sample() {
 					final AbstractJournal jnl = ref.get();
 					if (jnl != null) {
-						setValue(jnl.getFile().toString());
-					}
+                        final File file = jnl.getFile();
+                        if (file != null)
+                            setValue(file.toString());
+                    }
 				}
 			});
 			// counters.addCounter("file", new OneShotInstrument<String>(""

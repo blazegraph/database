@@ -314,11 +314,15 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
      */
     public void testStressDirectBuffers() throws InterruptedException {
 
-        if(true) {
-            // FIXME HA Test is disabled.
-            log.warn("This test has been observed to deadlock CI and is disabled for the moment.");
-            return;
-        }
+//        if(true) {
+//            /*
+//             * FIXME HA Test is disabled.
+//             * 
+//             * See https://sourceforge.net/apps/trac/bigdata/ticket/280
+//             */
+//            log.warn("This test has been observed to deadlock CI and is disabled for the moment.");
+//            return;
+//        }
         
 		ByteBuffer tst = null, rcv1 = null, rcv2 = null;
 		int i = -1, sze = -1;

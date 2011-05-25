@@ -62,7 +62,7 @@
   </servlet>
   <servlet-mapping>
   <servlet-name>REST API</servlet-name>
-  <url-pattern>/</url-pattern>
+  <url-pattern>/sparql</url-pattern>
   </servlet-mapping>
   <servlet-mapping>
   <servlet-name>Status</servlet-name>

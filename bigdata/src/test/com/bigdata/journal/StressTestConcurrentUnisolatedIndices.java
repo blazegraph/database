@@ -144,14 +144,14 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
              * scenario.
              */
             doConcurrentClientTest(journal,//
-                Long.MAX_VALUE,//30,// timeout
+                30,// timeout
                 20,// nresources
                 1, // minLocks
                 3, // maxLocks
-                1000,//100, // ntrials
+                100, // ntrials
                 3, // keyLen
                 1000, // nops
-                .05//0.02d // failureRate
+                0.02d // failureRate
         );
         
         } finally {
