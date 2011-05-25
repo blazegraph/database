@@ -181,7 +181,7 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
      */
     public byte[] serializeVal(Object obj) {
 
-        try {
+//        try {
             
             IV iv = (IV) obj;
 
@@ -191,11 +191,11 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
             
             return idbuf.toByteArray();
             
-        } catch(IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
+//        } catch(IOException ex) {
+//            
+//            throw new RuntimeException(ex);
+//            
+//        }
         
     }
 

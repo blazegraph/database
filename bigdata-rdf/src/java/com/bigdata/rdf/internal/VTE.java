@@ -32,18 +32,10 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
-import com.bigdata.rdf.lexicon.TermIdEncoder;
-
 /**
  * Value Type Enumeration (IVTE) is a class with methods for interpreting and 
  * setting the bit flags used to identify the type of an RDF Value (URI, 
  * Literal, Blank Node, SID, etc).
- * 
- * @todo update {@link TermIdEncoder}. This encodes term identifiers for
- *       scale-out but moving some bits around. It will be simpler now that the
- *       term identifier is all bits in the long integer with an additional byte
- *       prefix to differentiate URI vs Literal vs BNode vs SID and to indicate
- *       the inline value type (termId vs everything else).
  */
 public enum VTE {
 

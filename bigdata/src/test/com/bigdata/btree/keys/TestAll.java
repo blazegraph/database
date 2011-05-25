@@ -57,23 +57,26 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("BTree keys");
+        final TestSuite suite = new TestSuite("com.bigdata.btree.keys");
         
         /*
          * test key encoding and comparison support.
          */
         
         // test methods that compute the successor for various data types.
-        suite.addTestSuite( TestSuccessorUtil.class );
+        suite.addTestSuite(TestSuccessorUtil.class);
 
         // test key encoding operations.
         suite.addTestSuite(TestKeyBuilder.class);
+        
+        // tests for Unicode collation keys.
         suite.addTestSuite(TestJDKUnicodeKeyBuilder.class);
         suite.addTestSuite(TestICUUnicodeKeyBuilder.class);
 
+        // ICU portability and version info tests.
         suite.addTestSuite(TestICUPortabilityBug.class);
         suite.addTestSuite(TestICUVersionRecord.class);
-                
+        
         return suite;
         
     }

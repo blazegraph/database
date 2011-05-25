@@ -114,8 +114,8 @@ public class FileVersionDeleter extends TupleUpdater<TPV> {
 //        ndx.remove(key);
         
         // copy everything from the key except the old timestamp.
-        keyBuilder.reset().append(0/* off */,
-                key.length - Bytes.SIZEOF_LONG, key);
+        keyBuilder.reset().append(key, 0/* off */,
+                key.length - Bytes.SIZEOF_LONG);
         
         // append the new timestamp.
         keyBuilder.append(choosenTimestamp);

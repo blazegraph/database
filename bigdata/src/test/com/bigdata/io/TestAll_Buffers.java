@@ -65,6 +65,8 @@ public class TestAll_Buffers extends TestCase {
          * test fast DataOutput and DataInput implementations.
          */
 
+        // test slice of an input stream.
+        suite.addTestSuite(TestSliceInputStream.class);
         // test use of ByteBuffer as an input/output stream.
         suite.addTestSuite(TestByteBufferStreams.class);
         // test fixed-length record w/ absolute access.

@@ -32,19 +32,30 @@ import java.math.BigInteger;
 import java.util.UUID;
 
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.model.BigdataValue;
 
 /**
  * Data Type Enumeration (DTE) is a class which declares the known intrinsic
- * data types. The intrinsic data types are those having natural orders which
- * can be encoded into an unsigned byte[] key and decoded without loss. Whether
- * or not the datatype is actually inlined is a configuration option for the
- * lexicon. If a data type is not inlined, then its code will be {@link #TermId}
- * , which indicates that the "inline" value is a term identifier which must be
- * resolved against the ID2TERM index to materialize the value.
+ * data types, provides for extensibility to new data types, and provides for
+ * data types which either can not be inlined or are not being inlined. The
+ * intrinsic data types are those having natural orders which can be encoded
+ * into an unsigned byte[] key and decoded without loss. Whether or not a given
+ * data type is actually inlined is a configuration option for the lexicon.
  * <p>
- * The {@link VTE} as 4 distinctions (URI, Literal, BlankNode, and SID) and is
+ * If a data type is not inlined, then the representation of the value must be
+ * materialized. Non-inline values are {@link TermId}s and are materialized by
+ * looking {@link IV} in the TERMS index. More recently, we are also permitting
+ * indirection from the TERMS index. For example, very large objects may be
+ * stored in the file system, in S3, etc. In those cases, you must still resolve
+ * the {@link IV} against the TERMS index. Now the resulting object may be a
+ * {@link BigdataValue}. However, the object materialized from the TERMS index
+ * may also provide indirection into the file system, S3, etc.
+ * <p>
+ * The {@link VTE} has 4 distinctions (URI, Literal, BlankNode, and SID) and is
  * coded in the high 2 bits of a byte while the {@link DTE} has 16 possible
  * distinctions, one of which is reserved against future use and one of which is
  * reserved against extensibility in the set of intrinsic types.
@@ -53,7 +64,7 @@ import com.bigdata.rawstore.Bytes;
  * decodable; and (b) the collation rules for Unicode depend on the lexicon
  * configuration, which specifies parameters such as Locale, Strength, etc.
  * <p>
- * Blanks nodes (their IDs are UUIDs) and datatypes with larger values (UUIDs)
+ * Blanks nodes (their IDs are UUIDs) and data types with larger values (UUIDs)
  * or varying length values (xsd:integer, xsd:decimanl) can be inlined. Whether
  * it makes sense to do so is a question which trades off redundancy in the
  * statement indices for faster materialization of the data type values and a
@@ -61,7 +72,7 @@ import com.bigdata.rawstore.Bytes;
  * inlined, however they will have a different prefix to indicate that they are
  * Literals rather than blank nodes.
  * <p>
- * Note: While multidimensional datatypes (such as points or rectangles) could
+ * Note: While multidimensional data types (such as points or rectangles) could
  * be inlined (in the sense that their values could be converted to unsigned
  * byte[] keys and the keys could be decoded), they can not be placed into a
  * total order which has meaningful semantics by a single index. For example,
@@ -70,6 +81,7 @@ import com.bigdata.rawstore.Bytes;
  * types is to avoid indirection through the lexicon to materialize their
  * values. Efficiently resolving points in a region requires the use of a
  * spatial index.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestEncodeDecodeKeys.java 2753 2010-05-01 16:36:59Z thompsonbry
  *          $
@@ -179,8 +191,42 @@ public enum DTE {
     UUID((byte) 13, Bytes.SIZEOF_UUID, UUID.class, XSD.UUID.stringValue(),
             DTEFlags.NOFLAGS), //
 
-    /** This is reserved against use as a possible 15th intrinsic data type. */
-    Reserved1((byte) 14, 0/* len */, Void.class, null/* datatype */,
+    /**
+     * The "inline" value is a compressed Unicode string. This is decodable
+     * compression rather than a Unicode sort. It is suitable for representing
+     * "small" Unicode values directly within the statement indices. "Small" is
+     * configurable, but should not be overly large. The tradeoff is the growth
+     * in the B+Tree leaf size for a statement index versus the overhead
+     * required when indirecting through the {@link LexiconRelation} to
+     * materialize the RDF {@link Value}. Further, there is a practical upper
+     * bound on the size of a key in the B+Tree. Therefore, inlining of Unicode
+     * values having between 32 and 64 characters is suggested as a recommended
+     * practice. Beyond that, inlining can contribute significantly to the
+     * growth in the B+Tree leaf size and have a negative impact on join
+     * performance for the statement indices.
+     * <p>
+     * This {@link DTE} may be used in combination with {@link VTE} as follows:
+     * <dl>
+     * <dt>{@link VTE#BNODE}</dt>
+     * <dd>Represent an inline blank node identifier.</dd>
+     * <dt>{@link VTE#LITERAL}</dt>
+     * <dd>Represent a plain literal.</dd>
+     * <dt>{@link VTE#LITERAL} plus the extension bit</dt>
+     * <dd>Represent a data type literal where the extension IV is the data type
+     * of the literal.</dd>
+     * <dt>{@link VTE#URI} plus the extension bit</dt>
+     * <dd>Represent URI where the extension IV is the namespace of the URI and
+     * the inline Unicode component is the local name of the URI. This depends
+     * on the openrdf definition of a {@link URI}'s namespace and local name
+     * (basically, everything after the last '/' in the URI path or after the
+     * '#' if there is a URI anchor).</dd>
+     * </dl>
+     * 
+     * TODO Special case support for "short" language code literals by inlining
+     * a follow on language code for plain and language code literals and using
+     * a marker to indicate a "plain" literal.
+     */
+    XSDUnicode((byte) 14, 0/* len */, String.class, XSD.STRING.stringValue(),
             DTEFlags.NOFLAGS), //
 
     /**
@@ -254,7 +300,7 @@ public enum DTE {
         case 13:
             return UUID;
         case 14:
-            return Reserved1;
+            return XSDUnicode;
         case 15:
             return Extension;
         default:

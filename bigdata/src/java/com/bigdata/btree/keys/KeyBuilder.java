@@ -34,8 +34,9 @@ import java.text.Collator;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.UUID;
+
 import org.apache.log4j.Logger;
-import com.bigdata.btree.BytesUtil;
+
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
 
@@ -50,44 +51,36 @@ import com.bigdata.btree.ITupleSerializer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @see SuccessorUtil Compute the successor of a value before encoding it as a
+ * @see SuccessorUtil, Compute the successor of a value before encoding it as a
  *      component of a key.
  * 
- * @see BytesUtil#successor(byte[]) Compute the successor of an encoded key.
+ * @see BytesUtil#successor(byte[]), Compute the successor of an encoded key.
  * 
  * @todo introduce a mark and restore feature for generating multiple keys that
  *       share some leading prefix. in general, this is as easy as resetting the
  *       len field to the mark. keys with multiple components could benefit from
  *       allowing multiple marks (the sparse row store is the main use case).
- * 
- * @todo Integrate support for ICU versioning into the client and perhaps into
- *       the index metadata so clients can discover which version and
- *       configuration properties to use when generating keys for an index.
  */
 public class KeyBuilder implements IKeyBuilder {
 
-    protected static final Logger log = Logger.getLogger(KeyBuilder.class);
-    
-//    protected static final boolean INFO = log.isInfoEnabled();
-
-//    protected static final boolean DEBUG = log.isDebugEnabled();
+    private static final transient Logger log = Logger.getLogger(KeyBuilder.class);
     
     /**
      * The default capacity of the key buffer.
      */
-    final public static int DEFAULT_INITIAL_CAPACITY = 1024;
+    final public static transient int DEFAULT_INITIAL_CAPACITY = 1024;
     
     /**
      * A non-negative integer specifying the #of bytes of data in the buffer
      * that contain valid data starting from position zero(0).
      */
-    protected int len;
+    private int len;
     
     /**
      * The key buffer. This is re-allocated whenever the capacity of the buffer
      * is too small and reused otherwise.
      */
-    protected byte[] buf;
+    private byte[] buf;
     
     /**
      * The object used to generate sort keys from Unicode strings (optional).
@@ -96,7 +89,7 @@ public class KeyBuilder implements IKeyBuilder {
      * and the optional Unicode methods will all throw an
      * {@link UnsupportedOperationException}.
      */
-    protected final UnicodeSortKeyGenerator sortKeyGenerator;
+    private final UnicodeSortKeyGenerator sortKeyGenerator;
     
     /**
      * Creates a key builder with an initial buffer capacity of
@@ -116,7 +109,7 @@ public class KeyBuilder implements IKeyBuilder {
      *            keys. When zero (0) the {@link #DEFAULT_INITIAL_CAPACITY} will
      *            be used.
      */
-    public KeyBuilder(int initialCapacity) {
+    public KeyBuilder(final int initialCapacity) {
         
         this(0, createBuffer(initialCapacity));
         
@@ -133,10 +126,10 @@ public class KeyBuilder implements IKeyBuilder {
      * @exception IllegalArgumentException
      *                if the initial capacity is negative.
      */
-    protected static byte[] createBuffer(int initialCapacity) {
+    protected static byte[] createBuffer(final int initialCapacity) {
 
-        if(initialCapacity<0) {
-            
+        if (initialCapacity < 0) {
+
             throw new IllegalArgumentException("initialCapacity must be non-negative");
             
         }
@@ -198,16 +191,28 @@ public class KeyBuilder implements IKeyBuilder {
         this.sortKeyGenerator = sortKeyGenerator; // MAY be null.
         
     }
+
+    final public int off() {
+        
+        return 0;
+        
+    }
     
-    final public int getLength() {
+    final public int len() {
         
         return len;
         
     }
 
-    final public byte[] getBuffer() {
+    final public byte[] array() {
         
         return buf;
+        
+    }
+
+    final public int capacity() {
+        
+        return buf.length;
         
     }
     
@@ -227,9 +232,21 @@ public class KeyBuilder implements IKeyBuilder {
         len = pos;
         
     }
-    
-    final public KeyBuilder append(final int off, final int len, final byte[] a) {
+
+    final public KeyBuilder append(final byte b) {
         
+        return appendUnsigned(b);
+        
+    }
+    
+    final public KeyBuilder append(final byte[] a) {
+        
+        return append(a, 0, a.length);
+        
+    }
+    
+    final public KeyBuilder append(final byte[] a, final int off, final int len) {
+
         ensureFree(len);
         
         System.arraycopy(a, off, buf, this.len, len);
@@ -242,44 +259,20 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    /**
-     * Ensure that at least <i>len</i> bytes are free in the buffer. The
-     * {@link #buf buffer} may be grown by this operation but it will not be
-     * truncated.
-     * <p>
-     * This operation is equivalent to
-     * 
-     * <pre>
-     * ensureCapacity(this.len + len)
-     * </pre>
-     * 
-     * and the latter is often used as an optimization.
-     * 
-     * @param len
-     *            The minimum #of free bytes.
-     */
     final public void ensureFree(int len) {
         
         ensureCapacity(this.len + len );
         
     }
 
-    /**
-     * Ensure that the buffer capacity is a least <i>capacity</i> total bytes.
-     * The {@link #buf buffer} may be grown by this operation but it will not be
-     * truncated.
-     * 
-     * @param capacity
-     *            The minimum #of bytes in the buffer.
-     */
     final public void ensureCapacity(int capacity) {
         
-        if(capacity<0) throw new IllegalArgumentException();
-//        assert capacity >= 0;
+        if (capacity < 0)
+            throw new IllegalArgumentException();
         
         final int overflow = capacity - buf.length;
         
-        if(overflow>0) {
+        if (overflow > 0) {
         
             /*
              * extend to at least the target capacity.
@@ -295,14 +288,20 @@ public class KeyBuilder implements IKeyBuilder {
 
     }
 
+    final public byte[] toByteArray() {
+        
+        return getKey();
+        
+    }
+    
     final public byte[] getKey() {
         
-        byte[] tmp = new byte[this.len];
-        
+        final byte[] tmp = new byte[this.len];
+
         System.arraycopy(buf, 0, tmp, 0, this.len);
-        
+
         return tmp;
-        
+
     }
     
     /*
@@ -569,7 +568,7 @@ public class KeyBuilder implements IKeyBuilder {
                  * single byte whose value is pad+1.
                  */
                 
-                append((byte)(pad+1));
+                appendSigned((byte)(pad+1));
                 
                 textlen = 1;
                 
@@ -618,12 +617,6 @@ public class KeyBuilder implements IKeyBuilder {
         }
 
         return this;
-        
-    }
-    
-    final public KeyBuilder append(final byte[] a) {
-        
-        return append(0, a.length, a);
         
     }
     
@@ -858,7 +851,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    final public KeyBuilder append(final byte v) {
+    final public KeyBuilder appendSigned(final byte v) {
 
         // performance tweak
         if (len + 1 > buf.length) ensureCapacity(len+1);
@@ -1001,7 +994,7 @@ public class KeyBuilder implements IKeyBuilder {
     	final int sign = d.signum(); 
     	
     	if (sign == 0) {
-    		append((byte) 0);
+    		appendSigned((byte) 0);
     		
     		return this;
     	}
@@ -1018,7 +1011,7 @@ public class KeyBuilder implements IKeyBuilder {
     		exponent = -exponent;
     	}
     	
-    	append((byte) sign);
+    	appendSigned((byte) sign);
     	append(exponent);   	
     	
     	// Note: coded as digits 
@@ -1028,7 +1021,7 @@ public class KeyBuilder implements IKeyBuilder {
     	}
     	appendASCII(unscaledStr); // the unscaled BigInteger representation
     	// Note: uses unsigned 255 if negative and unsigned 0 if positive. 
-        append(sign == -1 ? (byte) Byte.MAX_VALUE: (byte) 0);
+        appendSigned(sign == -1 ? (byte) Byte.MAX_VALUE: (byte) 0);
     	
         return this;
     }
@@ -1089,7 +1082,7 @@ public class KeyBuilder implements IKeyBuilder {
 
         } else if (val instanceof Byte) {
             
-            append(((Byte) val).byteValue());
+            appendSigned(((Byte) val).byteValue());
 
         } else if (val instanceof Character) {
 
@@ -1764,9 +1757,9 @@ public class KeyBuilder implements IKeyBuilder {
                 log.info("Using default locale: " + locale.getDisplayName());
 
         }
-
-        // true iff ICU or ICU4JNI was choosen.
-        final boolean icu = (collatorChoice == CollatorEnum.ICU || collatorChoice == CollatorEnum.ICU4JNI);
+        
+        // true iff ICU
+        final boolean icu = collatorChoice == CollatorEnum.ICU;
 
         if (icu && !DefaultKeyBuilderFactory.isICUAvailable()) {
 
@@ -1791,10 +1784,6 @@ public class KeyBuilder implements IKeyBuilder {
 
         switch (collatorChoice) {
 
-        case ICU4JNI:
-            /*
-             * @todo verify the the ICU4JNI library is accessible.
-             */
         case ICU:
             return new KeyBuilder(new ICUSortKeyGenerator(locale, strength,
                     mode), len, buf);

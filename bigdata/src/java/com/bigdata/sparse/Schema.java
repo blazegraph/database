@@ -338,7 +338,7 @@ public class Schema implements Externalizable {
 
         // append the (encoded) schema name.
         keyBuilder.append(getSchemaBytes());
-        keyBuilder.append(primaryKeyType.getByteCode());
+        keyBuilder.appendSigned(primaryKeyType.getByteCode());
         keyBuilder.appendNul();
 
         if (primaryKey != null) {

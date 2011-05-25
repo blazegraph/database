@@ -19,6 +19,8 @@ import com.bigdata.btree.keys.StrengthEnum;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by the TERMS refactor.
  */
 public class LexiconKeyBuilder implements ITermIndexCodes {
 
@@ -53,7 +55,7 @@ public class LexiconKeyBuilder implements ITermIndexCodes {
      */
     public byte[] uri2key(final String uri) {
 
-        return keyBuilder.reset().append(TERM_CODE_URI).append(uri).getKey();
+        return keyBuilder.reset().appendSigned(TERM_CODE_URI).append(uri).getKey();
 
     }
 
@@ -71,7 +73,7 @@ public class LexiconKeyBuilder implements ITermIndexCodes {
 
     public byte[] plainLiteral2key(final String text) {
 
-        return keyBuilder.reset().append(TERM_CODE_LIT).append(text).getKey();
+        return keyBuilder.reset().appendSigned(TERM_CODE_LIT).append(text).getKey();
 
     }
 
@@ -92,7 +94,7 @@ public class LexiconKeyBuilder implements ITermIndexCodes {
 
         assert languageCode.length() > 0;
 
-        keyBuilder.reset().append(TERM_CODE_LCL);
+        keyBuilder.reset().appendSigned(TERM_CODE_LCL);
 
         keyBuilder.appendASCII(languageCode.toUpperCase()).appendNul();
 
@@ -134,7 +136,7 @@ public class LexiconKeyBuilder implements ITermIndexCodes {
          */
         
         // clear out any existing key and add prefix for the DTL space.
-        keyBuilder.reset().append(TERM_CODE_DTL);
+        keyBuilder.reset().appendSigned(TERM_CODE_DTL);
 
         // encode the datatype URI as Unicode sort key to make all data
         // types disjoint.
@@ -172,7 +174,7 @@ public class LexiconKeyBuilder implements ITermIndexCodes {
 
     public byte[] blankNode2Key(String id) {
 
-        return keyBuilder.reset().append(TERM_CODE_BND).append(id).getKey();
+        return keyBuilder.reset().appendSigned(TERM_CODE_BND).append(id).getKey();
 
     }
 

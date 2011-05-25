@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInput;
 
+import com.bigdata.io.compression.IUnicodeCompressor;
 import com.bigdata.journal.Name2Addr;
 
 /**
@@ -50,10 +51,11 @@ import com.bigdata.journal.Name2Addr;
  */
 public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
 
-//    protected static Logger log = Logger.getLogger(DataOutputBuffer.class);
-    
+//    private static transient final Logger log = Logger
+//            .getLogger(DataOutputBuffer.class);
+
     /**
-     * Uses {@link ByteArrayBuffer#DEFAULT_INITIAL_CAPACITY}.
+     * Uses the default for {@link ByteArrayBuffer#ByteArrayBuffer()}.
      */
     public DataOutputBuffer() {
         
@@ -303,16 +305,18 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
      *       do not suggest any requirement for Unicode (if you assume that the
      *       application values are already being serialized as byte[]s - which
      *       is always true when there is a client-server divide). It is used by
-     *       {@link Name2Addr} to store the index names.
+     *       {@link Name2Addr} to store the index names. It used to be used to
+     *       write Value into the lexicon, but that is now handled using a
+     *       {@link IUnicodeCompressor}.
      * 
      * @todo Consider changing the access modified on the desired method using
      *       reflection.
      */
     public void writeUTF(final String str) throws IOException {
         
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         
-        DataOutputStream dos = new DataOutputStream(baos);
+        final DataOutputStream dos = new DataOutputStream(baos);
         
         dos.writeUTF(str);
         

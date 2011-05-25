@@ -28,18 +28,20 @@
 
 package com.bigdata.io;
 
+import java.nio.ByteBuffer;
+
 import it.unimi.dsi.fastutil.io.RepositionableStream;
 
 /**
- * An interface for reading from and accessing a managed byte[]. Implementations
- * of this interface may permit transparent extension of the managed byte[].
+ * An interface for reading from and accessing a managed byte[] with access
+ * methods similar to those of {@link ByteBuffer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
  * @todo raise mark(), etc. into this interface?
  */
-public interface IByteArrayBuffer extends IDataRecord {
+public interface IByteArrayBuffer extends IDataRecord, IManagedByteArray {
 
     /**
      * The backing byte[] WILL be transparently replaced if the buffer capacity

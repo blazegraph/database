@@ -33,16 +33,15 @@
 	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-security-7.2.2.v20101205.jar"/>
 	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-webapp-7.2.2.v20101205.jar"/>
 	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-xml-7.2.2.v20101205.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-charset-4_8_rc1.jar"/>
 	<classpathentry kind="src" path="lgpl-utils/src/java"/>
 	<classpathentry kind="src" path="lgpl-utils/src/test"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-3_6.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/colt-1.2.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/cweb-commons-1.1-b2-dev.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/cweb-extser-0.1-b2-dev.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/cweb-junit-ext-1.1-b3-dev.jar" sourcepath="/junit-ext/src"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-3.8.1.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/apache/log4j-1.2.15.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4jni.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-api-1.4.3.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-log4j12-1.4.3.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/iris-0.58.jar"/>
@@ -71,5 +70,6 @@
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-sparql-testsuite-2.3.0.jar"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-store-testsuite-2.3.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/high-scale-lib-v1.1.2.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-4_8_rc1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

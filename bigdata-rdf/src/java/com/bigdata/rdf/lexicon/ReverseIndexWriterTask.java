@@ -1,12 +1,15 @@
 package com.bigdata.rdf.lexicon;
 
 import java.util.concurrent.Callable;
+
 import org.openrdf.model.BNode;
 import org.openrdf.model.Value;
+
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rdf.lexicon.Id2TermWriteProc.Id2TermWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataValue;
@@ -102,6 +105,7 @@ public class ReverseIndexWriterTask implements Callable<Long> {
 
             // buffer is reused for each serialized term.
             final DataOutputBuffer out = new DataOutputBuffer();
+            final ByteArrayBuffer tbuf = new ByteArrayBuffer();
 
             for (int i = 0; i < ndistinct; i++) {
 
@@ -118,7 +122,7 @@ public class ReverseIndexWriterTask implements Callable<Long> {
                         .getKey();
 
                 // Serialize the term.
-                vals[nonBNodeCount] = ser.serialize(x, out.reset());
+                vals[nonBNodeCount] = ser.serialize(x, out.reset(), tbuf);
 
                 nonBNodeCount++;
 

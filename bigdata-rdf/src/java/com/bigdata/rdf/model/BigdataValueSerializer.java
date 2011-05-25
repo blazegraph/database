@@ -30,7 +30,9 @@ package com.bigdata.rdf.model;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.io.OutputStream;
 
+import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
@@ -38,8 +40,12 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.io.SliceInputStream;
+import com.bigdata.io.compression.BOCU1Compressor;
+import com.bigdata.io.compression.IUnicodeCompressor;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 
 /**
@@ -54,11 +60,26 @@ public class BigdataValueSerializer<V extends Value> {
     /*
      * Serialization.
      */
+
+    /**
+     * Version zero(0) of the serialization format. This version could not write
+     * out very large Unicode strings (64k character limit). Also, there were
+     * are inefficiencies in {@link DataOutputBuffer} when writing UTF8 which
+     * caused a performance hit. See {@link DataOutputBuffer#writeUTF(String)}.
+     */
+    private static final short VERSION0 = 0x0;
+
+    /**
+     * Version ONE(1) of the serialization format. This version uses BOCU-1 to
+     * encode the data (BOCU-1 provides code point order preserving compressed
+     * Unicode).
+     */
+    private static final short VERSION1 = 0x1;
     
     /**
-     * Version zero(0) of the serialization format.
+     * The current serialization version.
      */
-    protected static final short VERSION0 = 0x0;
+    private final static short currentVersion = VERSION1;
     
     /**
      * Error message indicates that the version code in the serialized
@@ -79,6 +100,11 @@ public class BigdataValueSerializer<V extends Value> {
      * Factory used to de-serialize {@link Value}s.
      */
     private final ValueFactory valueFactory;
+
+    /**
+     * Used to compress Unicode strings.
+     */
+    private final IUnicodeCompressor uc;
     
     /**
      * Create an instance that will materialize objects using the caller's
@@ -93,7 +119,50 @@ public class BigdataValueSerializer<V extends Value> {
             throw new IllegalArgumentException();
         
         this.valueFactory = valueFactory;
+       
+        this.uc = new BOCU1Compressor();
         
+    }
+
+    
+    /**
+     * Return the term code as defined by {@link ITermIndexCodes} for this type
+     * of term. This is used to places URIs, different types of literals, and
+     * bnodes into disjoint parts of the key space for sort orders.
+     * 
+     * @see ITermIndexCodes
+     */
+    private byte getTermCode(final Value val) {
+        
+        if (val == null)
+            throw new IllegalArgumentException();
+        
+        if (val instanceof URI) {
+        
+            return ITermIndexCodes.TERM_CODE_URI;
+            
+        } else if (val instanceof Literal) {
+            
+            final Literal lit = (Literal) val;
+            
+            if (lit.getLanguage() != null)
+                return ITermIndexCodes.TERM_CODE_LCL;
+
+            if (lit.getDatatype() != null)
+                return ITermIndexCodes.TERM_CODE_DTL;
+
+            return ITermIndexCodes.TERM_CODE_LIT;
+
+        } else if (val instanceof BNode) {
+
+            return ITermIndexCodes.TERM_CODE_BND;
+            
+        } else {
+            
+            throw new IllegalArgumentException("class="+val.getClass().getName());
+            
+        }
+
     }
 
     /**
@@ -107,50 +176,49 @@ public class BigdataValueSerializer<V extends Value> {
      * @see {@link #deserialize(byte[])}
      */
     public byte[] serialize(final V val) {
-        
-        final DataOutputBuffer out = new DataOutputBuffer(128);
 
-        return serialize(val, out);
+        return serialize(val, new DataOutputBuffer(128), new ByteArrayBuffer(
+                128));
         
     }
-    
+
     /**
-     * Variant which permits reuse of the same buffer. This has the
-     * advantage that the buffer is reused on each invocation and swiftly
-     * grows to its maximum extent.
+     * Variant which permits reuse of the same buffer. This has the advantage
+     * that the buffer is reused on each invocation and swiftly grows to its
+     * maximum extent.
      * 
+     * @param val
+     *            The value.
      * @param out
      *            The buffer - the caller is responsible for resetting the
      *            buffer before each invocation.
+     * @param tmp
+     *            A buffer used to compress the component Unicode strings. This
+     *            will be reset as necessary by this method.
      * 
-     * @return The byte[] containing the serialized data record. This array
-     *         is newly allocated so that a series of invocations of this
-     *         method return distinct byte[]s.
+     * @return The byte[] containing the serialized data record. This array is
+     *         newly allocated so that a series of invocations of this method
+     *         return distinct byte[]s.
      */
-    public byte[] serialize(final V val, final DataOutputBuffer out) {
+    public byte[] serialize(final V val, final DataOutputBuffer out, final
+            ByteArrayBuffer tmp) {
         
         try {
 
-            final short version = VERSION0;
+            final short version = currentVersion;
 
             ShortPacker.packShort(out, version);
 
-            final byte termCode = getTermCode(val);
-
-            /*
-             * Note: VERSION0 writes the termCode immediately after the
-             * packed version identifier. Other versions MAY do something
-             * else.
-             */
-            out.writeByte(termCode);
-
-            /*
-             * FIXME There are inefficiencies in the DataOutputBuffer when
-             * writing UTF8. See if we can work around those using the ICU
-             * package. The issue is documented in the DataOutputBuffer
-             * class.
-             */
-            serialize(val, version, termCode, out);
+            switch (version) {
+            case VERSION0:
+                serializeVersion0(val, version, out);
+                break;
+            case VERSION1:
+                serializeVersion1(val, version, out, tmp);
+                break;
+            default:
+                throw new UnsupportedOperationException(ERR_VERSION);
+            }
 
             return out.toByteArray();
 
@@ -181,19 +249,23 @@ public class BigdataValueSerializer<V extends Value> {
      */
     public V deserialize(final byte[] b) {
 
-        return deserialize(new DataInputBuffer(b));
-        
+        return deserialize(new DataInputBuffer(b), new StringBuilder(b.length));
+
     }
 
     /**
      * Routine for efficient de-serialization of a {@link BigdataValue}.
      * <p>
-     * Note: This automatically uses the {@link BigdataValueFactoryImpl} to create
-     * the {@link BigdataValue}s from the de-serialized state so the factory
-     * reference is always set on the returned {@link BigdataValueImpl}.
+     * Note: This automatically uses the {@link BigdataValueFactoryImpl} to
+     * create the {@link BigdataValue}s from the de-serialized state so the
+     * factory reference is always set on the returned {@link BigdataValueImpl}.
      * 
      * @param b
      *            An input stream from which the serialized data may be read.
+     * @param tmp
+     *            A buffer used to decode the component Unicode strings. The
+     *            length of the buffer will be reset as necessary by this
+     *            method.
      * 
      * @return The {@link BigdataValue}.
      * 
@@ -202,27 +274,21 @@ public class BigdataValueSerializer<V extends Value> {
      * 
      * @see {@link #serialize()}
      */
-    public V deserialize(final DataInputBuffer in) {
+    public V deserialize(final DataInputBuffer in, final StringBuilder tmp) {
         
         try {
 
-            final short version = in.unpackShort();
+            final short version = ShortPacker.unpackShort(in);//in.unpackShort();
 
-            if (version != VERSION0) {
-
-                throw new RuntimeException(ERR_VERSION + " : " + version);
-
+            switch (version) {
+            case VERSION0:
+                return deserializeVersion0(version, in);
+            case VERSION1:
+                return deserializeVersion1(version, in, tmp);
+            default:
+                throw new UnsupportedOperationException(ERR_VERSION + " : "
+                        + version);
             }
-
-            /*
-             * Note: The term code immediately follows the packed version
-             * code for VERSION0 - this is not necessarily true for other
-             * serialization versions.
-             */
-
-            final byte termCode = in.readByte();
-
-            return deserialize(VERSION0, termCode, in);
 
         } catch (IOException ex) {
 
@@ -231,41 +297,36 @@ public class BigdataValueSerializer<V extends Value> {
         }
          
     }
-    
+
     /**
      * Implements the serialization of a Literal, URI, or BNode.
      * 
+     * @param val
+     *            The {@link Value}.
      * @param version
      *            The serialization version number (which has already been
      *            written on <i>out</i> by the caller).
-     * @param termCode
-     *            The byte encoding the type of term as defined by
-     *            {@link ITermIndexCodes} (this has already been written on
-     *            <i>out</i> by the caller).
      * @param out
      *            The data are written here.
      * 
      * @throws IOException
      */
-    protected void serialize(final V val, final short version,
-            final byte termCode, final DataOutput out) throws IOException {
-    
+    private void serializeVersion0(final V val, final short version,
+            final DataOutput out) throws IOException {
+
+        final byte termCode = getTermCode(val);
+
+        /*
+         * Note: VERSION0 writes the termCode immediately after the
+         * packed version identifier. Other versions MAY do something
+         * else.
+         */
+        out.writeByte(termCode);
+
         switch(termCode) {
  
         case ITermIndexCodes.TERM_CODE_BND: {
             
-//            if (true) {
-//
-//                /*
-//                 * Note: disabled since we never write the BNode as a value in
-//                 * the id:term index because BNodes IDs are only consistent, not
-//                 * stable.
-//                 */
-//
-//                throw new UnsupportedOperationException();
-//
-//            }
-
             out.writeUTF(((BNode) val).getID());
 
             break;
@@ -318,39 +379,6 @@ public class BigdataValueSerializer<V extends Value> {
 
     }
     
-//  Note: These are commented out since we face a "read-replace" problem if we
-//  try to implement Externalizable in a stand-off class.
-//    
-//    /**
-//     * Helper for {@link Externalizable}.
-//     * @param val
-//     * @param out
-//     * @throws IOException
-//     */
-//    void writeExternal(BigdataValue val, ObjectOutput out) throws IOException {
-//    
-//        final byte termCode = getTermCode(val);
-//        
-//        out.writeByte(termCode);
-//        
-//        serialize(val, VERSION0, termCode, out);
-//        
-//    }
-//
-//    /**
-//     * Helper for {@link Externalizable}.
-//     * @param in
-//     * @return
-//     * @throws IOException
-//     */
-//    BigdataValue readExternal(ObjectInput in) throws IOException {
-//        
-//        final byte termCode = in.readByte();
-//        
-//        return deserialize(VERSION0, termCode, in);
-//        
-//    }
-    
     /**
      * Implements the de-serialization of a Literal, URI, or BNode.
      * <p>
@@ -361,34 +389,26 @@ public class BigdataValueSerializer<V extends Value> {
      * @param version
      *            The serialization version number (which has already been read
      *            by the caller).
-     * @param termCode
-     *            The byte encoding the type of term as defined by
-     *            {@link ITermIndexCodes} (this has already been read by the
-     *            caller).
      * @param in
      *            The data are read from here.
      * 
      * @throws IOException
      */
     @SuppressWarnings("unchecked")
-    protected V deserialize(final short version, final byte termCode,
-            final DataInput in) throws IOException {
+    private V deserializeVersion0(final short version, final DataInput in)
+            throws IOException {
     
+        /*
+         * Note: The term code immediately follows the packed version
+         * code for VERSION0 - this is not necessarily true for other
+         * serialization versions.
+         */
+
+        final byte termCode = in.readByte();
+
         switch(termCode) {
         
         case ITermIndexCodes.TERM_CODE_BND: {
-            
-//            if(true) {
-//                
-//                /*
-//                 * Note: disabled since we never write the BNode as a value in
-//                 * the id:term index because BNodes IDs are only consistent, not
-//                 * stable.
-//                 */
-//
-//                throw new UnsupportedOperationException();
-//
-//         }
 
             return (V) valueFactory.createBNode(in.readUTF());
 
@@ -434,44 +454,224 @@ public class BigdataValueSerializer<V extends Value> {
         }
         
     }
-    
+
     /**
-     * Return the term code as defined by {@link ITermIndexCodes} for this type
-     * of term. This is used to places URIs, different types of literals, and
-     * bnodes into disjoint parts of the key space for sort orders.
+     * Implements the serialization of a Literal, URI, or BNode.
      * 
-     * @see ITermIndexCodes
+     * @param val
+     *            The {@link Value}.
+     * @param version
+     *            The serialization version number (which has already been
+     *            written on <i>out</i> by the caller).
+     * @param out
+     *            The data are written here.
+     * @param tmp
+     *            A buffer used to compress the component Unicode strings.
+     * 
+     * @throws IOException
      */
-    protected byte getTermCode(final Value val) {
+    private void serializeVersion1(final V val, final short version,
+            final DataOutput out, final ByteArrayBuffer tmp)
+            throws IOException {
+
+        final byte termCode = getTermCode(val);
+
+        /*
+         * Note: VERSION1 writes the termCode immediately after the packed
+         * version identifier. Other versions MAY do something else.
+         */
+        out.writeByte(termCode);
+
+        switch(termCode) {
+ 
+        case ITermIndexCodes.TERM_CODE_BND:
+            
+            encode(((BNode) val).getID(), out, tmp);
+            
+            break;
+
+        case ITermIndexCodes.TERM_CODE_URI:
+            
+            encode(((URI)val).stringValue(), out, tmp);
+            
+            break;
         
-        if (val == null)
-            throw new IllegalArgumentException();
+        case ITermIndexCodes.TERM_CODE_LIT:
+
+            encode(((Literal)val).getLabel(), out, tmp);
+            
+            break;
         
-        if (val instanceof URI) {
+        case ITermIndexCodes.TERM_CODE_LCL:
+
+            /*
+             * Note: This field is ASCII [A-Za-z0-9] and "-". However, this
+             * method writes using UTF-8 so it will generate one byte per
+             * character and it is probably more work to write the data
+             * directly as ASCII bytes.
+             */
+            
+            encode(((Literal) val).getLanguage(), out, tmp);
+
+            encode(((Literal) val).getLabel(), out, tmp);
+
+            break;
         
-            return ITermIndexCodes.TERM_CODE_URI;
-            
-        } else if (val instanceof Literal) {
-            
-            final Literal lit = (Literal) val;
-            
-            if (lit.getLanguage() != null)
-                return ITermIndexCodes.TERM_CODE_LCL;
+        case ITermIndexCodes.TERM_CODE_DTL:
 
-            if (lit.getDatatype() != null)
-                return ITermIndexCodes.TERM_CODE_DTL;
+            encode(((Literal) val).getDatatype().stringValue(), out, tmp);
 
-            return ITermIndexCodes.TERM_CODE_LIT;
+            encode(((Literal) val).getLabel(), out, tmp);
 
-        } else if (val instanceof BNode) {
+            break;
 
-            return ITermIndexCodes.TERM_CODE_BND;
-            
-        } else {
-            
-            throw new IllegalArgumentException("class="+val.getClass().getName());
-            
+        default:
+        
+            throw new IOException(ERR_CODE + " : " + termCode);
+        
         }
+
+    }
+
+    /**
+     * Implements the de-serialization of a Literal, URI, or BNode.
+     * <p>
+     * Note: This automatically uses the {@link BigdataValueFactoryImpl} to
+     * create the {@link BigdataValue}s from the de-serialized state so the
+     * factory reference is always set on the returned {@link BigdataValueImpl}.
+     * 
+     * @param version
+     *            The serialization version number (which has already been read
+     *            by the caller).
+     * @param in
+     *            The data are read from here.
+     * @param tmp
+     *            Buffer used to extract bytes to be decompressed.
+     * @param sb
+     *            Buffer used to decompress bytes.
+     * 
+     * @throws IOException
+     */
+    @SuppressWarnings("unchecked")
+    private V deserializeVersion1(final short version,
+            final DataInputBuffer in, final StringBuilder tmp)
+            throws IOException {
+
+        /*
+         * Note: The term code immediately follows the packed version code for
+         * VERSION0 - this is not necessarily true for other serialization
+         * versions.
+         */
+
+        final byte termCode = in.readByte();
+
+        switch (termCode) {
+
+        case ITermIndexCodes.TERM_CODE_BND:
+            return (V) valueFactory.createBNode(decode(in, tmp));
+
+        case ITermIndexCodes.TERM_CODE_URI:
+            return (V) valueFactory.createURI(decode(in, tmp));
+
+        case ITermIndexCodes.TERM_CODE_LIT:
+            return (V) valueFactory.createLiteral(decode(in, tmp));
+
+        case ITermIndexCodes.TERM_CODE_LCL: {
+
+            final String language = decode(in, tmp);
+
+            final String label = decode(in, tmp);
+
+            return (V) valueFactory.createLiteral(label, language);
+        }
+
+        case ITermIndexCodes.TERM_CODE_DTL: {
+
+            final String datatype = decode(in, tmp);
+
+            final String label = decode(in, tmp);
+
+            return (V) valueFactory.createLiteral(label, valueFactory
+                    .createURI(datatype));
+
+        }
+
+        default:
+
+            throw new IOException(ERR_CODE + " : " + termCode);
+
+        }
+
+    }
+
+    /**
+     * Encode the {@link String} onto the {@link OutputStream}. The temporary
+     * buffer is used to perform the encoding. The byte length of the encoding
+     * is written out using a packed long integer format followed by the coded
+     * bytes. This method is capable of writing out very long strings.
+     * 
+     * @param s
+     *            The character data.
+     * @param out
+     *            The output stream.
+     * @param tmp
+     *            The temporary buffer.
+     * @throws IOException
+     */
+    private void encode(final String s, final DataOutput out,
+            final ByteArrayBuffer tmp) throws IOException {
+     
+        // reset the temporary buffer
+        tmp.reset();
+        
+        // encode the data onto the temporary buffer.
+        uc.encode(s, tmp);
+        
+        // the #of bytes written onto the temporary buffer.
+        final int len = tmp.pos();
+        
+        // write out the packed byte length of the temporary buffer.
+        LongPacker.packLong(out, len);
+
+        // write out the data in the temporary buffer.
+        out.write(tmp.array(), 0/* off */, len);
+        
+    }
+
+    /**
+     * Decode a {@link String} from the input stream. The temporary buffer is
+     * used to perform the decoding.
+     * 
+     * @param in
+     *            The input stream.
+     * @param tmp
+     *            The temporary buffer.
+     * @return The decoded character data.
+     * 
+     * @throws IOException
+     */
+    private String decode(final DataInputBuffer in, final StringBuilder tmp)
+            throws IOException {
+
+        // read in the byte length of the encoded character data.
+        final long n = LongPacker.unpackLong(in);
+
+        if (n > Integer.MAX_VALUE) {
+            // Java does not support strings longer than int32 characters.
+            throw new IOException();
+        }
+
+        // reset the temporary buffer.
+        tmp.setLength(0);
+
+        // ensure sufficient capacity for (at least) that many chars.
+        tmp.ensureCapacity((int) n);
+
+        // decode into the temporary buffer.
+        uc.decode(new SliceInputStream(in, (int) n), tmp);
+
+        // return a new string allocated out of the temporary buffer.
+        return tmp.toString();
 
     }
 

@@ -30,7 +30,6 @@ package com.bigdata.rdf.store;
 import java.util.Properties;
 
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.load.ConcurrentDataLoader;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniFederation;
@@ -71,33 +70,11 @@ import com.bigdata.service.jini.JiniFederation;
  * executed as part of a map-reduce job.
  * <p>
  * 
- * @todo provide a mechanism to make document loading robust to client failure.
- *       When loads are unisolated, a client failure can result in the
- *       statements being loaded into only a subset of the statement indices.
- *       robust load would require a means for undo or redo of failed loads. a
- *       loaded based on map/reduce would naturally provide a robust mechanism
- *       using a redo model. The {@link ConcurrentDataLoader} does much of this
- *       already.
- * 
- * @todo provide batching and synchronization for database at once and TM update
- *       scenarios with a distributed {@link ITripleStore}.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: ScaleOutTripleStore.java 3186 2010-07-12 17:01:19Z thompsonbry
  *          $
  */
 public class ScaleOutTripleStore extends AbstractTripleStore {
-
-//    private final IBigdataFederation fed;
-//    
-//    /**
-//     * The {@link IBigdataFederation} that is being used.
-//     */
-//    public IBigdataFederation getFederation() {
-//        
-//        return fed;
-//        
-//    }
 
     /**
      * Ctor specified by {@link DefaultResourceLocator}
@@ -121,12 +98,6 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
          */
         
     }
-    
-//    public IBigdataFederation getIndexManager() {
-//        
-//        return fed;
-//        
-//    }
     
     final public boolean isStable() {
 

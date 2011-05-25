@@ -189,7 +189,7 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
     
     public int byteLength() {
 
-        return 1 + Bytes.SIZEOF_LONG;
+        return 1/* flags */+ Bytes.SIZEOF_LONG;
         
     }
 
@@ -206,7 +206,7 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
     public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
 
         // First emit the flags byte.
-        keyBuilder.append(flags());
+        keyBuilder.appendSigned(flags());
 
         keyBuilder.append(getTermId());
         

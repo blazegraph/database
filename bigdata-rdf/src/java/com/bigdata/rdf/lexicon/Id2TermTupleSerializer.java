@@ -39,6 +39,7 @@ import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
@@ -73,7 +74,7 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataVa
      * {@link #namespace} of the owning {@link LexiconRelation}.
      */
     transient private BigdataValueSerializer<BigdataValue> valueSer;
-    
+
     /**
      * Used to serialize RDF {@link Value}s.
      * <p>
@@ -81,6 +82,14 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataVa
      * restricted to a single writer so it does not have to be thread-safe.
      */
     final transient private DataOutputBuffer buf = new DataOutputBuffer(Bytes.SIZEOF_LONG);
+
+    /**
+     * Used to serialize RDF {@link Value}s.
+     * <p>
+     * Note: While this object is not thread-safe, the mutable B+Tree is
+     * restricted to a single writer so it does not have to be thread-safe.
+     */
+    final transient private ByteArrayBuffer tbuf = new ByteArrayBuffer();
 
     transient private BigdataValueFactory valueFactory;
 
@@ -184,7 +193,7 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataVa
         
         buf.reset();
         
-        return valueSer.serialize(obj, buf);
+        return valueSer.serialize(obj, buf, tbuf);
 
     }
 
@@ -197,7 +206,8 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataVa
 
         final IV iv = deserializeKey(tuple);
 
-        final BigdataValue tmp = valueSer.deserialize(tuple.getValueStream());
+        final BigdataValue tmp = valueSer.deserialize(tuple.getValueStream(),
+                new StringBuilder());
 
         tmp.setIV(iv);
 

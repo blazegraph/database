@@ -36,7 +36,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -476,7 +475,7 @@ public class IVUtility {
                     ? NullIV.INSTANCE.byteLength() : ivs[i].byteLength();
             
         }
-        
+
         return ivs;
         
     }
@@ -515,9 +514,11 @@ public class IVUtility {
         int o = offset;
         
         final byte flags = KeyBuilder.decodeByte(key[o++]);
-            
+
         /*
          * Handle a term identifier (versus an inline value).
+         * 
+         * FIXME TERMS refactor. Must decode TermIv and NULL IV.
          */
         if (!AbstractIV.isInline(flags)) {
     
@@ -558,10 +559,12 @@ public class IVUtility {
         
         final boolean isExtension = AbstractIV.isExtension(flags);
         
-        final TermId datatype;
+        final TermId datatype; // FIXME TERMS refactor: Type as TermIV not TermId. 
         if (isExtension) {
-            datatype = new TermId(VTE.URI, KeyBuilder.decodeLong(key, o));
-            o += Bytes.SIZEOF_LONG;
+            datatype = (TermId) decodeFromOffset(key, o);
+            o += datatype.byteLength();
+//            datatype = new TermId(VTE.URI, KeyBuilder.decodeLong(key, o));
+//            o += Bytes.SIZEOF_LONG;
         } else {
             datatype = null;
         }
@@ -656,9 +659,9 @@ public class IVUtility {
      *          the IV
      */
     public static final IV fromString(final String s) {
-        if (s.startsWith("TermId")) {
-            char type = s.charAt(s.length()-2);
-            long tid = Long.valueOf(s.substring(7, s.length()-2));
+        if (s.startsWith("TermId")) { // FIXME TERMS REFACTOR : "TermId" => TermIV?
+            final char type = s.charAt(s.length() - 2);
+            final long tid = Long.valueOf(s.substring(7, s.length() - 2));
             return new TermId(VTE.valueOf(type), tid);
         } else {
             final String type = s.substring(0, s.indexOf('(')); 

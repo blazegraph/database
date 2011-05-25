@@ -49,14 +49,14 @@ public interface IDataRecord extends IByteArraySlice {
      */
     IDataRecord slice(final int aoff, final int alen);
 
-    /**
-     * Return a copy of the data in the slice.
-     * 
-     * @return A new array containing data in the slice.
-     * 
-     * @see #asByteBuffer()
-     */
-    byte[] toByteArray();
+//    /**
+//     * Return a copy of the data in the slice.
+//     * 
+//     * @return A new array containing data in the slice.
+//     * 
+//     * @see #asByteBuffer()
+//     */
+//    byte[] toByteArray();
 
     /**
      * Wraps the data in the slice within a {@link ByteBuffer} (does NOT copy

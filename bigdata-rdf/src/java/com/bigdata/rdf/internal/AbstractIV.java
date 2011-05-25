@@ -51,9 +51,10 @@ import com.bigdata.rdf.model.BigdataValue;
  * intrinsic codings, which is important since we will dedicate just 4 bits for
  * to code the natural order of the value space, which is just only 16
  * distinctions. Given that we have 14 intrinsic data types, that leaves room
- * for just two more. One of those bits is reserved against (see
- * {@link DTE#Reserved1}). The other bit is reserved for extensibility in the
- * framework itself as described below (see {@link DTE#Extension}).
+ * for just two more. One of those bits provides for Unicode data (see
+ * {@link DTE#XSDUnicode} without a collation order). The other bit provides
+ * extensibility in the framework itself as described below (see
+ * {@link DTE#Extension}).
  * <p>
  * The header byte contains various bit flags which are laid out as follows:
  * 
@@ -105,9 +106,8 @@ import com.bigdata.rdf.model.BigdataValue;
  * </pre>
  * 
  * If <code>extension</code> was true, then then the next byte(s) encode
- * information about the source data type URI and the key space will be
- * partitioned based on the extended data type URI [the precise format of that
- * data has not yet been decided -- see below].
+ * information about the source data type URI (its {@link IV}) and the key space
+ * will be partitioned based on the extended data type URI.
  * 
  * <pre>
  * ---------- byte boundary ----------
@@ -170,10 +170,6 @@ import com.bigdata.rdf.model.BigdataValue;
  *       href="http://www.w3.org/TR/xmlschema-2/#namespaces"> XML Schema
  *       Datatypes namespaces </a>). I propose that we collapse these by default
  *       onto a canonical datatype URI.
- * 
- * @todo Can we inline the language code for a literal? I think that the
- *       language code must be ASCII and might be restricted to two characters.
- *       This might use up our {@link DTE#Reserved1} bit.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestEncodeDecodeKeys.java 2753 2010-05-01 16:36:59Z thompsonbry
@@ -542,7 +538,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
     public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
 
         // First emit the flags byte.
-        keyBuilder.append(flags);
+        keyBuilder.appendSigned(flags);
 
         if (!isInline()) {
             /*
@@ -555,7 +551,8 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         
         if (isExtension()) {
             
-            keyBuilder.append(getExtensionDatatype().getTermId());
+            IVUtility.encode(keyBuilder, getExtensionDatatype());
+//            keyBuilder.append(getExtensionDatatype().getTermId());
             
         }
         
@@ -587,10 +584,10 @@ public abstract class AbstractIV<V extends BigdataValue, T>
             
             switch (dte) {
             case XSDBoolean:
-                keyBuilder.append((byte) (t.booleanValue() ? 1 : 0));
+                keyBuilder.appendSigned((byte) (t.booleanValue() ? 1 : 0));
                 break;
             case XSDByte:
-                keyBuilder.append(t.byteValue());
+                keyBuilder.appendSigned(t.byteValue());
                 break;
             case XSDShort:
                 keyBuilder.append(t.shortValue());

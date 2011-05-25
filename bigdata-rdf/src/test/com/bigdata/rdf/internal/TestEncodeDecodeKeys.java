@@ -195,7 +195,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
     public void test_InlineValue() {
 
-        final Random r = new Random();
+//        final Random r = new Random();
 
         for (VTE vte : VTE.values()) {
 
@@ -211,6 +211,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
                 final IV<?, ?> v = new AbstractIV(vte,
                         true/* inline */, false/* extension */, dte) {
+
+                    private static final long serialVersionUID = 1L;
 
                     @Override
                     public boolean equals(Object o) {
@@ -348,9 +350,11 @@ public class TestEncodeDecodeKeys extends TestCase2 {
          * Encode.
          */
         final byte[] key;
+        final IKeyBuilder keyBuilder = new KeyBuilder();
         {
-            final IKeyBuilder keyBuilder = new KeyBuilder();
 
+            keyBuilder.reset();
+            
             for (int i = 0; i < e.length; i++) {
 
                 e[i].encode(keyBuilder);
@@ -911,5 +915,44 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
     }
 
+    public void test_SPO_encodeDecode_Unicode_BNodeID() {
+        final IV<?, ?>[] e = {//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                new UnicodeBNodeIV<BigdataBNode>("FOO"),//
+                new UnicodeBNodeIV<BigdataBNode>("_bar"),//
+        };
 
+        doEncodeDecodeTest(e);
+//        final IV<?, ?>[] e = {//
+//                new TermId<BigdataURI>(VTE.URI, 1L),//
+//                new TermId<BigdataURI>(VTE.URI, 2L),//
+//                new XSDBooleanIV<BigdataLiteral>(true),//
+//                new TermId<BigdataURI>(VTE.URI, 4L) //
+//        };
+//
+//        doEncodeDecodeTest(e);
+//
+//        e[2] = new XSDBooleanIV<BigdataLiteral>(false);
+//
+//        doEncodeDecodeTest(e);
+//        fail("write test");
+    }
+    
+    public void test_SPO_encodeDecode_Unicode_PlainLiteral() {
+        fail("write test");
+    }
+    
+    public void test_SPO_encodeDecode_Unicode_LanguadeCodeLiteral() {
+        fail("write test");
+    }
+    
+    public void test_SPO_encodeDecode_Unicode_DatatypeLiteral() {
+        fail("write test");
+    }
+    
+    public void test_SPO_encodeDecode_Unicode_URI() {
+        fail("write test");
+    }
+    
 }

@@ -85,30 +85,38 @@ public class AllocationData {
 		return null;
 	}
 	
-	static class SimpleSlice implements IByteArraySlice {
-		byte[] m_array;
+	private static class SimpleSlice implements IByteArraySlice {
+		
+	    final private byte[] buf;
 		
 		SimpleSlice(ByteBuffer bb) {
-			m_array = bb.array();
+			buf = bb.array();
 		}
 
 		SimpleSlice(byte[] bb) {
-			m_array = bb;
+			buf = bb;
 		}
 
 //		@Override
 		public byte[] array() {
-			return m_array;
+			return buf;
 		}
 
 //		@Override
 		public int len() {
-			return m_array.length;
+			return buf.length;
 		}
 
 //		@Override
 		public int off() {
 			return 0;
 		}
+		
+		public byte[] toByteArray() {
+
+		    return buf.clone();
+
+		}
+		
 	}
 }
