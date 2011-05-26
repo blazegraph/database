@@ -33,7 +33,6 @@
 	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-security-7.2.2.v20101205.jar"/>
 	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-webapp-7.2.2.v20101205.jar"/>
 	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-xml-7.2.2.v20101205.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-charset-4_8_rc1.jar"/>
 	<classpathentry kind="src" path="lgpl-utils/src/java"/>
 	<classpathentry kind="src" path="lgpl-utils/src/test"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/colt-1.2.0.jar"/>
@@ -70,6 +69,7 @@
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-sparql-testsuite-2.3.0.jar"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-store-testsuite-2.3.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/high-scale-lib-v1.1.2.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-4_8_rc1.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-4_8.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-charset-4_8.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
