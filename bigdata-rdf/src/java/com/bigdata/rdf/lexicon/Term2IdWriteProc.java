@@ -31,8 +31,6 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.concurrent.ConcurrentHashMap;
-import org.CognitiveWeb.extser.LongPacker;
-import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ICounter;
@@ -43,6 +41,8 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.io.LongPacker;
+import com.bigdata.io.ShortPacker;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
@@ -542,7 +542,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         case ITermIndexCodes.TERM_CODE_STMT:
             return VTE.STATEMENT;
         case ITermIndexCodes.TERM_CODE_DTL:
-        case ITermIndexCodes.TERM_CODE_DTL2:
+//        case ITermIndexCodes.TERM_CODE_DTL2:
         case ITermIndexCodes.TERM_CODE_LCL:
         case ITermIndexCodes.TERM_CODE_LIT:
             return VTE.LITERAL;

@@ -96,7 +96,7 @@ public class WrappedIV implements IV {
 		return iv.byteLength();
 	}
 
-	public IKeyBuilder encode(IKeyBuilder keyBuilder) {
+	public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
 		return iv.encode(keyBuilder);
 	}
 

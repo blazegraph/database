@@ -5,9 +5,9 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.btree.IndexMetadata.Options;
+import com.bigdata.io.LongPacker;
 
 /**
  * Configuration object for scatter split behavior for a scale-out index.

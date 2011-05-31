@@ -57,6 +57,16 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("RDF Internal Values");
 
+        // test suite for the DTEFlags (bit patterns).
+        suite.addTestSuite(TestDTEFlags.class);
+        
+        // test suite for VTE.
+        suite.addTestSuite(TestVTE.class);
+        
+        // test suite for DTE.
+        suite.addTestSuite(TestDTE.class);
+        
+        // test suite for encode/decode of IVs.
         suite.addTestSuite(TestEncodeDecodeKeys.class);
         
         /*

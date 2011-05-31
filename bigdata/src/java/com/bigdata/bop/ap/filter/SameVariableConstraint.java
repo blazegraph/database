@@ -9,7 +9,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
@@ -17,6 +16,7 @@ import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.io.LongPacker;
 import com.bigdata.relation.accesspath.IAccessPath;
 
 import cutthecrap.utils.striterators.IFilterTest;

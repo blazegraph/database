@@ -37,7 +37,6 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.UUID;
 
-import org.CognitiveWeb.extser.LongPacker;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.BTree;
@@ -45,6 +44,7 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexMetadata.Options;
+import com.bigdata.io.LongPacker;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.TermId;

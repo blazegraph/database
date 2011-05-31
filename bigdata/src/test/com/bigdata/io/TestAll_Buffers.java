@@ -76,10 +76,6 @@ public class TestAll_Buffers extends TestCase {
         suite.addTestSuite(TestByteArrayBuffer.class);
         // test extensible record w/ DataOutput API.
         suite.addTestSuite(TestDataOutputBuffer.class);
-        // test packed short support.
-        suite.addTestSuite(TestShortPacker.class);
-        // test packed long support.
-        suite.addTestSuite(TestLongPacker.class);
 
         return suite;
 

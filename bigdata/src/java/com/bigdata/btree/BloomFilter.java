@@ -34,12 +34,12 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.nio.ByteBuffer;
 
-import org.CognitiveWeb.extser.LongPacker;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.io.LongPacker;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.IRawStore;
 

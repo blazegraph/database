@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -21,60 +21,58 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.io.compression;
+/*
+ * Created on May 26, 2011
+ */
 
+package com.bigdata.io;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /**
- * Aggregates test suites into increasing dependency order.
- *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
+public class TestAll_Packers extends TestCase {
 
     /**
      * 
      */
-    public TestAll() {
+    public TestAll_Packers() {
     }
 
     /**
-     * @param arg0
+     * @param name
      */
-    public TestAll(String arg0) {
-        super(arg0);
+    public TestAll_Packers(String name) {
+        super(name);
     }
 
-    /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
-     */
     public static Test suite() {
 
         final TestSuite suite = new TestSuite(TestAll.class.getPackage()
                 .getName());
 
-        // tests for Unicode compression.
-        suite.addTestSuite(TestUnicodeCompressor.class);
+        /*
+         * TODO Harmonize the DataInputBuffer/ByteArrayBuffer test suites for
+         * the packers and the standalone LongPacker and ShortPacker test suites
+         * and verify interoperability.
+         */
         
-        // tests for the UnicodeHelper
-        suite.addTestSuite(TestUnicodeHelper.class);
-        
-        suite.addTestSuite(TestNOPRecordCompressor.class);
+        // test packed short support.
+        suite.addTestSuite(TestShortPacker.class);
+        // test packed long support.
+        suite.addTestSuite(TestLongPacker.class);
 
-        // tests some assumptions for Deflate and Inflate.
-        suite.addTestSuite(TestHuffmanEncoder.class);
+        // test packed short support.
+        suite.addTestSuite(ShortPackerTestCase.class);
+        // test packed long support.
+        suite.addTestSuite(LongPackerTestCase.class);
 
-        suite.addTestSuite(TestRecordCompressor_BestSpeed.class);
-
-        suite.addTestSuite(TestRecordCompressor_BestCompression.class);
-        
         return suite;
-        
+
     }
     
 }

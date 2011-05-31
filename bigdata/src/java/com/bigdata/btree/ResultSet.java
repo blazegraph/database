@@ -37,8 +37,6 @@ import java.io.ObjectOutput;
 import java.io.OutputStream;
 import java.util.Iterator;
 
-import org.CognitiveWeb.extser.LongPacker;
-import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.data.DefaultLeafCoder;
@@ -53,6 +51,8 @@ import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.FixedByteArrayBuffer;
+import com.bigdata.io.LongPacker;
+import com.bigdata.io.ShortPacker;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IRawStore;

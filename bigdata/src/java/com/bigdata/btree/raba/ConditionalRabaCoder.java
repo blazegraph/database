@@ -35,12 +35,12 @@ import java.io.ObjectOutput;
 import java.io.OutputStream;
 import java.util.Iterator;
 
-import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.btree.raba.codec.ICodedRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.io.LongPacker;
 
 /**
  * Coder conditionally applies other {@link IRabaCoder}s based on a condition,

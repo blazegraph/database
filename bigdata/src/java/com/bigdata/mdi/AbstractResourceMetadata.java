@@ -35,11 +35,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.io.ShortPacker;
 import com.bigdata.journal.Journal;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.Params;

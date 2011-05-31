@@ -36,10 +36,10 @@ import java.util.Random;
 
 import junit.framework.TestCase;
 
-import org.CognitiveWeb.extser.ShortPacker;
 
 /**
- * Test suite for packing and unpacking unsigned short integers.
+ * Test suite for packing and unpacking unsigned short integers using the
+ * {@link DataInputBuffer} and the {@link ByteArrayBuffer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

@@ -5,8 +5,8 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import org.CognitiveWeb.extser.LongPacker;
 
+import com.bigdata.io.LongPacker;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.ndx.IAsynchronousWriteBufferFactory;

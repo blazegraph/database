@@ -32,8 +32,6 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.io.OutputStream;
 
-import org.CognitiveWeb.extser.LongPacker;
-import org.CognitiveWeb.extser.ShortPacker;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
@@ -43,9 +41,9 @@ import org.openrdf.model.ValueFactory;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.io.SliceInputStream;
+import com.bigdata.io.ShortPacker;
 import com.bigdata.io.compression.BOCU1Compressor;
-import com.bigdata.io.compression.IUnicodeCompressor;
+import com.bigdata.io.compression.UnicodeHelper;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 
 /**
@@ -104,7 +102,7 @@ public class BigdataValueSerializer<V extends Value> {
     /**
      * Used to compress Unicode strings.
      */
-    private final IUnicodeCompressor uc;
+    private final UnicodeHelper uc;
     
     /**
      * Create an instance that will materialize objects using the caller's
@@ -120,7 +118,7 @@ public class BigdataValueSerializer<V extends Value> {
         
         this.valueFactory = valueFactory;
        
-        this.uc = new BOCU1Compressor();
+        this.uc = new UnicodeHelper(new BOCU1Compressor());
         
     }
 
@@ -278,7 +276,7 @@ public class BigdataValueSerializer<V extends Value> {
         
         try {
 
-            final short version = ShortPacker.unpackShort(in);//in.unpackShort();
+            final short version = ShortPacker.unpackShort((DataInput)in);//in.unpackShort();
 
             switch (version) {
             case VERSION0:
@@ -317,9 +315,13 @@ public class BigdataValueSerializer<V extends Value> {
         final byte termCode = getTermCode(val);
 
         /*
-         * Note: VERSION0 writes the termCode immediately after the
-         * packed version identifier. Other versions MAY do something
-         * else.
+         * Note: VERSION0 writes the termCode immediately after the packed
+         * version identifier. Other versions MAY do something else.
+         * 
+         * Note: This method requires the DataOutput interface for the
+         * writeUTF() method. If we can get those _exact_ semantics elsewhere
+         * (for backward compatibility they have to be exact) then we could
+         * relax the API and pass in an OutputStream.
          */
         out.writeByte(termCode);
 
@@ -471,7 +473,7 @@ public class BigdataValueSerializer<V extends Value> {
      * @throws IOException
      */
     private void serializeVersion1(final V val, final short version,
-            final DataOutput out, final ByteArrayBuffer tmp)
+            final OutputStream out, final ByteArrayBuffer tmp)
             throws IOException {
 
         final byte termCode = getTermCode(val);
@@ -480,25 +482,25 @@ public class BigdataValueSerializer<V extends Value> {
          * Note: VERSION1 writes the termCode immediately after the packed
          * version identifier. Other versions MAY do something else.
          */
-        out.writeByte(termCode);
+        out.write/*Byte*/(termCode);
 
         switch(termCode) {
  
         case ITermIndexCodes.TERM_CODE_BND:
             
-            encode(((BNode) val).getID(), out, tmp);
+            uc.encode(((BNode) val).getID(), out, tmp);
             
             break;
 
         case ITermIndexCodes.TERM_CODE_URI:
             
-            encode(((URI)val).stringValue(), out, tmp);
+            uc.encode(((URI)val).stringValue(), out, tmp);
             
             break;
         
         case ITermIndexCodes.TERM_CODE_LIT:
 
-            encode(((Literal)val).getLabel(), out, tmp);
+            uc.encode(((Literal)val).getLabel(), out, tmp);
             
             break;
         
@@ -511,17 +513,17 @@ public class BigdataValueSerializer<V extends Value> {
              * directly as ASCII bytes.
              */
             
-            encode(((Literal) val).getLanguage(), out, tmp);
+            uc.encode(((Literal) val).getLanguage(), out, tmp);
 
-            encode(((Literal) val).getLabel(), out, tmp);
+            uc.encode(((Literal) val).getLabel(), out, tmp);
 
             break;
         
         case ITermIndexCodes.TERM_CODE_DTL:
 
-            encode(((Literal) val).getDatatype().stringValue(), out, tmp);
+            uc.encode(((Literal) val).getDatatype().stringValue(), out, tmp);
 
-            encode(((Literal) val).getLabel(), out, tmp);
+            uc.encode(((Literal) val).getLabel(), out, tmp);
 
             break;
 
@@ -568,28 +570,28 @@ public class BigdataValueSerializer<V extends Value> {
         switch (termCode) {
 
         case ITermIndexCodes.TERM_CODE_BND:
-            return (V) valueFactory.createBNode(decode(in, tmp));
+            return (V) valueFactory.createBNode(uc.decode1(in, tmp));
 
         case ITermIndexCodes.TERM_CODE_URI:
-            return (V) valueFactory.createURI(decode(in, tmp));
+            return (V) valueFactory.createURI(uc.decode1(in, tmp));
 
         case ITermIndexCodes.TERM_CODE_LIT:
-            return (V) valueFactory.createLiteral(decode(in, tmp));
+            return (V) valueFactory.createLiteral(uc.decode1(in, tmp));
 
         case ITermIndexCodes.TERM_CODE_LCL: {
 
-            final String language = decode(in, tmp);
+            final String language = uc.decode1(in, tmp);
 
-            final String label = decode(in, tmp);
+            final String label = uc.decode1(in, tmp);
 
             return (V) valueFactory.createLiteral(label, language);
         }
 
         case ITermIndexCodes.TERM_CODE_DTL: {
 
-            final String datatype = decode(in, tmp);
+            final String datatype = uc.decode1(in, tmp);
 
-            final String label = decode(in, tmp);
+            final String label = uc.decode1(in, tmp);
 
             return (V) valueFactory.createLiteral(label, valueFactory
                     .createURI(datatype));
@@ -601,77 +603,6 @@ public class BigdataValueSerializer<V extends Value> {
             throw new IOException(ERR_CODE + " : " + termCode);
 
         }
-
-    }
-
-    /**
-     * Encode the {@link String} onto the {@link OutputStream}. The temporary
-     * buffer is used to perform the encoding. The byte length of the encoding
-     * is written out using a packed long integer format followed by the coded
-     * bytes. This method is capable of writing out very long strings.
-     * 
-     * @param s
-     *            The character data.
-     * @param out
-     *            The output stream.
-     * @param tmp
-     *            The temporary buffer.
-     * @throws IOException
-     */
-    private void encode(final String s, final DataOutput out,
-            final ByteArrayBuffer tmp) throws IOException {
-     
-        // reset the temporary buffer
-        tmp.reset();
-        
-        // encode the data onto the temporary buffer.
-        uc.encode(s, tmp);
-        
-        // the #of bytes written onto the temporary buffer.
-        final int len = tmp.pos();
-        
-        // write out the packed byte length of the temporary buffer.
-        LongPacker.packLong(out, len);
-
-        // write out the data in the temporary buffer.
-        out.write(tmp.array(), 0/* off */, len);
-        
-    }
-
-    /**
-     * Decode a {@link String} from the input stream. The temporary buffer is
-     * used to perform the decoding.
-     * 
-     * @param in
-     *            The input stream.
-     * @param tmp
-     *            The temporary buffer.
-     * @return The decoded character data.
-     * 
-     * @throws IOException
-     */
-    private String decode(final DataInputBuffer in, final StringBuilder tmp)
-            throws IOException {
-
-        // read in the byte length of the encoded character data.
-        final long n = LongPacker.unpackLong(in);
-
-        if (n > Integer.MAX_VALUE) {
-            // Java does not support strings longer than int32 characters.
-            throw new IOException();
-        }
-
-        // reset the temporary buffer.
-        tmp.setLength(0);
-
-        // ensure sufficient capacity for (at least) that many chars.
-        tmp.ensureCapacity((int) n);
-
-        // decode into the temporary buffer.
-        uc.decode(new SliceInputStream(in, (int) n), tmp);
-
-        // return a new string allocated out of the temporary buffer.
-        return tmp.toString();
 
     }
 

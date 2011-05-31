@@ -24,14 +24,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
 import java.io.DataInputStream;
+import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.CognitiveWeb.extser.LongPacker;
-
 import com.bigdata.io.ByteBufferInputStream;
+import com.bigdata.io.LongPacker;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -69,7 +70,7 @@ public class CommitRecordSerializer {
 
             dos.writeLong(commitCounter);
             
-            LongPacker.packLong(dos, n);
+            LongPacker.packLong((DataOutput)dos, n);
             
             for(int i=0; i<n; i++) {
   
@@ -105,7 +106,7 @@ public class CommitRecordSerializer {
             
             final long commitCounter = dis.readLong();
             
-            final int n = (int)LongPacker.unpackLong(dis);
+            final int n = (int)LongPacker.unpackLong((DataInput)dis);
 
             final long[] roots = new long[n];
 

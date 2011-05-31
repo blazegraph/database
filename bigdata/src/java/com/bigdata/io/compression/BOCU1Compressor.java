@@ -39,6 +39,9 @@ import java.nio.charset.Charset;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.io.ByteCountInputStream;
+import com.bigdata.io.ByteCountOutputStream;
+
 /**
  * BOCU-1 version.
  * 
@@ -65,10 +68,12 @@ public class BOCU1Compressor implements IUnicodeCompressor, Serializable {
 //        
 //    }
 
-    public void encode(final CharSequence s, final OutputStream os) {
+    public int encode(final CharSequence s, final OutputStream os) {
 
+        final ByteCountOutputStream bcos = new ByteCountOutputStream(os); 
+        
         // Wrap with Writer using BOCU-1.
-        final OutputStreamWriter w = new OutputStreamWriter(os, cs);
+        final OutputStreamWriter w = new OutputStreamWriter(bcos, cs);
 
         try {
 
@@ -86,6 +91,8 @@ public class BOCU1Compressor implements IUnicodeCompressor, Serializable {
             w.flush();
 
             w.close();
+            
+            return bcos.getNWritten();
 
         } catch (IOException ex) {
 
@@ -104,10 +111,12 @@ public class BOCU1Compressor implements IUnicodeCompressor, Serializable {
 //
 //    }
 
-    public void decode(final InputStream in, final Appendable sb) {
+    public int decode(final InputStream in, final Appendable sb) {
 
+        final ByteCountInputStream bcis = new ByteCountInputStream(in);
+        
         // Wrap with decoder for BUCU-1.
-        final InputStreamReader r = new InputStreamReader(in, cs);
+        final InputStreamReader r = new InputStreamReader(bcis, cs);
 
         try {
 
@@ -119,6 +128,8 @@ public class BOCU1Compressor implements IUnicodeCompressor, Serializable {
 
             }
 
+            return bcis.getNRead();
+            
         } catch (IOException ex) {
 
             throw new RuntimeException(ex);

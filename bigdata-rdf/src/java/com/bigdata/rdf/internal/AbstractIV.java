@@ -33,6 +33,7 @@ import org.deri.iris.basics.Literal;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -42,6 +43,18 @@ import com.bigdata.rdf.model.BigdataValue;
  * together into the flags byte used as a common prefix for all keys formed from
  * RDF Values regardless of whether they are based on an assigned term
  * identifier or the inlining of the RDF Value.
+ * <p>
+ * Literals which are projected onto primitive data types with a natural order
+ * (int, float, double, long, etc.) are in total order within that segment of
+ * the statement index and such segments are partitioned into non-overlapping
+ * key ranges. Thus key range scans may be used for where the primitive data
+ * type allows it while filtering on the value must be used where the data type
+ * does not have a natural ordering. Unicode values do not have a "natural"
+ * ordering within the statement indices as they are modeled by a reversible
+ * compression rather than a collation sort key. Therefore, when a high level
+ * query is constrained such that a variable is known to be of a given data type
+ * you can use {@link IV} aware operations. Otherwise, the {@link IV}s must be
+ * materialized and operations performed on {@link BigdataValue}s instead.
  * 
  * <h3>Binary record format</h3>
  * 
@@ -52,7 +65,7 @@ import com.bigdata.rdf.model.BigdataValue;
  * to code the natural order of the value space, which is just only 16
  * distinctions. Given that we have 14 intrinsic data types, that leaves room
  * for just two more. One of those bits provides for Unicode data (see
- * {@link DTE#XSDUnicode} without a collation order). The other bit provides
+ * {@link DTE#XSDString} without a collation order). The other bit provides
  * extensibility in the framework itself as described below (see
  * {@link DTE#Extension}).
  * <p>
@@ -486,7 +499,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
      * Imposes an ordering of IVs based on their natural sort ordering in the 
      * index as unsigned byte[]s.
      */
-    public int compareTo(final IV o) {
+    final public int compareTo(final IV o) {
 
         if (this == o)
             return 0;
@@ -504,7 +517,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
          * sort out extension types and datatype literals with a natural
          * datatype.
          */
-        int ret = (int) flags - (int) o.flags();
+        final int ret = (int) flags - (int) o.flags();
 
         if (ret < 0)
             return -1;
@@ -513,11 +526,15 @@ public abstract class AbstractIV<V extends BigdataValue, T>
             return 1;
 
         /*
-         * At this point we are comparing two IVs of the same intrinsic
-         * datatype. That is, they are both datatype literals expressed using
-         * one of the predefined datatypes. These can be compared by directly
-         * comparing their primitive values. E.g., long to long, int to int,
-         * etc.
+         * At this point we are comparing two IVs of the same intrinsic type.
+         * These can be compared by directly comparing their primitive values.
+         * E.g., long to long, int to int, etc. For the IVs which have inline
+         * Unicode, the comparison should be of the String values per the API
+         * for the appropriate RDF Value type (Literal, URI, Blank node). The
+         * String comparison will reflect the code points rather than any
+         * collation order, but Unicode values are inlined using a code point
+         * ordering preserving compression so comparing the Strings is the right
+         * thing to do.
          */
         return _compareTo(o);
 
@@ -525,16 +542,9 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 
     /**
      * Compare two {@link IV}s having the same intrinsic datatype.
-     * 
-     * @todo This should probably be moved to
-     *       {@link AbstractInlineIV} and implementations provided
-     *       for each concrete instance of that abstract class.
      */
     protected abstract int _compareTo(IV o);
 
-    /**
-     * {@inheritDoc}
-     */
     public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
 
         // First emit the flags byte.
@@ -542,95 +552,196 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 
         if (!isInline()) {
             /*
-             * Since the RDF Value is not inline, it will be represented as a
-             * term identifier.
+             * The IV is not 100% inline.
+             */
+            if (isExtension()) {
+                /*
+                 * The IV uses the "extension" bit. We have two different use
+                 * cases here. One is URIs in which we have factored out the
+                 * namespaceIV for the URI. The other is data type literals in
+                 * which we have factored out the datatypeIV for the literal
+                 * (this is only used when the datatype literal can not be
+                 * projected onto one of intrinsic data types).
+                 * 
+                 * FIXME Handle {namespaceIV,localName} URIs
+                 * 
+                 * FIXME Handle {datatypeIV,label} literals.
+                 */
+                throw new UnsupportedOperationException();
+            }
+            /*
+             * The RDF Value is represented as a term identifier (i.e., a key
+             * into the TERMS index).
+             * 
+             * FIXME TERMS REFACTOR: Handle NullIV as special case.
              */
             keyBuilder.append(getTermId());
             return keyBuilder;
         }
         
-        if (isExtension()) {
-            
-            IVUtility.encode(keyBuilder, getExtensionDatatype());
-//            keyBuilder.append(getExtensionDatatype().getTermId());
-            
+        if (isURI()) {
+            /*
+             * Handle a fully inline URI.
+             */
+            final InlineURIIV<?> iv = (InlineURIIV<?>) this;
+            final String uriString = iv.getInlineValue().stringValue();
+            final byte[] b = IVUtility.un.encode1(uriString);
+            keyBuilder.append(b);
+            iv.setByteLength(1/* flags */+ b.length);
+            return keyBuilder;
         }
-        
-        /*
-         * Append the natural value type representation.
-         * 
-         * Note: We have to handle the unsigned byte, short, int and long values
-         * specially to get the correct total key order.
-         */
-        
-        final DTE dte = getDTE();
 
         if (isBNode()) {
-            
-            switch (dte) {
+            /*
+             * Handle inline blank nodes.
+             */
+            switch (getDTE()) {
             case XSDInt:
                 keyBuilder.append(((Integer) getInlineValue()).intValue());
                 break;
             case UUID:
                 keyBuilder.append((UUID) getInlineValue());
                 break;
+            case XSDString: {
+                final UnicodeBNodeIV<?> iv = (UnicodeBNodeIV<?>) this;
+                final byte[] b = IVUtility.un.encode1(iv.getInlineValue());
+                keyBuilder.append(b);
+                iv.setByteLength(1/* flags */+ b.length);
+                break;
             }
-            
-        } else {
-        
-            final AbstractLiteralIV<?, ?> t = isExtension() ?
-                    ((ExtensionIV) this).getDelegate() :
-                    (AbstractLiteralIV<?, ?>) this;
-            
-            switch (dte) {
-            case XSDBoolean:
-                keyBuilder.appendSigned((byte) (t.booleanValue() ? 1 : 0));
-                break;
-            case XSDByte:
-                keyBuilder.appendSigned(t.byteValue());
-                break;
-            case XSDShort:
-                keyBuilder.append(t.shortValue());
-                break;
-            case XSDInt:
-                keyBuilder.append(t.intValue());
-                break;
-            case XSDLong:
-                keyBuilder.append(t.longValue());
-                break;
-            case XSDFloat:
-                keyBuilder.append(t.floatValue());
-                break;
-            case XSDDouble:
-                keyBuilder.append(t.doubleValue());
-                break;
-            case XSDInteger:
-                keyBuilder.append(t.integerValue());
-                break;
-            case XSDDecimal:
-                keyBuilder.append(t.decimalValue());
-                break;
-            case UUID:
-                keyBuilder.append((UUID)t.getInlineValue());
-                break;
-    //        case XSDUnsignedByte:
-    //            keyBuilder.appendUnsigned(t.byteValue());
-    //            break;
-    //        case XSDUnsignedShort:
-    //            keyBuilder.appendUnsigned(t.shortValue());
-    //            break;
-    //        case XSDUnsignedInt:
-    //            keyBuilder.appendUnsigned(t.intValue());
-    //            break;
-    //        case XSDUnsignedLong:
-    //            keyBuilder.appendUnsigned(t.longValue());
-    //            break;
             default:
-                throw new AssertionError(toString());
+                throw new AssertionError();
             }
+            // done.
+            return keyBuilder;
             
-        }
+        } 
         
+        // The datatype.
+        final DTE dte = getDTE();
+
+        /*
+         * We are dealing with some kind of inlined Literal. It may either be a
+         * natural datatype [int, long, float, etc.] or an IExtension projected
+         * onto a natural datatype.
+         * 
+         * Note: An optimized xsd:string handled by XSDStringExtension goes
+         * through this code path.
+         */
+        assert getVTE() == VTE.LITERAL;
+
+        if (isExtension()) {
+
+            /*
+             * Append the extension type for a datatype literal into the key.
+             * 
+             * Note: Non-inline extensions were handled above!
+             */
+            
+            IVUtility.encode(keyBuilder, getExtensionDatatype());
+
+        }
+
+        /*
+         * Append the natural value type representation.
+         * 
+         * Note: We have to handle the unsigned byte, short, int and long values
+         * specially to get the correct total key order.
+         * 
+         * Note: When we generate the key from an IV with Unicode data we cache
+         * the byteLength! This avoids having to compute it again since we know
+         * it at the time that we encode the IV.
+         */
+        final AbstractLiteralIV<?, ?> t = isExtension() //
+                ? ((ExtensionIV<?>) this).getDelegate()//
+                : (AbstractLiteralIV<?, ?>) this;
+
+        switch (dte) {
+        case XSDBoolean:
+            keyBuilder.appendSigned((byte) (t.booleanValue() ? 1 : 0));
+            break;
+        case XSDByte:
+            keyBuilder.appendSigned(t.byteValue());
+            break;
+        case XSDShort:
+            keyBuilder.append(t.shortValue());
+            break;
+        case XSDInt:
+            keyBuilder.append(t.intValue());
+            break;
+        case XSDLong:
+            keyBuilder.append(t.longValue());
+            break;
+        case XSDFloat:
+            keyBuilder.append(t.floatValue());
+            break;
+        case XSDDouble:
+            keyBuilder.append(t.doubleValue());
+            break;
+        case XSDInteger:
+            keyBuilder.append(t.integerValue());
+            break;
+        case XSDDecimal:
+            keyBuilder.append(t.decimalValue());
+            break;
+        case UUID:
+            keyBuilder.append((UUID) t.getInlineValue());
+            break;
+        // case XSDUnsignedByte:
+        // keyBuilder.appendUnsigned(t.byteValue());
+        // break;
+        // case XSDUnsignedShort:
+        // keyBuilder.appendUnsigned(t.shortValue());
+        // break;
+        // case XSDUnsignedInt:
+        // keyBuilder.appendUnsigned(t.intValue());
+        // break;
+        // case XSDUnsignedLong:
+        // keyBuilder.appendUnsigned(t.longValue());
+        // break;
+        case XSDString: {
+            if (this instanceof InlineLiteralIV<?>) {
+                /*
+                 * A fully inline Literal
+                 */
+                final InlineLiteralIV<?> iv = (InlineLiteralIV<?>) this;
+                // notice the current key length.
+                final int pos0 = keyBuilder.len();
+                // append the term code.
+                keyBuilder.append((byte) iv.getTermCode());
+                // handle language code or datatype URI.
+                if (iv.getLanguage() != null) {
+                    // language code
+                    keyBuilder.append(IVUtility.un.encode1(iv.getLanguage()));
+                } else if (iv.getDatatype() != null) {
+                    // datatype URI
+                    keyBuilder.append(IVUtility.un.encode1(iv.getDatatype()
+                            .stringValue()));
+                }
+                // the literal's label
+                keyBuilder.append(IVUtility.un.encode1(iv.getLabel()));
+                // figure the final length of the key.
+                final int len = keyBuilder.len() - pos0;
+                // cache the byteLength on the IV.
+                iv.setByteLength(1/* flags */+ len);
+                return keyBuilder;
+            }
+            /*
+             * Optimized code path for xsd:string when using in combination with
+             * ExternalIV.
+             */
+            // append the term code (note: plain literal!!!)  
+            keyBuilder.append((byte) ITermIndexCodes.TERM_CODE_LIT);
+            final byte[] b = IVUtility.un.encode1((String) t.getInlineValue());
+            keyBuilder.append(b);
+            ((IInlineUnicode) t)
+                    .setByteLength(1/* flags */+ 1/* termCode */+ b.length);
+            return keyBuilder;
+        }
+        default:
+            throw new AssertionError(toString());
+        }
+
         return keyBuilder;
         
     }

@@ -71,6 +71,8 @@ public class LexiconConfiguration<V extends BigdataValue>
 	 * UUIDs since those are inlined using a different mechanism. Note that
 	 * inlining of the IDs is permissible even in TOLD_BNODES mode since the ID
 	 * will be preserved.
+	 * 
+	 * FIXME TERMS REFACTOR : Configure and support max length blank node inlining into the statement indices.
 	 */
 	final int BNODE_INLINE_LIMIT = 64;
 
@@ -78,7 +80,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 	 * The maximum length of a {@link URI#getLocalName()} before the {@link URI}
 	 * will no longer be inlined into the statement indices.
 	 * 
-	 * FIXME Configure and support URI inlining into the statement indices.
+	 * FIXME TERMS REFACTOR : Configure and support URI inlining into the statement indices.
 	 */
 	final int URI_INLINE_LIMIT = 64;
 
@@ -90,7 +92,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 	 * Note: When inlining a datatype {@link URI} which is non-numeric, the
 	 * {@link URI} of the datatype must also be inlined.
 	 * 
-	 * FIXME Configure and support literal inlining into the statement indices.
+	 * FIXME TERMS REFACTOR : Configure and support literal inlining into the statement indices.
 	 */
 	final int LITERAL_INLINE_LIMIT = 64;
 
@@ -125,15 +127,25 @@ public class LexiconConfiguration<V extends BigdataValue>
     public V asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
         
     	// The TermId for the ExtensionIV.
-    	final TermId datatype = iv.getExtensionDatatype();
+    	final TermId datatypeIV = iv.getExtensionDatatype();
     	
     	// Find the IExtension from the datatype IV.
-    	final IExtension ext = termIds.get(datatype);
+    	final IExtension ext = termIds.get(datatypeIV);
+    	
+    	if(ext == null)
+    	    throw new RuntimeException("Unknown extension: "+datatypeIV);
     	
         return (V) ext.asValue(iv, vf);
         
     }
 
+    /**
+     * {@inheritDoc}
+     * 
+     * FIXME Add support for {@link UnicodeBNodeIV}, {@link InlineURIIV},
+     * {@link InlineLiteralIV}, {@link XSDStringExtension}, and the namespaceIV
+     * URI and datatypeIV Literal representations.
+     */
     public IV createInlineIV(final Value value) {
 
         // we know right away we can't handle URIs
@@ -348,8 +360,9 @@ public class LexiconConfiguration<V extends BigdataValue>
             case XSDUnsignedShort: // none of the unsigneds are tested yet
             case XSDUnsignedInt: // none of the unsigneds are tested yet
             case XSDUnsignedLong: // none of the unsigneds are tested yet
-            default:
                 return false;
+            default:
+                throw new AssertionError();
         }
 
     }

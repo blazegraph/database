@@ -38,8 +38,10 @@ import javax.xml.datatype.DatatypeFactory;
 
 import junit.framework.TestCase2;
 
+import org.deri.iris.basics.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
+import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -59,8 +61,7 @@ import com.bigdata.rdf.spo.SPO;
  * having variable component lengths while others are term identifiers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestEncodeDecodeKeys.java 2756 2010-05-03 22:26:18Z thompsonbry
- *          $
+ * @version $Id: TestEncodeDecodeKeys.java 2756 2010-05-03 22:26:18Z thompsonbry$
  */
 public class TestEncodeDecodeKeys extends TestCase2 {
 
@@ -70,57 +71,6 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     
     public TestEncodeDecodeKeys(String name) {
         super(name);
-    }
-
-    /**
-     * Unit test for {@link VTE} verifies that the
-     * correspondence between the enumerated types and the internal values is
-     * correct (self-consistent).
-     */
-    public void test_VTE_selfConsistent() {
-       
-        for(VTE e : VTE.values()) {
-
-            assertTrue("expected: " + e + " (v=" + e.v + "), actual="
-                    + VTE.valueOf(e.v),
-                    e == VTE.valueOf(e.v));
-
-        }
-        
-    }
-    
-    /**
-     * Unit test for {@link VTE} verifies that all legal byte
-     * values decode to an internal value type enum (basically, this checks that
-     * we mask the two lower bits).
-     */
-    public void test_VTE_decodeNoErrors() {
-
-        for (int i = Byte.MIN_VALUE; i <= Byte.MAX_VALUE; i++) {
-            
-            assertNotNull(VTE.valueOf((byte) i));
-            
-        }
-        
-    }
-
-    /**
-     * Unit test for {@link DTE} verifies that the
-     * correspondence between the enumerated types and the internal values is
-     * correct.
-     */
-    public void test_DTE_selfConsistent() {
-
-        for(DTE e : DTE.values()) {
-
-            assertTrue("expected: " + e + " (v=" + e.v + "), actual="
-                    + DTE.valueOf(e.v),
-                    e == DTE.valueOf(e.v));
-
-            assertEquals(e.v, e.v());
-
-        }
-
     }
 
     /**
@@ -715,25 +665,51 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         doEncodeDecodeTest(e);
         
     }
-    
-    public void test_SPO_encodeDecode_BNode() {
+
+    /**
+     * Unit test for {@link UUIDBNodeIV}, which provides support for inlining a
+     * told blank node whose <code>ID</code> can be parsed as a {@link UUID}.
+     */
+    public void test_SPO_encodeDecode_BNode_UUID_ID() {
         
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 new UUIDBNodeIV<BigdataBNode>(UUID.randomUUID()),//
-                new NumericBNodeIV<BigdataBNode>(52),//
         };
 
         doEncodeDecodeTest(e);
 
     }
 
+    /**
+     * Unit test for {@link NumericBNodeIV}, which provides support for inlining
+     * a told blank node whose <code>ID</code> can be parsed as an
+     * {@link Integer}.
+     */
+    public void test_SPO_encodeDecode_BNode_INT_ID() {
+        
+        final IV<?, ?>[] e = {//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                new NumericBNodeIV<BigdataBNode>(0),//
+                new NumericBNodeIV<BigdataBNode>(52),//
+                new NumericBNodeIV<BigdataBNode>(Integer.MAX_VALUE),//
+                new NumericBNodeIV<BigdataBNode>(Integer.MIN_VALUE),//
+        };
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    /**
+     * Unit test for the {@link EpochExtension}.
+     */
     public void test_SPO_encodeDecodeEpoch() {
         
         final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
         
-        EpochExtension<BigdataValue> ext = 
+        final EpochExtension<BigdataValue> ext = 
             new EpochExtension<BigdataValue>(new IDatatypeURIResolver() {
             public BigdataURI resolve(URI uri) {
                 BigdataURI buri = vf.createURI(uri.stringValue());
@@ -752,11 +728,14 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
     }
 
+    /**
+     * Unit test for the {@link ColorsEnumExtension}.
+     */
     public void test_SPO_encodeDecodeColor() {
         
         final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
         
-        ColorsEnumExtension<BigdataValue> ext = 
+        final ColorsEnumExtension<BigdataValue> ext = 
             new ColorsEnumExtension<BigdataValue>(new IDatatypeURIResolver() {
             public BigdataURI resolve(URI uri) {
                 BigdataURI buri = vf.createURI(uri.stringValue());
@@ -915,7 +894,39 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
     }
 
-    public void test_SPO_encodeDecode_Unicode_BNodeID() {
+    /**
+     * Unit test for the {@link XSDStringExtension} support for inlining
+     * <code>xsd:string</code>. This approach is more efficient since the
+     * datatypeURI is implicit in the {@link IExtension} handler than being
+     * explicitly represented in the inline data.
+     */
+    public void test_SPO_encodeDecode_extension_xsdString() {
+        
+        final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
+        
+        final XSDStringExtension<BigdataValue> ext = 
+            new XSDStringExtension<BigdataValue>(new IDatatypeURIResolver() {
+            public BigdataURI resolve(URI uri) {
+                final BigdataURI buri = vf.createURI(uri.stringValue());
+                buri.setIV(new TermId(VTE.URI, 1024));
+                return buri;
+            }
+        });
+        
+        final IV<?, ?>[] e = {//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                ext.createIV(new LiteralImpl("1234", XSD.STRING)),
+        };
+
+        doEncodeDecodeTest(e);
+    }
+
+    /**
+     * Unit test for inlining blank nodes having a Unicode <code>ID</code>.
+     */
+    public void test_SPO_encodeDecode_Inline_BNode_UnicodeID() {
+
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
@@ -924,34 +935,134 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         };
 
         doEncodeDecodeTest(e);
-//        final IV<?, ?>[] e = {//
-//                new TermId<BigdataURI>(VTE.URI, 1L),//
-//                new TermId<BigdataURI>(VTE.URI, 2L),//
-//                new XSDBooleanIV<BigdataLiteral>(true),//
-//                new TermId<BigdataURI>(VTE.URI, 4L) //
-//        };
-//
-//        doEncodeDecodeTest(e);
-//
-//        e[2] = new XSDBooleanIV<BigdataLiteral>(false);
-//
-//        doEncodeDecodeTest(e);
-//        fail("write test");
+        
     }
+
+    /**
+     * Unit test for {@link InlineLiteralIV}. That class provides inlining of
+     * any kind of {@link Literal}. However, while that class is willing to
+     * inline <code>xsd:string</code> it is more efficient to handle inlining
+     * for <code>xsd:string</code> using the {@link XSDStringExtension}.
+     * <p>
+     * This tests the inlining of plain literals.
+     */
+    public void test_SPO_encodeDecode_Inline_Literal_plainLiteral() {
+        
+        final IV<?, ?>[] e = {//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                new InlineLiteralIV<BigdataLiteral>("FOO", null/* language */,
+                        null/* datatype */),//
+        };
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    /**
+     * Unit test for {@link InlineLiteralIV}. That class provides inlining of
+     * any kind of {@link Literal}. However, while that class is willing to
+     * inline <code>xsd:string</code> it is more efficient to handle inlining
+     * for <code>xsd:string</code> using the {@link XSDStringExtension}.
+     * <p>
+     * This tests inlining of language code literals.
+     */
+    public void test_SPO_encodeDecode_Inline_Literal_languageCodeLiteral() {
+        
+        final IV<?, ?>[] e = {//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                new InlineLiteralIV<BigdataLiteral>("GOO", "en"/* language */,
+                        null/* datatype */),//
+        };
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    /**
+     * Unit test for {@link InlineLiteralIV}. That class provides inlining of
+     * any kind of {@link Literal}. However, while that class is willing to
+     * inline <code>xsd:string</code> it is more efficient to handle inlining
+     * for <code>xsd:string</code> using the {@link XSDStringExtension}.
+     * <p>
+     * This tests inlining of datatype literals which DO NOT correspond to
+     * registered extension types as the datatypeIV plus the inline Unicode
+     * value of the label.
+     */
+    public void test_SPO_encodeDecode_Inline_Literal_datatypeLiteral() {
+        
+        final IV<?, ?>[] e = {//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                new InlineLiteralIV<BigdataLiteral>("BAR", null/* language */,
+                        new URIImpl("http://www.bigdata.com")/* datatype */),//
+        };
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    /**
+     * Unit test for {@link InlineLiteralIV}. That class provides inlining of
+     * any kind of {@link Literal}. However, while that class is willing to
+     * inline <code>xsd:string</code> it is more efficient to handle inlining
+     * for <code>xsd:string</code> using the {@link XSDStringExtension}.
+     * <p>
+     * This tests for possible conflicting interpretations of an xsd:string
+     * value. The interpretation as a fully inline literal should be distinct
+     * from other possible interpretations so this is testing for unexpected
+     * errors.
+     */
+    public void test_SPO_encodeDecode_Inline_Literal_XSDString_DeconflictionTest() {
     
-    public void test_SPO_encodeDecode_Unicode_PlainLiteral() {
+        final IV<?, ?>[] e = {//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                new InlineLiteralIV<BigdataLiteral>("BAR", null/* language */,
+                        XSD.STRING/* datatype */),//
+        };
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    /**
+     * Unit test for inlining an entire URI using {@link InlineURIIV}. The URI
+     * is inlined as a Unicode component using {@link DTE#XSDString}. The
+     * extension bit is NOT set since we are not factoring out the namespace
+     * component of the URI.
+     */
+    public void test_SPO_encodeDecode_Inline_URI() {
+        
+        final IV<?, ?>[] e = {//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                new InlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com")),//
+//                new InlineURIIV<BigdataURI>(RDF.TYPE),//
+        };
+
+        doEncodeDecodeTest(e);
+        
+    }
+
+    /**
+     * FIXME Test for a URI broken down into namespace and local name
+     * components. The namespace component is coded by setting the extension bit
+     * and placing the IV of the namespace into the extension IV field. The
+     * local name is inlined as a Unicode component using {@link DTE#XSDString}.
+     */
+    public void test_SPO_encodeDecode_NonInline_URI_with_NamespaceIV() {
         fail("write test");
     }
-    
-    public void test_SPO_encodeDecode_Unicode_LanguadeCodeLiteral() {
-        fail("write test");
-    }
-    
-    public void test_SPO_encodeDecode_Unicode_DatatypeLiteral() {
-        fail("write test");
-    }
-    
-    public void test_SPO_encodeDecode_Unicode_URI() {
+
+    /**
+     * FIXME Test for a literal broken down into datatype IV and an inline
+     * label. The datatype IV is coded by setting the extension bit and placing
+     * the IV of the namespace into the extension IV field. The local name is
+     * inlined as a Unicode component using {@link DTE#XSDString}.
+     */
+    public void test_SPO_encodeDecode_NonInline_Literal_with_DatatypeIV() {
         fail("write test");
     }
     

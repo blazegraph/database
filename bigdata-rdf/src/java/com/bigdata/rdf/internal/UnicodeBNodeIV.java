@@ -23,13 +23,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal;
 
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Class for inline RDF blank nodes. Blank nodes MUST use a "short" Unicode ID
- * to be inlined with this class.
+ * to be inlined with this class, where "short" is the maximum length configured
+ * for the lexicon.
  * <p>
  * {@inheritDoc}
  * 
@@ -38,15 +38,36 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @see AbstractTripleStore.Options
  */
 public class UnicodeBNodeIV<V extends BigdataBNode> extends
-        AbstractBNodeIV<V, String> {
+        AbstractBNodeIV<V, String> implements IInlineUnicode {
 
+    private static final long serialVersionUID = 1L;
+    
+    /** The blank node ID. */
     private final String id;
+    
+    /** The cached byte length of this {@link IV}. */
+    private transient int byteLength = 0;
     
     public UnicodeBNodeIV(final String id) {
 
-        super(DTE.XSDUnicode);
+        super(DTE.XSDString);
 
         this.id = id;
+
+    }
+
+    /**
+     * 
+     * @param id The
+     * @param byteLength The byte length of this {@link IV}.
+     */
+    UnicodeBNodeIV(final String id, final int byteLength) {
+
+        super(DTE.XSDString);
+
+        this.id = id;
+
+        this.byteLength = byteLength;
 
     }
 
@@ -83,11 +104,22 @@ public class UnicodeBNodeIV<V extends BigdataBNode> extends
     }
 
     public int byteLength() {
-        if(true) {
-            // FIXME TERMS REFACTOR : must know its length, so compress in ctor?
-            throw new UnsupportedOperationException();
+        if (byteLength == 0) {
+            byteLength = 1/* flags */+ IVUtility.byteLengthUnicode(id);
         }
-        return 1 + Bytes.SIZEOF_INT;
+        return byteLength;
+    }
+
+    final public void setByteLength(final int byteLength) {
+
+        if (byteLength < 0)
+            throw new IllegalArgumentException();
+        
+        if (this.byteLength != 0 && this.byteLength != byteLength)
+            throw new IllegalStateException();
+        
+        this.byteLength = byteLength;
+        
     }
     
 }
