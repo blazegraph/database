@@ -27,7 +27,6 @@ import java.io.IOException;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -36,15 +35,13 @@ import com.bigdata.rdf.model.BigdataValue;
  * not being inlined), Literals (including datatype literals if they are not
  * being inlined) or SIDs (statement identifiers).
  */
-public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
-        extends AbstractIV<V, Void> {
+public class TermId<V extends BigdataValue> extends
+        AbstractNonInlineIV<V, Void> {
 
     /**
      * 
      */
     private static final long serialVersionUID = 4309045651680610931L;
-    
-//    private static final Logger log = Logger.getLogger(TermId.class);
     
     /**
      * Value used for a "NULL" term identifier.
@@ -74,6 +71,7 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
 
     /**
      * Constructor for a term identifier.
+     * 
      * @param vte
      * @param termId
      */
@@ -83,7 +81,7 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
          * Note: XSDBoolean happens to be assigned the code value of 0, which is
          * the value we want when the data type enumeration will be ignored.
          */
-        super(vte, false/* inline */, false/* extension */, DTE.XSDBoolean);
+        super(vte, false/* extension */, DTE.XSDBoolean);
 
         this.termId = termId;
         
@@ -97,62 +95,50 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
      */
     public String toString() {
 
-        return "TermId(" + termId + 
-                String.valueOf(getVTE().getCharCode()) + ")";
-//                + (datatype == null ? "" : datatype);
+        return "TermId(" + termId + String.valueOf(getVTE().getCharCode())
+                + ")";
 
     }
 
-    /**
-     * Callers must explicitly populate the value cache for a {@link TermId}.
-     * <p>
-     * {@inheritDoc}
-     */
-    @Override
-    final public V setValue(V v) {
-    	
-    	return super.setValue(v);
-    	
-    }
-    
-    /**
-     * Operation is not supported. You MUST explicitly set the value cache. 
-     * 
-     * {@inheritDoc}
-     * 
-     * @see #setValue(BigdataValue)
-     */
-    final public V asValue(final LexiconRelation lex) {
-    	throw new UnsupportedOperationException();
-//		/*
-//		 * Delegates to {@link LexiconRelation#getTerm(IV)}, which is an
-//		 * extremely inefficient method for materializing terms. Caches the
-//		 * BigdataValue once it has been materialized.
-//		 */
-//    	if (value == null) {
-//    		if (log.isInfoEnabled())
-//    			log.info("performing inefficient materialization");
-//    		value = (V) lex.getTerm(this);
-//    	}
-//    	return value;
-    }
-//    volatile private V value;
-    
-    final public Void getInlineValue() {
-        throw new UnsupportedOperationException();
-    }
+//    /**
+//     * Callers must explicitly populate the value cache.
+//     * <p>
+//     * {@inheritDoc}
+//     */
+//    @Override
+//    final public V setValue(V v) {
+//    	
+//    	return super.setValue(v);
+//    	
+//    }
+//    
+//    /**
+//     * Operation is not supported because this {@link IV} type is not 100%
+//     * inline. You MUST explicitly set the value cache.
+//     * <p>
+//     * {@inheritDoc}
+//     * 
+//     * @see #setValue(BigdataValue)
+//     */
+//    final public V asValue(final LexiconRelation lex) {
+//        throw new UnsupportedOperationException();
+//    }
+//    
+//    final public Void getInlineValue() {
+//        throw new UnsupportedOperationException();
+//    }
 
     final public long getTermId() {
         return termId;
     }
     
-    /**
-     * Always returns <code>false</code> since the RDF value is not inline.
-     */
-    @Override
-    final public boolean isInline() {
-        return false;
-    }
+//    /**
+//     * Always returns <code>false</code> since the RDF value is not inline.
+//     */
+//    @Override
+//    final public boolean isInline() {
+//        return false;
+//    }
 
     /**
      * Always returns <code>true</code> since this is a term identifier.

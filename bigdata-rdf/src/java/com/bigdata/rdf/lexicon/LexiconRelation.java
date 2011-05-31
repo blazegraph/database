@@ -2494,10 +2494,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             value = tmp;
 
         }
-
-        assert value.getIV() == iv : "expecting iv=" + iv + ", but found "
-                + value.getIV();
-        //        value.setTermId( id );
+// Note: This assert could be tripped by a data race on the cache, which is not an error.
+//        assert value.getIV() == iv : "expecting iv=" + iv + ", but found "
+//                + value.getIV();
+//        //        value.setTermId( id );
 
         return value;
 

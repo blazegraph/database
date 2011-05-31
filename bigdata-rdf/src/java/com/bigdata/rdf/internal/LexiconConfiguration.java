@@ -127,7 +127,7 @@ public class LexiconConfiguration<V extends BigdataValue>
     public V asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
         
     	// The TermId for the ExtensionIV.
-    	final TermId datatypeIV = iv.getExtensionDatatype();
+    	final TermId datatypeIV = iv.getExtensionIV();
     	
     	// Find the IExtension from the datatype IV.
     	final IExtension ext = termIds.get(datatypeIV);

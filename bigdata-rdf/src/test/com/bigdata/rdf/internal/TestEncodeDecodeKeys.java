@@ -42,6 +42,7 @@ import org.deri.iris.basics.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -1039,7 +1040,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 new InlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com")),//
-//                new InlineURIIV<BigdataURI>(RDF.TYPE),//
+                new InlineURIIV<BigdataURI>(RDF.TYPE),//
         };
 
         doEncodeDecodeTest(e);
@@ -1053,17 +1054,39 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      * local name is inlined as a Unicode component using {@link DTE#XSDString}.
      */
     public void test_SPO_encodeDecode_NonInline_URI_with_NamespaceIV() {
-        fail("write test");
+
+        final TermId namespaceIV = new TermId<BigdataURI>(VTE.URI, 3L);
+        
+        final IV<?, ?>[] e = {//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                new URIWithNamespaceIV<BigdataURI>(
+                        new InlineLiteralIV<BigdataLiteral>("bar"), namespaceIV),//
+        };
+
+        doEncodeDecodeTest(e);
+        
     }
 
     /**
-     * FIXME Test for a literal broken down into datatype IV and an inline
-     * label. The datatype IV is coded by setting the extension bit and placing
-     * the IV of the namespace into the extension IV field. The local name is
-     * inlined as a Unicode component using {@link DTE#XSDString}.
+     * Test for a literal broken down into datatype IV and an inline label. The
+     * datatype IV is coded by setting the extension bit and placing the IV of
+     * the namespace into the extension IV field. The local name is inlined as a
+     * Unicode component using {@link DTE#XSDString}.
      */
     public void test_SPO_encodeDecode_NonInline_Literal_with_DatatypeIV() {
-        fail("write test");
+
+        final TermId datatypeIV = new TermId<BigdataURI>(VTE.URI, 3L);
+        
+        final IV<?, ?>[] e = {//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                new LiteralWithDatatypeIV<BigdataLiteral>(
+                        new InlineLiteralIV<BigdataLiteral>("bar"), datatypeIV),//
+        };
+
+        doEncodeDecodeTest(e);
+
     }
     
 }

@@ -308,8 +308,8 @@ public class TestInlining extends AbstractTripleStoreTestCase {
             final ExtensionIV iv1 = (ExtensionIV) l1.getIV();
             final ExtensionIV iv2 = (ExtensionIV) l2.getIV();
             
-            assertTrue(iv1.getExtensionDatatype().equals(datatype.getIV()));
-            assertTrue(iv2.getExtensionDatatype().equals(datatype.getIV()));
+            assertTrue(iv1.getExtensionIV().equals(datatype.getIV()));
+            assertTrue(iv2.getExtensionIV().equals(datatype.getIV()));
             
             if (store.isStable()) {
                 
@@ -411,9 +411,9 @@ public class TestInlining extends AbstractTripleStoreTestCase {
             System.err.println(l2.getLabel() + ": " + iv2.getDelegate().byteValue());
             System.err.println(l3.getLabel() + ": " + iv3.getDelegate().byteValue());
             
-            assertTrue(iv1.getExtensionDatatype().equals(datatype.getIV()));
-            assertTrue(iv2.getExtensionDatatype().equals(datatype.getIV()));
-            assertTrue(iv3.getExtensionDatatype().equals(datatype.getIV()));
+            assertTrue(iv1.getExtensionIV().equals(datatype.getIV()));
+            assertTrue(iv2.getExtensionIV().equals(datatype.getIV()));
+            assertTrue(iv3.getExtensionIV().equals(datatype.getIV()));
             
             if (store.isStable()) {
                 

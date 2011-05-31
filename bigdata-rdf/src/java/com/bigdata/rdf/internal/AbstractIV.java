@@ -563,11 +563,16 @@ public abstract class AbstractIV<V extends BigdataValue, T>
                  * (this is only used when the datatype literal can not be
                  * projected onto one of intrinsic data types).
                  * 
-                 * FIXME Handle {namespaceIV,localName} URIs
+                 * {namespaceIV,localName} URIs
                  * 
-                 * FIXME Handle {datatypeIV,label} literals.
+                 * {datatypeIV,label} literals.
                  */
-                throw new UnsupportedOperationException();
+                final AbstractExtensionIV<?, ?> t = (AbstractExtensionIV<?, ?>) this;
+                // add the extension IV.
+                IVUtility.encode(keyBuilder, t.getExtensionIV());
+                // add the delegate IV.
+                IVUtility.encode(keyBuilder, t.getDelegate());
+                return keyBuilder;
             }
             /*
              * The RDF Value is represented as a term identifier (i.e., a key
@@ -638,7 +643,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
              * Note: Non-inline extensions were handled above!
              */
             
-            IVUtility.encode(keyBuilder, getExtensionDatatype());
+            IVUtility.encode(keyBuilder, getExtensionIV());
 
         }
 
@@ -746,7 +751,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         
     }
     
-    protected TermId getExtensionDatatype() {
+    protected TermId getExtensionIV() {
         return null;
     }
 

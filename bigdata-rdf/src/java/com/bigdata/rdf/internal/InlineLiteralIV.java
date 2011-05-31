@@ -85,6 +85,12 @@ public class InlineLiteralIV<V extends BigdataLiteral> extends
     /** The cached byte length of this {@link IV}. */
     private transient int byteLength = 0;
 
+    public InlineLiteralIV(final String label) {
+     
+        this(label, null/* languageCode */, null/* datatype */);
+        
+    }
+    
     public InlineLiteralIV(final String label, final String languageCode,
             final URI datatypeURI) {
 
