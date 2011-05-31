@@ -60,7 +60,7 @@ public class ExtensionIV<V extends BigdataLiteral>
     }
     
     @Override
-    public TermId getExtensionDatatype() {
+    public TermId getExtensionIV() {
         return datatype;
     }
     
@@ -96,8 +96,9 @@ public class ExtensionIV<V extends BigdataLiteral>
      * Return the length of the datatype IV plus the length of the delegate IV.
      */
     public int byteLength() {
+
         return datatype.byteLength() + delegate.byteLength();
-//        return delegate.byteLength() + Bytes.SIZEOF_LONG;
+        
     }
 
 	/**

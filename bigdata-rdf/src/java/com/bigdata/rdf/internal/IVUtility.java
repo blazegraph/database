@@ -67,17 +67,16 @@ public class IVUtility {
     /**
      * Return the byte length of the compressed representation of a unicode
      * string.
+     * <p>
+     * This does all the work to compress something and then returns you the
+     * length. Caller's need to be smart about how and when they find the byte
+     * length of an IV representing some inlined Unicode data since we basically
+     * have to serialize the String to find the length.
      * 
      * @param s
      *            The string.
      * 
      * @return Its compressed byte length.
-     * 
-     *         FIXME This does all the work to compress something and then
-     *         returns you the length. We need to be smart about how and when we
-     *         find the byte length of an IV which is inlining some Unicode data
-     *         since we basically have to serialize the String to find the
-     *         length.
      */
     static int byteLengthUnicode(final String s) {
         try {
@@ -557,29 +556,49 @@ public class IVUtility {
          */
         if (!AbstractIV.isInline(flags)) {
 
-            /*
-             * Handle a TermId.
-             * 
-             * FIXME TERMS REFACTOR. Must recognize NULL IV during decode (the
-             * representation will have to change with the TERMS index - perhaps
-             * an empty byte[] for the TERMS index key?).
-             * 
-             * FIXME TERMS REFACTOR. Must handle non-inline URI with localName
-             * in the IV and namespaceIV here (VTE:=URI; inline:=false;
-             * extension:=true; DTE:=XSDString).
-             * 
-             * FIXME TERMS REFACTOR. Must handle non-inline data type literal
-             * with label in the IV and datatypeIV here (VTE:=LITERAL;
-             * inline:=false; extension:=true; DTE:=XSDString).
-             */
-            
-            // decode the term identifier.
-            final long termId = KeyBuilder.decodeLong(key, o);
+            if (AbstractIV.isExtension(flags)) {
 
-            if (termId == TermId.NULL)
-                return null;
-            else
-                return new TermId(flags, termId);
+                /*
+                 * Handle non-inline URI or Literal. 
+                 */
+                
+                // Decode the extension IV.
+                final TermId<?> extensionIV = (TermId<?>) IVUtility
+                        .decodeFromOffset(key, o);
+                
+                // skip over the extension IV.
+                o += extensionIV.byteLength();
+
+                // Decode the inline component.
+                final InlineLiteralIV<BigdataLiteral> delegate = (InlineLiteralIV<BigdataLiteral>) IVUtility
+                        .decodeFromOffset(key, o);
+
+                switch (AbstractIV.getInternalValueTypeEnum(flags)) {
+                case URI:
+                    return new URIWithNamespaceIV<BigdataURI>(delegate, extensionIV);
+                case LITERAL:
+                    return new LiteralWithDatatypeIV<BigdataLiteral>(delegate, extensionIV);
+                default:
+                    throw new AssertionError();
+                }
+
+            } else {
+
+                /*
+                 * Handle a TermId.
+                 * 
+                 * FIXME TERMS REFACTOR: NullIV.
+                 */ 
+
+                // decode the term identifier.
+                final long termId = KeyBuilder.decodeLong(key, o);
+
+                if (termId == TermId.NULL)
+                    return null;
+                else
+                    return new TermId(flags, termId);
+
+            }
 
         }
 
@@ -668,12 +687,10 @@ public class IVUtility {
         
         final boolean isExtension = AbstractIV.isExtension(flags);
         
-        final TermId datatype; // FIXME TERMS refactor: Type as TermIV not TermId. 
+        final TermId datatype; 
         if (isExtension) {
             datatype = (TermId) decodeFromOffset(key, o);
             o += datatype.byteLength();
-//            datatype = new TermId(VTE.URI, KeyBuilder.decodeLong(key, o));
-//            o += Bytes.SIZEOF_LONG;
         } else {
             datatype = null;
         }

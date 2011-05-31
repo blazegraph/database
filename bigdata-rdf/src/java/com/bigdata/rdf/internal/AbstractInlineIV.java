@@ -46,17 +46,16 @@ abstract public class AbstractInlineIV<V extends BigdataValue, T>
      */
     private static final long serialVersionUID = -2847844163772097836L;
 
-    protected AbstractInlineIV(final VTE vte,
-            final DTE dte) {
+    protected AbstractInlineIV(final VTE vte, final DTE dte) {
 
         super(vte, true/* inline */, false/* extension */, dte);
 
     }
-    
-    protected AbstractInlineIV(final VTE vte, final boolean extension, 
+
+    protected AbstractInlineIV(final VTE vte, final boolean extension,
             final DTE dte) {
 
-        super(vte, true/* inline */, extension, dte);
+        super(vte, true/*inline*/, extension, dte);
 
     }
     
