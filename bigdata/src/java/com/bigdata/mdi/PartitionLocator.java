@@ -29,10 +29,10 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.UUID;
 
-import org.CognitiveWeb.extser.LongPacker;
-import org.CognitiveWeb.extser.ShortPacker;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.io.LongPacker;
+import com.bigdata.io.ShortPacker;
 import com.bigdata.service.ndx.ClientIndexView;
 
 /**

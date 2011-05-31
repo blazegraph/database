@@ -31,7 +31,12 @@ public class DefaultExtensionFactory implements IExtensionFactory {
     	if (lex.isInlineDateTimes())
     		extensions.add(new DateTimeExtension(
     				lex, lex.getInlineDateTimesTimeZone()));
-    	
+
+//    	FIXME Add Option for inlining xsd:string and for max inline length.
+//        if (lex.isInlineXSDString())
+//            extensions.add(new XSDStringExtension(
+//                    lex, lex.getMaxInlineLength()));
+
 		extensionsArray = extensions.toArray(new IExtension[extensions.size()]);
         
     }

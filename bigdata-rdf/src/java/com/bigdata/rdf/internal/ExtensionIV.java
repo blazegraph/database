@@ -1,9 +1,26 @@
 package com.bigdata.rdf.internal;
 
+import org.openrdf.model.Literal;
+
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
+/**
+ * Class provides support for datatype {@link Literal}s for which an
+ * {@link IExtension} was registered. An {@link ExtensionIV}
+ * <strong>always</strong> has the <em>inline</em> and <em>extension</em> bits
+ * set. An instance of this class bundles together an inline value of some
+ * primitive data type declared by {@link DTE} with the {@link IV} of the
+ * datatype URI for the datatype literal. {@link ExtensionIV} are fully inline
+ * since the datatype URI can be materialized by the {@link IExtension} while
+ * {@link DTE} identifies the value space and the point in the value space is
+ * directly inline.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ * @param <V>
+ */
 public class ExtensionIV<V extends BigdataLiteral> 
     extends AbstractInlineIV<V, Object> { 
 
@@ -14,7 +31,7 @@ public class ExtensionIV<V extends BigdataLiteral>
 
     private final AbstractLiteralIV delegate;
     
-    private final TermId datatype; // FIXME TERMS Refactor : TermId => TermIV.
+    private final TermId datatype;
     
     public ExtensionIV(final AbstractLiteralIV delegate, final TermId datatype) {
         
@@ -55,10 +72,11 @@ public class ExtensionIV<V extends BigdataLiteral>
     }
 
     public boolean equals(final Object o) {
-        if(this==o) return true;
-        if(o instanceof ExtensionIV) {
-            return this.delegate.equals(((ExtensionIV) o).delegate) &&
-                this.datatype.equals(((ExtensionIV) o).datatype);
+        if (this == o)
+            return true;
+        if (o instanceof ExtensionIV<?>) {
+            return this.delegate.equals(((ExtensionIV<?>) o).delegate)
+                    && this.datatype.equals(((ExtensionIV<?>) o).datatype);
         }
         return false;
     }
@@ -85,6 +103,8 @@ public class ExtensionIV<V extends BigdataLiteral>
 	/**
 	 * Defer to the {@link ILexiconConfiguration} which has specific knowledge
 	 * of how to generate an RDF value from this general purpose extension IV.
+	 * <p>
+	 * {@inheritDoc}
 	 */
 	@SuppressWarnings( { "unchecked", "rawtypes" })
 	public V asValue(final LexiconRelation lex) {

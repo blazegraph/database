@@ -28,14 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.io.compression;
 
 import java.io.ByteArrayInputStream;
-import java.io.DataInput;
-import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Random;
 
 import junit.framework.TestCase2;
-
-import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.io.DataOutputBuffer;
 
@@ -113,9 +109,10 @@ public class TestUnicodeCompressor extends TestCase2 {
 
             final int wordLength = r.nextInt(20) + 1;
 
-            // reset;
+            // reset
             sb.setLength(0);
 
+            // build up a string of randomly selected words.
             for (int i = 0; i < wordLength; i++) {
 
                 if (i > 0)
@@ -131,13 +128,14 @@ public class TestUnicodeCompressor extends TestCase2 {
              * Encode.
              */
             final byte[] a;
+            final int nencoded;
             {
 
                 // reset the output buffer.
                 outEncoded.reset();
                 
                 // encode the data.
-                c.encode(expected, outEncoded);
+                nencoded = c.encode(expected, outEncoded);
                 
                 // the encoded data.
                 a = outEncoded.toByteArray();
@@ -157,21 +155,26 @@ public class TestUnicodeCompressor extends TestCase2 {
              * BigdataValue.
              */
             final String actual;
+            final int ndecoded;
             {
 
                 // reset the output buffer.
                 outDecoded.setLength(0);
 
                 // decode.
-                c.decode(new ByteArrayInputStream(a, 0/* off */,
-                                a.length/* len */), outDecoded);
+                ndecoded = c.decode(new ByteArrayInputStream(a, 0/* off */,
+                        a.length/* len */), outDecoded);
 
                 // extract the decoded string.
                 actual = outDecoded.toString();
 
             }
 
+            // verify encode/decode.
             assertEquals(expected, actual);
+            
+            // verify #of bytes encoded / #of bytes decoded.
+            assertEquals(nencoded, ndecoded);
 
         }
 

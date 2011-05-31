@@ -79,6 +79,8 @@ public class TestAll extends TestCase {
 
         suite.addTest(TestAll_Buffers.suite());
         
+        suite.addTest(TestAll_Packers.suite());
+        
         suite.addTest(com.bigdata.io.compression.TestAll.suite());
 
 //        /*

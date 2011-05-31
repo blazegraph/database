@@ -226,7 +226,7 @@ public enum DTE {
      * a follow on language code for plain and language code literals and using
      * a marker to indicate a "plain" literal.
      */
-    XSDUnicode((byte) 14, 0/* len */, String.class, XSD.STRING.stringValue(),
+    XSDString((byte) 14, 0/* len */, String.class, XSD.STRING.stringValue(),
             DTEFlags.NOFLAGS), //
 
     /**
@@ -300,7 +300,7 @@ public enum DTE {
         case 13:
             return UUID;
         case 14:
-            return XSDUnicode;
+            return XSDString;
         case 15:
             return Extension;
         default:
@@ -445,7 +445,12 @@ public enum DTE {
      */
     public boolean isUnsignedNumeric() {
         
-        return (flags & DTEFlags.UNSIGNED_NUMERIC) != 0;
+        /*
+         * Note: The DTEFlags are not independent bits so when we test them
+         * we have to test for equality rather than masking off the various
+         * bits.
+         */
+        return flags == DTEFlags.UNSIGNED_NUMERIC;
         
     }
 

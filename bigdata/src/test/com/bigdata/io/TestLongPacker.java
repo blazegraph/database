@@ -30,16 +30,17 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInput;
 import java.io.DataInputStream;
+import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Random;
 
 import junit.framework.TestCase;
 
-import org.CognitiveWeb.extser.LongPacker;
 
 /**
- * Test suite for packing and unpacking unsigned long integers.
+ * Test suite for packing and unpacking unsigned long integers using the
+ * {@link DataInputBuffer} and the {@link ByteArrayBuffer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -180,20 +181,27 @@ public class TestLongPacker extends TestCase {
         
     }
 
-    public void doPackTest( long v, byte[] expected )
-    	throws IOException
-    {
-        
-        DataOutputBuffer dob = new DataOutputBuffer();
-        
-        final int nbytes = dob.packLong( v );
-        
-        final byte[] actual = dob.toByteArray();
-        
-        assertEquals( "nbytes", expected.length, nbytes );
-        assertEquals( "nbytes", getNBytes(expected[0]), nbytes );
-        assertEquals( "bytes", expected, actual );
-        
+    public void doPackTest(final long v, final byte[] expected)
+            throws IOException {
+
+        final DataOutputBuffer dob = new DataOutputBuffer();
+
+        try {
+
+            final int nbytes = dob.packLong(v);
+
+            final byte[] actual = dob.toByteArray();
+
+            assertEquals("nbytes", expected.length, nbytes);
+            assertEquals("nbytes", getNBytes(expected[0]), nbytes);
+            assertEquals("bytes", expected, actual);
+
+        } finally {
+
+            dob.close();
+            
+        }
+
     }
 
     public void test_getNibbleLength()
@@ -296,6 +304,7 @@ public class TestLongPacker extends TestCase {
 
         doPackTest( 0x10,  new byte[]{(byte)0x20, (byte)0x10 });
         doPackTest( 0x11,  new byte[]{(byte)0x20, (byte)0x11 });
+        doPackTest( 0x16,  new byte[]{(byte)0x20, (byte)0x16 });
         doPackTest( 0x1f,  new byte[]{(byte)0x20, (byte)0x1f });
         doPackTest( 0x20,  new byte[]{(byte)0x20, (byte)0x20 });
         doPackTest( 0xff,  new byte[]{(byte)0x20, (byte)0xff });
@@ -616,7 +625,7 @@ public class TestLongPacker extends TestCase {
 
                 long v = gen.nextLong();
 
-                LongPacker.packLong(os, v);
+                LongPacker.packLong((DataOutput)os, v);
 
                 expected[i] = v;
 

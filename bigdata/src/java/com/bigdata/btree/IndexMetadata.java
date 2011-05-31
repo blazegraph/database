@@ -35,7 +35,6 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import org.CognitiveWeb.extser.LongPacker;
 import org.apache.log4j.Logger;
 
 import com.bigdata.LRUNexus;
@@ -56,6 +55,7 @@ import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerRangeValidator;
 import com.bigdata.config.IntegerValidator;
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.io.LongPacker;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.io.compression.IRecordCompressorFactory;
 import com.bigdata.journal.IIndexManager;

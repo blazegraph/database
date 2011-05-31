@@ -187,6 +187,7 @@ public class SidIV<V extends BigdataBNode> extends
      * <p>
      * {@inheritDoc}
      */
+	@Override
     public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
 
         // First emit the flags byte.

@@ -133,8 +133,13 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      * Return the term identifier.
      * 
      * @return The term identifier.
+     * 
      * @throws UnsupportedOperationException
      *             unless the RDF value is represented by a term identifier.
+     * 
+     *             FIXME TERMS REFACTOR : Return the TermIV iff this is a TermIV
+     *             and otherwise throw the exception (do not extract the long
+     *             since the termId is not a variable length format).
      */
     long getTermId() throws UnsupportedOperationException;
 

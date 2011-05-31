@@ -27,22 +27,30 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.io.ByteArrayBuffer;
+import com.bigdata.io.NullOutputStream;
+import com.bigdata.io.compression.BOCU1Compressor;
+import com.bigdata.io.compression.UnicodeHelper;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
+import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
-
 
 /**
  * Helper class for {@link IV}s.
@@ -50,6 +58,35 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 public class IVUtility {
 
 	private static final transient Logger log = Logger.getLogger(IVUtility.class);
+	
+	/**
+	 * Helper instance for compression/decompression of Unicode string data.
+	 */
+	static UnicodeHelper un = new UnicodeHelper(new BOCU1Compressor());
+
+    /**
+     * Return the byte length of the compressed representation of a unicode
+     * string.
+     * 
+     * @param s
+     *            The string.
+     * 
+     * @return Its compressed byte length.
+     * 
+     *         FIXME This does all the work to compress something and then
+     *         returns you the length. We need to be smart about how and when we
+     *         find the byte length of an IV which is inlining some Unicode data
+     *         since we basically have to serialize the String to find the
+     *         length.
+     */
+    static int byteLengthUnicode(final String s) {
+        try {
+            return un.encode(s, new NullOutputStream(), new ByteArrayBuffer(s
+                    .length()));
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
 	
     public static boolean equals(IV iv1, IV iv2) {
         
@@ -516,12 +553,26 @@ public class IVUtility {
         final byte flags = KeyBuilder.decodeByte(key[o++]);
 
         /*
-         * Handle a term identifier (versus an inline value).
-         * 
-         * FIXME TERMS refactor. Must decode TermIv and NULL IV.
+         * Handle an IV which is not 100% inline.
          */
         if (!AbstractIV.isInline(flags)) {
-    
+
+            /*
+             * Handle a TermId.
+             * 
+             * FIXME TERMS REFACTOR. Must recognize NULL IV during decode (the
+             * representation will have to change with the TERMS index - perhaps
+             * an empty byte[] for the TERMS index key?).
+             * 
+             * FIXME TERMS REFACTOR. Must handle non-inline URI with localName
+             * in the IV and namespaceIV here (VTE:=URI; inline:=false;
+             * extension:=true; DTE:=XSDString).
+             * 
+             * FIXME TERMS REFACTOR. Must handle non-inline data type literal
+             * with label in the IV and datatypeIV here (VTE:=LITERAL;
+             * inline:=false; extension:=true; DTE:=XSDString).
+             */
+            
             // decode the term identifier.
             final long termId = KeyBuilder.decodeLong(key, o);
 
@@ -533,27 +584,85 @@ public class IVUtility {
         }
 
         /*
-         * Handle an inline value.
+         * Handle an inline value. 
          */
+
         // The value type (URI, Literal, BNode, SID)
         final VTE vte = AbstractIV.getInternalValueTypeEnum(flags);
 
-        // handle inline sids
-        if (vte == VTE.STATEMENT) {
-        	
-        	// spo is directly decodable from key
-        	final ISPO spo = SPOKeyOrder.SPO.decodeKey(key, o);
-        	
-        	// all spos that have a sid are explicit
-        	spo.setStatementType(StatementEnum.Explicit);
-        	spo.setStatementIdentifier(true);
-        	
-        	// create a sid iv and return it
-        	final SidIV sid = new SidIV(spo);
-        	return sid;
-        	
+        switch (vte) {
+        case STATEMENT: {
+            /*
+             * Handle inline sids.
+             */
+            // spo is directly decodable from key
+            final ISPO spo = SPOKeyOrder.SPO.decodeKey(key, o);
+            // all spos that have a sid are explicit
+            spo.setStatementType(StatementEnum.Explicit);
+            spo.setStatementIdentifier(true);
+            // create a sid iv and return it
+            return new SidIV(spo);
+        }
+        case BNODE: {
+            // The data type
+            final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
+            switch (dte) {
+            case XSDInt: {
+                final int x = KeyBuilder.decodeInt(key, o);
+                return new NumericBNodeIV<BigdataBNode>(x);
+            }
+            case UUID: {
+                final UUID x = KeyBuilder.decodeUUID(key, o);
+                return new UUIDBNodeIV<BigdataBNode>(x);
+            }
+            case XSDString: {
+                // decode buffer.
+                final StringBuilder sb = new StringBuilder();
+                // inline string value
+                final String str1;
+                // #of bytes read.
+                final int nbytes;
+                try {
+                    nbytes = un.decode(new ByteArrayInputStream(key, o,
+                            key.length - o), sb);
+                    str1 = sb.toString();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                return new UnicodeBNodeIV<BigdataBNode>(str1,
+                        1/* flags */+ nbytes);
+            }
+            default:
+                throw new AssertionError();
+            }
+        }
+        case URI: {
+            // decode buffer.
+            final StringBuilder sb = new StringBuilder();
+            // inline string value
+            final String str1;
+            // #of bytes read.
+            final int nbytes;
+            try {
+                nbytes = un.decode(new ByteArrayInputStream(key, o, key.length
+                        - o), sb);
+                str1 = sb.toString();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            return new InlineURIIV<BigdataURI>(new URIImpl(str1),
+                    1/* flags */+ nbytes);
+        }
+        case LITERAL:
+            break;
+        default:
+            throw new AssertionError();
         }
         
+        /*
+         * Inline literal.
+         */
+
         // The data type
         final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
         
@@ -588,12 +697,8 @@ public class IVUtility {
         }
         case XSDInt: {
             final int x = KeyBuilder.decodeInt(key, o);
-            if (vte == VTE.LITERAL) {
-                final AbstractLiteralIV iv = new XSDIntIV<BigdataLiteral>(x);
-                return isExtension ? new ExtensionIV(iv, datatype) : iv;
-            } else {
-                return new NumericBNodeIV<BigdataBNode>(x);
-            }
+            final AbstractLiteralIV iv = new XSDIntIV<BigdataLiteral>(x);
+            return isExtension ? new ExtensionIV(iv, datatype) : iv;
         }
         case XSDLong: {
             final long x = KeyBuilder.decodeLong(key, o);
@@ -622,12 +727,8 @@ public class IVUtility {
         }
         case UUID: {
             final UUID x = KeyBuilder.decodeUUID(key, o);
-            if (vte == VTE.LITERAL) {
-                final AbstractLiteralIV iv = new UUIDLiteralIV<BigdataLiteral>(x);
-                return isExtension ? new ExtensionIV(iv, datatype) : iv;
-            } else {
-                return new UUIDBNodeIV<BigdataBNode>(x);
-            }
+            final AbstractLiteralIV iv = new UUIDLiteralIV<BigdataLiteral>(x);
+            return isExtension ? new ExtensionIV(iv, datatype) : iv;
         }
             // case XSDUnsignedByte:
             // keyBuilder.appendUnsigned(t.byteValue());
@@ -641,11 +742,128 @@ public class IVUtility {
             // case XSDUnsignedLong:
             // keyBuilder.appendUnsigned(t.longValue());
             // break;
+        case XSDString: {
+            if(isExtension) {
+            // decode the termCode
+            final byte termCode = key[o++];
+            assert termCode == ITermIndexCodes.TERM_CODE_LIT : "termCode="
+                    + termCode;
+            // decode buffer.
+            final StringBuilder sb = new StringBuilder();
+            // inline string value
+            final String str1;
+            // #of bytes read.
+            final int nread;
+            try {
+                nread = un.decode(new ByteArrayInputStream(key, o, key.length
+                        - o), sb);
+                str1 = sb.toString();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            // Note: The 'delegate' will be an InlineLiteralIV w/o a datatype.
+            final InlineLiteralIV<BigdataLiteral> iv = new InlineLiteralIV<BigdataLiteral>(
+                    str1, null/* languageCode */, null/* datatype */,
+                    1/* flags */+ nread);
+            return isExtension ? new ExtensionIV<BigdataLiteral>(iv, datatype)
+                    : iv;
+            }
+            return decodeInlineLiteral(key,o);
+        }
         default:
             throw new UnsupportedOperationException("vte=" + vte + ", dte="
                     + dte);
         }
 
+    }
+    
+    static private InlineLiteralIV<BigdataLiteral> decodeInlineLiteral(
+            final byte[] key, final int offset) {
+
+        int o = offset;
+
+        /*
+         * Fully inline literal.
+         */
+
+        // decode the termCode
+        final byte termCode = key[o++];
+        // figure out the #of string values which were inlined.
+        final int nstrings;
+        final String str1, str2; 
+        switch (termCode) {
+        case ITermIndexCodes.TERM_CODE_LIT:
+            nstrings = 1;
+            break;
+        case ITermIndexCodes.TERM_CODE_LCL:
+            nstrings = 2;
+            break;
+        case ITermIndexCodes.TERM_CODE_DTL:
+            nstrings = 2;
+            break;
+        default:
+            throw new AssertionError("termCode=" + termCode);
+        }
+        // #of bytes read (not including the flags and termCode).
+        int nread = 0;
+        // decode buffer.
+        final StringBuilder sb = new StringBuilder();
+        // first inline string value
+        try {
+            final int nbytes = un.decode(new ByteArrayInputStream(key, o, key.length
+                    - o), sb);
+            str1 = sb.toString();
+            nread += nbytes;
+            o += nbytes;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        // second inline string value
+        if (nstrings == 2) {
+            sb.setLength(0); // reset buffer.
+            try {
+                final int nbytes = un.decode(new ByteArrayInputStream(key,
+                        o, key.length - o), sb);
+                str2 = sb.toString();
+                nread += nbytes;
+                o += nbytes;
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        } else {
+            str2 = null;
+        }
+        final int byteLength = 1/* flags */+ 1/* termCode */+ nread;
+        final InlineLiteralIV<BigdataLiteral> iv;
+        switch (termCode) {
+        case ITermIndexCodes.TERM_CODE_LIT:
+            iv = new InlineLiteralIV<BigdataLiteral>(//
+                    str1,//
+                    null, // language
+                    null, // datatype
+                    byteLength//
+                    );
+            break;
+        case ITermIndexCodes.TERM_CODE_LCL:
+            iv = new InlineLiteralIV<BigdataLiteral>(//
+                    str2,//
+                    str1, // language
+                    null, // datatype
+                    byteLength//
+                    );
+            break;
+        case ITermIndexCodes.TERM_CODE_DTL:
+            iv = new InlineLiteralIV<BigdataLiteral>(//
+                    str2,//
+                    null, // language
+                    new URIImpl(str1), // datatype
+                    byteLength//
+                    );
+            break;
+        default:
+            throw new AssertionError("termCode=" + termCode);
+        }
+        return iv;
     }
     
     /**

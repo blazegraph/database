@@ -1096,7 +1096,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
     /**
      * Private buffer for packing long integers.
      */
-    private byte[] pbuf = new byte[8];
+    final private byte[] pbuf = new byte[8];
     
     /**
      * Return the #of non-zero nibbles, counting from the first non-zero nibble

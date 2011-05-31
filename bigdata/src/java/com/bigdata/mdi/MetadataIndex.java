@@ -29,7 +29,6 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.UUID;
 
-import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
@@ -37,6 +36,7 @@ import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.view.FusedView;
+import com.bigdata.io.LongPacker;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.rawstore.IRawStore;
