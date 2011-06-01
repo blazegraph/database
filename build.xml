@@ -1544,26 +1544,45 @@ ${postInstallMessage}</echo>
       <!-- Issue stop on zookeeper first since zkServer leaves a pid file   -->
       <!-- around if the JVM is killed. That pid file needs to be cleaned   -->
       <!-- up before we can start a new instance.                           -->
-      <antcall target="stopZookeeper" />
+      <!--
+      <antcall target="stopZookeeper"/>
       <antcall target="stopLookup" />
       <antcall target="stopHttpd" />
-      
-      <antcall target="startZookeeper" />
-      <antcall target="startHttpd" />
-      <antcall target="startLookup" />
-
+  	  	
+      <antcall target="startZookeeper"/>
+      <antcall target="startHttpd"/>
+      <antcall target="startLookup"/>
+	  -->
       <!-- Run the tests -->
+  	  <antcall target="stopTestServices"/>
+  	  <antcall target="startTestServices"/>
       <antcall target="run-junit" />
-
+	  <antcall target="stopTestServices"/>
+      <!--
       <antcall target="stopLookup" />
       <antcall target="stopHttpd" />
       <antcall target="stopZookeeper" />
+	  -->
 
       <!-- This message is noticed by the hudson build and is used to trigger
            after various after actions. -->
       <echo>JUNIT RUN COMPLETE</echo>
     </target>
 
+	<target name="stopTestServices" if="${startTestServices}">
+		  <echo message="Stopping test services."/>
+	      <antcall target="stopZookeeper"/>
+	      <antcall target="stopLookup" />
+	      <antcall target="stopHttpd" />
+	</target>
+
+	<target name="startTestServices" if="${startTestServices}">
+		  <echo message="Starting test services."/>
+	      <antcall target="startZookeeper"/>
+	      <antcall target="startHttpd"/>
+	      <antcall target="startLookup"/>
+	</target>
+	
     <target name="startHttpd">
       <echo>java -jar ${dist.lib}/classserver.jar -verbose -stoppable -port ${test.codebase.port} -dir ${test.codebase.dir}
 </echo>
