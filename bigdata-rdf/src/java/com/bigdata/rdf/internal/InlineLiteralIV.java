@@ -42,15 +42,15 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 /**
  * Implementation for inline {@link Literal}s. Literals may be plain (just a
  * label), have a datatype URI, or have a language code. In each case, all
- * information is inlined. This class is mainly targeted at inlining small
- * plain literals and language code literals, but may also be used to fully
- * inlining literals in scale-out (which can be an attractive option).
+ * information is inlined. This class is mainly targeted at inlining small plain
+ * literals and language code literals, but may also be used to fully inlining
+ * literals in scale-out (which can be an attractive option).
  * <p>
  * Note: Optimized support for <code>xsd:string</code> inlining is provided by
  * the {@link XSDStringExtension}.
  * 
- * FIXME Validate methods on this class against {@link Literal} and
- * {@link BigdataLiteralImpl}
+ * TODO Validate methods on this class against {@link Literal} and
+ * {@link BigdataLiteralImpl} (API compliance).
  */
 public class InlineLiteralIV<V extends BigdataLiteral> extends
         AbstractLiteralIV<V, String> implements IInlineUnicode {

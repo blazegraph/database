@@ -24,31 +24,27 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
- * IExtensions are responsible for roundtripping between an RDF value and an
- * {@link ExtensionIV} for a particular datatype.  Because of how
- * {@link ExtensionIV}s are encoded and decoded, the IExtension will need to
- * have on hand the {@link TermId} for its datatype.  This is accomplished
- * via the {@link IDatatypeURIResolver} - the IExtension will give the resolver
- * the datatype URI it needs resolved and the resolver will lookup (or create)
- * the {@link TermId}.  
+ * {@link IExtension}s are responsible for round-tripping between an RDF
+ * {@link Value} and an {@link ExtensionIV} for a particular datatype. Because
+ * of how {@link ExtensionIV}s are encoded and decoded, the {@link IExtension}
+ * will need to have on hand the {@link TermId} for its datatype. This is
+ * accomplished via the {@link IDatatypeURIResolver} - the {@link IExtension}
+ * will give the resolver the datatype {@link URI} it needs resolved and the
+ * resolver will lookup (or create) the {@link TermId}. This is done when the
+ * {@link LexiconRelation} is created since the operation must write on the
+ * lexicon.
  */
 public interface IExtension<V extends BigdataValue> {
 
-//    /**
-//     * This will be called very early in the IExtension lifecycle so that the
-//     * {@link TermId} for the datatype URI will be on hand when needed.
-//     * 
-//     * @param resolver
-//     *          the datatype URI resolver
-//     */
-//    void resolveDatatype(final IDatatypeURIResolver resolver);
-    
     /**
      * Return the fully resolved datatype in the form of a {@link BigdataURI}
      * with the {@link TermId} already set.
@@ -57,14 +53,15 @@ public interface IExtension<V extends BigdataValue> {
      *          the datatype
      */
     BigdataURI getDatatype();
-    
+
     /**
      * Create an {@link ExtensionIV} from an RDF value.
      * 
      * @param value
-     *          the RDF value
-     * @return
-     *          the extension IV
+     *            The RDF {@link Value}
+     *            
+     * @return The extension {@link IV} -or- <code>null</code> if the
+     *         {@link Value} can not be inlined using this {@link IExtension}.
      */
     ExtensionIV createIV(final Value value);
     
@@ -72,11 +69,11 @@ public interface IExtension<V extends BigdataValue> {
      * Create an RDF value from an {@link ExtensionIV}.
      * 
      * @param iv
-     *          the extension IV
+     *          The extension {@link IV}
      * @param vf
-     *          the bigdata value factory
+     *          The bigdata value factory
      * @return
-     *          the RDF value
+     *          The RDF {@link Value}
      */
     V asValue(final ExtensionIV iv, final BigdataValueFactory vf);
     

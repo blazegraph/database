@@ -27,20 +27,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
+
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.rdf.internal.constraints.IVValueExpression;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
- * This is used by certain IVValueExpressions to create an alternate "view" of a
- * Literal or URI IV, such as one where the {@link BigdataValue} is transformed
- * into a simple literal (no datatype, no language tag) using the URI's
- * toString() or the Literal's label.
- * 
- * TODO Mike, I'd advise handling this as a TermId standing in for a Literal
- * whose datatype is xsd:string and whose termId is ZERO. That will basically
- * look like a Literal which has not been inserted into (or looked up against)
- * the database. At a minimum, I would extend {@link AbstractIV}. Bryan
+ * This is used by certain {@link IVValueExpression}s to create an alternate
+ * "view" of {@link IV} for a {@link Literal} or a {@link URI}, such as one
+ * where the {@link BigdataValue} is transformed into a simple literal (no
+ * datatype, no language tag) using the URI's toString() or the Literal's label.
  */
 public class WrappedIV implements IV {
 
@@ -70,7 +69,7 @@ public class WrappedIV implements IV {
 		return (this.altVal = altVal);
 	}
 
-	public BigdataValue getValue() throws NotMaterializedException {
+	public BigdataValue getValue() {
 		return altVal;
 	}
 

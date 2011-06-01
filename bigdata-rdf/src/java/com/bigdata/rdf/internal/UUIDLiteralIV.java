@@ -72,7 +72,7 @@ public class UUIDLiteralIV<V extends BigdataLiteral> extends
 			final ValueFactory f = lex.getValueFactory();
 			
 			v = (V) f.createLiteral(value.toString(), //
-					f.createURI(DTE.UUID.getDatatype()));
+					f.createURI(DTE.UUID.getDatatypeURI().stringValue()));
 			
 			v.setIV(this);
 			

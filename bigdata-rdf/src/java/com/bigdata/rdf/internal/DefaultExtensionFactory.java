@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.LinkedList;
 
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
  * Default {@link IExtensionFactory}. The following extensions are supported:
@@ -11,7 +12,8 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
  * <dt>{@link DateTimeExtension}</dt>
  * <dd>Inlining literals which represent <code>xsd:dateTime</code> values into
  * the statement indices.</dd>
- * <dt></dt><dd></dd>
+ * <dt>{@link XSDStringExtension}</dt>
+ * <dd>Inlining <code>xsd:string</code> literals into the statement indices.</dd>
  * </dl>
  */
 public class DefaultExtensionFactory implements IExtensionFactory {
@@ -29,13 +31,12 @@ public class DefaultExtensionFactory implements IExtensionFactory {
     public void init(final LexiconRelation lex) {
 
     	if (lex.isInlineDateTimes())
-    		extensions.add(new DateTimeExtension(
+    		extensions.add(new DateTimeExtension<BigdataLiteral>(
     				lex, lex.getInlineDateTimesTimeZone()));
 
-//    	FIXME Add Option for inlining xsd:string and for max inline length.
-//        if (lex.isInlineXSDString())
-//            extensions.add(new XSDStringExtension(
-//                    lex, lex.getMaxInlineLength()));
+        if (lex.getMaxInlineStringLength() > 0)
+            extensions.add(new XSDStringExtension<BigdataLiteral>(lex, lex
+                    .getMaxInlineStringLength()));
 
 		extensionsArray = extensions.toArray(new IExtension[extensions.size()]);
         

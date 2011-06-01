@@ -78,12 +78,14 @@ public class ColorsEnumExtension<V extends BigdataValue> implements IExtension<V
             throw new IllegalArgumentException();
         
         final String s = value.stringValue();
-        
-        final Color c = Enum.valueOf(Color.class, s);
-        
-        // not a valid color
-        if (c == null)
+
+        final Color c;
+        try {
+            c = Enum.valueOf(Color.class, s);
+        } catch (IllegalArgumentException ex) {
+            // not a valid color
             return null;
+        }
         
         final AbstractLiteralIV delegate = new XSDByteIV(c.getByte());
 

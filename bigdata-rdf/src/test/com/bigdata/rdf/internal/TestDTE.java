@@ -61,10 +61,22 @@ public class TestDTE extends TestCase {
         for(DTE e : DTE.values()) {
 
             // verify can decode from [v].
-            final DTE a = DTE.valueOf(e.v);
-            
-            if (e != a)
-                fail("expected: " + e + " (v=" + e.v + "), actual=" + a);
+            {
+
+                final DTE a = DTE.valueOf(e.v);
+
+                if (e != a)
+                    fail("expected: " + e + " (v=" + e.v + "), actual=" + a);
+            }
+
+            // verify can decode from [datatype].
+            {
+
+                final DTE a = DTE.valueOf(e.getDatatypeURI());
+
+                if (e != a)
+                    fail("expected: " + e + " (v=" + e.v + "), actual=" + a);
+            }
 
             assertEquals(e.v, e.v());
 
@@ -87,7 +99,7 @@ public class TestDTE extends TestCase {
         assertFalse(DTE.XSDBoolean.isBigNumeric());
         assertEquals(Bytes.SIZEOF_BYTE, DTE.XSDBoolean.len());
         assertEquals(Boolean.class, DTE.XSDBoolean.getCls());
-        assertEquals(XSD.BOOLEAN.stringValue(), DTE.XSDBoolean.getDatatype());
+        assertEquals(XSD.BOOLEAN, DTE.XSDBoolean.getDatatypeURI());
     }
     
     public void test_XSDByte() {
@@ -99,7 +111,7 @@ public class TestDTE extends TestCase {
         assertFalse(DTE.XSDByte.isBigNumeric());
         assertEquals(Bytes.SIZEOF_BYTE, DTE.XSDByte.len());
         assertEquals(Byte.class, DTE.XSDByte.getCls());
-        assertEquals(XSD.BYTE.stringValue(), DTE.XSDByte.getDatatype());
+        assertEquals(XSD.BYTE, DTE.XSDByte.getDatatypeURI());
     }
     
     public void test_XSDShort() {
@@ -111,7 +123,7 @@ public class TestDTE extends TestCase {
         assertFalse(DTE.XSDShort.isBigNumeric());
         assertEquals(Bytes.SIZEOF_SHORT, DTE.XSDShort.len());
         assertEquals(Short.class, DTE.XSDShort.getCls());
-        assertEquals(XSD.SHORT.stringValue(), DTE.XSDShort.getDatatype());
+        assertEquals(XSD.SHORT, DTE.XSDShort.getDatatypeURI());
     }
 
     public void test_XSDInt() {
@@ -123,7 +135,7 @@ public class TestDTE extends TestCase {
         assertFalse(DTE.XSDInt.isBigNumeric());
         assertEquals(Bytes.SIZEOF_INT, DTE.XSDInt.len());
         assertEquals(Integer.class, DTE.XSDInt.getCls());
-        assertEquals(XSD.INT.stringValue(), DTE.XSDInt.getDatatype());
+        assertEquals(XSD.INT, DTE.XSDInt.getDatatypeURI());
     }
 
     public void test_XSDLong() {
@@ -135,7 +147,7 @@ public class TestDTE extends TestCase {
         assertFalse(DTE.XSDLong.isBigNumeric());
         assertEquals(Bytes.SIZEOF_LONG, DTE.XSDLong.len());
         assertEquals(Long.class, DTE.XSDLong.getCls());
-        assertEquals(XSD.LONG.stringValue(), DTE.XSDLong.getDatatype());
+        assertEquals(XSD.LONG, DTE.XSDLong.getDatatypeURI());
     }
 
     // unsigned
@@ -148,7 +160,7 @@ public class TestDTE extends TestCase {
         assertFalse(DTE.XSDUnsignedByte.isBigNumeric());
         assertEquals(Bytes.SIZEOF_BYTE, DTE.XSDUnsignedByte.len());
         assertEquals(Byte.class, DTE.XSDUnsignedByte.getCls());
-        assertEquals(XSD.UNSIGNED_BYTE.stringValue(), DTE.XSDUnsignedByte.getDatatype());
+        assertEquals(XSD.UNSIGNED_BYTE, DTE.XSDUnsignedByte.getDatatypeURI());
     }
     
     public void test_XSDUnsignedShort() {
@@ -160,7 +172,7 @@ public class TestDTE extends TestCase {
         assertFalse(DTE.XSDUnsignedShort.isBigNumeric());
         assertEquals(Bytes.SIZEOF_SHORT, DTE.XSDUnsignedShort.len());
         assertEquals(Short.class, DTE.XSDUnsignedShort.getCls());
-        assertEquals(XSD.UNSIGNED_SHORT.stringValue(), DTE.XSDUnsignedShort.getDatatype());
+        assertEquals(XSD.UNSIGNED_SHORT, DTE.XSDUnsignedShort.getDatatypeURI());
     }
 
     public void test_XSDUnsignedInt() {
@@ -172,7 +184,7 @@ public class TestDTE extends TestCase {
         assertFalse(DTE.XSDUnsignedInt.isBigNumeric());
         assertEquals(Bytes.SIZEOF_INT, DTE.XSDUnsignedInt.len());
         assertEquals(Integer.class, DTE.XSDUnsignedInt.getCls());
-        assertEquals(XSD.UNSIGNED_INT.stringValue(), DTE.XSDUnsignedInt.getDatatype());
+        assertEquals(XSD.UNSIGNED_INT, DTE.XSDUnsignedInt.getDatatypeURI());
     }
 
     public void test_XSDUnsignedLong() {
@@ -184,7 +196,7 @@ public class TestDTE extends TestCase {
         assertFalse(DTE.XSDUnsignedLong.isBigNumeric());
         assertEquals(Bytes.SIZEOF_LONG, DTE.XSDUnsignedLong.len());
         assertEquals(Long.class, DTE.XSDUnsignedLong.getCls());
-        assertEquals(XSD.UNSIGNED_LONG.stringValue(), DTE.XSDUnsignedLong.getDatatype());
+        assertEquals(XSD.UNSIGNED_LONG, DTE.XSDUnsignedLong.getDatatypeURI());
     }
 
     // float
@@ -197,7 +209,7 @@ public class TestDTE extends TestCase {
         assertFalse(DTE.XSDFloat.isBigNumeric());
         assertEquals(Bytes.SIZEOF_FLOAT, DTE.XSDFloat.len());
         assertEquals(Float.class, DTE.XSDFloat.getCls());
-        assertEquals(XSD.FLOAT.stringValue(), DTE.XSDFloat.getDatatype());
+        assertEquals(XSD.FLOAT, DTE.XSDFloat.getDatatypeURI());
     }
 
     public void test_XSDDouble() {
@@ -209,7 +221,7 @@ public class TestDTE extends TestCase {
         assertFalse(DTE.XSDDouble.isBigNumeric());
         assertEquals(Bytes.SIZEOF_DOUBLE, DTE.XSDDouble.len());
         assertEquals(Double.class, DTE.XSDDouble.getCls());
-        assertEquals(XSD.DOUBLE.stringValue(), DTE.XSDDouble.getDatatype());
+        assertEquals(XSD.DOUBLE, DTE.XSDDouble.getDatatypeURI());
     }
 
     // big
@@ -223,7 +235,7 @@ public class TestDTE extends TestCase {
         assertTrue(DTE.XSDInteger.isBigNumeric());
         assertEquals(0/*varlen*/, DTE.XSDInteger.len());
         assertEquals(BigInteger.class, DTE.XSDInteger.getCls());
-        assertEquals(XSD.INTEGER.stringValue(), DTE.XSDInteger.getDatatype());
+        assertEquals(XSD.INTEGER, DTE.XSDInteger.getDatatypeURI());
     }
 
     public void test_XSDDecimal() {
@@ -235,7 +247,7 @@ public class TestDTE extends TestCase {
         assertTrue(DTE.XSDDecimal.isBigNumeric());
         assertEquals(0/*varlen*/, DTE.XSDDecimal.len());
         assertEquals(BigDecimal.class, DTE.XSDDecimal.getCls());
-        assertEquals(XSD.DECIMAL.stringValue(), DTE.XSDDecimal.getDatatype());
+        assertEquals(XSD.DECIMAL, DTE.XSDDecimal.getDatatypeURI());
     }
 
     // other
@@ -249,7 +261,7 @@ public class TestDTE extends TestCase {
         assertFalse(DTE.UUID.isBigNumeric());
         assertEquals(Bytes.SIZEOF_UUID, DTE.UUID.len());
         assertEquals(UUID.class, DTE.UUID.getCls());
-        assertEquals(XSD.UUID.stringValue(), DTE.UUID.getDatatype());
+        assertEquals(XSD.UUID, DTE.UUID.getDatatypeURI());
     }
     
     public void test_XSDString() {
@@ -261,7 +273,7 @@ public class TestDTE extends TestCase {
         assertFalse(DTE.XSDString.isBigNumeric());
         assertEquals(0/*varlen*/, DTE.XSDString.len());
         assertEquals(String.class, DTE.XSDString.getCls());
-        assertEquals(XSD.STRING.stringValue(), DTE.XSDString.getDatatype());
+        assertEquals(XSD.STRING, DTE.XSDString.getDatatypeURI());
     }
 
 }

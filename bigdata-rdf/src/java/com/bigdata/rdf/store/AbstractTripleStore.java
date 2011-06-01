@@ -95,6 +95,7 @@ import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.IExtensionFactory;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.XSDStringExtension;
 import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.ITextIndexer;
@@ -896,6 +897,27 @@ abstract public class AbstractTripleStore extends
 
         String DEFAULT_INLINE_LITERALS = "true";
 
+        /**
+         * The maximum length of a String value which may be inlined into the
+         * statement indices (default {@value #DEFAULT_MAX_INLINE_STRING_LENGTH}
+         * ). Depending on the configuration, this may applies to literal label
+         * (and datatypeURI or language code), URI local names, full URIs, blank
+         * node IDs, etc. The {@link XSDStringExtension} is registered when GT
+         * ZERO.
+         */
+        String MAX_INLINE_STRING_LENGTH = AbstractTripleStore.class.getName()
+                + ".maxInlineStringLength";
+
+        /**
+         * FIXME TERMS REFACTOR : Change to a non-zero default (e.g., 64). Note
+         * that there is currently an interaction when this is enabled with the
+         * full text indexer. Basically, if we inline a non-datatype literal
+         * then we need to inline the literal into the full text index as well
+         * for each keyword in that literal. That can produce quite a bit of
+         * duplication.
+         */
+        String DEFAULT_MAX_INLINE_STRING_LENGTH = "0"; // 64
+        
         /**
          * Set up database to inline bnodes directly into the statement indices 
          * rather than using the lexicon to map them to term identifiers and 

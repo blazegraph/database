@@ -905,14 +905,17 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         
         final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
         
+        final int maxInlineStringLength = 128;
+        
         final XSDStringExtension<BigdataValue> ext = 
-            new XSDStringExtension<BigdataValue>(new IDatatypeURIResolver() {
-            public BigdataURI resolve(URI uri) {
-                final BigdataURI buri = vf.createURI(uri.stringValue());
-                buri.setIV(new TermId(VTE.URI, 1024));
-                return buri;
-            }
-        });
+            new XSDStringExtension<BigdataValue>(
+                new IDatatypeURIResolver() {
+                    public BigdataURI resolve(URI uri) {
+                        final BigdataURI buri = vf.createURI(uri.stringValue());
+                        buri.setIV(new TermId(VTE.URI, 1024));
+                        return buri;
+                    }
+                }, maxInlineStringLength);
         
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
@@ -1048,10 +1051,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     }
 
     /**
-     * FIXME Test for a URI broken down into namespace and local name
-     * components. The namespace component is coded by setting the extension bit
-     * and placing the IV of the namespace into the extension IV field. The
-     * local name is inlined as a Unicode component using {@link DTE#XSDString}.
+     * Test for a URI broken down into namespace and local name components. The
+     * namespace component is coded by setting the extension bit and placing the
+     * IV of the namespace into the extension IV field. The local name is
+     * inlined as a Unicode component using {@link DTE#XSDString}.
      */
     public void test_SPO_encodeDecode_NonInline_URI_with_NamespaceIV() {
 
@@ -1060,7 +1063,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
-                new URIWithNamespaceIV<BigdataURI>(
+                new URINamespaceIV<BigdataURI>(
                         new InlineLiteralIV<BigdataLiteral>("bar"), namespaceIV),//
         };
 
@@ -1081,7 +1084,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
-                new LiteralWithDatatypeIV<BigdataLiteral>(
+                new LiteralDatatypeIV<BigdataLiteral>(
                         new InlineLiteralIV<BigdataLiteral>("bar"), datatypeIV),//
         };
 
