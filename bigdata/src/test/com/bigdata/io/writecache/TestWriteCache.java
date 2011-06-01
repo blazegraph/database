@@ -44,6 +44,7 @@ import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.TestCase3;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -85,6 +86,61 @@ public class TestWriteCache extends TestCase3 {
      * contents and metadata to the disk as necessary.
      */
     final private static String mode = "rw";
+    
+    /**
+     * Confirm checksum errors
+     */
+    public void test_writeCacheChecksums() {
+    	
+        try {
+
+            final File file = File.createTempFile(getName(), ".tmp");
+
+            final boolean isHighlyAvailable = false;
+
+            final ReopenFileChannel opener = new ReopenFileChannel(file, mode);
+
+            final ByteBuffer buf = DirectBufferPool.INSTANCE.acquire();
+
+            try {
+
+                // The buffer size must be at least 1k for these tests.
+                assertTrue(DirectBufferPool.INSTANCE.getBufferCapacity() >= Bytes.kilobyte32);
+
+                WriteCache writeCache =  new WriteCache.FileChannelWriteCache(0, buf,
+                        true, isHighlyAvailable, false, opener);
+ 
+
+            	long addr1 = 0;
+            	long addr2 = 12800;
+            	long addr3 = 24800;
+            	ByteBuffer data1 = getRandomData(512);
+            	int chk1 = ChecksumUtility.threadChk.get().checksum(data1, 0/* offset */, data1.limit());
+            	
+            	writeCache.write(addr1, data1, chk1);
+            	data1.flip();
+            	writeCache.write(addr2, data1, 23); // bad checksum
+            	data1.flip();
+            	writeCache.write(addr3, data1, chk1); // bad checksum
+            	
+            	writeCache.read(addr1);
+            	writeCache.read(addr3);
+            	
+            	try {
+            		writeCache.read(addr2);
+            		
+            		fail("Expected ChecksumError");
+            	} catch (ChecksumError ce) {
+            		System.out.println("Expected: " + ce.getMessage());
+            	}
+
+            } finally {
+            	DirectBufferPool.INSTANCE.release(buf);
+            }
+        } catch (Exception e) {
+        	fail("Unexpected exception", e);
+        }
+    }
 
     /**
      * Exercises most of the API.

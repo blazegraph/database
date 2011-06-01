@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
+
 import org.apache.log4j.MDC;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
@@ -41,6 +42,7 @@ import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.rio.RDFFormat;
+
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -99,6 +101,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
      */
     public void test_filter_01() {
 
+        TempTripleStore focusStore = null;
         final AbstractTripleStore store = getStore();
 
         try {
@@ -147,7 +150,6 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             /*
              * Setup a temporary store.
              */
-            final TempTripleStore focusStore;
             {
 
                 final Properties properties = store.getProperties();
@@ -216,6 +218,9 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             assertEquals("#removed", 1, nremoved);
             
         } finally {
+
+            if (focusStore != null)
+                focusStore.__tearDownUnitTest();
             
             store.__tearDownUnitTest();
             
@@ -229,7 +234,8 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
      * verified (this is based on rdfs11).
      */
     public void test_assertAll_01() {
-        
+
+        TempTripleStore tempStore = null;
         final AbstractTripleStore store = getStore();
         
         try {
@@ -244,7 +250,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
 
             final BigdataURI rdfsSubClassOf = f.asValue(RDFS.SUBCLASSOF);
 
-            final TempTripleStore tempStore = tm.newTempTripleStore();
+            tempStore = tm.newTempTripleStore();
 
             // buffer writes on the tempStore.
             {
@@ -282,6 +288,9 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             assertTrue(store.hasStatement(U, rdfsSubClassOf, X));
             
         } finally {
+        
+            if (tempStore != null)
+                tempStore.__tearDownUnitTest();
             
             store.__tearDownUnitTest();
             
@@ -324,7 +333,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             // add some assertions and verify aspects of their closure.
             {
             
-                StatementBuffer assertionBuffer = new StatementBuffer(tm
+                final StatementBuffer assertionBuffer = new StatementBuffer(tm
                         .newTempTripleStore(), store, 100/* capacity */);
 
                 assertionBuffer.add(U, rdfsSubClassOf, V);
@@ -355,7 +364,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
              */
             {
                 
-                StatementBuffer retractionBuffer = new StatementBuffer(tm
+                final StatementBuffer retractionBuffer = new StatementBuffer(tm
                         .newTempTripleStore(), store, 100/* capacity */);
 
                 retractionBuffer.add(V, rdfsSubClassOf, X);
@@ -382,7 +391,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
              */
             {
                 
-                StatementBuffer assertionBuffer = new StatementBuffer(tm
+                final StatementBuffer assertionBuffer = new StatementBuffer(tm
                         .newTempTripleStore(), store, 100/* capacity */);
                 
                 assertionBuffer.add(V, rdfsSubClassOf, X);
@@ -408,8 +417,8 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
              */
             {
                 
-                StatementBuffer retractionBuffer = new StatementBuffer(tm.newTempTripleStore(),store,
-                        100/* capacity */);
+                final StatementBuffer retractionBuffer = new StatementBuffer(tm
+                        .newTempTripleStore(), store, 100/* capacity */);
 
                 retractionBuffer.add(U, rdfsSubClassOf, X);
 
@@ -451,9 +460,9 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
         try {
             
             final TruthMaintenance tm = new TruthMaintenance(store.getInferenceEngine());
-            
+
             final BigdataValueFactory f = store.getValueFactory();
-            
+
             final BigdataURI U = f.createURI("http://www.bigdata.com/U");
             final BigdataURI V = f.createURI("http://www.bigdata.com/V");
             final BigdataURI X = f.createURI("http://www.bigdata.com/X");
@@ -462,8 +471,8 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
 
             {
 
+                // Note: new triple store on shared temporary store!
                 final TempTripleStore tempStore = tm.newTempTripleStore();
-
                 // buffer writes on the tempStore.
                 {
 
@@ -492,8 +501,9 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                             + tempStore.dumpStore(store, true, true, false,
                                     true));
 
-                System.err.println("Doing asserts.");
-                
+                if (log.isInfoEnabled())
+                    log.info("Doing asserts.");
+
                 // perform closure and write on the database.
                 tm.assertAll(tempStore);
 
@@ -507,8 +517,8 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             assertTrue(store.hasStatement(U, rdfsSubClassOf, V));
             assertTrue(store.hasStatement(V, rdfsSubClassOf, X));
             assertTrue(store.hasStatement(U, rdfsSubClassOf, X));
-            
-            // and verify their statement type. 
+
+            // and verify their statement type.
             assertEquals(StatementEnum.Explicit, store.getStatement(U,
                     rdfsSubClassOf, V).getStatementType());
             assertEquals(StatementEnum.Explicit, store.getStatement(V,
@@ -516,18 +526,19 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             assertEquals(StatementEnum.Explicit, store.getStatement(U,
                     rdfsSubClassOf, X).getStatementType());
 
-            // now retract 
+            // now retract
             {
 
+                // Note: new triple store on shared temporary store!
                 final TempTripleStore tempStore = tm.newTempTripleStore();
-
                 // buffer writes on the tempStore.
                 {
 
                     final StatementBuffer retractionBuffer = new StatementBuffer(
                             tempStore, store, 10/* capacity */);
 
-                    assertTrue(tempStore == retractionBuffer.getStatementStore());
+                    assertTrue(tempStore == retractionBuffer
+                            .getStatementStore());
 
                     /*
                      * Retract this statement. It is explicitly present in the
@@ -546,11 +557,12 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                             + tempStore.dumpStore(store, true, true, false,
                                     true));
 
-                System.err.println("Doing retraction.");
-                
+                if (log.isInfoEnabled())
+                    log.info("Doing retraction.");
+
                 // perform closure and write on the database.
                 tm.retractAll(tempStore);
-                
+
             }
 
             if (log.isInfoEnabled())
@@ -613,7 +625,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             // add some assertions and verify aspects of their closure.
             {
             
-                StatementBuffer assertionBuffer = new StatementBuffer(tm
+                final StatementBuffer assertionBuffer = new StatementBuffer(tm
                         .newTempTripleStore(), store, 100/* capacity */);
 
                 // stmt a
@@ -632,7 +644,8 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                 tm.assertAll((TempTripleStore)assertionBuffer.getStatementStore());
 
                 // dump after closure.
-                if(log.isInfoEnabled())log.info("\n"+store.dumpStore(true,true,false));
+                if (log.isInfoEnabled())
+                    log.info("\n" + store.dumpStore(true, true, false));
 
                 // explicit.
                 assertTrue(store.hasStatement(user, currentGraph, foo ));
@@ -641,7 +654,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
 
                 // verify that stmt c is marked as explicit in the kb.
 
-                BigdataStatement stmtC = (BigdataStatement) store
+                final BigdataStatement stmtC = (BigdataStatement) store
                         .getStatement(foo, rdftype, graph);
                 
                 assertNotNull(stmtC);
@@ -658,7 +671,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
              */
             {
                 
-                StatementBuffer retractionBuffer = new StatementBuffer(tm
+                final StatementBuffer retractionBuffer = new StatementBuffer(tm
                         .newTempTripleStore(), store, 100/* capacity */);
 
                 retractionBuffer.add(user, currentGraph, foo);
@@ -680,7 +693,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
 
                 // verify that stmt c is marked as explicit in the kb.
 
-                BigdataStatement stmtC = (BigdataStatement) store
+                final BigdataStatement stmtC = (BigdataStatement) store
                         .getStatement(foo, rdftype, graph);
                 
                 assertNotNull(stmtC);
@@ -773,11 +786,11 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                 final TempTripleStore controlStore = new TempTripleStore(store
                         .getProperties());
 
-                // Note: maintains closure on the controlStore.
-                final TruthMaintenance tmControlStore = new TruthMaintenance(
-                        controlStore.getInferenceEngine());
-
                 try {
+
+                    // Note: maintains closure on the controlStore.
+                    final TruthMaintenance tmControlStore = new TruthMaintenance(
+                            controlStore.getInferenceEngine());
 
                     final StatementBuffer assertionBuffer = new StatementBuffer(
                             tmControlStore.newTempTripleStore(), controlStore,
@@ -822,29 +835,29 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
      
 //        if(true) fail("re-enable this test");
         
-        URI a = new URIImpl("http://www.bigdata.com/a");
-        URI b = new URIImpl("http://www.bigdata.com/b");
-        URI entity = new URIImpl("http://www.bigdata.com/Entity");
-        URI sameAs = OWL.SAMEAS;
+        final URI a = new URIImpl("http://www.bigdata.com/a");
+        final URI b = new URIImpl("http://www.bigdata.com/b");
+        final URI entity = new URIImpl("http://www.bigdata.com/Entity");
+        final URI sameAs = OWL.SAMEAS;
 //        /*
 //         * Note: not using rdf:type to avoid entailments about (x rdf:type
 //         * Class) and (x rdfs:subClassOf y) that are not required by this test.
 //         */
 //      URI rdfType = new URIImpl("http://www.bigdata.com/type");
-        URI rdfType = RDF.TYPE;
+        final URI rdfType = RDF.TYPE;
 
-        AbstractTripleStore store = getStore();
+        final AbstractTripleStore store = getStore();
         
         try {
             
-            InferenceEngine inf = store.getInferenceEngine();
+            final InferenceEngine inf = store.getInferenceEngine();
 
-            TruthMaintenance tm = new TruthMaintenance(inf);
+            final TruthMaintenance tm = new TruthMaintenance(inf);
             
             // add some assertions and verify aspects of their closure.
             {
-            
-                StatementBuffer assertionBuffer = new StatementBuffer(tm
+
+                final StatementBuffer assertionBuffer = new StatementBuffer(tm
                         .newTempTripleStore(), store, 100/* capacity */);
 
                 // stmt a
@@ -856,12 +869,13 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                 
                 // assert the sameas
                 assertionBuffer.add(a, sameAs, b );
-                
+
                 // flush statements to the tempStore.
                 assertionBuffer.flush();
-                
+
                 // perform closure and write on the database.
-                tm.assertAll( (TempTripleStore)assertionBuffer.getStatementStore() );
+                tm.assertAll((TempTripleStore) assertionBuffer
+                        .getStatementStore());
 
                 // dump after closure.
                 if (log.isInfoEnabled())
@@ -869,7 +883,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                             + store.dumpStore(store, true, true, false, true));
 
             }
-            
+
             /*
              * retract stmt A and update the closure.
              * 
@@ -877,8 +891,8 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
              * other explicit statements were not touched.
              */
             {
-                
-                StatementBuffer retractionBuffer = new StatementBuffer(tm
+
+                final StatementBuffer retractionBuffer = new StatementBuffer(tm
                         .newTempTripleStore(), store, 100/* capacity */);
 
                 // retract the sameas
@@ -886,21 +900,22 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
 
                 // flush statements to the tempStore.
                 retractionBuffer.flush();
-                
+
                 // update the closure.
-                tm.retractAll( (TempTripleStore)retractionBuffer.getStatementStore() );
+                tm.retractAll((TempTripleStore) retractionBuffer
+                        .getStatementStore());
 
                 // dump after re-closure.
                 if (log.isInfoEnabled())
                     log.info("\ndump after re-closure:\n"
                             + store.dumpStore(store, true, true, false, true));
-                
+
             }
-            
+
         } finally {
-            
+
             store.__tearDownUnitTest();
-            
+
         }
 
     }
@@ -955,6 +970,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
         properties.setProperty(DataLoader.Options.CLOSURE,
                 ClosureEnum.None.toString());
 
+        TempTripleStore tmp = null;
         final AbstractTripleStore store = getStore(properties);
         
         try {
@@ -979,7 +995,6 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
              * Make a copy of the graph (statements only) that will serve as
              * ground truth.
              */
-            final TempTripleStore tmp;
             {
                 final Properties p = new Properties(properties);
 
@@ -1012,6 +1027,9 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             fail("Not expecting: "+ex, ex);
             
         } finally {
+
+            if(tmp != null)
+                tmp.__tearDownUnitTest();
             
             store.__tearDownUnitTest();
             

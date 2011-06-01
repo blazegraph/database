@@ -33,6 +33,9 @@ import java.util.UUID;
 
 import junit.framework.TestCase2;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.TestWormAddressManager;
 import com.bigdata.rawstore.WormAddressManager;
@@ -49,6 +52,9 @@ import com.bigdata.util.MillisecondTimestampFactory;
  *          test root block parameters for the {@link StoreTypeEnum#RW} store.
  */
 public class TestRootBlockView extends TestCase2 {
+
+    private static final transient Logger log = Logger
+            .getLogger(TestRootBlockView.class);
 
     /**
      * 
@@ -94,6 +100,16 @@ public class TestRootBlockView extends TestCase2 {
      * Constructor correct acceptance stress test.
      */
     public void test_ctor() {
+
+        /*
+         * Note: This temporarily suppresses the WARN messages which are
+         * otherwise generated when we do not compute the checksum of the root
+         * block. Those messages completely clutter the CI log.
+         */
+        final Logger log2 = Logger.getLogger(RootBlockView.class);
+        final Level c = log2.getLevel();
+        try {
+        log2.setLevel(Level.ERROR);
         
         final Random r = new Random();
         
@@ -246,13 +262,12 @@ public class TestRootBlockView extends TestCase2 {
                         log.info("Ignoring expected exception: " + ex);
                     
                 }
-                
+
                 /*
-                 * verify that we can read that root block anyway if we provide
+                 * Verify that we can read that root block anyway if we provide
                  * a [null] checksum utility.
                  */
-                
-                new RootBlockView(rootBlock0,modified,null/*checker*/);
+                new RootBlockView(rootBlock0, modified, null/* checker */);
 
             }
             
@@ -305,7 +320,9 @@ public class TestRootBlockView extends TestCase2 {
             }
             
         }
-        
+    } finally {
+        log2.setLevel(c);
+    }
     }
 
     /**

@@ -29,6 +29,7 @@ package com.bigdata.io;
 
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -439,10 +440,10 @@ public class DirectBufferPoolAllocator {
                             /*
                              * The allocation pool is closed.
                              * 
-                             * @todo use a lock to serialize these decisions
-                             * since otherwise allocations could be made
-                             * concurrent with a shutdown and release of the
-                             * buffers in the pool which would be a memory leak.
+                             * Note: The lock serializes these decisions since
+                             * otherwise allocations could be made concurrent
+                             * with a shutdown and release of the buffers in the
+                             * pool which would be a memory leak.
                              */
                             throw new IllegalStateException();
                         }
@@ -522,14 +523,17 @@ public class DirectBufferPoolAllocator {
                 allocations.clear();
 
                 // release backing buffers.
-                for (ByteBuffer b : nativeBuffers) {
-
+                final Iterator<ByteBuffer> bitr = nativeBuffers.iterator();
+                while(bitr.hasNext()) {
+                    final ByteBuffer b = bitr.next();
                     while (true) {
                         try {
                             directBufferPool.release(b);
                             break;
                         } catch (InterruptedException e) {
                             interrupted = true;
+                        } finally {
+                            bitr.remove();
                         }
                     }
 

@@ -43,9 +43,9 @@ import com.bigdata.io.TestCase3;
  */
 public abstract class AbstractIndexManagerTestCase<S extends IIndexManager> extends TestCase3 {
 
-    protected final static boolean INFO = log.isInfoEnabled();
+    private final static boolean INFO = log.isInfoEnabled();
 
-    protected final static boolean DEBUG = log.isDebugEnabled();
+    private final static boolean DEBUG = log.isDebugEnabled();
     
     //
     // Constructors.
@@ -78,7 +78,9 @@ public abstract class AbstractIndexManagerTestCase<S extends IIndexManager> exte
         if(INFO)
         log.info("\n================:END:" + testCase.getName()
                 + ":END:====================\n");
-        
+      
+        TestHelper.checkJournalsClosed(testCase, this);
+
     }
     
     public void tearDown() throws Exception {

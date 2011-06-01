@@ -371,7 +371,7 @@ public class TripleStoreUtility {
      * 
      * @return The {@link TempTripleStore}.
      */
-    static public TempTripleStore bulkExport(AbstractTripleStore db) {
+    static public TempTripleStore bulkExport(final AbstractTripleStore db) {
     
         final Properties properties = new Properties();
         
@@ -381,35 +381,43 @@ public class TripleStoreUtility {
         
         properties.setProperty(Options.AXIOMS_CLASS,
                 NoAxioms.class.getName());
-        
+
         final TempTripleStore tmp = new TempTripleStore(properties);
-    
-        final StatementBuffer<Statement> sb = new StatementBuffer<Statement>(tmp, 100000/* capacity */);
-    
-        final IV NULL = null;
-        
-        final IChunkedOrderedIterator<ISPO> itr1 = new BackchainAccessPath(db,
-                db.getAccessPath(NULL, NULL, NULL)).iterator();
-    
-        final BigdataStatementIterator itr2 = db.asStatementIterator(itr1);
-    
+
         try {
-    
-            while (itr2.hasNext()) {
-    
-                final BigdataStatement stmt = itr2.next();
-    
-                sb.add(stmt);
-    
+
+            final StatementBuffer<Statement> sb = new StatementBuffer<Statement>(
+                    tmp, 100000/* capacity */);
+
+            final IV NULL = null;
+
+            final IChunkedOrderedIterator<ISPO> itr1 = new BackchainAccessPath(
+                    db, db.getAccessPath(NULL, NULL, NULL)).iterator();
+
+            final BigdataStatementIterator itr2 = db.asStatementIterator(itr1);
+
+            try {
+
+                while (itr2.hasNext()) {
+
+                    final BigdataStatement stmt = itr2.next();
+
+                    sb.add(stmt);
+
+                }
+
+            } finally {
+
+                itr2.close();
+
             }
-    
-        } finally {
-    
-            itr2.close();
-            
+
+            sb.flush();
+
+        } catch (Throwable t) {
+            tmp.close();
+            throw new RuntimeException(t);
         }
-    
-        sb.flush();
     
         return tmp;
     

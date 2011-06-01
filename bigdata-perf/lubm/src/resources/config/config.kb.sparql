@@ -9,6 +9,6 @@ class=edu.lehigh.swat.bench.ubt.bigdata.SparqlRepositoryFactory
 ontology=ignored
 data=ignored
 # Use the default namespace specified to NanoSparqlServer
-database=http://localhost:81/sparql/
+database=http://localhost:80/sparql
 # Use a specific namespace regardless of the default specified to NanoSparqlServer
 #database=http://localhost:80/sparql/namespace/LUBM_U50/

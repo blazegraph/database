@@ -71,7 +71,7 @@ public class TestUnion extends AbstractRuleTestCase {
      */
     public void test_union() {
         
-//        fail("write test");
+        log.error("write test"); // FIXME Write tests.
         
     }
     

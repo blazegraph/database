@@ -805,7 +805,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
                             BD.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
                             BD.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
-                            BD.DEFAULT_MAX_HITS,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MIN_RANK,//1
+                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
@@ -841,8 +842,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "    ?s <"+RDFS.LABEL+"> ?o . " +
                     "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
                     "    ?o <"+BD.RELEVANCE+"> ?score . " +
-//                    "    ?o <"+BD.MIN_RELEVANCE+"> \"0.6\" . " +
-                    "    ?o <"+BD.MAX_HITS+"> \""+maxHits+"\" . " +
+                    "    ?o <"+BD.MAX_RANK+"> \""+maxHits+"\" . " +
                     "} " +
                     "order by desc(?score)";
                 
@@ -872,7 +872,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
                             BD.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
                             BD.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
-                            maxHits+1, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MIN_RANK,//1
+                            maxHits, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
@@ -941,7 +942,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            BD.DEFAULT_MAX_HITS,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MIN_RANK,//1
+                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
@@ -1014,7 +1016,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            BD.DEFAULT_MAX_HITS,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MIN_RANK,//1
+                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
@@ -1089,7 +1092,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             true, // prefixMatch
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            BD.DEFAULT_MAX_HITS,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MIN_RANK,//1
+                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
@@ -1162,7 +1166,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             true, // prefixMatch
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            BD.DEFAULT_MAX_HITS,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MIN_RANK,//1
+                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
@@ -1231,7 +1236,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             true, // prefixMatch
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            BD.DEFAULT_MAX_HITS,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MIN_RANK,//1
+                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             true, // matchAllTerms
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
@@ -1254,6 +1260,105 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
             }
 
+            { // minRank, maxRank
+            	
+            	final String searchQuery = "how now brown cow";
+            	final int minRank = 2;
+            	final int maxRank = 5;
+                final String query = 
+                    "select ?s ?o ?score " + 
+                    "where " +
+                    "{ " +
+                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
+                    "    ?o <"+BD.MIN_RANK+"> \""+minRank+"\" . " +
+                    "    ?o <"+BD.MAX_RANK+"> \""+maxRank+"\" . " +
+                    "}";
+                
+                if(log.isInfoEnabled())
+                    log.info("\n"+query);
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                int i = 0;
+                while (result.hasNext()) {
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
+                }
+                assertTrue("wrong # of results: " + i, i == (maxRank-minRank+1));
+                
+                result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            true, // prefixMatch
+                            BD.DEFAULT_MIN_RELEVANCE, // minCosine
+                            BD.DEFAULT_MAX_RELEVANCE, // maxCosine
+                            minRank,//1
+                            maxRank,//10000, // maxRank (=maxResults + 1)
+                            false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = new TermId(VTE.LITERAL, hit.getDocId());
+                	final Literal score = vf.createLiteral(hit.getCosine());
+                	final URI s = uris.get(id);
+                	final Literal o = literals.get(id);
+                    final BindingSet bs = createBindingSet(
+                    		new BindingImpl("s", s),
+                    		new BindingImpl("o", o),
+                    		new BindingImpl("score", score));
+                    if(log.isInfoEnabled())
+                        log.info(bs);
+                    answer.add(bs);
+                }
+                
+                compare(result, answer);
+
+            }
+            
+            { // countHits
+            	
+            	final String searchQuery = "how now brown cow";
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                
+                final int i = search.count(
+                			searchQuery, 
+                            null, // languageCode
+                            true, // prefixMatch
+                            BD.DEFAULT_MIN_RELEVANCE, // minCosine
+                            BD.DEFAULT_MAX_RELEVANCE, // maxCosine
+                            BD.DEFAULT_MIN_RANK, // minRank
+                            BD.DEFAULT_MAX_RANK, // maxRank
+                            false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                if (log.isInfoEnabled()) {
+                	log.info(i + " search results.");
+                }
+                
+                assertTrue("wrong # of results: " + i, i == 7);
+                
+            }
+            
         } finally {
             cxn.close();
         }

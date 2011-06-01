@@ -838,7 +838,7 @@ abstract public class WriteCache implements IWriteCache {
 				if (chk != ChecksumUtility.threadChk.get().checksum(b, 0/* offset */, reclen)) {
 
 					// Note: [offset] is a (possibly relative) file offset.
-					throw new ChecksumError("offset=" + offset);
+					throw new ChecksumError(checkdata());
 
 				}
 
@@ -1076,6 +1076,59 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
+	/**
+	 * Locks 
+	 * @return
+	 * @throws InterruptedException 
+	 * @throws IllegalStateException 
+	 */
+	public String checkdata() throws IllegalStateException, InterruptedException {
+		
+		if (!useChecksum) {
+			return "Unable to check since checksums are not enabled";
+		}
+		
+		ByteBuffer tmp = acquire();
+		try {
+			int nerrors = 0;
+			int nrecords = recordMap.size();
+			
+			for (Entry<Long, RecordMetadata> ent : recordMap.entrySet()) {
+				RecordMetadata md = ent.getValue();
+				
+				// length of the record w/o checksum field.
+				final int reclen = md.recordLength - 4;
+
+				// the start of the record in writeCache.
+				final int pos = md.bufferOffset;
+				
+				final int chk = tmp.getInt(pos + reclen);
+
+				// create a view with same offset, limit and position.
+				final ByteBuffer view = tmp.duplicate();
+
+				// adjust the view to just the record of interest.
+				view.limit(pos + reclen);
+				view.position(pos);
+				
+				final byte[] b = new byte[reclen];
+
+				final ByteBuffer dst = ByteBuffer.wrap(b);
+
+				// copy the data into [dst] (and the backing byte[]).
+				dst.put(view);
+				if (chk != ChecksumUtility.threadChk.get().checksum(b, 0/* offset */, reclen)) {
+					log.error("Bad data for address: " + ent.getKey());
+					nerrors++;
+				}
+
+			}
+			return "WriteCache checkdata - records: " + nrecords + ", errors: " + nerrors;	
+		} finally {
+			release();
+		}
+	}
+	
 	/**
 	 * Write the data from the buffer onto the channel. This method provides a
 	 * uniform means to request that the buffer write itself onto the backing

@@ -22,12 +22,10 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on May 19, 2011
+ * Created on May 27, 2011
  */
 
-package com.bigdata.journal;
-
-import com.bigdata.io.DirectBufferPoolTestHelper;
+package com.bigdata.io;
 
 import junit.extensions.proxy.IProxyTest;
 import junit.framework.Assert;
@@ -39,22 +37,22 @@ import junit.framework.TestCase;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestHelper {
+public class DirectBufferPoolTestHelper {
 
     /**
-     * Verify that any journal created by the test have been destroyed.
+     * Verify that any buffers acquired by the test have been released.
      * <p>
      * Note: This clears the counter as a side effect to prevent a cascade
      * of tests from being failed.
      */
-    public static void checkJournalsClosed(final TestCase test) {
+    public static void checkBufferPools(final TestCase test) {
 
-        checkJournalsClosed(test, null/*delegate*/);
+        checkBufferPools(test, null/*delegate*/);
         
     }
 
     /**
-     * Verify that any journal created by the test have been destroyed (variant
+     * Verify that any buffers acquired by the test have been released (variant
      * when using an {@link IProxyTest}).
      * <p>
      * Note: This clears the counter as a side effect to prevent a cascade of
@@ -64,54 +62,31 @@ public class TestHelper {
      *            The unit test instance.
      * @param testClass
      *            The instance of the delegate test class for a proxy test
-     *            suite.  For example, TestWORMStrategy.
+     *            suite. For example, TestWORMStrategy.
      */
-    public static void checkJournalsClosed(final TestCase test,
+    public static void checkBufferPools(final TestCase test,
             final TestCase testClass) {
-
-        final int nopen = AbstractJournal.nopen.getAndSet(0);
-        final int nclose = AbstractJournal.nclose.getAndSet(0);
-        final int ndestroy = AbstractJournal.ndestroy.getAndSet(0);
-
-        if (nopen != nclose) {
-
-            /*
-             * At least one journal was opened which was never closed.
-             */
-
-            Assert.fail("Test did not close journal(s)"//
-                    + ": nopen=" + nopen //
-                    + ", nclose=" + nclose//
-                    + ", ndestroy=" + ndestroy //
-                    + ", test=" + test.getClass() + "." + test.getName()//
-                    + (testClass == null ? "" : ", testClass="
-                            + testClass.getClass().getName())//
-            );
-
-        }
-
-        if (nopen > 0 && ndestroy == 0) {
-
-            /*
-             * At least one journal was opened which was never explicitly
-             * destroyed.
-             */
-
-            Assert.fail("Test did not destroy journal(s)"//
-                    + ": nopen=" + nopen //
-                    + ", nclose=" + nclose//
-                    + ", ndestroy=" + ndestroy //
-                    + ", test=" + test.getClass() + "." + test.getName()//
-                    + (testClass == null ? "" : ", testClass="
-                            + testClass.getClass().getName())//
-
-            );
-
-        }
-
-        // Also check the direct buffer pools.
-        DirectBufferPoolTestHelper.checkBufferPools(test, testClass);
         
+        final long nacquired = DirectBufferPool.totalAcquireCount.get();
+        final long nreleased = DirectBufferPool.totalReleaseCount.get();
+        DirectBufferPool.totalAcquireCount.set(0L);
+        DirectBufferPool.totalReleaseCount.set(0L);
+        
+        if (nacquired != nreleased) {
+
+            /*
+             * At least one buffer was acquired which was never released.
+             */
+
+            Assert.fail("Test did not release buffer(s)"//
+                    + ": nacquired=" + nacquired //
+                    + ", nreleased=" + nreleased //
+                    + ", test=" + test.getClass() + "." + test.getName()//
+                    + (testClass == null ? "" : ", testClass="
+                            + testClass.getClass().getName())//
+            );
+
+        }
         
     }
 

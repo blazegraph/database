@@ -62,19 +62,20 @@ public class TestSnapshotHelper extends TestCase2 {
 
         final File testFile = File.createTempFile(getName(), ".snapshot");
         
-        if (!testFile.delete()) {
-
-            fail("Could not delete test file: " + testFile);
-            
-        }
-        
         try {
         
+            if (!testFile.delete()) {
+
+                fail("Could not delete test file: " + testFile);
+                
+            }
+            
             // test empty snapshot.
             {
                 // populate and write.
                 {
-                    CommitTimeIndex ndx = CommitTimeIndex.createTransient();
+                    
+                    final CommitTimeIndex ndx = CommitTimeIndex.createTransient();
 
                     SnapshotHelper.write(ndx, testFile);
                 }
@@ -82,7 +83,7 @@ public class TestSnapshotHelper extends TestCase2 {
                 // read and verify.
                 {
 
-                    CommitTimeIndex ndx = CommitTimeIndex.createTransient();
+                    final CommitTimeIndex ndx = CommitTimeIndex.createTransient();
 
                     SnapshotHelper.read(ndx, testFile);
                     
@@ -99,23 +100,28 @@ public class TestSnapshotHelper extends TestCase2 {
                 
                 // populate and write.
                 {
-                    CommitTimeIndex ndx = CommitTimeIndex.createTransient();
+                    final CommitTimeIndex ndx = CommitTimeIndex.createTransient();
 
                     ndx.add(10L);
 
                     ndx.add(20L);
                     
-                    SnapshotHelper.write(ndx, testFile);
+                    final long nwritten = SnapshotHelper.write(ndx, testFile);
+                    
+                    assertEquals(2L, nwritten);
+                    
                 }
 
                 // read and verify.
                 {
 
-                    CommitTimeIndex ndx = CommitTimeIndex.createTransient();
+                    final CommitTimeIndex ndx = CommitTimeIndex.createTransient();
 
-                    SnapshotHelper.read(ndx, testFile);
+                    final long nread = SnapshotHelper.read(ndx, testFile);
+
+                    assertEquals(2L, nread);
                     
-                    assertEquals(new long[]{10,20},toArray(ndx));
+                    assertEquals(new long[] { 10, 20 }, toArray(ndx));
                     
                 }
 
@@ -137,7 +143,7 @@ public class TestSnapshotHelper extends TestCase2 {
      * 
      * @return The array.
      */
-    long[] toArray(CommitTimeIndex ndx) {
+    long[] toArray(final CommitTimeIndex ndx) {
         
         synchronized(ndx) {
             

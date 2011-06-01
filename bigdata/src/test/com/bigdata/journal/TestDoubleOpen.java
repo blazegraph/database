@@ -35,6 +35,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.util.InnerCause;
 
 /**
@@ -45,6 +47,9 @@ import com.bigdata.util.InnerCause;
  */
 public class TestDoubleOpen extends ProxyTestCase<Journal> {
 
+    private static final transient Logger log = Logger
+            .getLogger(TestDoubleOpen.class);
+    
     /**
      * 
      */
@@ -142,7 +147,7 @@ public class TestDoubleOpen extends ProxyTestCase<Journal> {
 
             p.setProperty(Journal.Options.FILE, file.toString());
 
-            final int LIMIT = 100;
+            final int LIMIT = 1000;
             
             for (int i = 0; i < LIMIT; i++) {
 
@@ -162,17 +167,21 @@ public class TestDoubleOpen extends ProxyTestCase<Journal> {
                             //@Override
                             public Void call() throws Exception {
 
-                                boolean didDoubleOpen = false;
+                                Journal tmp = null;
+//                                boolean didDoubleOpen = false;
                                 try {
 
-                                    new Journal(p);
+                                    tmp = new Journal(p);
 
-                                    /*
-                                     * Note: An assertion will be throw after
-                                     * the try / catch clause.
-                                     */
-                                    didDoubleOpen = true;
-                                    
+//                                    /*
+//                                     * Note: An assertion will be throw after
+//                                     * the try / catch clause.
+//                                     */
+//                                    didDoubleOpen = true;
+//                                    
+//                                    if (didDoubleOpen)
+                                    fail("Double-open of journal is not allowed");
+
                                 } catch (Throwable t) {
 
                                     Throwable cause;
@@ -214,10 +223,14 @@ public class TestDoubleOpen extends ProxyTestCase<Journal> {
 
                                     }
 
+                                } finally {
+                                    
+                                    if (tmp != null) {
+                                        // Ensure closed if double opened.
+                                        tmp.close();
+                                    }
+                                    
                                 }
-
-                                if (didDoubleOpen)
-                                    fail("Double-open of journal is not allowed");
 
                                 return null;
 

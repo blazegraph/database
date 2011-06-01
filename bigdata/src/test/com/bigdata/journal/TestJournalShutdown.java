@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.lang.ref.WeakReference;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -84,7 +85,7 @@ public class TestJournalShutdown extends TestCase2 {
     public void test_memoryLeakWithoutExplicitClose()
             throws InterruptedException {
 
-//        // This test currently fails....
+//        // This test currently fails.... [this has been fixed].
 //        fail("See https://sourceforge.net/apps/trac/bigdata/ticket/196.");
         
         doMemoryLeakTest(false);
@@ -125,83 +126,112 @@ public class TestJournalShutdown extends TestCase2 {
         final AtomicInteger ncreated = new AtomicInteger();
         final AtomicInteger nunfinalized = new AtomicInteger();
 
+        /*
+         * An array of weak references to the journals. These references will
+         * not cause the journals to be retained. However, since we can not
+         * force a major GC, the non-cleared references are used to ensure that
+         * all journals are destroyed by the end of this test.
+         */
+        final WeakReference<Journal>[] refs = new WeakReference[limit];
+
         try {
+            try {
 
-            for (int i = 0; i < limit; i++) {
+                for (int i = 0; i < limit; i++) {
 
-                final Journal jnl = new Journal(properties) {
-                    protected void finalize() throws Throwable {
-                        super.finalize();
-                        nunfinalized.decrementAndGet();
-                        if (log.isDebugEnabled())
-                            log.debug("Journal was finalized: ncreated="
-                                    + ncreated + ", nalive=" + nunfinalized);
-                    }
-                };
+                    final Journal jnl = new Journal(properties) {
+                        protected void finalize() throws Throwable {
+                            super.finalize();
+                            nunfinalized.decrementAndGet();
+                            if (log.isDebugEnabled())
+                                log
+                                        .debug("Journal was finalized: ncreated="
+                                                + ncreated
+                                                + ", nalive="
+                                                + nunfinalized);
+                        }
+                    };
 
-                nunfinalized.incrementAndGet();
-                ncreated.incrementAndGet();
+                    refs[i] = new WeakReference<Journal>(jnl);
 
-                if (closeJournal) {
-                    /*
-                     * Exercise each of the ways in which we can close the
-                     * journal.
-                     * 
-                     * Note: The Journal will not be finalized() unless it is
-                     * closed. It runs a variety of services which have
-                     * references back to the Journal and which will keep it
-                     * from being finalized until those services are shutdown.
-                     */
-                    switch (i % 4) {
-                    case 0:
-                        jnl.shutdown();
-                        break;
-                    case 1:
-                        jnl.shutdownNow();
-                        break;
-                    case 2:
-                        jnl.close();
-                        break;
-                    case 3:
-                        jnl.destroy();
-                        break;
-                    default:
-                        throw new AssertionError();
+                    nunfinalized.incrementAndGet();
+                    ncreated.incrementAndGet();
+
+                    if (closeJournal) {
+                        /*
+                         * Exercise each of the ways in which we can close the
+                         * journal.
+                         * 
+                         * Note: The Journal will not be finalized() unless it
+                         * is closed. It runs a variety of services which have
+                         * references back to the Journal and which will keep it
+                         * from being finalized until those services are
+                         * shutdown.
+                         */
+                        switch (i % 4) {
+                        case 0:
+                            jnl.shutdown();
+                            break;
+                        case 1:
+                            jnl.shutdownNow();
+                            break;
+                        case 2:
+                            jnl.close();
+                            break;
+                        case 3:
+                            jnl.destroy();
+                            break;
+                        default:
+                            throw new AssertionError();
+                        }
+
                     }
 
                 }
 
+            } catch (OutOfMemoryError err) {
+
+                log.error("Out of memory after creating " + ncreated
+                        + " journals.");
+
             }
 
-        } catch (OutOfMemoryError err) {
+            // Demand a GC.
+            System.gc();
 
-            log.error("Out of memory after creating " + ncreated
-                            + " journals.");
+            // Wait for it.
+            Thread.sleep(1000/* ms */);
+
+            if (log.isInfoEnabled()) {
+
+                log.info("Created " + ncreated + " journals.");
+
+                log.info("There are " + nunfinalized
+                        + " journals which are still alive.");
+
+            }
+
+            if (nunfinalized.get() == ncreated.get()) {
+
+                fail("Created " + ncreated
+                        + " journals.  No journals were finalized.");
+
+            }
+
+        } finally {
+
+            /*
+             * Ensure that all journals are destroyed by the end of the test.
+             */
+            for (int i = 0; i < refs.length; i++) {
+                final Journal jnl = refs[i] == null ? null : refs[i].get();
+                if (jnl != null) {
+                    jnl.destroy();
+                }
+            }
 
         }
-
-        // Demand a GC.
-        System.gc();
-
-        // Wait for it.
-        Thread.sleep(1000/* ms */);
-
-        if (log.isInfoEnabled()) {
-
-            log.info("Created " + ncreated + " journals.");
-
-            log.info("There are " + nunfinalized
-                    + " journals which are still alive.");
-
-        }
-
-        if (nunfinalized.get() == ncreated.get()) {
-
-            fail("Created " + ncreated
-                    + " journals.  No journals were finalized.");
-
-        }
-
+        
     }
 
 }

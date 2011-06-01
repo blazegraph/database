@@ -58,6 +58,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumWatcher;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -290,11 +291,11 @@ public class MockQuorumFixture {
             while (true) {
                 try {
                     runOnce();
-                } catch (InterruptedException t) {
-                    log.warn("Dispatcher exiting : " + t);
-                    break;
                 } catch (Throwable t) {
-                    log.error(t, t);
+                    if (InnerCause.isInnerCause(t, InterruptedException.class))
+                        log.warn("Dispatcher exiting : " + t);
+                    else
+                        log.error(t, t);
                     break;
                 }
             }
@@ -424,7 +425,7 @@ public class MockQuorumFixture {
             deque.put(e);
             dequeNotEmpty.signalAll();
         } catch (InterruptedException ex) {
-            throw new RuntimeException(ex.getMessage(), ex);
+            throw new RuntimeException(ex);
         } finally {
             lock.unlock();
         }
@@ -755,8 +756,12 @@ public class MockQuorumFixture {
                 while (true) {
                     try {
                         runOnce();
-                    } catch (InterruptedException e) {
-                        log.warn("Shutdown : " + e);
+                    } catch (Throwable t) {
+                        if (InnerCause.isInnerCause(t,
+                                InterruptedException.class))
+                            log.warn("Shutdown : " + t);
+                        else
+                            log.error(t, t);
                         break;
                     }
                 }
@@ -785,8 +790,13 @@ public class MockQuorumFixture {
                     try {
                         watcher.notify(e);
                     } catch (Throwable t) {
-                        // log an errors.
-                        log.error(t, t);
+                        if(InnerCause.isInnerCause(t,InterruptedException.class)) {
+                            log.warn(t);
+                            // propagate the interrupt.
+                            Thread.currentThread().interrupt();
+                        } else {
+                            log.error(t, t);
+                        }
                     }
                 } finally {
                     // signal dispatcher that we are done.
@@ -1037,9 +1047,7 @@ public class MockQuorumFixture {
 //                     */
 //                case CONSENSUS:
                 default:
-//                    if(log.isInfoEnabled())
-//                        log.info
-                        System.err.println("Ignoring : " + e);
+                    log.warn("Ignoring : " + e);
                 }
 
             }
@@ -1129,17 +1137,17 @@ public class MockQuorumFixture {
             return (S) fixture.getService(serviceId);
         }
 
-		/**
-		 * {@inheritDoc}
-		 * 
-		 * Overridden to save the <i>lastCommitTime</i> on
-		 * {@link #lastConsensusValue}.
-		 */
+        /**
+         * {@inheritDoc}
+         * 
+         * Overridden to save the <i>lastCommitTime</i> on
+         * {@link #lastConsensusValue}.
+         */
         @Override
-		public void consensus(long lastCommitTime) {
-			super.consensus(lastCommitTime);
-			this.lastConsensusValue = lastCommitTime;
-		}
+        public void consensus(long lastCommitTime) {
+            super.consensus(lastCommitTime);
+            this.lastConsensusValue = lastCommitTime;
+        }
 
         @Override
         public void lostConsensus() {
@@ -1240,22 +1248,19 @@ public class MockQuorumFixture {
 
                                 if (isPipelineMember()) {
 
-                                    System.err
-                                            .println("Will remove self from the pipeline: "
+                                    log.warn("Will remove self from the pipeline: "
                                                     + getServiceId());
 
                                     getActor().pipelineRemove();
 
-                                    System.err
-                                            .println("Will add self back into the pipeline: "
+                                    log.warn("Will add self back into the pipeline: "
                                                     + getServiceId());
 
                                     getActor().pipelineAdd();
 
                                     if (lastCommitTime != null) {
 
-                                        System.err
-                                                .println("Will cast our vote again: lastCommitTime="
+                                        log.warn("Will cast our vote again: lastCommitTime="
                                                         + +lastCommitTime
                                                         + ", " + getServiceId());
 

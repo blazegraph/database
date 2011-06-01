@@ -911,6 +911,7 @@ public class FullTextIndex extends AbstractRelation {
                 prefixMatch,//
                 .4, // minCosine
                 1.0d, // maxCosine
+                1, // minRank
                 10000, // maxRank
                 false, // matchAllTerms
                 this.timeout,//
@@ -942,7 +943,7 @@ public class FullTextIndex extends AbstractRelation {
             final double minCosine, final int maxRank) {
         
         return search(query, languageCode, false/* prefixMatch */, minCosine, 
-        		1.0d, maxRank, false, this.timeout, TimeUnit.MILLISECONDS);
+        		1.0d, 1, maxRank, false, this.timeout, TimeUnit.MILLISECONDS);
 
     }
 
@@ -982,8 +983,10 @@ public class FullTextIndex extends AbstractRelation {
      *            The minimum cosine that will be returned.
      * @param maxCosine
      *            The maximum cosine that will be returned.
-     * @param maxRank
-     *            The upper bound on the #of hits in the result set.
+	 * @param minRank
+	 *            The min rank of the search result.
+	 * @param maxRank
+	 *            The max rank of the search result.
      * @param prefixMatch
      *            When <code>true</code>, the matches will be on tokens which
      *            include the query tokens as a prefix. This includes exact
@@ -1019,8 +1022,266 @@ public class FullTextIndex extends AbstractRelation {
     public Hiterator<Hit> search(final String query, final String languageCode,
             final boolean prefixMatch, 
             final double minCosine, final double maxCosine,
-            final int maxRank, final boolean matchAllTerms,
+            final int minRank, final int maxRank, final boolean matchAllTerms,
             long timeout, final TimeUnit unit) {
+
+//        final long begin = System.currentTimeMillis();
+//        
+////        if (languageCode == null)
+////            throw new IllegalArgumentException();
+//
+//        if (query == null)
+//            throw new IllegalArgumentException();
+//        
+//        if (minCosine < 0d || minCosine > 1d)
+//            throw new IllegalArgumentException();
+//
+//        if (minRank <= 0 || maxRank <= 0)
+//            throw new IllegalArgumentException();
+//
+//        if (minRank > maxRank)
+//            throw new IllegalArgumentException();
+//
+//        if (timeout < 0L)
+//            throw new IllegalArgumentException();
+//        
+//        if (unit == null)
+//            throw new IllegalArgumentException();
+//        
+//        if (log.isInfoEnabled())
+//            log.info("languageCode=[" + languageCode + "], text=[" + query
+//                    + "], minCosine=" + minCosine + ", maxRank=" + maxRank
+//                    + ", matchAllTerms=" + matchAllTerms
+//                    + ", timeout=" + timeout + ", unit=" + unit);
+//
+//        if (timeout == 0L) {
+//
+//            // treat ZERO as equivalent to MAX_LONG.
+//            timeout = Long.MAX_VALUE;
+//            
+//        }
+//        
+//        // tokenize the query.
+//        final TermFrequencyData qdata;
+//        {
+//            
+//            final TokenBuffer buffer = new TokenBuffer(1, this);
+//            
+//            /*
+//             * If we are using prefix match (* operator) then we don't want
+//             * to filter stopwords from the search query.
+//             */
+//            final boolean filterStopwords = !prefixMatch;
+//            
+//            index(buffer, Long.MIN_VALUE/* docId */,
+//                    Integer.MIN_VALUE/* fieldId */, languageCode,
+//                    new StringReader(query), filterStopwords);
+//
+//            if (buffer.size() == 0) {
+//
+//                /*
+//                 * There were no terms after stopword extration.
+//                 */
+//
+//                log.warn("No terms after stopword extraction: query=" + query);
+//
+//                final long elapsed = System.currentTimeMillis() - begin;
+//
+//                return new Hiterator<Hit>(Arrays.asList(new Hit[] {}), elapsed,
+//                        minCosine, maxRank);
+//
+//            }
+//            
+//            qdata = buffer.get(0);
+//            
+//            qdata.normalize();
+//            
+//        }
+//        
+//        final ConcurrentHashMap<Long/*docId*/,Hit> hits;
+//        {
+//       
+//            // @todo use size of collection as upper bound.
+//            final int initialCapacity = Math.min(maxRank,10000);
+//            
+//            hits = new ConcurrentHashMap<Long, Hit>(initialCapacity);
+//            
+//        }
+//
+//        // run the queries.
+//        {
+//
+//            final List<Callable<Object>> tasks = new ArrayList<Callable<Object>>(
+//                    qdata.distinctTermCount());
+//
+//            for (TermMetadata md : qdata.terms.values()) {
+//
+//                tasks.add(new ReadIndexTask(md.termText(), prefixMatch,
+//                        md.localTermWeight, this, hits));
+//
+//            }
+//
+//            final ExecutionHelper<Object> executionHelper = new ExecutionHelper<Object>(
+//                    getExecutorService(), timeout, unit);
+//
+//            try {
+//
+//                executionHelper.submitTasks(tasks);
+//                
+//            } catch (InterruptedException ex) {
+//                
+//                log.warn("Interrupted - only partial results will be returned.");
+//                
+//            } catch (ExecutionException ex) {
+//
+//                throw new RuntimeException(ex);
+//                
+//            }
+//
+//        }
+//
+//        /*
+//         * If match all is specified, remove any hits with a term count less
+//         * than the number of search tokens.
+//         */
+//        if (matchAllTerms) {
+//        	
+//	        final int nterms = qdata.terms.size();
+//	        
+//	        if (log.isInfoEnabled())
+//	        	log.info("nterms: " + nterms);
+//	        
+//	        final Iterator<Map.Entry<Long,Hit>> it = hits.entrySet().iterator();
+//	        while (it.hasNext()) {
+//	        	final Hit hit = it.next().getValue();
+//		        if (log.isInfoEnabled())
+//		        	log.info("hit terms: " + hit.getTermCount());
+//	        	if (hit.getTermCount() != nterms)
+//	        		it.remove();
+//	        }
+//	        
+//        }
+//        
+//        // #of hits.
+//        final int nhits = hits.size();
+//        
+//        if (nhits == 0) {
+//
+//            log.warn("No hits: languageCode=[" + languageCode + "], query=["
+//                    + query + "]");
+//            
+//        }
+//        
+//        /*
+//         * Rank order the hits by relevance.
+//         * 
+//         * @todo consider moving documents through a succession of N pools where
+//         * N is the #of distinct terms in the query. The read tasks would halt
+//         * if the size of the pool for N terms reached maxRank. This might (or
+//         * might not) help with triage since we could process hits by pool and
+//         * only compute the cosines for one pool at a time until we had enough
+//         * hits.
+//         */
+//        
+//        if (log.isInfoEnabled())
+//            log.info("Rank ordering "+nhits+" hits by relevance");
+//        
+//        Hit[] a = hits.values().toArray(new Hit[nhits]);
+//        
+//        Arrays.sort(a);
+//
+//        /*
+//         * If maxCosine is specified, prune the hits that are above the max
+//         */
+//        if (maxCosine < 1.0d) {
+//
+//        	// find the first occurrence of a hit that is <= maxCosine
+//        	int i = 0;
+//        	for (Hit h : a) {
+//        		if (h.getCosine() <= maxCosine)
+//        			break;
+//        		i++;
+//        	}
+//        	
+//        	// no hits with relevance less than maxCosine
+//        	if (i == a.length) {
+//        		
+//        		a = new Hit[0];
+//        		
+//        	} else {
+//        	
+//	        	// copy the hits from that first occurrence to the end
+//	        	final Hit[] tmp = new Hit[a.length - i];
+//	        	System.arraycopy(a, i, tmp, 0, tmp.length);
+//	        	
+//	        	a = tmp;
+//	        	
+//        	}
+//        	
+//        }
+//
+//        /*
+//         * If minRank is specified, prune the hits that below the min
+//         */
+//        if (minRank > 1) {
+//
+//        	// no hits above minRank
+//        	if (minRank > a.length) {
+//        		
+//        		a = new Hit[0];
+//        		
+//        	} else {
+//        	
+//	        	// copy the hits from the minRank to the end
+//	        	final Hit[] tmp = new Hit[a.length - (minRank-1)];
+//	        	System.arraycopy(a, minRank-1, tmp, 0, tmp.length);
+//	        	
+//	        	a = tmp;
+//	        	
+//        	}
+//        	
+//        }
+//
+//        final long elapsed = System.currentTimeMillis() - begin;
+//        
+//        if (log.isInfoEnabled())
+//            log.info("Done: " + nhits + " hits in " + elapsed + "ms");
+//    	
+//        /*
+//         * Note: The caller will only see those documents which satisfy both
+//         * constraints (minCosine and maxRank). Results below a threshold will
+//         * be pruned. Any relevant results exceeding the maxRank will be pruned.
+//         */
+//        return new Hiterator<Hit>(Arrays.asList(a), 
+//        		minCosine,  maxRank-minRank+1);
+
+        
+		final Hit[] a = _search(query, languageCode, prefixMatch, minCosine,
+				maxCosine, minRank, maxRank, matchAllTerms, timeout, unit);
+    	
+        return new Hiterator<Hit>(Arrays.asList(a), 0.0d, Integer.MAX_VALUE); 
+
+    }
+    
+    public int count(final String query, final String languageCode,
+            final boolean prefixMatch, 
+            final double minCosine, final double maxCosine,
+            final int minRank, final int maxRank, final boolean matchAllTerms,
+            long timeout, final TimeUnit unit) {
+    	
+		final Hit[] a = _search(query, languageCode, prefixMatch, minCosine,
+				maxCosine, minRank, maxRank, matchAllTerms, timeout, unit);
+		
+		return a.length;
+		
+    }
+    
+    private Hit[] _search(
+    		final String query, final String languageCode, 
+    		final boolean prefixMatch, 
+            final double minCosine, final double maxCosine,
+            final int minRank, final int maxRank, 
+            final boolean matchAllTerms, long timeout, final TimeUnit unit) {
 
         final long begin = System.currentTimeMillis();
         
@@ -1033,10 +1294,10 @@ public class FullTextIndex extends AbstractRelation {
         if (minCosine < 0d || minCosine > 1d)
             throw new IllegalArgumentException();
 
-        if (maxCosine < 0d || maxCosine > 1d)
+        if (minRank <= 0 || maxRank <= 0)
             throw new IllegalArgumentException();
 
-        if (maxRank <= 0)
+        if (minRank > maxRank)
             throw new IllegalArgumentException();
 
         if (timeout < 0L)
@@ -1047,7 +1308,10 @@ public class FullTextIndex extends AbstractRelation {
         
         if (log.isInfoEnabled())
             log.info("languageCode=[" + languageCode + "], text=[" + query
-                    + "], minCosine=" + minCosine + ", maxRank=" + maxRank
+                    + "], minCosine=" + minCosine 
+                    + ", maxCosine=" + maxCosine
+                    + ", minRank=" + minRank
+                    + ", maxRank=" + maxRank
                     + ", matchAllTerms=" + matchAllTerms
                     + ", timeout=" + timeout + ", unit=" + unit);
 
@@ -1082,10 +1346,7 @@ public class FullTextIndex extends AbstractRelation {
 
                 log.warn("No terms after stopword extraction: query=" + query);
 
-                final long elapsed = System.currentTimeMillis() - begin;
-
-                return new Hiterator<Hit>(Arrays.asList(new Hit[] {}), elapsed,
-                        minCosine, maxRank);
+                return new Hit[] {};
 
             }
             
@@ -1146,15 +1407,22 @@ public class FullTextIndex extends AbstractRelation {
 	        final int nterms = qdata.terms.size();
 	        
 	        if (log.isInfoEnabled())
-	        	log.info("nterms: " + nterms);
+	        	log.info("matchAll=true, nterms=" + nterms);
 	        
 	        final Iterator<Map.Entry<Long,Hit>> it = hits.entrySet().iterator();
+	        
 	        while (it.hasNext()) {
+	        	
 	        	final Hit hit = it.next().getValue();
-		        if (log.isInfoEnabled())
+	        	
+		        if (log.isInfoEnabled()) {
 		        	log.info("hit terms: " + hit.getTermCount());
-	        	if (hit.getTermCount() != nterms)
+		        }
+		        
+	        	if (hit.getTermCount() != nterms) {
 	        		it.remove();
+	        	}
+	        	
 	        }
 	        
         }
@@ -1166,6 +1434,8 @@ public class FullTextIndex extends AbstractRelation {
 
             log.warn("No hits: languageCode=[" + languageCode + "], query=["
                     + query + "]");
+            
+            return new Hit[] {};
             
         }
         
@@ -1203,7 +1473,7 @@ public class FullTextIndex extends AbstractRelation {
         	// no hits with relevance less than maxCosine
         	if (i == a.length) {
         		
-        		a = new Hit[0];
+        		return new Hit[] {};
         		
         	} else {
         	
@@ -1217,18 +1487,80 @@ public class FullTextIndex extends AbstractRelation {
         	
         }
 
+        /*
+         * If minCosine is specified, prune the hits that are below the min
+         */
+        if (minCosine > 0.0d) {
+
+        	// find the first occurrence of a hit that is < minCosine
+        	int i = 0;
+        	for (Hit h : a) {
+        		if (h.getCosine() < minCosine)
+        			break;
+        		i++;
+        	}
+        	
+        	// no hits with relevance greater than minCosine
+        	if (i == 0) {
+        		
+        		return new Hit[] {};
+        		
+        	} else if (i < a.length) {
+        	
+	        	// copy the hits from 0 up to that first occurrence
+	        	final Hit[] tmp = new Hit[i];
+	        	System.arraycopy(a, 0, tmp, 0, tmp.length);
+	        	
+	        	a = tmp;
+	        	
+        	}
+        	
+        }
+
+        /*
+         * If minRank is specified, prune the hits that rank higher than the min
+         */
+        if (minRank > 1) {
+
+        	// no hits above minRank
+        	if (minRank > a.length) {
+        		
+        		return new Hit[] {};
+        		
+        	} else {
+        	
+	        	// copy the hits from the minRank to the end
+	        	final Hit[] tmp = new Hit[a.length - (minRank-1)];
+	        	System.arraycopy(a, minRank-1, tmp, 0, tmp.length);
+	        	
+	        	a = tmp;
+	        	
+        	}
+        	
+        }
+
+        final int newMax = maxRank-minRank+1;
+        
+        /*
+         * If maxRank is specified, prune the hits that rank lower than the max
+         */
+        if (newMax < a.length) {
+
+        	// copy the hits from the minRank to the end
+        	final Hit[] tmp = new Hit[newMax];
+        	System.arraycopy(a, 0, tmp, 0, tmp.length);
+        	
+        	a = tmp;
+        	
+        }
+
         final long elapsed = System.currentTimeMillis() - begin;
         
         if (log.isInfoEnabled())
-            log.info("Done: " + nhits + " hits in " + elapsed + "ms");
+            log.info("Done: " + a.length + " hits in " + elapsed + "ms");
 
-        /*
-         * Note: The caller will only see those documents which satisfy both
-         * constraints (minCosine and maxRank). Results below a threshold will
-         * be pruned. Any relevant results exceeding the maxRank will be pruned.
-         */
-        return new Hiterator<Hit>(Arrays.asList(a), elapsed, minCosine, maxRank);
-
+        return a;
+        
     }
     
     /*

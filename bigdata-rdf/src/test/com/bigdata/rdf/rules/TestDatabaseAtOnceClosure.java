@@ -597,36 +597,40 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
     protected void doFixedPointTest(final String[] resources,
             final AbstractTripleStore closureStore) throws Exception {
             
-        /*
-         * Gets loaded with the entailments computed by Sesame 2.
-         */
-        final TempTripleStore groundTruth;
-        {
-         
-            final Properties tmp = new Properties();
-            
-            tmp.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
-                    NoAxioms.class.getName());
-
-            groundTruth = new TempTripleStore(tmp);
-            
-        }
+        TempTripleStore groundTruth = null;
 
         try {
+
+            /*
+             * Setup [groundTruth], which gets loaded with the entailments
+             * computed by Sesame 2.
+             */
+            {
+
+                final Properties tmp = new Properties();
+
+                tmp
+                        .setProperty(
+                                com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                                NoAxioms.class.getName());
+
+                groundTruth = new TempTripleStore(tmp);
+
+            }
 
         	{ // use the Sesame2 inferencer to get ground truth
         		
                 int numSesame2Stmts = 0;
                 
-	            StatementBuffer buf = new StatementBuffer(groundTruth ,10);
+                final StatementBuffer buf = new StatementBuffer(groundTruth ,10);
 	            
-	            Repository sesame2 = new SailRepository(
+	            final Repository sesame2 = new SailRepository(
 	                    new ForwardChainingRDFSInferencer(
 	                    new MemoryStore()));
 	            
 	            sesame2.initialize();
 	            
-	            RepositoryConnection cxn = sesame2.getConnection();
+	            final RepositoryConnection cxn = sesame2.getConnection();
 	            
 	            cxn.setAutoCommit(false);
 	            
@@ -688,12 +692,12 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 	            	
 	            	cxn.commit();
 	            	
-	            	RepositoryResult<Statement> stmts = 
+	            	final RepositoryResult<Statement> stmts = 
 	            		cxn.getStatements(null, null, null, true);
 	            	
 	            	while(stmts.hasNext()) {
 	            		
-	            		Statement stmt = stmts.next();
+	            		final Statement stmt = stmts.next();
 	            		
 	            		buf.add(stmt.getSubject(), stmt.getPredicate(), 
 	            				stmt.getObject());
@@ -818,15 +822,18 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
              * entailments) into a TempTripleStore and then compare that
              * TempTripleStore to the data from Sesame2.
              */
-            final TempTripleStore tmp = TripleStoreUtility.bulkExport(closureStore);
-
-            assertTrue(TripleStoreUtility.modelsEqual(groundTruth, tmp));
-            
-            tmp.__tearDownUnitTest();
+            final TempTripleStore tmp = TripleStoreUtility
+                    .bulkExport(closureStore);
+            try {
+                assertTrue(TripleStoreUtility.modelsEqual(groundTruth, tmp));
+            } finally {
+                tmp.__tearDownUnitTest();
+            }
             
         } finally {
-            
-            groundTruth.__tearDownUnitTest();
+
+            if (groundTruth != null)
+                groundTruth.__tearDownUnitTest();
             
         }
         

@@ -376,7 +376,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         return globalRowStoreHelper.getGlobalRowStore();
         
     }
-    private GlobalRowStoreHelper globalRowStoreHelper = new GlobalRowStoreHelper(this); 
+    final private GlobalRowStoreHelper globalRowStoreHelper = new GlobalRowStoreHelper(this); 
 
     public BigdataFileSystem getGlobalFileSystem() {
 
@@ -385,7 +385,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         return globalFileSystemHelper.getGlobalFileSystem();
         
     }
-    private GlobalFileSystemHelper globalFileSystemHelper = new GlobalFileSystemHelper(this); 
+    final private GlobalFileSystemHelper globalFileSystemHelper = new GlobalFileSystemHelper(this); 
 
     public DefaultResourceLocator getResourceLocator() {
 
@@ -410,7 +410,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         return resourceLockManager;
         
     }
-    private ResourceLockService resourceLockManager = new ResourceLockService();
+    final private ResourceLockService resourceLockManager = new ResourceLockService();
 
     public void close() {
 

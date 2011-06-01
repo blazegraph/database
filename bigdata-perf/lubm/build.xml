@@ -119,7 +119,7 @@
 			<jvmarg value="-Dlubm.warmUp=false" />
 			<jvmarg value="-Dlubm.queryTime=10" />
 			<jvmarg value="-Dlubm.queryParallel=1" />
-			<jvmarg value="-Dlog4j.configuration=file:log4j.properties"/>
+			<jvmarg value="-Dlog4j.configuration=file:src/resources/logging/log4j.properties"/>
 			<arg value="query" />
 			<arg value="${lubm.configFile}" />
 			<arg value="${lubm.queryFile}" />

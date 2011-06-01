@@ -1112,7 +1112,7 @@ public class BytesUtil {
 	 * @return The integer extracted from the specified bit range.
 	 */
 	public static int getBits(final byte[] a, final int off, final int len) {
-	
+		
 		if (a == null)
 			throw new IllegalArgumentException();
 		if (off < 0)
@@ -1146,7 +1146,7 @@ public class BytesUtil {
 		long v = 0L; // buffer for up to 5 source bytes.
 		final int nbytes = toByteOffset - fromByteOffset + 1;
 		for (int i = fromByteOffset, j = 1; i <= toByteOffset; i++, j++) {
-			final byte x = a[i]; // next byte.
+			final long x = 0xFF & a[i]; // next byte.
 			final int shift = ((nbytes - j) << 3); //  
 			v |= (x << shift); // mask off high bits and shift into buf.
 		} // next byte in the byte[].
@@ -1160,6 +1160,20 @@ public class BytesUtil {
 		return w;
 	}
 
+	public static long getBits64(final byte[] a, final int off, final int len) {
+		long ret = 0;
+		if (len <= 32) {
+			ret = 0xFFFFFFFFL & getBits(a, off, len);
+		} else {
+			int hilen = len - 32;
+			ret = getBits(a, off, hilen);
+			ret <<= 32;
+			ret |= (0xFFFFFFFFL & getBits(a, off+hilen, 32));
+		}
+		
+		return ret;
+	}
+	
 	/**
 	 * Return the n-bit integer corresponding to the inclusive bit range of the
 	 * byte[]. Bit ZERO (0) is the Most Significant Bit (MSB). Bit positions

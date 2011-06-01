@@ -98,7 +98,7 @@ public class TestSparseRowStore extends ProxyTestCase<IIndexManager> implements
         
         if (ndx == null) {
 
-            if (INFO)
+            if(log.isInfoEnabled())
                 log.info("Registering index: " + name);
             
             /*
@@ -268,7 +268,7 @@ public class TestSparseRowStore extends ProxyTestCase<IIndexManager> implements
 
                 final KeyDecoder keyDecoder = new KeyDecoder(key);
                 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info(keyDecoder.getColumnName() + "="
                         + ValueType.decode(val) + " (" + keyDecoder.timestamp
                         + ")");
@@ -316,7 +316,7 @@ public class TestSparseRowStore extends ProxyTestCase<IIndexManager> implements
         
         } finally {
             
-            try {store.destroy();} catch(Throwable t) {log.error(t);}
+            store.destroy();
             
         }
         
@@ -339,11 +339,7 @@ public class TestSparseRowStore extends ProxyTestCase<IIndexManager> implements
 
         } finally {
 
-            try {
-                store.destroy();
-            } catch (Throwable t) {
-                log.error(t);
-            }
+            store.destroy();
 
         }
 
@@ -612,12 +608,8 @@ public class TestSparseRowStore extends ProxyTestCase<IIndexManager> implements
 
         } finally {
 
-            try {
-                store.destroy();
-            } catch (Throwable t) {
-                log.error(t);
-            }
-
+            store.destroy();
+            
         }
 
     }
@@ -758,11 +750,7 @@ public class TestSparseRowStore extends ProxyTestCase<IIndexManager> implements
             
         } finally {
             
-            try {
-                store.destroy();
-            } catch (Throwable t) {
-                log.error(t);
-            }
+            store.destroy();
             
         }
         
@@ -869,7 +857,7 @@ public class TestSparseRowStore extends ProxyTestCase<IIndexManager> implements
         
         } finally {
             
-            try {store.destroy();} catch(Throwable t) {log.error(t);}
+            store.destroy();
             
         }
 
@@ -1164,7 +1152,7 @@ public class TestSparseRowStore extends ProxyTestCase<IIndexManager> implements
 
         } finally {
 
-            try {store.destroy();} catch(Throwable t) {log.error(t);}
+            store.destroy();
 
         }
         
@@ -1249,7 +1237,7 @@ public class TestSparseRowStore extends ProxyTestCase<IIndexManager> implements
 
         } finally {
 
-            try {store.destroy();} catch(Throwable t) {log.error(t);}
+            store.destroy();
 
         }
 
@@ -1364,11 +1352,7 @@ public class TestSparseRowStore extends ProxyTestCase<IIndexManager> implements
 
         } finally {
 
-            try {
-                store.destroy();
-            } catch (Throwable t) {
-                log.error(t);
-            }
+            store.destroy();
 
         }
 
@@ -1483,12 +1467,8 @@ public class TestSparseRowStore extends ProxyTestCase<IIndexManager> implements
 
         } finally {
 
-            try {
-                store.destroy();
-            } catch (Throwable t) {
-                log.error(t);
-            }
-
+            store.destroy();
+            
         }
 
     }
@@ -1496,21 +1476,22 @@ public class TestSparseRowStore extends ProxyTestCase<IIndexManager> implements
     /**
      * Verify that two rows have the same column values.
      */
-    protected void assertSameValues(Map<String,Object> expected, Map<String,Object> actual) {
-        
+    protected void assertSameValues(final Map<String, Object> expected,
+            final Map<String, Object> actual) {
+
         assertEquals("#of values", expected.size(), actual.size() );
         
-        Iterator<String> itr = expected.keySet().iterator();
+        final Iterator<String> itr = expected.keySet().iterator();
 
         while(itr.hasNext()) {
             
-            String col = itr.next();
+            final String col = itr.next();
             
             assertTrue("No value: col=" + col, actual.containsKey(col));
             
-            Object expectedValue = expected.get(col);
+            final Object expectedValue = expected.get(col);
 
-            Object actualValue = actual.get(col);
+            final Object actualValue = actual.get(col);
             
             assertNotNull(col+" is null.", actualValue);
             

@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.data;
 
 import it.unimi.dsi.bits.Fast;
-import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.io.OutputBitStream;
 
 import java.io.Externalizable;
@@ -406,6 +405,9 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
         /** The #of bits in the delta encoding of the childEntryCount[]. */
         private final byte childEntryCountBits;
         
+        /** The minimum across the childEntryCount[]. */
+        private final long minChildEntryCount;
+        
         final public AbstractFixedByteArrayBuffer data() {
             
             return b;
@@ -497,6 +499,8 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
 				// Not used in this version.
 				childEntryCountBits = -1;
 			}
+			
+			minChildEntryCount = buf.getLong(O_childEntryCount + 1);
 
             // save reference to buffer
             this.b = buf;
@@ -588,6 +592,8 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
 				childEntryCountBits = -1;
 			}
 
+			minChildEntryCount = buf.getLong(O_childEntryCount + 1);
+			
 			// save reference to buffer
             this.b = buf;
 
@@ -743,34 +749,45 @@ public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
 				return b.getInt(O_childEntryCount + index * Bytes.SIZEOF_INT);
 
             } else {
-            	// Note: O_childEntryCount is [nbits], which is one byte.
-				final long min = b.getLong(O_childEntryCount + 1/*nbits*/);
+                // Note: O_childEntryCount is [nbits], which is one byte.
+//                final long min = b.getLong(O_childEntryCount + 1/* nbits */);
 
-                final InputBitStream ibs = b.getInputBitStream();
-                try {
+                final long bitpos = ((O_childEntryCount + 1 + Bytes.SIZEOF_LONG) << 3)
+                        + ((long) index * childEntryCountBits);
 
-					final long bitpos = ((O_childEntryCount + 1 + Bytes.SIZEOF_LONG) << 3)
-							+ ((long) index * childEntryCountBits);
+//                if (childEntryCountBits <= 32) {
 
-                    ibs.position(bitpos);
+                final long bitIndex = (b.off() << 3) + bitpos;
 
-                    final long deltat = ibs
-                            .readLong(childEntryCountBits/* nbits */);
+                final long deltat = BytesUtil.getBits64(b.array(),
+                        (int) bitIndex, childEntryCountBits);
 
-                    return min + deltat;
-                    
-                } catch(IOException ex) {
-                    
-                    throw new RuntimeException(ex);
-                    
-    // close not required for IBS backed by byte[] and has high overhead.
-//                } finally {
-//                    try {
-//                        ibs.close();
-//                    } catch (IOException ex) {
-//                        log.error(ex);
-//                    }
-                }
+                return minChildEntryCount + deltat;
+
+//                }
+
+//                final InputBitStream ibs = b.getInputBitStream();
+//                try {
+//
+//                    ibs.position(bitpos);
+//
+//                    final long deltat = ibs
+//                            .readLong(childEntryCountBits/* nbits */);
+//
+//                    return minChildEntryCount + deltat;
+//                    
+//                } catch(IOException ex) {
+//                    
+//                    throw new RuntimeException(ex);
+//                    
+//    // close not required for IBS backed by byte[] and has high overhead.
+////                } finally {
+////                    try {
+////                        ibs.close();
+////                    } catch (IOException ex) {
+////                        log.error(ex);
+////                    }
+//                }
             	
             }
 

@@ -104,8 +104,9 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
                 final Hiterator itr = ndx.search("The quick brown dog",
                         languageCode, false/* prefixMatch */);
                 
-                if(INFO) log.info("hits:" + itr);
-                
+                if (log.isInfoEnabled())
+                    log.info("hits:" + itr);
+
                 assertEquals(2, itr.size());
 
                 assertTrue(itr.hasNext());
@@ -131,7 +132,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
                 final Hiterator itr = ndx.search("The qui bro do",
                         languageCode, true/*prefixMatch*/);
                 
-                if(INFO) log.info("hits:" + itr);
+                if(log.isInfoEnabled()) log.info("hits:" + itr);
                 
                 assertEquals(2, itr.size());
 
@@ -158,7 +159,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
                 final Hiterator itr = ndx
                         .search("brown", languageCode, false/* prefixMatch */);
 
-                if (INFO)
+                if(log.isInfoEnabled())
                     log.info("hits:" + itr);
 
                 assertEquals(2, itr.size());
@@ -173,7 +174,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
                 final Hiterator itr = ndx
                         .search("brown", languageCode, true/* prefixMatch */);
 
-                if(INFO) log.info("hits:" + itr);
+                if(log.isInfoEnabled()) log.info("hits:" + itr);
 
                 assertEquals(2, itr.size());
 
@@ -187,7 +188,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
                 final Hiterator itr = ndx
                         .search("bro", languageCode, true/* prefixMatch */);
 
-                if(INFO) log.info("hits:" + itr);
+                if(log.isInfoEnabled()) log.info("hits:" + itr);
 
                 assertEquals(2, itr.size());
 
@@ -201,7 +202,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
                 final Hiterator itr = ndx
                         .search("bro", languageCode, false/* prefixMatch */);
 
-                if (INFO)
+                if(log.isInfoEnabled())
                     log.info("hits:" + itr);
 
                 assertEquals(0, itr.size());
@@ -216,7 +217,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
                 final Hiterator itr = ndx
                         .search("qui", languageCode, true/* prefixMatch */);
 
-                if (INFO)
+                if(log.isInfoEnabled())
                     log.info("hits:" + itr);
 
                 assertEquals(1, itr.size());
@@ -231,7 +232,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
                 final Hiterator itr = ndx
                         .search("qui", languageCode, false/* prefixMatch */);
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("hits:" + itr);
 
                 assertEquals(0, itr.size());
@@ -246,7 +247,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
                 final Hiterator itr = ndx
                         .search("quick", languageCode, false/* prefixMatch */);
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("hits:" + itr);
 
                 assertEquals(1, itr.size());
