@@ -40,6 +40,17 @@ import com.bigdata.rdf.model.BigdataValue;
  * "view" of {@link IV} for a {@link Literal} or a {@link URI}, such as one
  * where the {@link BigdataValue} is transformed into a simple literal (no
  * datatype, no language tag) using the URI's toString() or the Literal's label.
+ * <p>
+ * WrappedIVs don't get shipped around in scale-out, they never become part of
+ * the binding sets. They are intermediate objects passed between value
+ * expressions inside a constraint, which are all executed at the same time in
+ * one place. For example:
+ * <pre>
+ * FILTER(str(?o) = "foo")
+ * </pre>
+ * There is a CompareBOp wrapping a StrBOp - the StrBOp evaluates to a WrappedIV
+ * with an altView of the BigdataValue (the plain literal form) and the
+ * CompareBOp uses that WrappedIV as its left operand and returns true or false.
  */
 public class WrappedIV implements IV {
 
