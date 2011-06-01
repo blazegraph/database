@@ -89,13 +89,13 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.LexiconConfiguration;
 import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.XSDStringExtension;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -119,21 +119,9 @@ import cutthecrap.utils.striterators.Striterator;
 
 /**
  * The {@link LexiconRelation} handles all things related to the indices mapping
- * RDF {@link Value}s onto internal term identifiers.
- * <p>
- * The term2id index has all the distinct terms ever asserted. Those "terms"
- * include {s:p:o} keys for statements IFF statement identifiers are in use.
- * However, {@link BNode}s are NOT stored in the forward index, even though the
- * forward index is used to assign globally unique term identifiers for blank
- * nodes. See {@link BigdataValueFactoryImpl#createBNode()}.
- * <p>
- * The id2term index only has {@link URI}s and {@link Literal}s. It CAN NOT
- * used to resolve either {@link BNode}s or statement identifiers. In fact,
- * there is NO means to resolve either a statement identifier or a blank node.
- * Both are always assigned (consistently) within a context in which their
- * referent (if any) is defined. For a statement identifier the referent MUST be
- * defined by an instance of the statement itself. The RIO parser integration
- * and the {@link IStatementBuffer} implementations handle all of this stuff.
+ * external RDF {@link Value}s onto {@link IV}s (internal values)s and provides
+ * methods for efficient materialization of external RDF {@link Value}s from
+ * {@link IV}s
  * <p>
  * See {@link KeyBuilder.Options} for properties that control how the sort keys
  * are generated for the {@link URI}s and {@link Literal}s.
@@ -144,7 +132,7 @@ import cutthecrap.utils.striterators.Striterator;
 public class LexiconRelation extends AbstractRelation<BigdataValue> 
         implements IDatatypeURIResolver {
 
-    final protected static Logger log = Logger.getLogger(LexiconRelation.class);
+    final private static Logger log = Logger.getLogger(LexiconRelation.class);
 
     private final Set<String> indexNames;
 
@@ -421,6 +409,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     AbstractTripleStore.Options.INLINE_LITERALS,
                     AbstractTripleStore.Options.DEFAULT_INLINE_LITERALS));
 
+            maxInlineStringLength = Integer.parseInt(getProperty(
+                    AbstractTripleStore.Options.MAX_INLINE_STRING_LENGTH,
+                    AbstractTripleStore.Options.DEFAULT_MAX_INLINE_STRING_LENGTH));
+            
             inlineBNodes = storeBlankNodes && Boolean.parseBoolean(getProperty(
                     AbstractTripleStore.Options.INLINE_BNODES,
                     AbstractTripleStore.Options.DEFAULT_INLINE_BNODES));
@@ -439,9 +431,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     determineExtensionFactoryClass();
                 final IExtensionFactory xFactory = xfc.newInstance();
                 
-                lexiconConfiguration = new LexiconConfiguration(
-                        inlineLiterals, inlineBNodes, inlineDateTimes, xFactory);
-                
+                lexiconConfiguration = new LexiconConfiguration(inlineLiterals,
+                        maxInlineStringLength, inlineBNodes, inlineDateTimes,
+                        xFactory);
+
             } catch (InstantiationException e) {
                 throw new IllegalArgumentException(
                         AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
@@ -608,6 +601,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * {@link AbstractTripleStore.Options#INLINE_LITERALS}
      */
     final private boolean inlineLiterals;
+
+    /**
+     * The maximum length of <code>xsd:string</code> literals which will be
+     * inlined into the statement indices. The {@link XSDStringExtension} is
+     * registered when GT ZERO.
+     */
+    final private int maxInlineStringLength;
     
     /**
      * Are bnodes being inlined into the statement indices.
@@ -638,6 +638,16 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     final public boolean isInlineLiterals() {
         
         return inlineLiterals;
+        
+    }
+
+    /**
+     * Return the maximum length a string value which may be inlined into the
+     * statement indices.
+     */
+    final public int getMaxInlineStringLength() {
+        
+        return maxInlineStringLength;
         
     }
 
@@ -1702,9 +1712,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * operation is only supported when the {@link ITextIndexer} uses the
      * {@link FullTextIndex} class.
      * 
-     * TODO This will have to be redone once we finish
+     * TODO TERMS REFACTOR: This will have to be redone once we finish
      * http://sourceforge.net/apps/trac/bigdata/ticket/109 (store large literals
-     * as blobs) since the ID2TERM index will disappear.
+     * as blobs) since the ID2TERM index will disappear. [Also, if we are fully
+     * inlining literals then we will have to scan one of the statement indices
+     * as well!]
      */
     @SuppressWarnings("unchecked")
     public void rebuildTextIndex() {
@@ -1987,7 +1999,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * Task resolves a chunk of terms against the lexicon.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private class ResolveTermTask implements Callable<Void> {
         

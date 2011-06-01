@@ -575,9 +575,9 @@ public class IVUtility {
 
                 switch (AbstractIV.getInternalValueTypeEnum(flags)) {
                 case URI:
-                    return new URIWithNamespaceIV<BigdataURI>(delegate, extensionIV);
+                    return new URINamespaceIV<BigdataURI>(delegate, extensionIV);
                 case LITERAL:
-                    return new LiteralWithDatatypeIV<BigdataLiteral>(delegate, extensionIV);
+                    return new LiteralDatatypeIV<BigdataLiteral>(delegate, extensionIV);
                 default:
                     throw new AssertionError();
                 }

@@ -97,23 +97,23 @@ public enum DTE {
      * not preserved.
      */
     XSDBoolean((byte) 0, Bytes.SIZEOF_BYTE, Boolean.class,
-            XSD.BOOLEAN.stringValue(), DTEFlags.NOFLAGS), //
+            XSD.BOOLEAN, DTEFlags.NOFLAGS), //
 
     /** The "inline" value is a signed byte (xsd:byte). */
     XSDByte((byte) 1, Bytes.SIZEOF_BYTE, Byte.class,
-            XSD.BYTE.stringValue(), DTEFlags.NUMERIC), //
+            XSD.BYTE, DTEFlags.NUMERIC), //
 
     /** The "inline" value is a signed short (xsd:short). */
     XSDShort((byte) 2, Bytes.SIZEOF_SHORT, Short.class,
-            XSD.SHORT.stringValue(), DTEFlags.NUMERIC), //
+            XSD.SHORT, DTEFlags.NUMERIC), //
 
     /** The "inline" value is a signed 4 byte integer (xsd:int). */
     XSDInt((byte) 3, Bytes.SIZEOF_INT, Integer.class,
-            XSD.INT.stringValue(), DTEFlags.NUMERIC), //
+            XSD.INT, DTEFlags.NUMERIC), //
 
     /** The "inline" value is a signed 8 byte integer (xsd:long). */
     XSDLong((byte) 4, Bytes.SIZEOF_LONG, Long.class,
-            XSD.LONG.stringValue(), DTEFlags.NUMERIC), //
+            XSD.LONG, DTEFlags.NUMERIC), //
 
     /*
      * unsigned byte, short, int, long.
@@ -121,22 +121,22 @@ public enum DTE {
 
     /** The "inline" value is an unsigned byte (xsd:unsignedByte). */
     XSDUnsignedByte((byte) 5, Bytes.SIZEOF_BYTE, Byte.class,
-            XSD.UNSIGNED_BYTE.stringValue(),
+            XSD.UNSIGNED_BYTE,
             DTEFlags.UNSIGNED_NUMERIC), //
 
     /** The "inline" value is a unsigned short (xsd:unsignedShort). */
     XSDUnsignedShort((byte) 6, Bytes.SIZEOF_SHORT, Short.class,
-            XSD.UNSIGNED_SHORT.stringValue(),
+            XSD.UNSIGNED_SHORT,
             DTEFlags.UNSIGNED_NUMERIC), //
 
     /** The "inline" value is an unsigned 4 byte integer (xsd:unsignedInt). */
     XSDUnsignedInt((byte) 7, Bytes.SIZEOF_INT, Integer.class,
-            XSD.UNSIGNED_INT.stringValue(),
+            XSD.UNSIGNED_INT,
             DTEFlags.UNSIGNED_NUMERIC), //
 
     /** The "inline" value is an unsigned 8 byte integer (xsd:unsignedLong). */
     XSDUnsignedLong((byte) 8, Bytes.SIZEOF_LONG, Long.class,
-            XSD.UNSIGNED_LONG.stringValue(),
+            XSD.UNSIGNED_LONG,
             DTEFlags.UNSIGNED_NUMERIC), //
             
     /*
@@ -148,14 +148,14 @@ public enum DTE {
      * (xsd:float).
      */
     XSDFloat((byte) 9, Bytes.SIZEOF_FLOAT, Float.class,
-            XSD.FLOAT.stringValue(), DTEFlags.NUMERIC), //
+            XSD.FLOAT, DTEFlags.NUMERIC), //
             
     /**
      * The "inline" value is a double precision floating point number
      * (xsd:double).
      */
     XSDDouble((byte) 10, Bytes.SIZEOF_DOUBLE, Double.class,
-            XSD.DOUBLE.stringValue(), DTEFlags.NUMERIC), //
+            XSD.DOUBLE, DTEFlags.NUMERIC), //
 
     /*
      * xsd:integer, xsd:decimal.
@@ -166,7 +166,7 @@ public enum DTE {
      * {@link BigInteger}.
      */
     XSDInteger((byte) 11, 0/* variable length */, BigInteger.class,
-            XSD.INTEGER.stringValue(), DTEFlags.NUMERIC), //
+            XSD.INTEGER, DTEFlags.NUMERIC), //
 
     /**
      * The "inline" value is an xsd:decimal. This is mostly equivalent to
@@ -177,7 +177,7 @@ public enum DTE {
      * represent the precision, we could not use xsd:decimal in an index!)
      */
     XSDDecimal((byte) 12, 0/* variable length */, BigDecimal.class,
-            XSD.DECIMAL.stringValue(), DTEFlags.NUMERIC), //
+            XSD.DECIMAL, DTEFlags.NUMERIC), //
 
     /*
      * custom intrinsic data types.
@@ -188,7 +188,7 @@ public enum DTE {
      * 
      * @see http://lists.xml.org/archives/xml-dev/201003/msg00027.html
      */
-    UUID((byte) 13, Bytes.SIZEOF_UUID, UUID.class, XSD.UUID.stringValue(),
+    UUID((byte) 13, Bytes.SIZEOF_UUID, UUID.class, XSD.UUID,
             DTEFlags.NOFLAGS), //
 
     /**
@@ -221,12 +221,8 @@ public enum DTE {
      * (basically, everything after the last '/' in the URI path or after the
      * '#' if there is a URI anchor).</dd>
      * </dl>
-     * 
-     * TODO Special case support for "short" language code literals by inlining
-     * a follow on language code for plain and language code literals and using
-     * a marker to indicate a "plain" literal.
      */
-    XSDString((byte) 14, 0/* len */, String.class, XSD.STRING.stringValue(),
+    XSDString((byte) 14, 0/* len */, String.class, XSD.STRING,
             DTEFlags.NOFLAGS), //
 
     /**
@@ -248,17 +244,17 @@ public enum DTE {
      *            The class of the Java object used to represent instances of
      *            the coded data type.
      * @param datatype
-     *            The string value of the well-known URI for the data type.
+     *            The well-known URI for the data type.
      * @param flags
      *            Some bit flags. See {@link #NUMERIC},
      *            {@link #UNSIGNED_NUMERIC}, etc.
      */
     private DTE(final byte v, final int len, final Class<?> cls,
-            final String datatype, final int flags) {
+            final URI datatypeURI, final int flags) {
         this.v = v;
         this.len = len;
         this.cls = cls;
-        this.datatype = datatype;
+        this.datatypeURI = datatypeURI;
         this.flags = flags;
     }
 
@@ -308,14 +304,36 @@ public enum DTE {
         }
     }
 
+    /**
+     * Return the {@link DTE} for the datatype {@link URI}.
+     * 
+     * @param datatype
+     *            The datatype {@link URI}.
+     *            
+     * @return The {@link DTE} for that datatype -or- {@link #Extension} if the
+     *         datatype is <code>null</code> (there is no specific datatype for
+     *         an extension since extensions by their nature can handle any
+     *         datatype) -or- <code>null</code> if the datatype {@link URI} is
+     *         none of the datatypes for which native support is provided.
+     */
     static final public DTE valueOf(final URI datatype) {
         /*
          * Note: This switch MUST correspond to the declarations above (you can
-         * not made the cases of the switch from [v] since it is not considered
+         * not make the cases of the switch from [v] since it is not considered
          * a to be constant by the compiler).
          * 
-         * Note: This masks off everything but the lower 4 bits.
+         * TODO Optimize using trie, weighted frequency lookup tree, hash map,
+         * etc. Also, the match will always be on the local name once we proof
+         * the namespace.
          */
+        if (datatype == null) {
+            /*
+             * Note: This is a bit of a rough spot in the API. There is no
+             * datatype associated with [Extension] since it is a place holder
+             * for any an extension for any datatype.
+             */
+            return Extension;
+        }
         if (datatype.equals(XSD.BOOLEAN))
             return XSDBoolean;
         if (datatype.equals(XSD.BYTE))
@@ -344,7 +362,11 @@ public enum DTE {
             return XSDDecimal;
         if (datatype.equals(XSD.UUID))
             return UUID;
-
+        if (datatype.equals(XSD.STRING))
+            return XSDString;
+        /*
+         * Not a known DTE datatype.
+         */
         return null;
     }
 
@@ -366,9 +388,9 @@ public enum DTE {
     private final Class<?> cls;
 
     /**
-     * The string value of the well-known URI for the data type.
+     * The well-known URI for the data type.
      */
-    private final String datatype;
+    private final URI datatypeURI;
 
     /**
      * Some bit flags.
@@ -408,11 +430,11 @@ public enum DTE {
     }
 
     /**
-     * The string value of the corresponding datatype URI.
+     * The corresponding datatype {@link URI}.
      */
-    final public String getDatatype() {
+    final public URI getDatatypeURI() {
 
-        return datatype;
+        return datatypeURI;
         
     }
 

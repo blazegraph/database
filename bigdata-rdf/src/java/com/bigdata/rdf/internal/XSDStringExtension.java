@@ -28,21 +28,32 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
- * This implementation of {@link IExtension} supports fully inlined xsd:string
- * values.
+ * This implementation of {@link IExtension} supports fully inlined
+ * <code>xsd:string</code> values.
  */
 public class XSDStringExtension<V extends BigdataValue> implements IExtension<V> {
 
     private final BigdataURI xsdStringURI;
+    private final int maxInlineStringLength;
     
-    public XSDStringExtension(final IDatatypeURIResolver resolver) {
+    public XSDStringExtension(final IDatatypeURIResolver resolver,
+            final int maxInlineStringLength) {
+
+        if (resolver == null)
+            throw new IllegalArgumentException();
+
+        if (maxInlineStringLength < 0)
+            throw new IllegalArgumentException();
 
         this.xsdStringURI = resolver.resolve(XSD.STRING);
+        
+        this.maxInlineStringLength = maxInlineStringLength;
         
     }
         
@@ -57,6 +68,11 @@ public class XSDStringExtension<V extends BigdataValue> implements IExtension<V>
         if (value instanceof Literal == false)
             throw new IllegalArgumentException();
         
+        if (value.stringValue().length() > maxInlineStringLength) {
+            // Too large to inline.
+            return null;
+        }    
+        
         final Literal lit = (Literal) value;
         
         final URI dt = lit.getDatatype();
@@ -66,15 +82,16 @@ public class XSDStringExtension<V extends BigdataValue> implements IExtension<V>
             throw new IllegalArgumentException();
         
         final String s = value.stringValue();
-        
-        final AbstractLiteralIV delegate = new InlineLiteralIV(//
+
+        final InlineLiteralIV<BigdataLiteral> delegate = new InlineLiteralIV<BigdataLiteral>(//
                 s, // label
                 null, // no language
                 null // no datatype
         );
 
-        return new ExtensionIV(delegate, (TermId) getDatatype().getIV());
-        
+        return new ExtensionIV<BigdataLiteral>(delegate, (TermId) getDatatype()
+                .getIV());
+
     }
     
     public V asValue(final ExtensionIV iv, final BigdataValueFactory vf) {

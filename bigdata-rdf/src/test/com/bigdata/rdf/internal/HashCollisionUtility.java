@@ -1005,6 +1005,7 @@ public class HashCollisionUtility {
 		 */
 		conf = new LexiconConfiguration<BigdataValue>(
 				true, // inlineLiterals
+				64,   // maxInlineStringLength
 				true, // inlineBNodes
 				false, // inlineDateTimes
 				xFactory // extension factory
@@ -1871,7 +1872,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 				final BigdataURI uri = (BigdataURI) value;
 
-				if (uri.getLocalNameLength() < conf.URI_INLINE_LIMIT) {
+                if (uri.getLocalNameLength() < conf.getMaxInlineStringLength()) {
 
 					/*
 					 * Ingore URI that will be inlined into the statement
@@ -1891,7 +1892,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				final Literal lit = (Literal) value;
 
 				if (// lit.getDatatype() == null &&
-				lit.getLabel().length() < conf.LITERAL_INLINE_LIMIT) {
+				lit.getLabel().length() < conf.getMaxInlineStringLength()) {
 
 					/*
 					 * Ignore Literal that will be inlined in the statement
@@ -1917,10 +1918,10 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				}
 
 			} else if (value instanceof BigdataBNode) {
-
+			    // TODO Also recognize when inline as [int] or [UUID].
 				final BigdataBNode bnode = (BigdataBNode) value;
 
-				if (bnode.getID().length() < conf.BNODE_INLINE_LIMIT) {
+				if (bnode.getID().length() < conf.getMaxInlineStringLength()) {
 
 					/*
 					 * Ignore blank nodes that will be inlined into the

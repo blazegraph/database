@@ -67,7 +67,7 @@ public class XSDIntegerIV<V extends BigdataLiteral> extends
 		if (v == null) {
 			final BigdataValueFactory f = lex.getValueFactory();
 			v = (V) f.createLiteral(value.toString(),//
-					f.createURI(DTE.XSDInteger.getDatatype()));
+					f.createURI(DTE.XSDInteger.getDatatypeURI().stringValue()));
 			v.setIV(this);
 			setValue(v);
 		}

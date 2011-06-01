@@ -67,7 +67,7 @@ public class XSDDecimalIV<V extends BigdataLiteral> extends
 		if (v == null) {
 			final BigdataValueFactory f = lex.getValueFactory();
 			v = (V) f.createLiteral(value.toPlainString(),//
-					f.createURI(DTE.XSDDecimal.getDatatype()));
+					f.createURI(DTE.XSDDecimal.getDatatypeURI().stringValue()));
 			v.setIV(this);
 			setValue(v);
 		}

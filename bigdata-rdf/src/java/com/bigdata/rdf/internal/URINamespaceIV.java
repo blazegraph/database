@@ -12,10 +12,10 @@ import com.bigdata.rdf.model.BigdataURI;
  * @version $Id$
  * @param <V>
  */
-public class URIWithNamespaceIV<V extends BigdataURI> extends
+public class URINamespaceIV<V extends BigdataURI> extends
         AbstractExtensionIV<V, URI> {
 
-    public URIWithNamespaceIV(final AbstractLiteralIV delegate,
+    public URINamespaceIV(final AbstractLiteralIV delegate,
             final TermId datatype) {
 
         super(VTE.URI, delegate, datatype);

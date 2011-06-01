@@ -39,16 +39,23 @@ import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.util.InnerCause;
 
 /**
- * An object which describes which kinds of RDF Values are inlined into the 
+ * An object which describes which kinds of RDF Values are inlined into the
  * statement indices and how other RDF Values are coded into the lexicon.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ *          TODO Unit tests for inlining behaviors for all valid configurations,
+ *          including verification that the {@link IV} was cached on the
+ *          caller's {@link BigdataValue}
  */
 public class LexiconConfiguration<V extends BigdataValue> 
         implements ILexiconConfiguration<V> {
@@ -56,278 +63,444 @@ public class LexiconConfiguration<V extends BigdataValue>
     private static final Logger log = 
         Logger.getLogger(LexiconConfiguration.class);
     
-    private final boolean inlineLiterals, inlineBNodes, inlineDateTimes;
+    private final boolean inlineLiterals, inlineBNodes;
+
+    /**
+     * The maximum length of a Unicode string which may be inlined into the
+     * statement indices. This applies to blank node IDs, literal labels
+     * (including the {@link XSDStringExtension}), local names of {@link URI}s,
+     * etc.
+     */
+    final private int maxInlineStringLength;
 
     private final IExtensionFactory xFactory;
     
-    private final Map<TermId, IExtension> termIds;
+    private final Map<TermId, IExtension<BigdataValue>> termIds;
 
-    private final Map<String, IExtension> datatypes;
+    private final Map<String, IExtension<BigdataValue>> datatypes;
 
-	/**
-	 * The maximum length of a {@link BNode#getID()} before the {@link BNode}
-	 * will no longer be inlined into the statement indices. This limit only
-	 * applies to blank nodes whose IDs are not recognized as either integers or
-	 * UUIDs since those are inlined using a different mechanism. Note that
-	 * inlining of the IDs is permissible even in TOLD_BNODES mode since the ID
-	 * will be preserved.
-	 * 
-	 * FIXME TERMS REFACTOR : Configure and support max length blank node inlining into the statement indices.
-	 */
-	final int BNODE_INLINE_LIMIT = 64;
+    /**
+     * Return the maximum length of a Unicode string which may be inlined into
+     * the statement indices. This applies to blank node IDs, literal labels
+     * (including the {@link XSDStringExtension}), local names of {@link URI}s,
+     * etc.
+     */
+    public int getMaxInlineStringLength() {
 
-	/**
-	 * The maximum length of a {@link URI#getLocalName()} before the {@link URI}
-	 * will no longer be inlined into the statement indices.
-	 * 
-	 * FIXME TERMS REFACTOR : Configure and support URI inlining into the statement indices.
-	 */
-	final int URI_INLINE_LIMIT = 64;
-
-	/**
-	 * The maximum length of a plain, languageCode, or datatype literal's
-	 * {@link Literal#getLabel()} before the {@link Literal} will no longer be
-	 * inlined into the statement indices.
-	 * <p>
-	 * Note: When inlining a datatype {@link URI} which is non-numeric, the
-	 * {@link URI} of the datatype must also be inlined.
-	 * 
-	 * FIXME TERMS REFACTOR : Configure and support literal inlining into the statement indices.
-	 */
-	final int LITERAL_INLINE_LIMIT = 64;
-
-    public LexiconConfiguration(final boolean inlineLiterals, 
-            final boolean inlineBNodes, final boolean inlineDateTimes, 
-            final IExtensionFactory xFactory) {
-        
-        this.inlineLiterals = inlineLiterals;
-        this.inlineBNodes = inlineBNodes;
-        this.inlineDateTimes = inlineDateTimes;
-        this.xFactory = xFactory;
-        
-        termIds = new HashMap<TermId, IExtension>();
-        datatypes = new HashMap<String, IExtension>();
+        return maxInlineStringLength;
         
     }
     
-	public void initExtensions(final LexiconRelation lex) {
-
-		xFactory.init(lex);
-
-		for (IExtension extension : xFactory.getExtensions()) {
-			BigdataURI datatype = extension.getDatatype();
-			if (datatype == null)
-				continue;
-			termIds.put((TermId) datatype.getIV(), extension);
-			datatypes.put(datatype.stringValue(), extension);
-		}
+    public LexiconConfiguration(final boolean inlineLiterals,
+            final int maxInlineStringLength, final boolean inlineBNodes,
+            final boolean inlineDateTimes, final IExtensionFactory xFactory) {
         
+        if (maxInlineStringLength < 0)
+            throw new IllegalArgumentException();
+        
+        this.inlineLiterals = inlineLiterals;
+        this.maxInlineStringLength = maxInlineStringLength;
+        this.inlineBNodes = inlineBNodes;
+//        this.inlineDateTimes = inlineDateTimes;
+        this.xFactory = xFactory;
+        
+        termIds = new HashMap<TermId, IExtension<BigdataValue>>();
+        datatypes = new HashMap<String, IExtension<BigdataValue>>();
+
     }
 
+    public void initExtensions(final LexiconRelation lex) {
+
+        xFactory.init(lex);
+
+        for (IExtension<BigdataValue> extension : xFactory.getExtensions()) {
+
+            final BigdataURI datatype = extension.getDatatype();
+
+            if (datatype == null)
+                continue;
+
+            termIds.put((TermId) datatype.getIV(), extension);
+
+            datatypes.put(datatype.stringValue(), extension);
+
+        }
+
+    }
+
+    @SuppressWarnings("unchecked")
     public V asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
-        
-    	// The TermId for the ExtensionIV.
-    	final TermId datatypeIV = iv.getExtensionIV();
-    	
-    	// Find the IExtension from the datatype IV.
-    	final IExtension ext = termIds.get(datatypeIV);
-    	
-    	if(ext == null)
-    	    throw new RuntimeException("Unknown extension: "+datatypeIV);
-    	
+
+        // The TermId for the ExtensionIV.
+        final TermId datatypeIV = iv.getExtensionIV();
+
+        // Find the IExtension from the datatype IV.
+        final IExtension<BigdataValue> ext = termIds.get(datatypeIV);
+
+        if (ext == null)
+            throw new RuntimeException("Unknown extension: " + datatypeIV);
+
         return (V) ext.asValue(iv, vf);
-        
+
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * FIXME Add support for {@link UnicodeBNodeIV}, {@link InlineURIIV},
-     * {@link InlineLiteralIV}, {@link XSDStringExtension}, and the namespaceIV
-     * URI and datatypeIV Literal representations.
-     */
+    @SuppressWarnings("unchecked")
     public IV createInlineIV(final Value value) {
 
-        // we know right away we can't handle URIs
-        if (value instanceof URI)
-            return null;
+        final IV iv;
 
-        if (value instanceof Literal) {
+        /*
+         * Note: The decision to represent the Value as a TermId,
+         * URINamespaceIV, or LiteralDatatypeIV is made at a higher level if
+         * this method returns [null], indicating that the Value was not
+         * inlined.
+         */
 
-            final Literal l = (Literal) value;
+        if (value instanceof URI) {
 
-            final URI datatype = l.getDatatype();
+            iv = createInlineURIIV((URI) value);
 
-            // not a datatyped literal
-            if (datatype == null)
-                return null;
+        } else if (value instanceof Literal) {
 
-            if (datatypes.containsKey(datatype.stringValue())) {
-
-                final IExtension xFactory = 
-                    datatypes.get(datatype.stringValue());
-
-                try {
-
-                    final IV iv = xFactory.createIV(value);
-
-                    if (iv != null && value instanceof BigdataValue)
-                        ((BigdataValue) value).setIV(iv);
-
-                    return iv;
-
-                } catch (Exception ex) {
-
-                    log.warn("problem creating inline internal value for " +
-                            "extension datatype: " + value.stringValue());
-                    
-                    /* 
-                     * Some sort of parse error in the literal value most 
-                     * likely. Resort to term identifiers. 
-                     */
-                    return null;
-
-                }
-
-            }
-
-            // get the native DTE
-            final DTE dte = DTE.valueOf(datatype);
-
-            // no native DTE for this datatype
-            if (dte == null)
-                return null;
-
-            // check to see if we are inlining literals of this type
-            if (!isInline(VTE.LITERAL, dte))
-                return null;
-
-            final String v = value.stringValue();
-
-            IV iv = null;
-
-            try {
-
-                switch (dte) {
-                case XSDBoolean:
-                    iv = new XSDBooleanIV(XMLDatatypeUtil.parseBoolean(v));
-                    break;
-                case XSDByte:
-                    iv = new XSDByteIV(XMLDatatypeUtil.parseByte(v));
-                    break;
-                case XSDShort:
-                    iv = new XSDShortIV(XMLDatatypeUtil.parseShort(v));
-                    break;
-                case XSDInt:
-                    iv = new XSDIntIV(XMLDatatypeUtil.parseInt(v));
-                    break;
-                case XSDLong:
-                    iv = new XSDLongIV(XMLDatatypeUtil.parseLong(v));
-                    break;
-                case XSDFloat:
-                    iv = new XSDFloatIV(XMLDatatypeUtil.parseFloat(v));
-                    break;
-                case XSDDouble:
-                    iv = new XSDDoubleIV(XMLDatatypeUtil.parseDouble(v));
-                    break;
-                case XSDInteger:
-                    iv = new XSDIntegerIV(XMLDatatypeUtil.parseInteger(v));
-                    break;
-                case XSDDecimal:
-                    iv = new XSDDecimalIV(XMLDatatypeUtil.parseDecimal(v));
-                    break;
-                case UUID:
-                    iv = new UUIDLiteralIV(UUID.fromString(v));
-                    break;
-                default:
-                    iv = null;
-                }
-
-            } catch (NumberFormatException ex) {
-
-                // some dummy doesn't know how to format a number
-                // default to term identifier for this term 
-
-                log.warn("number format exception: " + v);
-                
-            }
-
-            if (iv != null && value instanceof BigdataValue)
-                ((BigdataValue) value).setIV(iv);
-
-            return iv;
+            iv = createInlineLiteralIV((Literal) value);
 
         } else if (value instanceof BNode) {
 
-            final BNode b = (BNode) value;
+            iv = createInlineBNodeIV((BNode) value);
 
-            final String id = b.getID();
-
-            final char c = id.charAt(0);
+        } else {
             
-            if (c == 'u') {
-                
-                try {
-
-                    final UUID uuid = UUID.fromString(id.substring(1));
-
-                    if (!uuid.toString().equals(id.substring(1)))
-                        return null;
-
-                    if (!isInline(VTE.BNODE, DTE.UUID))
-                        return null;
-
-                    final IV iv = new UUIDBNodeIV(uuid);
-
-                    if (value instanceof BigdataValue)
-                        ((BigdataValue) value).setIV(iv);
-
-                    return iv;
-
-                } catch (Exception ex) {
-
-                    // string id could not be converted to a UUID
-
-                }
-                
-            } else if (c == 'i') {
-                
-                try {
-
-                    final Integer i = Integer.valueOf(id.substring(1));
-
-                    // cannot normalize id, needs to remain syntactically identical
-                    if (!i.toString().equals(id.substring(1)))
-                        return null;
-
-                    if (!isInline(VTE.BNODE, DTE.XSDInt))
-                        return null;
-
-                    final IV iv = new NumericBNodeIV(i);
-
-                    if (value instanceof BigdataValue)
-                        ((BigdataValue) value).setIV(iv);
-
-                    return iv;
-
-                } catch (Exception ex) {
-
-                    // string id could not be converted to an Integer
-
-                }
-                
-            }
+            // Note: SIDs are handled elsewhere.
+            iv = null;
             
         }
 
+        if (iv != null && value instanceof BigdataValue) {
+         
+            // Cache the IV on the BigdataValue.
+            ((BigdataValue) value).setIV(iv);
+            
+        }
+       
+        return iv;
+
+    }
+
+    /**
+     * If the {@link URI} can be inlined into the statement indices for this
+     * {@link LexiconConfiguration}, then return its inline {@link IV}.
+     * 
+     * @param value
+     *            The {@link URI}.
+     *            
+     * @return The inline {@link IV} -or- <code>null</code> if the {@link URI}
+     *         can not be inlined into the statement indices.
+     */
+    private IV<BigdataURI, ?> createInlineURIIV(final URI value) {
+
+        if (value.stringValue().length() <= maxInlineStringLength) {
+
+            return new InlineURIIV<BigdataURI>(value);
+
+        }
+
+        // URI was not inlined.
         return null;
 
     }
 
     /**
-     * See {@link ILexiconConfiguration#isInline(VTE, DTE)}.
+     * If the {@link Literal} can be inlined into the statement indices for this
+     * {@link LexiconConfiguration}, then return its inline {@link IV}.
+     * 
+     * @param value
+     *            The {@link Literal}.
+     * 
+     * @return The inline {@link IV} -or- <code>null</code> if the
+     *         {@link Literal} can not be inlined into the statement indices.
      */
-    public boolean isInline(final VTE vte, final DTE dte) {
+    private IV<BigdataLiteral,?> createInlineLiteralIV(final Literal value) {
+
+        final URI datatype = value.getDatatype();
+
+        if (datatype != null && datatypes.containsKey(datatype.stringValue())) {
+
+            /*
+             * Check the registered extension factories first.
+             * 
+             * Note: optimized xsd:string support is provided via a registered
+             * extension. See XSDStringExtension.
+             * 
+             * TODO Should we explicitly disallow extensions which override the
+             * basic inlining behavior for xsd datatypes?
+             */
+
+            final IExtension<BigdataValue> xFactory = 
+                datatypes.get(datatype.stringValue());
+
+            try {
+
+                @SuppressWarnings("unchecked")
+                final IV<BigdataLiteral, ?> iv = xFactory.createIV(value);
+
+                return iv;
+
+            } catch (Throwable t) {
+
+                if(InnerCause.isInnerCause(t, InterruptedException.class)) {
+
+                    // Propagate interrupt.
+                    throw new RuntimeException(t);
+                    
+                }
+                
+                if(InnerCause.isInnerCause(t, Error.class)) {
+
+                    // Propagate error to preserve a stable encoding behavior.
+                    throw new Error(t);
+
+                }
+
+                /*
+                 * Some sort of parse error in the literal value most likely.
+                 */
+                
+                log.error(t.getMessage() + ": value=" + value.stringValue(), t);
+
+                // fall through.
+                
+            }
+
+        }
+
+        /*
+         * Attempt to inline an xsd datatype corresponding to either a java
+         * primitive (int, long, float, etc.) or to one of the special cases
+         * (BigDecimal, BigInteger).
+         * 
+         * Note: Optimized xsd:string inlining is handled by the
+         * XSDStringExtension (above).
+         */
+        IV<BigdataLiteral, ?> iv = createInlineDatatypeIV(value, datatype);
+
+        if (iv != null)
+            return iv;
+
+        /*
+         * Attempt to fully inline the literal.
+         */
+
+        final String label = value.getLabel();
+
+        final int datatypeLength = value.getDatatype() == null ? 0 : value
+                .getDatatype().stringValue().length();
+
+        final int languageLength = value.getLanguage() == null ? 0 : value
+                .getLanguage().length();
+
+        final long totalLength = label.length() + datatypeLength
+                + languageLength;
+
+        if (totalLength <= maxInlineStringLength) {
+
+            return new InlineLiteralIV<BigdataLiteral>(label, value
+                    .getLanguage(), value.getDatatype());
+
+        }
+
+        // Literal was not inlined.
+        return null;
+
+    }
+
+    /**
+     * Attempt to inline an xsd datatype corresponding to either a java
+     * primitive (int, long, float, etc.) or to one of the special cases
+     * (BigDecimal, BigInteger).
+     * 
+     * @param value
+     *            The RDF {@link Value}.
+     * @param datatype
+     *            The XSD datatype {@link URI}.
+     *            
+     * @return The {@link IV} -or- <code>null</code> if the value could not be
+     *         inlined.
+     */
+    private AbstractInlineIV<BigdataLiteral, ?> createInlineDatatypeIV(
+            final Literal value, final URI datatype) {
+
+        // get the native DTE
+        final DTE dte = DTE.valueOf(datatype);
+
+        if (dte == DTE.Extension || dte == null) {
+            /*
+             * Either a registered IExtension datatype or a datatype for which
+             * there is no native DTE support.
+             */
+            return null;
+        }
+
+        // check to see if we are inlining literals of this type
+        if (!isInline(VTE.LITERAL, dte))
+            return null;
+
+        final String v = value.stringValue();
+
+        try {
+
+            switch (dte) {
+            case XSDBoolean:
+                return new XSDBooleanIV<BigdataLiteral>(XMLDatatypeUtil
+                        .parseBoolean(v));
+            case XSDByte:
+                return new XSDByteIV<BigdataLiteral>(XMLDatatypeUtil
+                        .parseByte(v));
+            case XSDShort:
+                return new XSDShortIV<BigdataLiteral>(XMLDatatypeUtil
+                        .parseShort(v));
+            case XSDInt:
+                return new XSDIntIV<BigdataLiteral>(XMLDatatypeUtil.parseInt(v));
+            case XSDLong:
+                return new XSDLongIV<BigdataLiteral>(XMLDatatypeUtil
+                        .parseLong(v));
+            case XSDFloat:
+                return new XSDFloatIV<BigdataLiteral>(XMLDatatypeUtil
+                        .parseFloat(v));
+            case XSDDouble:
+                return new XSDDoubleIV<BigdataLiteral>(XMLDatatypeUtil
+                        .parseDouble(v));
+            case XSDInteger:
+                return new XSDIntegerIV<BigdataLiteral>(XMLDatatypeUtil
+                        .parseInteger(v));
+            case XSDDecimal:
+                return new XSDDecimalIV<BigdataLiteral>(XMLDatatypeUtil
+                        .parseDecimal(v));
+            case UUID:
+                return new UUIDLiteralIV<BigdataLiteral>(UUID.fromString(v));
+            default:
+                // Not handled.
+                return null;
+            }
+
+        } catch (NumberFormatException ex) {
+
+            /*
+             * Note: This winds up accepting the Value, but it gets handled as a
+             * TermId instead of being inlined.
+             * 
+             * TODO Should we reject the Value instead since it does not
+             * validate against the xsd schema datatype?
+             */
+
+            log.error(ex + ": value=" + v);
+
+            return null;
+
+        }
+
+    }
+    
+    /**
+     * If the {@link BNode} can be inlined into the statement indices for this
+     * {@link LexiconConfiguration}, then return its inline {@link IV}.
+     * 
+     * @param value
+     *            The {@link BNode}.
+     * 
+     * @return The inline {@link IV} -or- <code>null</code> if the {@link BNode}
+     *         can not be inlined into the statement indices.
+     */
+    private IV<BigdataBNode, ?> createInlineBNodeIV(final BNode value) {
+
+        final String id = value.getID();
+
+        final char c = id.charAt(0);
+
+        // Note: UUID is 16 bytes. If it has the 'u' prefix we can recognize it.
+        if (c == 'u' && id.length() == 17 && isInline(VTE.BNODE, DTE.UUID)) {
+
+            /*
+             * Inline as [UUID].
+             * 
+             * Note: We cannot normalize IDs, they need to remain syntactically
+             * identical.
+             */
+
+            try {
+
+                final String subStr = id.substring(1);
+                
+                final UUID uuid = UUID.fromString(subStr);
+
+                if (uuid.toString().equals(subStr)) {
+
+                    return new UUIDBNodeIV<BigdataBNode>(uuid);
+                    
+                }
+
+            } catch (Exception ex) {
+
+                /*
+                 * String id could not be converted to a UUID. Fall through.
+                 */
+
+            }
+            
+        } else if (c == 'i' && isInline(VTE.BNODE, DTE.XSDInt)) {
+
+            /*
+             * Inline as [int].
+             * 
+             * Note: We cannot normalize IDs, they need to remain syntactically
+             * identical.
+             */
+            
+            try {
+
+                final String subStr = id.substring(1);
+
+                final Integer i = Integer.valueOf(subStr);
+
+                if (i.toString().equals(subStr)) {
+
+                    return new NumericBNodeIV<BigdataBNode>(i);
+
+                }
+
+            } catch (Exception ex) {
+
+                /*
+                 * String id could not be converted to an Integer. Fall
+                 * through.
+                 */
+
+            }
+            
+        }
+        
+        if (maxInlineStringLength > 0 && id.length() <= maxInlineStringLength) {
+
+            /*
+             * Inline as [Unicode].
+             */
+
+            return new UnicodeBNodeIV<BigdataBNode>(id);
+
+        }
+
+        // The blank node was not inlined.
+        return null;
+        
+    }
+
+    /**
+     * Return <code>true</code> iff the {@link VTE} / {@link DTE} combination
+     * will be inlined within the statement indices using native inlining
+     * mechanims (not {@link IExtension} handlers) based solely on the
+     * consideration of the {@link VTE} and {@link DTE} (the length of the
+     * {@link Value} is not considered).
+     */
+    private boolean isInline(final VTE vte, final DTE dte) {
 
         switch (vte) {
 	        case STATEMENT:
@@ -342,6 +515,17 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     }
 
+    /**
+     * Hack for supported {@link DTE}s (this is here because we do not support
+     * the unsigned variants yet).
+     * 
+     * @param dte
+     *            The {@link DTE}.
+     * 
+     * @return <code>true</code> if the {@link DTE} has native inline support
+     *         (versus support via an {@link IExtension} handler or inline
+     *         support via a {@link InlineLiteralIV} (a catch all)).
+     */
     private boolean isSupported(final DTE dte) {
 
         switch (dte) {
@@ -356,10 +540,21 @@ public class LexiconConfiguration<V extends BigdataValue>
             case XSDDecimal:
             case UUID:
                 return true;
-            case XSDUnsignedByte: // none of the unsigneds are tested yet
-            case XSDUnsignedShort: // none of the unsigneds are tested yet
-            case XSDUnsignedInt: // none of the unsigneds are tested yet
-            case XSDUnsignedLong: // none of the unsigneds are tested yet
+            case XSDString:
+            /*
+             * Note: xsd:string is handled as a registered extension by
+             * XSDStringExtension. This method reports [false] for xsd:string
+             * because this method returns [true] only for datatypes handled
+             * outside of the extension mechanism.
+             */
+                return true;
+            case XSDUnsignedByte:
+            case XSDUnsignedShort: 
+            case XSDUnsignedInt:
+            case XSDUnsignedLong:
+            /*
+             * None of the unsigned datatypes are inlined yet.
+             */
                 return false;
             default:
                 throw new AssertionError();
