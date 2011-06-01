@@ -14,7 +14,6 @@ public class Hiterator<A extends IHit> implements Iterator<A> {
 
     final private Collection<A> hits;
     final private Iterator<A> src;
-    final private long elapsed;
     final private double minCosine;
     final private int maxRank;
 
@@ -54,31 +53,18 @@ public class Hiterator<A extends IHit> implements Iterator<A> {
     }
 
     /**
-     * The elapsed time in milliseconds required to compute the result set
-     * for the query.
-     */
-    public long elapsed() {
-        
-        return elapsed;
-        
-    }
-    
-    /**
      * 
      * @param hits
      * @param elapsed
      * @param minCosine
      * @param maxRank
      */
-    public Hiterator(final Collection<A> hits, final long elapsed,
+    public Hiterator(final Collection<A> hits, 
             final double minCosine, final int maxRank) {
 
         if (hits == null)
             throw new IllegalArgumentException();
 
-        if (elapsed < 0)
-            throw new IllegalArgumentException();
-        
         if (minCosine < 0d || minCosine > 1d)
             throw new IllegalArgumentException();
 
@@ -87,8 +73,6 @@ public class Hiterator<A extends IHit> implements Iterator<A> {
 
         this.hits = hits;
 
-        this.elapsed = elapsed;
-        
         this.minCosine = minCosine;
         
         this.maxRank = maxRank;
@@ -128,7 +112,7 @@ public class Hiterator<A extends IHit> implements Iterator<A> {
 
         nextHit = src.next();
 
-        if (rank + 1 >= maxRank || nextHit.getCosine() < minCosine) {
+        if (rank + 1 > maxRank || nextHit.getCosine() < minCosine) {
 
             exhausted = true;
 
@@ -180,7 +164,7 @@ public class Hiterator<A extends IHit> implements Iterator<A> {
 
     public String toString() {
         
-        return "Hiterator{elapsed=" + elapsed + ", minCosine=" + minCosine
+        return "Hiterator{minCosine=" + minCosine
                 + ", maxRank=" + maxRank + ", nhits=" + hits.size() + "} : "
                 + hits;
         

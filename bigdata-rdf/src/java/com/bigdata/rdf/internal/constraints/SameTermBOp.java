@@ -26,11 +26,16 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.openrdf.query.algebra.Compare.CompareOp;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.CompareBOp.Annotations;
 
 /**
  * Compare two terms for exact equality. 
@@ -42,10 +47,27 @@ public class SameTermBOp extends XSDBooleanIVValueExpression {
      */
     private static final long serialVersionUID = 1L;
     
+    public interface Annotations extends PipelineOp.Annotations {
+
+        /**
+         * The compare operator, which is a {@link CompareOp} enum value.
+         * Must be either EQ or NE.
+         */
+        String OP = (CompareBOp.class.getName() + ".op").intern();
+
+    }
+    
     public SameTermBOp(final IValueExpression<? extends IV> left, 
     		final IValueExpression<? extends IV> right) {
     	
-        this(new BOp[] { left, right }, null);
+        this(left, right, CompareOp.EQ);
+        
+    }
+    
+    public SameTermBOp(final IValueExpression<? extends IV> left,
+    		final IValueExpression<? extends IV> right, final CompareOp op) {
+    	
+        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op)));
         
     }
     
@@ -59,6 +81,11 @@ public class SameTermBOp extends XSDBooleanIVValueExpression {
         if (args.length != 2 || args[0] == null || args[1] == null)
 			throw new IllegalArgumentException();
 
+        final CompareOp op = (CompareOp) getRequiredProperty(Annotations.OP);
+        
+        if (!(op == CompareOp.EQ || op == CompareOp.NE))
+			throw new IllegalArgumentException();
+        
     }
 
     /**
@@ -77,7 +104,12 @@ public class SameTermBOp extends XSDBooleanIVValueExpression {
     	if (left == null || right == null)
             throw new SparqlTypeErrorException(); 
 
-		return left.equals(right);
+        final CompareOp op = (CompareOp) getRequiredProperty(Annotations.OP);
+        
+        switch(op) {
+        	case NE: return !left.equals(right);
+        	default: return left.equals(right);
+        }
 		
     }
     

@@ -45,7 +45,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.Tuple;
 import com.bigdata.btree.isolation.IsolatedFusedView;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.InnerCause;
 
 /**
  * Test suite for fully-isolated read-write transactions.
@@ -1071,16 +1070,6 @@ public class TestTx extends ProxyTestCase<Journal> {
 
     /**
      * Stress test for concurrent transactions against a single named index.
-     * 
-     * FIXME This demonstrates a problem when there are a modest number (10s) of
-     * concurrent transactions with a moderately large write sets (1000s). The
-     * problem is not deterministic, but you can always demonstrate it if you
-     * raise the parameters high enough. The issue shows up as a concurrent
-     * modification of the unisolated B+Tree during validation. The problem
-     * appears to be unrelated to the one documented in
-     * {@link JournalTransactionService}, as that has to do with the atomicity
-     * of the LocalTx state changes but the issue here is concurrent
-     * modification to the B+Tree.
      */
     public void testStress() throws InterruptedException, ExecutionException {
 

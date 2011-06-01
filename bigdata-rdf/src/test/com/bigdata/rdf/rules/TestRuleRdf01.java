@@ -34,7 +34,6 @@ import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.rule.Rule;
 

@@ -124,9 +124,9 @@ public class TestJustifications extends AbstractRuleTestCase {
              * the explicit statement that is the support for the rule.
              */
 
-            IV U = store.addTerm(new URIImpl("http://www.bigdata.com/U"));
-            IV A = store.addTerm(new URIImpl("http://www.bigdata.com/A"));
-            IV Y = store.addTerm(new URIImpl("http://www.bigdata.com/Y"));
+            final IV U = store.addTerm(new URIImpl("http://www.bigdata.com/U"));
+            final IV A = store.addTerm(new URIImpl("http://www.bigdata.com/A"));
+            final IV Y = store.addTerm(new URIImpl("http://www.bigdata.com/Y"));
 
             store.addStatements(new SPO[] {//
                     new SPO(U, A, Y, StatementEnum.Explicit) //
@@ -246,7 +246,7 @@ public class TestJustifications extends AbstractRuleTestCase {
                 while (itr.hasNext()) {
 
                     // de-serialize the justification from the key.
-                    Justification tmp = (Justification)itr.next().getObject();
+                    final Justification tmp = (Justification)itr.next().getObject();
                     
                     // verify the same.
                     assertEquals(jst, tmp);
@@ -277,30 +277,40 @@ public class TestJustifications extends AbstractRuleTestCase {
             // an empty focusStore.
             final TempTripleStore focusStore = new TempTripleStore(store
                     .getProperties(), store);
-            
-            /*
-             * The inference (A rdf:type rdf:property) is grounded by the
-             * explicit statement (U A Y).
-             */
 
-            assertTrue(Justification.isGrounded(inf, focusStore, store, expectedEntailment,
-                    false/* testHead */, true/* testFocusStore */,
-                    new VisitedSPOSet(focusStore.getIndexManager())));
+            try {
 
-            // add the statement (U A Y) to the focusStore.
-            focusStore.addStatements(new SPO[] {//
-                    new SPO(U, A, Y, StatementEnum.Explicit) //
-                    },//
-                    1);
+                /*
+                 * The inference (A rdf:type rdf:property) is grounded by the
+                 * explicit statement (U A Y).
+                 */
 
-            /*
-             * The inference is no longer grounded since we have declared that
-             * we are also retracting its grounds.
-             */
-            assertFalse(Justification.isGrounded(inf, focusStore, store, expectedEntailment,
-                    false/* testHead */, true/* testFocusStore */,
-                    new VisitedSPOSet(focusStore.getIndexManager())));
-            
+                assertTrue(Justification.isGrounded(inf, focusStore, store,
+                        expectedEntailment, false/* testHead */,
+                        true/* testFocusStore */, new VisitedSPOSet(focusStore
+                                .getIndexManager())));
+
+                // add the statement (U A Y) to the focusStore.
+                focusStore.addStatements(new SPO[] {//
+                        new SPO(U, A, Y, StatementEnum.Explicit) //
+                        },//
+                        1);
+
+                /*
+                 * The inference is no longer grounded since we have declared
+                 * that we are also retracting its grounds.
+                 */
+                assertFalse(Justification.isGrounded(inf, focusStore, store,
+                        expectedEntailment, false/* testHead */,
+                        true/* testFocusStore */, new VisitedSPOSet(focusStore
+                                .getIndexManager())));
+
+            } finally {
+
+                focusStore.__tearDownUnitTest();
+
+            }
+
             /*
              * remove the justified statements.
              */

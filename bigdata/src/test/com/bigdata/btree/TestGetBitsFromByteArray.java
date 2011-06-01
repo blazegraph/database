@@ -26,7 +26,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
+import it.unimi.dsi.io.InputBitStream;
+
+import java.io.IOException;
 import java.util.Formatter;
+import java.util.Random;
+
+import com.bigdata.rawstore.Bytes;
 
 import junit.framework.TestCase2;
 
@@ -361,7 +367,62 @@ public class TestGetBitsFromByteArray extends TestCase2 {
 		}
 
         return ret;
-    	
+
+    }
+
+    /**
+     * A stress test for compatibility with {@link InputBitStream}. An array is
+     * filled with random bits and the behavior of {@link InputBitStream} and
+     * {@link BytesUtil#getBits(byte[], int, int)} is compared on a number of
+     * randomly selected bit slices.
+     * 
+     * TODO Could be a performance comparison.
+     * 
+     * @throws IOException 
+     */
+    public void test_stress_InputBitStream_compatible() throws IOException {
+        
+        final Random r = new Random();
+
+        // #of
+        final int limit = 1000;
+
+        // Note: length is guaranteed to be LT int32 bits so [int] index is Ok.
+        final int len = r.nextInt(Bytes.kilobyte32 * 8) + 1;
+        final int bitlen = len << 3;
+        // Fill array with random data.
+        final byte[] b = new byte[len];
+        r.nextBytes(b);
+
+        // wrap with InputBitStream.
+        final InputBitStream ibs = new InputBitStream(b);
+
+        for (int i = 0; i < limit; i++) {
+
+            // start of the bit slice.
+            final int sliceBitOff = r.nextInt(bitlen - 32);
+
+            final int bitsremaining = bitlen - sliceBitOff;
+
+            // allow any slice of between 1 and 32 bits length.
+            final int sliceBitLen = r.nextInt(Math.min(32, bitsremaining)) + 1;
+            assert sliceBitLen >= 1 && sliceBitLen <= 32;
+
+            // position the stream.
+            ibs.position(sliceBitOff);
+
+            final int v1 = ibs.readInt(sliceBitLen);
+
+            final int v2 = BytesUtil.getBits(b, sliceBitOff, sliceBitLen);
+
+            if (v1 != v2) {
+                fail("Expected=" + v1 + ", actual=" + v2 + ", trial=" + i
+                        + ", bitSlice(off=" + sliceBitOff + ", len="
+                        + sliceBitLen + ")" + ", arrayLen=" + b.length);
+            }
+            
+        }
+
     }
 
 }

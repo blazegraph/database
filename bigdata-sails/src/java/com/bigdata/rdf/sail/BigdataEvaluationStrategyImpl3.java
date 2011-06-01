@@ -681,7 +681,9 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	        	final Value s = sp.getSubjectVar().getValue();
 	        	final Value p = sp.getPredicateVar().getValue();
 	        	if (s == null && p != null && 
-	        			(BD.RELEVANCE.equals(p) || BD.MAX_HITS.equals(p) ||
+	        			(BD.RELEVANCE.equals(p) || 
+        					BD.MIN_RANK.equals(p) ||
+        					BD.MAX_RANK.equals(p) ||
 	        				BD.MIN_RELEVANCE.equals(p) || 
 	        				BD.MAX_RELEVANCE.equals(p) || 
 	        				BD.MATCH_ALL_TERMS.equals(p))) {
@@ -1693,7 +1695,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         	com.bigdata.bop.Var.var(subjVar.getName());
         
         IVariableOrConstant<IV> relevance = new Constant(DummyIV.INSTANCE);
-        Literal maxHits = null;
+        Literal minRank = null;
+        Literal maxRank = null;
         Literal minRelevance = null;
         Literal maxRelevance = null;
         boolean matchAllTerms = false;
@@ -1713,11 +1716,16 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
             		throw new IllegalArgumentException("illegal metadata: " + meta);
         		}
         		relevance = com.bigdata.bop.Var.var(oVar.getName());
-        	} else if (BD.MAX_HITS.equals(pVal)) {
+        	} else if (BD.MIN_RANK.equals(pVal)) {
         		if (oVal == null || !(oVal instanceof Literal)) {
         			throw new IllegalArgumentException("illegal metadata: " + meta);
         		}
-        		maxHits = (Literal) oVal;
+        		minRank = (Literal) oVal;
+        	} else if (BD.MAX_RANK.equals(pVal)) {
+        		if (oVal == null || !(oVal instanceof Literal)) {
+        			throw new IllegalArgumentException("illegal metadata: " + meta);
+        		}
+        		maxRank = (Literal) oVal;
 	    	} else if (BD.MIN_RELEVANCE.equals(pVal)) {
         		if (oVal == null || !(oVal instanceof Literal)) {
         			throw new IllegalArgumentException("illegal metadata: " + meta);
@@ -1738,7 +1746,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         
         final IAccessPathExpander expander = 
         	new FreeTextSearchExpander(database, (Literal) objValue, 
-        			maxHits, minRelevance, maxRelevance, matchAllTerms);
+    			minRank, maxRank, minRelevance, maxRelevance, matchAllTerms);
 
         // Decide on the correct arity for the predicate.
         final BOp[] vars = new BOp[] {
@@ -1932,11 +1940,35 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     }
 
     private IValueExpression<? extends IV> toVE(final Compare compare) {
-    	final IValueExpression<? extends IV> iv1 = 
+    	final IValueExpression<? extends IV> left = 
     		toVE(compare.getLeftArg());
-    	final IValueExpression<? extends IV> iv2 = 
+    	final IValueExpression<? extends IV> right = 
     		toVE(compare.getRightArg());
-        return new CompareBOp(iv1, iv2, compare.getOperator());
+    	
+    	/*
+    	 * If the term is a Constant<URI> and the op is EQ or NE then we can 
+    	 * do a sameTerm optimization.
+    	 */
+    	final CompareOp op = compare.getOperator();
+    	if (op == CompareOp.EQ || op == CompareOp.NE) {
+    	
+	    	if (left instanceof Constant) {
+	    		final IV iv = ((Constant<? extends IV>) left).get();
+	    		if (iv.isURI()) {
+	    			return new SameTermBOp(left, right, op); 
+	    		}
+	    	}
+    	
+	    	if (right instanceof Constant) {
+	    		final IV iv = ((Constant<? extends IV>) right).get();
+	    		if (iv.isURI()) {
+	    			return new SameTermBOp(left, right, op); 
+	    		}
+	    	}
+	    	
+    	}
+    	
+        return new CompareBOp(left, right, compare.getOperator());
     }
 
     private IValueExpression<? extends IV> toVE(final Bound bound) {
@@ -2184,7 +2216,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
                         BD.DEFAULT_PREFIX_MATCH,//false/* prefixMatch */, 
                         BD.DEFAULT_MIN_RELEVANCE,//0d/* minCosine */,
                         BD.DEFAULT_MAX_RELEVANCE,//1.0d/* maxCosine */,
-                        BD.DEFAULT_MAX_HITS,//Integer.MAX_VALUE/* maxRank */, 
+                        BD.DEFAULT_MIN_RANK,//1/* minRank */, 
+                        BD.DEFAULT_MAX_RANK,//Integer.MAX_VALUE/* maxRank */, 
                         BD.DEFAULT_MATCH_ALL_TERMS,//false/* matchAllTerms */,
                         BD.DEFAULT_TIMEOUT,//0/* timeout */,
                         TimeUnit.MILLISECONDS);

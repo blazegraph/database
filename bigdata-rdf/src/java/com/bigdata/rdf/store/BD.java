@@ -161,19 +161,43 @@ public interface BD {
      * select ?s
      * where {
      *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
-     *   ?s bd:maxHits "5"^^xsd:int .
+     *   ?s bd:maxRank "5"^^xsd:int .
      * }
      * 
      * </pre>
      * 
-     * The default is {@value #DEFAULT_MAX_HITS}.
+     * The default is {@value #DEFAULT_MAX_RANK}.
      */
-    final URI MAX_HITS = new URIImpl(SEARCH_NAMESPACE+"maxHits");
+    final URI MAX_RANK = new URIImpl(SEARCH_NAMESPACE+"maxRank");
 
     /**
-     * The default for {@link #MAX_HITS}.
+     * The default for {@link #MAX_RANK}.
      */
-    final int DEFAULT_MAX_HITS = Integer.MAX_VALUE;
+    final int DEFAULT_MAX_RANK = Integer.MAX_VALUE;
+    
+    /**
+     * Magic predicate used to query for free text search metadata.  Use 
+     * in conjunction with {@link #SEARCH} as follows:
+     * <p>
+     * <pre>
+     * 
+     * select ?s
+     * where {
+     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bd:minRank "5"^^xsd:int .
+     * }
+     * 
+     * </pre>
+     * 
+     * The default is {@value #DEFAULT_MIN_RANK}.
+     */
+    final URI MIN_RANK = new URIImpl(SEARCH_NAMESPACE+"minRank");
+
+    /**
+     * The default for {@link #MIN_RANK} is 1, full text search results will
+     * start with the #1 most relevant hit by default.
+     */
+    final int DEFAULT_MIN_RANK = 1;
     
 	/**
 	 * Magic predicate used to query for free text search metadata. Use in

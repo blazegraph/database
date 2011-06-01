@@ -1873,65 +1873,65 @@ abstract public class AbstractTripleStore extends
         if (isReadOnly())
             throw new IllegalStateException();
 
-        /*
-         * Clear the reference since it was as of the last commit point.
-         */
-        readCommittedRef = null;
+//        /*
+//         * Clear the reference since it was as of the last commit point.
+//         */
+//        readCommittedRef = null;
         return 0l;
     }
     
-    /**
-     * A factory returning a read-committed view of the database.
-     * <p>
-     * Note: There is a distinct instance <i>per commit time</i>. If an
-     * intervening commit has occurred, then you will get back a new instance
-     * providing a read-consistent view as of the now most recent commit point.
-     * 
-     * FIXME The [per commit time] constraint is actually a function of the
-     * {@link ITx#READ_COMMITTED} semantics as implemented by the
-     * {@link IIndexManager}. If the indices are {@link IClientIndex}s then
-     * the instances remain valid since all requests are delegated through the
-     * {@link DataService} layer. However, if they are {@link BTree}s, then the
-     * instances are NOT valid.
-     * <p>
-     * Perhaps the best way to deal with this is to have a ReadCommittedBTree or
-     * to modify BTree to intrinsically understand read-committed semantics and
-     * to reload from the most recent checkpoint after each commit. That way the
-     * index references would always remain valid.
-     * <p>
-     * However, we have to be much more careful about read-consistent (choose a
-     * timestamp corresponding to the last commit point or the last closure
-     * point) vs read-committed (writes become immediately visible once they are
-     * committed).
-     */
-    final public AbstractTripleStore asReadCommittedView() {
-
-        if (getTimestamp() == ITx.READ_COMMITTED) {
-            
-            return this;
-            
-        }
-
-        synchronized(this) {
-        
-            AbstractTripleStore view = readCommittedRef == null ? null
-                    : readCommittedRef.get();
-            
-            if(view == null) {
-                
-                view = (AbstractTripleStore) getIndexManager().getResourceLocator()
-                        .locate(getNamespace(), ITx.READ_COMMITTED);
-                
-                readCommittedRef = new SoftReference<AbstractTripleStore>(view);
-                
-            }
-            
-            return view; 
-        
-        }
-        
-    }
-    private SoftReference<AbstractTripleStore> readCommittedRef;
+//    /**
+//     * A factory returning a read-committed view of the database.
+//     * <p>
+//     * Note: There is a distinct instance <i>per commit time</i>. If an
+//     * intervening commit has occurred, then you will get back a new instance
+//     * providing a read-consistent view as of the now most recent commit point.
+//     * 
+//     * FIXME The [per commit time] constraint is actually a function of the
+//     * {@link ITx#READ_COMMITTED} semantics as implemented by the
+//     * {@link IIndexManager}. If the indices are {@link IClientIndex}s then
+//     * the instances remain valid since all requests are delegated through the
+//     * {@link DataService} layer. However, if they are {@link BTree}s, then the
+//     * instances are NOT valid.
+//     * <p>
+//     * Perhaps the best way to deal with this is to have a ReadCommittedBTree or
+//     * to modify BTree to intrinsically understand read-committed semantics and
+//     * to reload from the most recent checkpoint after each commit. That way the
+//     * index references would always remain valid.
+//     * <p>
+//     * However, we have to be much more careful about read-consistent (choose a
+//     * timestamp corresponding to the last commit point or the last closure
+//     * point) vs read-committed (writes become immediately visible once they are
+//     * committed).
+//     */
+//    final public AbstractTripleStore asReadCommittedView() {
+//
+//        if (getTimestamp() == ITx.READ_COMMITTED) {
+//            
+//            return this;
+//            
+//        }
+//
+//        synchronized(this) {
+//        
+//            AbstractTripleStore view = readCommittedRef == null ? null
+//                    : readCommittedRef.get();
+//            
+//            if(view == null) {
+//                
+//                view = (AbstractTripleStore) getIndexManager().getResourceLocator()
+//                        .locate(getNamespace(), ITx.READ_COMMITTED);
+//                
+//                readCommittedRef = new SoftReference<AbstractTripleStore>(view);
+//                
+//            }
+//            
+//            return view; 
+//        
+//        }
+//        
+//    }
+//    private SoftReference<AbstractTripleStore> readCommittedRef;
     
     final public long getJustificationCount() {
 

@@ -793,12 +793,12 @@ public class TestBootstrapBigdataSail extends TestCase2 {
 
     }
 
-	/**
-	 * Unit test verifies that we can mix read/write transactions and the use
-	 * of the unisolated connection.
-	 */
-	public void test_readWriteTxAndUnisolatedConnection() {
-		fail("write this test");
-	}
+//	/**
+//	 * Unit test verifies that we can mix read/write transactions and the use
+//	 * of the unisolated connection.
+//	 */
+//	public void test_readWriteTxAndUnisolatedConnection() {
+//		fail("write this test");
+//	}
 	
 }

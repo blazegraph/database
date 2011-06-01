@@ -136,7 +136,8 @@ public class TestContextAdvancer extends TestCase2 {
             
             db.commit();
             
-            System.err.println(db.dumpStore());
+            if (log.isInfoEnabled())
+                log.info(db.dumpStore());
 
             // The expected distinct statements w/o their context info. 
             final BigdataStatement[] expectedDistinct = new BigdataStatement[]{

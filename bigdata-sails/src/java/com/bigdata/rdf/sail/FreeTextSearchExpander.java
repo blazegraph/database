@@ -59,7 +59,7 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
      */
     private final AbstractTripleStore database;
     
-    private final Literal query, maxHits, minRelevance, maxRelevance;
+    private final Literal query, minRank, maxRank, minRelevance, maxRelevance;
     
     private final boolean matchAllTerms;
     
@@ -69,12 +69,12 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
     public FreeTextSearchExpander(final AbstractTripleStore database,
             final Literal query) {
 
-        this(database, query, null, null, null, false);
+        this(database, query, null, null, null, null, false);
         
     }
     
     public FreeTextSearchExpander(final AbstractTripleStore database,
-            final Literal query, final Literal maxHits, 
+            final Literal query, final Literal minRank, final Literal maxRank, 
             final Literal minRelevance, final Literal maxRelevance,
             final boolean matchAllTerms) {
 
@@ -88,7 +88,9 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
         
         this.query = query;
         
-        this.maxHits = maxHits;
+        this.minRank = minRank;
+        
+        this.maxRank = maxRank;
         
         this.minRelevance = minRelevance;
         
@@ -174,7 +176,8 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
                                 prefixMatch,
                                 minRelevance == null ? BD.DEFAULT_MIN_RELEVANCE : minRelevance.doubleValue()/* minCosine */, 
                                 maxRelevance == null ? BD.DEFAULT_MAX_RELEVANCE : maxRelevance.doubleValue()/* maxCosine */, 
-                                maxHits == null ? BD.DEFAULT_MAX_HITS/*Integer.MAX_VALUE*/ : maxHits.intValue()+1/* maxRank */,
+                                minRank == null ? BD.DEFAULT_MIN_RANK/*1*/ : minRank.intValue()/* minRank */,
+                                maxRank == null ? BD.DEFAULT_MAX_RANK/*Integer.MAX_VALUE*/ : maxRank.intValue()/* maxRank */,
                                 matchAllTerms,
                                 BD.DEFAULT_TIMEOUT/*0L*//* timeout */,
                                 TimeUnit.MILLISECONDS);

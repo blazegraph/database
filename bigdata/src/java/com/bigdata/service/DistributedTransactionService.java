@@ -308,7 +308,7 @@ public abstract class DistributedTransactionService extends
             try {
 
                 // read most recent image.
-                final int entryCount = SnapshotHelper.read(commitTimeIndex,
+                final long entryCount = SnapshotHelper.read(commitTimeIndex,
                         file);
 
                 log.warn("Read snapshot: entryCount=" + entryCount + ", file="
@@ -459,7 +459,7 @@ public abstract class DistributedTransactionService extends
      */
     public static class SnapshotHelper {
 
-        static public int read(CommitTimeIndex ndx, File file)
+        static public long read(CommitTimeIndex ndx, File file)
                 throws IOException {
 
             final FileInputStream is = new FileInputStream(file);
@@ -480,10 +480,10 @@ public abstract class DistributedTransactionService extends
 
         }
         
-        static public int read(CommitTimeIndex ndx, DataInputStream is)
+        static public long read(CommitTimeIndex ndx, DataInputStream is)
                 throws IOException {
 
-            final int n = is.readInt();
+            final long n = is.readLong();
 
             for (int i = 0; i < n; i++) {
 

@@ -85,7 +85,8 @@ abstract public class AbstractJournalTestCase
 
         super.tearDown(testCase);
 
-        TestHelper.checkJournalsClosed(testCase, this);
+        // Note: moved into the parent class.
+//        TestHelper.checkJournalsClosed(testCase, this);
         
 //        deleteTestFile();
         

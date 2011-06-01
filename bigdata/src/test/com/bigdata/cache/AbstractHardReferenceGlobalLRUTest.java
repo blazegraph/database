@@ -337,15 +337,15 @@ public class AbstractHardReferenceGlobalLRUTest extends TestCase2 {
         /*
          * get, put, remove, clearCache, deleteCache, discardAllCaches.
          * 
-         * @todo any clearing of caches is might be too much based on the
-         * XorShift pseudo-random generator. Certainly, I am seeing too much
-         * when those parameters are non-zero.
+         * @todo any clearing of caches might be too much based on the XorShift
+         * pseudo-random generator. Certainly, I am seeing too much when those
+         * parameters are non-zero.
          * 
          * Note: deleteCache and discardAllCaches DO NOT guarantee consistency
-         * if there are concurrent operations against the cache and MIGHT NOT
-         * be safe for all implementations.
+         * if there are concurrent operations against the cache and MIGHT NOT be
+         * safe for all implementations.
          */
-        final Op gen = new Op(.8f, .2f, .005f, .0001f, .00005f, .00001f);
+        final Op gen = new Op(.8f, .2f, .005f, .0001f, .00005f, 0f);//.00001f);
 ////        final Op gen = new Op(.8f, .2f, .005f, 0f, 0f, 0f);
 
         StressTestGlobalLRU.doStressTest(timeout, nthreads, nops, nrecords,

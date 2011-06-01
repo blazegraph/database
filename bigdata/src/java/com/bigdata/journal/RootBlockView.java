@@ -54,7 +54,7 @@ public class RootBlockView implements IRootBlockView {
     /**
      * Logger.
      */
-    public static final Logger log = Logger.getLogger(RootBlockView.class);
+    private static final Logger log = Logger.getLogger(RootBlockView.class);
 
     static final transient short SIZEOF_TIMESTAMP  = Bytes.SIZEOF_LONG;
     static final transient short SIZEOF_MAGIC      = Bytes.SIZEOF_INT;
@@ -669,7 +669,7 @@ public class RootBlockView implements IRootBlockView {
         if (checker == null) {
             
             log.warn("Checksum will not be validated");
-            
+
         }
 
         // Check sum checker.

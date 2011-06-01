@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.data;
 
 import it.unimi.dsi.bits.Fast;
-import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.io.OutputBitStream;
 
 import java.io.Externalizable;
@@ -551,6 +550,12 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
         private final byte versionTimestampBits;
 
 		/**
+		 * The minimum across the versionTimestamp[] (iff version timestamps are
+		 * in use and otherwise <code>-1L</code>).
+		 */
+		private final long minVersionTimestamp;
+        
+		/**
 		 * Offset of the bit flags in the buffer encoding the presence of tuples
 		 * with raw records -or- <code>-1</code> if the leaf does not report
 		 * those data.
@@ -661,11 +666,12 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
                 pos++;
 
                 O_versionTimestamps = pos;
+                minVersionTimestamp = buf.getLong(pos);// cache.
                 // advance past the timestamps.
                 pos += (2 * SIZEOF_TIMESTAMP)
                         + BytesUtil.bitFlagByteLength(nkeys
                                 * versionTimestampBits/* nbits */);
-
+                
 //                // advance past the timestamps.
 //                pos += nkeys * SIZEOF_TIMESTAMP;
                 
@@ -673,6 +679,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
                 
                 O_versionTimestamps = -1;
                 versionTimestampBits = 0;
+                minVersionTimestamp = -1L;
                 
             }
 
@@ -842,6 +849,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
                 pos++;
 
                 O_versionTimestamps = pos;
+                minVersionTimestamp = buf.getLong(pos);// cache.
                 // advance past the timestamps.
                 pos += (2 * SIZEOF_TIMESTAMP)
                         + BytesUtil.bitFlagByteLength(nkeys
@@ -854,6 +862,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
                 
                 O_versionTimestamps = -1;
                 versionTimestampBits = 0;
+                minVersionTimestamp = -1L;
                 
             }
 
@@ -1002,7 +1011,8 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
             if (!hasVersionTimestamps())
                 throw new UnsupportedOperationException();
 
-            return b.getLong(O_versionTimestamps);
+//            return b.getLong(O_versionTimestamps);
+            return minVersionTimestamp;
 
         }
 
@@ -1022,31 +1032,41 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 
 //            return b.getLong(O_versionTimestamps + index * SIZEOF_TIMESTAMP);
 
-            final InputBitStream ibs = b.getInputBitStream();
-            try {
+			final long bitpos = ((O_versionTimestamps + (2L * SIZEOF_TIMESTAMP)) << 3)
+					+ ((long) index * versionTimestampBits);
 
-                final long bitpos = ((O_versionTimestamps + (2L * SIZEOF_TIMESTAMP)) << 3)
-                        + ((long)index * versionTimestampBits);
+			final long bitIndex = (b.off() << 3) + bitpos;
 
-                ibs.position(bitpos);
+			final long deltat = BytesUtil.getBits64(b.array(), (int) bitIndex,
+					versionTimestampBits);
+		
+		    return minVersionTimestamp + deltat;
 
-                final long deltat = ibs
-                        .readLong(versionTimestampBits/* nbits */);
-
-                return getMinimumVersionTimestamp() + deltat;
-                
-            } catch(IOException ex) {
-                
-                throw new RuntimeException(ex);
-                
-// close not required for IBS backed by byte[] and has high overhead.
-//            } finally {
-//                try {
-//                    ibs.close();
-//                } catch (IOException ex) {
-//                    log.error(ex);
-//                }
-            }
+//    	final InputBitStream ibs = b.getInputBitStream();
+//            try {
+//
+//                final long bitpos = ((O_versionTimestamps + (2L * SIZEOF_TIMESTAMP)) << 3)
+//                        + ((long)index * versionTimestampBits);
+//
+//                ibs.position(bitpos);
+//
+//                final long deltat = ibs
+//                        .readLong(versionTimestampBits/* nbits */);
+//
+//                return getMinimumVersionTimestamp() + deltat;
+//                
+//            } catch(IOException ex) {
+//                
+//                throw new RuntimeException(ex);
+//                
+//// close not required for IBS backed by byte[] and has high overhead.
+////            } finally {
+////                try {
+////                    ibs.close();
+////                } catch (IOException ex) {
+////                    log.error(ex);
+////                }
+//            }
 
         }
 
