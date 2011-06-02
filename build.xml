@@ -73,7 +73,13 @@
 	<!-- I set the target to 1.5 to support deployment on non-1.6 JVMs. -->
 	<target name="compile" depends="prepare">
 		<mkdir dir="${build.dir}" />
-		<javac destdir="${build.dir}/classes" classpathref="build.classpath" debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}" encoding="${javac.encoding}">
+		<javac destdir="${build.dir}/classes"
+			   classpathref="build.classpath"
+			   debug="${javac.debug}"
+			   debuglevel="${javac.debuglevel}"
+			   verbose="${javac.verbose}"
+			   encoding="${javac.encoding}"
+			   includeantruntime="false">
 			<!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
 			<!-- target="${javac.target}" source="${javac.source}" -->
 			<src path="${bigdata.dir}/bigdata/src/java" />
@@ -722,7 +728,14 @@ ${postInstallMessage}</echo>
 
 <target name="scale-out-sample" description="Run the scale-out sample code.">
 
-<javac destdir="${build.dir}/classes" classpathref="build.classpath" debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}" encoding="${javac.encoding}">
+<javac destdir="${build.dir}/classes"
+	   classpathref="build.classpath"
+	   debug="${javac.debug}"
+	   debuglevel="${javac.debuglevel}"
+	   verbose="${javac.verbose}"
+	   encoding="${javac.encoding}"
+	   includeantruntime="false"
+	>
 	<src path="${bigdata.dir}/bigdata-sails/src/samples" />
 </javac>
 <!-- copy resources. -->
@@ -1404,7 +1417,9 @@ ${postInstallMessage}</echo>
              source="1.5"
              target="1.5"
              classpath="${javac.test.classpath}"
-             verbose="${javac.verbose}">
+             verbose="${javac.verbose}"
+      		 includeantruntime="false"
+      	>
 
         <src path="${bigdata.dir}/bigdata/src/test" />
         <src path="${bigdata.dir}/bigdata-jini/src/test" />
@@ -1757,7 +1772,20 @@ ${postInstallMessage}</echo>
         <isset property="testName" />
       </condition>
 
-      <junit printsummary="on" haltonfailure="no" fork="no" dir="${classes.dir}" timeout="60000">
+      <!-- Note: timeout is milliseconds per forked JVM if specified. -->
+      <!-- We have some long running unit tests so the timeout needs  -->
+      <!-- to be more than a minute if you do specify this property.  -->
+      <!-- timeout="60000"                                            -->
+      <!--                                                            -->
+      <!-- Note: There are classloader problems with icu4j-charset    -->
+	  <!-- which make forking a JVM a requirement (the problems are   -->
+      <!-- related to the logging setup).                             -->
+      <junit printsummary="on"
+      	     haltonfailure="no"
+      	     fork="yes"
+      	     forkmode="once"
+      	     dir="${classes.dir}"
+      	>
         <formatter type="xml" />
         <formatter type="brief"/>
 
@@ -2075,7 +2103,14 @@ ${postInstallMessage}</echo>
 
 <target name="samples.compile" depends="compile">
 <mkdir dir="${build.dir}/samples/classes" />
-<javac destdir="${build.dir}/samples/classes" classpathref="samples.build.classpath" debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}" encoding="${javac.encoding}">
+<javac destdir="${build.dir}/samples/classes"
+	   classpathref="samples.build.classpath"
+	   debug="${javac.debug}"
+	   debuglevel="${javac.debuglevel}"
+	   verbose="${javac.verbose}"
+	   encoding="${javac.encoding}"
+	   includeantruntime="false"
+	>
 	<src path="${bigdata.dir}/bigdata-sails/src/samples" />
 	<compilerarg value="-version" />
 </javac>
