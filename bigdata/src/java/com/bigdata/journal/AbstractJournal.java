@@ -2228,11 +2228,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
-	/**
-	 * Return the object providing the {@link AbstractLocalTransactionManager}
-	 * for this journal.
-	 */
-	abstract public AbstractLocalTransactionManager getLocalTransactionManager();
+//	/**
+//	 * Return the object providing the {@link AbstractLocalTransactionManager}
+//	 * for this journal.
+//	 */
+//	abstract public AbstractLocalTransactionManager getLocalTransactionManager();
 
 	public long commit() {
 

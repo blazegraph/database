@@ -2973,6 +2973,10 @@ public class RWStore implements IStore, IBufferedWriter {
 
 	private FixedAllocator getBlock(final int addr) {
 		final int index = (-addr) >>> OFFSET_BITS;
+		
+		if (index >= m_allocs.size()) {
+			throw new PhysicalAddressResolutionException(addr);
+		}
 
 		return m_allocs.get(index);
 	}

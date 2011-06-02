@@ -855,6 +855,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         log.warn("Test not run.  See https://sourceforge.net/apps/trac/bigdata/ticket/235");
         
         return true;
+//        return false;
         
     }
     
@@ -870,7 +871,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
     	log.warn("Test not run.  See https://sourceforge.net/apps/trac/bigdata/ticket/235");
 
         return true;
-
+//        return false;
+        
     }
 
     /**

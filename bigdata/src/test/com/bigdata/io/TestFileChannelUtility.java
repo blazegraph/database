@@ -350,14 +350,14 @@ public class TestFileChannelUtility extends TestCase {
      */
     public void test_transferAllFrom() throws IOException {
 
-        if(SystemUtil.isOSX()) {
-            /*
-             * FIXME For some reason, this unit test is hanging under OS X.
-             * 
-             * @see https://sourceforge.net/apps/trac/bigdata/ticket/287
-             */
-            fail("Unit test hangs under OS X");
-        }
+//        if(SystemUtil.isOSX()) {
+//            /*
+//             * FIXME For some reason, this unit test is hanging under OS X.
+//             * 
+//             * @see https://sourceforge.net/apps/trac/bigdata/ticket/287
+//             */
+//            fail("Unit test hangs under OS X");
+//        }
         
         final File sourceFile = File.createTempFile("TestFileChannelUtility", getName());
 

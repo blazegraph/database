@@ -21,7 +21,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-package com.bigdata.rdf.sail.contrib;
+package com.bigdata.rdf.sail;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -49,7 +49,6 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
-import com.bigdata.rdf.sail.QuadsTestCase;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
@@ -245,9 +244,9 @@ public class TestRollbacks extends QuadsTestCase {
             RepositoryConnection conn = null;
             try {
 				int counter2 = 0;
-				conn = repo.getConnection();
-				conn.setAutoCommit(false);           	
-                while (firstCause.get() == null&&counter<maxCounter) {
+                conn = repo.getConnection();
+                conn.setAutoCommit(false);
+                while (firstCause.get() == null && counter < maxCounter) {
                     if (writer)
                         writer(conn);
                     else

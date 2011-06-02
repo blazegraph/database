@@ -2271,13 +2271,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         }
 
         /*
-         * Overriden methods for registering or dropping indices.
+         * Overridden methods for registering or dropping indices.
          */
         
         /**
          * Delegates to the {@link AbstractTask}.
          */
-        public void dropIndex(String name) {
+        public void dropIndex(final String name) {
 
             AbstractTask.this.dropIndex(name);
             
@@ -2423,6 +2423,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         public IResourceLocator getResourceLocator() {
             
             return resourceLocator;
+            
+        }
+
+        public ILocalTransactionManager getLocalTransactionManager() {
+            
+            return delegate.getLocalTransactionManager();
             
         }
 
@@ -2656,7 +2662,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         }
 
         @SuppressWarnings("unchecked")
-        public ReadOnlyJournal(AbstractJournal source) {
+        public ReadOnlyJournal(final AbstractJournal source) {
 
             if (source == null)
                 throw new IllegalArgumentException();
@@ -2666,7 +2672,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             /*
              * Setup a locator for resources. Resources that correspond to
              * indices declared by the task are accessible via the task itself.
-             * Other resources are assessible via the locator on the underlying
+             * Other resources are accessible via the locator on the underlying
              * journal. When the journal is part of a federation, that locator
              * will be the federation's locator.
              */
@@ -2679,7 +2685,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         }
 
         /*
-         * Index access methods (overriden or disallowed depending on what they
+         * Index access methods (overridden or disallowed depending on what they
          * do).
          */
         
@@ -2845,6 +2851,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
         }
         
+        public ILocalTransactionManager getLocalTransactionManager() {
+            
+            return delegate.getLocalTransactionManager();
+            
+        }
+
         public IResourceLockService getResourceLockService() {
             
             return delegate.getResourceLockService();

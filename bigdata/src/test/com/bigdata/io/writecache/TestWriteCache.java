@@ -107,15 +107,14 @@ public class TestWriteCache extends TestCase3 {
                 // The buffer size must be at least 1k for these tests.
                 assertTrue(DirectBufferPool.INSTANCE.getBufferCapacity() >= Bytes.kilobyte32);
 
-                WriteCache writeCache =  new WriteCache.FileChannelWriteCache(0, buf,
+                final WriteCache writeCache =  new WriteCache.FileChannelWriteCache(0, buf,
                         true, isHighlyAvailable, false, opener);
- 
 
-            	long addr1 = 0;
-            	long addr2 = 12800;
-            	long addr3 = 24800;
-            	ByteBuffer data1 = getRandomData(512);
-            	int chk1 = ChecksumUtility.threadChk.get().checksum(data1, 0/* offset */, data1.limit());
+                final long addr1 = 0;
+            	final long addr2 = 12800;
+            	final long addr3 = 24800;
+            	final ByteBuffer data1 = getRandomData(512);
+            	final int chk1 = ChecksumUtility.threadChk.get().checksum(data1, 0/* offset */, data1.limit());
             	
             	writeCache.write(addr1, data1, chk1);
             	data1.flip();
@@ -131,8 +130,9 @@ public class TestWriteCache extends TestCase3 {
             		
             		fail("Expected ChecksumError");
             	} catch (ChecksumError ce) {
-            		System.out.println("Expected: " + ce.getMessage());
-            	}
+                    if (log.isInfoEnabled())
+                        log.info("Expected: " + ce.getMessage());
+                }
 
             } finally {
             	DirectBufferPool.INSTANCE.release(buf);

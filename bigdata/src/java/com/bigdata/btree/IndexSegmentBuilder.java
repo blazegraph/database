@@ -1718,6 +1718,20 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
 //        // Flag used to flush the last leaf iff it is dirty.
 //        boolean needsFlush = false;
+
+        if (plan.nentries == 0) {
+            
+            /*
+             * A single empty root leaf.
+             */
+            
+            leaf.reset(plan.numInNode[leaf.level][0]);
+
+            flushNodeOrLeaf(leaf);
+
+            return;
+            
+        }
         
         // For each leaf in the plan while tuples remain.
         for (int i = 0; i < plan.nleaves && entryIterator.hasNext(); i++) {
@@ -2486,9 +2500,10 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              * immediately above.
              * 
              * Note: We only invoke flush() if a leaf has data so we should
-             * never be in a position of writing out an empty leaf.
+             * never be in a position of writing out an empty leaf (with the
+             * exception of a B+Tree which has no tuples).
              */
-            assert lastLeafData.getKeyCount() > 0 : "Last leaf is empty?";
+            assert plan.nentries == 0 || lastLeafData.getKeyCount() > 0 : "Last leaf is empty?";
 
             if (log.isDebugEnabled())
                 log.debug("updating last leaf"//

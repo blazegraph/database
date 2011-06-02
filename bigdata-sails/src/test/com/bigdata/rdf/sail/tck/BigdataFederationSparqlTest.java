@@ -60,7 +60,7 @@ import com.bigdata.service.jini.JiniFederation;
  * location, then it is convenient (but not necessary) to also specify its path. For
  * example:
  * <pre>
- * -Dbigdata.configuration=/nas/bigdata/benchmark/config/bigdataStandalone.config
+ * -Dbigdata.configuration=/nas/bigdata/benchmark/config/bigdataCluster.config
  * -Dcom.bigdata.counters.linux.sysstat.path=/usr/local/bin
  * </pre>
  * 

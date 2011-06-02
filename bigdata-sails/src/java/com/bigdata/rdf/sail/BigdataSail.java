@@ -545,7 +545,7 @@ public class BigdataSail extends SailBase implements Sail {
      * <code>true</code> iff the {@link BigdataSail} has been
      * {@link #initialize()}d and not {@link #shutDown()}.
      */
-    private boolean open;
+    private boolean openSail;
     
     /**
      * Set <code>true</code> by ctor variants that open/create the database
@@ -1066,9 +1066,9 @@ public class BigdataSail extends SailBase implements Sail {
      *             if the {@link BigdataSail} has not been {@link #initialize()}d
      *             or has been {@link #shutDown()}.
      */
-    protected void assertOpen() {
+    protected void assertOpenSail() {
 
-        if (!open)
+        if (!openSail)
             throw new IllegalStateException();
         
     }
@@ -1079,7 +1079,7 @@ public class BigdataSail extends SailBase implements Sail {
      */
     public boolean isOpen() {
         
-        return open;
+        return openSail;
         
     }
     
@@ -1090,7 +1090,7 @@ public class BigdataSail extends SailBase implements Sail {
     @Override
     protected void initializeInternal() throws SailException {
 
-        if (open)
+        if (openSail)
             throw new IllegalStateException();
         
         /*
@@ -1103,7 +1103,7 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
         
-        open = true;
+        openSail = true;
         
     }
     
@@ -1127,7 +1127,7 @@ public class BigdataSail extends SailBase implements Sail {
 
     public void shutDown() throws SailException {
         
-        assertOpen();
+        assertOpenSail();
 
         /*
          * Note: DO NOT shutdown the query engine. It is shared by all
@@ -1146,7 +1146,7 @@ public class BigdataSail extends SailBase implements Sail {
      */
     protected void shutDownInternal() throws SailException {
         
-        if (open) {
+        if (openSail) {
             
             try {
             
@@ -1161,7 +1161,7 @@ public class BigdataSail extends SailBase implements Sail {
                 
             } finally {
 
-                open = false;
+                openSail = false;
 
             }
 
@@ -1368,102 +1368,24 @@ public class BigdataSail extends SailBase implements Sail {
 		}
     	
     }
-        
+
     /**
-     * Return a read-only connection backed by a read-only transaction.  The
+     * Return a read-only connection backed by a read-only transaction. The
      * transaction will be closed when the connection is closed.
-     * @param timestamp The timestamp.
+     * 
+     * @param timestamp
+     *            The timestamp.
+     *            
      * @return The transaction.
+     * 
      * @throws IOException
      * @see ITransactionService#newTx(long)
      */
-    private BigdataSailConnection _getReadOnlyConnection(final long timestamp) throws IOException {
-    	
-        final String namespace = database.getNamespace();
+    private BigdataSailConnection _getReadOnlyConnection(final long timestamp)
+            throws IOException {
 
-        final IIndexManager indexManager = database.getIndexManager();
+        return new BigdataSailReadOnlyConnection(timestamp);
 
-        final ITransactionService txService = getTxService();
-        
-        return new BigdataSailConnection(null/*lock*/,false/*unisolated*/) {
-
-            /**
-             * The transaction id.
-             */
-            private long tx;
-
-            /**
-             * Constructor starts a new transaction.
-             */
-            {
-                newTx();
-            }
-            
-            /**
-             * Obtain a new read-only transaction from the journal's
-             * transaction service, and attach this SAIL connection to the new
-             * view of the database. 
-             */
-            protected void newTx() throws IOException {
-                
-                this.tx = txService.newTx(timestamp);
-
-                final AbstractTripleStore txView = (AbstractTripleStore) indexManager
-                        .getResourceLocator().locate(namespace, tx);
-                
-                attach(txView);
-                
-            }
-
-            /**
-             * NOP
-             */
-            @Override
-            public synchronized void commit() throws SailException {
-
-            	// NOP.
-            	
-            }
-            
-            /**
-             * NOP
-             */
-            @Override
-            public synchronized void rollback() throws SailException {
-
-            	// NOP
-            	
-            }
-            
-            /**
-             * A specialized close that will also abort the current read-only
-             * transaction.
-             */
-            @Override
-            public synchronized void close() throws SailException {
-
-                if (!isOpen()) {
-                    
-                    return;
-                    
-                }
-                
-                super.close();
-                
-                try {
-
-                    txService.abort(tx);
-                
-                } catch(IOException ex) {
-                        
-                    throw new SailException(ex);
-                    
-                }
-                
-            }
-
-        };
-        
     }
 
 	/**
@@ -1491,149 +1413,10 @@ public class BigdataSail extends SailBase implements Sail {
         	
         }
         
-        final ITransactionService txService = getTxService();
-        
-        final String namespace = database.getNamespace();
-        
         final Lock readLock = lock.readLock();
         readLock.lock();
-        
-        return new BigdataSailConnection(readLock,false/*unisolated*/) {
-            
-            /**
-             * The transaction id.
-             */
-            private long tx;
 
-            /**
-             * Constructor starts a new transaction.
-             */
-            {
-                newTx();
-            }
-            
-            /**
-             * Obtain a new read/write transaction from the journal's
-             * transaction service, and attach this SAIL connection to the new
-             * view of the database. 
-             */
-            protected void newTx() throws IOException {
-                
-                this.tx = txService.newTx(ITx.UNISOLATED);
-
-                final AbstractTripleStore txView = (AbstractTripleStore) indexManager
-                        .getResourceLocator().locate(namespace, tx);
-                
-                attach(txView);
-                
-            }
-
-            /**
-             * A specialized commit that goes through the transaction service
-             * available on the journal's transaction manager.  Once the commit
-             * happens, a new read/write transaction is automatically started
-             * so that this connection can continue to absorb writes.
-             * <p>
-             * Note: writes to the lexicon without dirtying the isolated indices
-             * (i.e. writes to the SPO relation) will cause the writes to the
-             * lexicon to never be committed.  Probably not a significant issue.
-             */
-            @Override
-            public synchronized void commit() throws SailException {
-
-                /*
-                 * don't double commit, but make a note that writes to the lexicon without
-                 * dirtying the isolated indices will cause the writes to the lexicon to never
-                 * be committed
-                 */
-                
-                assertWritable();
-
-                /*
-                 * Flush any pending writes.
-                 * 
-                 * Note: This must be done before you compute the closure so that the
-                 * pending writes will be read by the inference engine when it computes
-                 * the closure.
-                 */
-                
-                flushStatementBuffers(true/* assertions */, true/* retractions */);
-                
-                try {
-                
-                    txService.commit(tx);
-                    
-                    newTx();
-                
-                } catch(IOException ex) {
-                        
-                    throw new SailException(ex);
-                    
-                }
-                
-            }
-            
-            /**
-             * A specialized rollback that goes through the transaction service
-             * available on the journal's transaction manager.  Once the abort
-             * happens, a new read/write transaction is automatically started
-             * so that this connection can continue to absorb writes.
-             */
-            @Override
-            public synchronized void rollback() throws SailException {
-
-				/*
-				 * Note: DO NOT invoke super.rollback(). That will cause a
-				 * database (Journal) level abort(). The Journal level abort()
-				 * will discard the writes buffered on the unisolated indices
-				 * (the lexicon indices). That will cause lost updates and break
-				 * the eventually consistent design for the TERM2ID and ID2TERM
-				 * indices.
-				 */
-//                super.rollback();
-                
-                try {
-                
-                    txService.abort(tx);
-                    
-                    newTx();
-                
-                } catch(IOException ex) {
-                        
-                    throw new SailException(ex);
-                    
-                }
-                
-            }
-            
-            /**
-             * A specialized close that will also abort the current read/write
-             * transaction.
-             */
-            @Override
-            public synchronized void close() throws SailException {
-
-                if (!isOpen()) {
-                    
-                    return;
-                    
-                }
-                
-                super.close();
-                
-                try {
-
-                    txService.abort(tx);
-                
-                } catch(IOException ex) {
-                        
-                    throw new SailException(ex);
-                    
-                }
-                
-            }
-            
-        };
+        return new BigdataSailRWTxConnection(readLock);
         
     }
     
@@ -1667,14 +1450,20 @@ public class BigdataSail extends SailBase implements Sail {
         return queryEngine;
         
     }
-    
+
     /**
      * Inner class implements the {@link SailConnection}. Some additional
      * functionality is available on this class, including
      * {@link #computeClosure()}.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * 
+     *         TODO This should be made into a static class. As it is, there is
+     *         a possibility for subtle errors introduced by inheritence of
+     *         variables from the {@link BigdataSail}. For example, this was
+     *         causing a problem with the {@link #close()} method on this class
+     *         and on the classes derived from this class.
      */
     public class BigdataSailConnection implements NotifyingSailConnection {
 
@@ -1691,7 +1480,7 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * True iff the {@link SailConnection} is open.
          */
-        private boolean open;
+        protected boolean openConn;
         
         /**
          * non-<code>null</code> iff truth maintenance is being performed.
@@ -1749,9 +1538,10 @@ public class BigdataSail extends SailBase implements Sail {
 
         public String toString() {
         	
-			return getClass().getName() + "{timestamp="
-					+ TimestampUtility.toString(database.getTimestamp()) + "}";
-        	
+            return getClass().getName() + "{timestamp="
+                    + TimestampUtility.toString(database.getTimestamp())
+                    + ",open=" + openConn + "}";
+
         }
         
         public BigdataSail getBigdataSail() {
@@ -1900,15 +1690,15 @@ public class BigdataSail extends SailBase implements Sail {
          * 
          * @param database
          */
-        public synchronized void attach(final AbstractTripleStore database) {
+        protected synchronized void attach(final AbstractTripleStore database) {
 
-            BigdataSail.this.assertOpen();
+            BigdataSail.this.assertOpenSail();
             
             this.database = database;
             
             readOnly = database.isReadOnly();            
          
-            open = true;
+            openConn = true;
             
             assertBuffer = null;
             
@@ -2159,7 +1949,7 @@ public class BigdataSail extends SailBase implements Sail {
         public void setNamespace(final String prefix, final String namespace)
                 throws SailException {
 
-            assertWritable();
+            assertWritableConn();
 
 //            database.addNamespace(namespace,prefix);
             namespaces.put(prefix, namespace);
@@ -2318,7 +2108,7 @@ public class BigdataSail extends SailBase implements Sail {
                 
             }
             
-            assertWritable();
+            assertWritableConn();
 
             // flush any pending retractions first!
             flushStatementBuffers(false/* flushAssertBuffer */, true/* flushRetractBuffer */);
@@ -2352,7 +2142,7 @@ public class BigdataSail extends SailBase implements Sail {
             if (log.isInfoEnabled())
                 log.info("contexts=" + Arrays.toString(contexts));
             
-            assertWritable();
+            assertWritableConn();
 
             // discard any pending writes.
             clearBuffers();
@@ -2615,7 +2405,7 @@ public class BigdataSail extends SailBase implements Sail {
         private synchronized int removeStatements(final Resource s, final URI p,
                 final Value o, final Resource c) throws SailException {
             
-            assertWritable();
+            assertWritableConn();
 
             flushStatementBuffers(true/* flushAssertBuffer */, false/* flushRetractBuffer */);
 
@@ -2875,7 +2665,7 @@ public class BigdataSail extends SailBase implements Sail {
          */
         public synchronized void rollback() throws SailException {
 
-            assertWritable();
+            assertWritableConn();
 
             // discard buffered assertions and/or retractions.
             clearBuffers();
@@ -2899,7 +2689,7 @@ public class BigdataSail extends SailBase implements Sail {
          */
         public synchronized void commit() throws SailException {
 
-            assertWritable();
+            assertWritableConn();
 
             /*
              * Flush any pending writes.
@@ -2938,7 +2728,7 @@ public class BigdataSail extends SailBase implements Sail {
 
         final public boolean isOpen() throws SailException {
 
-            return open;
+            return openConn;
             
         }
 
@@ -2959,7 +2749,7 @@ public class BigdataSail extends SailBase implements Sail {
 
 //            assertOpen();
 
-            if (!open) {
+            if (!openConn) {
                 
                 return;
                 
@@ -3002,7 +2792,7 @@ public class BigdataSail extends SailBase implements Sail {
         			((Journal) getDatabase().getIndexManager())
         					.releaseUnisolatedConnection();
         		}
-                open = false;
+                openConn = false;
             }
             
         }
@@ -3101,9 +2891,9 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
         
-        protected void assertOpen() throws SailException {
+        protected void assertOpenConn() throws SailException {
 
-            if(!open) {
+            if(!openConn) {
                 
                 throw new SailException("Closed");
                 
@@ -3111,9 +2901,9 @@ public class BigdataSail extends SailBase implements Sail {
 
         }
         
-        protected void assertWritable() throws SailException {
+        protected void assertWritableConn() throws SailException {
 
-            assertOpen();
+            assertOpenConn();
             
             if (readOnly) {
 
@@ -3342,7 +3132,7 @@ public class BigdataSail extends SailBase implements Sail {
          */
         public synchronized void computeClosure() throws SailException {
 
-            assertWritable();
+            assertWritableConn();
 
             flushStatementBuffers(true/* assertions */, true/* retractions */);
 
@@ -3357,7 +3147,7 @@ public class BigdataSail extends SailBase implements Sail {
          */
         public synchronized void removeAllEntailments() throws SailException {
             
-            assertWritable();
+            assertWritableConn();
             
             flushStatementBuffers(true/* assertions */, true/* retractions */);
 
@@ -3423,7 +3213,7 @@ public class BigdataSail extends SailBase implements Sail {
              * native joins and the BigdataEvaluationStatistics rely on
              * this.
              */
-            Object[] newVals = replaceValues(dataset, tupleExpr, bindings);
+            final Object[] newVals = replaceValues(dataset, tupleExpr, bindings);
             dataset = (Dataset) newVals[0];
             bindings = (BindingSet) newVals[1];
             
@@ -3455,9 +3245,10 @@ public class BigdataSail extends SailBase implements Sail {
             if (log.isInfoEnabled())
                 log.info("Optimized query: " + tupleExpr);
 
-        	final Object[] newVals2 = replaceValues(dataset, tupleExpr, bindings);
-            dataset = (Dataset) newVals2[0];
-            bindings = (BindingSet) newVals2[1];
+            replaceValues(dataset, tupleExpr, bindings);
+//        	final Object[] newVals2 = replaceValues(dataset, tupleExpr, bindings);
+//            dataset = (Dataset) newVals2[0];
+//            bindings = (BindingSet) newVals2[1];
             
             return tupleExpr;
 
@@ -3543,7 +3334,7 @@ public class BigdataSail extends SailBase implements Sail {
                     log.info("Optimized query: " + tupleExpr);
 
             	final Object[] newVals2 = replaceValues(dataset, tupleExpr, bindings);
-                dataset = (Dataset) newVals2[0];
+//                dataset = (Dataset) newVals2[0];
                 bindings = (BindingSet) newVals2[1];
                 
                 // Note: evaluation begins with an empty binding set NOT the
@@ -3610,6 +3401,302 @@ public class BigdataSail extends SailBase implements Sail {
         
         private IChangeLog changeLog;
 
-    }
+    } // class BigdataSailConnection
    
+    /**
+     * A connection backed by a read/write transaction.
+     */
+    private class BigdataSailRWTxConnection extends BigdataSailConnection {
+
+        /**
+         * The transaction service.
+         */
+        private final ITransactionService txService;
+        
+        /**
+         * The transaction id.
+         */
+        private long tx;
+
+        /**
+         * Constructor starts a new transaction.
+         */
+        public BigdataSailRWTxConnection(final Lock readLock)
+                throws IOException {
+
+            super(readLock, false/* unisolated */);
+            
+            txService = getTxService();
+            
+            newTx();
+            
+        }
+        
+        /**
+         * Obtain a new read/write transaction from the journal's
+         * transaction service, and attach this SAIL connection to the new
+         * view of the database. 
+         */
+        protected void newTx() throws IOException {
+
+            // The view of the database *outside* of this connection.
+            final AbstractTripleStore database = BigdataSail.this.database;
+            
+            // The namespace of the triple store.
+            final String namespace = database.getNamespace();
+
+            // Open a new read/write transaction.
+            this.tx = txService.newTx(ITx.UNISOLATED);
+
+            try {
+
+                /*
+                 * Locate a view of the triple store isolated by that
+                 * transaction.
+                 */
+                final AbstractTripleStore txView = (AbstractTripleStore) database
+                        .getIndexManager().getResourceLocator().locate(
+                                namespace, tx);
+
+                // Attach that transaction view to this SailConnection.
+                attach(txView);
+
+            } catch (Throwable t) {
+
+                try {
+                    txService.abort(tx);
+                } catch (IOException ex) {
+                    log.error(ex, ex);
+                }
+                
+                throw new RuntimeException(t);
+                
+            }
+
+        }
+
+        /**
+         * A specialized commit that goes through the transaction service
+         * available on the journal's transaction manager.  Once the commit
+         * happens, a new read/write transaction is automatically started
+         * so that this connection can continue to absorb writes.
+         * <p>
+         * Note: writes to the lexicon without dirtying the isolated indices
+         * (i.e. writes to the SPO relation) will cause the writes to the
+         * lexicon to never be committed.  Probably not a significant issue.
+         */
+        @Override
+        public synchronized void commit() throws SailException {
+
+            /*
+             * don't double commit, but make a note that writes to the lexicon
+             * without dirtying the isolated indices will cause the writes to
+             * the lexicon to never be committed
+             */
+            
+            assertWritableConn();
+
+            /*
+             * Flush any pending writes.
+             * 
+             * Note: This must be done before you compute the closure so that
+             * the pending writes will be read by the inference engine when it
+             * computes the closure.
+             */
+            
+            flushStatementBuffers(true/* assertions */, true/* retractions */);
+            
+            try {
+            
+                txService.commit(tx);
+                
+                newTx();
+            
+            } catch(IOException ex) {
+                    
+                throw new SailException(ex);
+                
+            }
+            
+        }
+        
+        /**
+         * A specialized rollback that goes through the transaction service
+         * available on the journal's transaction manager.  Once the abort
+         * happens, a new read/write transaction is automatically started
+         * so that this connection can continue to absorb writes.
+         */
+        @Override
+        public synchronized void rollback() throws SailException {
+
+            /*
+             * Note: DO NOT invoke super.rollback(). That will cause a
+             * database (Journal) level abort(). The Journal level abort()
+             * will discard the writes buffered on the unisolated indices
+             * (the lexicon indices). That will cause lost updates and break
+             * the eventually consistent design for the TERM2ID and ID2TERM
+             * indices.
+             */
+//            super.rollback();
+            
+            try {
+            
+                txService.abort(tx);
+                
+                newTx();
+            
+            } catch(IOException ex) {
+                    
+                throw new SailException(ex);
+                
+            }
+            
+        }
+        
+        /**
+         * A specialized close that will also abort the current read/write
+         * transaction.
+         */
+        @Override
+        public synchronized void close() throws SailException {
+
+            if (!openConn) {
+                
+                return;
+                
+            }
+            
+            super.close();
+            
+            try {
+
+                txService.abort(tx);
+            
+            } catch(IOException ex) {
+                    
+                throw new SailException(ex);
+                
+            }
+            
+        }
+        
+    } // class BigdataSailReadWriteTxConnection
+    
+    private class BigdataSailReadOnlyConnection extends BigdataSailConnection {
+
+        /**
+         * The transaction service.
+         */
+        private final ITransactionService txService;
+        
+        /**
+         * The transaction id.
+         */
+        private long tx;
+
+        /**
+         * Constructor starts a new transaction.
+         */
+        BigdataSailReadOnlyConnection(final long timestamp) throws IOException {
+
+            super(null/* lock */, false/* unisolated */);
+            
+            txService = getTxService();
+
+            newTx(timestamp);
+            
+        }
+        
+        /**
+         * Obtain a new read-only transaction from the journal's transaction
+         * service, and attach this SAIL connection to the new view of the
+         * database.
+         */
+        protected void newTx(final long timestamp) throws IOException {
+            
+            // The view of the database *outside* of this connection.
+            final AbstractTripleStore database = BigdataSail.this.database;
+            
+            // The namespace of the triple store.
+            final String namespace = database.getNamespace();
+
+            // Obtain a new read-only transaction reading from that timestamp.
+            this.tx = txService.newTx(timestamp);
+
+            try {
+                
+                /*
+                 * Locate a view of the triple store isolated by that
+                 * transaction.
+                 */
+                final AbstractTripleStore txView = (AbstractTripleStore) database
+                        .getIndexManager().getResourceLocator().locate(
+                                namespace, tx);
+
+                // Attach that transaction view to this SailConnection.
+                attach(txView);
+
+            } catch (Throwable t) {
+
+                try {
+                    txService.abort(tx);
+                } catch (IOException ex) {
+                    log.error(ex, ex);
+                }
+
+                throw new RuntimeException(t);
+
+            }
+            
+        }
+
+        /**
+         * NOP
+         */
+        @Override
+        public synchronized void commit() throws SailException {
+
+            // NOP.
+            
+        }
+        
+        /**
+         * NOP
+         */
+        @Override
+        public synchronized void rollback() throws SailException {
+
+            // NOP
+            
+        }
+        
+        /**
+         * A specialized close that will also abort the current read-only
+         * transaction.
+         */
+        @Override
+        public synchronized void close() throws SailException {
+
+            if (!openConn) {
+                
+                return;
+                
+            }
+            
+            super.close();
+            
+            try {
+
+                txService.abort(tx);
+            
+            } catch(IOException ex) {
+                    
+                throw new SailException(ex);
+                
+            }
+            
+        }
+
+    } // class BigdataSailReadOnlyConnection
+    
 }

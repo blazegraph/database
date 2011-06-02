@@ -50,14 +50,13 @@ import com.bigdata.rawstore.WormAddressManager;
  */
 public class TemporaryStoreFactory {
 
-    protected static final transient Logger log = Logger
+    private static final transient Logger log = Logger
             .getLogger(TemporaryStoreFactory.class);
     
     /**
      * Configuration options for the {@link TemporaryStoreFactory}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public interface Options {
 

@@ -25,7 +25,6 @@ package com.bigdata.journal;
 
 import java.util.Properties;
 
-import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rawstore.IMRMW;
 
 /**
@@ -55,5 +54,11 @@ public interface IJournal extends IMRMW, IAtomicStore, IBTreeManager {
      * Immediate shutdown.
      */
     public void shutdownNow();
-    
+
+	/**
+	 * Return the object providing the local transaction manager for this
+	 * journal.
+	 */
+	public ILocalTransactionManager getLocalTransactionManager();
+
 }

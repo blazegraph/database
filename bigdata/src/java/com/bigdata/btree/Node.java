@@ -2665,7 +2665,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 		 * See http://www.cs.umd.edu/~pugh/java/memoryModel/archive/1096.html
 		 */
         AbstractNode child;
-        {//synchronized (childRefs) {
+        synchronized (childRefs) {
 
             /*
              * Note: we need to synchronize on here to ensure visibility for
@@ -2728,7 +2728,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * Note: This code block is synchronized in order to facilitate the safe
          * publication of the change in childRefs[index] to other threads.
          */
-        {//synchronized (childRefs) {
+        synchronized (childRefs) {
 
             /*
              * Since the childRefs[index] element has not been updated we do so

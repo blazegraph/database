@@ -85,10 +85,10 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
 
         final BigdataSail sail = getSail();
         
-        sail.initialize();
-        
         try {
         
+            sail.initialize();
+            
         if (!((BigdataSail) sail).database.getStatementIdentifiers()) {
 
             log.warn("Statement identifiers are not enabled");
@@ -234,7 +234,8 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
 
                     final BindingSet solution = itr.next();
 
-                    System.out.println("solution[" + i + "] : " + solution);
+                    if (log.isInfoEnabled())
+                        log.info("solution[" + i + "] : " + solution);
 
                     final Value actual = solution.getValue("Y");
 

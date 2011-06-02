@@ -25,18 +25,8 @@ abstract public class AbstractLocalTransactionManager implements
     /**
      * Logger.
      */
-    protected static final Logger log = Logger
-            .getLogger(AbstractLocalTransactionManager.class);
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final static protected boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final static protected boolean DEBUG = log.isDebugEnabled();
+	private static final Logger log = Logger
+			.getLogger(AbstractLocalTransactionManager.class);
 
     public AbstractLocalTransactionManager() {
 

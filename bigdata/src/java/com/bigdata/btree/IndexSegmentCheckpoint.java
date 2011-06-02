@@ -663,50 +663,51 @@ public class IndexSegmentCheckpoint {
         if (nentries < 0)
             throw new RootBlockException("nentries=" + nentries);
         
-        if (nentries == 0) {
-
-            /*
-             * Empty index segment.
-             */
-
-            if (nleaves != 0)
-                throw new RootBlockException("empty index but nleaves="
-                        + nleaves);
-
-            if (nnodes != 0)
-                throw new RootBlockException("empty index but nnodes="
-                        + nnodes);
-        
-            if (maxNodeOrLeafLength != 0)
-                throw new RootBlockException(
-                        "empty index but maxNodeOrLeafLength="
-                                + maxNodeOrLeafLength);
-            
-            if (extentLeaves != 0L)
-                throw new RootBlockException("empty index but extentLeaves="
-                        + extentLeaves);
-
-            if (offsetLeaves != 0L)
-                throw new RootBlockException("empty index but offsetLeaves="
-                        + offsetLeaves);
-
-            if (extentNodes != 0L)
-                throw new RootBlockException("empty index but extentNodes="
-                        + extentNodes);
-
-            if (offsetNodes != 0L)
-                throw new RootBlockException("empty index but offsetNodes="
-                        + offsetNodes);
-            
-            if (addrFirstLeaf != 0L)
-                throw new RootBlockException("empty index but addrFirstLeaf="
-                        + addrFirstLeaf);
-            
-            if (addrLastLeaf != 0L)
-                throw new RootBlockException("empty index but addrLastLeaf="
-                        + addrLastLeaf);
-            
-        } else {
+//        if (nentries == 0) {
+//
+//            /*
+//             * Empty index segment.
+//             */
+//
+//            if (nleaves != 0)
+//                throw new RootBlockException("empty index but nleaves="
+//                        + nleaves);
+//
+//            if (nnodes != 0)
+//                throw new RootBlockException("empty index but nnodes="
+//                        + nnodes);
+//        
+//            if (maxNodeOrLeafLength != 0)
+//                throw new RootBlockException(
+//                        "empty index but maxNodeOrLeafLength="
+//                                + maxNodeOrLeafLength);
+//            
+//            if (extentLeaves != 0L)
+//                throw new RootBlockException("empty index but extentLeaves="
+//                        + extentLeaves);
+//
+//            if (offsetLeaves != 0L)
+//                throw new RootBlockException("empty index but offsetLeaves="
+//                        + offsetLeaves);
+//
+//            if (extentNodes != 0L)
+//                throw new RootBlockException("empty index but extentNodes="
+//                        + extentNodes);
+//
+//            if (offsetNodes != 0L)
+//                throw new RootBlockException("empty index but offsetNodes="
+//                        + offsetNodes);
+//            
+//            if (addrFirstLeaf != 0L)
+//                throw new RootBlockException("empty index but addrFirstLeaf="
+//                        + addrFirstLeaf);
+//            
+//            if (addrLastLeaf != 0L)
+//                throw new RootBlockException("empty index but addrLastLeaf="
+//                        + addrLastLeaf);
+//            
+//        } else {
+        {
         
         if (nleaves <= 0)
             throw new RootBlockException("nleaves=" + nleaves);
@@ -1015,7 +1016,7 @@ public class IndexSegmentCheckpoint {
         sb.append(", nnodes=" + nnodes);
         sb.append(", nentries=" + nentries);
         sb.append(", maxNodeOrLeafLength=" + maxNodeOrLeafLength);
-        sb.append(", leavesRegion={extent=" + extentLeaves+", offset="+offsetLeaves+"}, avgLeafSize="+(extentLeaves/nleaves));
+        sb.append(", leavesRegion={extent=" + extentLeaves+", offset="+offsetLeaves+"}, avgLeafSize="+(nleaves==0?0:(extentLeaves/nleaves)));
         sb.append(", nodesRegion={extent=" + extentNodes+", offset="+offsetNodes+"}, avgNodeSize="+(nnodes==0?0:(extentNodes/nnodes)));
         sb.append(", blobsRegion={extent=" + extentBlobs+", offset="+offsetBlobs+"}");
         sb.append(", addrRoot=" + am.toString(addrRoot));

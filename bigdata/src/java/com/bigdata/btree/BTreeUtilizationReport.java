@@ -70,7 +70,8 @@ public class BTreeUtilizationReport implements IBTreeUtilizationReport,
 		nodeUtilization = (int) (nnodes == 0 ? 100 : (100L * numNonRootNodes)
 				/ (nnodes * (long) branchingFactor));
 
-		leafUtilization = (int) ((100L * nentries) / (nleaves * (long) branchingFactor));
+        leafUtilization = (int) (nleaves == 0 ? 0 : (100L * nentries)
+                / (nleaves * (long) branchingFactor));
 
         totalUtilization = (nodeUtilization + leafUtilization) / 2;
 

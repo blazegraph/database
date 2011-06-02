@@ -81,6 +81,10 @@ public class TestIndexSegmentBuilderWithBlobCapacity extends
         }
     }
     
+    protected boolean useRawRecords() {
+        return true;
+    }
+
     protected IndexSegmentCheckpoint doBuildAndDiscardCache(final BTree btree,
             final int m) throws IOException, Exception {
 
@@ -108,8 +112,4 @@ public class TestIndexSegmentBuilderWithBlobCapacity extends
 
     }
     
-    protected boolean useRawRecords() {
-		return true;
-	}
-
 }

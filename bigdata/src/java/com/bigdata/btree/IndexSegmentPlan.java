@@ -156,11 +156,11 @@ public class IndexSegmentPlan {
             if (log.isInfoEnabled())
                 log.info("Empty tree.");
             
-            nleaves = 0;
+            nleaves = 1;
             height = 0;
-            numInLeaf = new int[]{};
-            numInNode = new int[][]{};
-            numInLevel = new long[]{};
+            numInLeaf = new int[]{0};
+            numInNode = new int[][]{new int[]{0}};
+            numInLevel = new long[]{1};
             nnodes = 0;
             
             return;
