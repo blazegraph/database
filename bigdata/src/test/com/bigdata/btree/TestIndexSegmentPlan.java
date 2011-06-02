@@ -27,51 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-
 /**
  * Test suite for efficient post-order rebuild of an index in an external index
  * segment.
- * 
- * @todo verify post-conditions for files (temp file is deleted, perhaps the
- *       index segment is read only).
- * 
- * @todo try building large indices, exporting them into index segments, and
- *       then verifying that the index segments have the correct data. We can
- *       run a variety of index stress tests to build the index, sweep in data
- *       from the file system, etc., and then generate the corresponding index
- *       segment and validate it against the in memory {@link BTree}.
- * 
- * @todo The notion of merging multiple index segments requires a notion of
- *       which index segments are more recent or alternatively which values are
- *       more recent so that we can reconcile values for the same key. this is
- *       linked to how we will handle transactional isolation.
- * 
- * @todo Handle "delete" markers. For full transactional isolation we need to
- *       keep delete markers around until there are no more live transactions
- *       that could read the index entry. This suggests that we probably want to
- *       use the transaction timestamp rather than a version counter. Consider
- *       that a read by tx1 needs to check the index on the journal and then
- *       each index segment in turn in reverse historical order until an entry
- *       (potentially a delete marker) is found that is equal to or less than
- *       the timestamp of the committed state from which tx1 was born. This
- *       means that an index miss must test the journal and all live segments
- *       for that index (hence the use of bloom filters to filter out index
- *       misses). It also suggests that we should keep the timestamp as part of
- *       the key, except in the ground state index on the journal where the
- *       timestamp is the timestamp of the last commit of the journal. This
- *       probably will also address VLR TX that would span a freeze of the
- *       journal. We expunge the isolated index into a segment and do a merge
- *       when the transaction finally commits. We wind up doing the same
- *       validation and merge steps as when the isolation occurs within a more
- *       limited buffer, but in more of a batch fashion. This might work nicely
- *       if we buffer the isolatation index out to a certain size in memory and
- *       then start to spill it onto the journal. If fact, the hard reference
- *       queue already does this so we can just test to see if (a) anything has
- *       been written out from the isolation index; and (b) whether or not the
- *       journal was frozen since the isolation index was created.
- * 
- * Should the merge down should impose the transaction commit timestamp on the
- * items in the index?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -363,6 +321,48 @@ public class TestIndexSegmentPlan extends AbstractBTreeTestCase {
         assertEquals("numInNode[][]",plan.height+1,plan.numInNode.length);
         assertEquals("numInNode[0][]",new int[]{2},plan.numInNode[0]);
         assertEquals("numInNode[1][]",new int[]{5,5},plan.numInNode[1]);
+        
+    }
+
+    /**
+     * Tests {@link IndexSegmentPlan} for a tree with a branching factor of
+     * (m=10) and (n=10) entries (everything fits into the root leaf)
+     */
+    public void test_plan_m10_n10_everythingInTheRootLeaf() {
+        
+        IndexSegmentPlan plan = new IndexSegmentPlan(10,10);
+
+        assertEquals("m",10,plan.m);
+        assertEquals("(m+1/2)",5,plan.m2);
+        assertEquals("nentries",10,plan.nentries);
+        assertEquals("nleaves",1,plan.nleaves);
+        assertEquals("nnodes",0,plan.nnodes);
+        assertEquals("height",0,plan.height);
+        assertEquals("numInLeaf[]",new int[]{10},plan.numInLeaf);
+        assertEquals("numInLevel[]",new long[]{1},plan.numInLevel);
+        assertEquals("numInNode[][]",plan.height+1,plan.numInNode.length);
+        assertEquals("numInNode[0][]",new int[]{10},plan.numInNode[0]);
+        
+    }
+
+    /**
+     * Tests {@link IndexSegmentPlan} for a tree with a branching factor of
+     * (m=3) and (n=0) entries.
+     */
+    public void test_plan_m3_n0_emptyRootLeaf() {
+        
+        final IndexSegmentPlan plan = new IndexSegmentPlan(3, 0);
+
+        assertEquals("m",3,plan.m);
+        assertEquals("(m+1/2)",2,plan.m2);
+        assertEquals("nentries",0,plan.nentries);
+        assertEquals("nleaves",1,plan.nleaves);
+        assertEquals("nnodes",0,plan.nnodes);
+        assertEquals("height",0,plan.height);
+        assertEquals("numInLeaf[]",new int[]{0},plan.numInLeaf);
+        assertEquals("numInLevel[]",new long[]{1},plan.numInLevel);
+        assertEquals("numInNode[][]",plan.height+1,plan.numInNode.length);
+        assertEquals("numInNode[0][]",new int[]{0},plan.numInNode[0]);
         
     }
 

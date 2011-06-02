@@ -52,12 +52,14 @@ import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
+ * A test suite developed for some bits and pieces of SPARQL 1.0 coverage.
+ * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
 public class DavidsTestBOps extends ProxyBigdataSailTestCase {
 
-    protected static final Logger log = Logger.getLogger(DavidsTestBOps.class);
+    private static final Logger log = Logger.getLogger(DavidsTestBOps.class);
     
     @Override
     public Properties getProperties() {

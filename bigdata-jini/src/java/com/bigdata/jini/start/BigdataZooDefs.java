@@ -274,4 +274,15 @@ public interface BigdataZooDefs {
      */
     String MASTER_ELECTION = "masterElection";
 
+	/**
+	 * The name of the znode that is a child of {@link #LOGICAL_SERVICE_PREFIX}
+	 * serving as the root of the HA quorum for that logical service. For 
+	 * example:
+	 * 
+	 * <pre>
+	 * zpath=/benchmark/config/com.bigdata.service.jini.TransactionServer/logicalService0000000000/quorum
+	 * </pre>
+	 */
+    String QUORUM = "quorum";
+
 }

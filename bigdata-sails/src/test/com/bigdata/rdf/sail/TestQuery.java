@@ -27,19 +27,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
+
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
+
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.QueryLanguage;
-import org.openrdf.query.TupleQuery;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.Projection;
 import org.openrdf.query.algebra.ProjectionElem;
@@ -52,6 +52,7 @@ import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.sail.SailException;
+
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.store.DataLoader;
 
@@ -76,11 +77,6 @@ public class TestQuery extends ProxyBigdataSailTestCase {
         super(arg0);
     }
 
-    /**
-     * The namespace used when the LUBM data set was generated.
-     */
-    final String ub = "http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#";
-    
     /**
      * Load the data set (LUBM with 1 university).
      * 
@@ -121,9 +117,10 @@ public class TestQuery extends ProxyBigdataSailTestCase {
 
         }
 
-        log.info("Loading " + n + " files from " + dir);
+        if(log.isInfoEnabled())
+            log.info("Loading " + n + " files from " + dir);
 
-        DataLoader dataLoader = sail.database.getDataLoader();
+        final DataLoader dataLoader = sail.database.getDataLoader();
 
         dataLoader.loadData(resource, baseURL, rdfFormat);
 
@@ -161,14 +158,21 @@ public class TestQuery extends ProxyBigdataSailTestCase {
 
         final BigdataSail sail = getSail();
         
-        sail.initialize();
-        
         try {
         
+        sail.initialize();
+            
         loadData(sail);
         
         final BigdataSailConnection conn = sail.getConnection();
 
+        try {
+        
+        /**
+         * The namespace used when the LUBM data set was generated.
+         */
+        final String ub = "http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#";
+         
         final URI graduateStudent = new URIImpl(ub+"GraduateStudent");
 
         final URI takesCourse = new URIImpl(ub+"takesCourse");
@@ -275,16 +279,18 @@ public class TestQuery extends ProxyBigdataSailTestCase {
                 
                 while (itr.hasNext()) {
 
-                    BindingSet solution = itr.next();
+                    final BindingSet solution = itr.next();
                     
-                    System.out.println("solution["+i+"] : "+solution);
-                    
+                    if (log.isInfoEnabled())
+                        log.info("solution[" + i + "] : " + solution);
+
                     final Value actual = solution.getValue("X");
                     
                     final boolean found = expected.remove(actual);
                     
-                    assertTrue("Not expecting X=" + actual, found);
-                    
+                    if (!found)
+                        fail("Not expecting X=" + actual);
+
                     i++;
                     
                 }
@@ -301,10 +307,13 @@ public class TestQuery extends ProxyBigdataSailTestCase {
 
         finally {
 
-            conn.close();
-            
             cxn.close();
 
+        }
+        } finally {
+            
+            conn.close();
+            
         }
         
         } finally {

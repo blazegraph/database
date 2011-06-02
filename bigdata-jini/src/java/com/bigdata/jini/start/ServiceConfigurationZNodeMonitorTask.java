@@ -612,7 +612,11 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
             case MasterElectionLock:
             
                 return NONE;
+            
+            case Quorum:
                 
+            	return NONE;
+            	
             default:
             
                 throw new AssertionError(zpath);

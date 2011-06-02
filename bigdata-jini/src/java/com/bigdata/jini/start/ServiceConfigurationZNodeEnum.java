@@ -42,7 +42,13 @@ public enum ServiceConfigurationZNodeEnum {
     /**
      * An ephemeral znode representing physical service instance.
      */
-    PhysicalService;
+    PhysicalService,
+
+	/**
+	 * A persistent znode representing the quorum for a highly available logical
+	 * service.
+	 */
+	Quorum;
     
     private ServiceConfigurationZNodeEnum(){}
     
@@ -114,7 +120,7 @@ public enum ServiceConfigurationZNodeEnum {
         if (parent.endsWith(BigdataZooDefs.MASTER_ELECTION)) {
 
             /*
-             * The child is an EPHEMERAL znode representing a phsical
+             * The child is an EPHEMERAL znode representing a physical
              * service instance.
              */
 
@@ -141,6 +147,17 @@ public enum ServiceConfigurationZNodeEnum {
              */
 
             return PhysicalService;
+
+        }
+
+        if (child.endsWith(BigdataZooDefs.QUORUM)) {
+
+            /*
+             * The child is an PERSISTENT znode representing the quorum for
+             * the logical service.
+             */
+
+            return Quorum;
 
         }
 

@@ -72,6 +72,8 @@ public class TestAll_IndexSegment extends TestCase {
         suite.addTestSuite(TestIndexSegmentAddressManager.class);
         // test write and read back of the index segment metadata record.
         suite.addTestSuite(TestIndexSegmentCheckpoint.class);
+        // test with an empty B+Tree.
+        suite.addTestSuite(TestIndexSegmentBuilder_EmptyIndex.class);
         // test with small known examples in detail.
         suite.addTestSuite(TestIndexSegmentBuilderWithSmallTree.class);
         // and add in a stress test suite for those small examples.

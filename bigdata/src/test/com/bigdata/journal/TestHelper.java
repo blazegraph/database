@@ -109,10 +109,49 @@ public class TestHelper {
 
         }
 
+        checkTempStoresClosed(test, testClass);
+        
         // Also check the direct buffer pools.
         DirectBufferPoolTestHelper.checkBufferPools(test, testClass);
         
         
     }
 
+    /**
+     * Verify that any {@link TemporaryRawStore}s created by the test have been
+     * destroyed.
+     * <p>
+     * Note: This clears the counter as a side effect to prevent a cascade of
+     * tests from being failed.
+     * 
+     * @param test
+     *            The unit test instance.
+     * @param testClass
+     *            The instance of the delegate test class for a proxy test
+     *            suite. For example, TestWORMStrategy.
+     */
+    private static void checkTempStoresClosed(final TestCase test,
+            final TestCase testClass) {
+
+        final int nopen = TemporaryRawStore.nopen.getAndSet(0);
+        final int nclose = TemporaryRawStore.nclose.getAndSet(0);
+        
+        if (nopen != nclose) {
+
+            /*
+             * At least one temporary store was opened which was never closed.
+             */
+
+            Assert.fail("Test did not close temp store(s)"//
+                    + ": nopen=" + nopen //
+                    + ", nclose=" + nclose//
+                    + ", test=" + test.getClass() + "." + test.getName()//
+                    + (testClass == null ? "" : ", testClass="
+                            + testClass.getClass().getName())//
+            );
+
+        }
+
+    }
+    
 }

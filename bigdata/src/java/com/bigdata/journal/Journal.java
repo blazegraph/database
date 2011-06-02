@@ -41,7 +41,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
@@ -1188,16 +1187,32 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
     
-    public void deleteResources() {
-        
-        super.deleteResources();
-        
+//    public void deleteResources() {
+//        
+//        super.deleteResources();
+//        
+//        // Note: can be null if error in ctor.
+//        if (tempStoreFactory != null)
+//            tempStoreFactory.closeAll();
+//
+//    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to close the {@link TemporaryStoreFactory}.
+     */
+    @Override
+    protected void _close() {
+
+        super._close();
+
         // Note: can be null if error in ctor.
         if (tempStoreFactory != null)
             tempStoreFactory.closeAll();
 
     }
-
+    
     public <T> Future<T> submit(AbstractTask<T> task) {
 
         return concurrencyManager.submit(task);

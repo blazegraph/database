@@ -43,7 +43,8 @@ import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.sparse.SparseRowStore;
 
 public class JournalDelegate implements IJournal {
-	protected final AbstractJournal delegate;
+	
+	private final AbstractJournal delegate;
 	
 	public JournalDelegate(final AbstractJournal source) {
 		this.delegate = source;
@@ -221,7 +222,11 @@ public class JournalDelegate implements IJournal {
 		return delegate.getResourceLocator();
 	}
 
-	public IResourceLockService getResourceLockService() {
+    public ILocalTransactionManager getLocalTransactionManager() {
+        return delegate.getLocalTransactionManager();
+    }
+
+    public IResourceLockService getResourceLockService() {
 		return delegate.getResourceLockService();
 	}
 

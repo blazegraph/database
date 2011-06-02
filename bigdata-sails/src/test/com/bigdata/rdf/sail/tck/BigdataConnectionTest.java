@@ -168,14 +168,32 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
                 : ((BigdataSailRepository) testRepository).getDatabase()
                         .getIndexManager();
 
+        /*
+         * Note: The code in the block below was taken verbatim from
+         * super.testDown() in order to explore a tear down issue in testOpen().
+         */
         super.tearDown();
+//        {
+//            
+//            testCon2.close();
+//            testCon2 = null;
+//
+//            testCon.close();
+//            testCon = null;
+//
+//            testRepository.shutDown();
+//            testRepository = null;
+//
+//            vf = null;
+//
+//        }
 
         if (backend != null)
             backend.destroy();
 
     }
 
-	/**
+    /**
 	 * This test has been overridden because Sesame assumes "read-committed"
 	 * transaction semantics while bidata uses snapshot isolation for its
 	 * transactions.
@@ -249,5 +267,18 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
 		assertFalse(testCon2.hasStatement(bob, name, nameBob, false)); // Yes. This is snapshot isolation semantics.
 
     }
-    
+
+//    /**
+//     * Copied into the local test suite unchanged in order to debug with this
+//     * test.
+//     */
+//    @Override
+//    public void testOpen() throws Exception {
+//        assertTrue(testCon.isOpen());
+//        assertTrue(testCon2.isOpen());
+//        testCon.close();
+//        assertFalse(testCon.isOpen());
+//        assertTrue(testCon2.isOpen());
+//    }
+
 }

@@ -1991,8 +1991,16 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         final int nkeys = this.getKeyCount();
         final int minKeys = this.minKeys();
         final int maxKeys = this.maxKeys();
-        
-        if ((btree.root != this) && (nkeys < minKeys)) {
+
+        /*
+         * Since the index segment does not materialize the root when running a
+         * leaf cursor we can not rely on [btree.root != this].
+         */
+        final boolean isRoot = (btree.root == this)
+                || ((btree instanceof IndexSegment) && btree.getEntryCount() == 0);
+
+        if (!isRoot
+                && (nkeys < minKeys)) {
             /*
              * Min keys failure.
              * 
@@ -2000,7 +2008,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
              */
             out.println(indent(height) + "ERROR: too few keys: m="
                     + branchingFactor + ", minKeys=" + minKeys + ", nkeys="
-                    + nkeys + ", isLeaf=" + isLeaf());
+                    + nkeys + ", isLeaf=" + isLeaf() + ", isRoot=" + isRoot);
             ok = false;
         }
 
@@ -2008,7 +2016,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             // max keys failure.
             out.println(indent(height) + "ERROR: too many keys: m="
                     + branchingFactor + ", maxKeys=" + maxKeys + ", nkeys="
-                    + nkeys + ", isLeaf=" + isLeaf());
+                    + nkeys + ", isLeaf=" + isLeaf() + ", isRoot=" + isRoot);
             ok = false;
         }
 

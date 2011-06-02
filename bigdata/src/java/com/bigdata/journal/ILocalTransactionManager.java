@@ -36,8 +36,6 @@ import com.bigdata.service.IServiceShutdown;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo we don't really need an interface for this as there is only one impl.
  */
 public interface ILocalTransactionManager extends
         /* ITransactionManager, */IServiceShutdown {

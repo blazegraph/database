@@ -186,7 +186,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
              */
             {
 
-                StatementBuffer sb = new StatementBuffer(sail.database, 100/* capacity */);
+                final StatementBuffer<Statement> sb = new StatementBuffer<Statement>(
+                        sail.database, 100/* capacity */);
 
                 sb.add(new URIImpl("http://www.bigdata.com/A"), RDFS.LABEL,
                         new LiteralImpl("Yellow Rose"));
@@ -376,10 +377,12 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 		" }";
 
         // the ontology (nothing is indexed for full text search).
-        final Graph test_restart_1 = new GraphImpl(); {
+        final Graph test_restart_1 = new GraphImpl();
+        {
 
-            test_restart_1.add(new StatementImpl(ORGANIZATION, RDFS.SUBCLASSOF, ENTITY));
-            
+            test_restart_1.add(new StatementImpl(ORGANIZATION, RDFS.SUBCLASSOF,
+                    ENTITY));
+
         }
 
         // the entity data (the rdfs:label gets indexed for full text search)
@@ -422,8 +425,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 { // load ontology and optionally the entity data.
                     final RepositoryConnection cxn = repo.getConnection();
-                    cxn.setAutoCommit(false);
                     try {
+                        cxn.setAutoCommit(false);
                         log.info("loading ontology");
                         cxn.add(test_restart_1);
                         if (!doYouWantMeToBreak) {
@@ -443,8 +446,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 if (doYouWantMeToBreak) {
                     // load the entity data.
                     final RepositoryConnection cxn = repo.getConnection();
-                    cxn.setAutoCommit(false);
                     try {
+                        cxn.setAutoCommit(false);
                         log.info("loading entity data");
                         cxn.add(test_restart_2);
                         cxn.commit();
@@ -540,9 +543,9 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
             (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
-        
         try {
+
+            cxn.setAutoCommit(false);
             
             final BNode a = new BNodeImpl("_:a");
             final BNode b = new BNodeImpl("_:b");
@@ -702,11 +705,12 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
             (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
         
         try {
             
-        	final ValueFactory vf = sail.getValueFactory();
+            cxn.setAutoCommit(false);
+
+            final ValueFactory vf = sail.getValueFactory();
 
         	final URI s1 = vf.createURI(BD.NAMESPACE+"s1");
         	final URI s2 = vf.createURI(BD.NAMESPACE+"s2");
@@ -1006,7 +1010,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 
                 result = tupleQuery.evaluate();
 
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final ITextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
@@ -1226,7 +1230,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 
                 result = tupleQuery.evaluate();
 
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
                 final ITextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();

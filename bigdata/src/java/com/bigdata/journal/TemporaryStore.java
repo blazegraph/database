@@ -34,6 +34,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bfs.GlobalFileSystemHelper;
 import com.bigdata.btree.BTree;
@@ -47,10 +49,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * A temporary store that supports named indices but no concurrency controls.
- * {@link #checkpoint()} may be used to checkpoint the indices and
- * {@link #restoreLastCheckpoint()} may be used to revert to the last
- * checkpoint. If you note the checkpoint addresses from {@link #checkpoint()}
- * then you can restore any checkpoint with {@link #restoreCheckpoint(long)}
  * <p>
  * If you want a temporary store that supports named indices and concurrency
  * controls then choose a {@link Journal} with {@link BufferMode#Temporary}.
@@ -62,7 +60,13 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
+//* {@link #checkpoint()} may be used to checkpoint the indices and
+//* {@link #restoreLastCheckpoint()} may be used to revert to the last
+//* checkpoint. If you note the checkpoint addresses from {@link #checkpoint()}
+//* then you can restore any checkpoint with {@link #restoreCheckpoint(long)}
 public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
+
+    private static final Logger log = Logger.getLogger(TemporaryStore.class);
 
     /**
      * The size of the live index cache for the {@link Name2Addr} instance.
@@ -164,79 +168,79 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         
     }
     
-    /**
-     * The address of the last checkpoint written. When ZERO(0L) no checkpoint
-     * has been written and {@link #name2Addr} is simple discarded on
-     * {@link #abort()}.
-     */
-    private long lastCheckpointAddr = 0L;
-
-    /**
-     * Reverts to the last checkpoint, if any. If there is no last checkpoint,
-     * then the post-condition is as if the store had never been written on
-     * (except that the storage on the backing file is not reclaimed).
-     */
-    public void restoreLastCheckpoint() {
-        
-        restoreCheckpoint(lastCheckpointAddr);
-        
-    }
-    
-    /**
-     * Reverts to the checkpoint associated with the given <i>checkpointAddr</i>.
-     * When ZERO(0L), the post-condition is as if the store had never been
-     * written on (except that the storage on the backing file is not
-     * reclaimed). The <i>checkpointAddr</i> is noted as the current
-     * {@link #restoreLastCheckpoint()} point.
-     */
-    public void restoreCheckpoint(final long checkpointAddr) {
-
-        assertOpen();
-
-        name2Addr = null;
-        
-        if (checkpointAddr != 0L) {
-
-            name2Addr = (Name2Addr) Name2Addr
-                    .load(this, checkpointAddr, false/* readOnly */);
-
-        } else {
-            
-            setupName2AddrBTree();
-            
-        }
-        
-        // note the restore point.
-        lastCheckpointAddr = checkpointAddr;
-
-    }
-
-    /**
-     * Checkpoints the dirty indices and notes the new
-     * {@link #restoreLastCheckpoint()} point. You can revert to the last
-     * written checkpoint using {@link #restoreLastCheckpoint()} or to an
-     * arbitrary checkpoint using {@link #restoreCheckpoint(long)}.
-     * <p>
-     * Note: {@link ITx#READ_COMMITTED} views of indices become available after
-     * a {@link #checkpoint()}. If the store has not been checkpointed, then
-     * the read committed views are unavailable for an index. After a checkpoint
-     * in which a given index was dirty, a new read-committed view is available
-     * for that index and checkpoint.
-     * <p>
-     * Note: This is NOT an atomic commit protocol, but the restore point will
-     * be updated iff the checkpoint succeeds.
-     * 
-     * @return The checkpoint address.
-     */
-    public long checkpoint() {
-
-        assertOpen();
-
-        // checkpoint the indices and note the restore point.
-        return lastCheckpointAddr = name2Addr.handleCommit(System
-                .currentTimeMillis());
-        
-    }
+//    /**
+//     * The address of the last checkpoint written. When ZERO(0L) no checkpoint
+//     * has been written and {@link #name2Addr} is simple discarded on
+//     * {@link #abort()}.
+//     */
+//    private long lastCheckpointAddr = 0L;
+//
+//    /**
+//     * Reverts to the last checkpoint, if any. If there is no last checkpoint,
+//     * then the post-condition is as if the store had never been written on
+//     * (except that the storage on the backing file is not reclaimed).
+//     */
+//    public void restoreLastCheckpoint() {
+//        
+//        restoreCheckpoint(lastCheckpointAddr);
+//        
+//    }
+//    
+//    /**
+//     * Reverts to the checkpoint associated with the given <i>checkpointAddr</i>.
+//     * When ZERO(0L), the post-condition is as if the store had never been
+//     * written on (except that the storage on the backing file is not
+//     * reclaimed). The <i>checkpointAddr</i> is noted as the current
+//     * {@link #restoreLastCheckpoint()} point.
+//     */
+//    public void restoreCheckpoint(final long checkpointAddr) {
+//
+//        assertOpen();
+//
+//        name2Addr = null;
+//        
+//        if (checkpointAddr != 0L) {
+//
+//            name2Addr = (Name2Addr) Name2Addr
+//                    .load(this, checkpointAddr, false/* readOnly */);
+//
+//        } else {
+//            
+//            setupName2AddrBTree();
+//            
+//        }
+//        
+//        // note the restore point.
+//        lastCheckpointAddr = checkpointAddr;
+//
+//    }
+//
+//    /**
+//     * Checkpoints the dirty indices and notes the new
+//     * {@link #restoreLastCheckpoint()} point. You can revert to the last
+//     * written checkpoint using {@link #restoreLastCheckpoint()} or to an
+//     * arbitrary checkpoint using {@link #restoreCheckpoint(long)}.
+//     * <p>
+//     * Note: {@link ITx#READ_COMMITTED} views of indices become available after
+//     * a {@link #checkpoint()}. If the store has not been checkpointed, then
+//     * the read committed views are unavailable for an index. After a checkpoint
+//     * in which a given index was dirty, a new read-committed view is available
+//     * for that index and checkpoint.
+//     * <p>
+//     * Note: This is NOT an atomic commit protocol, but the restore point will
+//     * be updated iff the checkpoint succeeds.
+//     * 
+//     * @return The checkpoint address.
+//     */
+//    public long checkpoint() {
+//
+//        assertOpen();
+//
+//        // checkpoint the indices and note the restore point.
+//        return lastCheckpointAddr = name2Addr.handleCommit(System
+//                .currentTimeMillis());
+//        
+//    }
 
     public void registerIndex(final IndexMetadata metadata) {
         
@@ -295,23 +299,22 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         }
 
     }
-    
+
     /**
      * Historical reads and transactions are not supported.
-     * <p>
-     * Note: If {@link ITx#READ_COMMITTED} is requested, then the returned
-     * {@link BTree} will reflect the state of the named index as of the last
-     * {@link #checkpoint()}. This view will be read-only and is NOT updated by
-     * {@link #checkpoint()}. You must actually {@link #checkpoint()} before an
-     * {@link ITx#READ_COMMITTED} view will be available.
      * 
      * @param name
      * @param timestamp
      * 
      * @throws UnsupportedOperationException
-     *             unless the timestamp is either {@link ITx#READ_COMMITTED} or
-     *             {@link ITx#UNISOLATED}.
+     *             unless the timestamp is {@link ITx#UNISOLATED}.
      */
+//    * <p>
+//    * Note: If {@link ITx#READ_COMMITTED} is requested, then the returned
+//    * {@link BTree} will reflect the state of the named index as of the last
+//    * {@link #checkpoint()}. This view will be read-only and is NOT updated by
+//    * {@link #checkpoint()}. You must actually {@link #checkpoint()} before an
+//    * {@link ITx#READ_COMMITTED} view will be available.
     public BTree getIndex(final String name, final long timestamp) {
 
         assertOpen();

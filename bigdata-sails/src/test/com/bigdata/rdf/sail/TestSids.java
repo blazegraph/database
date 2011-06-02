@@ -95,13 +95,17 @@ public class TestSids extends ProxyBigdataSailTestCase {
     public void testSids() throws Exception {
 
         final BigdataSail sail = getSail();
-        sail.initialize();
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-        final BigdataSailRepositoryConnection cxn = 
-            (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
         
         try {
+
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            final BigdataSailRepositoryConnection cxn = 
+                (BigdataSailRepositoryConnection) repo.getConnection();
+            
+            try {
+
+            cxn.setAutoCommit(false);
     
             cxn.add(getClass().getResourceAsStream("sids.rdf"), "", RDFFormat.RDFXML);
 
@@ -176,8 +180,11 @@ public class TestSids extends ProxyBigdataSailTestCase {
                 
             }
             
+            } finally {
+                cxn.close();
+            }
+
         } finally {
-            cxn.close();
             sail.__tearDownUnitTest();
         }
 
@@ -186,15 +193,19 @@ public class TestSids extends ProxyBigdataSailTestCase {
     public void testSids2() throws Exception {
 
         final BigdataSail sail = getSail();
-        sail.initialize();
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-        final BigdataSailRepositoryConnection cxn = 
-            (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
         
         try {
     
-        	final ValueFactory vf = sail.getValueFactory();
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            final BigdataSailRepositoryConnection cxn = 
+                (BigdataSailRepositoryConnection) repo.getConnection();
+            
+            try {
+
+            cxn.setAutoCommit(false);
+
+            final ValueFactory vf = sail.getValueFactory();
         	
         	final URI host1 = vf.createURI("http://localhost/host1");
         	final URI host = vf.createURI("http://domainnamespace.com/host#Host");
@@ -314,9 +325,13 @@ public class TestSids extends ProxyBigdataSailTestCase {
                 }
                 
             }
+
+            } finally {
+                
+                cxn.close();
+            }
             
         } finally {
-            cxn.close();
             sail.__tearDownUnitTest();
         }
 

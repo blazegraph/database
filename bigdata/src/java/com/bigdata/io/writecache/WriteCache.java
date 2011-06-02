@@ -1076,13 +1076,16 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
-	/**
-	 * Locks 
-	 * @return
-	 * @throws InterruptedException 
-	 * @throws IllegalStateException 
-	 */
-	public String checkdata() throws IllegalStateException, InterruptedException {
+    /**
+     * Debug routine logs @ ERROR additional information when a checksum error
+     * has been encountered.
+     * 
+     * @return An informative error message.
+     * 
+     * @throws InterruptedException
+     * @throws IllegalStateException
+     */
+	private String checkdata() throws IllegalStateException, InterruptedException {
 		
 		if (!useChecksum) {
 			return "Unable to check since checksums are not enabled";
@@ -1094,7 +1097,8 @@ abstract public class WriteCache implements IWriteCache {
 			int nrecords = recordMap.size();
 			
 			for (Entry<Long, RecordMetadata> ent : recordMap.entrySet()) {
-				RecordMetadata md = ent.getValue();
+				
+			    final RecordMetadata md = ent.getValue();
 				
 				// length of the record w/o checksum field.
 				final int reclen = md.recordLength - 4;
