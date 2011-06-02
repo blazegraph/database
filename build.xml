@@ -1873,6 +1873,7 @@ ${postInstallMessage}</echo>
       	     fork="yes"
       	     forkmode="once"
       	     dir="${classes.dir}"
+      	     clonevm="true"
       	>
         <formatter type="xml" />
         <formatter type="brief"/>
