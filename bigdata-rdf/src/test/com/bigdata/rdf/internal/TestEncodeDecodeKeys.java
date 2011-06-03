@@ -55,6 +55,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
  * Unit tests for encoding and decoding compound keys (such as are used by the
@@ -1050,6 +1051,50 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         
     }
 
+	/**
+	 * Unit test for a fully inlined representation of a URI based on a
+	 * <code>byte</code> code. The flags byte looks like:
+	 * <code>VTE=URI, inline=true, extension=false,
+	 * DTE=XSDByte</code>. It is followed by a <code>unsigned byte</code> value
+	 * which is the index of the URI in the {@link Vocabulary} class for the
+	 * triple store.
+	 */
+    public void test_SPO_encodeDecode_URIByteIV() {
+
+        final IV<?, ?>[] e = {//
+				new URIByteIV<BigdataURI>((byte) Byte.MIN_VALUE),//
+				new URIByteIV<BigdataURI>((byte) -1),//
+				new URIByteIV<BigdataURI>((byte) 0),//
+				new URIByteIV<BigdataURI>((byte) 1),//
+				new URIByteIV<BigdataURI>((byte) Byte.MAX_VALUE),//
+        };
+
+        doEncodeDecodeTest(e);
+        
+    }
+
+	/**
+	 * Unit test for a fully inlined representation of a URI based on a
+	 * <code>short</code> code. The flags byte looks like:
+	 * <code>VTE=URI, inline=true, extension=false,
+	 * DTE=XSDShort</code>. It is followed by an <code>unsigned short</code>
+	 * value which is the index of the URI in the {@link Vocabulary} class for
+	 * the triple store.
+	 */
+    public void test_SPO_encodeDecode_URIShortIV() {
+
+        final IV<?, ?>[] e = {//
+				new URIShortIV<BigdataURI>((short) Short.MIN_VALUE),//
+				new URIShortIV<BigdataURI>((short) -1),//
+				new URIShortIV<BigdataURI>((short) 0),//
+				new URIShortIV<BigdataURI>((short) 1),//
+				new URIShortIV<BigdataURI>((short) Short.MAX_VALUE),//
+        };
+
+        doEncodeDecodeTest(e);
+        
+    }
+
     /**
      * Test for a URI broken down into namespace and local name components. The
      * namespace component is coded by setting the extension bit and placing the
@@ -1090,6 +1135,45 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
         doEncodeDecodeTest(e);
 
+    }
+
+	/**
+	 * Unit test for a fully inline representation of a URI based on a
+	 * namespaceIV represented by a {@link URIShortIV} and a Unicode localName.
+	 */
+    public void test_SPO_encodeDecode_URINamespaceIV() {
+
+        final IV<?, ?>[] e = {//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                new URINamespaceIV<BigdataURI>(
+                		new InlineLiteralIV<BigdataLiteral>("bar"),// localName
+                		new URIShortIV<BigdataURI>((short)1) // namespace
+                		),
+        };
+
+        doEncodeDecodeTest(e);
+        
+    }
+
+	/**
+	 * Unit test for a fully inline representation of a datatype Literal based
+	 * on a datatypeIV represented by a {@link URIShortIV} and a Unicode
+	 * localName.
+	 */
+    public void test_SPO_encodeDecode_LiteralNamespaceIV() {
+
+        final IV datatypeIV = new URIShortIV<BigdataURI>((short)1);
+
+        final IV<?, ?>[] e = {//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                new LiteralDatatypeIV<BigdataLiteral>(
+                        new InlineLiteralIV<BigdataLiteral>("bar"), datatypeIV),//
+        };
+
+        doEncodeDecodeTest(e);
+        
     }
     
 }
