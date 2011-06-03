@@ -58,13 +58,11 @@ abstract public class AbstractInlineIV<V extends BigdataValue, T>
         super(vte, true/*inline*/, extension, dte);
 
     }
-    
-    /**
-     * Returns the String-value of a Value object. This returns either a
-     * Literal's label, a URI's URI or a BNode's ID.
-     * 
-     * @see Value#stringValue()
-     */
+
+	/**
+	 * Returns a human interpretable string value of the {@link IV} object. When
+	 * possible, returns either a Literal's label, a URI's URI or a BNode's ID.
+	 */
     abstract public String stringValue();
 
     /**

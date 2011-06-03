@@ -103,7 +103,11 @@ public class LexiconConfiguration<V extends BigdataValue>
         this.inlineBNodes = inlineBNodes;
 //        this.inlineDateTimes = inlineDateTimes;
         this.xFactory = xFactory;
-        
+
+		/*
+		 * Note: These collections are read-only so we do NOT need additional
+		 * synchronization.
+		 */
         termIds = new HashMap<TermId, IExtension<BigdataValue>>();
         datatypes = new HashMap<String, IExtension<BigdataValue>>();
 
@@ -186,16 +190,33 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     }
 
-    /**
-     * If the {@link URI} can be inlined into the statement indices for this
-     * {@link LexiconConfiguration}, then return its inline {@link IV}.
-     * 
-     * @param value
-     *            The {@link URI}.
-     *            
-     * @return The inline {@link IV} -or- <code>null</code> if the {@link URI}
-     *         can not be inlined into the statement indices.
-     */
+	/**
+	 * If the {@link URI} can be inlined into the statement indices for this
+	 * {@link LexiconConfiguration}, then return its inline {@link IV}.
+	 * 
+	 * @param value
+	 *            The {@link URI}.
+	 * 
+	 * @return The inline {@link IV} -or- <code>null</code> if the {@link URI}
+	 *         can not be inlined into the statement indices.
+	 * 
+	 *         FIXME Consider an inlining mechanism for well known namespaces
+	 *         which bit codes the namespace against a predefined dictionary
+	 *         (one declared to the lexicon configuration). This could be used
+	 *         to radically reduce the space and time requirements for the
+	 *         common namespaces (rdf, rdfs, xsd, owl, bigdata, etc).
+	 *         <p>
+	 *         We are all out of {@link DTE} bits, so this would have to
+	 *         multiplex the {@link DTE#Extension} semantics. E.g., by reserving
+	 *         another byte if the extension bit is on which is then used to
+	 *         distinguish the different kinds of extension schemes. This is
+	 *         actually in line with the original concept for extension. Right
+	 *         now, there is only a single "kind" of extension where the
+	 *         following bytes are an {@link IV} to be resolved against the
+	 *         TERMS index. That works pretty well, but we are missing out on an
+	 *         opportunity to back the well known namespaces into just one byte.
+	 * 
+	 */
     private IV<BigdataURI, ?> createInlineURIIV(final URI value) {
 
         if (value.stringValue().length() <= maxInlineStringLength) {

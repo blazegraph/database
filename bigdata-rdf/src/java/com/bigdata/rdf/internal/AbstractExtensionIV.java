@@ -18,10 +18,10 @@ abstract public class AbstractExtensionIV<V extends BigdataValue, T> extends
 
     private final AbstractLiteralIV delegate;
     
-    private final TermId extensionIv;
+    private final IV extensionIv;
     
     protected AbstractExtensionIV(final VTE vte,
-            final AbstractLiteralIV delegate, final TermId extensionIv) {
+            final AbstractLiteralIV delegate, final IV extensionIv) {
 
         super(vte, true/* extension */, delegate.getDTE());
         
@@ -41,7 +41,7 @@ abstract public class AbstractExtensionIV<V extends BigdataValue, T> extends
     }
     
     @Override
-    public TermId getExtensionIV() {
+    public IV getExtensionIV() {
 
         return extensionIv;
         
@@ -65,7 +65,10 @@ abstract public class AbstractExtensionIV<V extends BigdataValue, T> extends
 
     final protected int _compareTo(final IV o) {
 
-        int ret = extensionIv._compareTo(((AbstractExtensionIV) o).extensionIv);
+//        int ret = extensionIv._compareTo(((AbstractExtensionIV) o).extensionIv);
+
+    	final int ret = extensionIv
+				.compareTo(((AbstractExtensionIV) o).extensionIv);
 
         if (ret != 0)
             return ret;

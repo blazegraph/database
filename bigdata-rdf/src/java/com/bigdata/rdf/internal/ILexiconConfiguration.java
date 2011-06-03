@@ -36,19 +36,20 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  */
 public interface ILexiconConfiguration<V extends BigdataValue> {
 
-    /**
-     * Create an inline {@link IV} for the supplied RDF value if inlining is
-     * supported for the supplied RDF value.
-     * <p>
-     * If the supplied RDF value is a {@link BigdataValue} then the {@link IV}
-     * will be set as a side-effect.
-     * 
-     * @param value
-     *            the RDF value
-     * 
-     * @return The inline {@link IV} -or- <code>null</code> if the {@link Value}
-     *         can not be represented by an {@link IV}.
-     */
+	/**
+	 * Create an inline {@link IV} for the supplied RDF value if inlining is
+	 * supported for the supplied RDF value.
+	 * <p>
+	 * If the supplied RDF value is a {@link BigdataValue} then the {@link IV}
+	 * will be set as a side-effect and will be available from
+	 * {@link BigdataValue#getIV()}.
+	 * 
+	 * @param value
+	 *            the RDF value
+	 * 
+	 * @return The inline {@link IV} -or- <code>null</code> if the {@link Value}
+	 *         can not be represented by an {@link IV}.
+	 */
     IV createInlineIV(final Value value);
     
     /**

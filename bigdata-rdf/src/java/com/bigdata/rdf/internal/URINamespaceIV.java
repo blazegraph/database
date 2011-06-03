@@ -15,10 +15,9 @@ import com.bigdata.rdf.model.BigdataURI;
 public class URINamespaceIV<V extends BigdataURI> extends
         AbstractExtensionIV<V, URI> {
 
-    public URINamespaceIV(final AbstractLiteralIV delegate,
-            final TermId datatype) {
+	public URINamespaceIV(final AbstractLiteralIV delegate, final IV datatype) {
 
-        super(VTE.URI, delegate, datatype);
+		super(VTE.URI, delegate, datatype);
 
     }
 
