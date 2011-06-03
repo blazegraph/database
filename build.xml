@@ -1869,7 +1869,8 @@ ${postInstallMessage}</echo>
 	  <!-- which make forking a JVM a requirement (the problems are   -->
       <!-- related to the logging setup).                             -->
  	  <!-- dir="${classes.dir}" -->
-      <junit printsummary="yes"
+      <!-- Note: printsummary is either 'on' or 'off' (default).      -->
+      <junit printsummary="on"
       	     haltonfailure="no"
       	     fork="yes"
       	     forkmode="once"
