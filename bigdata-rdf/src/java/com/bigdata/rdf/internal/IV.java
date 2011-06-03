@@ -154,6 +154,16 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      */
     boolean isInline();
 
+	/**
+	 * <code>true</code> iff the <code>flags</code> byte is followed by an
+	 * {@link IV} which defines how the subsequent value (represented according
+	 * to the {@link DTE}) will be interpreted. This is used to support
+	 * projections of value spaces for data type literals onto the intrinsic
+	 * types. It is also used to support indirect resolution of the namespace
+	 * associated with a URI.
+	 */
+    boolean isExtension();
+
     /**
      * Return the Java {@link Object} corresponding to the inline value.
      * 
@@ -162,13 +172,6 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      *             unless the RDF value is inline.
      */
     T getInlineValue() throws UnsupportedOperationException;
-
-//    /**
-//     * 
-//     * @return
-//     * @throws NoSuccessorException
-//     */
-//    T successor() throws NoSuccessorException;
     
     /**
      * <code>true</code> for any of the numeric data types (xsd:byte,

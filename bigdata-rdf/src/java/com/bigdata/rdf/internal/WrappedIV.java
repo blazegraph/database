@@ -150,6 +150,10 @@ public class WrappedIV implements IV {
 		return iv.isInline();
 	}
 
+	public boolean isExtension() {
+		return iv.isExtension();
+	}
+
 	public Object getInlineValue() throws UnsupportedOperationException {
 		return iv.getInlineValue();
 	}

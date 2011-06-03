@@ -435,14 +435,14 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         return isInline(flags);
     }
 
-    /**
-     * {@inheritDoc}
-     * <p>
-     * This implementation based on the <code>extension</code> bit flag. Since
-     * the extension flag is only used for datatype literals, this method can be
-     * overridden in many derived classes which have compile time knowledge of
-     * whether the value is an RDF {@link Literal} or not.
-     */
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * This implementation based on the <code>extension</code> bit flag. Since
+	 * the extension flag is only used for specific kinds of {@link IV}s, this
+	 * method can be overridden in many derived classes which have compile time
+	 * knowledge of whether the value is an RDF {@link Literal} or not.
+	 */
     public boolean isExtension() {
         return isExtension(flags);
     }
