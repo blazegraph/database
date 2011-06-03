@@ -563,8 +563,7 @@ public class IVUtility {
                  */
                 
                 // Decode the extension IV.
-                final TermId<?> extensionIV = (TermId<?>) IVUtility
-                        .decodeFromOffset(key, o);
+				final IV extensionIV = IVUtility.decodeFromOffset(key, o);
                 
                 // skip over the extension IV.
                 o += extensionIV.byteLength();
@@ -622,40 +621,45 @@ public class IVUtility {
             // create a sid iv and return it
             return new SidIV(spo);
         }
-        case BNODE: {
-            // The data type
-            final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
-            switch (dte) {
-            case XSDInt: {
-                final int x = KeyBuilder.decodeInt(key, o);
-                return new NumericBNodeIV<BigdataBNode>(x);
-            }
-            case UUID: {
-                final UUID x = KeyBuilder.decodeUUID(key, o);
-                return new UUIDBNodeIV<BigdataBNode>(x);
-            }
-            case XSDString: {
-                // decode buffer.
-                final StringBuilder sb = new StringBuilder();
-                // inline string value
-                final String str1;
-                // #of bytes read.
-                final int nbytes;
-                try {
-                    nbytes = un.decode(new ByteArrayInputStream(key, o,
-                            key.length - o), sb);
-                    str1 = sb.toString();
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                return new UnicodeBNodeIV<BigdataBNode>(str1,
-                        1/* flags */+ nbytes);
-            }
-            default:
-                throw new AssertionError();
-            }
+        case BNODE:
+        	return decodeInlineBNode(flags,key,o);
+        case URI:
+        	return decodeInlineURI(flags,key,o);
+        case LITERAL:
+            return decodeInlineLiteral(flags, key, o);
+        default:
+            throw new AssertionError();
         }
-        case URI: {
+        
+    }
+
+	/**
+	 * Decode an inline blank node from an offset.
+	 * 
+	 * @param flags
+	 *            The flags.
+	 * @param key
+	 *            The key.
+	 * @param o
+	 *            The offset.
+	 *            
+	 * @return The decoded {@link IV}.
+	 */
+	static private IV decodeInlineBNode(final byte flags, final byte[] key,
+			final int o) {
+    	
+        // The data type
+        final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
+        switch (dte) {
+        case XSDInt: {
+            final int x = KeyBuilder.decodeInt(key, o);
+            return new NumericBNodeIV<BigdataBNode>(x);
+        }
+        case UUID: {
+            final UUID x = KeyBuilder.decodeUUID(key, o);
+            return new UUIDBNodeIV<BigdataBNode>(x);
+        }
+        case XSDString: {
             // decode buffer.
             final StringBuilder sb = new StringBuilder();
             // inline string value
@@ -663,24 +667,81 @@ public class IVUtility {
             // #of bytes read.
             final int nbytes;
             try {
-                nbytes = un.decode(new ByteArrayInputStream(key, o, key.length
-                        - o), sb);
+                nbytes = un.decode(new ByteArrayInputStream(key, o,
+                        key.length - o), sb);
                 str1 = sb.toString();
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            return new InlineURIIV<BigdataURI>(new URIImpl(str1),
+            return new UnicodeBNodeIV<BigdataBNode>(str1,
                     1/* flags */+ nbytes);
         }
-        case LITERAL:
-            break;
         default:
-            throw new AssertionError();
+			throw new UnsupportedOperationException("dte=" + dte);
         }
-        
-        /*
-         * Inline literal.
-         */
+    }
+
+	/**
+	 * Decode an inline URI from a byte offset.
+	 * 
+	 * @param flags
+	 *            The flags byte.
+	 * @param key
+	 *            The key.
+	 * @param o
+	 *            The offset.
+	 * 
+	 * @return The decoded {@link IV}.
+	 */
+	static private IV decodeInlineURI(final byte flags, final byte[] key,
+			final int o) {
+
+		// The data type
+		final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
+		switch (dte) {
+		case XSDByte: {
+			final byte x = key[o];//KeyBuilder.decodeByte(key[o]);
+			return new URIByteIV<BigdataURI>(x);
+		}
+		case XSDShort: {
+			final short x = KeyBuilder.decodeShort(key, o);
+			return new URIShortIV<BigdataURI>(x);
+		}
+		case XSDString: {
+			// decode buffer.
+			final StringBuilder sb = new StringBuilder();
+			// inline string value
+			final String str1;
+			// #of bytes read.
+			final int nbytes;
+			try {
+				nbytes = un.decode(new ByteArrayInputStream(key, o, key.length
+						- o), sb);
+				str1 = sb.toString();
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+			return new InlineURIIV<BigdataURI>(new URIImpl(str1),
+					1/* flags */+ nbytes);
+		}
+		default:
+			throw new UnsupportedOperationException("dte=" + dte);
+		}
+
+	}
+
+	/**
+	 * Decode an inline literal from an offset.
+	 * 
+	 * @param flags
+	 *            The flags byte.
+	 * @param key
+	 *            The key.
+	 * @param o
+	 *            The offset.
+	 */
+	static private IV decodeInlineLiteral(final byte flags, final byte[] key,
+			int o) {
 
         // The data type
         final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
@@ -785,16 +846,26 @@ public class IVUtility {
             return isExtension ? new ExtensionIV<BigdataLiteral>(iv, datatype)
                     : iv;
             }
-            return decodeInlineLiteral(key,o);
+            return decodeInlineUnicodeLiteral(key,o);
         }
         default:
-            throw new UnsupportedOperationException("vte=" + vte + ", dte="
-                    + dte);
+			throw new UnsupportedOperationException("dte=" + dte);
         }
 
     }
-    
-    static private InlineLiteralIV<BigdataLiteral> decodeInlineLiteral(
+
+	/**
+	 * Decode an inline literal which is represented as a one or two compressed
+	 * Unicode values.
+	 * 
+	 * @param key
+	 *            The key.
+	 * @param offset
+	 *            The offset into the key.
+	 *            
+	 * @return The decoded {@link IV}.
+	 */
+    static private InlineLiteralIV<BigdataLiteral> decodeInlineUnicodeLiteral(
             final byte[] key, final int offset) {
 
         int o = offset;

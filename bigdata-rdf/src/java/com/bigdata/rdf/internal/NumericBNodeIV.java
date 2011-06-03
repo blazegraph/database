@@ -50,6 +50,12 @@ public class NumericBNodeIV<V extends BigdataBNode> extends
     
     private final int id;
     
+    int intValue() {
+    	
+    	return id;
+    	
+    }
+    
     public NumericBNodeIV(final int id) {
 
         super(DTE.XSDInt);

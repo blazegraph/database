@@ -588,11 +588,26 @@ public abstract class AbstractIV<V extends BigdataValue, T>
             /*
              * Handle a fully inline URI.
              */
-            final InlineURIIV<?> iv = (InlineURIIV<?>) this;
-            final String uriString = iv.getInlineValue().stringValue();
-            final byte[] b = IVUtility.un.encode1(uriString);
-            keyBuilder.append(b);
-            iv.setByteLength(1/* flags */+ b.length);
+            switch (getDTE()) {
+            case XSDByte: {
+				keyBuilder.append(((URIByteIV<?>) this).byteValue());
+				break;
+            }
+            case XSDShort: {
+				keyBuilder.append(((URIShortIV<?>) this).shortValue());
+				break;
+            }
+            case XSDString: {
+                final InlineURIIV<?> iv = (InlineURIIV<?>) this;
+                final String uriString = iv.getInlineValue().stringValue();
+                final byte[] b = IVUtility.un.encode1(uriString);
+                keyBuilder.append(b);
+                iv.setByteLength(1/* flags */+ b.length);
+				break;
+            }
+            default:
+                throw new UnsupportedOperationException("dte="+getDTE());
+            }
             return keyBuilder;
         }
 
@@ -601,9 +616,9 @@ public abstract class AbstractIV<V extends BigdataValue, T>
              * Handle inline blank nodes.
              */
             switch (getDTE()) {
-            case XSDInt:
-                keyBuilder.append(((Integer) getInlineValue()).intValue());
-                break;
+			case XSDInt:
+				keyBuilder.append(((NumericBNodeIV<?>) this).intValue());
+				break;
             case UUID:
                 keyBuilder.append((UUID) getInlineValue());
                 break;
@@ -615,7 +630,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
                 break;
             }
             default:
-                throw new AssertionError();
+                throw new UnsupportedOperationException("dte="+getDTE());
             }
             // done.
             return keyBuilder;
@@ -751,7 +766,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         
     }
     
-    protected TermId getExtensionIV() {
+    protected IV getExtensionIV() {
         return null;
     }
 

@@ -15,8 +15,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 public class LiteralDatatypeIV<V extends BigdataLiteral> extends
         AbstractExtensionIV<V, Literal> {
 
-    public LiteralDatatypeIV(final AbstractLiteralIV delegate,
-            final TermId datatype) {
+	public LiteralDatatypeIV(final AbstractLiteralIV delegate, final IV datatype) {
 
         super(VTE.LITERAL, delegate, datatype);
 
