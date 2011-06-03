@@ -1868,11 +1868,11 @@ ${postInstallMessage}</echo>
       <!-- Note: There are classloader problems with icu4j-charset    -->
 	  <!-- which make forking a JVM a requirement (the problems are   -->
       <!-- related to the logging setup).                             -->
-      <junit printsummary="on"
+ 	  <!-- dir="${classes.dir}" -->
+      <junit printsummary="yes"
       	     haltonfailure="no"
       	     fork="yes"
       	     forkmode="once"
-      	     dir="${classes.dir}"
       	     clonevm="true"
       	>
         <formatter type="xml" />
