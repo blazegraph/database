@@ -52,10 +52,6 @@ import com.bigdata.util.InnerCause;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          TODO Unit tests for inlining behaviors for all valid configurations,
- *          including verification that the {@link IV} was cached on the
- *          caller's {@link BigdataValue}
  */
 public class LexiconConfiguration<V extends BigdataValue> 
         implements ILexiconConfiguration<V> {
@@ -199,23 +195,6 @@ public class LexiconConfiguration<V extends BigdataValue>
 	 * 
 	 * @return The inline {@link IV} -or- <code>null</code> if the {@link URI}
 	 *         can not be inlined into the statement indices.
-	 * 
-	 *         FIXME Consider an inlining mechanism for well known namespaces
-	 *         which bit codes the namespace against a predefined dictionary
-	 *         (one declared to the lexicon configuration). This could be used
-	 *         to radically reduce the space and time requirements for the
-	 *         common namespaces (rdf, rdfs, xsd, owl, bigdata, etc).
-	 *         <p>
-	 *         We are all out of {@link DTE} bits, so this would have to
-	 *         multiplex the {@link DTE#Extension} semantics. E.g., by reserving
-	 *         another byte if the extension bit is on which is then used to
-	 *         distinguish the different kinds of extension schemes. This is
-	 *         actually in line with the original concept for extension. Right
-	 *         now, there is only a single "kind" of extension where the
-	 *         following bytes are an {@link IV} to be resolved against the
-	 *         TERMS index. That works pretty well, but we are missing out on an
-	 *         opportunity to back the well known namespaces into just one byte.
-	 * 
 	 */
     private IV<BigdataURI, ?> createInlineURIIV(final URI value) {
 
