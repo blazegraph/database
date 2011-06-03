@@ -225,12 +225,17 @@ public enum DTE {
     XSDString((byte) 14, 0/* len */, String.class, XSD.STRING,
             DTEFlags.NOFLAGS), //
 
-    /**
-     * This is a place holder for extension of the intrinsic data types. Its
-     * code corresponds to 0xf, which is to say all four bits are on. When this
-     * code is used, the next byte(s) must be examined to determine the actual
-     * intrinsic data type.
-     */
+	/**
+	 * This is a place holder for extension of the intrinsic data types. Its
+	 * code corresponds to 0xf, which is to say all four bits are on. When this
+	 * code is used, the next byte(s) must be examined to determine the actual
+	 * intrinsic data type.
+	 * <p>
+	 * Note: This is NOT the same as the {@link AbstractIV#isExtension()} bit.
+	 * The latter <strong>always</strong> indicates that an {@link IV} follows
+	 * the <code>flags</code> byte. In contrast, {@link DTE#Extension} gives you
+	 * another byte which you can use to handle additional "intrinsic" types.
+	 */
     Extension((byte) 15, 0/* len */, Void.class, null/* datatype */,
             DTEFlags.NOFLAGS);
     
