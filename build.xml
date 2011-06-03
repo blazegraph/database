@@ -1672,14 +1672,14 @@ ${postInstallMessage}</echo>
       <echo>JUNIT RUN COMPLETE</echo>
     </target>
 
-	<target name="stopTestServices" if="${startTestServices}">
+	<target name="stopTestServices" unless="${skipTestServices}">
 		  <echo message="Stopping test services."/>
 	      <antcall target="stopZookeeper"/>
 	      <antcall target="stopLookup" />
 	      <antcall target="stopHttpd" />
 	</target>
 
-	<target name="startTestServices" if="${startTestServices}">
+	<target name="startTestServices" unless="${skipTestServices}">
 		  <echo message="Starting test services."/>
 	      <antcall target="startZookeeper"/>
 	      <antcall target="startHttpd"/>
