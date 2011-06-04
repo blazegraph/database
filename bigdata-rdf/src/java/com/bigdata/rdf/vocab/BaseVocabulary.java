@@ -31,28 +31,26 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.ValueFactoryImpl;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
-import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.io.LongPacker;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.URIByteIV;
+import com.bigdata.rdf.internal.URIShortIV;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueSerializer;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -72,23 +70,41 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
     private static final long serialVersionUID = 1560142397515291331L;
 
     /**
-     * The database that is the authority for the defined terms and term
-     * identifiers. This will be <code>null</code> when the de-serialization
-     * ctor is used.
+     * The {@link BigdataValueFactory} for the namespace associated with the KB
+     * instance.
      */
-    final private transient AbstractTripleStore database;
+    private transient BigdataValueFactory valueFactory;
 
     /**
-     * The {@link Value}s together with their assigned term identifiers.
+     * An ordered set of the declared vocabulary classes in the order in which
+     * they were declared.
      */
-    private Map<Value, IV> values;
+    private transient LinkedHashSet<VocabularyDecl> decls;
+
+    /**
+     * The {@link Value}s together with their assigned {@link IV}s.
+     * <p>
+     * Note: The {@link IV} is permanently attached to each {@link BigdataValue}.
+     * <p>
+     * Note: A {@link Map} is used for O(1) lookup of a {@link BigdataValue}
+     * from a {@link Value}, but the keys and values for a given entry are
+     * always the same reference.
+     */
+    private transient LinkedHashMap<Value, BigdataValue> val2iv;
+
+    /**
+     * Reverse lookup from {@link IV} to {@link Value}.
+     */
+    private transient Map<IV, BigdataValue> iv2val;
     
     /**
      * De-serialization ctor. 
      */
     protected BaseVocabulary() {
-        
-        this.database = null;
+    
+        /*
+         * Note: [namespace] is set by readExternal().
+         */
         
     }
     
@@ -98,154 +114,273 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
      * @param database
      *            The database.
      */
-    protected BaseVocabulary(AbstractTripleStore database) {
-        
-        if (database == null)
+    protected BaseVocabulary(final String namespace) {
+
+        if (namespace == null)
             throw new IllegalArgumentException();
-        
-        this.database = database;
+
+        this.valueFactory = BigdataValueFactoryImpl
+                .getInstance(namespace);
         
     }
 
     /**
-     * Uses {@link #addAxioms(Collection)} to collect the declared axioms and
-     * then writes the axioms onto the database specified to the
-     * {@link BaseVocabulary#BaseVocabulary(AbstractTripleStore)} ctor.
+     * Invoked by {@link AbstractTripleStore#create()} to initialize the
+     * {@link Vocabulary}.
      * 
-     * @throws IllegalStateException
-     *             if that ctor was not used.
      * @throws IllegalStateException
      *             if {@link #init()} has already been invoked.
      */
-    final public void init() {
+    synchronized final public void init() {
 
-        if (database == null)
+        /*
+         * Note: This just passes in the default initial capacity for a hash map
+         * since we do not have better information when invoked in this manner.
+         */
+        
+        init(16/* ndecls */, 16/* nvalues */);
+        
+    }
+    
+    /**
+     * Invoked by {@link AbstractTripleStore#create()} to initialize the
+     * {@link Vocabulary}.
+     * 
+     * @throws IllegalStateException
+     *             if {@link #init()} has already been invoked.
+     */
+    synchronized final private void init(final int declsInitialCapacity,
+            final int valuesInitialCapacity) {
+
+        if (valueFactory == null)
             throw new IllegalStateException();
 
-        if (values != null)
+        if (val2iv != null)
             throw new IllegalStateException();
         
-        // setup [values] collection.
-        values = new HashMap<Value, IV>(200);
+        if (iv2val != null)
+            throw new IllegalStateException();
+        
+        // Setup declarations set.
+        this.decls = new LinkedHashSet<VocabularyDecl>(declsInitialCapacity);
 
-        // obtain collection of values to be used.
+        // Setup forward map.
+        val2iv = new LinkedHashMap<Value, BigdataValue>(valuesInitialCapacity);
+
+        // Hook for subclass to provide its vocabulary decls.
         addValues();
 
-        // write values onto the database lexicon.
-        writeValues();
+        // Setup reverse map now that we know the exact size.
+        iv2val = new LinkedHashMap<IV, BigdataValue>(val2iv.size());
+
+        addAllDecls();
+        
+        // Make stable assignment of IVs to each Value, populating maps.
+        generateIVs();
         
     }
     
     /**
-     * Add all {@link Value}s declared by this class.
-     * <p>
-     * Note: Subclasses MUST extend this method to add their {@link Value}s.
+     * Hook for subclasses to provide their {@link VocabularyDecl}s using
+     * {@link #addDecl(VocabularyDecl)}.
      */
-    protected void addValues() {
-
-        if (values == null)
-            throw new IllegalStateException();
-        
-        // NOP.
-        
-    }
+    abstract protected void addValues();
     
     /**
-     * Adds a {@link Value} into the internal collection.
+     * Add a declared vocabulary.
      * 
-     * @param value
-     *            The value.
-     * 
-     * @throws IllegalArgumentException
-     *             if the value is <code>null</code>.
+     * @param decl
+     *            The vocabulary declaration.
      */
-    final protected void add(Value value) {
+    final protected void addDecl(final VocabularyDecl decl) {
 
-        if (database == null)
-            throw new IllegalStateException();
-
-        if (values == null)
-            throw new IllegalStateException();
-
-        if (value == null)
+        if (decl == null)
             throw new IllegalArgumentException();
         
-        // convert to BigdataValues when adding to the map.
-        values.put(database.getValueFactory().asValue(value), null);
+        if(log.isInfoEnabled())
+            log.info(decl.getClass().getName());
+        
+        decls.add(decl);
         
     }
     
+//    /**
+//     * Adds a {@link Value} into the internal collection.
+//     * 
+//     * @param value
+//     *            The value.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if the value is <code>null</code>.
+//     */
+//    final protected void add(final URI value) {
+//
+//        if (value == null)
+//            throw new IllegalArgumentException();
+//        
+//        // convert to BigdataValues when adding to the collection.
+//        val2iv.add(valueFactory.asValue(value));
+//
+//    }
+
     /**
-     * Writes the values onto the lexicon. Note that the {@link Value}s are
-     * converted to {@link BigdataValue}s by {@link #add(Value)} so that we can
-     * invoke {@link AbstractTripleStore#addTerms(BigdataValue[])} directly and
-     * get back the assigned term identifiers. However, we can not de-serialize
-     * the {@link Value}s as {@link BigdataValue}s because we do not have the
-     * {@link AbstractTripleStore} reference on hand at that time.
+     * Add all vocabulary items from all declaring classes.
      */
-    private void writeValues() {
-        
-        if (database == null)
-            throw new IllegalStateException();
-        
-        // the distinct set of values to be defined.
-        final BigdataValue[] a = values.keySet().toArray(new BigdataValue[] {});
+    private void addAllDecls() {
 
-        // write on the database.
-        database.getLexiconRelation()
-                .addTerms(a, a.length, false/* readOnly */);
+        for (VocabularyDecl decl : decls) {
+        
+            final Iterator<URI> itr = decl.values();
 
-        // pair values with their assigned term identifiers.
-        for (BigdataValue v : a) {
-            
-            values.put(v, v.getIV());
+            while (itr.hasNext()) {
+
+                // Convert to BigdataValues when adding to the collection.
+                final BigdataValue value = valueFactory.asValue(itr.next());
+
+                // Add to the collection.
+                if (val2iv.put(value, value) != null) {
+
+                    /*
+                     * This has already been declared by some vocabulary. There
+                     * is no harm in this, but the vocabularies should be
+                     * distinct.
+                     */
+         
+                    log.warn("Duplicate declaration: " + value);
+                    
+                } else {
+                    
+                    if (log.isDebugEnabled())
+                        log.debug(decl.getClass().getName() + ":" + value);
+                    
+                }
+
+            }
             
         }
+
+    }
+    
+    /**
+     * Make a stable assignment of {@link IV}s to declared {@link Value}s.
+     * <p>
+     * Note: The {@link Value}s are converted to {@link BigdataValue}s by
+     * {@link #add(Value)} so that we can invoke
+     * {@link AbstractTripleStore#addTerms(BigdataValue[])} directly and get
+     * back the assigned {@link IV}s. We rely on the <code>namespace</code> of
+     * the {@link AbstractTripleStore} to deserialize {@link BigdataValue}s
+     * using the appropriate {@link BigdataValueFactory}.
+     */
+    private void generateIVs() {
+        
+        /*
+         * Assign IVs to each vocabulary item.
+         */
+        final int n = size();
+
+        if (n <= 255) {
+
+            // The Values in the order in which they were declared.
+            int i = 0;
+            for(Map.Entry<Value, BigdataValue> e : val2iv.entrySet()) {
+                
+                final BigdataValue value = e.getValue();
+                
+                final IV iv = new URIByteIV<BigdataURI>((byte) i);
+                
+                // Cache the IV on the Value.
+                value.setIV(iv);
+                
+//                // Do not cache the Value on the IV.
+//                iv.setValue(value);
+
+                iv2val.put(iv, value);
+                
+                i++;
+                
+            }
+            
+        } else if (n <= 65535/* MaxUnsignedShort */) {
+
+            // The Values in the order in which they were declared.
+            int i = 0;
+            for(Map.Entry<Value, BigdataValue> e : val2iv.entrySet()) {
+                
+                final BigdataValue value = e.getValue();
+                                
+                final IV iv = new URIShortIV<BigdataURI>((short) i);
+                
+                // Cache the IV on the Value.
+                value.setIV(iv);
+                
+//                // Do not cache the Value on the IV.
+//                iv.setValue(value);
+
+                iv2val.put(iv, value);
+                
+                i++;
+                
+            }
+
+        } else {
+
+            throw new UnsupportedOperationException(
+                    "Too many vocabulary items: n=" + n);
+            
+        }
+        
+        assert iv2val.size() == val2iv.size();
         
     }
     
     final public int size() {
         
-        if (values == null)
+        if (val2iv == null)
             throw new IllegalStateException();
         
-        return values.size();
+        return val2iv.size();
         
     }
 
-    final public Iterator<Value> values() {
+    final public Iterator<BigdataValue> values() {
         
-        return Collections.unmodifiableMap(values).keySet().iterator();
+        return Collections.unmodifiableMap(val2iv).values().iterator();
         
     }
-    
-    final public IV get(Value value) {
 
-        if (values == null)
+    final public BigdataValue asValue(final IV iv) {
+        
+        if (val2iv == null)
             throw new IllegalStateException();
-        
-        if (value == null)
-            throw new IllegalArgumentException();
-        
-        final IV iv = values.get(value);
         
         if (iv == null)
-            throw new IllegalArgumentException("Not defined: " + value);
+            throw new IllegalArgumentException();
 
-        return iv;
-
+        return iv2val.get(iv);
+        
     }
 
-    final public IConstant<IV> getConstant(Value value) {
+    final public IV get(final Value value) {
 
-        if (values == null)
+        if (val2iv == null)
             throw new IllegalStateException();
 
         if (value == null)
             throw new IllegalArgumentException();
 
-        final IV iv = values.get(value);
+        final BigdataValue tmp = val2iv.get(value);
 
+        if (tmp == null)
+            return null;
+
+        return tmp.getIV();
+
+    }
+
+    final public IConstant<IV> getConstant(final Value value) {
+
+        final IV iv = get(value);
+        
         if (iv == null)
             throw new IllegalArgumentException("Not defined: " + value);
 
@@ -253,15 +388,41 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
 
     }
 
+//    /**
+//     * The initial version. This version is no longer supported. The manner in
+//     * which the lexicon is encoded has fundamentally changed with the
+//     * replacement of the TERM2ID and ID2TERM indices with a single TERMS index
+//     * and additional inlining of values into the statement indices.
+//     */
+//    private static final transient short VERSION0 = 0;
+//
+//    /**
+//     * This version modified the serialization to include the namespace of the
+//     * KB instance and to pack the byte length values (this version was never
+//     * deployed).
+//     */
+//    private static final transient short VERSION1 = 1;
+
     /**
-     * The initial version.
+     * This version modified the serialization to include the namespace of the
+     * KB instance and a list of the {@link VocabularyDecl} classes to be
+     * instantiated. The names of those classes are given in the order in which
+     * they were declared. When the vocabulary is deserialized, the
+     * {@link BigdataValue}s and {@link IV}s are simply reconstructed from those
+     * classes.
+     * <p>
+     * Note: VERSION ZERO (0) was the initial version. That version is no longer
+     * supported. The manner in which the lexicon is encoded has fundamentally
+     * changed with the replacement of the TERM2ID and ID2TERM indices with a
+     * single TERMS index and additional inlining of values into the statement
+     * indices.
      */
-    private static final transient short VERSION0 = 0;
+    private static final transient short VERSION2 = 2;
 
     /**
      * The current version.
      */
-    private static final transient short VERSION = VERSION0;
+    private static final transient short currentVersion = VERSION2;
 
     /**
      * Note: The de-serialized state contains {@link Value}s but not
@@ -271,122 +432,451 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
      * since the only access to the {@link Value}s is via {@link #get(Value)}
      * and {@link #getConstant(Value)}.
      */
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        
-        if (values != null)
+    public void readExternal(final ObjectInput in) throws IOException,
+            ClassNotFoundException {
+
+        if (val2iv != null)
+            throw new IllegalStateException();
+        if (iv2val != null)
             throw new IllegalStateException();
         
         final short version = in.readShort();
 
         switch (version) {
-        case VERSION0:
+//        case VERSION0:
+//            readVersion0(in);
+//            break;
+//        case VERSION1:
+//            readVersion1(in);
+//            break;
+        case VERSION2:
+            readVersion2(in);
             break;
         default:
             throw new UnsupportedOperationException("Unknown version: "
                     + version);
         }
 
-        final ValueFactory valueFactory = new ValueFactoryImpl();
+    }
 
-        final BigdataValueSerializer<Value> valueSer = new BigdataValueSerializer<Value>(
-                valueFactory);
+//    /**
+//     * The old code for {@link #VERSION0}. This is here for historical purposes
+//     * only.
+//     *
+//     * @param in
+//     * @throws IOException
+//     */
+//    private void readVersion0(final ObjectInput in) throws IOException {
+//
+//        /*
+//         * Note: VERSION0 was not able to provide the correct
+//         * BigdataValueFactory since it did not have access to the KB namespace.
+//         */
+//        final ValueFactory valueFactory = new ValueFactoryImpl();
+//        
+//        final BigdataValueSerializer<Value> valueSer = new BigdataValueSerializer<Value>(
+//                valueFactory);
+//
+//        // read in the #of values.
+//        final int nvalues = in.readInt();
+//        
+//        if (nvalues < 0)
+//            throw new IOException();
+//        
+//        // allocate the map with sufficient capacity.
+//        val2iv = new LinkedHashMap<BigdataValue, IV>(nvalues);
+//        iv2val = new LinkedHashMap<IV, BigdataValue>(nvalues);
+//
+//        for (int i = 0; i < nvalues; i++) {
+//            
+//            // #of bytes in the serialized value.
+//            int nbytes = in.readInt();
+//
+//            // allocate array of that many bytes.
+//            byte[] b = new byte[nbytes];
+//            
+//            // read the data for the serialized value.
+//            in.readFully(b);
+//
+//            // de-serialize the value.
+//            final Value value = valueSer.deserialize(b);
+//
+//            // #of bytes in the serialized IV.
+//            nbytes = in.readInt(); 
+//            
+//            // allocate array for that many bytes.
+//            b = new byte[nbytes];
+//            
+//            // read the data for the serialized IV.
+//            in.readFully(b);
+//            
+//            // decode the IV.
+//            final IV iv = IVUtility.decode(b);
+//
+//            // stuff in the map.
+//            val2iv.put(value, iv);
+//            iv2val.put(iv, value);
+//            
+//        }
+//
+//    }
+
+//    private void readVersion1(final ObjectInput in) throws IOException {
+//        
+//        // read in the #of values.
+//        final int nvalues = LongPacker.unpackInt(in);
+//        
+//        // The namespace of the KB instance.
+//        final String namespace = in.readUTF();
+//        
+//        // Note: The value factory uses the namespace of the KB instance! 
+//        valueFactory = BigdataValueFactoryImpl.getInstance(namespace);
+//
+//        // ValueSerializer using the namespace of the KB instance!
+//        final BigdataValueSerializer<BigdataValue> valueSer = new BigdataValueSerializer<BigdataValue>(
+//                valueFactory);
+//
+//        // allocate the map with sufficient capacity.
+//        val2iv = new LinkedHashMap<Value, BigdataValue>(nvalues);
+//        iv2val = new LinkedHashMap<IV, BigdataValue>(nvalues);
+//
+//        // buffer reused for each Value/IV.
+//        final ByteArrayBuffer buf = new ByteArrayBuffer();
+//
+//        // buffer reused for each Value.
+//        final StringBuilder tmp = new StringBuilder();
+//
+//        for (int i = 0; i < nvalues; i++) {
+//            
+//            // #of bytes in the serialized value.
+//            int nbytes = LongPacker.unpackInt(in);
+//
+//            buf.reset();
+//            buf.ensureCapacity(nbytes);
+//            
+//            // read the data for the serialized value.
+//            in.readFully(buf.array(), 0/* off */, nbytes/* len */);
+//
+//            // de-serialize the value.
+//            final BigdataValue value = valueSer
+//                    .deserialize(//
+//                            new DataInputBuffer(buf.array(), 0/* off */, nbytes/* len */), //
+//                            tmp//
+//                    );
+//
+//            // #of bytes in the serialized IV.
+//            nbytes = LongPacker.unpackInt(in);
+//            
+//            buf.reset();
+//            buf.ensureCapacity(nbytes);
+//
+//            // read the data for the serialized IV.
+//            in.readFully(buf.array(), 0/* off */, nbytes/* len */);
+//
+//            // decode the IV.
+//            final IV iv = IVUtility.decode(buf.array());
+//
+//            // stuff in the map.
+//            val2iv.put(value, value);
+//            iv2val.put(iv, value);
+//            value.setIV(iv); // cache the IV
+////            iv.setValue(value); // but do not cache the Value.
+//            
+//        }
+//        
+//    }
+    
+    private void readVersion2(final ObjectInput in) throws IOException {
+
+        // read in the #of declarations.
+        final int ndecls = LongPacker.unpackInt(in);
 
         // read in the #of values.
-        final int nvalues = in.readInt();
+        final int nvalues = LongPacker.unpackInt(in);
+
+        // read in the checksum.
+        final long checksumActual = in.readLong();
         
-        if (nvalues < 0)
+        // The namespace of the KB instance.
+        final String namespace = in.readUTF();
+
+        // Note: The value factory uses the namespace of the KB instance!
+        valueFactory = BigdataValueFactoryImpl.getInstance(namespace);
+        
+        // Initialize the vocabulary.
+        init(ndecls, nvalues);
+        
+//        decls = new LinkedHashSet<VocabularyDecl>(ndecls);
+//
+//        // allocate the map with sufficient capacity.
+//        val2iv = new LinkedHashMap<Value, BigdataValue>(nvalues);
+//        iv2val = new LinkedHashMap<IV, BigdataValue>(nvalues);
+//
+//        for (int i = 0; i < ndecls; i++) {
+//
+//            final String className = in.readUTF();
+//
+//            try {
+//
+//                final Class<?> cls = Class.forName(className);
+//
+//                if (!VocabularyDecl.class.isAssignableFrom(cls))
+//                    throw new IOException(className);
+//
+//                final VocabularyDecl decl = (VocabularyDecl) cls.newInstance();
+//
+//                decls.add(decl);
+//
+//            } catch (InstantiationException e) {
+//
+//                throw new IOException(e);
+//
+//            } catch (IllegalAccessException e) {
+//
+//                throw new IOException(e);
+//
+//            } catch (ClassNotFoundException e) {
+//
+//                throw new IOException(e);
+//
+//            }
+//
+//        }
+//
+//        addAllDecls();
+
+        if (ndecls != decls.size()) {
+            /*
+             * This indicates a versioning problem with the vocabulary
+             * declaration classes.
+             */
             throw new IOException();
-        
-        // allocate the map with sufficient capacity.
-        values = new HashMap<Value,IV>(nvalues);
-        
-        for (int i = 0; i < nvalues; i++) {
-            
-            // #of bytes in the serialized value.
-            int nbytes = in.readInt();
+        }
 
-            // allocate array of that many bytes.
-            byte[] b = new byte[nbytes];
-            
-            // read the data for the serialized value.
-            in.readFully(b);
+        if (nvalues != val2iv.size()) {
+            /*
+             * This indicates a versioning problem with the vocabulary
+             * declaration classes.
+             */
+            throw new VocabularyVersioningException();
+        }
 
-            // de-serialize value (NOT a BigdataValue!)
-            final Value value = valueSer.deserialize(b);
-
-            nbytes = in.readInt();
-            
-            b = new byte[nbytes];
-            
-            in.readFully(b);
-            
-            final IV iv = IVUtility.decode(b);
-
-            // stuff in the map.
-            values.put(value, iv);
-            
+        // compute a checksum on the hash codes of the URIs.
+        long checksum = 0;
+        for(Value value : val2iv.keySet()) {
+            checksum += value.hashCode();
         }
         
+        if (checksum != checksumActual) {
+            /*
+             * This indicates a versioning problem with the vocabulary
+             * declaration classes.
+             */
+            throw new VocabularyVersioningException();
+        }
+
+        generateIVs();
+        
     }
+    
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
-    public void writeExternal(ObjectOutput out) throws IOException {
-
-        if (values == null)
+        if (val2iv == null)
+            throw new IllegalStateException();
+        if (iv2val == null)
             throw new IllegalStateException();
 
-        out.writeShort(VERSION);
-        
-        final int nvalues = values.size();
+        out.writeShort(currentVersion);
 
-        // write on the #of values.
-        out.writeInt(nvalues);
-        
-        // reused for each serialized term.
-        final DataOutputBuffer buf = new DataOutputBuffer();
-        final ByteArrayBuffer tbuf = new ByteArrayBuffer();
-        
-        final BigdataValueSerializer<Value> valueSer = new BigdataValueSerializer<Value>(
-                new ValueFactoryImpl());
-        
-        final IKeyBuilder keyBuilder = KeyBuilder.newInstance();
-        
-        final Iterator<Map.Entry<Value,IV>> itr = values.entrySet().iterator();
-
-        while(itr.hasNext()) {
-            
-            final Map.Entry<Value, IV> entry = itr.next();
-            
-            final Value value = entry.getKey();
-            
-            final IV iv = entry.getValue();
-
-            assert value != null;
-            
-            assert iv != null;
-
-            // reset the buffer.
-            buf.reset();
-            
-            // serialize the Value onto the buffer.
-            valueSer.serialize(value, buf, tbuf);
-            
-            // #of bytes in the serialized value.
-            final int nbytes = buf.limit();
-            
-            // write #of bytes on the output stream.
-            out.writeInt(nbytes);
-            
-            // copy serialized value onto the output stream.
-            out.write(buf.array(), 0, buf.limit());
-            
-            final byte[] b = iv.encode(keyBuilder.reset()).getKey(); 
-            
-            out.writeInt(b.length);
-            
-            out.write(b);
-            
+        switch (currentVersion) {
+//        case VERSION0:
+//            writeVersion0(out);
+//            break;
+//        case VERSION1:
+//            writeVersion1(out);
+//            break;
+        case VERSION2:
+            writeVersion2(out);
+            break;
+        default:
+            throw new AssertionError();
         }
-        
+    
     }
 
+//    /**
+//     * The old code for {@link #VERSION0}. This is here for historical purposes
+//     * only.
+//     * 
+//     * @param out
+//     * @throws IOException
+//     */
+//    private void writeVersion0(final ObjectOutput out) throws IOException {
+//        
+//        final int nvalues = val2iv.size();
+//        
+//        // write on the #of values.
+//        out.writeInt(nvalues);
+//
+//        // reused for each serialized term.
+//        final DataOutputBuffer buf = new DataOutputBuffer();
+//        final ByteArrayBuffer tbuf = new ByteArrayBuffer();
+//
+//        final BigdataValueSerializer<Value> valueSer = new BigdataValueSerializer<Value>(
+//                new ValueFactoryImpl());
+//
+//        final IKeyBuilder keyBuilder = KeyBuilder.newInstance();
+//
+//        final Iterator<Map.Entry<BigdataValue, IV>> itr = val2iv.entrySet()
+//                .iterator();
+//
+//        while (itr.hasNext()) {
+//
+//            final Map.Entry<BigdataValue, IV> entry = itr.next();
+//
+//            final BigdataValue value = entry.getKey();
+//
+//            final IV iv = entry.getValue();
+//
+//            assert value != null;
+//
+//            assert iv != null;
+//
+//            // reset the buffer.
+//            buf.reset();
+//
+//            // serialize the Value onto the buffer.
+//            valueSer.serialize(value, buf, tbuf);
+//
+//            // #of bytes in the serialized value.
+//            final int nbytes = buf.limit();
+//
+//            // write #of bytes on the output stream.
+//            out.writeInt(nbytes);
+//
+//            // copy serialized value onto the output stream.
+//            out.write(buf.array(), 0, buf.limit());
+//
+//            final byte[] b = iv.encode(keyBuilder.reset()).getKey();
+//
+//            out.writeInt(b.length);
+//
+//            out.write(b);
+//
+//        }
+//
+//    }
+
+//    private void writeVersion1(final ObjectOutput out) throws IOException {
+//        
+//        final int nvalues = val2iv.size();
+//        assert iv2val.size() == nvalues;
+//        
+//        // write on the #of values.
+//        LongPacker.packLong(out, nvalues);
+//
+//        // The namespace of the KB instance.
+//        out.writeUTF(valueFactory.getNamespace());
+//        
+//        // reused for each serialized term.
+//        final DataOutputBuffer buf = new DataOutputBuffer();
+//        final ByteArrayBuffer tbuf = new ByteArrayBuffer();
+//        final IKeyBuilder keyBuilder = KeyBuilder.newInstance();
+//
+//        final BigdataValueSerializer<Value> valueSer = new BigdataValueSerializer<Value>(
+//                valueFactory);
+//
+//        final Iterator<Map.Entry<Value, BigdataValue>> itr = val2iv.entrySet()
+//                .iterator();
+//
+//        while (itr.hasNext()) {
+//
+//            final Map.Entry<Value, BigdataValue> entry = itr.next();
+//
+//            final BigdataValue value = entry.getValue();
+//
+//            final IV iv = value.getIV();
+//
+//            assert value != null;
+//
+//            assert iv != null;
+//
+//            // reset the buffer.
+//            buf.reset();
+//
+//            // serialize the Value onto the buffer.
+//            valueSer.serialize(value, buf, tbuf);
+//
+//            // #of bytes in the serialized value.
+//            final int nbytes = buf.limit();
+//
+//            // write #of bytes on the output stream.
+//            LongPacker.packLong(out, nbytes);
+//
+//            // copy serialized value onto the output stream.
+//            out.write(buf.array(), 0, buf.limit());
+//
+//            // encode the key.
+//            iv.encode(keyBuilder.reset());
+//
+//            // write #of bytes in the IV on the output stream.
+//            LongPacker.packLong(out, keyBuilder.len());
+//
+//            // write the IV on the output stream.
+//            out.write(keyBuilder.array(), 0/* off */, keyBuilder.len());
+//
+//        }
+//
+//    }
+
+    private void writeVersion2(final ObjectOutput out) throws IOException {
+
+        assert iv2val.size() == val2iv.size();
+
+        // compute a checksum on the hash codes of the URIs.
+        long checksum = 0;
+        for(Value value : val2iv.keySet()) {
+            checksum += value.hashCode();
+        }
+        
+        // write on the #of declarations.
+        LongPacker.packLong(out, decls.size());
+
+        // write on the #of values.
+        LongPacker.packLong(out, val2iv.size());
+
+        // write out the checksum.
+        out.writeLong(checksum);
+        
+        // The namespace of the KB instance.
+        out.writeUTF(valueFactory.getNamespace());
+
+//        for (VocabularyDecl decl : decls) {
+//
+//            // The class name of the vocabulary declaration.
+//            out.writeUTF(decl.getClass().getName());
+//
+//        }
+
+    }
+
+    /**
+     * An instance of this class indicates a versioning problem with the
+     * {@link VocabularyDecl declaration classes}. If a vocabulary declaration
+     * class is modified after it has been used to instantiate a triple store
+     * then the mapping of URIs onto IVs might not be stable with the result
+     * that encode and decode of statements may be broken.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    public static class VocabularyVersioningException extends IOException {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 1L;
+        
+    }
+    
 }

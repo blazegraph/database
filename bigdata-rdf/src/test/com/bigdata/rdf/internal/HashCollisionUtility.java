@@ -80,6 +80,8 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
+import com.bigdata.rdf.vocab.BaseVocabulary;
+import com.bigdata.rdf.vocab.RDFSVocabulary;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.util.concurrent.Latch;
@@ -983,6 +985,9 @@ public class HashCollisionUtility {
 
 		vf = BigdataValueFactoryImpl.getInstance("test");
 		
+		final BaseVocabulary vocab = new RDFSVocabulary(vf.getNamespace());
+		vocab.init();
+		
 		// factory does not support any extensions.
 		final IExtensionFactory xFactory = new IExtensionFactory() {
 
@@ -1008,7 +1013,8 @@ public class HashCollisionUtility {
 				64,   // maxInlineStringLength
 				true, // inlineBNodes
 				false, // inlineDateTimes
-				xFactory // extension factory
+				xFactory, // extension factory
+				vocab     // predefined vocabulary
 				);
 		
 //		valueCache = new ConcurrentWeakValueCacheWithBatchedUpdates<Value, BigdataValue>(

@@ -81,10 +81,21 @@ public interface BigdataValue extends Value, IElement {//, Comparable<BigdataVal
      * identifiers will be value for that {@link TempTripleStore}.
      */
     public IV getIV();
-    
+
     /**
-     * Set the internal value for this value.  May be a term identifier or an
-     * inline value.
+     * Set the internal value for this value.
+     * <p>
+     * Note: Both {@link IV} and {@link BigdataValue} can cache one another. The
+     * pattern for caching is that you <em>always</em> cache the {@link IV} on
+     * the {@link BigdataValue} using {@link BigdataValue#setIV(IV)}. However,
+     * the {@link BigdataValue} is normally NOT cached on the {@link IV}. The
+     * exception is when the {@link BigdataValue} has been materialized from the
+     * {@link IV} by joining against the lexicon. The query plan is responsible
+     * for deciding when to materialize the {@link BigdataValue} from the
+     * {@link IV} and when to {@link #dropValue() drop} the cached
+     * {@link BigdataValue}. (The cached {@link BigdataValue} SHOULD be dropped
+     * as soon the query plan not longer requires the materialized {@link Value}
+     * .)
      * 
      * @param iv
      *            The internal value.

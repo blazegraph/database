@@ -35,7 +35,12 @@ import org.openrdf.model.Value;
  *          $
  */
 public class BNodeContextFactory implements BigdataValueFactory {
-	public void remove(String namespace) {
+	
+    public String getNamespace() {
+        return valueFactory.getNamespace();
+    }
+    
+    public void remove(String namespace) {
 	}
 
     /**

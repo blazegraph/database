@@ -27,10 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.vocab;
 
-import com.bigdata.rdf.store.AbstractTripleStore;
-
 /**
  * An empty {@link Vocabulary}.
+ * <p>
+ * Note: The use of this class is no longer recommended. It was used
+ * historically when the lexicon should be empty (no pre-declared terms).
+ * However, the {@link Vocabulary} now provides a mechanism for fast and compact
+ * inlining of URIs into the statement indices. Using an empty
+ * {@link Vocabulary} therefore simply robs you of the opportunity to have more
+ * compact encodings of those URIs.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -49,12 +54,19 @@ public class NoVocabulary extends BaseVocabulary {
     }
 
     /**
-     * @param database
+     * @param Namespace
      */
-    public NoVocabulary(AbstractTripleStore database) {
+    public NoVocabulary(final String namespace) {
 
-        super(database);
+        super(namespace);
         
+    }
+
+    /**
+     * NOP.
+     */
+    @Override
+    protected void addValues() {
     }
 
 }

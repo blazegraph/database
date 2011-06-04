@@ -368,4 +368,48 @@ public class LongPacker
         return l;
     }
 
+    /**
+     * Convenience method unpacks long and throws an exception if the value
+     * exceeds {@link Integer#MAX_VALUE}.
+     * 
+     * @param is
+     *            The input stream.
+     *            
+     * @return The integer value.
+     * 
+     * @throws IOException
+     */
+    static public int unpackInt(final DataInput is) throws IOException {
+
+        final long v = unpackLong(is);
+
+        if (v > Integer.MAX_VALUE)
+            throw new IOException();
+
+        return (int) v;
+
+    }
+
+    /**
+     * Convenience method unpacks long and throws an exception if the value
+     * exceeds {@link Integer#MAX_VALUE}.
+     * 
+     * @param is
+     *            The input stream.
+     *            
+     * @return The integer value.
+     * 
+     * @throws IOException
+     */
+    static public int unpackInt(final InputStream is) throws IOException {
+
+        final long v = unpackLong(is);
+
+        if (v > Integer.MAX_VALUE)
+            throw new IOException();
+
+        return (int) v;
+
+    }
+
 }
