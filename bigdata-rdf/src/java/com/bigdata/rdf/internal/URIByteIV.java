@@ -91,7 +91,6 @@ public class URIByteIV<V extends BigdataURI> extends AbstractInlineIV<V, Byte> {
 		
 	}
 
-	@Override
 	public V asValue(final LexiconRelation lex)
 			throws UnsupportedOperationException {
 

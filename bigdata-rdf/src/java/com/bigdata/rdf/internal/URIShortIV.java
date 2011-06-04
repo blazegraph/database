@@ -91,7 +91,6 @@ public class URIShortIV<V extends BigdataURI> extends AbstractInlineIV<V, Short>
 		
 	}
 
-	@Override
 	public V asValue(final LexiconRelation lex)
 			throws UnsupportedOperationException {
 
