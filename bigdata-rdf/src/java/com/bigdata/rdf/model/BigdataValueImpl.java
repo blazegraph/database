@@ -114,13 +114,13 @@ public abstract class BigdataValueImpl implements BigdataValue {
         if (iv == null) {
 
             throw new IllegalArgumentException(
-                    "Can not set termId to null: term=" + this);
+                    "Can not set IV to null: term=" + this);
 
         }
 
         if (this.iv != null && !IVUtility.equals(this.iv, iv)) {
 
-            throw new IllegalStateException("termId already assigned: old="
+            throw new IllegalStateException("Already assigned: old="
                     + this.iv + ", new=" + iv);
 
         }

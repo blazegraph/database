@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -44,6 +44,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -59,7 +60,15 @@ public class LexiconConfiguration<V extends BigdataValue>
     private static final Logger log = 
         Logger.getLogger(LexiconConfiguration.class);
     
-    private final boolean inlineLiterals, inlineBNodes;
+    /**
+     * <code>true</code> if datatype literals will be inlined.
+     */
+    private final boolean inlineLiterals;
+
+    /**
+     * <code>true</code> if (conforming) blank nodes will inlined.
+     */
+    private final boolean inlineBNodes;
 
     /**
      * The maximum length of a Unicode string which may be inlined into the
@@ -70,10 +79,20 @@ public class LexiconConfiguration<V extends BigdataValue>
     final private int maxInlineStringLength;
 
     private final IExtensionFactory xFactory;
-    
-    private final Map<TermId, IExtension<BigdataValue>> termIds;
 
-    private final Map<String, IExtension<BigdataValue>> datatypes;
+    private final Vocabulary vocab;
+    
+    /**
+     * Mapping from the {@link IV} for the datatype URI of a registered
+     * extension to the {@link IExtension}.
+     */
+    private final Map<IV, IExtension<BigdataValue>> iv2ext;
+
+    /**
+     * Mapping from the string value of the datatype URI for a registered
+     * extension to the {@link IExtension}.
+     */
+    private final Map<String, IExtension<BigdataValue>> datatype2ext;
 
     /**
      * Return the maximum length of a Unicode string which may be inlined into
@@ -87,25 +106,33 @@ public class LexiconConfiguration<V extends BigdataValue>
         
     }
     
-    public LexiconConfiguration(final boolean inlineLiterals,
-            final int maxInlineStringLength, final boolean inlineBNodes,
-            final boolean inlineDateTimes, final IExtensionFactory xFactory) {
+    public LexiconConfiguration(//
+            final boolean inlineLiterals,//
+            final int maxInlineStringLength,//
+            final boolean inlineBNodes,//
+            final boolean inlineDateTimes,//
+            final IExtensionFactory xFactory,//
+            final Vocabulary vocab//
+            ) {
         
         if (maxInlineStringLength < 0)
             throw new IllegalArgumentException();
-        
+
+        if (vocab == null)
+            throw new IllegalArgumentException();
+
         this.inlineLiterals = inlineLiterals;
         this.maxInlineStringLength = maxInlineStringLength;
         this.inlineBNodes = inlineBNodes;
-//        this.inlineDateTimes = inlineDateTimes;
         this.xFactory = xFactory;
+        this.vocab = vocab;
 
 		/*
 		 * Note: These collections are read-only so we do NOT need additional
 		 * synchronization.
 		 */
-        termIds = new HashMap<TermId, IExtension<BigdataValue>>();
-        datatypes = new HashMap<String, IExtension<BigdataValue>>();
+        iv2ext = new LinkedHashMap<IV, IExtension<BigdataValue>>();
+        datatype2ext = new LinkedHashMap<String, IExtension<BigdataValue>>();
 
     }
 
@@ -120,9 +147,9 @@ public class LexiconConfiguration<V extends BigdataValue>
             if (datatype == null)
                 continue;
 
-            termIds.put((TermId) datatype.getIV(), extension);
+            iv2ext.put(datatype.getIV(), extension);
 
-            datatypes.put(datatype.stringValue(), extension);
+            datatype2ext.put(datatype.stringValue(), extension);
 
         }
 
@@ -135,7 +162,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         final TermId datatypeIV = iv.getExtensionIV();
 
         // Find the IExtension from the datatype IV.
-        final IExtension<BigdataValue> ext = termIds.get(datatypeIV);
+        final IExtension<BigdataValue> ext = iv2ext.get(datatypeIV);
 
         if (ext == null)
             throw new RuntimeException("Unknown extension: " + datatypeIV);
@@ -158,7 +185,22 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         if (value instanceof URI) {
 
-            iv = createInlineURIIV((URI) value);
+            /*
+             * Test the Vocabulary to see if this URI was pre-declared. If so,
+             * then return the IV from the Vocabulary. It will be either an
+             * URIByteIV or an URIShortIV.
+             */
+            final IV tmp = vocab.get(value);
+
+            if (tmp != null) {
+
+                iv = tmp;
+                
+            } else {
+
+                iv = createInlineURIIV((URI) value);
+                
+            }
 
         } else if (value instanceof Literal) {
 
@@ -223,7 +265,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         final URI datatype = value.getDatatype();
 
-        if (datatype != null && datatypes.containsKey(datatype.stringValue())) {
+        if (datatype != null && datatype2ext.containsKey(datatype.stringValue())) {
 
             /*
              * Check the registered extension factories first.
@@ -236,7 +278,7 @@ public class LexiconConfiguration<V extends BigdataValue>
              */
 
             final IExtension<BigdataValue> xFactory = 
-                datatypes.get(datatype.stringValue());
+                datatype2ext.get(datatype.stringValue());
 
             try {
 
@@ -416,8 +458,12 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         final char c = id.charAt(0);
 
-        // Note: UUID is 16 bytes. If it has the 'u' prefix we can recognize it.
-        if (c == 'u' && id.length() == 17 && isInline(VTE.BNODE, DTE.UUID)) {
+        /*
+         * Note: UUID.toString() is 36 bytes. If it has the 'u' prefix we can
+         * recognize it, so that is a total of 37 bytes.
+         */
+        if (c == 'u' && 
+                id.length() == 37 && isInline(VTE.BNODE, DTE.UUID)) {
 
             /*
              * Inline as [UUID].
@@ -496,7 +542,7 @@ public class LexiconConfiguration<V extends BigdataValue>
     /**
      * Return <code>true</code> iff the {@link VTE} / {@link DTE} combination
      * will be inlined within the statement indices using native inlining
-     * mechanims (not {@link IExtension} handlers) based solely on the
+     * mechanisms (not {@link IExtension} handlers) based solely on the
      * consideration of the {@link VTE} and {@link DTE} (the length of the
      * {@link Value} is not considered).
      */

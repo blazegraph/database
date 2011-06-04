@@ -47,7 +47,13 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * @version $Id$
  */
 public interface BigdataValueFactory extends ValueFactory {
-	/**
+	
+    /**
+     * The namespace of the KB instance associated with the value factory.
+     */
+    public String getNamespace();
+
+    /**
 	 * Remove instance of valueFactory from static cache
 	 */
 	void remove(final String namespace);

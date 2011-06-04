@@ -33,6 +33,7 @@ import org.openrdf.model.Value;
 
 import com.bigdata.bop.IConstant;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.model.BigdataValue;
 
 /**
  * Interface for a pre-defined vocabulary.
@@ -43,14 +44,33 @@ import com.bigdata.rdf.internal.IV;
 public interface Vocabulary {
 
     /**
+     * The #of defined {@link Value}s.
+     * 
+     * @throws IllegalStateException
+     *             if the values have not been defined.
+     */
+    int size();
+
+    /**
+     * The {@link Value}s in an arbitrary order.
+     * 
+     * @throws IllegalStateException
+     *             if the values have not been defined.
+     */
+    Iterator<? extends Value> values();
+
+    /**
      * The term identifier for the pre-defined {@link Value}.
      * 
      * @param value
      *            The value.
-     * @return The term identifier.
-     * 
-     * @throws IllegalArgumentException
-     *             if that {@link Value} is not defined for this vocabulary.
+     *            
+     * @return The {@link IV} for that {@link Value} -or- <code>null</code> if
+     *         the {@link Value} was not defined by this {@link Vocabulary}.
+     */
+    /*
+     * Note: Prior to the TERMS_REFACTOR_BRANCH this would throw an exception
+     * if the Value was not declared by the Vocabulary.
      */
     public IV get(Value value);
     
@@ -66,21 +86,18 @@ public interface Vocabulary {
      *             if that {@link Value} is not defined for this vocabulary.
      */
     public IConstant<IV> getConstant(Value value);
+
+    /**
+     * Reverse lookup of an {@link IV} defined by this vocabulary.
+     * 
+     * @param iv
+     *            The {@link IV}.
+     * 
+     * @return The {@link BigdataValue} -or- <code>null</code> if the {@link IV}
+     *         was not defined by the vocabulary.
+     * 
+     * @since TERMS_REFACTOR_BRANCH
+     */
+    public Value asValue(IV iv);
     
-    /**
-     * The #of defined {@link Value}s.
-     * 
-     * @throws IllegalStateException
-     *             if the values have not been defined.
-     */
-    int size();
-
-    /**
-     * The {@link Value}s in an arbitrary order.
-     * 
-     * @throws IllegalStateException
-     *             if the values have not been defined.
-     */
-    Iterator<Value> values();
-
 }

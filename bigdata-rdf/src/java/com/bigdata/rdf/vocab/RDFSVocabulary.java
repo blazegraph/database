@@ -31,19 +31,24 @@ import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * A {@link Vocabulary} including well-known {@link Value}s for RDF, RDF
- * Schema, and owl:sameAs and friends.
+ * A {@link Vocabulary} including well-known {@link Value}s for {@link RDF},
+ * {@link RDFS}, {@link OWL}, {@link XMLSchema}, and {@link Sesame}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ *          TODO SKOS, DC
+ * 
+ *          TODO BD,
+ * 
+ *          TODO LUBM, BSBM, ...
  */
 public class RDFSVocabulary extends BaseVocabulary {
-
-    private static final long serialVersionUID = -6646094201371729113L;
 
     /**
      * De-serialization ctor.
@@ -57,42 +62,23 @@ public class RDFSVocabulary extends BaseVocabulary {
     /**
      * Used by {@link AbstractTripleStore#create()}.
      * 
-     * @param db
-     *            The database.
+     * @param namespace
+     *            The namespace of the KB instance.
      */
-    public RDFSVocabulary(AbstractTripleStore db) {
+    public RDFSVocabulary(final String namespace) {
 
-        super( db );
+        super( namespace );
         
     }
 
     @Override
     protected void addValues() {
 
-        add(RDF.TYPE);
-        add(RDF.PROPERTY);
-        add(RDFS.SUBCLASSOF);
-        add(RDFS.SUBPROPERTYOF);
-        add(RDFS.DOMAIN);
-        add(RDFS.RANGE);
-        add(RDFS.CLASS);
-        add(RDFS.RESOURCE);
-        add(RDFS.CONTAINERMEMBERSHIPPROPERTY);
-        add(RDFS.DATATYPE);
-        add(RDFS.MEMBER);
-        add(RDFS.LITERAL);
-
-        add(OWL.SAMEAS);
-        add(OWL.EQUIVALENTCLASS);
-        add(OWL.EQUIVALENTPROPERTY);
-        add(OWL.INVERSEOF);
-        add(OWL.CLASS);
-        add(OWL.OBJECTPROPERTY);
-        add(OWL.TRANSITIVEPROPERTY);
-        add(OWL.DATATYPEPROPERTY);
-        add(OWL.RESTRICTION);
-        add(OWL.ONPROPERTY);
-        add(OWL.HASVALUE);
+        addDecl(new RDFVocabularyDecl());
+        addDecl(new RDFSVocabularyDecl());
+        addDecl(new OWLVocabularyDecl());
+        addDecl(new XMLSchemaVocabularyDecl());
+        addDecl(new SesameVocabularyDecl());
 
     }
 

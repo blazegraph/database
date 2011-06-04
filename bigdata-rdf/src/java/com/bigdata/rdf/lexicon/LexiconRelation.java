@@ -433,7 +433,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 
                 lexiconConfiguration = new LexiconConfiguration(inlineLiterals,
                         maxInlineStringLength, inlineBNodes, inlineDateTimes,
-                        xFactory);
+                        xFactory, getContainer().getVocabulary());
 
             } catch (InstantiationException e) {
                 throw new IllegalArgumentException(

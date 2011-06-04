@@ -33,9 +33,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 
 /**
@@ -48,7 +46,7 @@ import com.bigdata.rdf.store.AbstractTripleStore.Options;
  *            The generic type for the inline value.
  */
 public interface IV<V extends BigdataValue, T> extends Serializable, 
-        Comparable<IV> {
+        Comparable<IV>, IVCache<V> {
 
     /**
      * The value of the flags representing the {@link VTE} and the {@link DTE}.
@@ -212,65 +210,4 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      */
     boolean isFloatingPointNumeric();
 
-	/**
-	 * If the value is not already cached, then inflate an inline RDF value to a
-	 * {@link BigdataValue} and cache it on a private field.
-	 * <p>
-	 * Note: Query plans are responsible for ensuring that {@link IV}s have been
-	 * materialized before operators are evaluated which invoke this method.
-	 * This pattern ensures that efficient batch operators are used to
-	 * materialize {@link Value}s, and thereby avoids heavy RMI overhead in
-	 * scale-out, and provides operators which use {@link #getValue()} with a
-	 * simple method signature which does not require access to the lexicon.
-	 * Query plans are also responsible for dropping variables once they are no
-	 * longer needed or, in the case of large values and BLOBs, dropping the
-	 * cached {@link BigdataValue} when possible in order to avoid excess
-	 * network and heap overhead.
-	 * 
-	 * @param lex
-	 *            The lexicon relation (this is required in order to access the
-	 *            {@link BigdataValueFactory} for the namespace associated with
-	 *            lexicon when we materialize an inline {@link IV}).
-	 * 
-	 * @return The corresponding {@link BigdataValue}.
-	 * 
-	 * @throws UnsupportedOperationException
-	 *             if the {@link IV} does not represent something which can be
-	 *             materialized. For example, a dummy value or a "null".
-	 */
-    V asValue(final LexiconRelation lex) 
-        throws UnsupportedOperationException;
-
-    /**
-     * Cache the materialized value.
-     * 
-     * @param val
-     * 			   The {@link BigdataValue}.
-     */
-    V setValue(final V val);
-    
-	/**
-	 * Return a pre-materialized RDF {@link BigdataValue} which has been cached
-	 * on this {@link IV} by a previous invocation of
-	 * {@link #asValue(LexiconRelation)}.
-	 * 
-	 * @return The {@link BigdataValue}.
-	 * 
-	 * @throws NotMaterializedException
-	 *             if the value is not cached.
-	 */
-	V getValue() throws NotMaterializedException;
-
-	/**
-	 * Drop the cached {@link BigdataValue}. This is a NOP if the cache is
-	 * empty.
-	 */
-	void dropValue();
-	
-	/**
-	 * Returns true if the RDF {@link BigdataValue} has been pre-materialized
-	 * and cached on this {@link IV}.
-	 */
-	boolean hasValue();
-	
 }

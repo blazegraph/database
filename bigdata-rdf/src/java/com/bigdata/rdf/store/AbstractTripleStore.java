@@ -27,7 +27,6 @@
 
 package com.bigdata.rdf.store;
 
-import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
@@ -131,6 +130,7 @@ import com.bigdata.rdf.vocab.BaseVocabulary;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.RDFSVocabulary;
 import com.bigdata.rdf.vocab.Vocabulary;
+import com.bigdata.rdf.vocab.VocabularyDecl;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IDatabase;
 import com.bigdata.relation.IMutableDatabase;
@@ -152,9 +152,7 @@ import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.search.FullTextIndex;
-import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedConvertingIterator;
 import com.bigdata.striterator.DelegateChunkedIterator;
@@ -595,7 +593,7 @@ abstract public class AbstractTripleStore extends
                 + ".termCache.capacity").intern();
         
         String DEFAULT_TERM_CACHE_CAPACITY = "10000";//"50000";
-        
+
         /**
          * The name of the class that will establish the pre-defined
          * {@link Vocabulary} for the database (default
@@ -604,16 +602,39 @@ abstract public class AbstractTripleStore extends
          * disabled.
          * <p>
          * The {@link Vocabulary} is initialized by
-         * {@link AbstractTripleStore#create()} and its serialized state is
-         * stored in the global row store under the
-         * {@link TripleStoreSchema#VOCABULARY} property.  
-         * 
-         * @see NoVocabulary
-         * @see RDFSVocabulary
+         * {@link AbstractTripleStore#create()}. Its state is stored in the
+         * global row store under the {@link TripleStoreSchema#VOCABULARY}
+         * property. The named {@link Vocabulary} class will be used to
+         * instantiate a consistent vocabulary mapping each time a view of the
+         * {@link AbstractTripleStore} is materialized. This depends on the
+         * named {@link Vocabulary} class having a stable behavior. Thus the
+         * {@link BaseVocabulary} class builds in protection against version
+         * changes and will refuse to materialize a view of the
+         * {@link AbstractTripleStore} if the {@link Vocabulary} would not be
+         * consistent.
+         * <p>
+         * The {@link BaseVocabulary} class is designed for easy and modular
+         * extension. You can trivially define a concrete instance of this class
+         * which provides any (reasonable) number of {@link VocabularyDecl}
+         * instances. Each {@link VocabularyDecl} declares the namespace(s) and
+         * the {@link URI}s for some ontology. A number of such classes have
+         * been created and are combined by the
+         * {@link #DEFAULT_VOCABULARY_CLASS}. You can create your own
+         * {@link VocabularyDecl} classes and combine them within your own
+         * {@link Vocabulary}, but it must extend {@link BaseVocabulary}.
          */
         String VOCABULARY_CLASS = (AbstractTripleStore.class.getName() + ".vocabularyClass")
                 .intern();
 
+        /**
+         * Note: The default {@link Vocabulary} class may be changed from time
+         * to time as additional {@link VocabularyDecl} are created and bundled
+         * into a new default {@link Vocabulary}. However, a deployed concrete
+         * instance of the default {@link Vocabulary} class MUST NOT be modified
+         * since that could introduce inconsistencies into the URI to IV mapping
+         * which it provides for {@link AbstractTripleStore}s created using that
+         * class.
+         */
         String DEFAULT_VOCABULARY_CLASS = RDFSVocabulary.class.getName();
         
         /**
@@ -1120,17 +1141,19 @@ abstract public class AbstractTripleStore extends
             mode = DatabaseMode.QUADS;
         } 
         
+        if (lexicon) {
+            this.vocabularyClass = determineVocabularyClass();
+        } else {
+            this.vocabularyClass = NoVocabulary.class;
+        }
+        properties.setProperty(Options.VOCABULARY_CLASS, vocabularyClass.getName());
+
         if (mode != null) {
             switch (mode) {
             case TRIPLES: {
                 this.quads = false;
                 this.statementIdentifiers = false;
                 this.axiomClass = determineAxiomClass();
-                if (lexicon) {
-                    this.vocabularyClass = determineVocabularyClass();
-                } else {
-                    this.vocabularyClass = NoVocabulary.class;
-                }
                 properties.setProperty(Options.QUADS, "false");
                 properties.setProperty(Options.STATEMENT_IDENTIFIERS, "false");
                 break;
@@ -1139,11 +1162,6 @@ abstract public class AbstractTripleStore extends
                 this.quads = false;
                 this.statementIdentifiers = true;
                 this.axiomClass = determineAxiomClass();
-                if (lexicon) {
-                    this.vocabularyClass = determineVocabularyClass();
-                } else {
-                    this.vocabularyClass = NoVocabulary.class;
-                }
                 properties.setProperty(Options.QUADS, "false");
                 properties.setProperty(Options.STATEMENT_IDENTIFIERS, "true");
                 break;
@@ -1152,11 +1170,9 @@ abstract public class AbstractTripleStore extends
                 this.quads = true;
                 this.statementIdentifiers = false;
                 this.axiomClass = NoAxioms.class;
-                this.vocabularyClass = NoVocabulary.class;
                 properties.setProperty(Options.QUADS, "true");
                 properties.setProperty(Options.STATEMENT_IDENTIFIERS, "false");
                 properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
-                properties.setProperty(Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
                 break;
             }
             default:
@@ -1174,7 +1190,7 @@ abstract public class AbstractTripleStore extends
             if (lexicon) {
                 
                 axiomClass = determineAxiomClass();
-                vocabularyClass = determineVocabularyClass();
+//                vocabularyClass = determineVocabularyClass();
                 
             } else {
                 
@@ -1184,7 +1200,7 @@ abstract public class AbstractTripleStore extends
                  */
 
                 axiomClass = NoAxioms.class;
-                vocabularyClass = NoVocabulary.class;
+//                vocabularyClass = NoVocabulary.class;
 
             }
             
@@ -1379,6 +1395,32 @@ abstract public class AbstractTripleStore extends
 
             if (lexicon) {
 
+                /*
+                 * Setup the vocabulary.
+                 */
+                {
+                    
+                    assert vocab == null;
+
+                    try {
+
+                        final Constructor<? extends BaseVocabulary> ctor = vocabularyClass
+                                .getConstructor(new Class[] { String.class });
+
+                        // save reference.
+                        vocab = ctor.newInstance(new Object[] { getNamespace() });
+
+                    } catch (Exception ex) {
+
+                        throw new RuntimeException(ex);
+
+                    }
+
+                    // initialize.
+                    ((BaseVocabulary) vocab).init();
+
+                }
+                
                 lexiconRelation = new LexiconRelation(getIndexManager(),
                         getNamespace() + "."
                                 + LexiconRelation.NAME_LEXICON_RELATION,
@@ -1396,37 +1438,11 @@ abstract public class AbstractTripleStore extends
             spoRelation.create();//assignedSplits);
 
             /*
-             * The axioms and the vocabulary both require the lexicon to
-             * pre-exist. The axioms also requires the SPORelation to pre-exist.
+             * The axioms require the lexicon to pre-exist. The axioms also
+             * requires the SPORelation to pre-exist.
              */
             if(lexicon) {
 
-                /*
-                 * Setup the vocabulary.
-                 */
-                {
-                    
-                    assert vocab == null;
-
-                    try {
-
-                        final Constructor<? extends BaseVocabulary> ctor = vocabularyClass
-                                .getConstructor(new Class[] { AbstractTripleStore.class });
-
-                        // save reference.
-                        vocab = ctor.newInstance(new Object[] { this });
-
-                    } catch (Exception ex) {
-
-                        throw new RuntimeException(ex);
-
-                    }
-
-                    // initialize (writes on the lexicon).
-                    ((BaseVocabulary) vocab).init();
-
-                }
-                
                 /*
                  * Setup the axiom model.
                  */

@@ -94,16 +94,7 @@ public class URIShortIV<V extends BigdataURI> extends AbstractInlineIV<V, Short>
 	public V asValue(final LexiconRelation lex)
 			throws UnsupportedOperationException {
 
-		/*
-		 * FIXME Enable. Consider passing [IV] not [int].
-		 * 
-		 * FIXME We need a means to obtain the unsigned int from the byte for
-		 * this operation. That will give us all 64k possible indices rather
-		 * than just 32k.
-		 */
-//		return lex.getContainer().getVocabulary().get(value);
-		
-		throw new UnsupportedOperationException();
+	    return (V) lex.getContainer().getVocabulary().asValue(this);
 		
 	}
 
