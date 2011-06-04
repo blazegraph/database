@@ -132,8 +132,7 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
     static private final boolean runStaticQueryOptimizer = true;
 
     /**
-     * Open/create the journal, setting the {@link #database} and
-     * {@link #namespace} as side-effects.
+     * Open/create the journal.
      * 
      * @param properties
      *            The properties.
