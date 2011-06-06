@@ -34,7 +34,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.vocab.decls.DublinCoreVocabularyDecl;
+import com.bigdata.rdf.vocab.decls.DCAllVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.OWLVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.RDFSVocabularyDecl;
@@ -45,7 +45,7 @@ import com.bigdata.rdf.vocab.decls.XMLSchemaVocabularyDecl;
 
 /**
  * A {@link Vocabulary} including well-known {@link Value}s for {@link RDF},
- * {@link RDFS}, {@link OWL}, {@link DublinCoreVocabularyDecl Dublin Core},
+ * {@link RDFS}, {@link OWL}, {@link DCAllVocabularyDecl Dublin Core},
  * {@link SKOSVocabularyDecl SKOS}, {@link FOAFVocabularyDecl FOAF},
  * {@link XMLSchema}, and {@link Sesame}.
  * 
@@ -88,7 +88,7 @@ public class RDFSVocabulary extends BaseVocabulary {
         
         addDecl(new SKOSVocabularyDecl());
         
-        addDecl(new DublinCoreVocabularyDecl());
+        addDecl(new DCAllVocabularyDecl());
         
         addDecl(new XMLSchemaVocabularyDecl());
         
