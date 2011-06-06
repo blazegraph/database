@@ -34,19 +34,23 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.decls.DublinCoreVocabularyDecl;
+import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
+import com.bigdata.rdf.vocab.decls.OWLVocabularyDecl;
+import com.bigdata.rdf.vocab.decls.RDFSVocabularyDecl;
+import com.bigdata.rdf.vocab.decls.RDFVocabularyDecl;
+import com.bigdata.rdf.vocab.decls.SKOSVocabularyDecl;
+import com.bigdata.rdf.vocab.decls.SesameVocabularyDecl;
+import com.bigdata.rdf.vocab.decls.XMLSchemaVocabularyDecl;
 
 /**
  * A {@link Vocabulary} including well-known {@link Value}s for {@link RDF},
- * {@link RDFS}, {@link OWL}, {@link XMLSchema}, and {@link Sesame}.
+ * {@link RDFS}, {@link OWL}, {@link DublinCoreVocabularyDecl Dublin Core},
+ * {@link SKOSVocabularyDecl SKOS}, {@link FOAFVocabularyDecl FOAF},
+ * {@link XMLSchema}, and {@link Sesame}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          TODO SKOS, DC
- * 
- *          TODO BD,
- * 
- *          TODO LUBM, BSBM, ...
  */
 public class RDFSVocabulary extends BaseVocabulary {
 
@@ -75,9 +79,19 @@ public class RDFSVocabulary extends BaseVocabulary {
     protected void addValues() {
 
         addDecl(new RDFVocabularyDecl());
+   
         addDecl(new RDFSVocabularyDecl());
+        
         addDecl(new OWLVocabularyDecl());
+        
+        addDecl(new FOAFVocabularyDecl());
+        
+        addDecl(new SKOSVocabularyDecl());
+        
+        addDecl(new DublinCoreVocabularyDecl());
+        
         addDecl(new XMLSchemaVocabularyDecl());
+        
         addDecl(new SesameVocabularyDecl());
 
     }

@@ -25,40 +25,42 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 4, 2011
  */
 
-package com.bigdata.rdf.vocab;
+package com.bigdata.rdf.vocab.decls;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 
 import org.openrdf.model.URI;
-import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.vocabulary.SESAME;
+
+import com.bigdata.rdf.vocab.VocabularyDecl;
+
+import cutthecrap.utils.striterators.Striterator;
 
 /**
- * Vocabulary and namespace for {@link Sesame}.
- * 
- * @see Sesame
+ * Vocabulary and namespace for Dublin Core, including:
+ * <ul>
+ * <li>{@link DCTermsVocabularyDecl}</li>
+ * <li>{@link DCElementsVocabularyDecl}</li>
+ * </ul>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: SesameVocabularyDecl.java 4628 2011-06-04 22:01:57Z thompsonbry
+ *          $
+ * 
+ * @see DCTermsVocabularyDecl
+ * @see DCElementsVocabularyDecl
  */
-public class SesameVocabularyDecl implements VocabularyDecl {
+public class DublinCoreVocabularyDecl implements VocabularyDecl {
 
-    static private final URI[] uris = new URI[]{
-        new URIImpl(SESAME.NAMESPACE),//
-        SESAME.DIRECTSUBCLASSOF,//
-        SESAME.DIRECTSUBPROPERTYOF,//
-        SESAME.DIRECTTYPE,//
-    };
-
-    public SesameVocabularyDecl() {
+    public DublinCoreVocabularyDecl() {
     }
     
     public Iterator<URI> values() {
 
-        return Collections.unmodifiableList(Arrays.asList(uris)).iterator();
-        
+        return new Striterator()//
+            .append(new DCTermsVocabularyDecl().values())//
+            .append(new DCElementsVocabularyDecl().values())//
+            ;
+
     }
 
 }

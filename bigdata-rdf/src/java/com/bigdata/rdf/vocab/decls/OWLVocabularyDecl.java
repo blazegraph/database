@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 4, 2011
  */
 
-package com.bigdata.rdf.vocab;
+package com.bigdata.rdf.vocab.decls;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -34,6 +34,8 @@ import java.util.Iterator;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.OWL;
+
+import com.bigdata.rdf.vocab.VocabularyDecl;
 
 /**
  * Vocabulary and namespace for {@link OWL}.
