@@ -33,6 +33,7 @@ import org.openrdf.model.URI;
 
 import com.bigdata.rdf.vocab.VocabularyDecl;
 
+import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
@@ -49,14 +50,14 @@ import cutthecrap.utils.striterators.Striterator;
  * @see DCTermsVocabularyDecl
  * @see DCElementsVocabularyDecl
  */
-public class DublinCoreVocabularyDecl implements VocabularyDecl {
+public class DCAllVocabularyDecl implements VocabularyDecl {
 
-    public DublinCoreVocabularyDecl() {
+    public DCAllVocabularyDecl() {
     }
     
     public Iterator<URI> values() {
 
-        return new Striterator()//
+        return new Striterator(new EmptyIterator())//
             .append(new DCTermsVocabularyDecl().values())//
             .append(new DCElementsVocabularyDecl().values())//
             ;

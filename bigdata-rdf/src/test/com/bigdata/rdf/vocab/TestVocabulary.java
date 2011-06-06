@@ -66,6 +66,9 @@ public class TestVocabulary extends TestCase2 {
 
         vocab.init();
         
+        if (log.isInfoEnabled())
+            log.info("Vocabulary size: " + vocab.size());
+        
         doRoundTripTest(vocab);
 
         // point tests for known value.
@@ -123,7 +126,7 @@ public class TestVocabulary extends TestCase2 {
             
             // The vocabulary size is consistent with its iterator.
             assertEquals(nfound, vocab.size());
-            
+
         }
         
     }

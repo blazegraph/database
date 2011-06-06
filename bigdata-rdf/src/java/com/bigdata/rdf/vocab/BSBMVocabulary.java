@@ -29,7 +29,7 @@ package com.bigdata.rdf.vocab;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.decls.BSBMVocabularyDecl;
-import com.bigdata.rdf.vocab.decls.DublinCoreVocabularyDecl;
+import com.bigdata.rdf.vocab.decls.DCAllVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.RDFSVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.RDFVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.XMLSchemaVocabularyDecl;
@@ -68,7 +68,7 @@ public class BSBMVocabulary extends BaseVocabulary {
 
         addDecl(new RDFVocabularyDecl());
         addDecl(new RDFSVocabularyDecl());
-        addDecl(new DublinCoreVocabularyDecl());
+        addDecl(new DCAllVocabularyDecl());
         addDecl(new XMLSchemaVocabularyDecl());
         addDecl(new BSBMVocabularyDecl());
 
