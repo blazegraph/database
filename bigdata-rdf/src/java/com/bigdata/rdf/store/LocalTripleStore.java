@@ -29,6 +29,8 @@ package com.bigdata.rdf.store;
 
 import java.util.Properties;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.BTree;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
@@ -50,6 +52,8 @@ import com.bigdata.relation.locator.DefaultResourceLocator;
  * @version $Id$
  */
 public class LocalTripleStore extends AbstractLocalTripleStore {
+
+    final static private Logger log = Logger.getLogger(LocalTripleStore.class);
 
     protected final Journal store;
 

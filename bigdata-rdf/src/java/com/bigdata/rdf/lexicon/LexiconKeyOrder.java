@@ -5,10 +5,11 @@ import java.util.Comparator;
 
 import org.openrdf.model.Value;
 
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueIdComparator;
 import com.bigdata.striterator.AbstractKeyOrder;
-import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Natural index orders for the {@link LexiconRelation}.
@@ -179,6 +180,27 @@ public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> {
     private Object readResolve() throws ObjectStreamException {
 
         return LexiconKeyOrder.valueOf(index);
+
+    }
+    
+    protected void appendKeyComponent(final IKeyBuilder keyBuilder,
+            final int i, final Object keyComponent) {
+
+        if (index == _TERM2ID) {
+        	
+        	final BigdataValue term = (BigdataValue) keyComponent;
+        	final LexiconKeyBuilder lexKeyBuilder = 
+        		new LexiconKeyBuilder(keyBuilder);
+        	lexKeyBuilder.value2Key(term);
+        	
+        } else if (index == _ID2TERM) {
+        	
+        	final TermId id = (TermId) keyComponent;
+        	id.encode(keyBuilder);
+        	
+        } else {
+        	throw new AssertionError();
+        }
 
     }
 

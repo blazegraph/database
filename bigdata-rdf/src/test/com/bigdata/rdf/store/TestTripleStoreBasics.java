@@ -92,6 +92,9 @@ public class TestTripleStoreBasics extends TestCase2 {
         // test suite for bulk filter of statements absent/present in the kb.
         suite.addTestSuite(TestBulkFilter.class);
 
+        // test suite for temp stores sharing the same lexicon.
+        suite.addTestSuite(TestSharedLexiconTempStore.class);
+        
         /*
          * test suite for the rio parser and data loading integration, including
          * support for statement identifiers and handling of blank nodes when

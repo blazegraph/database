@@ -361,7 +361,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		public Properties getProperties() {
 
-			System.out.println("TestRWJournal:getProperties");
+            if (log.isInfoEnabled())
+                log.info("TestRWJournal:getProperties");
 
 			final Properties properties = super.getProperties();
 
@@ -588,7 +589,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				faddr = allocBatch(rw, 10000, 90, 128);
 				faddr = allocBatch(rw, 20000, 45, 64);
 
-				System.out.println("Final allocation: " + faddr + ", allocations: "
+				if(log.isInfoEnabled())
+				    log.info("Final allocation: " + faddr + ", allocations: "
 						+ (rw.getTotalAllocations() - numAllocs) + ", allocated bytes: "
 						+ (rw.getTotalAllocationsSize() - startAllocations));
 
@@ -640,7 +642,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			final int ints = FixedAllocator.calcBitSize(optDensity, slotSize, reserve, mod);
 			// there are max 254 ints available to a FixedAllocator
 			final int maxuse = (254 / (ints + 1)) * ints;
-			System.out.println("Allocate " + ints + ":" + (32 * ints * slotSize) + " for " + slotSize + " in "
+			if(log.isInfoEnabled())
+			    log.info("Allocate " + ints + ":" + (32 * ints * slotSize) + " for " + slotSize + " in "
 					+ reserve + " using " + maxuse + " of 254 possible");
 		}
 
@@ -722,7 +725,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				bufferStrategy = (RWStrategy) store.getBufferStrategy();
 				rw = bufferStrategy.getRWStore();
 
-				System.out.println("Final allocations: " + (rw.getTotalAllocations() - numAllocs)
+				if(log.isInfoEnabled())
+				    log.info("Final allocations: " + (rw.getTotalAllocations() - numAllocs)
 						+ ", allocated bytes: " + (rw.getTotalAllocationsSize() - startAllocations) + ", file length: "
 						+ rw.getStoreFile().length());
 			} finally {
@@ -771,7 +775,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				store.close();
 
 				// added to try and foce bug
-				System.out.println("Re-open Journal");
+				if(log.isInfoEnabled())log.info("Re-open Journal");
 				store = (Journal) getStore();
 				reallocBatchWithRead(store, 1, 800, 1500, tcount, true, true);
 				reallocBatchWithRead(store, 1, 50, 250, tcount, true, true);
@@ -779,33 +783,33 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				store.close();
 				// .. end add to force bug
 
-				System.out.println("Re-open Journal");
+				if(log.isInfoEnabled())log.info("Re-open Journal");
 				store = (Journal) getStore();
 				reallocBatchWithRead(store, 1, 2000, 10000, tcount, true, true);
 				reallocBatchWithRead(store, 1, 200, 500, tcount, true, true);
 				store.close();
-				System.out.println("Re-open Journal");
+				if(log.isInfoEnabled())log.info("Re-open Journal");
 				store = (Journal) getStore();
 				reallocBatchWithRead(store, 1, 800, 1256, tcount, true, true);
 				reallocBatchWithRead(store, 1, 50, 250, tcount, true, true);
 				reallocBatchWithRead(store, 1, 50, 250, tcount, true, true);
 				showStore(store);
 				store.close();
-				System.out.println("Re-open Journal");
+				if(log.isInfoEnabled())log.info("Re-open Journal");
 				store = (Journal) getStore();
 				showStore(store);
 				reallocBatchWithRead(store, 1, 400, 1000, tcount, true, true);
 				reallocBatchWithRead(store, 1, 1000, 2000, tcount, true, true);
 				reallocBatchWithRead(store, 1, 400, 1000, tcount, true, true);
 				store.close();
-				System.out.println("Re-open Journal");
+				if(log.isInfoEnabled())log.info("Re-open Journal");
 				store = (Journal) getStore();
 
 				bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
 				rw = bufferStrategy.getRWStore();
 
-				System.out.println("Final allocations: " + (rw.getTotalAllocations() - numAllocs)
+				if(log.isInfoEnabled())log.info("Final allocations: " + (rw.getTotalAllocations() - numAllocs)
 						+ ", allocated bytes: " + (rw.getTotalAllocationsSize() - startAllocations) + ", file length: "
 						+ rw.getStoreFile().length());
 			} finally {
@@ -859,12 +863,13 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			}
 		}
 		
-		void showStore(Journal store) {
-			RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+		void showStore(final Journal store) {
+			
+		    final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
-			RWStore rw = bufferStrategy.getRWStore();
+			final RWStore rw = bufferStrategy.getRWStore();
 
-			System.out.println("Fixed Allocators: " + rw.getFixedAllocatorCount() + ", heap allocated: "
+			if(log.isInfoEnabled())log.info("Fixed Allocators: " + rw.getFixedAllocatorCount() + ", heap allocated: "
 					+ rw.getFileStorage() + ", utilised bytes: " + rw.getAllocatedSlots() + ", file length: "
 					+ rw.getStoreFile().length());
 
@@ -1028,7 +1033,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				final StringBuilder str = new StringBuilder();
 				rw.getStorageStats().showStats(str);
-				System.out.println(str);
+				if(log.isInfoEnabled())log.info(str);
 			} finally {
 
 				store.destroy();
@@ -1058,7 +1063,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				long faddr = bs.write(bb); // rw.alloc(buf, buf.length);
 
-				log.info("Blob Allocation at " + rw.convertFromAddr(faddr));
+				if(log.isInfoEnabled())log.info("Blob Allocation at " + rw.convertFromAddr(faddr));
 
 				bb.position(0);
 
@@ -1066,7 +1071,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				assertEquals(bb, rdBuf);
 
-				System.out.println("Now commit to disk");
+				if(log.isInfoEnabled())log.info("Now commit to disk");
 
 				store.commit();
 
@@ -1131,7 +1136,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				final long pa = bs.getPhysicalAddress(faddr);
 				bb.position(0);
 
-				System.out.println("Now commit to disk (1)");
+				if(log.isInfoEnabled())log.info("Now commit to disk (1)");
 
 				store.commit();
 
@@ -1155,7 +1160,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 					 * consistency of the last commit point, so we have to commit
 					 * first then test for deferred frees.
 					 */
-					System.out.println("Now commit to disk (2)");
+					if(log.isInfoEnabled())log.info("Now commit to disk (2)");
 
 					store.commit();
 
@@ -1270,7 +1275,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 					realAddr = rw.metaBit2Addr(allocAddr);
 				}
-				System.out.println("metaAlloc lastAddr: " + realAddr);
+				if(log.isInfoEnabled())log.info("metaAlloc lastAddr: " + realAddr);
 			} finally {
 				store.destroy();
 			}
@@ -1423,9 +1428,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				store.commit();
 				final StringBuilder str = new StringBuilder();
 				rw.showAllocators(str);
-				System.out.println(str);
+				if(log.isInfoEnabled())log.info(str);
 				store.close();
-				System.out.println("Re-open Journal");
+				if(log.isInfoEnabled())log.info("Re-open Journal");
 				store = (Journal) getStore();
 
 				showStore(store);
@@ -1557,10 +1562,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
 																				// of
 																				// blocks
 				store.commit();
-				System.out.println("Final allocations: " + rw.getTotalAllocations() + ", allocated bytes: "
+				if(log.isInfoEnabled())log.info("Final allocations: " + rw.getTotalAllocations() + ", allocated bytes: "
 						+ rw.getTotalAllocationsSize() + ", file length: " + rw.getStoreFile().length());
 				store.close();
-				System.out.println("Re-open Journal");
+				if(log.isInfoEnabled())log.info("Re-open Journal");
 				store = (Journal) getStore();
 
 				showStore(store);

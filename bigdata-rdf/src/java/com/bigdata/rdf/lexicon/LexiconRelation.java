@@ -59,6 +59,8 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.ap.filter.BOpResolver;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
@@ -97,9 +99,12 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.AbstractRelation;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ArrayAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -2934,17 +2939,38 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         	}
         	
         	final BigdataValue val = term.get();
+
+            // see if it already has an IV or can be assigned an inline IV
+        	IV iv = val.getIV();
+        	if (iv == null) {
+        		iv = getInlineIV(val);
+        	}            
+
+        	if (iv != null) {
+        		
+	        	// cache the IV on the value
+	        	val.setIV(iv);
+	        	
+	        	// cache the value on the IV
+	        	iv.setValue(val);
+	        	
+	        	return new ArrayAccessPath<BigdataValue>(new BigdataValue[] { val }, 
+	    				predicate, keyOrder);
+	        	
+        	}
+       
+        	final CacheValueFilter filter = CacheValueFilter.newInstance();
         	
-        	final IV iv = getIV(val);
+        	final IPredicate<BigdataValue> tmp = (IPredicate<BigdataValue>) 
+        		predicate.setProperty(
+        			Predicate.Annotations.ACCESS_PATH_FILTER, filter
+        		);
         	
-        	// cache the IV on the value
-        	val.setIV(iv);
+        	AccessPath<BigdataValue> ap = new AccessPath<BigdataValue>(
+        			this, localIndexManager, tmp, keyOrder
+        			);
         	
-        	// cache the value on the IV
-        	iv.setValue(val);
-        	
-        	return new ArrayAccessPath<BigdataValue>(new BigdataValue[] { val }, 
-    				predicate, keyOrder);
+        	return ap;
         	
     	} else if (keyOrder == LexiconKeyOrder.ID2TERM) {
     		
@@ -2958,16 +2984,39 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         	
         	final IV iv = term.get();
         	
-        	final BigdataValue val = getTerm(iv);
+        	final BigdataValue val = termCache.get(iv);
         	
-        	// cache the IV on the value
-        	val.setIV(iv);
+        	if (val != null) {
         	
-        	// cache the value on the IV
-        	iv.setValue(val);
+        		if (log.isDebugEnabled())
+        			log.debug("found term in the term cache: " + val);
+        		
+	        	// cache the IV on the value
+	        	val.setIV(iv);
+	        	
+	        	// cache the value on the IV
+	        	iv.setValue(val);
+	        	
+	        	return new ArrayAccessPath<BigdataValue>(new BigdataValue[] { val }, 
+	    				predicate, keyOrder);
+	        	
+        	}
         	
-        	return new ArrayAccessPath<BigdataValue>(new BigdataValue[] { val }, 
-    				predicate, keyOrder);
+        	if (log.isDebugEnabled())
+        		log.debug("did not find term in the term cache: " + iv);
+        	
+        	final CacheValueFilter filter = CacheValueFilter.newInstance();
+        	
+        	final IPredicate<BigdataValue> tmp = (IPredicate<BigdataValue>) 
+        		predicate.setProperty(
+        			Predicate.Annotations.ACCESS_PATH_FILTER, filter
+        		);
+        	
+        	final AccessPath<BigdataValue> ap = new AccessPath<BigdataValue>(
+        			this, localIndexManager, tmp, keyOrder
+        			).init();
+        	
+        	return ap;
         	
     	} else {
     	

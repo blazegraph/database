@@ -250,7 +250,7 @@ public class IVUtility {
         // fixed length numerics
         if (dte1.isFloatingPointNumeric() || dte2.isFloatingPointNumeric()) {
             // non-BigDecimal floating points
-        	if (dte1 == DTE.XSDFloat && dte2 == DTE.XSDFloat)
+        	if (dte1 == DTE.XSDFloat || dte2 == DTE.XSDFloat)
         		return numericalMath(num1.floatValue(), num2.floatValue(), op);
         	else
         		return numericalMath(num1.doubleValue(), num2.doubleValue(), op);
