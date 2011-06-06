@@ -67,7 +67,9 @@ public class TestFileSystemScanner extends TestCase2 {
                 new File("bigdata/src/java/com/bigdata/service/ndx/pipeline"), new FilenameFilter() {
 
                     public boolean accept(File dir, String name) {
-                        System.err.println("Considering: "+dir+File.separator+name);
+                                if (log.isInfoEnabled())
+                                    log.info("Considering: " + dir
+                                            + File.separator + name);
                         return name.endsWith(".java");
                     }
 
@@ -94,8 +96,9 @@ public class TestFileSystemScanner extends TestCase2 {
                         assertNotNull(file);
                     }
                     
-                    System.err.println(Arrays.toString(files));
-                    
+                    if (log.isInfoEnabled())
+                        log.info(Arrays.toString(files));
+
                     n += files.length;
                     
                 }
@@ -118,7 +121,8 @@ public class TestFileSystemScanner extends TestCase2 {
             
             final Long acceptCount = scanner.call();
             
-            System.out.println("Scanner accepted: "+acceptCount+" files");
+            if (log.isInfoEnabled())
+                log.info("Scanner accepted: " + acceptCount + " files");
 
             // close buffer so task draining the buffer will terminate.
             buffer.close();

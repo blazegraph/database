@@ -396,7 +396,8 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
                         final long delayMillis = (long) (r.nextDouble() * (maxWriteDelay - minWriteDelay))
                                 + minWriteDelay;
 
-                        System.err.println("Writing on " + chunk.length
+                        if(log.isInfoEnabled())
+                            log.info("Writing on " + chunk.length
                                 + " elements on " + locator + " (delay="
                                 + delayMillis + ") ...");
 
@@ -406,7 +407,8 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
                             throw new RuntimeException(ex);
                         }
 
-                        System.err.println("Wrote on " + this + ".");
+                        if(log.isInfoEnabled())
+                            log.info("Wrote on " + this + ".");
 
                     }
                     
@@ -940,14 +942,16 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
 
                 for (Map.Entry<L, HS> e : subStats.entrySet()) {
 
-                    System.out.println(e.getKey() + " : " + e.getValue());
+                    if(log.isInfoEnabled())
+                        log.info(e.getKey() + " : " + e.getValue());
 
                 }
 
             }
 
             // show the master stats
-            System.out.println(master.stats.toString());
+            if(log.isInfoEnabled())
+                log.info(master.stats.toString());
 
         }
 

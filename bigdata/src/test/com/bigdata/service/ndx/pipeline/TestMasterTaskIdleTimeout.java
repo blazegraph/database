@@ -576,7 +576,8 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
                 + actualAverageOutputChunkSize + ", N=" + N + ", O=" + O
                 + ", " + expectedAverageOutputChunkSize+", ratio="+r;
         
-            System.err.println(msg);
+            if(log.isInfoEnabled())
+                log.info(msg);
         
             if (r < .8 || r > 1.1) {
 

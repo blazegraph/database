@@ -56,9 +56,6 @@ import com.bigdata.relation.rule.eval.Solution;
 /**
  * Test suite for writing, reading, chasing and retracting {@link Justification}s.
  * 
- * FIXME isGroundedJustification - there is one simple test (directly proven)
- * but this needs more testing.
- * 
  * @todo test the comparator. it is especially important that that all
  *       justifications for the same entailment are clustered.
  *       <P>
@@ -276,7 +273,8 @@ public class TestJustifications extends AbstractRuleTestCase {
             
             // an empty focusStore.
             final TempTripleStore focusStore = new TempTripleStore(store
-                    .getProperties(), store);
+                    .getIndexManager().getTempStore(), store.getProperties(),
+                    store);
 
             try {
 
@@ -307,7 +305,12 @@ public class TestJustifications extends AbstractRuleTestCase {
 
             } finally {
 
-                focusStore.__tearDownUnitTest();
+                /*
+                 * Destroy the temp kb, but not the backing TemporaryStore. That
+                 * will be destroyed when we destroy the IndexManager associated
+                 * with the main store (below).
+                 */
+                focusStore.destroy();
 
             }
 
@@ -323,8 +326,8 @@ public class TestJustifications extends AbstractRuleTestCase {
              */
             {
                 
-                final ITupleIterator itr = store.getSPORelation().getJustificationIndex()
-                        .rangeIterator(null, null);
+                final ITupleIterator<?> itr = store.getSPORelation()
+                        .getJustificationIndex().rangeIterator();
                 
                 assertFalse(itr.hasNext());
                 

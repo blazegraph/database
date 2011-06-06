@@ -30,6 +30,7 @@ import org.openrdf.query.algebra.And;
 import org.openrdf.query.algebra.BNodeGenerator;
 import org.openrdf.query.algebra.Bound;
 import org.openrdf.query.algebra.Compare;
+import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.CompareAll;
 import org.openrdf.query.algebra.CompareAny;
 import org.openrdf.query.algebra.Datatype;
@@ -63,6 +64,7 @@ import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.Regex;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.Str;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
@@ -70,8 +72,6 @@ import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
-import org.openrdf.query.algebra.Compare.CompareOp;
-import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
@@ -83,12 +83,12 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.constraint.INBinarySearch;
@@ -103,12 +103,17 @@ import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.AndBOp;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
+import com.bigdata.rdf.internal.constraints.DatatypeBOp;
 import com.bigdata.rdf.internal.constraints.EBVBOp;
+import com.bigdata.rdf.internal.constraints.FuncBOp;
 import com.bigdata.rdf.internal.constraints.IsBNodeBOp;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.IsLiteralBOp;
 import com.bigdata.rdf.internal.constraints.IsURIBOp;
+import com.bigdata.rdf.internal.constraints.LangBOp;
+import com.bigdata.rdf.internal.constraints.LangMatchesBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
@@ -116,16 +121,15 @@ import com.bigdata.rdf.internal.constraints.RegexBOp;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
 import com.bigdata.rdf.internal.constraints.StrBOp;
-import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.sop.SOp;
 import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree;
+import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
 import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
-import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
@@ -777,49 +781,37 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     			 * UnsupportedOperatorException here must just flow through
     			 * to Sesame evaluation of the entire query.
     			 */
-//    			if (op instanceof Regex) {
-//        			final Regex regex = (Regex) op;
-//    				final IPredicate bop = toPredicate(regex);
-//    				sop.setBOp(bop);
-//    			} else {
-	    			final ValueExpr ve = (ValueExpr) op;
-					final IConstraint bop = toConstraint(ve);
-					sop.setBOp(bop);
-//    			}
+    			final ValueExpr ve = (ValueExpr) op;
+				final IConstraint bop = toConstraint(ve);
+				sop.setBOp(bop);
     		} else if (op instanceof Filter) {
     			final Filter filter = (Filter) op;
     			final ValueExpr ve = filter.getCondition();
-    			try {
-//    				if (ve instanceof Regex) {
-//            			final Regex regex = (Regex) ve;
-//        				final IPredicate bop = toPredicate(regex);
-//        				sop.setBOp(bop);
-//        			} else {
-        				final IConstraint bop = toConstraint(ve);
-        				sop.setBOp(bop);
-//        			}
-    			} catch (UnsupportedOperatorException ex) {
-    				/*
-    				 * If we encounter a sesame filter (ValueExpr) that we
-    				 * cannot translate, we can safely wrap the entire query
-    				 * with a Sesame filter iterator to capture that
-    				 * untranslatable value expression.  If we are not in the
-    				 * root group however, we risk applying the filter to the
-    				 * wrong context (for example a filter inside an optional
-    				 * join group cannot be applied universally to the entire
-    				 * solution).  In this case we must punt. 
-    				 */
-    				if (sop.getGroup() == SOpTreeBuilder.ROOT_GROUP_ID) {
-    					sopsToPrune.add(sop);
-    					sesameFilters.add(filter);
-					} else {
-						/*
-						 * Note: DO NOT wrap with a different exception type -
-						 * the caller is looking for this.
-						 */
-    					throw new UnsupportedOperatorException(ex);
-    				}
-    			}
+//    			try {
+    				final IConstraint bop = toConstraint(ve);
+    				sop.setBOp(bop);
+//    			} catch (UnsupportedOperatorException ex) {
+//    				/*
+//    				 * If we encounter a sesame filter (ValueExpr) that we
+//    				 * cannot translate, we can safely wrap the entire query
+//    				 * with a Sesame filter iterator to capture that
+//    				 * untranslatable value expression.  If we are not in the
+//    				 * root group however, we risk applying the filter to the
+//    				 * wrong context (for example a filter inside an optional
+//    				 * join group cannot be applied universally to the entire
+//    				 * solution).  In this case we must punt. 
+//    				 */
+//    				if (sop.getGroup() == SOpTreeBuilder.ROOT_GROUP_ID) {
+//    					sopsToPrune.add(sop);
+//    					sesameFilters.add(filter);
+//					} else {
+//						/*
+//						 * Note: DO NOT wrap with a different exception type -
+//						 * the caller is looking for this.
+//						 */
+//    					throw new UnsupportedOperatorException(ex);
+//    				}
+//    			}
     		}
     	}
     	
@@ -1832,11 +1824,11 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         } else if (ve instanceof Label) {
         	throw new UnsupportedOperatorException(ve);
         } else if (ve instanceof Lang) {
-        	throw new UnsupportedOperatorException(ve);
+        	return toVE((Lang) ve);
         } else if (ve instanceof LangMatches) {
-        	throw new UnsupportedOperatorException(ve);
+        	return toVE((LangMatches) ve);
         } else if (ve instanceof Datatype) {
-        	throw new UnsupportedOperatorException(ve);
+        	return toVE((Datatype) ve);
         } else if (ve instanceof Namespace) {
         	throw new UnsupportedOperatorException(ve);
         } else if (ve instanceof LocalName) {
@@ -1854,7 +1846,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         } else if (ve instanceof Like) {
         	throw new UnsupportedOperatorException(ve);
         } else if (ve instanceof FunctionCall) {
-        	throw new UnsupportedOperatorException(ve);
+        	return toVE((FunctionCall) ve);
         } else if (ve instanceof And) {
             return toVE((And) ve);
         } else if (ve instanceof Or) {
@@ -2012,6 +2004,36 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	} else {
     		return new RegexBOp(var, pattern);
     	}
+    }
+
+    private IValueExpression<? extends IV> toVE(final FunctionCall fc) {
+    	final String lex = database.getLexiconRelation().getNamespace();
+    	final String func = fc.getURI();
+    	final List<ValueExpr> args = fc.getArgs();
+    	final IValueExpression<? extends IV>[] bops = 
+    		new IValueExpression[args.size()];
+    	for (int i = 0; i < bops.length; i++) {
+    		bops[i] = toVE(args.get(i));
+    	}
+    	return new FuncBOp(bops, func, lex);
+    }
+
+    private IValueExpression<? extends IV> toVE(final Datatype dt) {
+    	final String lex = database.getLexiconRelation().getNamespace();
+    	final IValueExpression<? extends IV> arg = toVE(dt.getArg());
+    	return new DatatypeBOp(arg, lex);
+    }
+
+    private IValueExpression<? extends IV> toVE(final Lang lang) {
+    	final String lex = database.getLexiconRelation().getNamespace();
+    	final IValueExpression<? extends IV> arg = toVE(lang.getArg());
+    	return new LangBOp(arg, lex);
+    }
+
+    private IValueExpression<? extends IV> toVE(final LangMatches lm) {
+    	final IValueExpression<? extends IV> tag = toVE(lm.getLeftArg());
+    	final IValueExpression<? extends IV> range = toVE(lm.getRightArg());
+    	return new LangMatchesBOp(tag, range);
     }
 
 	/**

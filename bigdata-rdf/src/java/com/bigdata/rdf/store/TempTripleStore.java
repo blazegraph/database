@@ -32,6 +32,8 @@ import java.util.Enumeration;
 import java.util.Properties;
 import java.util.UUID;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
@@ -82,6 +84,8 @@ import com.bigdata.service.IBigdataFederation;
  */
 public class TempTripleStore extends AbstractLocalTripleStore {
     
+    final static private Logger log = Logger.getLogger(TempTripleStore.class);
+
     private final TemporaryStore store;
     
     public TemporaryStore getIndexManager() {
@@ -173,20 +177,24 @@ public class TempTripleStore extends AbstractLocalTripleStore {
      *       here.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static interface Options extends AbstractTripleStore.Options { //, TemporaryStore.Options {
         
     }
-    
+
     /**
      * Create a transient {@link ITripleStore} backed by a new
      * {@link TemporaryStore}.
      * 
      * @param properties
      *            See {@link Options}.
+     * 
+     * @deprecated by
+     *             {@link TempTripleStore#TempTripleStore(TemporaryStore, Properties, AbstractTripleStore)}
+     *             which permits you to reuse the same backing
+     *             {@link TemporaryStore} instance until it becomes full.
      */
-    public TempTripleStore(Properties properties) {
+    public TempTripleStore(final Properties properties) {
        
         this(properties, null);
         
@@ -224,7 +232,7 @@ public class TempTripleStore extends AbstractLocalTripleStore {
      *             {@link TruthMaintenance} which have to create a lot of
      *             temporary stores.
      */
-    public TempTripleStore(Properties properties, AbstractTripleStore db) {
+    public TempTripleStore(final Properties properties, final AbstractTripleStore db) {
         
         this(new TemporaryStore(), properties, db);
 
@@ -258,8 +266,8 @@ public class TempTripleStore extends AbstractLocalTripleStore {
 
         if (db != null) {
 
-            ((DefaultResourceLocator) db.getIndexManager().getResourceLocator())
-                    .add(store);
+            ((DefaultResourceLocator<?>) db.getIndexManager()
+                    .getResourceLocator()).add(store);
 
         }
 
@@ -275,10 +283,11 @@ public class TempTripleStore extends AbstractLocalTripleStore {
      * Note: This is here just to make it easy to have the reference to the
      * [store] and its [uuid] when we create one in the calling ctor.
      */
-    private TempTripleStore(TemporaryStore store, Properties properties) {
+    private TempTripleStore(final TemporaryStore store,
+            final Properties properties) {
 
         this(store, UUID.randomUUID() + "kb", ITx.UNISOLATED, properties);
-        
+
     }
 
     /**
@@ -316,30 +325,31 @@ public class TempTripleStore extends AbstractLocalTripleStore {
      * 
      * @return The stacked properties.
      */
-    private static Properties stackProperties(Properties properties, AbstractTripleStore db) {
+    private static Properties stackProperties(final Properties properties,
+            final AbstractTripleStore db) {
+
+        final Properties tmp = db.getProperties();
         
-        Properties tmp = db.getProperties();
-        
-        Enumeration e = properties.keys();
-        
-        while(e.hasMoreElements()) {
-            
-            Object ekey = e.nextElement();
-            
-            if(!(ekey instanceof String)) {
-                
+        final Enumeration<Object> e = properties.keys();
+
+        while (e.hasMoreElements()) {
+
+            final Object ekey = e.nextElement();
+
+            if (!(ekey instanceof String)) {
+
                 continue;
-                
+
             }
-            
-            final String key = (String)ekey;
-            
-            tmp.setProperty(key,properties.getProperty(key));
-            
+
+            final String key = (String) ekey;
+
+            tmp.setProperty(key, properties.getProperty(key));
+
         }
-        
+
         return tmp;
-        
+
     }
 
     /**

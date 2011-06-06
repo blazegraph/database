@@ -241,7 +241,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     protected static final String ERR_TOO_MANY_TUPLES = "Too many tuples";
     
     /**
-     * Warning message when the index segment will be empty.
+     * Message when the index segment will be empty.
      */
     protected static final String ERR_NO_TUPLES = "No tuples";
     
@@ -1230,8 +1230,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 //            
 //        }
 
-        if (entryCount == 0)
-            log.warn(ERR_NO_TUPLES);
+        if (entryCount == 0&&log.isInfoEnabled())
+            log.info(ERR_NO_TUPLES);
         
         if (entryIterator == null)
             throw new IllegalArgumentException();

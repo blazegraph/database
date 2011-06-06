@@ -78,7 +78,6 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
-import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.Axioms;
@@ -172,25 +171,6 @@ import com.bigdata.striterator.IKeyOrder;
  * it is easy to write new rules. Those {@link IRule}s can be introduced using
  * custom {@link BaseClosure} implementations. See {@link Options#CLOSURE_CLASS}.
  * 
- * @todo When using a read-historical views for a very large scale-out triple
- *       store on an {@link IBigdataFederation} with concurrent writes (or
- *       concurrent overflow of data services) can cause exceptions to be thrown
- *       if resources required for the view are simultaneously released. This is
- *       most likely to occur for operations that must traverse all tuples in a
- *       scale-out index, such as {@link #getExactStatementCount()} or
- *       {@link #getExactStatementCount()}.
- *       <p>
- *       The workaround is to use {@link ITimestampService#setEarliestTxStartTime(long)}
- *       to ensure that the data for the historical view are not released during
- *       the operation.
- *       <p>
- *       The fix will be the use of a read-historical <em>transaction</em>
- *       which will explicitly coordinate the release time for the
- *       {@link IBigdataFederation}.
- * 
- * @todo Support rules (IF TripleExpr THEN ...) This is basically encapsulating
- *       the rule execution layer.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -198,7 +178,7 @@ abstract public class AbstractTripleStore extends
         AbstractResource<IDatabase<AbstractTripleStore>> implements ITripleStore,
         IRawTripleStore, IMutableDatabase<AbstractTripleStore> {
 
-    final static protected Logger log = Logger.getLogger(ITripleStore.class);
+    final static private Logger log = Logger.getLogger(AbstractTripleStore.class);
 
     /**
      * This is used to conditionally enable the logic to retract justifications
@@ -1539,8 +1519,19 @@ abstract public class AbstractTripleStore extends
                 {
                     final LexiconRelation lex = getLexiconRelation();
 
-                    if (lex != null)
+                    if (lex != null
+                            && lex.getIndexManager() == getIndexManager()) {
+
+                        /*
+                         * Destroy the lexicon, but only if it is backed by the
+                         * same index manager. (This prevents a lexicon on the
+                         * database from being destroyed when a statements-only
+                         * instance on a temporary store is destroyed.
+                         */
                         lex.destroy();
+                        
+                    }
+                    
                 }
 
                 lexiconRelation = null;

@@ -699,11 +699,13 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
                         final long delayMillis = (long) (r.nextDouble() * maxWriteDelay);
                         
-                        System.err.println("Writing on " + locator + " (delay="+delayMillis+") ...");
+                        if(log.isInfoEnabled())
+                            log.info("Writing on " + locator + " (delay="+delayMillis+") ...");
                         
                         Thread.sleep(delayMillis/* ms */);
                         
-                        System.err.println("Wrote on " + locator + ".");
+                        if(log.isInfoEnabled())
+                            log.info("Wrote on " + locator + ".");
                     }
 
                 };
@@ -840,7 +842,8 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
                 for (Map.Entry<Integer, Integer> e : redirects.entrySet()) {
 
-                    System.out.println("key: " + e.getKey() + " => L("
+                    if(log.isInfoEnabled())
+                        log.info("key: " + e.getKey() + " => L("
                             + e.getValue() + ")");
 
                 }
@@ -853,14 +856,16 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
                 for (Map.Entry<L, HS> e : subStats.entrySet()) {
 
-                    System.out.println(e.getKey() + " : " + e.getValue());
+                    if(log.isInfoEnabled())
+                        log.info(e.getKey() + " : " + e.getValue());
 
                 }
 
             }
 
             // show the master stats
-            System.out.println(master.stats.toString());
+            if(log.isInfoEnabled())
+                log.info(master.stats.toString());
 
         }
 

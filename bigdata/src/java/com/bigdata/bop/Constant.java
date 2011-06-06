@@ -137,14 +137,25 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
     
     final public boolean equals(final Object o) {
 
-        if(!(o instanceof IVariableOrConstant<?>)) {
-            
-            // incomparable types.
+        if (this == o)
+            return true;
+        
+        if(!(o instanceof IConstant<?>)) {
+
+            /*
+             * Incomparable types.
+             * 
+             * Note: This used to permit IVariableOrConstant, but it is not
+             * possible to invoke get() on an IVariable without a bindingSet
+             * against which to resolve its asBound value.
+             * 
+             * See https://sourceforge.net/apps/trac/bigdata/ticket/276
+             */
             return false;
             
         }
         
-        final Object otherValue = ((IVariableOrConstant<?>) o).get();
+        final Object otherValue = ((IConstant<?>) o).get();
         
         // handles reference equality, including when both are null.
         if (value == otherValue)

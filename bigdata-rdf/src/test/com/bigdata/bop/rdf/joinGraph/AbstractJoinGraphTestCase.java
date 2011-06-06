@@ -456,7 +456,8 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
         final PipelineOp queryOp = PartitionedJoinGroup.getQuery(idFactory,
                 distinct, selected, predOrder, constraints);
 
-        System.out.println(BOpUtility.toString(queryOp));
+        if (log.isInfoEnabled())
+            log.info(BOpUtility.toString(queryOp));
         
         // run the query, counting results and chunks.
         long nout = 0;
