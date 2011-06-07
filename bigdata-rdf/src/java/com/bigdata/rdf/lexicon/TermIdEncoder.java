@@ -67,6 +67,8 @@ import com.bigdata.btree.BTree.PartitionedCounter;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by the TERMS index.
  */
 public class TermIdEncoder {
 

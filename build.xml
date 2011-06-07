@@ -1870,12 +1870,19 @@ ${postInstallMessage}</echo>
       <!-- related to the logging setup).                             -->
  	  <!-- dir="${classes.dir}" -->
       <!-- Note: printsummary is either 'on' or 'off' (default).      -->
+      <!-- try reloading="true" and see if we can run w/o forking.    -->
       <junit printsummary="on"
       	     haltonfailure="no"
+	     logfailedtests="true"
+	     showoutput="true"
       	     fork="yes"
       	     forkmode="once"
       	     clonevm="true"
       	>
+
+	<!-- You can set JVM parameters here if fork is enabled.      -->
+	<!-- <jvmarg value="-Djava.compiler=NONE"/> -->
+
         <formatter type="xml" />
         <formatter type="brief"/>
 

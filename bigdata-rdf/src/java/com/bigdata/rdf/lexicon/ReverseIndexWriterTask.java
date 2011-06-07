@@ -28,6 +28,8 @@ import com.bigdata.rdf.spo.ISPO;
  * Otherwise a client that writes on the terms index and fails before writing on
  * the ids index would cause those terms to remain undefined in the reverse
  * index.
+ * 
+ * @deprecated by {@link TermsWriteTask}
  */
 public class ReverseIndexWriterTask implements Callable<Long> {
 

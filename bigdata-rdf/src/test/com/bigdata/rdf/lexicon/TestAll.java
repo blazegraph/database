@@ -60,8 +60,9 @@ public class TestAll extends TestCase {
         /*
          * Non-proxy tests.
          */
-        
-        suite.addTestSuite(TestComparators.class);
+
+        // Unit tests for operations on the TERMS index.
+        suite.addTestSuite(TestTermsIndex.class);
 
         suite.addTestSuite(TestSerialization.class);
 
@@ -71,10 +72,10 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestId2TermTupleSerializer.class);
 
-        // basic unit tests for adding terms to the lexicon.
+        // integration tests for adding terms to the lexicon.
         suite.addTestSuite(TestAddTerms.class);
         
-        // test suite for the vocabulary models and their persistence.
+        // integration test suite for the vocabulary models.
         suite.addTestSuite(TestVocabulary.class);
 
         // test suite for the completion scan (prefix match for literals).

@@ -145,7 +145,8 @@ public class DatatypeBOp extends IVValueExpression<IV>
 	    	
 	    	if (datatypeIV == null) {
 	    		
-	    		datatypeIV = new TermId(VTE.valueOf(val), TermId.NULL);
+//	    		datatypeIV = new TermId(VTE.valueOf(val), TermId.NULL);
+	    		datatypeIV = TermId.mockIV(VTE.valueOf(val));
 	    		datatype.setIV(datatypeIV);
 		    	
 	    	}

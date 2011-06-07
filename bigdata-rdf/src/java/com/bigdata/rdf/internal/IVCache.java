@@ -107,10 +107,20 @@ public interface IVCache<V extends BigdataValue> {
      */
     V getValue() throws NotMaterializedException;
 
-    /**
-     * Drop the cached {@link BigdataValue}. This is a NOP if the cache is
-     * empty.
-     */
+	/**
+	 * Drop the cached {@link BigdataValue}. This is a NOP if the cache is
+	 * empty.
+	 * 
+	 * FIXME There is a concurrency problem with this method for any IV for
+	 * which we are sharing the reference among multiple threads. That includes
+	 * the Vocabulary IVs and anything served out of the termCache. Probably the
+	 * method should be dropped. It was intended for us in scale-out and is not
+	 * currently invoked. Most of the time when we do not need the materialized
+	 * Value any longer, we will simply drop the variable. The exception is
+	 * BLOBs in scale-out. There we could replace the IV (if it was materialized
+	 * in advance of its last necessary usage) with an IV that has a blob
+	 * reference (or just send the blob reference rather than the blob).
+	 */
     void dropValue();
     
     /**

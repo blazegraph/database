@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
@@ -45,6 +46,7 @@ import com.bigdata.io.compression.BOCU1Compressor;
 import com.bigdata.io.compression.UnicodeHelper;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
+import com.bigdata.rdf.lexicon.TermsIndexHelper;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -434,7 +436,7 @@ public class IVUtility {
 
         if (iv == null) {
 
-            NullIV.INSTANCE.encode(keyBuilder);
+            TermId.NullIV.encode(keyBuilder);
             
         } else {
             
@@ -508,7 +510,7 @@ public class IVUtility {
             ivs[i] = decodeFromOffset(key, o);
             
             o += ivs[i] == null 
-                    ? NullIV.INSTANCE.byteLength() : ivs[i].byteLength();
+                    ? TermId.NullIV.byteLength() : ivs[i].byteLength();
             
         }
 
@@ -537,7 +539,7 @@ public class IVUtility {
             ivs.add(iv);
             
             offset += iv == null
-                    ? NullIV.INSTANCE.byteLength() : iv.byteLength();
+                    ? TermId.NullIV.byteLength() : iv.byteLength();
             
         }
         
@@ -583,19 +585,23 @@ public class IVUtility {
 
             } else {
 
-                /*
-                 * Handle a TermId.
-                 * 
-                 * FIXME TERMS REFACTOR: NullIV.
-                 */ 
+				/*
+				 * Handle a TermId, including a NullIV.
+				 */ 
 
-                // decode the term identifier.
-                final long termId = KeyBuilder.decodeLong(key, o);
+            	o--; // back up one byte to the flags byte.
+				final byte[] termIdKey = Arrays.copyOfRange(key, o/* from */, o
+						+ TermsIndexHelper.TERMS_INDEX_KEY_SIZE/* to */);
 
-                if (termId == TermId.NULL)
-                    return null;
-                else
-                    return new TermId(flags, termId);
+				return new TermId(termIdKey);
+				
+//				// decode the term identifier.
+//                final long termId = KeyBuilder.decodeLong(key, o);
+//
+//                if (termId == TermId.NULL)
+//                    return null;
+//                else
+//                    return new TermId(flags, termId);
 
             }
 
@@ -953,22 +959,19 @@ public class IVUtility {
         }
         return iv;
     }
-    
-    /**
-     * Decode an IV from its string representation as encoded by
-     * {@link TermId#toString()} and 
-     * {@link AbstractInlineIV#toString()}.
-     * 
-     * @param s
-     *          the string representation
-     * @return
-     *          the IV
-     */
+
+	/**
+	 * Decode an IV from its string representation as encoded by
+	 * {@link TermId#toString()} and {@link AbstractInlineIV#toString()} (this
+	 * is used by the prototype IRIS integration.)
+	 * 
+	 * @param s
+	 *            the string representation
+	 * @return the IV
+	 */
     public static final IV fromString(final String s) {
-        if (s.startsWith("TermId")) { // FIXME TERMS REFACTOR : "TermId" => TermIV?
-            final char type = s.charAt(s.length() - 2);
-            final long tid = Long.valueOf(s.substring(7, s.length() - 2));
-            return new TermId(VTE.valueOf(type), tid);
+        if (s.startsWith("TermId")) {
+        	return TermId.fromString(s);
         } else {
             final String type = s.substring(0, s.indexOf('(')); 
             final String val = s.substring(s.indexOf('('), s.length()-1);

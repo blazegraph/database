@@ -63,21 +63,24 @@ public enum VTE {
      */
     final byte v;
 
-    /**
-     * Return the {@link VTE} identified by the LOW TWO (2)
-     * bits in the caller's value.
-     * 
-     * @param b
-     *            The bit flags.
-     * @return The corresponding {@link VTE}.
-     */
+	/**
+	 * Return the {@link VTE} identified by the LOW TWO (2) bits in the caller's
+	 * value.
+	 * 
+	 * @param b
+	 *            The bit flags.
+	 * 
+	 * @return The corresponding {@link VTE}.
+	 * 
+	 * @see AbstractIV#getVTE(byte)
+	 */
     static public VTE valueOf(final byte b) {
-        /*
-         * Note: Java does not permit the construct URI.v in the cases of the
-         * switch (it is not interpreted as a constant). Therefore the switch
-         * cases are hardwired to the values specified for each of the 4 RDF
-         * Value types above.
-         */
+		/*
+		 * Note: Java does not permit the construction URI.v in the cases of the
+		 * switch (it is not interpreted as a constant). Therefore the switch
+		 * cases are hard wired to the values specified for each of the 4 RDF
+		 * Value types above.
+		 */
         switch (b & 0x03) { // mask off everything but the low 2 bits.
         case 0x00:
             return URI;

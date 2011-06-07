@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
@@ -60,8 +61,8 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.bop.ap.filter.BOpResolver;
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -79,6 +80,8 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.btree.raba.IRaba;
+import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
@@ -99,8 +102,6 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.AbstractRelation;
@@ -126,7 +127,7 @@ import cutthecrap.utils.striterators.Striterator;
  * The {@link LexiconRelation} handles all things related to the indices mapping
  * external RDF {@link Value}s onto {@link IV}s (internal values)s and provides
  * methods for efficient materialization of external RDF {@link Value}s from
- * {@link IV}s
+ * {@link IV}s.
  * <p>
  * See {@link KeyBuilder.Options} for properties that control how the sort keys
  * are generated for the {@link URI}s and {@link Literal}s.
@@ -303,6 +304,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             set.add(getFQN(LexiconKeyOrder.ID2TERM));
 
+            set.add(getFQN(LexiconKeyOrder.TERMS));
+
             if(textIndex) {
                 
                 set.add(getNamespace() + "." + FullTextIndex.NAME_SEARCH);
@@ -314,8 +317,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             this.indexNames = Collections.unmodifiableSet(set);
 
             this.keyOrders = Arrays
-                    .asList((IKeyOrder<BigdataValue>[]) new IKeyOrder[] {
-                            LexiconKeyOrder.TERM2ID, LexiconKeyOrder.ID2TERM });
+					.asList((IKeyOrder<BigdataValue>[]) new IKeyOrder[] {
+							LexiconKeyOrder.TERM2ID, LexiconKeyOrder.ID2TERM,
+							LexiconKeyOrder.TERMS });
 
         }
 
@@ -515,6 +519,26 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             // register the indices.
 
+			indexManager
+					.registerIndex(getTermsIndexMetadata(getFQN(LexiconKeyOrder.TERMS)));
+
+			/*
+			 * Insert a tuple for the NullIV mapping it to a null value in the
+			 * TERMS index.
+			 */
+			{
+				final TermsIndexHelper helper = new TermsIndexHelper();
+
+				final IKeyBuilder keyBuilder = helper.newKeyBuilder();
+
+				final byte[] key = TermId.NullIV.encode(keyBuilder).getKey();
+				
+				final IIndex ndx = getIndex(getFQN(LexiconKeyOrder.TERMS));
+
+				// Insert a tuple for the NullIV mapping it to a null value.
+				ndx.insert(key/* NullIV */, null/* value */);
+			}
+
             indexManager
                     .registerIndex(getTerm2IdIndexMetadata(getFQN(LexiconKeyOrder.TERM2ID)));
 
@@ -567,6 +591,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             final IIndexManager indexManager = getIndexManager();
 
+            indexManager.dropIndex(getFQN(LexiconKeyOrder.TERMS));
+            terms = null;
+
             indexManager.dropIndex(getFQN(LexiconKeyOrder.ID2TERM));
             id2term = null;
 
@@ -594,10 +621,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     }
     
+    volatile private IIndex terms;
+    /** @deprecated by {@link #terms}. */
     volatile private IIndex id2term;
+    /** @deprecated by {@link #terms}. */
     volatile private IIndex term2id;
     private final boolean textIndex;
     final boolean storeBlankNodes;
+    /** @deprecated TERMS_REFACTOR: termIdBitsToReverse is no longer required. */
     final int termIdBitsToReverse;
     
     /**
@@ -681,6 +712,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * rotated into the high bits when it is assigned.
      * 
      * @see AbstractTripleStore.Options#TERMID_BITS_TO_REVERSE
+     * 
+     * @deprecated No longer required with TERMS_REFACTOR.
      */
     final public int getTermIdBitsToReverse() {
         
@@ -711,10 +744,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
     }
 
-    /**
-     * Overridden to use {@link #getTerm2IdIndex()} and
-     * {@link #getId2TermIndex()} as appropriate.
-     */
+	/**
+	 * Overridden to use local cache of the index reference.
+	 */
     @Override
     public IIndex getIndex(final IKeyOrder<? extends BigdataValue> keyOrder) {
 
@@ -726,6 +758,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             
             return getTerm2IdIndex();
             
+        } else if (keyOrder == LexiconKeyOrder.TERMS) {
+            
+            return getTermsIndex();
+            
         } else {
             
             throw new AssertionError("keyOrder=" + keyOrder);
@@ -734,6 +770,52 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     }
 
+    final public IIndex getTermsIndex() {
+
+        if (terms == null) {
+
+            synchronized (this) {
+
+                if (terms == null) {
+
+                    final long timestamp = getTimestamp();
+                    
+                    if (TimestampUtility.isReadWriteTx(timestamp)) {
+                        /*
+                         * We always use the unisolated view of the lexicon
+                         * indices for mutation and the lexicon indices do NOT
+                         * set the [isolatable] flag even if the kb supports
+                         * full tx isolation. This is because we use an
+                         * eventually consistent strategy to write on the
+                         * lexicon indices.
+                         * 
+                         * Note: It appears that we have already ensured that
+                         * we will be using the unisolated view of the lexicon
+                         * relation in AbstractTripleStore#getLexiconRelation()
+                         * so this code path should not be evaluated.
+                         */
+                        terms = AbstractRelation
+                                .getIndex(getIndexManager(),
+                                        getFQN(LexiconKeyOrder.TERMS),
+                                        ITx.UNISOLATED);
+                    } else {
+                        terms = super.getIndex(LexiconKeyOrder.TERMS);
+                    }
+
+                    if (terms == null)
+                        throw new IllegalStateException();
+
+                }
+
+            }
+            
+        }
+
+        return terms;
+
+    }
+    
+    /** @deprecated by {@link #getTermsIndex()}. */
     final public IIndex getTerm2IdIndex() {
 
         if (term2id == null) {
@@ -779,6 +861,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     }
 
+	/** @deprecated by {@link #getTermsIndex()} */
     final public IIndex getId2TermIndex() {
 
         if (id2term == null) {
@@ -880,7 +963,64 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         return viewRef.get();
 
     }
-    
+
+	/**
+	 * Return the {@link IndexMetadata} for the TERMS index.
+	 * 
+	 * @param name
+	 *            The name of the index.
+	 *            
+	 * @return The {@link IndexMetadata}.
+	 */
+    protected IndexMetadata getTermsIndexMetadata(final String name) {
+
+        final IndexMetadata metadata = new IndexMetadata(getIndexManager(),
+                getProperties(), name, UUID.randomUUID());
+
+//		final int m = 1024;
+//		final int q = 8000;
+		final int ratio = 32;
+		final int maxRecLen = 0;
+
+		metadata.setNodeKeySerializer(new FrontCodedRabaCoder(ratio));
+
+		final DefaultTupleSerializer tupleSer = new DefaultTupleSerializer(
+				new DefaultKeyBuilderFactory(new Properties()),//
+				/*
+				 * leaf keys
+				 */
+				// DefaultFrontCodedRabaCoder.INSTANCE,//
+				new FrontCodedRabaCoder(ratio),//
+				// CanonicalHuffmanRabaCoder.INSTANCE,
+				/*
+				 * leaf values TODO Performance comparison CanonicalHuffman versus Simple /w gzip.
+				 */
+				CanonicalHuffmanRabaCoder.INSTANCE
+		// new SimpleRabaCoder()//
+		);
+
+		metadata.setTupleSerializer(tupleSer);
+
+		// enable raw record support.
+		metadata.setRawRecords(true);
+
+		// set the maximum length of a byte[] value in a leaf.
+		metadata.setMaxRecLen(maxRecLen);
+
+//		/*
+//		 * increase the branching factor since leaf size is smaller w/o large
+//		 * records.
+//		 */
+//		metadata.setBranchingFactor(m);
+//
+//		// Note: You need to give sufficient heap for this option!
+//		metadata.setWriteRetentionQueueCapacity(q);
+
+		return metadata;
+
+    }
+
+	/** @deprecated by {@link #getTermsIndexMetadata(String)} */
     protected IndexMetadata getTerm2IdIndexMetadata(final String name) {
 
         final IndexMetadata metadata = newIndexMetadata(name);
@@ -891,6 +1031,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     }
 
+	/** @deprecated by {@link #getTermsIndexMetadata(String)} */
     protected IndexMetadata getId2TermIndexMetadata(final String name) {
 
         final IndexMetadata metadata = newIndexMetadata(name);
@@ -913,10 +1054,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         return keyOrders.iterator();
         
     }
-    
+
     public LexiconKeyOrder getPrimaryKeyOrder() {
         
-        return LexiconKeyOrder.TERM2ID;
+//        return LexiconKeyOrder.TERM2ID;
+    	return LexiconKeyOrder.TERMS;
         
     }
 
@@ -1232,28 +1374,28 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
     }
 
-    /**
-     * Batch insert of terms into the database.
-     * <p>
-     * Note: Duplicate {@link BigdataValue} references and {@link BigdataValue}s
-     * that already have an assigned term identifiers are ignored by this
-     * operation.
-     * <p>
-     * Note: This implementation is designed to use unisolated batch writes on
-     * the terms and ids index that guarantee consistency.
-     * <p>
-     * If the full text index is enabled, then the terms will also be inserted
-     * into the full text index.
-     * 
-     * @param terms
-     *            An array whose elements [0:nterms-1] will be inserted.
-     * @param numTerms
-     *            The #of terms to insert.
-     * @param readOnly
-     *            When <code>true</code>, unknown terms will not be inserted
-     *            into the database. Otherwise unknown terms are inserted into
-     *            the database.
-     */
+	/**
+	 * Batch insert of terms into the database.
+	 * <p>
+	 * Note: Duplicate {@link BigdataValue} references and {@link BigdataValue}s
+	 * that already have an assigned term identifiers are ignored by this
+	 * operation.
+	 * <p>
+	 * Note: This implementation is designed to use unisolated batch writes on
+	 * the terms and ids index that guarantee consistency.
+	 * <p>
+	 * If the full text index is enabled, then the terms will also be inserted
+	 * into the full text index.
+	 * 
+	 * @param terms
+	 *            An array whose elements [0:nterms-1] will be inserted.
+	 * @param numTerms
+	 *            The #of terms to insert.
+	 * @param readOnly
+	 *            When <code>true</code>, unknown terms will not be inserted
+	 *            into the database. Otherwise unknown terms are inserted into
+	 *            the database.
+	 */
     @SuppressWarnings("unchecked")
     private void _addTerms(final BigdataValue[] terms, final int numTerms,
             final boolean readOnly) {
@@ -1267,6 +1409,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         final long begin = System.currentTimeMillis();
         
         final WriteTaskStats stats = new WriteTaskStats();
+
+        try {
+            // write on the TERMS index (rync RPC)
+            new TermsWriteTask(this, readOnly, numTerms, terms, stats)
+                    .call();
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
 
         final KVO<BigdataValue>[] a;
         try {
@@ -1421,8 +1571,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     private BigdataValue[] addInlineTerms(final BigdataValue[] terms, final int numTerms) {
      
         // these are the terms that will need to be indexed (not inline terms)
-        final ArrayList<BigdataValue> terms2 = 
-            new ArrayList<BigdataValue>(numTerms);
+		final List<BigdataValue> terms2 = new LinkedList<BigdataValue>(/*numTerms*/);
         
         for (int i = 0; i < numTerms; i++) {
             
@@ -1437,7 +1586,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
         if(nremaining == 0) 
         	return EMPTY_VALUE_ARRAY;
-        
+
+        // dense array having terms that need further processing.
         return terms2.toArray(new BigdataValue[terms2.size()]);
 
     }
@@ -1717,7 +1867,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * operation is only supported when the {@link ITextIndexer} uses the
      * {@link FullTextIndex} class.
      * 
-     * TODO TERMS REFACTOR: This will have to be redone once we finish
+     * FIXME TERMS REFACTOR: This will have to be redone once we finish
      * http://sourceforge.net/apps/trac/bigdata/ticket/109 (store large literals
      * as blobs) since the ID2TERM index will disappear. [Also, if we are fully
      * inlining literals then we will have to scan one of the statement indices
@@ -2382,7 +2532,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         if (tid == null)
             throw new IllegalArgumentException();
         
-        if (tid.getTermId() == TermId.NULL)
+        if(tid.isNullIV())//if (tid.getTermId() == TermId.NULL)
             throw new IllegalArgumentException();
         
         if (tid.isStatement()) {
@@ -2753,6 +2903,42 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 //        // Same #of terms in the forward and reverse indices.
 //        assertEquals("#terms", store.getIdTermIndex().rangeCount(null, null),
 //                store.getTermIdIndex().rangeCount(null, null));
+
+        /**
+         * Dumps the TERMS index.
+         */
+        {
+        	
+            sb.append("---- TERMS index ----\n");
+
+            final IIndex ndx = getTermsIndex();
+
+            final ITupleIterator<?> itr = ndx.rangeIterator(null, null);
+
+            while (itr.hasNext()) {
+
+                final ITuple<?> tuple = itr.next();
+                
+//                // the term identifier.
+//                Object val = itr.next();
+
+				/*
+				 * The sort key for the term. This is a hash code plus a counter
+				 * (to break hash collisions). The IV for an entry in the TERMS
+				 * index is formed by wrapping this key.
+				 */
+                final byte[] key = tuple.getKey();
+
+                /*
+                 * deserialize the RDF Value.
+                 */
+				final Value value = (Value) tuple.getObject();
+
+                sb.append(BytesUtil.toString(key) + " : " + value +"\n");
+
+            }
+
+        }
         
         /**
          * Dumps the forward mapping.

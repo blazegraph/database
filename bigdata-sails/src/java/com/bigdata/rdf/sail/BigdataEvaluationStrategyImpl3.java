@@ -2097,7 +2097,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         	} else {
         		
         		// create a phony TermId
-        		final IV iv = new TermId(VTE.valueOf(v), TermId.NULL);
+//        		final IV iv = new TermId(VTE.valueOf(v), TermId.NULL);
+        		final IV iv = TermId.mockIV(VTE.valueOf(v));
         		
         		// cache the BigdataValue on the IV
         		iv.setValue(v);

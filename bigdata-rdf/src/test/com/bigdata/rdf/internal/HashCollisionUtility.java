@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -39,7 +38,6 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
@@ -62,9 +60,7 @@ import com.bigdata.btree.keys.KV;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
-import com.bigdata.btree.raba.codec.FixedLengthValueRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
-import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.DirectBufferPool;
@@ -73,9 +69,6 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.model.BigdataBNode;
-import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
@@ -436,61 +429,6 @@ public class HashCollisionUtility {
 
 	private final static Logger log = Logger
 			.getLogger(HashCollisionUtility.class);
-
-	/**
-	 * An index mapping {@link URI#getNamespace()} strings onto unique
-	 * identifiers which are then used to shorten the {@link URI}s. The index
-	 * maps <code>namespace : id</code>, where namespace is given by
-	 * {@link URI#getNamespace()} and a {@link URI#getLocalName()} and
-	 * <code>id</code> is a consistently assigned unique identifier for that
-	 * namespace. The remainder of the {@link URI} is returned by
-	 * {@link URI#getLocalName()}. Per that method, there is always a localName.
-	 * The localName can include the last component of the {@link URL} path, the
-	 * anchor, the query string, etc. When the localName is short, the
-	 * {@link URI} can be inlined directly into the statement indices. Factoring
-	 * the {@link URI} into the namespace and the localName provides a great
-	 * reduction in the space required to represent instance data {@link URI}s
-	 * in the database and makes it possible to inline many instance {@link URI}
-	 * s into the statement indices.
-	 * <p>
-	 * Note: Because this is data driven, the namespace index can include keys
-	 * which are prefixes of other keys or otherwise overlap with them. For
-	 * example, <code>http://www.bigdata.com/</code> and
-	 * <code>http://www.bigdata.com#</code> could both be found in the namespace
-	 * index.
-	 * 
-	 * TODO We could actually NOT install <code>rdf:</code>, <code>rdfs:</code>,
-	 * and similar namespaces into this index in order to have a potentially
-	 * shorter coding for them (a single termId).
-	 * 
-	 * TODO We need to use a <code>long</code> ID in scale-out if we permit this
-	 * index to become sharded. If we do not, then we could use an
-	 * <code>int</code> in both standalone and scale-out. The #of URI prefixes
-	 * we encounter could be large if the data represent a web graph, so that is
-	 * a good reason to use a <code>long</code> in scale-out.
-	 * 
-	 * TODO We could also use hash(prefix) as the key. I've only avoided that
-	 * here because it is slightly more complex and the total #of URI prefixes
-	 * that we expect to encounter is so small that it does not seem worthwhile,
-	 * at least, not for this utility. (Actually, there is probably a benefit to
-	 * having the URIs cluster by prefix in this index.)
-	 * 
-	 * TODO We could impose clustering by prefix in the TERMS index and hence in
-	 * the statement indices as well, if we form the key for the TERMS index for
-	 * a URI using the code assigned by this index as a prefix followed by a
-	 * hash value. However, we should automatically get clustering in the
-	 * statement indices for a given prefix when the URI follows the typical
-	 * patterns for an RDF namespace.
-	 * 
-	 * TODO MikeP would like to see the ability to register patterns or prefixes
-	 * which would not participate. For example, all things matching the pattern
-	 * <code>http://www.bigdata.com/foo/TIMESTAMP/bar</code>, where TIMESTAMP is
-	 * something that looks like a timestamp. He things that there could be a
-	 * lot of outlier data which looks like this and it would certainly clutter
-	 * the NAMESPACE index, potentially making the entire thing too large to
-	 * stuff into memory.
-	 */
-	private final BTree namespaceIndex;
 
 	/**
 	 * An index mapping <code>hashCode(Value)+counter : Value</code>. This
@@ -936,8 +874,6 @@ public class HashCollisionUtility {
 	private final int nbuffers = 1000;
 	
 	private HashCollisionUtility(final Journal jnl) {		
-
-		this.namespaceIndex = getNamespaceIndex(jnl);
 
 		this.termsIndex = getTermsIndex(jnl);
 
@@ -1436,62 +1372,6 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		
 	}
 
-	/**
-	 * Return the index in which we store URI prefixes.
-	 * 
-	 * @param jnl
-	 *            The index manager.
-	 *            
-	 * @return The index.
-	 */
-	private BTree getNamespaceIndex(final Journal jnl) {
-		
-		final String name = "NAMESPACE";
-		
-		BTree ndx = jnl.getIndex(name);
-
-		final int m = 32;
-		final int q = 500;
-//		final int ratio = 8;
-//		final int maxRecLen = 0;
-		if(ndx == null) {
-			
-			final IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
-			
-//			md.setNodeKeySerializer(new FrontCodedRabaCoder(ratio));
-			
-			final DefaultTupleSerializer tupleSer = new DefaultTupleSerializer(
-					new DefaultKeyBuilderFactory(new Properties()),//
-					/*
-					 * leaf keys
-					 */
-					DefaultFrontCodedRabaCoder.INSTANCE,//
-//					new FrontCodedRabaCoder(ratio),//
-					/*
-					 * leaf values
-					 */
-					new FixedLengthValueRabaCoder(Bytes.SIZEOF_LONG)
-			);
-			
-			md.setTupleSerializer(tupleSer);
-			
-//			// enable raw record support.
-//			md.setRawRecords(true);
-//			
-//			// set the maximum length of a byte[] value in a leaf.
-//			md.setMaxRecLen(maxRecLen);
-
-			md.setBranchingFactor(m);
-			md.setWriteRetentionQueueCapacity(q);
-			
-			ndx = jnl.registerIndex(name, md);
-			
-		}
-		
-		return ndx;
-		
-	}
-	
 	private void parseFileOrDirectory(final File fileOrDir,
 			final RDFFormat fallback) throws Exception {
 
@@ -1818,148 +1698,67 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		}
 
 		/**
-		 * Return <code>true</code> if the RDF {@link Value} should be inlined
-		 * into the statement indices. Such {@link Value}s will not be stored
-		 * into the TERMS index.
-		 * 
-		 * @param value
-		 *            The RDF {@link Value}.
-		 * 
-		 * @return <code>true</code> if the value will be inlined into the
-		 *         statement indices.
-		 * 
-		 *         TODO Move to {@link LexiconConfiguration}.
-		 *         <p>
-		 *         Consider dividing the work up between createIV(), which
-		 *         actually constructs the IV, and isInlineValue(), which simply
-		 *         understands whether or not the value can be represented
-		 *         inline within the statement indices. The only reason to
-		 *         create this division is so that we do not create the IV twice
-		 *         (once to see if we can and then once to create the statement
-		 *         index keys).
-		 *         <p>
-		 *         -URIs with short localNames should have their namespace
-		 *         registered against the NAMESPACE index and should be inlined
-		 *         into the statement indices.
-		 *         <p>
-		 *         - Literals with short labels should be inlined into the
-		 *         statement indices, including languageCode literals with short
-		 *         labels and plain literals with short labels.
-		 */
-		private boolean isInlineValue(final BigdataValue value) {
-			
-			if (conf.createInlineIV(value) != null) {
-
-				/*
-				 * This is something that we would inline into the statement
-				 * indices.
-				 */
-
-				return true;
-				
-			}
-
-//			{
-//				
-//				final BigdataValue cachedValue = valueCache.get(value);
-//				
-//				if ( cachedValue != null) {
-//
-//					// Cache hit - no need to test the index.
-//					ncached.incrementAndGet();
-//
-//					return true;
-//
-//				}
-//			
-//			}
-
-			if (value instanceof BigdataURI) {
-
-				final BigdataURI uri = (BigdataURI) value;
-
-                if (uri.getLocalNameLength() < conf.getMaxInlineStringLength()) {
-
-					/*
-					 * Ingore URI that will be inlined into the statement
-					 * indices.
-					 */
-
-					c.nshortURIs.incrementAndGet();
-
-					return true;
-
-				}
-
-				return false;
-
-			} else if (value instanceof BigdataLiteral) {
-
-				final Literal lit = (Literal) value;
-
-				if (// lit.getDatatype() == null &&
-				lit.getLabel().length() < conf.getMaxInlineStringLength()) {
-
-					/*
-					 * Ignore Literal that will be inlined in the statement
-					 * indices.
-					 */
-
-					c.nshortLiterals.incrementAndGet();
-
-					return true;
-
-				}
-
-				final URI datatype = ((BigdataLiteral) value).getDatatype();
-
-				// Note: URI.stringValue() is efficient....
-				if (datatype != null
-						&& XMLSchema.DATETIME.stringValue().equals(
-								datatype.stringValue())) {
-
-					// will be inlined into the statement indices.
-					return true;
-
-				}
-
-			} else if (value instanceof BigdataBNode) {
-			    // TODO Also recognize when inline as [int] or [UUID].
-				final BigdataBNode bnode = (BigdataBNode) value;
-
-				if (bnode.getID().length() < conf.getMaxInlineStringLength()) {
-
-					/*
-					 * Ignore blank nodes that will be inlined into the
-					 * statement indices.
-					 */
-
-					c.nshortBNodes.incrementAndGet();
-
-					return true;
-
-				}
-
-			}
-
-			return false;
-
-		}
-
-		/**
 		 * If the RDF {@link Value} can not be represented inline within the
 		 * statement indices, then buffer the value for batch resolution against
 		 * the TERMS index.
 		 * 
 		 * @param value
 		 *            The RDF {@link Value}.
-		 *            
+		 * 
+		 * @return A {@link Value}. If the caller's {@link Value} could be
+		 *         represented as an inline {@link IV}, then the returned value
+		 *         will be a {@link BigdataValue} and the inline {@link IV} will
+		 *         be available from {@link BigdataValue#getIV()}. Otherwise the
+		 *         caller's {@link Value} is returned and the {@link Value} must
+		 *         be resolved against the TERMS index in order to obtain its
+		 *         {@link IV}.
+		 * 
 		 * @throws InterruptedException
+		 * 
+		 *             FIXME Handle {@link TermId}, {@link URINamespaceIV}, and
+		 *             {@link LiteralDatatypeIV}. These are three kinds of
+		 *             "non-inline" values. They will have to be queued for
+		 *             insertion into the TERMS index and Statement which depend
+		 *             on those non-inline values will have to be deferred until
+		 *             we have resolved those non-inline values. This is
+		 *             basically the same logic that we already have for
+		 *             StatementBuffer, except that an asynchronous queue is
+		 *             being used (by this class) to do the resolution of the IV
+		 *             for large values.
+		 *             <p>
+		 *             Other kinds of {@link IV}s which could be handled here
+		 *             would be references to large values stored in the file
+		 *             system, in S3, etc.
 		 */
 		private void bufferValue(final BigdataValue value)
 				throws InterruptedException {
 
-			if (isInlineValue(value)) {
+			// Not expecting the IV to already be cached.
+			assert value.getIV() == null;
+			
+			// Attempt to inline this value.
+			final IV<?, ?> iv = conf.createInlineIV(value);
+
+			if (iv != null) {
+
+				// This is being inlined.
+				
+				switch (iv.getVTE()) {
+				case URI:
+					c.nshortURIs.incrementAndGet();
+					break;
+				case BNODE:
+					c.nshortBNodes.incrementAndGet();
+					break;
+				case LITERAL:
+					c.nshortLiterals.incrementAndGet();
+					break;
+				default:
+					throw new AssertionError();
+				}
+				
+				// Verify IV is cached on that Value.
+				assert value.getIV() == iv;
 
 				return;
 				
@@ -1967,6 +1766,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 
 			if (context != null && context.getSlotBytes() >= valueBufSize) {
 
+				// Incremental flush of large values to the TERMS index.
 				flush();
 
 			}
@@ -2035,7 +1835,17 @@ sparse, but this suggests that we should try a different coder for the leaf keys
                             if (log.isDebugEnabled())
                                 log.debug("Duplicate value in chunk: "
                                         + Arrays.toString(t.val));
-							
+
+							/*
+							 * FIXME This pattern does not really work out for
+							 * building statements since we lack a reference to
+							 * the Value which is being inserted into the TERMS
+							 * index. The StatementBuffer handles this. It keeps
+							 * the Values in a map and inserts all values into
+							 * the database. [It should only keep the distinct
+							 * non-inline values but it currently keeps all
+							 * distinct values without regard to inlining.]
+							 */
 							return;
 							
 						}
@@ -2052,6 +1862,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 				nvalues++;
 
 			}
+			
+			return;
 		
 		} // bufferValue()
 
@@ -2596,6 +2408,15 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		// The caller MUST specify the filename using -D on the command line.
 		final String journalFile = System.getProperty(Journal.Options.FILE);
 		
+		if (journalFile == null) {
+
+			System.err.println("Journal file must be specified: -D"
+					+ Journal.Options.FILE);
+
+			System.exit(1);
+			
+		}
+		
 		properties.setProperty(Journal.Options.FILE, journalFile);
 
 		if (new File(journalFile).exists()) {
@@ -2679,23 +2500,5 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		}
 
 	}
-
-//    /**
-//     * A simple order preserving hash code (or at least locality preserving).
-//     * 
-//     * @param a
-//     *            The data.
-//     * @return The hash code.
-//     * 
-//     *         TODO Much faster against {@link MutableString}.
-//     */
-//    static private long hash(final char[] a) {
-//        long v = 0;
-//        for (int i = 0; i < a.length; i++) {
-//            final char ch = a[i];
-//            v = ((v << 6) | (v >> 58)) ^ ch;
-//        }
-//        return v;
-//    }
     
 }

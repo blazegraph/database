@@ -3,13 +3,15 @@ package com.bigdata.rdf.lexicon;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import org.apache.log4j.Logger;
+
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
+import com.bigdata.rdf.lexicon.TermsWriteProc.TermsWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
@@ -17,17 +19,14 @@ import com.bigdata.service.ndx.pipeline.KVOC;
 import com.bigdata.service.ndx.pipeline.KVOList;
 
 /**
- * Synchronous RPC write on the TERM2ID index.
+ * Synchronous RPC write on the TERMS index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
- * 
- * @deprecated by {@link TermsWriteTask}
+ * @version $Id: Term2IdWriteTask.java 3408 2010-08-04 18:53:35Z thompsonbry $
  */
-public class Term2IdWriteTask implements
-        Callable<KVO<BigdataValue>[]> {
+public class TermsWriteTask implements Callable<Void> {
 
-    private static transient final Logger log = Logger.getLogger(Term2IdWriteTask.class);
+    private static transient final Logger log = Logger.getLogger(TermsWriteTask.class);
             
     private final LexiconRelation r;
     private final boolean readOnly;
@@ -35,7 +34,7 @@ public class Term2IdWriteTask implements
     private final BigdataValue[] terms;
     private final WriteTaskStats stats;
     
-    public Term2IdWriteTask(final LexiconRelation r,
+    public TermsWriteTask(final LexiconRelation r,
             final boolean readOnly, final int numTerms,
             final BigdataValue[] terms, final WriteTaskStats stats) {
 
@@ -62,24 +61,29 @@ public class Term2IdWriteTask implements
         this.stats = stats;
         
     }
-    
-    /**
-     * Unify the {@link BigdataValue}s with the TERM2ID index, setting the
-     * term identifiers (TIDs) on those values as a side-effect.
-     * 
-     * @return A dense {@link KVO}[] chunk consisting of only those
-     *         distinct terms whose term identifier was not already known.
-     *         (This may be used to write on the reverse index).
-     * 
-     * @throws Exception
-     */
-    public KVO<BigdataValue>[] call() throws Exception {
-        
-        /*
-         * Insert into the forward index (term -> id). This will either assign a
-         * termId or return the existing termId if the term is already in the
-         * lexicon.
-         */
+
+	/**
+	 * Unify the {@link BigdataValue}s with the TERMS index, setting the
+	 * {@link IV}s on the {@link BigdataValue}s as a side-effect.
+	 * 
+	 * @throws Exception
+	 */
+    public Void call() throws Exception {
+
+		/*
+		 * Insert into the TERMS index ({termCode,hash(Value),counter} ->
+		 * Value). This will set the IV on the BigdataValue. If the Value was
+		 * not in the lexicon, then a new entry is created in the TERMS index
+		 * for the Value and the key for that entry is wrapped as its IV. If the
+		 * Value is in the lexicon, then the key for the existing entry is
+		 * wrapped as its IV.
+		 * 
+		 * Note: The code has to scan the "collision bucket" comprised of each
+		 * Value having the same hash code. In practice, collisions are quite
+		 * rare and the #of tuples in each "collision bucket" is quite small.
+		 * 
+		 * Note: TERMS index shards must not split "collision buckets".
+		 */
         
         // The #of distinct terms lacking a pre-assigned term identifier in [a].
         int ndistinct = 0;
@@ -90,19 +94,20 @@ public class Term2IdWriteTask implements
             
             final KVO<BigdataValue>[] b;
 
-            /*
-             * First make sure that each term has an assigned sort key.
-             */
+			/*
+			 * Make sure that each term has an assigned sort key.
+			 * 
+			 * FIXME This should first remove any duplicates and anything with
+			 * an pre-assigned IV. That will let us avoid any further costs
+			 * associated with those Values.
+			 */
             {
 
                 long _begin = System.currentTimeMillis();
                 
-                final Term2IdTupleSerializer tupleSer = (Term2IdTupleSerializer) r.getIndex(
-                        LexiconKeyOrder.TERM2ID).getIndexMetadata()
-                        .getTupleSerializer();
-
                 // may contain duplicates and/or terms with pre-assigned term identifiers.
-                b = r.generateSortKeys(tupleSer.getLexiconKeyBuilder(), terms, numTerms);
+				b = new TermsIndexHelper().generateKVOs(r.getValueFactory()
+						.getValueSerializer(), terms, numTerms);
 
                 stats.keyGenTime = System.currentTimeMillis() - _begin;
 
@@ -122,19 +127,18 @@ public class Term2IdWriteTask implements
 
             }
 
-            /*
-             * For each distinct term that does not have a pre-assigned term
-             * identifier, add it to a remote unisolated batch operation that
-             * assigns term identifiers.
-             * 
-             * Note: Both duplicate term references and terms with their term
-             * identifiers already assigned are dropped out in this step.
-             */
+			/*
+			 * For each distinct term that does not have a pre-assigned IV, add
+			 * it to a remote unisolated batch operation that assigns IVs.
+			 * 
+			 * Note: Both duplicate term references and terms with their IVs
+			 * already assigned are dropped out in this step.
+			 */
             {
 
                 final long _begin = System.currentTimeMillis();
 
-                final IIndex termIdIndex = r.getTerm2IdIndex();
+                final IIndex termsIndex = r.getTermsIndex();
 
                 /*
                  * Create a key buffer holding the sort keys. This does not
@@ -151,6 +155,7 @@ public class Term2IdWriteTask implements
                  * to ensure a robust and consistent mapping).
                  */
                 final byte[][] keys = new byte[numTerms][];
+                final byte[][] vals = new byte[numTerms][];
                 a = new KVO[numTerms];
                 {
 
@@ -159,10 +164,10 @@ public class Term2IdWriteTask implements
                         if (b[i].obj.getIV() != null) {
                             
                             if (log.isDebugEnabled())
-                                log.debug("term identifier already assigned: "
+                                log.debug("IV already assigned: "
                                         + b[i].obj);
                             
-                            // term identifier already assigned.
+                            // IV is already assigned.
                             continue;
                             
                         }
@@ -170,7 +175,7 @@ public class Term2IdWriteTask implements
                         if (i > 0 && b[i - 1].obj == b[i].obj) {
 
                             if (log.isDebugEnabled())
-                                log.debug("duplicate term reference: "
+                                log.debug("duplicate reference: "
                                         + b[i].obj);
                             
                             // duplicate reference.
@@ -181,8 +186,9 @@ public class Term2IdWriteTask implements
                         // assign to a[] (dense variant of b[]).
                         a[ndistinct] = b[i];
                         
-                        // assign to keys[] (dense and correlated with a[]).
+                        // assign to keys[]/vals[] (dense; correlated with a[]).
                         keys[ndistinct] = b[i].key;
+                        vals[ndistinct] = b[i].val;
                         
                         ndistinct++;
 
@@ -196,19 +202,17 @@ public class Term2IdWriteTask implements
                      * Nothing to be written.
                      */
                     
-                    return new KVO[0];
+                    return null;// new KVO[0];
                     
                 }
                 
-                final AbstractKeyArrayIndexProcedureConstructor ctor =
-                    new Term2IdWriteProcConstructor(
-                            readOnly, r.storeBlankNodes, r.termIdBitsToReverse);
+				final AbstractKeyArrayIndexProcedureConstructor ctor = new TermsWriteProcConstructor(
+						readOnly, r.storeBlankNodes);
                 
-                // run the procedure.
-                termIdIndex.submit(0/* fromIndex */, ndistinct/* toIndex */,
-                        keys, null/* vals */, ctor,
-                        new Term2IdWriteProcResultHandler(a, readOnly,
-                                stats.nunknown));
+				// run the procedure.
+				termsIndex.submit(0/* fromIndex */, ndistinct/* toIndex */,
+						keys, vals, ctor, new TermsWriteProcResultHandler(a,
+								readOnly, stats.nunknown));
 
                 stats.indexTime = stats.forwardIndexTime = System.currentTimeMillis()
                         - _begin;
@@ -219,7 +223,7 @@ public class Term2IdWriteTask implements
         
         stats.ndistinct = ndistinct;
 
-        return KVO.dense(a, ndistinct);
+        return null;//KVO.dense(a, ndistinct);
         
     } // call
 
@@ -236,10 +240,10 @@ public class Term2IdWriteTask implements
      * {@link #a} is given by {@link Split#fromIndex}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
+     * @version $Id: Term2IdWriteTask.java 3408 2010-08-04 18:53:35Z thompsonbry $
      */
-    static private class Term2IdWriteProcResultHandler implements
-            IResultHandler<Term2IdWriteProc.Result, Void> {
+	static class TermsWriteProcResultHandler implements
+			IResultHandler<TermsWriteProc.Result, Void> {
 
         private final KVO<BigdataValue>[] a;
         private final boolean readOnly;
@@ -260,8 +264,8 @@ public class Term2IdWriteTask implements
          *            Incremented as a side effect for each terms that could not
          *            be resolved (iff readOnly == true).
          */
-        public Term2IdWriteProcResultHandler(final KVO<BigdataValue>[] a,
-                final boolean readOnly, final AtomicInteger nunknown) {
+		public TermsWriteProcResultHandler(final KVO<BigdataValue>[] a,
+				final boolean readOnly, final AtomicInteger nunknown) {
 
             if (a == null)
                 throw new IllegalArgumentException();
@@ -281,14 +285,14 @@ public class Term2IdWriteTask implements
          * Copy the assigned / discovered term identifiers onto the
          * corresponding elements of the terms[].
          */
-        public void aggregate(final Term2IdWriteProc.Result result,
+        public void aggregate(final TermsWriteProc.Result result,
                 final Split split) {
 
             for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
 
-                final IV termId = result.ivs[j];
+                final IV iv = result.ivs[j];
 
-                if (termId == null) {
+                if (iv == null) {
 
                     if (!readOnly)
                         throw new AssertionError();
@@ -298,7 +302,7 @@ public class Term2IdWriteTask implements
                 } else {
 
                     // assign the term identifier.
-                    a[i].obj.setIV(termId);
+                    a[i].obj.setIV(iv);
 
                     if(a[i] instanceof KVOList) {
                         
@@ -307,15 +311,14 @@ public class Term2IdWriteTask implements
                         if (!tmp.isDuplicateListEmpty()) {
 
                             // assign the term identifier to the duplicates.
-                            tmp.map(new AssignTermId(termId));
+                            tmp.map(new AssignTermId(iv));
 
                         }
                         
                     }
                     
-                    if (log.isDebugEnabled()) {
-                        log.debug("termId=" + termId + ", term=" + a[i].obj);
-                    }
+					if (log.isDebugEnabled())
+						log.debug("termId=" + iv + ", term=" + a[i].obj);
 
                 }
 
@@ -337,7 +340,7 @@ public class Term2IdWriteTask implements
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
+     * @version $Id: Term2IdWriteTask.java 3408 2010-08-04 18:53:35Z thompsonbry $
      * 
      * @todo this should be more transparent. One way to do that is to get rid
      *       of {@link KVOList#map(com.bigdata.service.ndx.pipeline.KVOList.Op)}
@@ -368,5 +371,5 @@ public class Term2IdWriteTask implements
         }
 
     }
-
+    
 }

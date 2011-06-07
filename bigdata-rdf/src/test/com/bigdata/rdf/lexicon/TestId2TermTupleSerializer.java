@@ -41,6 +41,7 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @deprecated by the TERMS_REFACTOR
  */
 public class TestId2TermTupleSerializer extends TestCase2 {
 

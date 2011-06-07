@@ -47,10 +47,7 @@ import com.bigdata.btree.IndexMetadata.Options;
 import com.bigdata.io.LongPacker;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataStatement;
-import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -299,27 +296,27 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
 
     }
 
-    /**
-     * The initial version. The s, p, and o of each axiom were written out as
-     * <code>long</code> integers.
-     * 
-     * TODO It is probably impossible to retain support for this version, but we
-     * can always comment it out of the code easily enough.
-     */
-    private static final transient byte VERSION0 = 0;
+//    /**
+//     * The initial version. The s, p, and o of each axiom were written out as
+//     * <code>long</code> integers.
+//     */
+//    private static final transient byte VERSION0 = 0;
 
-    /**
-     * The serialization format was changed when we introduced the TERMS index
-     * (as opposed to the TERM2ID and ID2TERM index). Up to that point, the s,
-     * p, and o components were always <code>long</code> termIds assigned by the
-     * TERM2ID index. However, the refactor which introduced the TERMS index
-     * generalized the {@link IV}s further such that we can no longer rely on
-     * the <code>long</code> termId encoding. Therefore, the serialization of
-     * the axioms was changed to the length of each {@link SPOKeyOrder#SPO}
-     * index key followed by the <code>byte[]</code> comprising that key. This
-     * has the effect of using the {@link IV} representation directly within the
-     * serialization of the axioms.
-     */ 
+	/**
+	 * The serialization format was changed when we introduced the TERMS index
+	 * (as opposed to the TERM2ID and ID2TERM index). Up to that point, the s,
+	 * p, and o components were always <code>long</code> termIds assigned by the
+	 * TERM2ID index. However, the refactor which introduced the TERMS index
+	 * generalized the {@link IV}s further such that we can no longer rely on
+	 * the <code>long</code> termId encoding. Therefore, the serialization of
+	 * the axioms was changed to the length of each {@link SPOKeyOrder#SPO}
+	 * index key followed by the <code>byte[]</code> comprising that key. This
+	 * has the effect of using the {@link IV} representation directly within the
+	 * serialization of the axioms.
+	 * <p>
+	 * Note: In the initial version, the s, p, and o of each axiom were written
+	 * out as <code>long</code> integers.  That version is no longer supported.
+	 */ 
     private static final transient byte VERSION1 = 1;
 
     /**
@@ -333,9 +330,9 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
         final byte version = in.readByte();
 
         switch (version) {
-        case VERSION0:
-            readVersion0(in);
-            break;
+//        case VERSION0:
+//            readVersion0(in);
+//            break;
         case VERSION1:
             readVersion1(in);
             break;
@@ -346,31 +343,31 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
 
     }
 
-    @SuppressWarnings("unchecked")
-    private void readVersion0(final ObjectInput in) throws IOException {
-
-        final long naxioms = LongPacker.unpackLong(in);
-
-        if (naxioms < 0 || naxioms > Integer.MAX_VALUE)
-            throw new IOException();
-
-        createBTree((int) naxioms);
-
-        for (int i = 0; i < naxioms; i++) {
-
-            final IV s = new TermId<BigdataURI>(VTE.URI, in.readLong());
-
-            final IV p = new TermId<BigdataURI>(VTE.URI, in.readLong());
-
-            final IV o = new TermId<BigdataURI>(VTE.URI, in.readLong());
-
-            final SPO spo = new SPO(s, p, o, StatementEnum.Axiom);
-
-            btree.insert(tupleSer.serializeKey(spo), spo.getStatementType()
-                    .serialize());
-
-        }
-    }
+//    @SuppressWarnings("unchecked")
+//    private void readVersion0(final ObjectInput in) throws IOException {
+//
+//        final long naxioms = LongPacker.unpackLong(in);
+//
+//        if (naxioms < 0 || naxioms > Integer.MAX_VALUE)
+//            throw new IOException();
+//
+//        createBTree((int) naxioms);
+//
+//        for (int i = 0; i < naxioms; i++) {
+//
+//            final IV s = new TermId<BigdataURI>(VTE.URI, in.readLong());
+//
+//            final IV p = new TermId<BigdataURI>(VTE.URI, in.readLong());
+//
+//            final IV o = new TermId<BigdataURI>(VTE.URI, in.readLong());
+//
+//            final SPO spo = new SPO(s, p, o, StatementEnum.Axiom);
+//
+//            btree.insert(tupleSer.serializeKey(spo), spo.getStatementType()
+//                    .serialize());
+//
+//        }
+//    }
 
     @SuppressWarnings("unchecked")
     private void readVersion1(final ObjectInput in) throws IOException {
@@ -423,35 +420,35 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
         out.writeByte(currentVersion);
 
         switch(currentVersion) {
-        case VERSION0: writeVersion0(out); break;
+//        case VERSION0: writeVersion0(out); break;
         case VERSION1: writeVersion1(out); break;
         default: throw new AssertionError();
         }
 
     }
 
-    private void writeVersion0(final ObjectOutput out) throws IOException {
-
-        final long naxioms = btree.rangeCount();
-
-        LongPacker.packLong(out, naxioms);
-
-        @SuppressWarnings("unchecked")
-        final ITupleIterator<SPO> itr = btree.rangeIterator();
-
-        while (itr.hasNext()) {
-
-            final SPO spo = itr.next().getObject();
-
-            out.writeLong(spo.s().getTermId());
-
-            out.writeLong(spo.p().getTermId());
-
-            out.writeLong(spo.o().getTermId());
-
-        }
-
-    }
+//    private void writeVersion0(final ObjectOutput out) throws IOException {
+//
+//        final long naxioms = btree.rangeCount();
+//
+//        LongPacker.packLong(out, naxioms);
+//
+//        @SuppressWarnings("unchecked")
+//        final ITupleIterator<SPO> itr = btree.rangeIterator();
+//
+//        while (itr.hasNext()) {
+//
+//            final SPO spo = itr.next().getObject();
+//
+//            out.writeLong(spo.s().getTermId());
+//
+//            out.writeLong(spo.p().getTermId());
+//
+//            out.writeLong(spo.o().getTermId());
+//
+//        }
+//
+//    }
 
     private void writeVersion1(final ObjectOutput out) throws IOException {
 

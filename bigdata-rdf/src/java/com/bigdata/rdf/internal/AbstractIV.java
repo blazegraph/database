@@ -248,16 +248,34 @@ public abstract class AbstractIV<V extends BigdataValue, T>
     protected AbstractIV(final VTE vte, final boolean inline,
             final boolean extension, final DTE dte) {
 
+		this(toFlags(vte, inline, extension, dte));
+
+    }
+
+	/**
+	 * Return the <code>flags</code> byte given the details from which its state
+	 * encodes.
+	 * 
+	 * @param vte
+	 * @param inline
+	 * @param extension
+	 * @param dte
+	 * 
+	 * @return The flags byte.
+	 */
+    static byte toFlags(final VTE vte, final boolean inline,
+            final boolean extension, final DTE dte) {
+
         // vte << 6 bits (it is in the high 2 bits).
         // inline << 5 bits
         // extension << 4 bits
         // dte is in the low 4 bits.
-        this( (byte) ((//
+        return (byte) ((//
                 (((int) vte.v) << VTE_SHIFT)//
                 | ((inline ? 1 : 0) << INLINE_SHIFT)//
                 | ((extension ? 1 : 0) << EXTENSION_SHIFT) //
                 | (dte.v)//
-                ) & 0xff));
+                ) & 0xff);
 
     }
     
@@ -346,11 +364,29 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         return (flags & EXTENSION_MASK) != 0;
         
     }
+
+	/**
+	 * Return the {@link VTE} encoding in a flags byte.
+	 * <p>
+	 * Note: {@link VTE#valueOf(byte)} assumes that the VTE bits are in the TWO
+	 * (2) LSB bits of the byte. However, the VTE bits are actually stored in
+	 * the TWO (2) MSB bits of the <i>flags</i> byte. This method is responsible
+	 * for shifting the VTE bits down before invoking {@link VTE#valueOf(byte)}.
+	 * 
+	 * @param flags
+	 *            A flags byte.
+	 * 
+	 * @return The {@link VTE} encoded in the flags byte.
+	 */
+	static final public VTE getVTE(final byte flags) {
+
+		return VTE.valueOf((byte) (((flags & VTE_MASK) >>> VTE_SHIFT) & 0xff));
+
+    }
     
     final public VTE getVTE() {
 
-        return VTE
-                .valueOf((byte) (((flags & VTE_MASK) >>> VTE_SHIFT) & 0xff));
+        return getVTE(flags);
 
     }
 
@@ -456,6 +492,16 @@ public abstract class AbstractIV<V extends BigdataValue, T>
      */
     public boolean isTermId() {
         return !isInline();
+    }
+    
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This implementation returns <code>false</code>. it is overridden by
+     * {@link TermId}.
+     */
+    public boolean isNullIV() {
+    	return false;
     }
     
     final public boolean isNumeric() {
@@ -574,14 +620,16 @@ public abstract class AbstractIV<V extends BigdataValue, T>
                 IVUtility.encode(keyBuilder, t.getDelegate());
                 return keyBuilder;
             }
-            /*
-             * The RDF Value is represented as a term identifier (i.e., a key
-             * into the TERMS index).
-             * 
-             * FIXME TERMS REFACTOR: Handle NullIV as special case.
-             */
-            keyBuilder.append(getTermId());
-            return keyBuilder;
+			/*
+			 * The RDF Value is represented as a term identifier (i.e., a key
+			 * into the TERMS index).
+			 * 
+			 * Note: This is handled by TermIV#encode() so we will never get to
+			 * this point in the code.
+			 */
+//            keyBuilder.append(getTermId());
+//            return keyBuilder;
+            throw new AssertionError();
         }
         
         if (isURI()) {
