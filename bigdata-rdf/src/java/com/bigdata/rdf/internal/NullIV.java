@@ -34,15 +34,54 @@ package com.bigdata.rdf.internal;
  * few other locations.
  * 
  * @author mrpersonick
+ * 
+ * @deprecated by {@link TermId#NullIV}
  */
 class NullIV extends TermId {
 
-    private static final long serialVersionUID = -214758033769962923L;
-    
-    final public static transient IV INSTANCE = new NullIV();
-    
+//    private static final long serialVersionUID = -214758033769962923L;
+//    
+//    final public static transient IV INSTANCE = new NullIV();
+//
+//	/**
+//	 * Return <code>true</code> if the unsigned byte[] key represents a
+//	 * {@link NullIV}.
+//	 * 
+//	 * @param key
+//	 *            The key.
+//	 *            
+//	 * @return <code>true</code> if the key represents a {@link NullIV}.
+//	 */
+//	static boolean isNullIV(final byte[] key) {
+//
+//		for (int i = 0; i < key.length; i++) {
+//
+//			if (key[i] != 0)
+//				return false;
+//			
+//		}
+//
+//		return true;
+//    	
+//    }
+//
+//    /**
+//     * Note: This key is all (unsigned) zeros.
+//     */
+//    static private byte[] getNullIVKey() {
+//
+//    	final byte[] key = new byte[TermsIndexHelper.TERMS_INDEX_KEY_SIZE];
+//    	
+//    	key[0] = TermId.toFlags(VTE.URI); // Note: VTE.URI is unsigned ZERO.
+//
+//    	return key;
+//    	
+//    }
+//    
     private NullIV() {
-        super(VTE.BNODE, TermId.NULL);
+    	super(null);
+//		super(getNullIVKey());
+////        super(VTE.BNODE, TermId.NULL);
     }
 
 }

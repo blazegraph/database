@@ -118,27 +118,33 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      */
     DTE getDTE();
 
-    /**
-     * <code>true</code> iff the RDF value is represented by a term identifier.
-     * When an RDF Value is represented as a term identifier, it must be
-     * resolved against the <code>ID2TERM</code> index.
-     * 
-     * @see #isInline()
-     */
+	/**
+	 * <code>true</code> iff the RDF value is represented by a {@link TermId}.
+	 * When an RDF Value is represented as a {@link TermId}, it must be resolved
+	 * against the <code>TERMS</code> index.
+	 * 
+	 * @see #isInline()
+	 */
     boolean isTermId();
 
-    /**
-     * Return the term identifier.
-     * 
-     * @return The term identifier.
-     * 
-     * @throws UnsupportedOperationException
-     *             unless the RDF value is represented by a term identifier.
-     * 
-     *             FIXME TERMS REFACTOR : Return the TermIV iff this is a TermIV
-     *             and otherwise throw the exception (do not extract the long
-     *             since the termId is not a variable length format).
-     */
+	/**
+	 * <code>true</code> iff the {@link IV} represents a <em>null</em>
+	 * {@link IV} reference. <code>null</code> {@link IV}s are somewhat special.
+	 * They get used as wildcards for the keys in the justifications index and
+	 * perhaps (?) in a few other locations.
+	 */
+    boolean isNullIV();
+    
+	/**
+	 * Return the term identifier.
+	 * 
+	 * @return The term identifier.
+	 * 
+	 * @throws UnsupportedOperationException
+	 *             unless the RDF value is represented by a term identifier.
+	 * 
+	 * @deprecated termIds no longer exist as of the TERMS refactor.
+	 */
     long getTermId() throws UnsupportedOperationException;
 
     /**

@@ -64,15 +64,16 @@ public class DummyIV extends AbstractIV {
         return null;
     }
 
-    /**
-     * Note: This returns {@link TermId#NULL} for backwards compatibility.
-     */
-    public long getTermId() throws UnsupportedOperationException {
-        return TermId.NULL;
+//    /**
+//     * Note: This returns {@link TermId#NULL} for backwards compatibility.
+//     */
+    public long getTermId() {
+//        return TermId.NULL;
+    	throw new UnsupportedOperationException();
     }
 
-    public boolean isNull() {
-        return false;
+    public boolean isNullIV() {
+        return true;// FIXME Should this return true? getTermId() was returning 0L...
     }
 
     public int compareTo(Object o) {

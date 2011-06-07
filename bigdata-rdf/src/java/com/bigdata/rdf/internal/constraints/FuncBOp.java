@@ -152,7 +152,8 @@ public class FuncBOp extends IVValueExpression<IV>
 	    	
 	    	if (iv == null) {
 	    		
-	    		iv = new TermId(VTE.valueOf(val), TermId.NULL);
+//	    		iv = new TermId(VTE.valueOf(val), TermId.NULL);
+	    		iv = TermId.mockIV(VTE.valueOf(val));
 	    		
 		    	val.setIV(iv);
 		    	

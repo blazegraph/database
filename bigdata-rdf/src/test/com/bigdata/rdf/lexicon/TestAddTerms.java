@@ -32,9 +32,16 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
+
 import org.openrdf.model.vocabulary.RDF;
+
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -66,6 +73,65 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
        
     }
 
+	/**
+	 * Verify that a {@link TermId#NullIV} was entered into the TERMS index when
+	 * the lexicon was created.
+	 */
+    public void test_NullIV() {
+    
+        final Properties properties = getProperties();
+        
+        // test w/o predefined vocab.
+        properties.setProperty(Options.VOCABULARY_CLASS, NoVocabulary.class
+                .getName());
+
+        // test w/o axioms - they imply a predefined vocab.
+        properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        // test w/o the full text index.
+        properties.setProperty(Options.TEXT_INDEX, "false");
+
+        // test w/o inlining
+        properties.setProperty(Options.INLINE_LITERALS, "false");
+
+        final AbstractTripleStore store = getStore(properties);
+        
+        try {
+        	
+        	final TermsIndexHelper helper = new TermsIndexHelper();
+
+        	final IKeyBuilder keyBuilder = helper.newKeyBuilder();
+        	
+        	final IIndex ndx = store.getLexiconRelation().getTermsIndex();
+        	
+        	assertEquals(1L,ndx.rangeCount());
+        	
+        	final byte[] key = TermId.NullIV.encode(keyBuilder).getKey();
+        	
+        	// The NullIV is paired with a [null] value.
+			assertNull(ndx.lookup(key));
+
+			// Visit the tuples in the index.
+			final ITupleIterator<TermId> itr = ndx.rangeIterator();
+			
+			assertTrue(itr.hasNext());
+
+			final ITuple<TermId> tuple = itr.next();
+			
+			assertEquals(key, tuple.getKey());
+			assertEquals(null, tuple.getValue());
+			assertFalse(tuple.isDeletedVersion());
+			
+			assertFalse(itr.hasNext());
+			
+        } finally {
+        	
+        	store.__tearDownUnitTest();
+        	
+        }
+    	
+    }
+    
     public void test_addTerms() {
 
         final Properties properties = getProperties();
@@ -111,22 +177,24 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
             terms.add(f.createLiteral("12.00", f
                     .createURI("http://www.w3.org/2001/XMLSchema#float")));
 
-            /*
-             * Note: Blank nodes will not round trip through the lexicon unless
-             * the "told bnodes" is enabled.
-             */
-//            terms.add(f.createBNode());
-//            terms.add(f.createBNode("a"));
+			if (store.getLexiconRelation().isStoreBlankNodes()) {
+	            /*
+	             * Note: Blank nodes will not round trip through the lexicon unless
+	             * the "told bnodes" is enabled.
+	             */
+				terms.add(f.createBNode());
+				terms.add(f.createBNode("a"));
+			}
 
-            final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
+			final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
 
-            if (store.isStable()) {
-                
-                store.commit();
-                
-                store = reopenStore(store);
+			if (store.isStable()) {
 
-                // verify same reverse mappings.
+				store.commit();
+
+				store = reopenStore(store);
+
+				// verify same reverse mappings.
 
                 final Map<IV, BigdataValue> ids2 = store.getLexiconRelation()
                         .getTerms(ids.keySet());

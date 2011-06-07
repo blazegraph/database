@@ -130,11 +130,11 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     	}
     	
     	// handle the special case where we have exact termId equality
-    	// probably would never hit this because of SameTermOp
+    	// probably would never hit this because of SameTermBOp
     	if (op == CompareOp.EQ && left.isTermId() && right.isTermId()) {
     		
-    		if (left.getTermId() == right.getTermId())
-    			return true;
+			if (left.equals(right))
+				return true;
     		
     	}
     	

@@ -134,7 +134,8 @@ public class LangBOp extends IVValueExpression<IV>
 	    	
 	    	if (langIV == null) {
 	    		
-	    		langIV = new TermId(VTE.LITERAL, TermId.NULL);
+//	    		langIV = new TermId(VTE.LITERAL, TermId.NULL);
+	    		langIV = TermId.mockIV(VTE.LITERAL);
 	    		lang.setIV(langIV);
 		    	
 	    	}

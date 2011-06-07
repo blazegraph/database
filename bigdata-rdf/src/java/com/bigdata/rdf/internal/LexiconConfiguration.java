@@ -328,27 +328,30 @@ public class LexiconConfiguration<V extends BigdataValue>
         if (iv != null)
             return iv;
 
-        /*
-         * Attempt to fully inline the literal.
-         */
+		/*
+		 * Attempt to fully inline the literal.
+		 */
+		if (maxInlineStringLength > 0) {
 
-        final String label = value.getLabel();
+			final String label = value.getLabel();
 
-        final int datatypeLength = value.getDatatype() == null ? 0 : value
-                .getDatatype().stringValue().length();
+			final int datatypeLength = value.getDatatype() == null ? 0 : value
+					.getDatatype().stringValue().length();
 
-        final int languageLength = value.getLanguage() == null ? 0 : value
-                .getLanguage().length();
+			final int languageLength = value.getLanguage() == null ? 0 : value
+					.getLanguage().length();
 
-        final long totalLength = label.length() + datatypeLength
-                + languageLength;
+			final long totalLength = label.length() + datatypeLength
+					+ languageLength;
 
-        if (totalLength <= maxInlineStringLength) {
+			if (totalLength <= maxInlineStringLength) {
 
-            return new InlineLiteralIV<BigdataLiteral>(label, value
-                    .getLanguage(), value.getDatatype());
+				return new InlineLiteralIV<BigdataLiteral>(label, value
+						.getLanguage(), value.getDatatype());
 
-        }
+			}
+
+		}
 
         // Literal was not inlined.
         return null;

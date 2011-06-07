@@ -29,7 +29,9 @@ package com.bigdata.rdf.model;
 
 import java.io.DataInput;
 import java.io.DataOutput;
+import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 
 import org.openrdf.model.BNode;
@@ -122,6 +124,19 @@ public class BigdataValueSerializer<V extends Value> {
         
     }
 
+//    public byte getTermCode(final InputStream is) throws IOException {
+//    	final short version = ShortPacker.unpackShort(is);
+//    	switch(version){
+//    	case VERSION0:
+//		case VERSION1:
+//			final int b = is.read();
+//			if(b == -1)
+//				throw new EOFException();
+//			return (byte)(0xff & b);
+//		default:
+//			throw new AssertionError();
+//		}
+//    }
     
     /**
      * Return the term code as defined by {@link ITermIndexCodes} for this type

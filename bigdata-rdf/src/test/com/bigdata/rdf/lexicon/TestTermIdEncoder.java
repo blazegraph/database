@@ -40,6 +40,7 @@ import com.bigdata.btree.ICounter;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @deprecated by the TERMS_REFACTOR
  */
 public class TestTermIdEncoder extends TestCase2 {
 

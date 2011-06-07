@@ -78,6 +78,8 @@ import com.bigdata.rdf.internal.TermId;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by the TERMS index.
  */
 public class Term2IdTupleSerializer extends DefaultTupleSerializer {
 

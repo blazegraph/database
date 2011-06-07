@@ -536,10 +536,13 @@ abstract public class AbstractTripleStore extends
          * knowledge base. If you estimate that you will have 50 x 200M index
          * partitions for the statement indices, then SQRT(50) =~ 7 would be a
          * good choice.
+         * 
+         * @deprecated No longer required with TERMS_REFACTOR
          */
         String TERMID_BITS_TO_REVERSE = (AbstractTripleStore.class.getName() + ".termIdBitsToReverse")
                 .intern();
 
+        /** @deprecated No longer required with TERMS_REFACTOR */
         String DEFAULT_TERMID_BITS_TO_REVERSE = "6";
 
         /**

@@ -80,6 +80,8 @@ import com.bigdata.btree.IOverflowHandler;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated This can be deleted when we finish the TERMS_REFACTOR.
  */
 public class TestLongLiterals extends TestCase2 {
 

@@ -29,7 +29,6 @@ package com.bigdata.rdf.internal;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.Random;
 import java.util.TimeZone;
 import java.util.UUID;
 
@@ -47,6 +46,7 @@ import org.openrdf.model.vocabulary.RDF;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.lexicon.TermsIndexHelper;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -75,76 +75,38 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         super(name);
     }
 
-    /**
-     * Unit tests for {@link TermId}
-     */
-    public void test_TermId() {
+	private TermsIndexHelper helper;
+	
+	protected void setUp() throws Exception {
+		super.setUp();
+		helper = new TermsIndexHelper();
+	}
 
-        final Random r = new Random();
-        
-        for(VTE vte : VTE.values()) {
-//        InternalValueTypeEnum vte = InternalValueTypeEnum.BNODE;
-//        {
+	protected void tearDown() throws Exception {
+		super.tearDown();
+		helper = null;
+	}
 
-//            for(DTE dte : DTE.values()) {
+	/**
+	 * Factory for {@link TermId}s.
+	 */
+	private TermId newTermId(final VTE vte) {
 
-                // 64 bit random term identifier.
-                final long termId = r.nextLong();
+		final int hashCode = nextHashCode++;
+		
+		// the math here is just to mix up the counter values a bit.
+		final byte counter = (byte) ((nextHashCode + 12) % 7);
+		
+		final IKeyBuilder keyBuilder = helper.newKeyBuilder();
 
-                final TermId<?> v = new TermId<BigdataValue>(vte, termId);
+		final byte[] key = helper.makeKey(keyBuilder, vte, hashCode, counter);
+		
+		return new TermId(key);
 
-                assertTrue(v.isTermId());
+	}
 
-                assertFalse(v.isInline());
-                
-                assertEquals(termId, v.getTermId());
-
-                try {
-                    v.getInlineValue();
-                    fail("Expecting "+UnsupportedOperationException.class);
-                } catch(UnsupportedOperationException ex) {
-                    // ignored.
-                }
-                
-                assertEquals("flags="+v.flags(), vte, v.getVTE());
-
-//                assertEquals(dte, v.getInternalDataTypeEnum());
-
-                switch(vte) {
-                case URI:
-                    assertTrue(v.isURI());
-                    assertFalse(v.isBNode());
-                    assertFalse(v.isLiteral());
-                    assertFalse(v.isStatement());
-                    break;
-                case BNODE:
-                    assertFalse(v.isURI());
-                    assertTrue(v.isBNode());
-                    assertFalse(v.isLiteral());
-                    assertFalse(v.isStatement());
-                    break;
-                case LITERAL:
-                    assertFalse(v.isURI());
-                    assertFalse(v.isBNode());
-                    assertTrue(v.isLiteral());
-                    assertFalse(v.isStatement());
-                    break;
-                case STATEMENT:
-                    assertFalse(v.isURI());
-                    assertFalse(v.isBNode());
-                    assertFalse(v.isLiteral());
-                    assertTrue(v.isStatement());
-                    break;
-                default:
-                    fail("vte=" + vte);
-                }
-
-//            }
-            
-        }
-        
-    }
-
+	private int nextHashCode = 1;
+    
     public void test_InlineValue() {
 
 //        final Random r = new Random();
@@ -346,10 +308,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_allTermIds() {
 
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
-                new TermId<BigdataURI>(VTE.URI, 3L),//
-                new TermId<BigdataURI>(VTE.URI, 4L) //
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI) //
         };
 
         doEncodeDecodeTest(e);
@@ -362,10 +324,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDBoolean() {
 
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new XSDBooleanIV<BigdataLiteral>(true),//
-                new TermId<BigdataURI>(VTE.URI, 4L) //
+                newTermId(VTE.URI) //
         };
 
         doEncodeDecodeTest(e);
@@ -382,10 +344,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDByte() {
 
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new XSDByteIV<BigdataLiteral>((byte)1),//
-                new TermId<BigdataURI>(VTE.URI, 4L) //
+                newTermId(VTE.URI) //
         };
 
         doEncodeDecodeTest(e);
@@ -414,10 +376,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDShort() {
 
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new XSDShortIV<BigdataLiteral>((short)1),//
-                new TermId<BigdataURI>(VTE.URI, 4L) //
+                newTermId(VTE.URI) //
         };
 
         doEncodeDecodeTest(e);
@@ -446,10 +408,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDInt() {
 
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new XSDIntIV<BigdataLiteral>(1),//
-                new TermId<BigdataURI>(VTE.URI, 4L) //
+                newTermId(VTE.URI) //
         };
 
         doEncodeDecodeTest(e);
@@ -478,10 +440,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDLong() {
 
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new XSDLongIV<BigdataLiteral>(1L),//
-                new TermId<BigdataURI>(VTE.URI, 4L) //
+                newTermId(VTE.URI) //
         };
 
         doEncodeDecodeTest(e);
@@ -510,10 +472,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDFloat() {
 
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new XSDFloatIV<BigdataLiteral>(1f),//
-                new TermId<BigdataURI>(VTE.URI, 4L) //
+                newTermId(VTE.URI) //
         };
 
         doEncodeDecodeTest(e);
@@ -563,10 +525,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDDouble() {
 
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new XSDDoubleIV<BigdataLiteral>(1d),//
-                new TermId<BigdataURI>(VTE.URI, 4L) //
+                newTermId(VTE.URI) //
         };
 
         doEncodeDecodeTest(e);
@@ -616,10 +578,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_UUID() {
 
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new UUIDLiteralIV<BigdataLiteral>(UUID.randomUUID()),//
-                new TermId<BigdataURI>(VTE.URI, 4L) //
+                newTermId(VTE.URI) //
         };
 
         doEncodeDecodeTest(e);
@@ -640,11 +602,11 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDInteger() {
 
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new XSDIntegerIV<BigdataLiteral>(BigInteger
                         .valueOf(3L)),//
-                new TermId<BigdataURI>(VTE.URI, 4L) //
+                newTermId(VTE.URI) //
         };
 
         doEncodeDecodeTest(e);
@@ -657,11 +619,11 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDDecimal() {
 
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new XSDDecimalIV<BigdataLiteral>(BigDecimal
                         .valueOf(3.3d)),//
-                new TermId<BigdataURI>(VTE.URI, 4L) //
+                newTermId(VTE.URI) //
         };
 
         doEncodeDecodeTest(e);
@@ -675,8 +637,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_BNode_UUID_ID() {
         
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new UUIDBNodeIV<BigdataBNode>(UUID.randomUUID()),//
         };
 
@@ -692,8 +654,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_BNode_INT_ID() {
         
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new NumericBNodeIV<BigdataBNode>(0),//
                 new NumericBNodeIV<BigdataBNode>(52),//
                 new NumericBNodeIV<BigdataBNode>(Integer.MAX_VALUE),//
@@ -714,15 +676,15 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final EpochExtension<BigdataValue> ext = 
             new EpochExtension<BigdataValue>(new IDatatypeURIResolver() {
             public BigdataURI resolve(URI uri) {
-                BigdataURI buri = vf.createURI(uri.stringValue());
-                buri.setIV(new TermId(VTE.URI, 1024));
+            	final BigdataURI buri = vf.createURI(uri.stringValue());
+                buri.setIV(newTermId(VTE.URI));
                 return buri;
             }
         });
         
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 ext.createIV(new LiteralImpl("1234", EpochExtension.EPOCH)),
         };
 
@@ -740,15 +702,15 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final ColorsEnumExtension<BigdataValue> ext = 
             new ColorsEnumExtension<BigdataValue>(new IDatatypeURIResolver() {
             public BigdataURI resolve(URI uri) {
-                BigdataURI buri = vf.createURI(uri.stringValue());
-                buri.setIV(new TermId(VTE.URI, 1024));
+                final BigdataURI buri = vf.createURI(uri.stringValue());
+                buri.setIV(newTermId(VTE.URI));
                 return buri;
             }
         });
         
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 ext.createIV(new LiteralImpl("Blue", ColorsEnumExtension.COLOR)),
         };
 
@@ -769,7 +731,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
             new DateTimeExtension<BigdataValue>(new IDatatypeURIResolver() {
 	            public BigdataURI resolve(URI uri) {
 	                final BigdataURI buri = vf.createURI(uri.stringValue());
-	                buri.setIV(new TermId(VTE.URI, 1024));
+	                buri.setIV(newTermId(VTE.URI));
 	                return buri;
 	            }
 	        },
@@ -833,7 +795,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                 new IDatatypeURIResolver() {
                     public BigdataURI resolve(URI uri) {
                         final BigdataURI buri = vf.createURI(uri.stringValue());
-                        buri.setIV(new TermId(VTE.URI, 1024));
+                        buri.setIV(newTermId(VTE.URI));
                         return buri;
                     }
                 }, TimeZone.getTimeZone("GMT"));
@@ -881,15 +843,15 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecodeSids() {
         
     	final SPO spo = new SPO(
-    			new TermId(VTE.URI, 1L), 
-    			new TermId(VTE.URI, 2L), 
-    			new TermId(VTE.URI, 4L),
+    			newTermId(VTE.URI), 
+    			newTermId(VTE.URI), 
+    			newTermId(VTE.URI),
     			StatementEnum.Explicit);
     	
         final IV<?, ?>[] e = {//
-                new SidIV(spo),//
-                new TermId(VTE.URI, 8L),//
-                new TermId(VTE.URI, 16L) //
+                new SidIV<BigdataBNode>(spo),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI) //
         };
 
         doEncodeDecodeTest(e);
@@ -913,14 +875,14 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                 new IDatatypeURIResolver() {
                     public BigdataURI resolve(URI uri) {
                         final BigdataURI buri = vf.createURI(uri.stringValue());
-                        buri.setIV(new TermId(VTE.URI, 1024));
+                        buri.setIV(newTermId(VTE.URI));
                         return buri;
                     }
                 }, maxInlineStringLength);
         
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 ext.createIV(new LiteralImpl("1234", XSD.STRING)),
         };
 
@@ -933,8 +895,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_Inline_BNode_UnicodeID() {
 
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new UnicodeBNodeIV<BigdataBNode>("FOO"),//
                 new UnicodeBNodeIV<BigdataBNode>("_bar"),//
         };
@@ -954,8 +916,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_Inline_Literal_plainLiteral() {
         
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new InlineLiteralIV<BigdataLiteral>("FOO", null/* language */,
                         null/* datatype */),//
         };
@@ -975,8 +937,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_Inline_Literal_languageCodeLiteral() {
         
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new InlineLiteralIV<BigdataLiteral>("GOO", "en"/* language */,
                         null/* datatype */),//
         };
@@ -998,8 +960,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_Inline_Literal_datatypeLiteral() {
         
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new InlineLiteralIV<BigdataLiteral>("BAR", null/* language */,
                         new URIImpl("http://www.bigdata.com")/* datatype */),//
         };
@@ -1022,8 +984,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_Inline_Literal_XSDString_DeconflictionTest() {
     
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new InlineLiteralIV<BigdataLiteral>("BAR", null/* language */,
                         XSD.STRING/* datatype */),//
         };
@@ -1041,8 +1003,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_Inline_URI() {
         
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new InlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com")),//
                 new InlineURIIV<BigdataURI>(RDF.TYPE),//
         };
@@ -1103,11 +1065,11 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      */
     public void test_SPO_encodeDecode_NonInline_URI_with_NamespaceIV() {
 
-        final TermId namespaceIV = new TermId<BigdataURI>(VTE.URI, 3L);
+        final TermId namespaceIV = newTermId(VTE.URI);
         
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new URINamespaceIV<BigdataURI>(
                         new InlineLiteralIV<BigdataLiteral>("bar"), namespaceIV),//
         };
@@ -1124,11 +1086,11 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      */
     public void test_SPO_encodeDecode_NonInline_Literal_with_DatatypeIV() {
 
-        final TermId datatypeIV = new TermId<BigdataURI>(VTE.URI, 3L);
+        final TermId datatypeIV = newTermId(VTE.URI);
         
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new LiteralDatatypeIV<BigdataLiteral>(
                         new InlineLiteralIV<BigdataLiteral>("bar"), datatypeIV),//
         };
@@ -1144,8 +1106,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_URINamespaceIV() {
 
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new URINamespaceIV<BigdataURI>(
                 		new InlineLiteralIV<BigdataLiteral>("bar"),// localName
                 		new URIShortIV<BigdataURI>((short)1) // namespace
@@ -1166,8 +1128,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final IV datatypeIV = new URIShortIV<BigdataURI>((short)1);
 
         final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
+                newTermId(VTE.URI),//
+                newTermId(VTE.URI),//
                 new LiteralDatatypeIV<BigdataLiteral>(
                         new InlineLiteralIV<BigdataLiteral>("bar"), datatypeIV),//
         };

@@ -45,6 +45,8 @@ import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by the TERMS_REFACTOR
  */
 public class TestTerm2IdTupleSerializer extends TestCase2 {
 

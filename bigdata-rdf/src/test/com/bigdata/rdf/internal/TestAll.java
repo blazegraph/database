@@ -65,6 +65,9 @@ public class TestAll extends TestCase {
         
         // test suite for DTE.
         suite.addTestSuite(TestDTE.class);
+
+        // basic test suite for TermId.
+        suite.addTestSuite(TestTermId.class);
         
         // test suite for encode/decode of IVs.
         suite.addTestSuite(TestEncodeDecodeKeys.class);

@@ -142,7 +142,11 @@ public class WrappedIV implements IV {
 		return iv.isTermId();
 	}
 
-	public long getTermId() throws UnsupportedOperationException {
+	public boolean isNullIV() {
+		return iv.isNullIV();
+	}
+
+	public long getTermId() {
 		return iv.getTermId();
 	}
 

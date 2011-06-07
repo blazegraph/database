@@ -6,6 +6,8 @@ import java.util.Comparator;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.journal.Journal;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueIdComparator;
@@ -26,21 +28,41 @@ public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> {
      * Note: these constants make it possible to use switch(index())
      * constructs.
      */
+	/** @deprecated by {@link #_TERMS}. */
     public static final transient int _TERM2ID = 0;
 
+	/** @deprecated by {@link #_TERMS}. */
     public static final transient int _ID2TERM = 1;
+
+    public static final transient int _TERMS = 2;
 
     /**
      * The index whose keys are formed from the terms (RDF {@link Value}s).
+     * 
+     * @deprecated by {@link #TERMS}.
      */
     public static final transient LexiconKeyOrder TERM2ID = new LexiconKeyOrder(
             _TERM2ID);
 
     /**
      * The index whose keys are formed from the term identifiers.
+     * 
+     * @deprecated by {@link #TERMS}.
      */
     public static final transient LexiconKeyOrder ID2TERM = new LexiconKeyOrder(
             _ID2TERM);
+
+	/**
+	 * The index whose keys are formed from the hash code of the RDF
+	 * {@link Value} plus a counter (to break ties on the hash code). The
+	 * {@link IV} for an entry in the TERMS index is formed by wrapping this
+	 * key. The values are the RDF {@link Value}s and are often represented by
+	 * raw records on the backing {@link Journal}. This index is only used for
+	 * "large" {@link Value}s. Most RDF {@link Value}s wind up inlined into the
+	 * statement indices.
+	 */
+    public static final transient LexiconKeyOrder TERMS = new LexiconKeyOrder(
+            _TERMS);
 
     /**
      * The positional index corresponding to the RDF Value in a
@@ -83,6 +105,8 @@ public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> {
             return TERM2ID;
         case _ID2TERM:
             return ID2TERM;
+        case _TERMS:
+            return TERMS;
         default:
             throw new IllegalArgumentException("Unknown: index" + index);
         }
@@ -99,6 +123,8 @@ public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> {
             return "TERM2ID";
         case _ID2TERM:
             return "ID2TERM";
+        case _TERMS:
+            return "TERMS";
         default:
             throw new AssertionError();
         }
@@ -129,6 +155,7 @@ public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> {
         switch(index) {
         case _TERM2ID: return 1;
         case _ID2TERM: return 1;
+        case _TERMS: return 1;
         default: throw new AssertionError();
         }
     }
@@ -145,6 +172,7 @@ public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> {
         switch(index) {
         case _TERM2ID: return SLOT_TERM;
         case _ID2TERM: return SLOT_ID;
+        case _TERMS: return SLOT_ID;
         default: throw new AssertionError();
         }
         
@@ -157,6 +185,7 @@ public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> {
     final public Comparator<BigdataValue> getComparator() {
 
         switch (index) {
+        case _TERMS:
         case _TERM2ID:
             /*
              * FIXME Must impose unsigned byte[] comparison. That is

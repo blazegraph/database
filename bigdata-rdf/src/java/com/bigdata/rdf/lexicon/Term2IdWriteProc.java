@@ -107,6 +107,8 @@ import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link TermsWriteTask}
  */
 public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure {
