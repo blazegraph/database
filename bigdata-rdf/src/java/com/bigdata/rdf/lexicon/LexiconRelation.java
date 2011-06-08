@@ -29,7 +29,6 @@ package com.bigdata.rdf.lexicon;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -62,11 +61,9 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.filter.PrefixFilter;
@@ -82,6 +79,7 @@ import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
@@ -518,9 +516,17 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             final IIndexManager indexManager = getIndexManager();
 
             // register the indices.
-
-			indexManager
-					.registerIndex(getTermsIndexMetadata(getFQN(LexiconKeyOrder.TERMS)));
+            final String termsName = getFQN(LexiconKeyOrder.TERMS);
+            IIndex terms = null;
+            if (indexManager instanceof IJournal) {
+                terms = ((IJournal) indexManager).registerIndex(termsName,
+                        getTermsIndexMetadata(termsName));
+            } else {
+                /*
+                 * Scale-out an other non-transactional contexts.
+                 */
+                indexManager.registerIndex(getTermsIndexMetadata(termsName));
+            }
 
 			/*
 			 * Insert a tuple for the NullIV mapping it to a null value in the
@@ -533,10 +539,17 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
 				final byte[] key = TermId.NullIV.encode(keyBuilder).getKey();
 				
-				final IIndex ndx = getIndex(getFQN(LexiconKeyOrder.TERMS));
+                if (terms == null) {
+                    /*
+                     * Scale-out (will not have been reported by registerIndex
+                     * but we are not running a transaction so we can look it up
+                     * now).
+                     */
+                    terms = getIndex(getFQN(LexiconKeyOrder.TERMS));
+                }
 
 				// Insert a tuple for the NullIV mapping it to a null value.
-				ndx.insert(key/* NullIV */, null/* value */);
+				terms.insert(key/* NullIV */, null/* value */);
 			}
 
 //            indexManager
