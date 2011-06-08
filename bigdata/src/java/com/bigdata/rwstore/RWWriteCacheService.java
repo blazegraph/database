@@ -31,6 +31,7 @@ import java.nio.channels.FileChannel;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
@@ -59,7 +60,7 @@ public class RWWriteCacheService extends WriteCacheService implements IWriteCach
      * Provide default FileChannelScatteredWriteCache
      */
     @Override
-    public WriteCache newWriteCache(final ByteBuffer buf,
+    public WriteCache newWriteCache(final IBufferAccess buf,
             final boolean useChecksum,
             final boolean bufferHasData,
             final IReopenChannel<? extends Channel> opener)

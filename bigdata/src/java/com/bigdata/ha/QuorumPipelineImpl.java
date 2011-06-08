@@ -22,6 +22,7 @@ import com.bigdata.ha.pipeline.HAReceiveService;
 import com.bigdata.ha.pipeline.HASendService;
 import com.bigdata.ha.pipeline.HAReceiveService.IHAReceiveCallback;
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.QuorumMember;
 import com.bigdata.quorum.QuorumStateChangeListener;
@@ -158,7 +159,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      * that do not relay will have a <code>null</code> at their
      * corresponding index.
      */
-    private ByteBuffer receiveBuffer;
+    private IBufferAccess receiveBuffer;
 
     /**
      * Cached metadata about the downstream service.
@@ -362,7 +363,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
                         /*
                          * Release the buffer back to the pool.
                          */
-                        DirectBufferPool.INSTANCE.release(receiveBuffer);
+                        receiveBuffer.release();
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     } finally {
@@ -510,7 +511,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      *             if this is the leader.
      */
     protected ByteBuffer getReceiveBuffer() {
-        return receiveBuffer;
+        return receiveBuffer.buffer();
     }
 
     public HASendService getHASendService() {

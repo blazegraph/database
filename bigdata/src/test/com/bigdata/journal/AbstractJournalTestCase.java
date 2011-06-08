@@ -72,6 +72,8 @@ abstract public class AbstractJournalTestCase
 
         super.setUp(testCase);
 
+        TestHelper.checkJournalsClosed(testCase, this);
+
 //        if(log.isInfoEnabled())
 //        log.info("\n\n================:BEGIN:" + testCase.getName()
 //                + ":BEGIN:====================");

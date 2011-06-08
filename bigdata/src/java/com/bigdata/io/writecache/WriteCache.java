@@ -53,6 +53,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.StoreTypeEnum;
@@ -121,7 +122,7 @@ abstract public class WriteCache implements IWriteCache {
 	 * Note: This is an {@link AtomicReference} since we want to clear this
 	 * field in {@link #close()}.
 	 */
-	final private AtomicReference<ByteBuffer> buf;
+	final private AtomicReference<IBufferAccess> buf;
 
 	/**
 	 * The read lock allows concurrent {@link #acquire()}s while the write lock
@@ -167,7 +168,7 @@ abstract public class WriteCache implements IWriteCache {
 
 			// latch.inc();
 
-			final ByteBuffer tmp = buf.get();
+			final IBufferAccess tmp = buf.get();
 
 			if (tmp == null) {
 
@@ -178,7 +179,7 @@ abstract public class WriteCache implements IWriteCache {
 			}
 
 			// Note: The ReadLock is still held!
-			return tmp;
+			return tmp.buffer();
 
 		} catch (Throwable t) {
 
@@ -216,7 +217,7 @@ abstract public class WriteCache implements IWriteCache {
 	 */
 	ByteBuffer peek() {
 
-		final ByteBuffer b = buf.get();
+		final ByteBuffer b = buf.get().buffer();
 
 		return b == null ? null : b.asReadOnlyBuffer();
 
@@ -387,7 +388,7 @@ abstract public class WriteCache implements IWriteCache {
 	 * 
 	 * @throws InterruptedException
 	 */
-	public WriteCache(ByteBuffer buf, final boolean scatteredWrites, final boolean useChecksum,
+	public WriteCache(IBufferAccess buf, final boolean scatteredWrites, final boolean useChecksum,
 			final boolean isHighlyAvailable, final boolean bufferHasData) throws InterruptedException {
 
 		if (bufferHasData && buf == null)
@@ -421,17 +422,17 @@ abstract public class WriteCache implements IWriteCache {
 		}
 
 		// save reference to the write cache.
-		this.buf = new AtomicReference<ByteBuffer>(buf);
+		this.buf = new AtomicReference<IBufferAccess>(buf);
 
 		// the capacity of the buffer in bytes.
-		this.capacity = buf.capacity();
+		this.capacity = buf.buffer().capacity();
 
 		/*
 		 * Discard anything in the buffer, resetting the position to zero, the
 		 * mark to zero, and the limit to the capacity.
 		 */
 		if (!bufferHasData) {
-			buf.clear();
+			buf.buffer().clear();
 		}
 
 		/*
@@ -533,7 +534,7 @@ abstract public class WriteCache implements IWriteCache {
 	 */
 	final int remaining() {
 
-		final int remaining = capacity - buf.get().position();
+		final int remaining = capacity - buf.get().buffer().position();
 
 		return remaining;
 
@@ -544,7 +545,7 @@ abstract public class WriteCache implements IWriteCache {
 	 */
 	public final int bytesWritten() {
 
-		return buf.get().position();
+		return buf.get().buffer().position();
 
 	}
 
@@ -1011,7 +1012,7 @@ abstract public class WriteCache implements IWriteCache {
 
 		try {
 
-			final ByteBuffer tmp = this.buf.get();
+			final ByteBuffer tmp = this.buf.get().buffer();
 
 			if (tmp == null)
 				throw new IllegalStateException();
@@ -1196,7 +1197,7 @@ abstract public class WriteCache implements IWriteCache {
 			// // wait until there are no readers using the buffer.
 			// latch.await();
 
-			final ByteBuffer tmp = buf.get();
+			final ByteBuffer tmp = buf.get().buffer();
 
 			if (tmp == null) {
 
@@ -1246,7 +1247,7 @@ abstract public class WriteCache implements IWriteCache {
 			 */
 
 			// position := 0; limit := capacity.
-			final ByteBuffer tmp = buf.get();
+			final IBufferAccess tmp = buf.get();
 
 			if (tmp == null) {
 
@@ -1259,13 +1260,13 @@ abstract public class WriteCache implements IWriteCache {
 
 				try {
 
-					_resetState(tmp);
+					_resetState(tmp.buffer());
 
 				} finally {
 
 					if (releaseBuffer) {
 
-						DirectBufferPool.INSTANCE.release(tmp);
+						tmp.release();
 
 					}
 
@@ -1572,7 +1573,7 @@ abstract public class WriteCache implements IWriteCache {
 		 * 
 		 * @throws InterruptedException
 		 */
-		public FileChannelWriteCache(final long baseOffset, final ByteBuffer buf, final boolean useChecksum,
+		public FileChannelWriteCache(final long baseOffset, final IBufferAccess buf, final boolean useChecksum,
 				final boolean isHighlyAvailable, final boolean bufferHasData, final IReopenChannel<FileChannel> opener)
 				throws InterruptedException {
 
@@ -1659,7 +1660,7 @@ abstract public class WriteCache implements IWriteCache {
 		 * 
 		 * @throws InterruptedException
 		 */
-		public FileChannelScatteredWriteCache(final ByteBuffer buf, final boolean useChecksum,
+		public FileChannelScatteredWriteCache(final IBufferAccess buf, final boolean useChecksum,
 				final boolean isHighlyAvailable, final boolean bufferHasData, final IReopenChannel<FileChannel> opener,
 				final BufferedWrite bufferedWrite)
 				throws InterruptedException {
@@ -2243,7 +2244,7 @@ abstract public class WriteCache implements IWriteCache {
 		writeLock.lockInterruptibly();
 
 		try {
-			resetRecordMapFromBuffer(buf.get(), recordMap);
+			resetRecordMapFromBuffer(buf.get().buffer(), recordMap);
 		} finally {
 			writeLock.unlock();
 		}

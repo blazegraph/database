@@ -920,6 +920,24 @@ public class FullTextIndex extends AbstractRelation {
     
     }
     
+    public Hiterator search(final String query, final String languageCode,
+            final double minCosine, final boolean prefixMatch) {
+
+        return search( //
+                query,//
+                languageCode,//
+                prefixMatch,//
+                minCosine, // minCosine
+                1.0d, // maxCosine
+                1, // minRank
+                10000, // maxRank
+                false, // matchAllTerms
+                this.timeout,//
+                TimeUnit.MILLISECONDS//
+                );
+    
+    }
+    
     /**
      * Performs a full text search against indexed documents returning a hit
      * list using the configured default timeout.
@@ -1263,6 +1281,19 @@ public class FullTextIndex extends AbstractRelation {
 
     }
     
+    /**
+     * Used to support test cases.
+     */
+    public int count(final String query, final String languageCode,
+    		final boolean prefixMatch) {
+    	
+    	return count(query, languageCode, prefixMatch, 0.0d, 1.0d, 1, 10000, 
+    			false, this.timeout,//
+                TimeUnit.MILLISECONDS);
+    	
+    }
+   
+    
     public int count(final String query, final String languageCode,
             final boolean prefixMatch, 
             final double minCosine, final double maxCosine,
@@ -1456,6 +1487,12 @@ public class FullTextIndex extends AbstractRelation {
         Hit[] a = hits.values().toArray(new Hit[nhits]);
         
         Arrays.sort(a);
+        
+        if (log.isDebugEnabled()) {
+        	log.debug("before min/max cosine/rank pruning:");
+        	for (Hit h : a)
+        		log.debug(h);
+        }
 
         /*
          * If maxCosine is specified, prune the hits that are above the max
@@ -1540,6 +1577,9 @@ public class FullTextIndex extends AbstractRelation {
         }
 
         final int newMax = maxRank-minRank+1;
+        
+        if (log.isDebugEnabled())
+        	log.debug("new max rank: " + newMax);
         
         /*
          * If maxRank is specified, prune the hits that rank lower than the max

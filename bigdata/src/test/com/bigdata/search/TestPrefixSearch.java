@@ -107,7 +107,8 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
                 if (log.isInfoEnabled())
                     log.info("hits:" + itr);
 
-                assertEquals(2, itr.size());
+                assertEquals(2, ndx.count("The quick brown dog",
+                        languageCode, false/* prefixMatch */));
 
                 assertTrue(itr.hasNext());
 
@@ -134,7 +135,8 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
                 
                 if(log.isInfoEnabled()) log.info("hits:" + itr);
                 
-                assertEquals(2, itr.size());
+                assertEquals(2, ndx.count("The qui bro do",
+                        languageCode, true/*prefixMatch*/));
 
                 assertTrue(itr.hasNext());
 
@@ -162,7 +164,8 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
                 if(log.isInfoEnabled())
                     log.info("hits:" + itr);
 
-                assertEquals(2, itr.size());
+                assertEquals(2, ndx
+                        .count("brown", languageCode, false/* prefixMatch */));
 
             }
 
@@ -176,7 +179,8 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
 
                 if(log.isInfoEnabled()) log.info("hits:" + itr);
 
-                assertEquals(2, itr.size());
+                assertEquals(2, ndx
+                        .count("brown", languageCode, true/* prefixMatch */));
 
             }
 
@@ -190,7 +194,8 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
 
                 if(log.isInfoEnabled()) log.info("hits:" + itr);
 
-                assertEquals(2, itr.size());
+                assertEquals(2, ndx
+                        .count("bro", languageCode, true/* prefixMatch */));
 
             }
 

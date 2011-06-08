@@ -2609,6 +2609,16 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *         {@link BigdataValue} for that term identifier in the lexicon.
      */
     final public BigdataValue getTerm(final IV iv) {
+    	
+    	return getTerm(iv, true);
+    	
+    }
+    
+    /**
+     * When readFromIndex=false, only handles inline, NULL, bnodes, SIDs, and
+     * the termCache - does not attempt to read from disk.
+     */
+    final private BigdataValue getTerm(final IV iv, final boolean readFromIndex) {
 
 //		if (false) { // alternative forces the standard code path.
 //			final Collection<IV> ivs = new LinkedList<IV>();
@@ -2625,7 +2635,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         // handle NULL, bnodes, statement identifiers, and the termCache.
         BigdataValue value = _getTermId(tid);
         
-        if (value != null)
+        if (value != null || !readFromIndex)
             return value;
         
         final IIndex ndx = getTermsIndex();
@@ -3199,7 +3209,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         	
         	final IV iv = term.get();
         	
-        	final BigdataValue val = termCache.get(iv);
+    		if (log.isDebugEnabled())
+    			log.debug("materializing: " + iv);
+    		
+//        	final BigdataValue val = termCache.get(iv);
+        	
+        	final BigdataValue val = getTerm(iv, false);
         	
         	if (val != null) {
         	

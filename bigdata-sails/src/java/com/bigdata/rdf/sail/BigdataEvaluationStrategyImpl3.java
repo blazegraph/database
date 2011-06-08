@@ -30,7 +30,6 @@ import org.openrdf.query.algebra.And;
 import org.openrdf.query.algebra.BNodeGenerator;
 import org.openrdf.query.algebra.Bound;
 import org.openrdf.query.algebra.Compare;
-import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.CompareAll;
 import org.openrdf.query.algebra.CompareAny;
 import org.openrdf.query.algebra.Datatype;
@@ -64,7 +63,6 @@ import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.Regex;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
-import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.Str;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
@@ -72,6 +70,8 @@ import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
+import org.openrdf.query.algebra.Compare.CompareOp;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
@@ -83,12 +83,12 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.constraint.INBinarySearch;
@@ -105,6 +105,7 @@ import com.bigdata.rdf.internal.constraints.AndBOp;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.DatatypeBOp;
 import com.bigdata.rdf.internal.constraints.EBVBOp;
+import com.bigdata.rdf.internal.constraints.FalseBOp;
 import com.bigdata.rdf.internal.constraints.FuncBOp;
 import com.bigdata.rdf.internal.constraints.IsBNodeBOp;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
@@ -113,7 +114,6 @@ import com.bigdata.rdf.internal.constraints.IsURIBOp;
 import com.bigdata.rdf.internal.constraints.LangBOp;
 import com.bigdata.rdf.internal.constraints.LangMatchesBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
-import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
@@ -121,15 +121,17 @@ import com.bigdata.rdf.internal.constraints.RegexBOp;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
 import com.bigdata.rdf.internal.constraints.StrBOp;
+import com.bigdata.rdf.internal.constraints.TrueBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.sop.SOp;
 import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree;
-import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
 import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
+import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
@@ -1924,11 +1926,34 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     }
 
     private IValueExpression<? extends IV> toVE(SameTerm sameTerm) {
-    	final IValueExpression<? extends IV> iv1 = 
+    	final IValueExpression<? extends IV> left = 
     		toVE(sameTerm.getLeftArg());
-    	final IValueExpression<? extends IV> iv2 = 
+    	final IValueExpression<? extends IV> right = 
     		toVE(sameTerm.getRightArg());
-        return new SameTermBOp(iv1, iv2);
+    	
+    	/*
+    	 * If a constant operand in the SameTerm op uses a value not found
+    	 * in the database, we must defer to the CompareBOp, which can perform
+    	 * value comparisons.  SameTermBOp only works on IVs. 
+    	 */
+    	
+    	if (left instanceof Constant) {
+    		final IV iv = ((Constant<? extends IV>) left).get();
+//            if (iv.isTermId() && iv.getTermId() == TermId.NULL) {
+            if (iv.isTermId() && iv.isNullIV()) {
+    			return new CompareBOp(left, right, CompareOp.EQ); 
+    		}
+    	}
+    	
+    	if (right instanceof Constant) {
+    		final IV iv = ((Constant<? extends IV>) right).get();
+//            if (iv.isTermId() && iv.getTermId() == TermId.NULL) {
+            if (iv.isTermId() && iv.isNullIV()) {
+    			return new CompareBOp(left, right, CompareOp.EQ); 
+    		}
+    	}
+    	
+        return new SameTermBOp(left, right);
     }
 
     private IValueExpression<? extends IV> toVE(final Compare compare) {
@@ -1939,25 +1964,41 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	
     	/*
     	 * If the term is a Constant<URI> and the op is EQ or NE then we can 
-    	 * do a sameTerm optimization.
+    	 * do a sameTerm optimization. The URI constant must be a real term
+    	 * in the database.
     	 */
     	final CompareOp op = compare.getOperator();
     	if (op == CompareOp.EQ || op == CompareOp.NE) {
     	
 	    	if (left instanceof Constant) {
 	    		final IV iv = ((Constant<? extends IV>) left).get();
-	    		if (iv.isURI()) {
+//                if (iv.isURI() && iv.getTermId() != TermId.NULL) {
+	    		if (iv.isURI() && !iv.isNullIV()) {
 	    			return new SameTermBOp(left, right, op); 
 	    		}
 	    	}
     	
 	    	if (right instanceof Constant) {
 	    		final IV iv = ((Constant<? extends IV>) right).get();
-	    		if (iv.isURI()) {
+//                if (iv.isURI() && iv.getTermId() != TermId.NULL) {
+                if (iv.isURI() && !iv.isNullIV()) {
 	    			return new SameTermBOp(left, right, op); 
 	    		}
 	    	}
 	    	
+    	}
+    	
+    	if (log.isDebugEnabled()) {
+    		log.debug(left == right);
+    		log.debug(left.equals(right));
+    	}
+    	
+    	if (left.equals(right)) {
+    		if (compare.getOperator() == CompareOp.EQ) {
+    			return TrueBOp.INSTANCE;
+    		} else {
+    			return FalseBOp.INSTANCE;
+    		}
     	}
     	
         return new CompareBOp(left, right, compare.getOperator());

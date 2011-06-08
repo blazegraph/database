@@ -65,6 +65,7 @@ import com.bigdata.counters.CAT;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.AccessPath;
+import com.bigdata.relation.accesspath.ArrayAccessPath;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -2016,6 +2017,14 @@ public class PipelineJoin<E> extends PipelineOp implements
 			 */
 			public int compareTo(final AccessPathTask o) {
 
+				/*
+				 * Just go ahead and run the ArrayAccessPaths first.
+				 */
+				if (accessPath instanceof ArrayAccessPath)
+					return -1;
+				if (o.accessPath instanceof ArrayAccessPath)
+					return 1;
+				
 				return BytesUtil.compareBytes(getFromKey(), o.getFromKey());
 
 			}

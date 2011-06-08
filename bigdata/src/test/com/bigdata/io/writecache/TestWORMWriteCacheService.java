@@ -56,6 +56,7 @@ import com.bigdata.ha.QuorumPipelineImpl;
 import com.bigdata.ha.pipeline.HAReceiveService;
 import com.bigdata.ha.pipeline.HASendService;
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.TestCase3;
@@ -1147,7 +1148,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         // conditionally fail this test since it deadlocks CI.
         if(skipReorganizePipelineTest()) return;
 
-        for (int i = 0; i < 80; i++) {
+        for (int i = 0; i < 500; i++) {
         
             System.out.println("TEST " + i);
 
@@ -1876,7 +1877,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
                     fileExtent, opener, quorum) {
 
                 @Override
-                public WriteCache newWriteCache(ByteBuffer buf,
+                public WriteCache newWriteCache(IBufferAccess buf,
                         boolean useChecksum, boolean bufferHasData,
                         IReopenChannel<? extends Channel> opener)
                         throws InterruptedException {

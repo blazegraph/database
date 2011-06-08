@@ -39,6 +39,7 @@ import com.bigdata.ha.pipeline.HAReceiveService;
 import com.bigdata.ha.pipeline.HASendService;
 import com.bigdata.ha.pipeline.HAWriteMessageBase;
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.TestCase3;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
@@ -324,12 +325,13 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 //            return;
 //        }
         
-		ByteBuffer tst = null, rcv1 = null, rcv2 = null;
+		IBufferAccess tstdb = null, rcv1db = null, rcv2db = null;
 		int i = -1, sze = -1;
 		try {
-			tst = DirectBufferPool.INSTANCE.acquire();
-			rcv1 = DirectBufferPool.INSTANCE.acquire();
-			rcv2 = DirectBufferPool.INSTANCE.acquire();
+			tstdb = DirectBufferPool.INSTANCE.acquire();
+			rcv1db = DirectBufferPool.INSTANCE.acquire();
+			rcv2db = DirectBufferPool.INSTANCE.acquire();
+			final ByteBuffer tst = tstdb.buffer(), rcv1 = rcv1db.buffer(), rcv2 = rcv2db.buffer();
 			for (i = 0; i < 1000; i++) {
 
 				if(log.isTraceEnabled())
@@ -372,17 +374,17 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 			throw new RuntimeException("i=" + i + ", sze=" + sze + " : " + t, t);
 		} finally {
 			try {
-				if (tst != null) {
-					DirectBufferPool.INSTANCE.release(tst);
+				if (tstdb != null) {
+					tstdb.release();
 				}
 			} finally {
 				try {
-					if (rcv1 != null) {
-						DirectBufferPool.INSTANCE.release(rcv1);
+					if (rcv1db != null) {
+						rcv1db.release();
 					}
 				} finally {
-					if (rcv2 != null) {
-						DirectBufferPool.INSTANCE.release(rcv2);
+					if (rcv2db != null) {
+						rcv2db.release();
 					}
 				}
 			}

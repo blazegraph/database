@@ -21,30 +21,50 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+
+/**
+Note: Portions of this file are copyright by Aduna.
+
+Copyright Aduna (http://www.aduna-software.com/) (c) 1997-2007.
+
+Licensed under the Aduna BSD-style license.
+*/
+
 package com.bigdata.rdf.internal.constraints;
 
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
+
+import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.model.BigdataValue;
 
 /**
  * A math expression involving a left and right IValueExpression operand. The
  * operation to be applied to the operands is specified by the
  * {@link Annotations#OP} annotation.
  */
-final public class MathBOp extends IVValueExpression { 
+final public class MathBOp extends IVValueExpression 
+		implements INeedsMaterialization { 
 
     /**
 	 * 
 	 */
 	private static final long serialVersionUID = 9136864442064392445L;
+	
+	private static final transient Logger log = Logger.getLogger(MathBOp.class);
+	
     
     public interface Annotations extends ImmutableBOp.Annotations {
 
@@ -141,7 +161,40 @@ final public class MathBOp extends IVValueExpression {
         if (right == null)
         	throw new SparqlTypeErrorException.UnboundVarException();
         
-        return IVUtility.numericalMath(left, right, op());
+        try {
+        
+        	if (log.isDebugEnabled()) {
+        		log.debug(toString(left.toString(), right.toString()));
+        	}
+        	
+        	if (left.isInline() && right.isInline()) {
+        	
+        		return IVUtility.numericalMath(left, right, op());
+        		
+        	} else {
+        		
+        		final BigdataValue val1 = left.getValue();
+        		
+        		final BigdataValue val2 = right.getValue();
+        		
+        		if (!(val1 instanceof Literal) || !(val2 instanceof Literal)) {
+        			throw new SparqlTypeErrorException();
+        		}
+        		
+        		return IVUtility.literalMath((Literal) val1, (Literal) val2,
+        				op());
+        		
+        	}
+        	
+        } catch (IllegalArgumentException ex) {
+        	
+        	if (log.isDebugEnabled()) {
+        		log.debug("illegal argument, filtering solution");
+        	}
+        	
+        	throw new SparqlTypeErrorException();
+        	
+        }
 
     }
 
@@ -164,6 +217,15 @@ final public class MathBOp extends IVValueExpression {
     	sb.append("(").append(left()).append(", ").append(right()).append(")");
     	return sb.toString();
         
+    }
+    
+    private String toString(final String left, final String right) {
+    	
+    	final StringBuilder sb = new StringBuilder();
+    	sb.append(op());
+    	sb.append("(").append(left).append(", ").append(right).append(")");
+    	return sb.toString();
+    	
     }
 
     final public boolean equals(final MathBOp m) {
@@ -210,5 +272,27 @@ final public class MathBOp extends IVValueExpression {
 		return h;
 		
 	}
+
+    private volatile transient Set<IVariable<IV>> terms;
+    
+    public Set<IVariable<IV>> getTermsToMaterialize() {
+    
+    	if (terms == null) {
+    		
+    		terms = new LinkedHashSet<IVariable<IV>>();
+    		
+    		for (BOp bop : args()) {
+    			
+    			if (bop instanceof IVariable)
+    				terms.add((IVariable<IV>) bop);
+    		
+    		}
+    		
+    	}
+    	
+    	return terms;
+    	
+    }
+    
 	
 }

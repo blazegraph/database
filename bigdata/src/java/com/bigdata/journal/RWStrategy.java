@@ -34,6 +34,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.ha.QuorumRead;
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.quorum.Quorum;
@@ -592,7 +593,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 * IHABufferStrategy
 	 */
 
-    public void writeRawBuffer(final HAWriteMessage msg, final ByteBuffer b)
+    public void writeRawBuffer(final HAWriteMessage msg, final IBufferAccess b)
             throws IOException, InterruptedException {
 
         m_store.writeRawBuffer(msg, b);

@@ -38,6 +38,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.io.IBufferAccess;
 
 /**
  * The MemoryManager manages an off-heap Direct {@link ByteBuffer}. It uses the
@@ -66,7 +67,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	 * The set of direct {@link ByteBuffer} which are currently being managed by
 	 * this {@link MemoryManager} instance.
 	 */
-    private final ByteBuffer[] m_resources;
+    private final IBufferAccess[] m_resources;
 	
 	/**
 	 * The lock used to serialize all allocation/deallocation requests. This is
@@ -160,7 +161,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		
 		m_pool = pool;
 		
-		m_resources = new ByteBuffer[sectors];
+		m_resources = new IBufferAccess[sectors];
 		
 		m_sectorSize = pool.getBufferCapacity();
 		
@@ -182,10 +183,10 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	private void releaseDirectBuffers() {
 		// release to pool.
 		for (int i = 0; i < m_resources.length; i++) {
-			final ByteBuffer buf = m_resources[i];
+			final IBufferAccess buf = m_resources[i];
 			if (buf != null) {
 				try {
-					DirectBufferPool.INSTANCE.release(buf);
+					buf.release();
 				} catch (InterruptedException e) {
 					log.error("Unable to release direct buffers", e);
 				} finally {
@@ -335,7 +336,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 				 */
 
 				// Allocate new buffer (blocking request).
-				final ByteBuffer nbuf;
+				final IBufferAccess nbuf;
 				try {
 					if (blocks) {
 						nbuf = m_pool.acquire();
@@ -629,7 +630,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		final long paddr = sector.getPhysicalAddress(offset);
 		
 		// Duplicate the buffer to avoid side effects to position and limit.
-		final ByteBuffer ret = m_resources[sector.m_index].duplicate();
+		final ByteBuffer ret = m_resources[sector.m_index].buffer().duplicate();
 		
 		final int bufferAddr = (int) (paddr - (sector.m_index * m_sectorSize));
 		

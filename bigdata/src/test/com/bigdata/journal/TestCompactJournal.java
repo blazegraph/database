@@ -124,13 +124,13 @@ public class TestCompactJournal extends ProxyTestCase<Journal> {
 
         final Journal src = getStore(getProperties());
 
-        // register an index and commit the journal.
-        final String NAME = "testIndex";
-        src.registerIndex(new IndexMetadata(NAME,UUID.randomUUID()));
-        src.commit();
-        
         try {
 
+            // register an index and commit the journal.
+            final String NAME = "testIndex";
+            src.registerIndex(new IndexMetadata(NAME,UUID.randomUUID()));
+            src.commit();
+            
             final Future<Journal> f = src.compact(out);
 
             final Journal newJournal = f.get();
@@ -178,20 +178,20 @@ public class TestCompactJournal extends ProxyTestCase<Journal> {
 
         final Journal src = getStore(getProperties());
 
-        // register an index and commit the journal.
-        final String NAME = "testIndex";
-        src.registerIndex(new IndexMetadata(NAME,UUID.randomUUID()));
-        {
-            BTree ndx = src.getIndex(NAME);
-            KV[] a = AbstractBTreeTestCase.getRandomKeyValues(1000/* ntuples */);
-            for (KV kv : a) {
-               ndx.insert(kv.key, kv.val);
-           }
-        }
-        src.commit();
-        
         try {
 
+            // register an index and commit the journal.
+            final String NAME = "testIndex";
+            src.registerIndex(new IndexMetadata(NAME,UUID.randomUUID()));
+            {
+                BTree ndx = src.getIndex(NAME);
+                KV[] a = AbstractBTreeTestCase.getRandomKeyValues(1000/* ntuples */);
+                for (KV kv : a) {
+                   ndx.insert(kv.key, kv.val);
+               }
+            }
+            src.commit();
+            
             Future<Journal> f = src.compact(out);
 
             Journal newJournal = f.get();

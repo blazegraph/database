@@ -44,6 +44,7 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
 import com.bigdata.ha.QuorumRead;
 import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
@@ -898,7 +899,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                         fileMetadata.writeCacheBufferCount, useChecksums,
                         extent, opener, quorum) {
                     @Override
-                    public WriteCache newWriteCache(final ByteBuffer buf,
+                    public WriteCache newWriteCache(final IBufferAccess buf,
                             final boolean useChecksum,
                             final boolean bufferHasData,
                             final IReopenChannel<? extends Channel> opener)
@@ -935,7 +936,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      */
     private class WriteCacheImpl extends WriteCache.FileChannelWriteCache {
 
-        public WriteCacheImpl(final long baseOffset, final ByteBuffer buf,
+        public WriteCacheImpl(final long baseOffset, final IBufferAccess buf,
                 final boolean useChecksum,
                 final boolean bufferHasData,
                 final IReopenChannel<FileChannel> opener)
@@ -2244,7 +2245,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 		// NOP
 	}
 
-    public void writeRawBuffer(final HAWriteMessage msg, final ByteBuffer b)
+    public void writeRawBuffer(final HAWriteMessage msg, final IBufferAccess b)
             throws IOException, InterruptedException {
 
         writeCacheService.newWriteCache(b, useChecksums,

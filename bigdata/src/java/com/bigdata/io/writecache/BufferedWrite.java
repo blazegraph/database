@@ -33,6 +33,7 @@ import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.rwstore.RWStore;
 
@@ -66,7 +67,7 @@ public class BufferedWrite {
 	 * into a single IO.
 	 */
 //	private final ByteBuffer m_data;
-	private final AtomicReference<ByteBuffer> m_data = new AtomicReference<ByteBuffer>();
+	private final AtomicReference<IBufferAccess> m_data = new AtomicReference<IBufferAccess>();
 
 	/**
 	 * The offset on the backing channel at which the data in {@link #m_data}
@@ -120,7 +121,7 @@ public class BufferedWrite {
 //	synchronized
 	public void release() throws InterruptedException {
 
-		final ByteBuffer tmp = m_data.get();
+		final IBufferAccess tmp = m_data.get();
 
 		if (tmp == null) {
 
@@ -131,7 +132,7 @@ public class BufferedWrite {
 
 		if (m_data.compareAndSet(tmp/* expected */, null/* update */)) {
 
-			DirectBufferPool.INSTANCE.release(tmp);
+			tmp.release();
 
 		}
 		
@@ -161,7 +162,7 @@ public class BufferedWrite {
 		final int slot_len = m_store.getSlotSize(data_len);
 		
 		int nwrites = 0;
-		final ByteBuffer m_data = this.m_data.get();
+		final ByteBuffer m_data = this.m_data.get().buffer();
 		if (slot_len > m_data.remaining()) {
 			/*
 			 * There is not enough room in [m_data] to absorb the caller's data
@@ -211,7 +212,7 @@ public class BufferedWrite {
 	public int flush(final IReopenChannel<FileChannel> opener)
 			throws IOException {
 
-		final ByteBuffer m_data = this.m_data.get();
+		final ByteBuffer m_data = this.m_data.get().buffer();
 
 		if (m_data.position() == 0) {
 			// NOP.
@@ -238,7 +239,7 @@ public class BufferedWrite {
 	synchronized
 	public void reset() {
 		
-		final ByteBuffer m_data = this.m_data.get();
+		final ByteBuffer m_data = this.m_data.get().buffer();
 
 		// reset the buffer state.
 		m_data.position(0);

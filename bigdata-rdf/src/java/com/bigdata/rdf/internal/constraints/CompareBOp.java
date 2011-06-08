@@ -133,8 +133,18 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     	// probably would never hit this because of SameTermBOp
     	if (op == CompareOp.EQ && left.isTermId() && right.isTermId()) {
     		
-			if (left.equals(right))
-				return true;
+//            final long tid1 = left.getTermId();
+//            final long tid2 = right.getTermId();
+//            
+//            if (tid1 == tid2 && tid1 != TermId.NULL && tid2 != TermId.NULL)
+//                return true;
+
+            if (!left.isNullIV() && !right.isNullIV() && left.equals(right)) {
+                /*
+                 * Neither may be a NullIV (or mock IV) and they are equals().
+                 */
+                return true;
+            }
     		
     	}
     	

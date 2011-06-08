@@ -58,6 +58,7 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.BufferedWrite;
 import com.bigdata.io.writecache.IBufferedWriter;
@@ -515,7 +516,7 @@ public class RWStore implements IStore, IBufferedWriter {
     private TreeMap<Integer, Integer> m_lockAddresses = null;
 
 	class WriteCacheImpl extends WriteCache.FileChannelScatteredWriteCache {
-        public WriteCacheImpl(final ByteBuffer buf,
+        public WriteCacheImpl(final IBufferAccess buf,
                 final boolean useChecksum,
                 final boolean bufferHasData,
                 final IReopenChannel<FileChannel> opener)
@@ -663,7 +664,7 @@ public class RWStore implements IStore, IBufferedWriter {
                     m_reopener, m_quorum) {
 				
                         @SuppressWarnings("unchecked")
-			            public WriteCache newWriteCache(final ByteBuffer buf,
+			            public WriteCache newWriteCache(final IBufferAccess buf,
 			                    final boolean useChecksum,
 			                    final boolean bufferHasData,
 			                    final IReopenChannel<? extends Channel> opener)
@@ -4441,7 +4442,7 @@ public class RWStore implements IStore, IBufferedWriter {
 
     }
 
-    public void writeRawBuffer(final HAWriteMessage msg, final ByteBuffer b)
+    public void writeRawBuffer(final HAWriteMessage msg, final IBufferAccess b)
             throws IOException, InterruptedException {
 
         m_writeCache.newWriteCache(b, true/* useChecksums */,
