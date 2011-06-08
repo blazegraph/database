@@ -40,13 +40,17 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * Note: Implementations of a {@link VocabularyDecl} MUST be stable across the
  * life cycle of an {@link AbstractTripleStore}. For this reason it is strongly
  * recommended that new versions of a vocabulary are defined in a new class.
- * Further, each class SHOULD provide a declaration for the namespace(s) used by
- * the vocabulary. This provides for compact encoding of URIs within that
- * namespace (e.g., using a {@link URIShortIV} for the namespace and a
- * compressed unicode representation of the localName of the URI) even if those
- * URIs were not part of the original vocabulary declaration.
+ * <p>
+ * Each class SHOULD provide a declaration for the namespace(s) used by the
+ * vocabulary. It is convention to expose this {@link String} value as a public
+ * static field named <code>NAMESPACE</code>. Declaring the namespace used by
+ * provides for compact encoding of URIs within that namespace (e.g., using a
+ * {@link URIShortIV} for the namespace and a compressed unicode representation
+ * of the localName of the URI) even if those URIs were not part of the original
+ * vocabulary declaration. Thus, it provides a compact fallback encoding if the
+ * vocabulary evolves after the {@link AbstractTripleStore} has been
+ * provisioned.
  * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public interface VocabularyDecl {
