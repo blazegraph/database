@@ -2,14 +2,16 @@ package com.bigdata.rdf.store;
 
 import java.io.IOException;
 import java.util.Properties;
+
 import org.openrdf.model.Statement;
+
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -44,9 +46,12 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
 
         final LocalTripleStore store = (LocalTripleStore) getStore();
         try {
-            final IV s = new TermId(VTE.URI, 1);
-            final IV p = new TermId(VTE.URI, 2);
-            final IV o = new TermId(VTE.URI, 3);
+            
+            final MockTermIdFactory f = new MockTermIdFactory();
+            
+            final IV s = f.newTermId(VTE.URI);
+            final IV p = f.newTermId(VTE.URI);
+            final IV o = f.newTermId(VTE.URI);
 
             // add the statement.
             store.addStatements(new SPO[] { //
@@ -122,20 +127,22 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
      */
     public void test_abort() {
 
+        final MockTermIdFactory f = new MockTermIdFactory();
+        
+        final IV s = f.newTermId(VTE.URI);
+        final IV p = f.newTermId(VTE.URI);
+        final IV o = f.newTermId(VTE.URI);
+
         class AbortException extends RuntimeException {
             private static final long serialVersionUID = 1L;
         }
 
         final LocalTripleStore store = (LocalTripleStore) getStore();
 
-        // Should be a nop.
-        store.abort();
-        
-        final IV s = new TermId(VTE.URI, 1);
-        final IV p = new TermId(VTE.URI, 2);
-        final IV o = new TermId(VTE.URI, 3);
-
         try {
+
+            // Should be a nop.
+            store.abort();
 
             // add the statement.
             store.addStatements(new SPO[] { //

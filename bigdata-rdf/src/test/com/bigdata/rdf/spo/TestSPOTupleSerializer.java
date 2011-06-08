@@ -48,10 +48,12 @@ Modifications:
 package com.bigdata.rdf.spo;
 
 import junit.framework.TestCase2;
+
 import com.bigdata.btree.AbstractTuple;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.StatementEnum;
@@ -66,12 +68,6 @@ import com.bigdata.rdf.model.StatementEnum;
  */
 public class TestSPOTupleSerializer extends TestCase2 {
 
-    private TermId _1 = tid(1), _2 = tid(2), _3 = tid(3), _4 = tid(4);
-    
-    private TermId tid(long tid) {
-        return new TermId(VTE.URI, tid);
-    }
-    
     /**
      * 
      */
@@ -85,6 +81,25 @@ public class TestSPOTupleSerializer extends TestCase2 {
         super(arg0);
     }
 
+    private TermId _1, _2, _3, _4;
+    
+    private MockTermIdFactory factory;
+    
+    protected void setUp() throws Exception {
+        super.setUp();
+        factory = new MockTermIdFactory();
+        _1 = tid(1); _2 = tid(2); _3 = tid(3); _4 = tid(4);
+    }
+
+    protected void tearDown() throws Exception {
+        super.tearDown();
+        factory = null;
+    }
+    
+    private TermId tid(long tidIsIgnored) {
+        return factory.newTermId(VTE.URI);
+    }
+
     public void test_statementOrder() {
 
         SPOTupleSerializer fixture = new SPOTupleSerializer(
@@ -93,10 +108,12 @@ public class TestSPOTupleSerializer extends TestCase2 {
         byte[] k_1 = fixture.serializeKey(new SPO(_1, _2, _3));
         byte[] k_2 = fixture.serializeKey(new SPO(_2, _2, _3));
         byte[] k_3 = fixture.serializeKey(new SPO(_2, _2, _4));
-        
-        System.err.println("k_1(_1,_2,_2) = "+BytesUtil.toString(k_1));
-        System.err.println("k_2(_2,_2,_3) = "+BytesUtil.toString(k_2));
-        System.err.println("k_3(_2,_2,_4) = "+BytesUtil.toString(k_3));
+
+        if (log.isInfoEnabled()) {
+            log.info("k_1(_1,_2,_2) = " + BytesUtil.toString(k_1));
+            log.info("k_2(_2,_2,_3) = " + BytesUtil.toString(k_2));
+            log.info("k_3(_2,_2,_4) = " + BytesUtil.toString(k_3));
+        }
         
         assertTrue(BytesUtil.compareBytes(k_1, k_2)<0);
         assertTrue(BytesUtil.compareBytes(k_2, k_3)<0);

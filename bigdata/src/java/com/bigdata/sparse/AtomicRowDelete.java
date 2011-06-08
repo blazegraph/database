@@ -6,6 +6,8 @@ import java.io.ObjectOutput;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
 
@@ -25,6 +27,8 @@ public class AtomicRowDelete extends AbstractAtomicRowReadOrWrite {
      * 
      */
     private static final long serialVersionUID = 7481235291210326044L;
+
+    private static final Logger log = Logger.getLogger(AtomicRowDelete.class);
 
     private long writeTime;
     
@@ -89,7 +93,7 @@ public class AtomicRowDelete extends AbstractAtomicRowReadOrWrite {
 
         if (tps == null) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("No data for primaryKey: " + primaryKey);
 
         }
@@ -128,7 +132,7 @@ public class AtomicRowDelete extends AbstractAtomicRowReadOrWrite {
 
             final Map<String, Object> map = tps.asMap();
 
-            if (INFO) {
+            if (log.isInfoEnabled()) {
 
                 log.info("Will delete " + map.size() + " properties: names="
                         + map.keySet());

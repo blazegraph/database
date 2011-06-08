@@ -33,7 +33,6 @@ import org.openrdf.model.vocabulary.RDFS;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * The axioms for RDF Schema plus a few axioms to support owl:sameAs,
@@ -59,13 +58,13 @@ public class OwlAxioms extends RdfsAxioms {
         
     }
     
-    public OwlAxioms(AbstractTripleStore db) {
+    public OwlAxioms(final String namespace) {
         
-        super(db);
+        super(namespace);
         
     }
     
-    protected void addAxioms(Collection<BigdataStatement> axioms) {
+    protected void addAxioms(final Collection<BigdataStatement> axioms) {
 
         super.addAxioms(axioms);
 

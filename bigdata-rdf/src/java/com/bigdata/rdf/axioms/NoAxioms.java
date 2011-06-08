@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.axioms;
 
-import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * An empty axiom model.
@@ -50,10 +49,10 @@ public class NoAxioms extends BaseAxioms {
         super();
         
     }
-    
-    public NoAxioms(AbstractTripleStore db) {
 
-        super(db);
+    public NoAxioms(final String namespace) {
+        
+        super(namespace);
         
     }
     

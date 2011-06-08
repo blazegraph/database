@@ -35,9 +35,12 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.lexicon.TermsIndexHelper;
 
 /**
  * Test suite for {@link SPOPredicate}.
@@ -60,22 +63,51 @@ public class TestSPOPredicate extends TestCase2 {
         super(name);
     }
     
-    final String relation  = "test";
+    private String relation;
 
-    final static Constant<IV> rdfsSubClassOf = new Constant<IV>(
-            new TermId(VTE.URI, 1L));
+    private Constant<IV> rdfsSubClassOf;
     
-    final static Constant<IV> rdfsResource = new Constant<IV>(
-            new TermId(VTE.URI, 2L));
+    private Constant<IV> rdfsResource;
     
-    final static Constant<IV> rdfType = new Constant<IV>(
-            new TermId(VTE.URI, 3L));
+    private Constant<IV> rdfType;
     
-    final static Constant<IV> rdfsClass = new Constant<IV>(
-            new TermId(VTE.URI, 4L));
+    private Constant<IV> rdfsClass;
     
-    final static Constant<IV> someGraph = new Constant<IV>(
-            new TermId(VTE.URI, 6L));
+    private Constant<IV> someGraph;
+    
+    private MockTermIdFactory factory;
+    
+    protected void setUp() throws Exception {
+
+        super.setUp();
+
+        factory = new MockTermIdFactory();
+
+        relation = "test";
+
+        rdfsSubClassOf = new Constant<IV>(factory.newTermId(VTE.URI));
+
+        rdfsResource = new Constant<IV>(factory.newTermId(VTE.URI));
+
+        rdfType = new Constant<IV>(factory.newTermId(VTE.URI));
+
+        rdfsClass = new Constant<IV>(factory.newTermId(VTE.URI));
+
+        someGraph = new Constant<IV>(factory.newTermId(VTE.URI));
+
+    }
+    
+    protected void tearDown() throws Exception {
+    
+        factory = null;
+
+        relation = null;
+
+        rdfsSubClassOf = rdfsResource = rdfType = rdfsClass = someGraph = null;
+        
+        super.tearDown();
+        
+    }
     
 	public void test_ctor_triples_oneVar() {
 

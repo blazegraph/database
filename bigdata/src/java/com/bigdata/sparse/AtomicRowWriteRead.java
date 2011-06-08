@@ -7,8 +7,11 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.util.InnerCause;
 
 /**
  * Atomic write on a logical row. All property values written will have the
@@ -26,6 +29,8 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
      * 
      */
     private static final long serialVersionUID = 7481235291210326044L;
+
+    private static final Logger log = Logger.getLogger(AtomicRowWriteRead.class);
 
     private long writeTime;
     
@@ -128,7 +133,7 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
 
             if(!precondition.accept(tps)) {
 
-                if(INFO) {
+                if(log.isInfoEnabled()) {
 
                     log.info("precondition failed: "+tps);
                     
@@ -158,8 +163,15 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
          * atomic read are atomic as a unit.
          */
 
-        return atomicRead(ndx, schema, primaryKey, fromTime, toTime, writeTime,
+        try {
+            return atomicRead(ndx, schema, primaryKey, fromTime, toTime, writeTime,
                 filter);
+        } catch(Throwable t) {
+            if (!InnerCause.isInnerCause(t, InterruptedException.class)) {
+                log.error(t, t);
+            }
+            throw new RuntimeException(t);
+        }
         
     }
 
@@ -167,7 +179,7 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
             final Object primaryKey, final Map<String, Object> propertySet,
             final long writeTime) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Schema=" + schema + ", primaryKey="
                     + schema.getPrimaryKeyName() + ", value=" + primaryKey
                     + ", ntuples=" + propertySet.size());
@@ -220,7 +232,7 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
              */
             ndx.insert(key, val);
 
-            if(DEBUG) {
+            if(log.isDebugEnabled()) {
                 
                 log.debug("col=" + col + ", value=" + value);
                 
@@ -287,7 +299,7 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
         
         // outcome of the auto-inc counter.
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Auto-increment: name=" + col + ", counter=" + counter);
         
         return counter;
@@ -312,7 +324,7 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
         // #of property values.
         final int n = in.readInt();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Reading " + n + " property values");
 
         for (int i = 0; i < n; i++) {
@@ -323,7 +335,7 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
 
             propertySet.put(name, value);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("name=" + name + ", value=" + value);
 
         }

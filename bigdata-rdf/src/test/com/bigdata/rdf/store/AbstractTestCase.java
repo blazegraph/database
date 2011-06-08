@@ -445,29 +445,29 @@ abstract public class AbstractTestCase
         /**
          * Dumps the term:id index.
          */
-        for( Iterator<TermId> itr = store.getLexiconRelation().termIdIndexScan(); itr.hasNext(); ) {
+        for( Iterator<TermId> itr = store.getLexiconRelation().termsIndexScan(); itr.hasNext(); ) {
             
             System.err.println("term->id : "+itr.next());
             
         }
 
-        /**
-         * Dumps the id:term index.
-         */
-        for( Iterator<Value> itr = store.getLexiconRelation().idTermIndexScan(); itr.hasNext(); ) {
-            
-            System.err.println("id->term : "+itr.next());
-            
-        }
+//        /**
+//         * Dumps the id:term index.
+//         */
+//        for( Iterator<Value> itr = store.getLexiconRelation().idTermIndexScan(); itr.hasNext(); ) {
+//            
+//            System.err.println("id->term : "+itr.next());
+//            
+//        }
 
-        /**
-         * Dumps the terms in term order.
-         */
-        for( Iterator<Value> itr = store.getLexiconRelation().termIterator(); itr.hasNext(); ) {
-            
-            System.err.println("termOrder : "+itr.next());
-            
-        }
+//        /**
+//         * Dumps the terms in term order.
+//         */
+//        for( Iterator<Value> itr = store.getLexiconRelation().termIterator(); itr.hasNext(); ) {
+//            
+//            System.err.println("termOrder : "+itr.next());
+//            
+//        }
         
     }
     

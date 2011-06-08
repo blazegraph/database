@@ -32,6 +32,7 @@ import java.util.Properties;
 import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -74,6 +75,9 @@ public class TestVocabulary extends AbstractTripleStoreTestCase {
         // override the default.
         properties.setProperty(Options.VOCABULARY_CLASS, NoVocabulary.class
                 .getName());
+
+        properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class
+                .getName());
         
         AbstractTripleStore store = getStore(properties);
         
@@ -94,6 +98,9 @@ public class TestVocabulary extends AbstractTripleStoreTestCase {
             // lookup/add some values.
             final BigdataValueFactory f = store.getValueFactory();
 
+            // Must be using the same namespace.
+            assertTrue(vocab.getNamespace()==f.getNamespace());
+            
             final BigdataURI rdfType = f.asValue(RDF.TYPE);
             final BigdataURI rdfProperty = f.asValue(RDF.PROPERTY);
             final BigdataURI unknownURI = f.createURI("http://www.bigdata.com/unknown");
@@ -167,6 +174,9 @@ public class TestVocabulary extends AbstractTripleStoreTestCase {
         
         // override the default.
         properties.setProperty(Options.VOCABULARY_CLASS, RDFSVocabulary.class
+                .getName());
+
+        properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class
                 .getName());
         
         AbstractTripleStore store = getStore(properties);

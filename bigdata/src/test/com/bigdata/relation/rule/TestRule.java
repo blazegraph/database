@@ -28,9 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.rule;
 
 import java.util.Set;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.VTE;
+
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -41,7 +39,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 
@@ -206,6 +204,8 @@ public class TestRule extends AbstractRuleTestCase {
      */
     public void test_ruleBindings() {
 
+        final MockTermIdFactory factory = new MockTermIdFactory();
+        
         final Var<IV> u = Var.var("u");
 
         final IPredicate head = new P(relation, u, rdfsSubClassOf, rdfsResource);
@@ -224,7 +224,7 @@ public class TestRule extends AbstractRuleTestCase {
         assertFalse(r.isFullyBound(0,bindingSet));
 
         // verify you can overwrite a variable in the tail.
-        bindingSet.set(u, new Constant<IV>(new TermId(VTE.URI, 1L)));
+        bindingSet.set(u, new Constant<IV>(factory.newTermId(VTE.URI)));
 
         assertTrue(r.isFullyBound(0,bindingSet)); // is fully bound.
         

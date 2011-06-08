@@ -601,10 +601,7 @@ public class LexiconConfiguration<V extends BigdataValue>
             case XSDUnsignedShort: 
             case XSDUnsignedInt:
             case XSDUnsignedLong:
-            /*
-             * None of the unsigned datatypes are inlined yet.
-             */
-                return false;
+                return true;
             default:
                 throw new AssertionError();
         }

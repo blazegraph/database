@@ -46,7 +46,6 @@ import org.openrdf.model.vocabulary.RDF;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.lexicon.TermsIndexHelper;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -75,53 +74,57 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         super(name);
     }
 
-	private TermsIndexHelper helper;
+//	private TermsIndexHelper helper;
+	private MockTermIdFactory termIdFactory;
 	
 	protected void setUp() throws Exception {
 		super.setUp();
-		helper = new TermsIndexHelper();
+//		helper = new TermsIndexHelper();
+		termIdFactory = new MockTermIdFactory();
 	}
 
 	protected void tearDown() throws Exception {
 		super.tearDown();
-		helper = null;
+		termIdFactory = null;
 	}
 
-	/**
-	 * Factory for {@link TermId}s.
-	 */
-	private TermId newTermId(final VTE vte) {
+    /**
+     * Factory for {@link TermId}s.
+     */
+    private TermId newTermId(final VTE vte) {
+        return termIdFactory.newTermId(vte);
+    }
 
-		final int hashCode = nextHashCode++;
-		
-		// the math here is just to mix up the counter values a bit.
-		final byte counter = (byte) ((nextHashCode + 12) % 7);
-		
-		final IKeyBuilder keyBuilder = helper.newKeyBuilder();
-
-		final byte[] key = helper.makeKey(keyBuilder, vte, hashCode, counter);
-		
-		return new TermId(key);
-
-	}
-
-	private int nextHashCode = 1;
+//	/**
+//	 * Factory for {@link TermId}s.
+//	 */
+//	private TermId newTermId(final VTE vte) {
+//
+//		final int hashCode = nextHashCode++;
+//		
+//		// the math here is just to mix up the counter values a bit.
+//		final byte counter = (byte) ((nextHashCode + 12) % 7);
+//		
+//		final IKeyBuilder keyBuilder = helper.newKeyBuilder();
+//
+//		final byte[] key = helper.makeKey(keyBuilder, vte, hashCode, counter);
+//		
+//		return new TermId(key);
+//
+//	}
+//
+//	private int nextHashCode = 1;
     
     public void test_InlineValue() {
 
-//        final Random r = new Random();
-
         for (VTE vte : VTE.values()) {
 
-            if (vte.equals(VTE.URI)) {
-                // We do not inline URIs.
-                continue;
-            }
+//            if (vte.equals(VTE.URI)) {
+//                // We do not inline URIs.
+//                continue;
+//            }
 
             for (DTE dte : DTE.values()) {
-
-//                // 64 bit random term identifier.
-//                final long termId = r.nextLong();
 
                 final IV<?, ?> v = new AbstractIV(vte,
                         true/* inline */, false/* extension */, dte) {
@@ -245,7 +248,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      * 
      * @return An ordered array of the {@link IV}s for that key.
      */
-    public IV[] decodeStatementKey(final byte[] key, final int arity) {
+    static public IV[] decodeStatementKey(final byte[] key, final int arity) {
 
         return IVUtility.decode(key, arity);
         
@@ -258,7 +261,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      * @param e
      *            The array of the expected values.
      */
-    protected IV<?, ?>[] doEncodeDecodeTest(final IV<?, ?>[] e) {
+    static protected IV<?, ?>[] doEncodeDecodeTest(final IV<?, ?>[] e) {
 
         /*
          * Encode.
@@ -286,11 +289,23 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
             for (int i = 0; i < e.length; i++) {
 
-                if (!e[i].equals(a[i])) {
-                 
-                    fail("index=" + Integer.toString(i) + " : expected=" + e[i]
-                            + ", actual=" + a[i]);
-                    
+                final IV expected = e[i];
+
+                final IV actual = a[i];
+                
+                if (!expected.equals(actual)) {
+
+                    fail("index=" + Integer.toString(i) + " : expected="
+                            + expected + ", actual=" + actual);
+
+                }
+
+                if (expected.hashCode() != actual.hashCode()) {
+
+                    fail("index=" + Integer.toString(i) + " : expected="
+                            + expected.hashCode() + ", actual="
+                            + actual.hashCode());
+
                 }
 
             }

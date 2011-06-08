@@ -29,6 +29,7 @@ package com.bigdata.rdf.axioms;
 import java.util.Iterator;
 
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.spo.SPO;
 
 
@@ -41,6 +42,12 @@ import com.bigdata.rdf.spo.SPO;
  */
 public interface Axioms {
         
+    /**
+     * The namespace of the owning {@link LexiconRelation}.
+     * @return
+     */
+    String getNamespace();
+    
     /**
      * Test for an axiom.
      * 

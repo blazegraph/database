@@ -72,6 +72,10 @@ public class TestAll extends TestCase {
         // test suite for encode/decode of IVs.
         suite.addTestSuite(TestEncodeDecodeKeys.class);
         
+        suite.addTestSuite(TestUnsignedIVs.class);
+        
+        suite.addTestSuite(TestUnsignedIntegerIVs.class);
+        
         /*
          * Long literal support is not yet finished. 
          */

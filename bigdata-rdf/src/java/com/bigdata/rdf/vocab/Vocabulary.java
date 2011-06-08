@@ -33,6 +33,7 @@ import org.openrdf.model.Value;
 
 import com.bigdata.bop.IConstant;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -43,6 +44,12 @@ import com.bigdata.rdf.model.BigdataValue;
  */
 public interface Vocabulary {
 
+    /**
+     * The namespace of the owning {@link LexiconRelation}.
+     * @return
+     */
+    public String getNamespace();
+    
     /**
      * The #of defined {@link Value}s.
      * 
@@ -99,5 +106,5 @@ public interface Vocabulary {
      * @since TERMS_REFACTOR_BRANCH
      */
     public Value asValue(IV iv);
-    
+
 }

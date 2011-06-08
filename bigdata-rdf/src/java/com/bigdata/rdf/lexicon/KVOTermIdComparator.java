@@ -14,6 +14,8 @@ import com.bigdata.rdf.model.BigdataValue;
  * @version $Id$
  * 
  * @see BigdataValue#getIV()
+ * 
+ * FIXME This appears to be unused?
  */
 public class KVOTermIdComparator implements Comparator<KVO<BigdataValue>> {
 

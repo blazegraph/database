@@ -29,10 +29,10 @@ package com.bigdata.rdf.spo;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Random;
+
 import junit.framework.TestCase2;
+
 import com.bigdata.btree.AbstractBTreeTestCase;
-import com.bigdata.btree.ICounter;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
@@ -43,9 +43,8 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.FixedByteArrayBuffer;
+import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 
 /**
  * Test suite for approaches to key compression for statement indices (keys are
@@ -55,10 +54,6 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
  * compression can be used (a) before sorting the data; (b) when serializing the
  * data for a remote operation on a data service; and (c) in the nodes and
  * leaves of the indices themselves.
- * 
- * FIXME test w/ int64 front-coded and int64 huffman compression. These should
- * be much better for the statement indices since the logical key is long[3] or
- * long[4].
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -79,18 +74,27 @@ public class TestSPOKeyCoders extends TestCase2 {
         super(arg0);
     }
 
-    private final Random r = new Random();
+    private MockTermIdFactory factory;
     
+    protected void setUp() throws Exception {
+        super.setUp();
+        factory = new MockTermIdFactory();
+    }
+
+    protected void tearDown() throws Exception {
+        super.tearDown();
+        factory = null;
+    }
+  
     /**
-     * Random positive integer (note that the lower two bits indicate either
-     * a URI, BNode, Literal or Statement Identifier and are randomly assigned
-     * along with the rest of the bits). The actual term identifiers for a
-     * triple store are assigned by the {@link ICounter} for the
-     * {@link LexiconRelation}'s TERM2id index.
+     * Random {@link TermId}.
      */
     protected TermId getTermId() {
-        
-        return new TermId(VTE.URI, r.nextInt(Integer.MAX_VALUE - 1) + 1);
+
+        /*
+         * FIXME This does not exercise the case with SIDs support enabled.
+         */
+        return factory.newTermIdNoSids();
         
     }
     
@@ -104,6 +108,8 @@ public class TestSPOKeyCoders extends TestCase2 {
      */
     protected SPO[] getData(final int n) {
         
+//        final IKeyBuilder keyBuilder = new KeyBuilder();
+        
         final SPO[] a = new SPO[n];
 
         for (int i = 0; i < n; i++) {
@@ -114,6 +120,14 @@ public class TestSPOKeyCoders extends TestCase2 {
              * indices.
              */
             a[i] = new SPO(getTermId(), getTermId(), getTermId());
+            
+//            final SPO spo = a[i];
+//            
+//            final byte[] key = SPOKeyOrder.SPO.encodeKey(keyBuilder, spo);
+//            
+//            final SPO decoded = SPOKeyOrder.SPO.decodeKey(key);
+//            
+//            assertEquals(spo, decoded);
             
         }
 
@@ -172,9 +186,12 @@ public class TestSPOKeyCoders extends TestCase2 {
 
         /*
          * Generate keys from the SPOs.
+         * 
+         * FIXME This does not exercise the case with SIDs support enabled.
          */
         final SPOTupleSerializer tupleSer = 
         	new SPOTupleSerializer(SPOKeyOrder.SPO, false/* sids */);
+        
         final byte[][] keys = new byte[a.length][];
         {
 

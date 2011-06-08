@@ -57,7 +57,7 @@ public class TestIVCache extends AbstractTripleStoreTestCase {
     		final BigdataValueFactory f = lex.getValueFactory();
     		
     		final BigdataURI uri = f.createURI("http://www.bigdata.com");
-    		final BigdataBNode bnd = f.createBNode("12");
+    		final BigdataBNode bnd = f.createBNode();//"12");
     		final BigdataLiteral lit = f.createLiteral("bigdata");
     		
     		final BigdataValue[] a = new BigdataValue[] {

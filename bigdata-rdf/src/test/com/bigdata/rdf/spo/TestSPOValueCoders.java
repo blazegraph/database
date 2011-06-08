@@ -33,7 +33,6 @@ import java.util.Random;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
-import com.bigdata.btree.ICounter;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.btree.raba.codec.ICodedRaba;
@@ -42,9 +41,9 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.FixedByteArrayBuffer;
+import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.StatementEnum;
 
 /**
@@ -75,35 +74,32 @@ public class TestSPOValueCoders extends TestCase2 {
         super(arg0);
     }
 
-    private final Random r = new Random();
+    protected void setUp() throws Exception {
+        super.setUp();
+        factory = new MockTermIdFactory();
+        r = new Random();
+    }
+
+    protected void tearDown() throws Exception {
+        super.tearDown();
+        factory = null;
+        r = null;
+    }
+    private Random r;
+    private MockTermIdFactory factory;
     
-    /**
-     * Random positive integer (note that the lower two bits indicate either
-     * a URI, BNode, Literal or Statement Identifier and are randomly assigned
-     * along with the rest of the bits). The actual term identifiers for a
-     * triple store are assigned by the {@link ICounter} for the
-     * {@link LexiconRelation}'s TERM2id index.
-     */
-    protected TermId getTermId() {
+    private TermId getTermId() {
         
-        return new TermId(VTE.URI, r.nextInt(Integer.MAX_VALUE - 1) + 1);
+        return factory.newTermId(VTE.URI);
         
     }
 
-    protected TermId getTermId(long tid) {
+    private TermId getTermId(long tidIsIgnored) {
         
-        return new TermId(VTE.URI, tid);
+        return factory.newTermId(VTE.URI);
         
-    }
-
-    protected TermId getSID() {
-        
-        return new TermId(VTE.STATEMENT, (r.nextInt(Integer.MAX_VALUE - 1) + 1));
-
     }
     
-    private final TermId _0 = getTermId(0);
-
     /**
      * Return an array of {@link SPO}s.
      * 
@@ -200,6 +196,8 @@ public class TestSPOValueCoders extends TestCase2 {
      * both.
      */
     public void test_FastRDFValueCoder2_001() {
+
+        final TermId _0 = getTermId(0);
 
         doRoundTripTest(new SPO[] { new SPO(_0, _0, _0, StatementEnum.Axiom) },
                 new FastRDFValueCoder2(), false);

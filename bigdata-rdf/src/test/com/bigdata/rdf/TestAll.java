@@ -60,8 +60,11 @@ public class TestAll extends TestCase {
         // test suite for the internal representation of RDF Values.
         suite.addTest( com.bigdata.rdf.internal.TestAll.suite() );
 
-        // vocabulary test suite.
+        // vocabulary test suite (w/o triple store)
         suite.addTest( com.bigdata.rdf.vocab.TestAll.suite() );
+
+        // axioms test suite (w/o triple store)
+        suite.addTest( com.bigdata.rdf.axioms.TestAll.suite() );
 
         // test suite for RDF specific operators.
         suite.addTest( com.bigdata.bop.rdf.TestAll.suite() );

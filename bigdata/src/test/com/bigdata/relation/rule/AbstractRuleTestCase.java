@@ -40,6 +40,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.spo.SPOPredicate;
@@ -64,20 +65,22 @@ abstract public class AbstractRuleTestCase extends TestCase2 {
         super(name);
     }
 
+    private static MockTermIdFactory f = new MockTermIdFactory();
+    
     protected final static Constant<IV> rdfsSubClassOf = new Constant<IV>(
-            new TermId(VTE.URI, 1L));
+            f.newTermId(VTE.URI));
     
     protected final static Constant<IV> rdfsResource = new Constant<IV>(
-            new TermId(VTE.URI, 2L));
+            f.newTermId(VTE.URI));
     
     protected final static Constant<IV> rdfType = new Constant<IV>(
-            new TermId(VTE.URI, 3L));
+            f.newTermId(VTE.URI));
     
     protected final static Constant<IV> rdfsClass = new Constant<IV>(
-            new TermId(VTE.URI, 4L));
+            f.newTermId(VTE.URI));
 
     protected final static Constant<IV> rdfProperty = new Constant<IV>(
-            new TermId(VTE.URI, 5L));
+            f.newTermId(VTE.URI));
 
     /**
      * this is rdfs9:

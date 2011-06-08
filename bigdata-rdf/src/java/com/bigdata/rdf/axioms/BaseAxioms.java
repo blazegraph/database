@@ -32,33 +32,26 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Set;
-import java.util.UUID;
 
 import org.openrdf.model.Value;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IndexMetadata.Options;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.LongPacker;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
-import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
-
-import cutthecrap.utils.striterators.Resolver;
-import cutthecrap.utils.striterators.Striterator;
 
 /**
  * A collection of axioms.
@@ -77,21 +70,38 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public abstract class BaseAxioms implements Axioms, Externalizable {
     
-    /**
-     * The axioms in SPO order.
-     */
-    private transient BTree btree;
+//    /**
+//     * The axioms in SPO order.
+//     */
+//    private transient BTree btree;
     
     /**
-     * Used to format keys for that {@link BTree}.
+     * The axioms.
      */
-    private transient SPOTupleSerializer tupleSer;
+    private Set<SPO> axioms;
+    
+//    /**
+//     * Used to format keys for that {@link BTree}.
+//     */
+//    private transient SPOTupleSerializer tupleSer;
 
+//    /**
+//     * Non-<code>null</code> iff the ctor specifies this value.
+//     */
+//    private final transient AbstractTripleStore db;
+    
     /**
-     * Non-<code>null</code> iff the ctor specifies this value.
+     * The namespace of the associated kb instance. This is used to materialize
+     * the appropriate {@link BigdataValueFactory}.
      */
-    private final transient AbstractTripleStore db;
+    private String namespace;
 
+    final public String getNamespace() {
+        
+        return namespace;
+        
+    }
+    
     /**
      * The value factory to be used when creating axioms.
      * 
@@ -100,7 +110,8 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
      */
     final protected BigdataValueFactory getValueFactory() {
         
-        return db.getValueFactory();
+        return BigdataValueFactoryImpl.getInstance(namespace);
+//        return db.getValueFactory();
         
     }
     
@@ -109,7 +120,7 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
      */
     protected BaseAxioms() {
 
-        db = null;
+//        db = null;
         
     }
     
@@ -117,15 +128,18 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
      * Ctor variant used by {@link AbstractTripleStore#create()}.
      * <p>
      * Note: When de-serializing a {@link BaseAxioms} object the zero-arg ctor
-     * will be used and the {@link AbstractTripleStore} reference will not be
-     * set.
+     * will be used.
      * 
-     * @param db
-     *            The database.
+     * @param namespace
+     *            The namespace for the {@link AbstractTripleStore} instance.
      */
-    protected BaseAxioms(final AbstractTripleStore db) {
+    protected BaseAxioms(final String namespace) {
      
-        this.db = db;
+        if(namespace == null)
+            throw new IllegalArgumentException();
+        
+//        this.db = db;
+        this.namespace = namespace;
         
     }
     
@@ -137,20 +151,16 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
      * @throws IllegalStateException
      *             if that ctor was not used.
      */
-    final public void init() {
-
-        if (db == null)
-            throw new IllegalStateException();
+    final public void init(final AbstractTripleStore db) {
 
         // setup [axioms] collection.
-        final Set<BigdataStatement> axioms = new HashSet<BigdataStatement>(
+        final Set<BigdataStatement> axioms = new LinkedHashSet<BigdataStatement>(
                 200);
 
         // obtain collection of axioms to be used.
         addAxioms(axioms);
 
-        // write axioms onto the db.
-        writeAxioms(axioms);
+        this.axioms = writeAxioms(db, axioms);
         
     }
     
@@ -174,41 +184,36 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
         // NOP.
         
     }
-    
+
     /**
-     * Writes the axioms on the database, builds an internal B+Tree that is used
-     * to quickly identify axioms based on {s:p:o} term identifier tuples, and
-     * returns the distinct {s:p:o} term identifier tuples for the declared
-     * axioms.
-     * <p>
-     * Note: if the terms for the axioms are already in the lexicon and the
-     * axioms are already in the database then this will not write on the
-     * database, but it will still result in the SPO[] containing the axioms to
-     * be defined in {@link MyStatementBuffer}.
+     * Writes the axioms on the database, resolving {@link BigdataStatement}s to
+     * {@link SPO}s.
+     * 
+     * @return The axioms expressed as {@link SPO}s.
      */
-    private void writeAxioms(final Collection<BigdataStatement> axioms) {
-        
+    private Set<SPO> writeAxioms(final AbstractTripleStore db,
+            final Collection<BigdataStatement> axioms) {
+
+        if (db == null)
+            throw new IllegalArgumentException();
+
         if (axioms == null)
             throw new IllegalArgumentException();
         
-        if (db == null)
-            throw new IllegalStateException();
-        
         final int naxioms = axioms.size();
-        
-        // SPO[] exposed by our StatementBuffer subclass.
-        final SPO[] stmts;
 
+        final LinkedHashSet<SPO> ret = new LinkedHashSet<SPO>(naxioms);
+        
         if (naxioms > 0) {
 
-        // Note: min capacity of one handles case with no axioms.
-            
+            // Note: min capacity of one handles case with no axioms.
             final int capacity = Math.max(1, naxioms);
             
             final MyStatementBuffer buffer = new MyStatementBuffer(db, capacity);
 
-            for (Iterator<BigdataStatement> itr = axioms.iterator(); itr
-                    .hasNext();) {
+            final Iterator<BigdataStatement> itr = axioms.iterator();
+
+            while (itr.hasNext()) {
 
                 final BigdataStatement triple = itr.next();
 
@@ -221,102 +226,123 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
             // write on the database.
             buffer.flush();
         
-            stmts = ((MyStatementBuffer)buffer).stmts;
+            // SPO[] exposed by our StatementBuffer subclass.
+            final SPO[] stmts = ((MyStatementBuffer)buffer).stmts;
             
-        } else {
-            
-            stmts = null;
-            
-        }
-
-		/*
-		 * Fill the btree with the axioms in SPO order.
-		 * 
-		 * Note: This should ALWAYS use the SPO key order even for quads since
-		 * we just want to test on the (s,p,o).
-		 * 
-		 * @todo This would be faster with a hashmap on the SPOs.
-		 * 
-		 * @todo There is no need to put the statement type into the in-memory
-		 * axioms. they are axioms after all. That is, we could just have the
-		 * keys and no values.
-		 */
-        {
-
-            createBTree(naxioms/* naxioms */);
-            
-            if (stmts != null) {
-
-                for (SPO spo : stmts) {
-
-                    btree.insert(tupleSer.serializeKey(spo), spo
-                            .getStatementType().serialize());
-
-                }
-
+            for(SPO spo : stmts) {
+                
+                ret.add(spo);
+                
             }
-
+            
         }
+
+        // The axioms as SPO objects.
+        return ret;
         
     }
     
-    /**
-     * Create the {@link BTree} to hold the axioms.
-     * 
-     * @param naxioms
-     *            The #of axioms (used to tune the branching factor).
-     * 
-     * @throws IllegalStateException
-     *             if the {@link #btree} exists.
-     */
-    private void createBTree(final int naxioms) {
-        
-        if (btree != null)
-            throw new IllegalStateException();
-                
-        // exact fill of the root leaf.
-        final int branchingFactor = Math.max(Options.MIN_BRANCHING_FACTOR, naxioms );
-        
-        /*
-         * Note: This uses a SimpleMemoryRawStore since we never explicitly
-         * close the BaseAxioms class. Also, all data should be fully
-         * buffered in the leaf of the btree so the btree will never touch
-         * the store after it has been populated.
-         */
-        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
-        
-        metadata.setBranchingFactor(branchingFactor);
+//    /**
+//     * Create the {@link BTree} to hold the axioms.
+//     * 
+//     * @param naxioms
+//     *            The #of axioms (used to tune the branching factor).
+//     * 
+//     * @throws IllegalStateException
+//     *             if the {@link #btree} exists.
+//     */
+//    private void createBTree(final int naxioms) {
+//        
+//        if (btree != null)
+//            throw new IllegalStateException();
+//                
+//        // exact fill of the root leaf.
+//        final int branchingFactor = Math.max(Options.MIN_BRANCHING_FACTOR, naxioms );
+//        
+//        /*
+//         * Note: This uses a SimpleMemoryRawStore since we never explicitly
+//         * close the BaseAxioms class. Also, all data should be fully
+//         * buffered in the leaf of the btree so the btree will never touch
+//         * the store after it has been populated.
+//         */
+//        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+//        
+//        metadata.setBranchingFactor(branchingFactor);
+//
+//        tupleSer = new SPOTupleSerializer(SPOKeyOrder.SPO, false/* sids */);
+//        
+//        metadata.setTupleSerializer(tupleSer);
+//        
+//        btree = BTree.createTransient(metadata);
+////        btree = BTree.create(new SimpleMemoryRawStore(), metadata);
+//
+//    }
 
-        tupleSer = new SPOTupleSerializer(SPOKeyOrder.SPO, false/* sids */);
-        
-        metadata.setTupleSerializer(tupleSer);
-        
-        btree = BTree.createTransient(metadata);
-//        btree = BTree.create(new SimpleMemoryRawStore(), metadata);
-
-    }
-
+//    /**
+//     * Builds an internal B+Tree that is used to quickly identify axioms based
+//     * on {s:p:o} term identifier tuples, and returns the distinct {s:p:o} term
+//     * identifier tuples for the declared axioms.
+//     * <p>
+//     * Note: if the terms for the axioms are already in the lexicon and the
+//     * axioms are already in the database then this will not write on the
+//     * database, but it will still result in the SPO[] containing the axioms to
+//     * be defined in {@link MyStatementBuffer}.
+//     * 
+//     * @param axioms
+//     */
+//    private void buildBTree(final Collection<BigdataStatement> axioms) {
+//
+//        /*
+//         * Fill the btree with the axioms in SPO order.
+//         * 
+//         * Note: This should ALWAYS use the SPO key order even for quads since
+//         * we just want to test on the (s,p,o).
+//         * 
+//         * @todo This would be MUCH faster with a hashmap on the SPOs.
+//         * 
+//         * @todo There is no need to put the statement type into the in-memory
+//         * axioms. they are axioms after all. That is, we could just have the
+//         * keys and no values.
+//         */
+//
+//        final int naxioms = axioms.size();
+//        
+//        createBTree(naxioms/* naxioms */);
+//
+//        for (BigdataStatement spo : axioms) {
+//
+//            btree.insert(tupleSer.serializeKey(spo), spo.getStatementType()
+//                    .serialize());
+//
+//        }
+//        
+//    }
+    
 //    /**
 //     * The initial version. The s, p, and o of each axiom were written out as
 //     * <code>long</code> integers.
 //     */
 //    private static final transient byte VERSION0 = 0;
 
-	/**
-	 * The serialization format was changed when we introduced the TERMS index
-	 * (as opposed to the TERM2ID and ID2TERM index). Up to that point, the s,
-	 * p, and o components were always <code>long</code> termIds assigned by the
-	 * TERM2ID index. However, the refactor which introduced the TERMS index
-	 * generalized the {@link IV}s further such that we can no longer rely on
-	 * the <code>long</code> termId encoding. Therefore, the serialization of
-	 * the axioms was changed to the length of each {@link SPOKeyOrder#SPO}
-	 * index key followed by the <code>byte[]</code> comprising that key. This
-	 * has the effect of using the {@link IV} representation directly within the
-	 * serialization of the axioms.
-	 * <p>
-	 * Note: In the initial version, the s, p, and o of each axiom were written
-	 * out as <code>long</code> integers.  That version is no longer supported.
-	 */ 
+    /**
+     * The serialization format was changed when we introduced the TERMS index
+     * (as opposed to the TERM2ID and ID2TERM index). Up to that point, the s,
+     * p, and o components were always <code>long</code> termIds assigned by the
+     * TERM2ID index. However, the refactor which introduced the TERMS index
+     * generalized the {@link IV}s further such that we can no longer rely on
+     * the <code>long</code> termId encoding. Therefore, the serialization of
+     * the axioms was changed to the length of each {@link SPOKeyOrder#SPO}
+     * index key followed by the <code>byte[]</code> comprising that key. This
+     * has the effect of using the {@link IV} representation directly within the
+     * serialization of the axioms.
+     * <p>
+     * Note: In the initial version, the s, p, and o of each axiom were written
+     * out as <code>long</code> integers. That version is no longer supported.
+     * <p>
+     * This version also includes the <em>namespace</em> so we can obtain the
+     * appropriate {@link BigdataValueFactory} instance without requiring a
+     * reference to the {@link AbstractTripleStore}.
+     */ 
     private static final transient byte VERSION1 = 1;
 
     /**
@@ -372,21 +398,19 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
     @SuppressWarnings("unchecked")
     private void readVersion1(final ObjectInput in) throws IOException {
 
-        final long naxioms = LongPacker.unpackLong(in);
+        namespace = in.readUTF();
+        
+        final int naxioms = LongPacker.unpackInt(in);
 
-        if (naxioms < 0 || naxioms > Integer.MAX_VALUE)
-            throw new IOException();
+//        if (naxioms < 0 || naxioms > Integer.MAX_VALUE)
+//            throw new IOException();
 
-        createBTree((int) naxioms);
+        axioms = new LinkedHashSet<SPO>(naxioms);
+//        createBTree((int) naxioms);
 
         for (int i = 0; i < naxioms; i++) {
 
-            final long n = LongPacker.unpackLong(in);
-
-            if (n < 0 || n > 1024)// reasonable upper bound.
-                throw new IOException();
-
-            final int nbytes = (int) n;
+            final int nbytes = LongPacker.unpackInt(in);
 
             final byte[] key = new byte[nbytes];
 
@@ -395,7 +419,8 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
             final IV[] ivs = IVUtility.decodeAll(key);
 
             if (ivs.length != 3)
-                throw new IOException();
+                throw new IOException("Expecting 3 IVs, not: "
+                        + Arrays.toString(ivs));
 
             final IV s = ivs[0];
 
@@ -405,8 +430,9 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
 
             final SPO spo = new SPO(s, p, o, StatementEnum.Axiom);
 
-            btree.insert(tupleSer.serializeKey(spo), spo.getStatementType()
-                    .serialize());
+//            btree.insert(tupleSer.serializeKey(spo), spo.getStatementType()
+//                    .serialize());
+            axioms.add(spo);
 
         }
 
@@ -414,8 +440,8 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
 
     public void writeExternal(final ObjectOutput out) throws IOException {
 
-        if (btree == null)
-            throw new IllegalStateException();
+//        if (btree == null)
+//            throw new IllegalStateException();
 
         out.writeByte(currentVersion);
 
@@ -452,30 +478,46 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
 
     private void writeVersion1(final ObjectOutput out) throws IOException {
 
-        final long naxioms = btree.rangeCount();
+        out.writeUTF(namespace);
 
-        LongPacker.packLong(out, naxioms);
+        LongPacker.packLong(out, axioms.size());
 
-        @SuppressWarnings("unchecked")
-        final ITupleIterator<SPO> itr = btree.rangeIterator();
+        final IKeyBuilder keyBuilder = new KeyBuilder(24/*initialCapacity*/);
+        
+        for (SPO spo : axioms) {
 
-        while (itr.hasNext()) {
+            final byte[] key = SPOKeyOrder.SPO.encodeKey(keyBuilder, spo);
+            
+            if (true) {
+                
+                final IV[] ivs = IVUtility.decodeAll(key);
+                
+                if (ivs.length != 3)
+                    throw new IOException("Expecting 3 IVs, not: "
+                            + Arrays.toString(ivs) + " for " + spo);
 
-            final ITuple<SPO> t = itr.next();
+                final IV s = ivs[0];
 
-            final byte[] key = t.getKey();
+                final IV p = ivs[1];
+
+                final IV o = ivs[2];
+
+                final SPO spo2 = new SPO(s, p, o, StatementEnum.Axiom);
+                if (!spo.equals(spo2))
+                    throw new IOException("Expecting: " + spo + ", not " + spo2);
+            }
 
             LongPacker.packLong(out, key.length);
 
             out.write(key);
 
         }
-
+        
     }
     
     final public boolean isAxiom(final IV s, final IV p, final IV o) {
 
-        if (btree == null)
+        if (axioms == null)
             throw new IllegalStateException();
 
         // fast rejection.
@@ -485,9 +527,9 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
             
         }
 
-        final byte[] key = tupleSer.serializeKey(new SPO(s, p, o));
-        
-        if(btree.contains(key)) {
+        final SPO spo = new SPO(s, p, o, StatementEnum.Axiom);
+
+        if(axioms.contains(spo)) {
             
             return true;
             
@@ -499,31 +541,19 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
 
     public final int size() {
         
-        if (btree == null)
+        if (axioms == null)
             throw new IllegalStateException();
         
-        return (int) btree.rangeCount();
+        return axioms.size();
         
     }
     
-    @SuppressWarnings("unchecked")
     final public Iterator<SPO> axioms() {
         
-        if (btree == null)
+        if (axioms == null)
             throw new IllegalStateException();
         
-        final ITupleIterator<SPO> itr = btree.rangeIterator();
-        
-        return new Striterator(itr).addFilter(new Resolver() {
-
-            private static final long serialVersionUID = 1L;
-
-            @Override
-            protected Object resolve(Object obj) {
-                return ((ITuple<ISPO>)obj).getObject();
-            }
-            
-        });
+        return Collections.unmodifiableSet(axioms).iterator();
         
     }
 

@@ -132,6 +132,26 @@ public class TestVocabulary extends TestCase2 {
     }
 
     /**
+     * Unit tests for {@link NoVocabulary}.
+     */
+    public void test_NoVocabulary() {
+        
+        final NoVocabulary vocab = new NoVocabulary(getName());
+
+        vocab.init();
+
+        // nothing in this vocabulary.
+        assertEquals(0, vocab.size());
+        assertFalse(vocab.values().hasNext());
+        
+        doRoundTripTest(vocab);
+
+        // point test for an unknown value.
+        assertNull(vocab.get(new URIImpl("http://www.bigdata.com/unknown-uri")));
+
+    }
+
+    /**
      * Test (de-)serialization of a {@link Vocabulary}.
      */
     static void doRoundTripTest(final Vocabulary expected) {

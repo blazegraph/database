@@ -62,7 +62,6 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -80,8 +79,6 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.btree.raba.IRaba;
-import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
-import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
@@ -114,7 +111,6 @@ import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.CanonicalFactory;
@@ -140,6 +136,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     final private static Logger log = Logger.getLogger(LexiconRelation.class);
 
+    /** FIXME TERMS REFACTOR WHEN TRUE. */
+    final private static boolean TERMS = true;
+    
     private final Set<String> indexNames;
 
     private final List<IKeyOrder<BigdataValue>> keyOrders;
@@ -539,13 +538,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 				ndx.insert(key/* NullIV */, null/* value */);
 			}
 
-            indexManager
-                    .registerIndex(getTerm2IdIndexMetadata(getFQN(LexiconKeyOrder.TERM2ID)));
+//            indexManager
+//                    .registerIndex(getTerm2IdIndexMetadata(getFQN(LexiconKeyOrder.TERM2ID)));
+//
+//            indexManager
+//                    .registerIndex(getId2TermIndexMetadata(getFQN(LexiconKeyOrder.ID2TERM)));
 
-            indexManager
-                    .registerIndex(getId2TermIndexMetadata(getFQN(LexiconKeyOrder.ID2TERM)));
-
-            if (textIndex) {
+            if (!TERMS&&textIndex) {
 
                 // create the full text index
                 
@@ -594,13 +593,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             indexManager.dropIndex(getFQN(LexiconKeyOrder.TERMS));
             terms = null;
 
+            if(!TERMS) {
             indexManager.dropIndex(getFQN(LexiconKeyOrder.ID2TERM));
             id2term = null;
 
             indexManager.dropIndex(getFQN(LexiconKeyOrder.TERM2ID));
             term2id = null;
+            }
 
-            if (textIndex) {
+            if (textIndex&&!TERMS) {
 
                 getSearchEngine().destroy();
 
@@ -817,7 +818,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     
     /** @deprecated by {@link #getTermsIndex()}. */
     final public IIndex getTerm2IdIndex() {
-
+        
+        if(TERMS)
+            throw new UnsupportedOperationException();
+        
         if (term2id == null) {
 
             synchronized (this) {
@@ -864,6 +868,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 	/** @deprecated by {@link #getTermsIndex()} */
     final public IIndex getId2TermIndex() {
 
+        if(TERMS)
+            throw new UnsupportedOperationException();
+        
         if (id2term == null) {
 
             synchronized (this) {
@@ -919,6 +926,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      */
     public ITextIndexer<?> getSearchEngine() {
 
+        if(TERMS)
+            throw new UnsupportedOperationException();
+        
         if (!textIndex)
             return null;
 
@@ -979,27 +989,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
 //		final int m = 1024;
 //		final int q = 8000;
-		final int ratio = 32;
-		final int maxRecLen = 0;
+//		final int ratio = 32;
+		final int maxRecLen = 16;
 
-		metadata.setNodeKeySerializer(new FrontCodedRabaCoder(ratio));
-
-		final DefaultTupleSerializer tupleSer = new DefaultTupleSerializer(
-				new DefaultKeyBuilderFactory(new Properties()),//
-				/*
-				 * leaf keys
-				 */
-				// DefaultFrontCodedRabaCoder.INSTANCE,//
-				new FrontCodedRabaCoder(ratio),//
-				// CanonicalHuffmanRabaCoder.INSTANCE,
-				/*
-				 * leaf values TODO Performance comparison CanonicalHuffman versus Simple /w gzip.
-				 */
-				CanonicalHuffmanRabaCoder.INSTANCE
-		// new SimpleRabaCoder()//
-		);
-
-		metadata.setTupleSerializer(tupleSer);
+        /*
+         * TODO Examine performance for different node and leaf key and value
+         * serializers and coding ratios.
+         */
+        metadata.setTupleSerializer(new TermsTupleSerializer(getNamespace(),
+                valueFactory));
 
 		// enable raw record support.
 		metadata.setRawRecords(true);
@@ -1143,6 +1141,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         if (lits == null || lits.length == 0)
             throw new IllegalArgumentException();
 
+        if(TERMS)
+            throw new UnsupportedOperationException();
+        
         if (log.isInfoEnabled()) {
 
             log.info("#lits=" + lits.length);
@@ -1411,127 +1412,127 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         final WriteTaskStats stats = new WriteTaskStats();
 
         try {
-            // write on the TERMS index (rync RPC)
+            // write on the TERMS index (rync sharded RPC in scale-out)
             new TermsWriteTask(this, readOnly, numTerms, terms, stats)
                     .call();
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
 
-        final KVO<BigdataValue>[] a;
-        try {
-            // write on the forward index (sync RPC)
-            a = new Term2IdWriteTask(this, readOnly, numTerms, terms, stats)
-                    .call();
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
-        
-        /*
-         * Note: [a] is dense and its elements are distinct. it will be in sort
-         * key order for the Values.
-         */
-        final int ndistinct = a.length;
-
-        if (ndistinct == 0) {
-
-            // Nothing left to do.
-            return;
-            
-        }
-        
-        if(!readOnly) {
-            
-            {
-    
-                /*
-                 * Sort terms based on their assigned termId (when interpreted
-                 * as unsigned long integers).
-                 * 
-                 * Note: We sort before the index writes since we will co-thread
-                 * the reverse index write and the full text index write.
-                 * Sorting first let's us read from the same array.
-                 */
-    
-                final long _begin = System.currentTimeMillis();
-    
-                Arrays.sort(a, 0, ndistinct, KVOTermIdComparator.INSTANCE);
-                
-                stats.sortTime += System.currentTimeMillis() - _begin;
-    
-            }
-
-            /*
-             * Write on the reverse index and the full text index.
-             */
-            {
-
-                final long _begin = System.currentTimeMillis();
-
-                final List<Callable<Long>> tasks = new LinkedList<Callable<Long>>();
-
-                tasks.add(new ReverseIndexWriterTask(getId2TermIndex(),
-                        valueFactory, a, ndistinct, storeBlankNodes));
-
-                if (textIndex) {
-
-                    /*
-                     * Note: terms[] is in termId order at this point and can
-                     * contain both duplicates and terms that already have term
-                     * identifiers and therefore are already in the index.
-                     * 
-                     * Therefore, instead of terms[], we use an iterator that
-                     * resolves the distinct terms in a[] (it is dense) to do
-                     * the indexing.
-                     */
-
-                    final Iterator<BigdataValue> itr = new Striterator(
-                            new ChunkedArrayIterator(ndistinct, a, null/* keyOrder */))
-                            .addFilter(new Resolver() {
-
-                        private static final long serialVersionUID = 1L;
-
-                        @Override
-                        protected Object resolve(final Object obj) {
-                        
-                            return ((KVO<BigdataValue>) obj).obj;
-                            
-                        }
-                        
-                    });
-
-                    tasks.add(new FullTextIndexWriterTask(
-                            ndistinct/* capacity */, itr));
-
-                }
-
-                /*
-                 * Co-thread the reverse index writes and the search index
-                 * writes.
-                 */
-                try {
-
-                    final List<Future<Long>> futures = getExecutorService()
-                            .invokeAll(tasks);
-
-                    stats.reverseIndexTime = futures.get(0).get();
-                    
-                    if (textIndex)
-                        stats.fullTextIndexTime = futures.get(1).get();
-                    else 
-                        stats.fullTextIndexTime = 0L;
-
-                } catch (Throwable t) {
-
-                    throw new RuntimeException(t);
-
-                }
-
-                stats.indexTime += System.currentTimeMillis() - _begin;
-
-            }
-            
-        }
+//        final KVO<BigdataValue>[] a;
+//        try {
+//            // write on the forward index (sync RPC)
+//            a = new Term2IdWriteTask(this, readOnly, numTerms, terms, stats)
+//                    .call();
+//        } catch (Exception ex) {
+//            throw new RuntimeException(ex);
+//        }
+//        
+//        /*
+//         * Note: [a] is dense and its elements are distinct. it will be in sort
+//         * key order for the Values.
+//         */
+//        final int ndistinct = a.length;
+//
+//        if (ndistinct == 0) {
+//
+//            // Nothing left to do.
+//            return;
+//            
+//        }
+//        
+//        if(!readOnly) {
+//            
+//            {
+//    
+//                /*
+//                 * Sort terms based on their assigned termId (when interpreted
+//                 * as unsigned long integers).
+//                 * 
+//                 * Note: We sort before the index writes since we will co-thread
+//                 * the reverse index write and the full text index write.
+//                 * Sorting first let's us read from the same array.
+//                 */
+//    
+//                final long _begin = System.currentTimeMillis();
+//    
+//                Arrays.sort(a, 0, ndistinct, KVOTermIdComparator.INSTANCE);
+//                
+//                stats.sortTime += System.currentTimeMillis() - _begin;
+//    
+//            }
+//
+//            /*
+//             * Write on the reverse index and the full text index.
+//             */
+//            {
+//
+//                final long _begin = System.currentTimeMillis();
+//
+//                final List<Callable<Long>> tasks = new LinkedList<Callable<Long>>();
+//
+//                tasks.add(new ReverseIndexWriterTask(getId2TermIndex(),
+//                        valueFactory, a, ndistinct, storeBlankNodes));
+//
+//                if (textIndex) {
+//
+//                    /*
+//                     * Note: terms[] is in termId order at this point and can
+//                     * contain both duplicates and terms that already have term
+//                     * identifiers and therefore are already in the index.
+//                     * 
+//                     * Therefore, instead of terms[], we use an iterator that
+//                     * resolves the distinct terms in a[] (it is dense) to do
+//                     * the indexing.
+//                     */
+//
+//                    final Iterator<BigdataValue> itr = new Striterator(
+//                            new ChunkedArrayIterator(ndistinct, a, null/* keyOrder */))
+//                            .addFilter(new Resolver() {
+//
+//                        private static final long serialVersionUID = 1L;
+//
+//                        @Override
+//                        protected Object resolve(final Object obj) {
+//                        
+//                            return ((KVO<BigdataValue>) obj).obj;
+//                            
+//                        }
+//                        
+//                    });
+//
+//                    tasks.add(new FullTextIndexWriterTask(
+//                            ndistinct/* capacity */, itr));
+//
+//                }
+//
+//                /*
+//                 * Co-thread the reverse index writes and the search index
+//                 * writes.
+//                 */
+//                try {
+//
+//                    final List<Future<Long>> futures = getExecutorService()
+//                            .invokeAll(tasks);
+//
+//                    stats.reverseIndexTime = futures.get(0).get();
+//                    
+//                    if (textIndex)
+//                        stats.fullTextIndexTime = futures.get(1).get();
+//                    else 
+//                        stats.fullTextIndexTime = 0L;
+//
+//                } catch (Throwable t) {
+//
+//                    throw new RuntimeException(t);
+//
+//                }
+//
+//                stats.indexTime += System.currentTimeMillis() - _begin;
+//
+//            }
+//            
+//        }
 
         final long elapsed = System.currentTimeMillis() - begin;
 
@@ -2059,8 +2060,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 
             }
 
-            // the id:term index.
-            final IIndex ndx = getId2TermIndex();
+//            final IIndex ndx = getId2TermIndex();
+            final IIndex ndx = getTermsIndex();
 
             /*
              * Note: This parameter is not terribly sensitive.
@@ -2219,14 +2220,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             final ResultBuffer results = resultHandler.getResult();
 
             /*
-             * synchronize on the term cache before updating it.
-             * 
-             * Note: This is synchronized to guard against a race condition
-             * where concurrent threads resolve the term against the database.
-             * If both threads attempt to insert their resolved term
-             * definitions, which are distinct objects, into the cache then one
-             * will get an IllegalStateException since the other's object will
-             * already be in the cache.
+             * Update the termCache.
              */
             {
 
@@ -2634,12 +2628,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         if (value != null)
             return value;
         
-        final IIndex ndx = getId2TermIndex();
+        final IIndex ndx = getTermsIndex();
 
-        final Id2TermTupleSerializer tupleSer = (Id2TermTupleSerializer) ndx
+        final TermsTupleSerializer tupleSer = (TermsTupleSerializer) ndx
                 .getIndexMetadata().getTupleSerializer();
         
-        final byte[] key = tupleSer.id2key(tid);
+        final byte[] key = tupleSer.serializeKey(tid);
 
         final byte[] data = ndx.lookup(key);
 
@@ -2724,27 +2718,47 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *          the term identifier for the value
      */
     private TermId getTermId(final Value value) {
-        
-        final IIndex ndx = getTerm2IdIndex();
 
-        final byte[] key;
-        {
         
-            final Term2IdTupleSerializer tupleSer = (Term2IdTupleSerializer) ndx
-                    .getIndexMetadata().getTupleSerializer();
+        
+        final TermsIndexHelper h = new TermsIndexHelper();
 
-            // generate key iff not on hand.
-            key = tupleSer.getLexiconKeyBuilder().value2Key(value);
+        final IKeyBuilder keyBuilder = h.newKeyBuilder();
         
-        }
+        final BigdataValue asValue = valueFactory.asValue(value);
         
-        // lookup in the forward index.
-        final byte[] tmp = ndx.lookup(key);
+        final byte[] baseKey = h.makePrefixKey(keyBuilder, asValue);
 
-        if (tmp == null)
+        final byte[] val = valueFactory.getValueSerializer().serialize(asValue);
+
+        final byte[] key = h.resolveOrAddValue(getTermsIndex(),
+                true/* readOnly */, keyBuilder, baseKey, val);
+        
+        if( key == null ) {
+            // Not found.
             return null;
+        }
 
-        final TermId tid = (TermId) IVUtility.decode(tmp);
+//        final IIndex ndx = getTerm2IdIndex();
+//
+//        final byte[] key;
+//        {
+//        
+//            final Term2IdTupleSerializer tupleSer = (Term2IdTupleSerializer) ndx
+//                    .getIndexMetadata().getTupleSerializer();
+//
+//            // generate key iff not on hand.
+//            key = tupleSer.getLexiconKeyBuilder().value2Key(value);
+//        
+//        }
+//        
+//        // lookup in the forward index.
+//        final byte[] tmp = ndx.lookup(key);
+
+//        if (tmp == null)
+//            return null;
+
+        final TermId tid = (TermId) IVUtility.decode(key);
 
         if(value instanceof BigdataValue) {
 
@@ -2820,9 +2834,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * (efficient index scan).
      */
     @SuppressWarnings("unchecked")
-    public Iterator<TermId> termIdIndexScan() {
+    public Iterator<TermId> termsIndexScan() {
 
-        final IIndex ndx = getTerm2IdIndex();
+        final IIndex ndx = getTermsIndex();
 
         return new Striterator(ndx.rangeIterator(null, null, 0/* capacity */,
                 IRangeQuery.VALS, null/* filter */)).addFilter(new Resolver() {
@@ -2839,6 +2853,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
                 final ITuple tuple = (ITuple) val;
 
+                if (tuple.isNull()) {
+                 
+                    return TermId.NullIV;
+                    
+                }
+                
                 return IVUtility.decode(tuple.getValue());
                 
             }
@@ -2865,7 +2885,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     public Iterator<Value> termIterator() {
 
         // visit term identifiers in term order.
-        final Iterator<TermId> itr = termIdIndexScan();
+        final Iterator<TermId> itr = termsIndexScan();
 
         // resolve term identifiers to terms.
         return new Striterator(itr).addFilter(new Resolver() {
@@ -2877,6 +2897,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
              *            the term identifier.
              */
             protected Object resolve(final Object val) {
+
+                if (((TermId) val).isNullIV())
+                    return null;
 
                 // resolve against the id:term index (random lookup).
                 return getTerm((TermId) val);
@@ -2904,123 +2927,123 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 //        assertEquals("#terms", store.getIdTermIndex().rangeCount(null, null),
 //                store.getTermIdIndex().rangeCount(null, null));
 
-        /**
-         * Dumps the TERMS index.
-         */
-        {
-        	
-            sb.append("---- TERMS index ----\n");
-
-            final IIndex ndx = getTermsIndex();
-
-            final ITupleIterator<?> itr = ndx.rangeIterator(null, null);
-
-            while (itr.hasNext()) {
-
-                final ITuple<?> tuple = itr.next();
-                
-//                // the term identifier.
-//                Object val = itr.next();
-
-				/*
-				 * The sort key for the term. This is a hash code plus a counter
-				 * (to break hash collisions). The IV for an entry in the TERMS
-				 * index is formed by wrapping this key.
-				 */
-                final byte[] key = tuple.getKey();
-
-                /*
-                 * deserialize the RDF Value.
-                 */
-				final Value value = (Value) tuple.getObject();
-
-                sb.append(BytesUtil.toString(key) + " : " + value +"\n");
-
-            }
-
-        }
+//        /**
+//         * Dumps the TERMS index.
+//         */
+//        {
+//        	
+//            sb.append("---- TERMS index ----\n");
+//
+//            final IIndex ndx = getTermsIndex();
+//
+//            final ITupleIterator<?> itr = ndx.rangeIterator(null, null);
+//
+//            while (itr.hasNext()) {
+//
+//                final ITuple<?> tuple = itr.next();
+//                
+////                // the term identifier.
+////                Object val = itr.next();
+//
+//				/*
+//				 * The sort key for the term. This is a hash code plus a counter
+//				 * (to break hash collisions). The IV for an entry in the TERMS
+//				 * index is formed by wrapping this key.
+//				 */
+//                final byte[] key = tuple.getKey();
+//
+//                /*
+//                 * Deserialize the RDF Value.
+//                 */
+//				final Value value = (Value) tuple.getObject();
+//
+//                sb.append(BytesUtil.toString(key) + " : " + value +"\n");
+//
+//            }
+//
+//        }
         
-        /**
-         * Dumps the forward mapping.
-         */
-        {
-
-            sb.append("---- terms index (forward mapping) ----\n");
-
-            final IIndex ndx = getTerm2IdIndex();
-
-            final ITupleIterator<?> itr = ndx.rangeIterator(null, null);
-
-            while (itr.hasNext()) {
-
-                final ITuple<?> tuple = itr.next();
-                
-//                // the term identifier.
-//                Object val = itr.next();
-
-                /*
-                 * The sort key for the term. This is not readily decodable. See
-                 * RdfKeyBuilder for specifics.
-                 */
-                final byte[] key = tuple.getKey();
-
-                /*
-                 * deserialize the term identifier.
-                 */
-                final IV iv = IVUtility.decode(tuple.getValue());
-
-                sb.append(BytesUtil.toString(key) + " : " + iv +"\n");
-
-            }
-
-        }
-
-        /**
-         * Dumps the reverse mapping.
-         */
-        {
-
-            sb.append("---- ids index (reverse mapping) ----\n");
-
-            final IIndex ndx = getId2TermIndex();
-
-            final ITupleIterator<BigdataValue> itr = ndx.rangeIterator(null, null);
-
-            while (itr.hasNext()) {
-
-                final ITuple<BigdataValue> tuple = itr.next();
-                
-                final BigdataValue term = tuple.getObject();
-                
-                sb.append(term.getIV()+ " : " + term+"\n");
-
-            }
-
-        }
-        
-        /**
-         * Dumps the term:id index.
-         */
-        sb.append("---- term->id ----\n");
-        for( Iterator<TermId> itr = termIdIndexScan(); itr.hasNext(); ) {
-            
-            sb.append(itr.next());
-            
-            sb.append("\n");
-            
-        }
-
-        /**
-         * Dumps the id:term index.
-         */
-        sb.append("---- id->term ----\n");
-        for( Iterator<Value> itr = idTermIndexScan(); itr.hasNext(); ) {
-            
-            sb.append(itr.next());
-            
-            sb.append("\n");
-            
-        }
+//        /**
+//         * Dumps the forward mapping.
+//         */
+//        {
+//
+//            sb.append("---- terms index (forward mapping) ----\n");
+//
+//            final IIndex ndx = getTerm2IdIndex();
+//
+//            final ITupleIterator<?> itr = ndx.rangeIterator(null, null);
+//
+//            while (itr.hasNext()) {
+//
+//                final ITuple<?> tuple = itr.next();
+//                
+////                // the term identifier.
+////                Object val = itr.next();
+//
+//                /*
+//                 * The sort key for the term. This is not readily decodable. See
+//                 * RdfKeyBuilder for specifics.
+//                 */
+//                final byte[] key = tuple.getKey();
+//
+//                /*
+//                 * deserialize the term identifier.
+//                 */
+//                final IV iv = IVUtility.decode(tuple.getValue());
+//
+//                sb.append(BytesUtil.toString(key) + " : " + iv +"\n");
+//
+//            }
+//
+//        }
+//
+//        /**
+//         * Dumps the reverse mapping.
+//         */
+//        {
+//
+//            sb.append("---- ids index (reverse mapping) ----\n");
+//
+//            final IIndex ndx = getId2TermIndex();
+//
+//            final ITupleIterator<BigdataValue> itr = ndx.rangeIterator(null, null);
+//
+//            while (itr.hasNext()) {
+//
+//                final ITuple<BigdataValue> tuple = itr.next();
+//                
+//                final BigdataValue term = tuple.getObject();
+//                
+//                sb.append(term.getIV()+ " : " + term+"\n");
+//
+//            }
+//
+//        }
+//        
+//        /**
+//         * Dumps the term:id index.
+//         */
+//        sb.append("---- term->id ----\n");
+//        for( Iterator<TermId> itr = termIdIndexScan(); itr.hasNext(); ) {
+//            
+//            sb.append(itr.next());
+//            
+//            sb.append("\n");
+//            
+//        }
+//
+//        /**
+//         * Dumps the id:term index.
+//         */
+//        sb.append("---- id->term ----\n");
+//        for( Iterator<Value> itr = idTermIndexScan(); itr.hasNext(); ) {
+//            
+//            sb.append(itr.next());
+//            
+//            sb.append("\n");
+//            
+//        }
 
         /**
          * Dumps the terms in term order.
@@ -3028,7 +3051,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         sb.append("---- terms in term order ----\n");
         for( Iterator<Value> itr = termIterator(); itr.hasNext(); ) {
             
-            sb.append(itr.next().toString());
+            final Value val = itr.next();
+            
+            if (val == null) {
+                sb.append("NullIV");
+            } else {
+                sb.append(val.toString());
+            }
             
             sb.append("\n");
             

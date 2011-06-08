@@ -43,6 +43,7 @@ import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.striterator.ICloseableIterator;
@@ -68,6 +69,24 @@ public class TestSPOKeyOrder extends TestCase2 {
         super(name);
     }
 
+    private MockTermIdFactory factory;
+    
+    protected void setUp() throws Exception {
+        super.setUp();
+        factory = new MockTermIdFactory();
+    }
+
+    protected void tearDown() throws Exception {
+        super.tearDown();
+        factory = null;
+    }
+
+    private TermId tid(long tidIsIgnored) {
+        
+        return factory.newTermId(VTE.URI);
+        
+    }
+    
     /**
      * Writes the serialized size of an instance on stdout. It is an amazing 61
      * bytes. You can serialize just the {@link SPOKeyOrder#index()} byte value
@@ -75,15 +94,13 @@ public class TestSPOKeyOrder extends TestCase2 {
      */
     public void test_serializationSize() {
 
-        System.out.println("serializedSize="
-                + SerializerUtil.serialize(SPOKeyOrder.SPO).length + " bytes");
+        if (log.isInfoEnabled())
+            log.info("serializedSize="
+                    + SerializerUtil.serialize(SPOKeyOrder.SPO).length
+                    + " bytes");
 
     }
 
-    private TermId tid(long tid) {
-        return new TermId(VTE.URI, tid);
-    }
-    
     /**
      * Unit tests verifies all of the triple key encoding orders. It encodes a
      * known key in each order in turn and verifies by decoding using the SPO
