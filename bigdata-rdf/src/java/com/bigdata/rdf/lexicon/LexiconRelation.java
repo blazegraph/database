@@ -29,6 +29,7 @@ package com.bigdata.rdf.lexicon;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -2570,8 +2571,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
              * @see TestAddTerms
              */
 
-			final BigdataBNode bnode = valueFactory.createBNode("B"
-                    + Long.toString(tid.getTermId()));
+            final BigdataBNode bnode = valueFactory.createBNode(tid.bnodeId());
 
             // set the term identifier on the object.
             bnode.setIV(tid);

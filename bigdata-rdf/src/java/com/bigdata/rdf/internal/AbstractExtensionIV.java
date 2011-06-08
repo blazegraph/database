@@ -16,12 +16,12 @@ import com.bigdata.rdf.model.BigdataValue;
 abstract public class AbstractExtensionIV<V extends BigdataValue, T> extends
         AbstractNonInlineIV<V, T> {
 
-    private final AbstractLiteralIV delegate;
+    private final AbstractIV delegate;
     
     private final IV extensionIv;
     
     protected AbstractExtensionIV(final VTE vte,
-            final AbstractLiteralIV delegate, final IV extensionIv) {
+            final AbstractIV delegate, final IV extensionIv) {
 
         super(vte, true/* extension */, delegate.getDTE());
         
@@ -34,7 +34,7 @@ abstract public class AbstractExtensionIV<V extends BigdataValue, T> extends
         
     }
     
-    public AbstractLiteralIV getDelegate() {
+    public AbstractIV getDelegate() {
 
         return delegate;
         

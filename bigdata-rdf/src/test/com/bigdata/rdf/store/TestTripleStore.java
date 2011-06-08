@@ -31,6 +31,7 @@ package com.bigdata.rdf.store;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
+
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
@@ -44,10 +45,9 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
+
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.Id2TermWriteProc;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc;
