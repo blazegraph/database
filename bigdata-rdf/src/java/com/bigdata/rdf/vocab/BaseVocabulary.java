@@ -333,6 +333,12 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
         
     }
     
+    final public String getNamespace() {
+        
+        return valueFactory.getNamespace();
+        
+    }
+    
     final public int size() {
         
         if (val2iv == null)

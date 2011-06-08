@@ -34,7 +34,6 @@ import org.openrdf.model.vocabulary.RDFS;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * The axioms for RDF Schema.
@@ -58,17 +57,17 @@ public class RdfsAxioms extends BaseAxioms {
         super();
         
     }
-    
-    public RdfsAxioms(AbstractTripleStore db) {
 
-        super(db);
+    public RdfsAxioms(final String namespace) {
+        
+        super(namespace);
         
     }
-
+    
     /**
      * Adds the axioms for RDF Schema.
      */
-    protected void addAxioms(Collection<BigdataStatement> axioms) {
+    protected void addAxioms(final Collection<BigdataStatement> axioms) {
 
         super.addAxioms(axioms);
         

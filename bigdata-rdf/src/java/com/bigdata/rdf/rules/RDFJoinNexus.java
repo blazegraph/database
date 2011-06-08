@@ -470,8 +470,9 @@ public class RDFJoinNexus extends AbstractJoinNexus implements IJoinNexus {
 
     }
 
-    final private static transient IConstant<IV> fakeTermId = 
-        new Constant<IV>(new TermId(VTE.URI, -1L));
+    final private static transient IConstant<IV> fakeTermId =
+        new Constant<IV>(TermId.mockIV(VTE.URI));
+//        new Constant<IV>(new TermId(VTE.URI, -1L));
 
     /**
      * FIXME unit tests for DISTINCT with a head and ELEMENT, with bindings and

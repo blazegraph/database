@@ -56,17 +56,17 @@ abstract public class AbstractAtomicRowReadOrWrite extends
         AbstractIndexProcedure implements ISimpleIndexProcedure,
         IRowStoreConstants, Externalizable {
 
-    protected static final Logger log = Logger.getLogger(AbstractAtomicRowReadOrWrite.class);
+    private static final Logger log = Logger.getLogger(AbstractAtomicRowReadOrWrite.class);
     
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    protected final static boolean INFO = log.isInfoEnabled();
-    
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    protected final static boolean DEBUG = log.isDebugEnabled();
+//    /**
+//     * True iff the {@link #log} level is INFO or less.
+//     */
+//    protected final static boolean INFO = log.isInfoEnabled();
+//    
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    protected final static boolean DEBUG = log.isDebugEnabled();
     
     protected Schema schema;
     protected Object primaryKey;
@@ -160,7 +160,7 @@ abstract public class AbstractAtomicRowReadOrWrite extends
 
         if (tps == null) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("No data for primaryKey: " + primaryKey);
 
         }
@@ -207,7 +207,7 @@ abstract public class AbstractAtomicRowReadOrWrite extends
     
         final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
     
-        if (INFO) {
+        if (log.isInfoEnabled()) {
             log.info("read: fromKey=" + BytesUtil.toString(fromKey)+"\n"+
                      "read:   toKey=" + BytesUtil.toString(toKey));
         }
@@ -266,7 +266,7 @@ abstract public class AbstractAtomicRowReadOrWrite extends
     
                 // Skip property names that have been filtered out.
     
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
     
                     log.debug("Skipping property: name=" + col + " (filtered)");
                     
@@ -313,7 +313,7 @@ abstract public class AbstractAtomicRowReadOrWrite extends
             
             if (columnValueTimestamp < fromTime) {
 
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
 
                     log.debug("Ignoring earlier revision: col=" + col
                             + ", fromTime=" + fromTime + ", timestamp="
@@ -327,7 +327,7 @@ abstract public class AbstractAtomicRowReadOrWrite extends
 
             if (toTime != CURRENT_ROW && columnValueTimestamp >= toTime) {
 
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
 
                     log.debug("Ignoring later revision: col=" + col
                             + ", toTime=" + toTime + ", timestamp="
@@ -353,7 +353,7 @@ abstract public class AbstractAtomicRowReadOrWrite extends
 
             tps.set(col, columnValueTimestamp, v);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Accept: name=" + col + ", timestamp="
                         + columnValueTimestamp + ", value=" + v);
     

@@ -75,6 +75,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
@@ -93,6 +94,8 @@ import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.IExtensionFactory;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSDStringExtension;
 import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
@@ -160,6 +163,7 @@ import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.util.InnerCause;
 
 /**
  * Abstract base class that implements logic for the {@link ITripleStore}
@@ -1376,6 +1380,9 @@ abstract public class AbstractTripleStore extends
 
             super.create();
 
+            final String LEXICON_NAMESPACE = lexicon ? getNamespace() + "."
+                    + LexiconRelation.NAME_LEXICON_RELATION : null;
+            
             if (lexicon) {
 
                 /*
@@ -1391,7 +1398,7 @@ abstract public class AbstractTripleStore extends
                                 .getConstructor(new Class[] { String.class });
 
                         // save reference.
-                        vocab = ctor.newInstance(new Object[] { getNamespace() });
+                        vocab = ctor.newInstance(new Object[] { LEXICON_NAMESPACE });
 
                     } catch (Exception ex) {
 
@@ -1405,8 +1412,7 @@ abstract public class AbstractTripleStore extends
                 }
                 
                 lexiconRelation = new LexiconRelation(getIndexManager(),
-                        getNamespace() + "."
-                                + LexiconRelation.NAME_LEXICON_RELATION,
+                        LEXICON_NAMESPACE,
                         getTimestamp(), tmp);
 
                 lexiconRelation.create();//assignedSplits);
@@ -1436,10 +1442,10 @@ abstract public class AbstractTripleStore extends
                     try {
 
                         final Constructor<? extends BaseAxioms> ctor = axiomClass
-                                .getConstructor(new Class[] { AbstractTripleStore.class });
+                                .getConstructor(new Class[] { String.class });
 
                         // save reference.
-                        axioms = ctor.newInstance(new Object[] { this });
+                        axioms = ctor.newInstance(new Object[] { LEXICON_NAMESPACE });
 
                     } catch (Exception ex) {
 
@@ -1448,7 +1454,7 @@ abstract public class AbstractTripleStore extends
                     }
 
                     // initialize (writes on the lexicon and statement indices). 
-                    ((BaseAxioms)axioms).init();
+                    ((BaseAxioms) axioms).init(this);
 
                 }
 
@@ -1498,6 +1504,11 @@ abstract public class AbstractTripleStore extends
 
             commit();
 
+        } catch (Throwable t) {
+            if (!InnerCause.isInnerCause(t, InterruptedException.class)) {
+                log.error(t, t);
+            }
+            throw new RuntimeException(t);
         } finally {
 
             unlock(resourceLock);
@@ -1958,46 +1969,58 @@ abstract public class AbstractTripleStore extends
 
     final public long getTermCount() {
 
-        final byte[] fromKey = new byte[] { KeyBuilder
-                .encodeByte(ITermIndexCodes.TERM_CODE_URI) };
-
-        /*
-         * Note: the term count deliberately excludes the statement identifiers
-         * which follow the bnodes in the lexicon.
-         */
-        final byte[] toKey = new byte[] { KeyBuilder
-                .encodeByte((byte) (ITermIndexCodes.TERM_CODE_BND + 1)) };
-
-        return getLexiconRelation().getTerm2IdIndex()
-                .rangeCount(fromKey, toKey);
+//        final byte[] fromKey = new byte[] { KeyBuilder
+//                .encodeByte(ITermIndexCodes.TERM_CODE_URI) };
+//
+//        /*
+//         * Note: the term count deliberately excludes the statement identifiers
+//         * which follow the bnodes in the lexicon.
+//         */
+//        final byte[] toKey = new byte[] { KeyBuilder
+//                .encodeByte((byte) (ITermIndexCodes.TERM_CODE_BND + 1)) };
+//
+//        return getLexiconRelation().getTermsIndex()
+//                .rangeCount(fromKey, toKey);
+        
+        // Report everything except the NullIV.
+        return getLexiconRelation().getTermsIndex().rangeCount() - 1;
 
     }
 
     final public long getURICount() {
 
-        final byte[] fromKey = new byte[] { KeyBuilder
-                .encodeByte(ITermIndexCodes.TERM_CODE_URI) };
+//        final byte[] fromKey = new byte[] { KeyBuilder
+//                .encodeByte(ITermIndexCodes.TERM_CODE_URI) };
+//
+//        final byte[] toKey = new byte[] { KeyBuilder
+//                .encodeByte((byte) (ITermIndexCodes.TERM_CODE_URI + 1)) };
 
-        final byte[] toKey = new byte[] { KeyBuilder
-                .encodeByte((byte) (ITermIndexCodes.TERM_CODE_URI + 1)) };
+        final byte[] fromKey = new byte[] { TermId.toFlags(VTE.URI) };
 
-        return getLexiconRelation().getTerm2IdIndex()
-                .rangeCount(fromKey, toKey);
+        final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
+
+        return getLexiconRelation().getTermsIndex().rangeCount(fromKey, toKey);
 
     }
 
     final public long getLiteralCount() {
 
-        // Note: the first of the kinds of literals (plain).
-        final byte[] fromKey = new byte[] { KeyBuilder
-                .encodeByte(ITermIndexCodes.TERM_CODE_LIT) };
+//        // Note: the first of the kinds of literals (plain).
+//        final byte[] fromKey = new byte[] { KeyBuilder
+//                .encodeByte(ITermIndexCodes.TERM_CODE_LIT) };
+//
+//        // Note: spans the last of the kinds of literals.
+//        final byte[] toKey = new byte[] { KeyBuilder
+//                .encodeByte((byte) (ITermIndexCodes.TERM_CODE_DTL + 1)) };
+//
+//        return getLexiconRelation().getTerm2IdIndex()
+//                .rangeCount(fromKey, toKey);
 
-        // Note: spans the last of the kinds of literals.
-        final byte[] toKey = new byte[] { KeyBuilder
-                .encodeByte((byte) (ITermIndexCodes.TERM_CODE_DTL + 1)) };
+        final byte[] fromKey = new byte[] { TermId.toFlags(VTE.LITERAL) };
 
-        return getLexiconRelation().getTerm2IdIndex()
-                .rangeCount(fromKey, toKey);
+        final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
+
+        return getLexiconRelation().getTermsIndex().rangeCount(fromKey, toKey);
 
     }
 
@@ -2009,14 +2032,20 @@ abstract public class AbstractTripleStore extends
      */
     final public long getBNodeCount() {
         
-        final byte[] fromKey = new byte[] { KeyBuilder
-                .encodeByte(ITermIndexCodes.TERM_CODE_BND) };
+//        final byte[] fromKey = new byte[] { KeyBuilder
+//                .encodeByte(ITermIndexCodes.TERM_CODE_BND) };
+//
+//        final byte[] toKey = new byte[] { KeyBuilder
+//                .encodeByte((byte) (ITermIndexCodes.TERM_CODE_BND + 1)) };
+//
+//        return getLexiconRelation().getTerm2IdIndex()
+//                .rangeCount(fromKey, toKey);
 
-        final byte[] toKey = new byte[] { KeyBuilder
-                .encodeByte((byte) (ITermIndexCodes.TERM_CODE_BND + 1)) };
+        final byte[] fromKey = new byte[] { TermId.toFlags(VTE.BNODE) };
 
-        return getLexiconRelation().getTerm2IdIndex()
-                .rangeCount(fromKey, toKey);
+        final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
+
+        return getLexiconRelation().getTermsIndex().rangeCount(fromKey, toKey);
 
     }
 

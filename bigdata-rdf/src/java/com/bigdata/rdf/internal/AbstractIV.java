@@ -755,18 +755,18 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         case UUID:
             keyBuilder.append((UUID) t.getInlineValue());
             break;
-        // case XSDUnsignedByte:
-        // keyBuilder.appendUnsigned(t.byteValue());
-        // break;
-        // case XSDUnsignedShort:
-        // keyBuilder.appendUnsigned(t.shortValue());
-        // break;
-        // case XSDUnsignedInt:
-        // keyBuilder.appendUnsigned(t.intValue());
-        // break;
-        // case XSDUnsignedLong:
-        // keyBuilder.appendUnsigned(t.longValue());
-        // break;
+        case XSDUnsignedByte:
+            keyBuilder.appendSigned(((XSDUnsignedByteIV<?>) t).rawValue());
+            break;
+        case XSDUnsignedShort:
+            keyBuilder.append(((XSDUnsignedShortIV<?>) t).rawValue());
+            break;
+        case XSDUnsignedInt:
+            keyBuilder.append(((XSDUnsignedIntIV<?>) t).rawValue());
+            break;
+        case XSDUnsignedLong:
+            keyBuilder.append(((XSDUnsignedLongIV<?>) t).rawValue());
+            break;
         case XSDString: {
             if (this instanceof InlineLiteralIV<?>) {
                 /*

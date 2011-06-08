@@ -814,18 +814,26 @@ public class IVUtility {
             final AbstractLiteralIV iv = new UUIDLiteralIV<BigdataLiteral>(x);
             return isExtension ? new ExtensionIV(iv, datatype) : iv;
         }
-            // case XSDUnsignedByte:
-            // keyBuilder.appendUnsigned(t.byteValue());
-            // break;
-            // case XSDUnsignedShort:
-            // keyBuilder.appendUnsigned(t.shortValue());
-            // break;
-            // case XSDUnsignedInt:
-            // keyBuilder.appendUnsigned(t.intValue());
-            // break;
-            // case XSDUnsignedLong:
-            // keyBuilder.appendUnsigned(t.longValue());
-            // break;
+        case XSDUnsignedByte: {
+            final byte x = KeyBuilder.decodeByte(key[o]);
+            final AbstractLiteralIV iv = new XSDUnsignedByteIV<BigdataLiteral>(x);
+            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+        }
+        case XSDUnsignedShort: {
+            final short x = KeyBuilder.decodeShort(key, o);
+            final AbstractLiteralIV iv = new XSDUnsignedShortIV<BigdataLiteral>(x);
+            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+        }
+        case XSDUnsignedInt: {
+            final int x = KeyBuilder.decodeInt(key, o);
+            final AbstractLiteralIV iv = new XSDUnsignedIntIV<BigdataLiteral>(x);
+            return isExtension ? new ExtensionIV(iv, datatype) : iv;
+        }
+        case XSDUnsignedLong: {
+            final long x = KeyBuilder.decodeLong(key, o);
+            final AbstractLiteralIV iv = new XSDUnsignedLongIV<BigdataLiteral>(x);
+            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+        }
         case XSDString: {
             if(isExtension) {
             // decode the termCode

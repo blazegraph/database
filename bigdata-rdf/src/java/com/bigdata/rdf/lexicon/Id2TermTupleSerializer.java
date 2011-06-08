@@ -56,6 +56,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by the TERMS REFACTOR
  */
 public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataValue> {
 

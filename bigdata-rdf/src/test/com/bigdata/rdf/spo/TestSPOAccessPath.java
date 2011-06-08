@@ -35,7 +35,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -77,6 +77,18 @@ public class TestSPOAccessPath extends AbstractTripleStoreTestCase {
         super(name);
     }
 
+    private MockTermIdFactory factory;
+    
+    protected void setUp() throws Exception {
+        super.setUp();
+        factory = new MockTermIdFactory();
+    }
+
+    protected void tearDown() throws Exception {
+        super.tearDown();
+        factory = null;
+    }
+
     /**
      * There are 8 distinct triple pattern bindings for a triple store that
      * select among 3 distinct access paths.
@@ -86,11 +98,11 @@ public class TestSPOAccessPath extends AbstractTripleStoreTestCase {
         final AbstractTripleStore store = getStore();
 
         // constants used for s,p,o,c when bound. 0L used when unbound.
-        final IV S = new TermId(VTE.URI, 1);
-        final IV P = new TermId(VTE.URI, 2);
-        final IV O = new TermId(VTE.URI, 3);
-        final IV C = new TermId(VTE.URI, 4);
-        final IV _ = new TermId(VTE.URI, 0);
+        final IV S = factory.newTermId(VTE.URI, 1);
+        final IV P = factory.newTermId(VTE.URI, 2);
+        final IV O = factory.newTermId(VTE.URI, 3);
+        final IV C = factory.newTermId(VTE.URI, 4);
+        final IV _ = factory.newTermId(VTE.URI, 0);
 
         try {
 
@@ -225,7 +237,7 @@ public class TestSPOAccessPath extends AbstractTripleStoreTestCase {
                 final IAccessPath<ISPO> accessPath = store.getSPORelation()
                         .getAccessPath(predicate);
 
-                assertSameSPOs(new ISPO[] { //
+                assertSameSPOs(new ISPO[] { // FIXME TERMS REFACTOR FAILS HERE
                                 new SPO(s1.getIV(), p1.getIV(), o1
                                         .getIV(), StatementEnum.Explicit),//
                                 new SPO(s1.getIV(), s1.getIV(), o1

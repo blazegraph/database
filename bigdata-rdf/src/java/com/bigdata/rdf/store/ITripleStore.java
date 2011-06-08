@@ -146,9 +146,13 @@ interface ITripleStore {
     long getStatementCount(Resource c, boolean exact);
 
     /**
-     * The #of terms in the lexicon (this is not specific to any named graph).
+     * The #of RDF {@link Value}s in the lexicon (this is not specific to any
+     * named graph).
      * <p>
      * This may be an estimate when using partitioned indices.
+     * <p>
+     * Many RDF {@link Value}s are inlined into the statement indices. Inlined
+     * values are not be reported by this method.
      */
     long getTermCount();
 
@@ -156,6 +160,9 @@ interface ITripleStore {
      * The #of URIs in the lexicon (this is not specific to any named graph).
      * <p>
      * This may be an estimate when using partitioned indices.
+     * <p>
+     * Many RDF {@link Value}s are inlined into the statement indices. Inlined
+     * values are not be reported by this method.
      */
     long getURICount();
 
@@ -164,6 +171,9 @@ interface ITripleStore {
      * graph).
      * <p>
      * This may be an estimate when using partitioned indices.
+     * <p>
+     * Many RDF {@link Value}s are inlined into the statement indices. Inlined
+     * values are not be reported by this method.
      */
     long getLiteralCount();
 
@@ -176,6 +186,9 @@ interface ITripleStore {
      * {@link AbstractTripleStore.Options#STORE_BLANK_NODES} is
      * <code>false</code> since there will not be any blank nodes in the
      * lexicon.
+     * <p>
+     * Many RDF {@link Value}s are inlined into the statement indices. Inlined
+     * values are not be reported by this method.
      */
     long getBNodeCount();
 

@@ -167,8 +167,10 @@ public class TestTermsIndex extends TestCase2 {
 		
 		try {
 			
-			final IndexMetadata metadata = getTermsIndexMetadata("TERMS");
-			
+		    final String namespace = getName();
+		    
+		    final IndexMetadata metadata = getTermsIndexMetadata(namespace);
+		    
 			final BTree ndx = BTree.create(store, metadata);
 			
 			final TermsIndexHelper helper = new TermsIndexHelper();
@@ -188,17 +190,68 @@ public class TestTermsIndex extends TestCase2 {
 		
 	}
 
+    /**
+     * Return the {@link IndexMetadata} for the TERMS index.
+     * 
+     * @param name
+     *            The name of the index.
+     *            
+     * @return The {@link IndexMetadata}.
+     */
+	private IndexMetadata getTermsIndexMetadata(final String namespace) {
+	    
+        final String name = namespace+".TERMS";
+
+        final BigdataValueFactory valueFactory = BigdataValueFactoryImpl
+                .getInstance(namespace);
+        
+        final IndexMetadata metadata = new IndexMetadata(name, UUID
+                .randomUUID());
+
+//      final int m = 1024;
+//      final int q = 8000;
+//      final int ratio = 32;
+        final int maxRecLen = 0;
+
+//      metadata.setNodeKeySerializer(new FrontCodedRabaCoder(ratio));
+
+//      final DefaultTupleSerializer tupleSer = new DefaultTupleSerializer(
+//              new DefaultKeyBuilderFactory(new Properties()),//
+//              new FrontCodedRabaCoder(ratio),//
+//              CanonicalHuffmanRabaCoder.INSTANCE
+//      );
+//
+//      metadata.setTupleSerializer(tupleSer);
+
+        // enable raw record support.
+        metadata.setRawRecords(true);
+
+        // set the maximum length of a byte[] value in a leaf.
+        metadata.setMaxRecLen(maxRecLen);
+
+//      /*
+//       * increase the branching factor since leaf size is smaller w/o large
+//       * records.
+//       */
+//      metadata.setBranchingFactor(m);
+//
+//      // Note: You need to give sufficient heap for this option!
+//      metadata.setWriteRetentionQueueCapacity(q);
+
+        metadata.setTupleSerializer(new TermsTupleSerializer(namespace,
+                valueFactory));
+
+        return metadata;
+
+	}
+
 	/**
 	 * Unit test for lookup and adding values to the TERMS index when blank
 	 * nodes are NOT stored in the TERMS index.
-	 * 
-	 * FIXME When not in the told bnodes mode, verify that a second insert of
-	 * the same blank node will yield a different IV (you can not unify a blank
-	 * node with the TERMS index unless you are in told bnodes mode).
 	 */
-	public void test_termsIndex_addLookup() {
+	public void test_termsIndex_addLookup_standard_bnode_semantics() {
 
-		doTermsIndexAddLookupTest(false/* storeBnodes */);
+		doTermsIndexAddLookupTest(false/* toldBNodes */);
 
 	}
 
@@ -208,7 +261,7 @@ public class TestTermsIndex extends TestCase2 {
 	 */
 	public void test_termsIndex_addLookup_toldBNodesMode() {
 
-		doTermsIndexAddLookupTest(true/* storeBnodes */);
+		doTermsIndexAddLookupTest(true/* toldBNodes */);
 
 	}
 
@@ -219,20 +272,19 @@ public class TestTermsIndex extends TestCase2 {
 	 * and (c) point lookups using an {@link IV} as a fully qualified key for
 	 * the TERMS index.
 	 * 
-	 * @param storeBlankNodes
+	 * @param toldBNodes
 	 *            when <code>true</code> blank nodes will be inserted into the
 	 *            TERMS index.
 	 */
-	private void doTermsIndexAddLookupTest(final boolean storeBlankNodes) {
+	private void doTermsIndexAddLookupTest(final boolean toldBNodes) {
 		
 		final IRawStore store = new SimpleMemoryRawStore();
 		
 		try {
 			
-			final String namespace = getName();
-
-			final IndexMetadata metadata = getTermsIndexMetadata(namespace
-					+ ".TERMS");
+		    final String namespace = getName();
+		    
+		    final IndexMetadata metadata = getTermsIndexMetadata(namespace);
 
 			final BTree ndx = BTree.create(store, metadata);
 
@@ -289,7 +341,7 @@ public class TestTermsIndex extends TestCase2 {
 				final WriteTaskStats stats = new WriteTaskStats();
 
 				final TermsWriteProc.TermsWriteProcConstructor ctor = new TermsWriteProc.TermsWriteProcConstructor(
-						readOnly, storeBlankNodes);
+						readOnly, toldBNodes);
 
 				ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
 						vals, ctor, new TermsWriteProcResultHandler(a,
@@ -313,7 +365,7 @@ public class TestTermsIndex extends TestCase2 {
 				final WriteTaskStats stats = new WriteTaskStats();
 
 				final TermsWriteProc.TermsWriteProcConstructor ctor = new TermsWriteProc.TermsWriteProcConstructor(
-						readOnly, storeBlankNodes);
+						readOnly, toldBNodes);
 
 				ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
 						vals, ctor, new TermsWriteProcResultHandler(a,
@@ -396,24 +448,38 @@ public class TestTermsIndex extends TestCase2 {
 				final WriteTaskStats stats = new WriteTaskStats();
 
 				final TermsWriteProc.TermsWriteProcConstructor ctor = new TermsWriteProc.TermsWriteProcConstructor(
-						readOnly, storeBlankNodes);
+						readOnly, toldBNodes);
 
 				ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
 						vals, ctor, new TermsWriteProcResultHandler(a,
 								readOnly, stats.nunknown));
 
+				int nnotfound = 0;
 				for (int i = 0; i < a.length; i++) {
 
+				    final IV expectedIV = expected[i];
+				    
 					final IV actualIV = a[i].obj.getIV();
 					
-					// IV was discovered.
-					assertNotNull(actualIV);
-					
-					assertEquals(expected[i], actualIV);
+					if(expectedIV.isBNode()) {
+                        if (toldBNodes) {
+                            // IV is discoverable.
+                            assertNotNull(actualIV);
+                            assertEquals(expected[i], actualIV);
+                        } else {
+                            // IV is NOT discoverable (can not unify bnodes).
+                            assertNull(actualIV);
+                            nnotfound++;
+                        }
+                    } else {
+                        // IV is discoverable.
+                        assertNotNull(actualIV);
+                        assertEquals(expected[i], actualIV);
+                    }
 					
 				}
 				
-				assertEquals(0, stats.nunknown.get());
+				assertEquals(nnotfound, stats.nunknown.get());
 				
 			}
 
@@ -425,19 +491,172 @@ public class TestTermsIndex extends TestCase2 {
 		
 	}
 
-	/**
-	 * Unit test with a small number of collisions.
-	 */
-	public void test_someCollisions() {
+    /**
+     * Unit test with standard blank nodes semantics verifies that separate
+     * writes on the TERMS index using the same BNode ID result in distinct keys
+     * being assigned (blank nodes do not unify).
+     */
+    public void test_blank_nodes_are_distinct() {
 
-		doHashCollisionTest(12);
+        final boolean storeBlankNodes = false;
 
-	}
+        final IRawStore store = new SimpleMemoryRawStore();
 
-	/**
-	 * Unit test with a the maximum number of collisions.
-	 */
-	public void test_lotsOfCollisions() {
+        try {
+
+            final String namespace = getName();
+            
+            final IndexMetadata metadata = getTermsIndexMetadata(namespace);
+
+            final BTree ndx = BTree.create(store, metadata);
+
+            final BigdataValueFactory vf = BigdataValueFactoryImpl
+                    .getInstance(namespace);
+
+            final TermsIndexHelper h = new TermsIndexHelper();
+
+            // Write on the TERMS index, obtaining IVs for those BNodes.
+            final IV[] ivs1;
+            {
+
+                /*
+                 * Generate Values that we will use to read and write on the
+                 * TERMS index.
+                 */
+                final BigdataValue[] values;
+                {
+
+                    final BigdataBNode bnode1 = vf.createBNode();
+
+                    final BigdataBNode bnode2 = vf.createBNode("abc");
+
+                    values = new BigdataValue[] { bnode1, bnode2 };
+
+                }
+
+                final KVO<BigdataValue>[] a = h.generateKVOs(vf
+                        .getValueSerializer(), values, values.length);
+
+                final byte[][] keys = new byte[a.length][];
+                final byte[][] vals = new byte[a.length][];
+                for (int i = 0; i < a.length; i++) {
+                    keys[i] = a[i].key;
+                    vals[i] = a[i].val;
+                }
+
+                final boolean readOnly = false;
+                final WriteTaskStats stats = new WriteTaskStats();
+
+                final TermsWriteProc.TermsWriteProcConstructor ctor = new TermsWriteProc.TermsWriteProcConstructor(
+                        readOnly, storeBlankNodes);
+
+                ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
+                        vals, ctor, new TermsWriteProcResultHandler(a,
+                                readOnly, stats.nunknown));
+
+                // Copy out the assigned IVs.
+                ivs1 = new IV[a.length];
+                for (int i = 0; i < a.length; i++) {
+                    final IV iv = a[i].obj.getIV();
+                    assertNotNull(iv);
+                    ivs1[i] = iv;
+                }
+
+            }
+
+            // Write on the TERMS index, obtaining new IVs for those BNodes.
+            final IV[] ivs2;
+            {
+
+                /*
+                 * Generate Values that we will use to read and write on the
+                 * TERMS index (we need distinct instances since the IV once
+                 * set can not be cleared from the BigdataValue).
+                 */
+                final BigdataValue[] values;
+                {
+
+                    final BigdataBNode bnode1 = vf.createBNode();
+
+                    final BigdataBNode bnode2 = vf.createBNode("abc");
+
+                    values = new BigdataValue[] { bnode1, bnode2 };
+
+                }
+
+                final KVO<BigdataValue>[] a = h.generateKVOs(vf
+                        .getValueSerializer(), values, values.length);
+
+                final byte[][] keys = new byte[a.length][];
+                final byte[][] vals = new byte[a.length][];
+                for (int i = 0; i < a.length; i++) {
+                    keys[i] = a[i].key;
+                    vals[i] = a[i].val;
+                }
+
+                final boolean readOnly = false;
+                final WriteTaskStats stats = new WriteTaskStats();
+
+                final TermsWriteProc.TermsWriteProcConstructor ctor = new TermsWriteProc.TermsWriteProcConstructor(
+                        readOnly, storeBlankNodes);
+
+                ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
+                        vals, ctor, new TermsWriteProcResultHandler(a,
+                                readOnly, stats.nunknown));
+
+                // Copy out the assigned IVs.
+                ivs2 = new IV[a.length];
+                for (int i = 0; i < a.length; i++) {
+                    final IV iv = a[i].obj.getIV();
+                    assertNotNull(iv);
+                    ivs2[i] = iv;
+                }
+
+            }
+
+            /*
+             * Verify that all assigned IVs are distinct and that all assigned
+             * IVs can be used to materialize the blank nodes that we wrote onto
+             * the TERMS index.
+             */
+            {
+
+                final IKeyBuilder keyBuilder = h.newKeyBuilder(); 
+                
+                // Same #of IVs.
+                assertEquals(ivs1.length, ivs2.length);
+
+                for (int i = 0; i < ivs1.length; i++) {
+                    assertNotNull(ivs1[i]);
+                    assertNotNull(ivs2[i]);
+                    assertNotSame(ivs1[i], ivs2[i]);
+                    assertNotNull(h.lookup(ndx, ivs1[i], keyBuilder));
+                    assertNotNull(h.lookup(ndx, ivs2[i], keyBuilder));
+                }
+                
+            }
+
+        } finally {
+
+            store.destroy();
+
+        }
+
+    }
+
+    /**
+     * Unit test with a small number of collisions.
+     */
+    public void test_someCollisions() {
+
+        doHashCollisionTest(12);
+
+    }
+
+    /**
+     * Unit test with a the maximum number of collisions.
+     */
+    public void test_lotsOfCollisions() {
 
 		doHashCollisionTest(255);
 
@@ -479,10 +698,9 @@ public class TestTermsIndex extends TestCase2 {
 			
 			final TermsIndexHelper h = new TermsIndexHelper();
 
-			final String namespace = getName();
-
-			final IndexMetadata metadata = getTermsIndexMetadata(namespace
-					+ ".TERMS");
+            final String namespace = getName();
+            
+            final IndexMetadata metadata = getTermsIndexMetadata(namespace);
 
 			final BTree ndx = BTree.create(store, metadata);
 
@@ -588,6 +806,134 @@ public class TestTermsIndex extends TestCase2 {
 
 	}
 
+    /**
+     * Create a TERMS index, put some data into it, and verify that we can use
+     * the {@link TermsTupleSerializer} to access that data, including handling
+     * of the NullIV.
+     */
+    public void test_TermsTupleSerializer() {
+
+        final IRawStore store = new SimpleMemoryRawStore();
+        
+        try {
+            
+            final TermsIndexHelper h = new TermsIndexHelper();
+
+            final String namespace = getName();
+
+            final IndexMetadata metadata = getTermsIndexMetadata(namespace);
+
+            final BTree ndx = BTree.create(store, metadata);
+
+            final IKeyBuilder keyBuilder = h.newKeyBuilder();
+
+            {
+                final byte[] key = TermId.NullIV.encode(keyBuilder).getKey();
+
+                // Insert a tuple for the NullIV mapping it to a null value.
+                ndx.insert(key/* NullIV */, null/* value */);
+            }
+
+            final BigdataValueFactory vf = BigdataValueFactoryImpl
+                    .getInstance(namespace);
+
+            /*
+             * Generate Values that we will use to read and write on the TERMS
+             * index.
+             */
+            final BigdataValue[] values;
+            {
+
+                final BigdataURI uri1 = vf
+                        .createURI("http://www.bigdata.com/testTerm");
+
+                final BigdataLiteral lit1 = vf.createLiteral("bigdata");
+
+                final BigdataLiteral lit2 = vf.createLiteral("bigdata", "en");
+
+                final BigdataLiteral lit3 = vf.createLiteral("bigdata",
+                        XMLSchema.STRING);
+
+                final BigdataBNode bnode1 = vf.createBNode();
+
+                final BigdataBNode bnode2 = vf.createBNode("abc");
+
+                values = new BigdataValue[] { uri1, lit1, lit2, lit3, bnode1,
+                        bnode2 };
+
+            }
+
+            final KVO<BigdataValue>[] a = h.generateKVOs(vf
+                    .getValueSerializer(), values, values.length);
+
+            final byte[][] keys = new byte[a.length][];
+            final byte[][] vals = new byte[a.length][];
+            for (int i = 0; i < a.length; i++) {
+                keys[i] = a[i].key;
+                vals[i] = a[i].val;
+            }
+
+            /*
+             * Write on the TERMS index, setting IVs as side-effect on
+             * BigdataValues.
+             */
+            {
+
+                final boolean readOnly = false;
+                final boolean storeBlankNodes = true;
+                final WriteTaskStats stats = new WriteTaskStats();
+
+                final TermsWriteProc.TermsWriteProcConstructor ctor = new TermsWriteProc.TermsWriteProcConstructor(
+                        readOnly, storeBlankNodes);
+
+                ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
+                        vals, ctor, new TermsWriteProcResultHandler(a,
+                                readOnly, stats.nunknown));
+
+            }
+            
+            /*
+             * Exercise the TermsTupleSerializer
+             */
+            {
+                
+                final TermsTupleSerializer tupSer = (TermsTupleSerializer) ndx
+                        .getIndexMetadata().getTupleSerializer();
+                
+                for(BigdataValue value : values) {
+                    
+                    final IV iv = value.getIV();
+                    
+                    assertNotNull(iv);
+                    
+                    // Test serializeKey.
+                    final byte[] key = tupSer.serializeKey(iv);
+
+                    final byte[] val = ndx.lookup(key);
+
+                    final BigdataValue actualValue = vf.getValueSerializer()
+                            .deserialize(val);
+
+                    assertEquals(value, actualValue);
+                    
+                    /*
+                     * TODO It should be possible to test more of the tupleSer
+                     * directly. E.g., by running an iterator over the tuples
+                     * and visiting them.
+                     */
+                    
+                }
+                
+            }
+
+        } finally {
+
+            store.destroy();
+
+        }
+
+    }
+
 	/**
 	 * Mock variant of
 	 * {@link TermsIndexHelper#generateKVOs(BigdataValueSerializer, BigdataValue[], int)}
@@ -645,52 +991,5 @@ public class TestTermsIndex extends TestCase2 {
 		return a;
 
 	}
-
-	/**
-	 * Return the {@link IndexMetadata} for the TERMS index.
-	 * 
-	 * @param name
-	 *            The name of the index.
-	 *            
-	 * @return The {@link IndexMetadata}.
-	 */
-    private IndexMetadata getTermsIndexMetadata(final String name) {
-
-		final IndexMetadata metadata = new IndexMetadata(name, UUID
-				.randomUUID());
-
-//		final int m = 1024;
-//		final int q = 8000;
-//		final int ratio = 32;
-		final int maxRecLen = 0;
-
-//		metadata.setNodeKeySerializer(new FrontCodedRabaCoder(ratio));
-
-//		final DefaultTupleSerializer tupleSer = new DefaultTupleSerializer(
-//				new DefaultKeyBuilderFactory(new Properties()),//
-//				new FrontCodedRabaCoder(ratio),//
-//				CanonicalHuffmanRabaCoder.INSTANCE
-//		);
-//
-//		metadata.setTupleSerializer(tupleSer);
-
-		// enable raw record support.
-		metadata.setRawRecords(true);
-
-		// set the maximum length of a byte[] value in a leaf.
-		metadata.setMaxRecLen(maxRecLen);
-
-//		/*
-//		 * increase the branching factor since leaf size is smaller w/o large
-//		 * records.
-//		 */
-//		metadata.setBranchingFactor(m);
-//
-//		// Note: You need to give sufficient heap for this option!
-//		metadata.setWriteRetentionQueueCapacity(q);
-
-		return metadata;
-
-    }
 
 }

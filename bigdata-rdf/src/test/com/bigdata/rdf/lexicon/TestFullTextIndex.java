@@ -149,7 +149,13 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
                             @Override
                             protected Object resolve(Object e) {
-                                return new TermId(VTE.LITERAL, ((Hit) e).getDocId());
+                                /*
+                                 * FIXME TERMS REFACTOR : The hit will directly
+                                 * give us the IV (or a byte[] for that IV). We
+                                 * just need to return that IV here.
+                                 */
+                                throw new UnsupportedOperationException();
+//                                return new TermId(VTE.LITERAL, ((Hit) e).getDocId());
                             }
                         })));
 

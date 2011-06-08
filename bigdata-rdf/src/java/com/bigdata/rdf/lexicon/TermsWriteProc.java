@@ -34,7 +34,6 @@ import java.io.ObjectOutput;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
-import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
@@ -91,11 +90,11 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
      * Serialized as extended metadata. When <code>true</code> blank nodes
      * are stored in the lexicon's forward index.
      */
-    private boolean storeBlankNodes;
+    private boolean toldBNodes;
     
-    public final boolean isStoreBlankNodes() {
+    public final boolean isToldBNodes() {
         
-        return storeBlankNodes;
+        return toldBNodes;
         
     }
 
@@ -115,7 +114,7 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 
 		this.readOnly = readOnly;
 
-		this.storeBlankNodes = storeBlankNodes;
+		this.toldBNodes = storeBlankNodes;
 
 	}
 
@@ -123,7 +122,7 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 			AbstractKeyArrayIndexProcedureConstructor<TermsWriteProc> {
 
 		private final boolean readOnly;
-		private final boolean storeBlankNodes;
+		private final boolean toldBNodes;
 
 		public final boolean sendValues() {
 
@@ -132,11 +131,11 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
         }
 
         public TermsWriteProcConstructor(final boolean readOnly,
-                final boolean storeBlankNodes) {
+                final boolean toldBNodes) {
 
             this.readOnly = readOnly;
 
-            this.storeBlankNodes = storeBlankNodes;
+            this.toldBNodes = toldBNodes;
 
         }
 
@@ -148,7 +147,7 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 				log.info("ntuples=" + (toIndex - fromIndex));
 
 			return new TermsWriteProc(keySer, valSer, fromIndex, toIndex, keys,
-					vals, readOnly, storeBlankNodes);
+					vals, readOnly, toldBNodes);
 
         }
 
@@ -186,9 +185,6 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
         // used to store the discovered / assigned term identifiers.
         final IV[] ivs = new IV[numTerms];
         
-        // used to assign IVs for blank nodes when NOT in told bnodes mode.
-        final ICounter counter = ndx.getCounter();
-        
 		final byte[] baseKey = new byte[keyBuilder.capacity()];
         
         for (int i = 0; i < numTerms; i++) {
@@ -200,7 +196,7 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 			// decode the VTE from the flags.
 			final VTE vte = AbstractIV.getVTE(baseKey[0]);
             
-			if (!storeBlankNodes && vte == VTE.BNODE) {
+			if (!toldBNodes && vte == VTE.BNODE) {
 
                 /*
                  * Do not enter blank nodes into the TERMS index.
@@ -220,42 +216,34 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
                     // blank nodes can not be resolved by the index.
                     ivs[i] = null;
 
+                    /*
+                     * FIXME Use this to track down people who pass in a blank
+                     * node on a read-only request when we are not using told
+                     * bnodes. Under these conditions we can not unify the blank
+                     * node with the TERMS index so the node should not have
+                     * been passed in at all (for efficiency reasons).
+                     */
+//                    throw new UnsupportedOperationException();
+
                 } else {
 
-					/*
-					 * FIXME We may have to revisit this logic for constructing
-					 * a unique blank node identifier.
-					 * 
-					 * If you are inserting blank nodes and you are not in told
-					 * bnodes mode, then each time we insert a blank node it
-					 * needs to be assigned a distinct IV. (In fact, there is no
-					 * reason to send a blank node to the TERMS index if you are
-					 * only reading on it and you are not in told bnodes mode
-					 * because the unification will always fail.)
-					 * 
-					 * That could be done using a counter to choose a hash code,
-					 * but it must be a hash code within the key range of a
-					 * shard. Perhaps decoding the from/to key of the range and
-					 * then rolling a random number for the hash code would be
-					 * efficient. Since there could already be one (or more)
-					 * values in the TERMS index for that hash code we then have
-					 * to range count the collision bucket and insert a new
-					 * tuple whose collision counter is that range count.
-					 * 
-					 * It would seem to be far more efficient to use UUIDs for
-					 * blank nodes and then inline them if we are not in a told
-					 * bnodes mode than to permit them to be written onto the
-					 * TERMS index. When we are in a told bnodes mode, then they
-					 * can be unified against the TERMS index but it is still
-					 * more efficient to inline whenever possible.
-					 */
-                	
+                    /*
+                     * We are not in a told bnode mode and this is not a
+                     * read-only request.
+                     */
+
+                    final byte[] key = helper.addBNode(ndx, keyBuilder,
+                            baseKey, getValue(i));
+
+                    ivs[i] = new TermId<BigdataValue>(key);
+
 //                    // assign a term identifier.
 //					final long termId = counter.incrementAndGet();
 //
 //                    ivs[i] = new TermId(VTE(code), termId);
-                	
-                	throw new UnsupportedOperationException();
+                    
+//                	final BNode bnode = (BNode)BigdataValueFactoryImpl.getInstance("test").getValueSerializer().deserialize(getValue(i));
+//                	throw new UnsupportedOperationException("BNode: ID="+bnode.getID());
                     
                 }
                 

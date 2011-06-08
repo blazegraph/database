@@ -51,9 +51,8 @@ import junit.framework.TestCase2;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.ap.filter.SameVariableConstraint;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOPredicate;
@@ -80,37 +79,69 @@ public class TestSameVariableConstraint extends TestCase2 {
         super(name);
     }
 
-    private final String relationName = "r";
-    
-    protected final static Constant<IV> a = new Constant<IV>(new TermId(VTE.URI, 1L));
-    
-    protected final static Constant<IV> b = new Constant<IV>(new TermId(VTE.URI, 1L));
-    
-    protected final static Constant<IV> c = new Constant<IV>(new TermId(VTE.URI, 1L));;
-    
-    protected final static Constant<IV> d = new Constant<IV>(new TermId(VTE.URI, 1L));
+    private String relation;
 
+    private Constant<IV> a;
+    
+    private Constant<IV> b;
+    
+    private Constant<IV> c;
+    
+    private Constant<IV> d;
+    
+    private MockTermIdFactory factory;
+    
+    protected void setUp() throws Exception {
+
+        super.setUp();
+
+        factory = new MockTermIdFactory();
+
+        relation = "r";
+
+        a = new Constant<IV>(factory.newTermId(VTE.URI));
+
+        b = new Constant<IV>(factory.newTermId(VTE.URI));
+
+        c = new Constant<IV>(factory.newTermId(VTE.URI));
+
+        d = new Constant<IV>(factory.newTermId(VTE.URI));
+
+    }
+    
+    protected void tearDown() throws Exception {
+    
+        factory = null;
+
+        relation = null;
+
+        a = b = c = d = null;
+        
+        super.tearDown();
+        
+    }
+    
     public void test_no_dups1() {
 
         // (a,b,c,d)
         assertNull(SameVariableConstraint.newInstance(new SPOPredicate(
-                relationName, a, b, c, d)));
+                relation, a, b, c, d)));
 
         // (?a,b,c,d)
         // (a,?b,c,d)
         // (a,b,?c,d)
         // (a,b,c,?d)
         assertNull(SameVariableConstraint.newInstance(new SPOPredicate(
-                relationName, Var.var("a"), b, c, d)));
+                relation, Var.var("a"), b, c, d)));
 
         assertNull(SameVariableConstraint.newInstance(new SPOPredicate(
-                relationName, a, Var.var("b"), c, d)));
+                relation, a, Var.var("b"), c, d)));
 
         assertNull(SameVariableConstraint.newInstance(new SPOPredicate(
-                relationName, a, b, Var.var("c"), d)));
+                relation, a, b, Var.var("c"), d)));
         
         assertNull(SameVariableConstraint.newInstance(new SPOPredicate(
-                relationName, a, b, c, Var.var("d"))));
+                relation, a, b, c, Var.var("d"))));
 
         // (?a,?b,c,d)
         // (?a,b,?c,d)
@@ -119,22 +150,22 @@ public class TestSameVariableConstraint extends TestCase2 {
         // (a,?b,c,?d)
         // (a,b,?c,?d)
         assertNull(SameVariableConstraint.newInstance(new SPOPredicate(
-                relationName, Var.var("a"), Var.var("b"), c, d)));
+                relation, Var.var("a"), Var.var("b"), c, d)));
         
         assertNull(SameVariableConstraint.newInstance(new SPOPredicate(
-                relationName, Var.var("a"), c, Var.var("c"), d)));
+                relation, Var.var("a"), c, Var.var("c"), d)));
         
         assertNull(SameVariableConstraint.newInstance(new SPOPredicate(
-                relationName, Var.var("a"), b, c, Var.var("d"))));
+                relation, Var.var("a"), b, c, Var.var("d"))));
         
         assertNull(SameVariableConstraint.newInstance(new SPOPredicate(
-                relationName, a, Var.var("b"), Var.var("c"), d)));
+                relation, a, Var.var("b"), Var.var("c"), d)));
         
         assertNull(SameVariableConstraint.newInstance(new SPOPredicate(
-                relationName, a, Var.var("b"), c, Var.var("d"))));
+                relation, a, Var.var("b"), c, Var.var("d"))));
         
         assertNull(SameVariableConstraint.newInstance(new SPOPredicate(
-                relationName, a, b, Var.var("c"), Var.var("d"))));
+                relation, a, b, Var.var("c"), Var.var("d"))));
         
     }
     
@@ -151,7 +182,7 @@ public class TestSameVariableConstraint extends TestCase2 {
         {
          
             final SameVariableConstraint<ISPO> constraint = SameVariableConstraint
-                    .newInstance(new SPOPredicate(relationName,//
+                    .newInstance(new SPOPredicate(relation,//
                             Var.var("a"), Var.var("a"), c, d));
 
             assertNotNull(constraint);
@@ -163,7 +194,7 @@ public class TestSameVariableConstraint extends TestCase2 {
         {
 
             final SameVariableConstraint<ISPO> constraint = SameVariableConstraint
-                    .newInstance(new SPOPredicate(relationName,//
+                    .newInstance(new SPOPredicate(relation,//
                             Var.var("a"), b, Var.var("a"), d));
 
             assertNotNull(constraint);
@@ -175,7 +206,7 @@ public class TestSameVariableConstraint extends TestCase2 {
         {
 
             final SameVariableConstraint<ISPO> constraint = SameVariableConstraint
-                    .newInstance(new SPOPredicate(relationName,//
+                    .newInstance(new SPOPredicate(relation,//
                             Var.var("a"), b, c, Var.var("a")));
 
             assertNotNull(constraint);
@@ -187,7 +218,7 @@ public class TestSameVariableConstraint extends TestCase2 {
         {
 
             final SameVariableConstraint<ISPO> constraint = SameVariableConstraint
-                    .newInstance(new SPOPredicate(relationName,//
+                    .newInstance(new SPOPredicate(relation,//
                             a, Var.var("b"), Var.var("b"), d));
 
             assertNotNull(constraint);
@@ -199,7 +230,7 @@ public class TestSameVariableConstraint extends TestCase2 {
         {
 
             final SameVariableConstraint<ISPO> constraint = SameVariableConstraint
-                    .newInstance(new SPOPredicate(relationName,//
+                    .newInstance(new SPOPredicate(relation,//
                             a, Var.var("b"), c, Var.var("b")));
 
             assertNotNull(constraint);
@@ -211,7 +242,7 @@ public class TestSameVariableConstraint extends TestCase2 {
         {
 
             final SameVariableConstraint<ISPO> constraint = SameVariableConstraint
-                    .newInstance(new SPOPredicate(relationName,//
+                    .newInstance(new SPOPredicate(relation,//
                             a, b, Var.var("c"), Var.var("c")));
 
             assertNotNull(constraint);
@@ -223,7 +254,7 @@ public class TestSameVariableConstraint extends TestCase2 {
         {
 
             final SameVariableConstraint<ISPO> constraint = SameVariableConstraint
-                    .newInstance(new SPOPredicate(relationName,//
+                    .newInstance(new SPOPredicate(relation,//
                             a, Var.var("c"), Var.var("c"), Var.var("c")));
 
             assertNotNull(constraint);
@@ -235,7 +266,7 @@ public class TestSameVariableConstraint extends TestCase2 {
         {
 
             final SameVariableConstraint<ISPO> constraint = SameVariableConstraint
-                    .newInstance(new SPOPredicate(relationName,//
+                    .newInstance(new SPOPredicate(relation,//
                             Var.var("c"), b, Var.var("c"), Var.var("c")));
 
             assertNotNull(constraint);
@@ -247,7 +278,7 @@ public class TestSameVariableConstraint extends TestCase2 {
         {
 
             final SameVariableConstraint<ISPO> constraint = SameVariableConstraint
-                    .newInstance(new SPOPredicate(relationName,//
+                    .newInstance(new SPOPredicate(relation,//
                             Var.var("c"), Var.var("c"), c, Var.var("c")));
 
             assertNotNull(constraint);
@@ -259,7 +290,7 @@ public class TestSameVariableConstraint extends TestCase2 {
         {
 
             final SameVariableConstraint<ISPO> constraint = SameVariableConstraint
-                    .newInstance(new SPOPredicate(relationName,//
+                    .newInstance(new SPOPredicate(relation,//
                             Var.var("a"), Var.var("a"), c, Var.var("d")));
 
             assertNotNull(constraint);
@@ -271,7 +302,7 @@ public class TestSameVariableConstraint extends TestCase2 {
         {
 
             final SameVariableConstraint<ISPO> constraint = SameVariableConstraint
-                    .newInstance(new SPOPredicate(relationName,//
+                    .newInstance(new SPOPredicate(relation,//
                             Var.var("a"), Var.var("a"), Var.var("a"), Var.var("d")));
 
             assertNotNull(constraint);
@@ -294,7 +325,7 @@ public class TestSameVariableConstraint extends TestCase2 {
         {
 
             final SameVariableConstraint<ISPO> constraint = SameVariableConstraint
-                    .newInstance(new SPOPredicate(relationName,//
+                    .newInstance(new SPOPredicate(relation,//
                             Var.var("a"), Var.var("a"), Var.var("b"), Var.var("b")));
 
             assertNotNull(constraint);
@@ -309,7 +340,7 @@ public class TestSameVariableConstraint extends TestCase2 {
         {
 
             final SameVariableConstraint<ISPO> constraint = SameVariableConstraint
-                    .newInstance(new SPOPredicate(relationName,//
+                    .newInstance(new SPOPredicate(relation,//
                             Var.var("a"), Var.var("b"), Var.var("a"), Var.var("b")));
 
             assertNotNull(constraint);
@@ -324,7 +355,7 @@ public class TestSameVariableConstraint extends TestCase2 {
         {
 
             final SameVariableConstraint<ISPO> constraint = SameVariableConstraint
-                    .newInstance(new SPOPredicate(relationName,//
+                    .newInstance(new SPOPredicate(relation,//
                             Var.var("a"), Var.var("b"), Var.var("b"), Var.var("a")));
 
             assertNotNull(constraint);

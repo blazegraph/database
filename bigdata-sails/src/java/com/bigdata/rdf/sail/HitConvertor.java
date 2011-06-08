@@ -83,7 +83,13 @@ public class HitConvertor implements
 
                                 final IHit hit = (IHit) arg0;
 
-                                return new TermId(VTE.LITERAL, hit.getDocId());
+                                /*
+                                 * FIXME TERMS REFACTOR : The hit will directly
+                                 * give us the IV (or a byte[] for that IV). We
+                                 * just need to return that IV here.
+                                 */
+                                throw new UnsupportedOperationException();
+//                                return new TermId(VTE.LITERAL, hit.getDocId());
                             }
 
                         })));

@@ -47,6 +47,7 @@ import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlanFactory2;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.StatementEnum;
@@ -92,14 +93,58 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
         
     }
 
-    /**
-     * This method was introduced to make the assigned identifiers conform with
-     * the expectations for identifiers as assigned by the lexicon. This was
-     * necessitated by the change to {@link ISPO#hasStatementIdentifier()} to
-     * test the term id bits.
-     */
-    private static TermId uriId(long in) {
-        return new TermId(VTE.URI, in);
+    private Constant<IV> rdfsSubClassOf;
+    
+    private Constant<IV> rdfsResource;
+    
+    private Constant<IV> rdfType;
+    
+    private Constant<IV> rdfsClass;
+    
+    private Constant<IV> someGraph;
+    
+    private MockTermIdFactory factory;
+    
+    protected void setUp() throws Exception {
+
+        super.setUp();
+
+        factory = new MockTermIdFactory();
+
+        rdfsSubClassOf = new Constant<IV>(factory.newTermId(VTE.URI));
+
+        rdfsResource = new Constant<IV>(factory.newTermId(VTE.URI));
+
+        rdfType = new Constant<IV>(factory.newTermId(VTE.URI));
+
+        rdfsClass = new Constant<IV>(factory.newTermId(VTE.URI));
+
+        someGraph = new Constant<IV>(factory.newTermId(VTE.URI));
+
+    }
+    
+    protected void tearDown() throws Exception {
+    
+        factory = null;
+
+        rdfsSubClassOf = rdfsResource = rdfType = rdfsClass = someGraph = null;
+        
+        super.tearDown();
+        
+    }
+
+//    /**
+//     * This method was introduced to make the assigned identifiers conform with
+//     * the expectations for identifiers as assigned by the lexicon. This was
+//     * necessitated by the change to {@link ISPO#hasStatementIdentifier()} to
+//     * test the term id bits.
+//     */
+//    private static TermId uriId(long in) {
+//        return new TermId(VTE.URI, in);
+//    }
+
+    private TermId uriId(long ignored) {
+        return factory.newTermId(VTE.URI);
     }
 
 //    private static long literalId(long in) {
@@ -112,20 +157,20 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 //                | ITermIdCodes.TERMID_CODE_BNODE;
 //    }
 
-    protected final static Constant<IV> rdfsSubClassOf = new Constant<IV>(
-            uriId(1L));
-    
-    protected final static Constant<IV> rdfsResource = new Constant<IV>(
-            uriId(2L));
-    
-    protected final static Constant<IV> rdfType = new Constant<IV>(
-            uriId(3L));
-    
-    protected final static Constant<IV> rdfsClass = new Constant<IV>(
-            uriId(4L));
-
-    protected final static Constant<IV> rdfProperty = new Constant<IV>(
-            uriId(5L));
+//    protected final static Constant<IV> rdfsSubClassOf = new Constant<IV>(
+//            uriId(1L));
+//    
+//    protected final static Constant<IV> rdfsResource = new Constant<IV>(
+//            uriId(2L));
+//    
+//    protected final static Constant<IV> rdfType = new Constant<IV>(
+//            uriId(3L));
+//    
+//    protected final static Constant<IV> rdfsClass = new Constant<IV>(
+//            uriId(4L));
+//
+//    protected final static Constant<IV> rdfProperty = new Constant<IV>(
+//            uriId(5L));
 
     /**
      * this is rdfs9:
@@ -138,9 +183,9 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
      * @version $Id$
      */
     @SuppressWarnings({ "serial", "unchecked" })
-    static protected class TestRuleRdfs9 extends Rule {
+    protected class TestRuleRdfs9 extends Rule {
         
-        @SuppressWarnings("unchecked")
+//        @SuppressWarnings("unchecked")
 		public TestRuleRdfs9(String relation) {
             
             super(  "rdfs9",//

@@ -34,6 +34,7 @@ import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -44,6 +45,11 @@ import com.bigdata.rdf.store.AbstractTripleStore.Options;
 
 /**
  * Test suite for the {@link Axioms}.
+ * <p>
+ * Note: {@link BaseAxioms} required an {@link AbstractTripleStore} to convert
+ * the {@link BigdataStatement} objects into {@link SPO}s. This makes it
+ * impossible to unit test the axioms classes independent of the
+ * {@link AbstractTripleStore}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -66,6 +72,28 @@ public class TestAxioms extends AbstractTripleStoreTestCase {
        
     }
 
+    /**
+     * Unit test of the constructors for the axiom classes. This does not test
+     * serialization because that uses {@link SPO} objects which are only
+     * created when we write on the {@link AbstractTripleStore}.
+     */
+    public void test_ctor_NoAxioms() {
+
+        new NoAxioms(getName());
+        
+    }
+
+    /**
+     * Unit test of the constructors for the axiom classes. This does not test
+     * serialization because that uses {@link SPO} objects which are only
+     * created when we write on the {@link AbstractTripleStore}.
+     */
+    public void test_ctor_RDFSAxioms() {
+
+        new RdfsAxioms(getName());
+        
+    }
+
     public void test_NoAxioms() {
 
         Properties properties = getProperties();
@@ -81,6 +109,9 @@ public class TestAxioms extends AbstractTripleStoreTestCase {
 //            assertEquals(0, store.getStatementCount());
             
             final BigdataValueFactory f = store.getValueFactory();
+
+            // Must be using the same namespace.
+            assertEquals(store.getAxioms().getNamespace(), f.getNamespace());
 
             final BigdataURI rdfType = f.asValue(RDF.TYPE);
             final BigdataURI rdfProperty = f.asValue(RDF.PROPERTY);

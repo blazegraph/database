@@ -44,7 +44,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.resources.AbstractTestSegSplitter;
@@ -72,6 +72,18 @@ public class TestXXXCShardSplitHandler extends AbstractTestSegSplitter {
         super(name);
     }
 
+    private MockTermIdFactory factory;
+    
+    protected void setUp() throws Exception {
+        super.setUp();
+        factory = new MockTermIdFactory();
+    }
+
+    protected void tearDown() throws Exception {
+        super.tearDown();
+        factory = null;
+    }
+
     /**
      * Register a {@link BTree} against the journal, generate some data and
      * commit the data.
@@ -87,7 +99,7 @@ public class TestXXXCShardSplitHandler extends AbstractTestSegSplitter {
      * @param splitHandler
      */
     @SuppressWarnings("unchecked")
-    static private BTree generateQuadsData(final IJournal store,
+    private BTree generateQuadsData(final IJournal store,
             final String name, final int ntuples,
             final LocalPartitionMetadata pmd) {
         
@@ -118,21 +130,22 @@ public class TestXXXCShardSplitHandler extends AbstractTestSegSplitter {
         final IV[] o = new IV[Math.max(ntuples/400,5)];
         final IV[] c = new IV[Math.max(ntuples/10,200)];
         
-        System.err.println("ntuples=" + ntuples + ", #s=" + s.length + ", #p="
-                + p.length + ", #o=" + o.length + ", #c=" + c.length);
-        
+        if (log.isInfoEnabled())
+            log.info("ntuples=" + ntuples + ", #s=" + s.length + ", #p="
+                    + p.length + ", #o=" + o.length + ", #c=" + c.length);
+
         long v = 0;
         for (int i = 0; i < s.length; i++) {
-            s[i] = new TermId(VTE.URI, (v = v + r.nextInt(100)));
+            s[i] = factory.newTermId(VTE.URI, (int)(v = v + r.nextInt(100)));
         }
         for (int i = 0; i < p.length; i++) {
-            p[i] = new TermId(VTE.URI, (v = v + r.nextInt(100)));
+            p[i] = factory.newTermId(VTE.URI, (int)(v = v + r.nextInt(100)));
         }
         for (int i = 0; i < o.length; i++) {
-            o[i] = new TermId(VTE.URI, (v = v + r.nextInt(100)));
+            o[i] = factory.newTermId(VTE.URI, (int)(v = v + r.nextInt(100)));
         }
         for (int i = 0; i < c.length; i++) {
-            c[i] = new TermId(VTE.URI, (v = v + r.nextInt(100)));
+            c[i] = factory.newTermId(VTE.URI, (int)(v = v + r.nextInt(100)));
         }
 
         final IKeyBuilder keyBuilder = KeyBuilder.newInstance();

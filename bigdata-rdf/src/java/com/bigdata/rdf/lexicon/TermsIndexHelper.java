@@ -27,6 +27,7 @@
 package com.bigdata.rdf.lexicon;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.BNode;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.BytesUtil;
@@ -153,10 +154,9 @@ public class TermsIndexHelper {
 	 *             could be an int[] return here (assuming up to an int counter,
 	 *             or a short[], or a byte[]).
 	 */
-	public byte[] resolveOrAddValue(final IIndex termsIndex,
-			final boolean readOnly, final IKeyBuilder keyBuilder,
-			/* final IKeyBuilder keyBuilder2x, */final byte[] baseKey,
-			final byte[] val) {
+    public byte[] resolveOrAddValue(final IIndex termsIndex,
+            final boolean readOnly, final IKeyBuilder keyBuilder,
+            final byte[] baseKey, final byte[] val) {
 
 		/*
 		 * This is the fixed length hash code prefix. When a collision
@@ -315,6 +315,95 @@ public class TermsIndexHelper {
 
 	}
 
+    /**
+     * Add an entry for a {@link BNode} to the TERMS index (do NOT use when told
+     * blank node semantics apply).
+     * <p>
+     * All {@link BNode}s entered by this method are distinct regardless of
+     * their {@link BNode#getID()}. Since blank nodes can not be unified with
+     * the TERMS index (unless we are using told blank node semantics) we simply
+     * add another entry for the caller's {@link BNode} and return the key for
+     * that entry which will be wrapped as an {@link IV}. That entry will be
+     * made distinct from all other entries for the same {@link VTE} and
+     * hashCode by appending the current collision counter (which is just the
+     * range count).
+     * 
+     * @param termsIndex
+     *            The TERMS index.
+     * @param keyBuilder
+     *            The buffer will be reset as necessary.
+     * @param baseKey
+     *            The base key for the hash code (without the counter suffix).
+     * @param val
+     *            The (serialized and compressed) RDF {@link BNode}.
+     * 
+     * @return The key for the distinct bnode.
+     * 
+     * @throws CollisionBucketSizeException
+     *             if an attempt is made to insert a {@link Value} into a
+     *             collision bucket which is full.
+     * 
+     *             TODO All we really need to return is the counter since the
+     *             client already has the baseKey. That would be less NIO and
+     *             could be an int[] return here (assuming up to an int counter,
+     *             or a short[], or a byte[]).
+     */
+    public byte[] addBNode(final IIndex ndx, final IKeyBuilder keyBuilder,
+            final byte[] baseKey, final byte[] val) {
+
+        /*
+         * The fromKey is strictly LT any full key for the hash code of this val
+         * but strictly GT any key have a hash code LT the hash code of this
+         * val.
+         */
+        final byte[] fromKey = baseKey;
+
+        // key strictly LT any successor of the hash code of this val.
+        final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
+
+        // fast range count. this tells us how many collisions there are.
+        // this is an exact collision count since we are not deleting tuples
+        // from the TERMS index.
+        final long rangeCount = ndx.rangeCount(fromKey, toKey);
+
+        if (rangeCount >= 255/* unsigned byte */) {
+
+            /*
+             * Impose a hard limit on the #of hash collisions we will accept in
+             * this utility.
+             * 
+             * TODO We do not need to have a hard limit if we use BigInteger for
+             * the counter, but the performance will go through the floor if we
+             * have to scan 32k entries on a hash collision!
+             */
+
+            throw new CollisionBucketSizeException(rangeCount);
+        }
+
+        // Force range count into (signed) byte
+        final byte counter = (byte) rangeCount;
+
+        // Form a key using the collision counter (guaranteed distinct).
+        final byte[] key = makeKey(keyBuilder.reset(), baseKey, counter);
+
+        // Insert into the index.
+        if (ndx.insert(key, val) != null) {
+
+            throw new AssertionError();
+
+        }
+
+        if (rangeCount >= 127) { // arbitrary limit to log @ WARN.
+
+            log.warn("Collision: hashCode=" + BytesUtil.toString(key)
+                    + ", collisionBucketSize=" + rangeCount);
+        
+        }
+
+        return key;
+
+    }
+
 	/**
 	 * Return the value associated with the {@link IV} in the TERMS index.
 	 * <p>
@@ -405,7 +494,7 @@ public class TermsIndexHelper {
 	 * @param hashCode
 	 *            The hash code of the {@link BigdataValue}.
 	 * 
-	 * @return The prefix formed key.
+	 * @return The prefix key.
 	 */
 	public byte[] makePrefixKey(final IKeyBuilder keyBuilder, final VTE vte,
 			final int hashCode) {
@@ -416,6 +505,25 @@ public class TermsIndexHelper {
 		
 		return keyBuilder.getKey();
 		
+	}
+	
+    /**
+     * Create a prefix key for the TERMS index from the {@link BigdataValue}.
+     * 
+     * @param keyBuilder
+     *            The caller is responsible for resetting the buffer as
+     *            required.
+     * @param value
+     *            The {@link BigdataValue}
+     * 
+     * @return The prefix key.
+     */
+	public byte[] makePrefixKey(final IKeyBuilder keyBuilder, final BigdataValue value) {
+
+	    final VTE vte = VTE.valueOf(value);
+
+	    return makePrefixKey(keyBuilder, vte, value.hashCode());
+	    
 	}
 	
 	/**

@@ -145,11 +145,11 @@ public abstract class ProxyTestCase
      * an entire suite of tests.)
      */
     
-    public void setUp() throws Exception {
+    protected void setUp() throws Exception {
         getOurDelegate().setUp(this);
     }
 
-    public void tearDown() throws Exception {
+    protected void tearDown() throws Exception {
         getOurDelegate().tearDown(this);
     }
 
