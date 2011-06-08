@@ -571,7 +571,7 @@ public class IVUtility {
                 o += extensionIV.byteLength();
 
                 // Decode the inline component.
-                final InlineLiteralIV<BigdataLiteral> delegate = (InlineLiteralIV<BigdataLiteral>) IVUtility
+                final AbstractIV delegate = (AbstractIV) IVUtility
                         .decodeFromOffset(key, o);
 
                 switch (AbstractIV.getInternalValueTypeEnum(flags)) {

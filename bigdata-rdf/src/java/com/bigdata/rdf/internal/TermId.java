@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.internal;
 
 import java.io.IOException;
+import java.math.BigInteger;
 
 import org.openrdf.model.Value;
 
@@ -445,5 +446,19 @@ public class TermId<V extends BigdataValue> extends
 		}
 
 	}
+
+    /**
+     * Using the {@link BigInteger} class to create a unique bnode id based on
+     * the byte[] key of the {@link TermId}.
+     */
+    public String bnodeId() {
+        
+        final int signum = data.length > 0 ? 1 : 0;
+        
+        final BigInteger bi = new BigInteger(signum, data);
+        
+        return "B" + bi.toString();
+        
+    }
 
 }
