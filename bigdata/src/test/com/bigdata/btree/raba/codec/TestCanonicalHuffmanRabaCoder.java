@@ -49,6 +49,7 @@ import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder.AbstractCodingSetup;
 import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder.RabaCodingSetup;
+import com.bigdata.rawstore.Bytes;
 
 /**
  * Test suite for the {@link CanonicalHuffmanRabaCoder}.
@@ -583,5 +584,115 @@ public class TestCanonicalHuffmanRabaCoder extends AbstractRabaCoderTestCase {
         }
         
     }
+    
+    /**
+     * A stress test for compatibility with {@link InputBitStream}. An array is
+     * filled with random bits and the behavior of {@link InputBitStream} and
+     * {@link BytesUtil#getBits(byte[], int, int)} is compared on a number of
+     * randomly selected bit slices.
+     * 
+     * TODO Could be a performance comparison.
+     * 
+     * @throws IOException 
+     */
+    public void test_stress_InputBitStream_compatible() throws IOException {
+        
+        final Random r = new Random();
 
+        // #of
+        final int limit = 1000;
+
+        // Note: length is guaranteed to be LT int32 bits so [int] index is Ok.
+        final int len = r.nextInt(Bytes.kilobyte32 * 8) + 1;
+        final int bitlen = len << 3;
+        // Fill array with random data.
+        final byte[] b = new byte[len];
+        r.nextBytes(b);
+
+        // wrap with InputBitStream.
+        final InputBitStream ibs = new InputBitStream(b);
+
+        for (int i = 0; i < limit; i++) {
+
+            // start of the bit slice.
+            final int sliceBitOff = r.nextInt(bitlen - 32);
+
+            final int bitsremaining = bitlen - sliceBitOff;
+
+            // allow any slice of between 1 and 32 bits length.
+            final int sliceBitLen = r.nextInt(Math.min(32, bitsremaining)) + 1;
+            assert sliceBitLen >= 1 && sliceBitLen <= 32;
+
+            // position the stream.
+            ibs.position(sliceBitOff);
+
+            final int v1 = ibs.readInt(sliceBitLen);
+
+            final int v2 = BytesUtil.getBits(b, sliceBitOff, sliceBitLen);
+
+            if (v1 != v2) {
+                fail("Expected=" + v1 + ", actual=" + v2 + ", trial=" + i
+                        + ", bitSlice(off=" + sliceBitOff + ", len="
+                        + sliceBitLen + ")" + ", arrayLen=" + b.length);
+            }
+            
+        }
+
+    }
+
+    public void test_confirm_InputBitStream_compatible() throws IOException {
+    	
+    	final byte[] tbuf = new byte[] {
+    			(byte) 0xAA, 
+    			(byte) 0xAA, 
+    			(byte) 0xAA, 
+    			(byte) 0xAA, 
+    			(byte) 0xAA, 
+    			(byte) 0xAA, 
+    			(byte) 0xAA, 
+    			(byte) 0xAA
+    	};
+    	
+        // wrap with InputBitStream.
+        final InputBitStream ibs = new InputBitStream(tbuf);
+        
+        // 1010
+        assertTrue(compare(ibs, tbuf, 0, 4) == 0xA);
+        // 1010 1010
+        assertTrue(compare(ibs, tbuf, 0, 8) == 0xAA);
+        // 0101
+        assertTrue(compare(ibs, tbuf, 1, 4) == 0x5);
+        // 01 0101
+        assertTrue(compare(ibs, tbuf, 1, 6) == 0x15);
+        // 1010 1010
+        assertTrue(compare(ibs, tbuf, 0, 32) == 0xAAAAAAAA);
+        assertTrue(compare(ibs, tbuf, 1, 32) == 0x55555555);
+        
+        // Now try some 64bit comparisons
+        assertTrue(compare64(ibs, tbuf, 0, 48) == 0xAAAAAAAAAAAAL);
+        assertTrue(compare64(ibs, tbuf, 1, 48) == 0x555555555555L);
+
+    }
+    
+    int compare(InputBitStream ibs, byte[] buf, int offset, int bits) throws IOException {
+    	ibs.position(offset);
+    	int v1 = ibs.readInt(bits);
+    	int v2 = BytesUtil.getBits(buf, offset, bits);
+    	
+    	assertTrue(v1 == v2);
+    	
+    	return v1;
+   	
+    }
+    
+    long compare64(InputBitStream ibs, byte[] buf, int offset, int bits) throws IOException {
+    	ibs.position(offset);
+    	long v1 = ibs.readLong(bits);
+    	long v2 = BytesUtil.getBits64(buf, offset, bits);
+    	
+    	assertTrue(v1 == v2);
+    	
+    	return v1;
+   	
+    }
 }

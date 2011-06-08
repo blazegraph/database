@@ -72,7 +72,7 @@ public class TestDirectBufferPool extends TestCase2 {
         final int poolSizeDuring;
         final int poolAcquiredDuring;
         {
-            ByteBuffer b = null;
+            IBufferAccess b = null;
             try {
                 b = DirectBufferPool.INSTANCE.acquire();
 
@@ -85,7 +85,7 @@ public class TestDirectBufferPool extends TestCase2 {
 
             } finally {
                 if (b != null)
-                    DirectBufferPool.INSTANCE.release(b);
+                    b.release();
             }
         }
 
@@ -116,19 +116,19 @@ public class TestDirectBufferPool extends TestCase2 {
          * change.
          */
         {
-            ByteBuffer b = null;
+            IBufferAccess b = null;
             try {
                 b = DirectBufferPool.INSTANCE.acquire();
             } finally {
                 if (b != null)
-                    DirectBufferPool.INSTANCE.release(b);
+                    b.release();
             }
         }
 
         final int poolSizeBefore = DirectBufferPool.INSTANCE.getPoolSize();
 
         for (int i = 0; i < 10; i++) {
-            ByteBuffer b = null;
+            IBufferAccess b = null;
             try {
                 b = DirectBufferPool.INSTANCE.acquire();
                 // pool size remains constant.
@@ -136,7 +136,7 @@ public class TestDirectBufferPool extends TestCase2 {
                         .getPoolSize());
             } finally {
                 if (b != null)
-                    DirectBufferPool.INSTANCE.release(b);
+                    b.release();
             }
         }
 
@@ -154,20 +154,20 @@ public class TestDirectBufferPool extends TestCase2 {
      */
     public void test_doubleRelease() throws InterruptedException {
 
-        ByteBuffer b = null;
+        IBufferAccess b = null;
         try {
             b = DirectBufferPool.INSTANCE.acquire();
         } finally {
             if (b != null)
-                DirectBufferPool.INSTANCE.release(b);
+                b.release();
         }
 
         if (b != null) {
             try {
                 // Attempt to double-release the buffer.
-                DirectBufferPool.INSTANCE.release(b);
-                fail("Expecting: " + IllegalArgumentException.class);
-            } catch (IllegalArgumentException ex) {
+                b.release();
+                fail("Expecting: " + IllegalStateException.class);
+            } catch (IllegalStateException ex) {
                 if (log.isInfoEnabled())
                     log.info("Ignoring expected exception: " + ex);
             }
@@ -186,11 +186,12 @@ public class TestDirectBufferPool extends TestCase2 {
                 1/* poolCapacity */, DirectBufferPool.INSTANCE
                         .getBufferCapacity());
 
-        ByteBuffer b = null;
+        IBufferAccess b = null;
         try {
             b = DirectBufferPool.INSTANCE.acquire();
             try {
-                testPool.release(b);
+            	// Only possible to test since in same package
+                testPool.release(b.buffer());
                 fail("Release should not be permitted to a different pool. Expecting: "
                         + IllegalArgumentException.class);
             } catch (IllegalArgumentException ex) {
@@ -198,8 +199,7 @@ public class TestDirectBufferPool extends TestCase2 {
                     log.info("Ignoring expected exception: " + ex);
             }
         } finally {
-            if (b != null)
-                DirectBufferPool.INSTANCE.release(b);
+            b.release();
         }
 
     }

@@ -40,6 +40,7 @@ import junit.framework.AssertionFailedError;
 
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.TestCase3;
 import com.bigdata.io.writecache.WriteCache;
@@ -100,7 +101,7 @@ public class TestWriteCache extends TestCase3 {
 
             final ReopenFileChannel opener = new ReopenFileChannel(file, mode);
 
-            final ByteBuffer buf = DirectBufferPool.INSTANCE.acquire();
+            final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
 
             try {
 
@@ -135,7 +136,7 @@ public class TestWriteCache extends TestCase3 {
                 }
 
             } finally {
-            	DirectBufferPool.INSTANCE.release(buf);
+            	buf.release();
             }
         } catch (Exception e) {
         	fail("Unexpected exception", e);
@@ -193,7 +194,7 @@ public class TestWriteCache extends TestCase3 {
 
             final ReopenFileChannel opener = new ReopenFileChannel(file, mode);
 
-            final ByteBuffer buf = DirectBufferPool.INSTANCE.acquire();
+            final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
 
             try {
 
@@ -512,7 +513,7 @@ public class TestWriteCache extends TestCase3 {
                 
             } finally {
 
-                DirectBufferPool.INSTANCE.release(buf);
+                buf.release();
 
                 opener.destroy();
 
@@ -575,7 +576,7 @@ public class TestWriteCache extends TestCase3 {
 
             final ReopenFileChannel opener = new ReopenFileChannel(file, mode);
 
-            final ByteBuffer buf = DirectBufferPool.INSTANCE.acquire();
+            final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
             try {
 
                 // The buffer size must be at least 1k for these tests.
@@ -888,7 +889,7 @@ public class TestWriteCache extends TestCase3 {
                 
             } finally {
 
-                DirectBufferPool.INSTANCE.release(buf);
+                buf.release();
 
                 opener.destroy();
 
@@ -917,9 +918,9 @@ public class TestWriteCache extends TestCase3 {
         final ReopenFileChannel opener = new ReopenFileChannel(file, mode);
         try {
 
-    	ByteBuffer buf = ByteBuffer.allocate(2 * 1024 * 1024);
-    	ByteBuffer buf2 = buf.duplicate();
-    	
+            final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
+            final IBufferAccess buf2 = DirectBufferPool.INSTANCE.acquire();
+
     	long addr1 = 12800;
     	ByteBuffer data1 = getRandomData(20 * 1024);
     	int chk1 = ChecksumUtility.threadChk.get().checksum(data1, 0/* offset */, data1.limit());
@@ -933,16 +934,16 @@ public class TestWriteCache extends TestCase3 {
     	// write first data buffer
     	cache1.write(addr1, data1, chk1);
     	data1.flip();
-    	buf2.limit(buf.position());
-    	buf2.position(0);
+    	buf2.buffer().limit(buf.buffer().position());
+    	buf2.buffer().position(0);
     	cache2.resetRecordMapFromBuffer();
        	assertEquals(cache1.read(addr1), data1);
        	assertEquals(cache2.read(addr1), data1);
     	
     	// now simulate removal/delete
     	cache1.clearAddrMap(addr1);
-    	buf2.limit(buf.position());
-    	buf2.position(0);
+    	buf2.buffer().limit(buf.buffer().position());
+    	buf2.buffer().position(0);
     	cache2.resetRecordMapFromBuffer();
     	assertTrue(cache2.read(addr1) == null);
     	assertTrue(cache1.read(addr1) == null);
@@ -950,8 +951,8 @@ public class TestWriteCache extends TestCase3 {
     	// now write second data buffer
     	cache1.write(addr1, data2, chk2);
     	data2.flip();
-    	buf2.limit(buf.position());
-    	buf2.position(0);
+    	buf2.buffer().limit(buf.buffer().position());
+    	buf2.buffer().position(0);
     	cache2.resetRecordMapFromBuffer();
     	assertEquals(cache2.read(addr1), data2);
     	assertEquals(cache1.read(addr1), data2);
@@ -1026,7 +1027,7 @@ public class TestWriteCache extends TestCase3 {
         
         final File file = File.createTempFile(getName(), ".tmp");
         
-        final ByteBuffer buf = DirectBufferPool.INSTANCE.acquire();
+        final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
         
         try {
 
@@ -1136,7 +1137,7 @@ public class TestWriteCache extends TestCase3 {
             }
         } finally {
 
-            DirectBufferPool.INSTANCE.release(buf);
+            buf.release();
             
         }
     }

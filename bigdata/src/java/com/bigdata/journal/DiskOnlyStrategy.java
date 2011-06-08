@@ -45,6 +45,7 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.journal.WORMStrategy.StoreCounters;
 import com.bigdata.rawstore.Bytes;
@@ -281,7 +282,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * condition without the write cache as measured by
          * {@link AbstractMRMWTestCase}.
          */
-        private ByteBuffer buf;
+        private IBufferAccess buf;
         
         /**
          * An index into the write cache used for read through on the cache. The
@@ -323,7 +324,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * 
          * @param capacity
          */
-        public WriteCache(final ByteBuffer writeCache) {
+        public WriteCache(final IBufferAccess writeCache) {
             
             if (writeCache == null)
                 throw new IllegalArgumentException();
@@ -332,13 +333,13 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             this.buf = writeCache;
             
             // the capacity of the buffer in bytes.
-            final int capacity = writeCache.capacity();
+            final int capacity = writeCache.buffer().capacity();
             
             /*
              * Discard anything in the buffer, resetting the position to zero,
              * the mark to zero, and the limit to the capacity.
              */
-            writeCache.clear();
+            writeCache.buffer().clear();
             
             /*
              * An estimate of the #of records that might fit within the write
@@ -358,7 +359,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          */
         final int position() {
             
-            return buf.position();
+            return buf.buffer().position();
             
         }
 
@@ -367,25 +368,25 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          */
         final int capacity() {
             
-            return buf.capacity();
+            return buf.buffer().capacity();
             
         }
         
         void flush() {
             
             // #of bytes to write on the disk.
-            final int nbytes = buf.position();
+            final int nbytes = buf.buffer().position();
 
             if (nbytes == 0) return;
 
             // limit := position; position := 0;
-            buf.flip();
+            buf.buffer().flip();
 
             // write the data on the disk file.
-            writeOnDisk(buf, writeCacheOffset, true/*append*/);
+            writeOnDisk(buf.buffer(), writeCacheOffset, true/*append*/);
 
             // position := 0; limit := capacity.
-            buf.clear();
+            buf.buffer().clear();
 
             // clear the index since all records were flushed to disk.
             writeCacheIndex.clear();
@@ -404,10 +405,10 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         void write(final long addr, final ByteBuffer data) {
 
             // the position() at which the record is cached.
-            final int position = buf.position();
+            final int position = buf.buffer().position();
 
             // copy the record into the cache.
-            buf.put(data);
+            buf.buffer().put(data);
 
             // add the record to the write cache index for read(addr).
             writeCacheIndex.put(Long.valueOf(addr), Integer.valueOf(position));
@@ -456,7 +457,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             final int pos = writeCachePosition;
 
             // create a view with same offset, limit and position.
-            final ByteBuffer tmp = buf.duplicate();
+            final ByteBuffer tmp = buf.buffer().duplicate();
 
             // adjust the view to just the record of interest.
             tmp.limit(pos + nbytes);
@@ -1305,7 +1306,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         if (fileMetadata.writeCacheEnabled && !fileMetadata.readOnly
                 && fileMetadata.closeTime == 0L) {
 
-            final ByteBuffer tmp;
+            final IBufferAccess tmp;
             try {
                 /*
                  * Note: a timeout here is not such a good idea. It could be
@@ -1318,7 +1319,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             }
 
             if (log.isInfoEnabled())
-                log.info("Enabling writeCache: capacity=" + tmp.capacity());
+                log.info("Enabling writeCache: capacity=" + tmp.buffer().capacity());
 
             writeCache = new WriteCache(tmp);
 
@@ -2531,14 +2532,14 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     
     synchronized private final void releaseWriteCache() {
 
-        final ByteBuffer tmp = writeCache == null ? null : writeCache.buf;
+        final IBufferAccess tmp = writeCache == null ? null : writeCache.buf;
 
         if (tmp == null)
             return;
 
         try {
             
-            DirectBufferPool.INSTANCE.release(tmp);
+            tmp.release();
             
         } catch (InterruptedException e) {
         

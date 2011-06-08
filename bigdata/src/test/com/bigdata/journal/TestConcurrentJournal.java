@@ -630,12 +630,15 @@ public class TestConcurrentJournal extends ProxyTestCase {
                             /* ignore */
                             if (log.isInfoEnabled())
                                 log.info("Ignoring interrupt: " + ex);
+                            
+                            break;
                         }
                     }
+                    
+                    return null;
 
                 }
-
-            });
+             });
 
             // wait until the task starts executing.
 

@@ -384,7 +384,7 @@ public class DirectBufferPoolAllocator {
          * context. Last element in the list is the {@link ByteBuffer} against
          * which allocations are currently being made.
          */
-        private final LinkedList<ByteBuffer> nativeBuffers = new LinkedList<ByteBuffer>();
+        private final LinkedList<IBufferAccess> directBuffers = new LinkedList<IBufferAccess>();
 
         /**
          * The set of native {@link ByteBuffer}s in use by this allocation
@@ -407,7 +407,7 @@ public class DirectBufferPoolAllocator {
 
             return getClass().getName() + "{key=" + key + ",#allocations="
                     + allocations.size() + ",#nativeBuffers="
-                    + nativeBuffers.size() + "}";
+                    + directBuffers.size() + "}";
             
         }
         
@@ -432,9 +432,9 @@ public class DirectBufferPoolAllocator {
 
                 while (nbytes > 0) {
 
-                    ByteBuffer nativeBuffer = nativeBuffers.peekLast();
+                    IBufferAccess directBuffer = directBuffers.peekLast();
 
-                    if (nativeBuffer == null) {
+                    if (directBuffer == null) {
 
                         if (!open.get()) {
                             /*
@@ -448,11 +448,12 @@ public class DirectBufferPoolAllocator {
                             throw new IllegalStateException();
                         }
                         
-                        nativeBuffers.add(nativeBuffer = directBufferPool
+                        directBuffers.add(directBuffer = directBufferPool
                                 .acquire());
 
                     }
 
+                    final ByteBuffer nativeBuffer = directBuffer.buffer();
                     final int remaining = nativeBuffer.remaining();
 
                     final int allocSize = Math.min(remaining, nbytes);
@@ -523,12 +524,12 @@ public class DirectBufferPoolAllocator {
                 allocations.clear();
 
                 // release backing buffers.
-                final Iterator<ByteBuffer> bitr = nativeBuffers.iterator();
+                final Iterator<IBufferAccess> bitr = directBuffers.iterator();
                 while(bitr.hasNext()) {
-                    final ByteBuffer b = bitr.next();
+                    final IBufferAccess b = bitr.next();
                     while (true) {
                         try {
-                            directBufferPool.release(b);
+                            b.release();
                             break;
                         } catch (InterruptedException e) {
                             interrupted = true;

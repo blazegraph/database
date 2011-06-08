@@ -46,6 +46,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.service.ResourceService.ReadBufferTask;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.config.NicUtil;
@@ -84,9 +85,9 @@ public class TestReceiveBuffer extends TestCase3 {
         
         final UUID allowedUUID = UUID.randomUUID();
 
-        final ByteBuffer allowedBuffer = DirectBufferPool.INSTANCE.acquire(1,
+        final IBufferAccess allowedBufferdb = DirectBufferPool.INSTANCE.acquire(1,
                 TimeUnit.SECONDS);
-        
+        final ByteBuffer allowedBuffer = allowedBufferdb.buffer();
         try {
 
             // populate with some random data.
@@ -132,8 +133,9 @@ public class TestReceiveBuffer extends TestCase3 {
             };
 
             // acquire the receive buffer from the pool.
-            final ByteBuffer receiveBuffer = DirectBufferPool.INSTANCE.acquire(
+            final IBufferAccess receiveBufferdb = DirectBufferPool.INSTANCE.acquire(
                     1, TimeUnit.SECONDS);
+            final ByteBuffer receiveBuffer = receiveBufferdb.buffer();
 
             try {
 
@@ -163,7 +165,7 @@ public class TestReceiveBuffer extends TestCase3 {
             } finally {
 
                 // release the buffer back to the pool.
-                DirectBufferPool.INSTANCE.release(receiveBuffer);
+                receiveBufferdb.release();
 
                 // shutdown the service.
                 service.shutdownNow();
@@ -175,7 +177,7 @@ public class TestReceiveBuffer extends TestCase3 {
         } finally {
 
             // release the buffer back to the pool.
-            DirectBufferPool.INSTANCE.release(allowedBuffer);
+            allowedBufferdb.release();
 
         }
 
@@ -193,7 +195,7 @@ public class TestReceiveBuffer extends TestCase3 {
 
         final Random r = new Random();
         
-        final ConcurrentHashMap<UUID, ByteBuffer> buffers = new ConcurrentHashMap<UUID, ByteBuffer>();
+        final ConcurrentHashMap<UUID, IBufferAccess> buffers = new ConcurrentHashMap<UUID, IBufferAccess>();
         
         final ResourceService service = new ResourceService(
                 new InetSocketAddress(InetAddress
@@ -204,7 +206,7 @@ public class TestReceiveBuffer extends TestCase3 {
             @Override
             protected ByteBuffer getBuffer(UUID uuid) {
 
-                return buffers.get(uuid);
+                return buffers.get(uuid).buffer();
 
             }
 
@@ -234,10 +236,10 @@ public class TestReceiveBuffer extends TestCase3 {
             // setup buffers with random data.
             final UUID[] uuids = new UUID[nbuffers];
             for (int i = 0; i < nbuffers; i++) {
-                final ByteBuffer b;
+                final IBufferAccess b;
                 buffers.put(uuids[i] = UUID.randomUUID(),
                         b = DirectBufferPool.INSTANCE.acquire());
-                fillBufferWithRandomData(b);
+                fillBufferWithRandomData(b.buffer());
             }
 
             // setup concurrent tasks.
@@ -249,16 +251,16 @@ public class TestReceiveBuffer extends TestCase3 {
                     public Void call() throws Exception {
                         final UUID uuid = uuids[r
                                                 .nextInt(nbuffers)];
-                        final ByteBuffer expected = buffers.get(uuid);
+                        final ByteBuffer expected = buffers.get(uuid).buffer();
 
-                        final ByteBuffer tmp = DirectBufferPool.INSTANCE
+                        final IBufferAccess tmp = DirectBufferPool.INSTANCE
                                 .acquire();
                         try {
 
-                            tmp.clear();
+                            tmp.buffer().clear();
 
                             final ByteBuffer actual = new ReadBufferTask(
-                                    service.getAddr(), uuid, tmp).call();
+                                    service.getAddr(), uuid, tmp.buffer()).call();
 
                             /*
                              * Verify that the returned buffer has the same data
@@ -267,7 +269,7 @@ public class TestReceiveBuffer extends TestCase3 {
                              */
                             assertEquals(expected, actual);
                         } finally {
-                            DirectBufferPool.INSTANCE.release(tmp);
+                            tmp.release();
                         }
                         return null;
                     }
@@ -305,9 +307,9 @@ public class TestReceiveBuffer extends TestCase3 {
                 log.info(service.counters.getCounters());
 
             // release the allocated buffers.
-            for (ByteBuffer b : buffers.values()) {
+            for (IBufferAccess b : buffers.values()) {
 
-                DirectBufferPool.INSTANCE.release(b);
+                b.release();
                 
             }
 

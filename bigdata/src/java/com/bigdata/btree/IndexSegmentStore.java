@@ -47,6 +47,7 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
@@ -120,7 +121,7 @@ public class IndexSegmentStore extends AbstractRawStore {
      * the use of this buffer means that reading a node that has fallen off of
      * the queue does not require any IO.
      */
-    private volatile ByteBuffer buf_nodes;
+    private volatile IBufferAccess buf_nodes;
     
     /**
      * The random access file used to read the index segment. This is
@@ -704,7 +705,7 @@ public class IndexSegmentStore extends AbstractRawStore {
                 try {
 
                     // release the buffer back to the pool.
-                    DirectBufferPool.INSTANCE.release(buf_nodes);
+                    buf_nodes.release();
 
                 } catch (Throwable t) {
 
@@ -1020,7 +1021,7 @@ public class IndexSegmentStore extends AbstractRawStore {
         final ByteBuffer tmp;
         synchronized(this) {
             
-            tmp = buf_nodes.asReadOnlyBuffer();
+            tmp = buf_nodes.buffer().asReadOnlyBuffer();
             
         }
 
@@ -1351,13 +1352,14 @@ public class IndexSegmentStore extends AbstractRawStore {
                         + ", #bytes=" + checkpoint.extentNodes + ", file=" + file);
 
             // #of bytes to read.
-            buf_nodes.limit((int)checkpoint.extentNodes);
+            final ByteBuffer tmp = buf_nodes.buffer();
+            tmp.limit((int)checkpoint.extentNodes);
             
             // attempt to read the nodes into the buffer.
-            FileChannelUtility.readAll(opener, buf_nodes,
+            FileChannelUtility.readAll(opener, tmp,
                     checkpoint.offsetNodes);
             
-            buf_nodes.flip();
+            tmp.flip();
             
         } catch (Throwable t1) {
 
@@ -1374,7 +1376,7 @@ public class IndexSegmentStore extends AbstractRawStore {
                 try {
                 
                     // release buffer back to the pool.
-                    DirectBufferPool.INSTANCE.release(buf_nodes);
+                    buf_nodes.release();
                     
                 } catch (Throwable t) {
                     

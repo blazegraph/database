@@ -70,28 +70,17 @@ public class DirectBufferPool {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      */
-    private static class BufferState {
+    private class BufferState implements IBufferAccess {
      
         /**
          * The buffer instance.
          */
-        private final ByteBuffer buf;
-
-        /**
-         * <code>true</code> iff the buffer is currently acquired.
-         */
-        private boolean acquired;
-
-//        /**
-//         * The #of times this buffer has been acquired.
-//         */
-//        private long nacquired = 0L;
+        private ByteBuffer buf;
         
-        BufferState(final ByteBuffer buf, final boolean acquired) {
+        BufferState(final ByteBuffer buf) {
             if (buf == null)
                 throw new IllegalArgumentException();
             this.buf = buf;
-            this.acquired = acquired;
         }
         
         /**
@@ -130,6 +119,35 @@ public class DirectBufferPool {
              */
             throw new AssertionError();
         }
+
+        // Implement IDirectBuffer methods
+		public ByteBuffer buffer() {
+			return buf;
+		}
+
+		public void release() throws InterruptedException {
+			release(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+		}
+
+		public void release(long timeout, TimeUnit units) throws InterruptedException {
+			if (buf != null) {
+				DirectBufferPool.this.release(buf, timeout, units);
+				buf = null;
+			} else {
+				throw new IllegalStateException("Buffer has already been released");
+			}
+		}
+        
+		protected void finalize() {
+			if (buf != null) {
+				try {
+					DirectBufferPool.this.release(buf);
+				} catch (InterruptedException e) {
+					// ignore
+				}
+				log.warn("Buffer released on finalize");
+			} 
+		}
         
         
     }
@@ -145,18 +163,7 @@ public class DirectBufferPool {
      * Note: This is NOT a weak reference collection since the JVM will leak
      * native memory.
      */
-    final private BlockingQueue<BufferState> pool;
-
-    /**
-     * Used to recognize {@link ByteBuffer}s allocated by this pool so that we
-     * can refuse offered buffers that were allocated elsewhere (a paranoia
-     * feature which could be dropped).
-     * <p>
-     * Note: {@link LinkedHashSet} is used here for its fast iterator semantics
-     * since we need to do a linear scan of this collection in
-     * {@link #getBufferState(ByteBuffer)}.
-     */
-    final private LinkedHashSet<BufferState> allocated;
+    final private BlockingQueue<ByteBuffer> pool;
 
     /**
      * The number {@link ByteBuffer}s allocated (must use {@link #lock} for
@@ -426,10 +433,7 @@ public class DirectBufferPool {
 
         this.bufferCapacity = bufferCapacity;
 
-        // Note: This is required in order to detect double-opens.
-        this.allocated = new LinkedHashSet<BufferState>();
-
-        this.pool = new LinkedBlockingQueue<BufferState>(poolCapacity);
+        this.pool = new LinkedBlockingQueue<ByteBuffer>(poolCapacity);
 
         pools.add(this);
         
@@ -456,7 +460,7 @@ public class DirectBufferPool {
      * @throws OutOfMemoryError
      *             if there is not enough free memory to fulfill the request.
      */
-    public ByteBuffer acquire() throws InterruptedException {
+    public IBufferAccess acquire() throws InterruptedException {
 
         try {
             
@@ -493,7 +497,7 @@ public class DirectBufferPool {
      * @throws InterruptedException
      * @throws TimeoutException
      */
-    public ByteBuffer acquire(final long timeout, final TimeUnit unit)
+    public IBufferAccess acquire(final long timeout, final TimeUnit unit)
             throws InterruptedException, TimeoutException {
 
         if(log.isInfoEnabled())
@@ -510,17 +514,13 @@ public class DirectBufferPool {
             }
 
             // the head of the pool must exist.
-            final BufferState state = pool.take();
+            final ByteBuffer buf = pool.take();
 
-            if (state.acquired)
-                throw new RuntimeException("Buffer already acquired");
-            
-            state.acquired = true;
             acquired++;
             totalAcquireCount.increment();
 
             // limit -> capacity; pos-> 0; mark cleared.
-            state.buf.clear();
+            buf.clear();
 
             if (log.isTraceEnabled()) {
                 final Throwable t = new RuntimeException(
@@ -528,7 +528,7 @@ public class DirectBufferPool {
                 log.trace(t, t);
             }
             
-            return state.buf;
+            return new BufferState(buf);
 
         } finally {
 
@@ -553,7 +553,7 @@ public class DirectBufferPool {
      *             if the buffer has already been released.
      * @throws InterruptedException
      */
-    public void release(final ByteBuffer b) throws InterruptedException {
+    final protected void release(final ByteBuffer b) throws InterruptedException {
 
         if (!release(b, Long.MAX_VALUE, TimeUnit.MILLISECONDS)) {
 
@@ -578,7 +578,7 @@ public class DirectBufferPool {
      *             if the buffer has already been released.
      * @throws InterruptedException
      */
-    public boolean release(final ByteBuffer b, final long timeout,
+    final private boolean release(final ByteBuffer b, final long timeout,
             final TimeUnit units) throws InterruptedException {
 
         if(log.isInfoEnabled())
@@ -590,20 +590,10 @@ public class DirectBufferPool {
         lock.lock();
 
         try {
-
-            final BufferState state = getBufferState(b);
-
-            // Check for double-release!
-            if (!state.acquired) {
-                log.error("Buffer already released.");
-                throw new IllegalArgumentException("buffer already released.");
-            }
-
             // add to the pool.
-            if(!pool.offer(state, timeout, units))
+            if(!pool.offer(b, timeout, units))
                 return false;
 
-            state.acquired = false;
             acquired--;
             totalReleaseCount.increment();
             
@@ -677,14 +667,9 @@ public class DirectBufferPool {
             // update the pool size.
             size++;
 
-            // wrap with state metadata.
-            final BufferState state = new BufferState(b, false/* acquired */);
-
-            // add to the set of known buffers
-            allocated.add(state);
 
             // add to the pool.
-            pool.add(state);
+            pool.add(b);
 
             /*
              * There is now a buffer in the pool and the caller will get it
@@ -734,45 +719,6 @@ public class DirectBufferPool {
         assert !pool.isEmpty();
 
         return;
-
-    }
-
-    /**
-     * Note: There is really no reason why we could not accept "donated" direct
-     * {@link ByteBuffer}s as long as they conform with the constraints on the
-     * {@link DirectBufferPool}.
-     * 
-     * @param b
-     *            The buffer.
-     */
-    private BufferState getBufferState(final ByteBuffer b) {
-
-        assert lock.isHeldByCurrentThread();
-
-        if (b == null)
-            throw new IllegalArgumentException("null reference");
-
-        if (b.capacity() != bufferCapacity)
-            throw new IllegalArgumentException("wrong capacity");
-
-        if(!b.isDirect())
-            throw new IllegalArgumentException("not direct");
-        
-        /*
-         * Linear scan for a BufferState object having that ByteBuffer
-         * reference.
-         */
-        for (BufferState x : allocated) {
-
-            if (x.buf == b) {
-                
-                return x;
-                
-            }
-
-        }
-
-        throw new IllegalArgumentException("Buffer not allocated by this pool.");
 
     }
 

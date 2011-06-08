@@ -10,6 +10,7 @@ import com.bigdata.btree.IndexSegment.IndexSegmentTupleCursor;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.io.IBufferAccess;
 
 /**
  * A fast iterator based on multi-block IO for the {@link IndexSegment}. This
@@ -75,7 +76,7 @@ public class IndexSegmentMultiBlockIterator<E> implements ITupleIterator<E> {
     /**
      * The buffer.
      */
-    private volatile ByteBuffer buffer;
+    private volatile IBufferAccess buffer;
 
     /**
      * The inclusive lower bound -or- <code>null</code> if there is no lower
@@ -274,13 +275,13 @@ public class IndexSegmentMultiBlockIterator<E> implements ITupleIterator<E> {
                 throw new RuntimeException(e);
             }
         }
-        return buffer;
+        return buffer.buffer();
     }
 
     private void releaseBuffer() {
         if (buffer != null) {
             try {
-                pool.release(buffer);
+                buffer.release();
             } catch (InterruptedException e) {
                 // Propagate interrupt.
                 Thread.currentThread().interrupt();
@@ -373,7 +374,7 @@ public class IndexSegmentMultiBlockIterator<E> implements ITupleIterator<E> {
             // acquire the buffer from the pool.
             acquireBuffer();
             // Read the first block.
-            nextBlock(firstLeafAddr, buffer);
+            nextBlock(firstLeafAddr, buffer.buffer());
             // Extract the first leaf.
             final ImmutableLeaf leaf = getLeaf(firstLeafAddr);
             // Return the first leaf.
@@ -408,7 +409,7 @@ public class IndexSegmentMultiBlockIterator<E> implements ITupleIterator<E> {
             }
             if (offset + nbytes > blockOffset + blockLength) {
                 // read the next block.
-                nextBlock(nextLeafAddr, buffer);
+                nextBlock(nextLeafAddr, buffer.buffer());
             }
         }
         // extract the next leaf.
@@ -444,7 +445,7 @@ public class IndexSegmentMultiBlockIterator<E> implements ITupleIterator<E> {
         final int offsetWithinBuffer = (int)(offset - blockOffset);
 
         // read only view of the leaf in the buffer.
-        final ByteBuffer tmp = buffer.asReadOnlyBuffer();
+        final ByteBuffer tmp = buffer.buffer().asReadOnlyBuffer();
         tmp.limit(offsetWithinBuffer + nbytes);
         tmp.position(offsetWithinBuffer);
 

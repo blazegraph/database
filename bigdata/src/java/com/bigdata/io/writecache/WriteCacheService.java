@@ -60,6 +60,7 @@ import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumPipeline;
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.WriteCache.WriteCacheCounters;
 import com.bigdata.journal.AbstractBufferStrategy;
@@ -833,7 +834,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * 
      * @throws InterruptedException
      */
-    abstract public WriteCache newWriteCache(ByteBuffer buf,
+    abstract public WriteCache newWriteCache(IBufferAccess buf,
             boolean useChecksum, boolean bufferHasData,
             IReopenChannel<? extends Channel> opener) throws InterruptedException;
 

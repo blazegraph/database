@@ -97,7 +97,13 @@ public class DatatypeBOp extends IVValueExpression<IV>
     }
 
     public IV get(final IBindingSet bs) {
-        
+     
+        final String namespace = (String)
+			getRequiredProperty(Annotations.NAMESPACE);
+	
+	    final BigdataValueFactory vf = 
+	    	BigdataValueFactoryImpl.getInstance(namespace);
+    	
         final IV iv = get(0).get(bs);
         
         if (log.isDebugEnabled()) {
@@ -107,6 +113,28 @@ public class DatatypeBOp extends IVValueExpression<IV>
         // not yet bound
         if (iv == null)
         	throw new SparqlTypeErrorException();
+        
+        if (iv.isNumeric()) {
+        	
+//            final BigdataURI datatype = vf.createURI(iv.getDTE().getDatatype());
+            final BigdataURI datatype = vf.asValue(iv.getDTE().getDatatypeURI());
+        	
+	    	IV datatypeIV = datatype.getIV();
+	    	
+	    	if (datatypeIV == null) {
+	    		
+//                datatypeIV = new TermId(VTE.URI, TermId.NULL);
+                datatypeIV = TermId.mockIV(VTE.URI);
+	    		datatype.setIV(datatypeIV);
+		    	
+	    	}
+	    	
+	    	// cache the value on the IV
+	    	datatypeIV.setValue(datatype);
+	    	
+	    	return datatypeIV;
+        	
+        }
         
         final BigdataValue val = iv.getValue();
         
@@ -127,12 +155,6 @@ public class DatatypeBOp extends IVValueExpression<IV>
 			} else if (literal.getLanguage() == null) {
 				
 				// simple literal
-	            final String namespace = (String)
-	        		getRequiredProperty(Annotations.NAMESPACE);
-	        
-		        final BigdataValueFactory vf = 
-		        	BigdataValueFactoryImpl.getInstance(namespace);
-        
 				datatype = vf.asValue(XSD.STRING);
 				
 			} else {
@@ -146,7 +168,8 @@ public class DatatypeBOp extends IVValueExpression<IV>
 	    	if (datatypeIV == null) {
 	    		
 //	    		datatypeIV = new TermId(VTE.valueOf(val), TermId.NULL);
-	    		datatypeIV = TermId.mockIV(VTE.valueOf(val));
+//              datatypeIV = new TermId(VTE.URI, TermId.NULL);
+	    		datatypeIV = TermId.mockIV(VTE.URI);
 	    		datatype.setIV(datatypeIV);
 		    	
 	    	}

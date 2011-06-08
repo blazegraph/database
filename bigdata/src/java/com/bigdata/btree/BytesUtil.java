@@ -1195,7 +1195,7 @@ public class BytesUtil {
 		return (ret & bitmasks[l]) << shift;
 	}
 
-	public static long tstGetBits64(final byte[] a, final int off, final int len) {
+	public static long altGetBits64(final byte[] a, final int off, final int len) {
 
 		if (a == null || off < 0 || len < 0 || len > 64)
 			throw new IllegalArgumentException();
@@ -1209,7 +1209,7 @@ public class BytesUtil {
 		 */
 
 		// byte in which the bit range begins.
-		int bi = byteIndexForBit(off);
+		int bi = off/8;
 		// start bit offset
 		int bo = off % 8;
 		// bits remaining in current byte
@@ -1236,7 +1236,7 @@ public class BytesUtil {
 	/*
 	 * Is there any advantage in 32-bit math over 64-bit?
 	 */
-	public static int tstGetBits32(final byte[] a, final int off, final int len) {
+	public static int altGetBits32(final byte[] a, final int off, final int len) {
 
 		if (a == null || off < 0 || len < 0 || len > 64)
 			throw new IllegalArgumentException();
@@ -1250,7 +1250,7 @@ public class BytesUtil {
 		 */
 
 		// byte in which the bit range begins.
-		int bi = byteIndexForBit(off);
+		int bi = off/8;
 		// start bit offset
 		int bo = off % 8;
 		// bits remaining in current byte
@@ -1287,6 +1287,20 @@ public class BytesUtil {
 
 		return ret;
 	}
+	
+	/**
+	 * Some benchmarks seem to indicate that altGetBits32 is faster than getBits
+	 * for smaller byte counts.  OTOH the cost of the redirection may outweigh
+	 * any benefit.
+	 */
+	public static int optGetBits(final byte[] a, final int off, final int len) {
+		if (len <= 16) {
+			return altGetBits32(a, off, len);
+		} else {
+			return getBits(a, off, len);
+		}
+	}
+
 
 	/**
 	 * Return the n-bit integer corresponding to the inclusive bit range of the

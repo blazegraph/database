@@ -180,120 +180,119 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
     public void test_twothreadIndexCreationRate() throws InterruptedException {
 
         final Properties properties = getProperties();
-        
-        final Journal journal = new Journal(properties);
 
-        try {
-        
-        // the initial value of the commit counter.
-        final long beginCommitCounter = journal.getRootBlockView().getCommitCounter();
+		for (int t = 0; t < 100; t++) {
 
-        final long begin = System.currentTimeMillis();
-        
-        final int ntasks = 1000;
+			final Journal journal = new Journal(properties);
 
-        final Lock lock = new ReentrantLock();
-        final AtomicInteger ndone = new AtomicInteger(0);
-        final Condition done = lock.newCondition();
-        
-        Thread t1 = new Thread() {
+			try {
 
-            public void run() {
-                
-                for (int i = 0; i < ntasks/2; i++) {
+				// the initial value of the commit counter.
+				final long beginCommitCounter = journal.getRootBlockView().getCommitCounter();
 
-                    // resource names are non-overlapping.
-                    final String resource = ""+i;
-                    
-                    final UUID indexUUID = UUID.randomUUID();
+				final long begin = System.currentTimeMillis();
 
-                    final BTree ndx = BTree.create(journal, new IndexMetadata(
-                            resource, indexUUID));
-                    
-                    journal.registerIndex(resource, ndx);
+				final int ntasks = 1000;
 
-                }
+				final Lock lock = new ReentrantLock();
+				final AtomicInteger ndone = new AtomicInteger(0);
+				final Condition done = lock.newCondition();
 
-                lock.lock();
-                try {
-                    ndone.incrementAndGet();
-                    done.signal();
-                }
-                finally {
-                    lock.unlock();
-                }
-                
-            }
-        
-        };
+				Thread t1 = new Thread() {
 
-        Thread t2 = new Thread() {
-            
-            public void run() {
-                for (int i = ntasks/2; i < ntasks; i++) {
+					public void run() {
 
-                    // resource names are non-overlapping.
-                    final String resource = ""+i;
-                    
-                    final UUID indexUUID = UUID.randomUUID();
+						for (int i = 0; i < ntasks / 2; i++) {
 
-                    final BTree ndx = BTree.create(journal, new IndexMetadata(
-                            resource, indexUUID));
+							// resource names are non-overlapping.
+							final String resource = "" + i;
 
-                    journal.registerIndex(resource, ndx);
+							final UUID indexUUID = UUID.randomUUID();
 
-                }
-                
-                lock.lock();
-                try {
-                    ndone.incrementAndGet();
-                    done.signal();
-                }
-                finally {
-                    lock.unlock();
-                }
-                
-            }
+							final BTree ndx = BTree.create(journal, new IndexMetadata(resource, indexUUID));
 
-        };
-        
-        t1.setDaemon(true);
-        t2.setDaemon(true);
-        
-        t1.start();
-        t2.start();
+							journal.registerIndex(resource, ndx);
 
-        lock.lock();
-        try {
-            while(ndone.get()<2) {
-                done.await();
-            }
-        } finally {
-            lock.unlock();
-        }
-        
-        // unchanged (no commit was performed).
-        assertEquals(beginCommitCounter,journal.getRootBlockView().getCommitCounter());
-        
-        final long now = System.currentTimeMillis();
-        
-        final long elapsed1 = now - begin;
-        
-        journal.commit();
-        
-        final long elapsed2 = now - begin;
-        
-        System.err.println("#tasks=" + ntasks + ", elapsed=" + elapsed1
-                + ", #indices created per second="
-                + (int)(1000d * ntasks / elapsed1) + ", commit=" + elapsed2 + "ms");
-        
-        } finally {
-        
-            journal.destroy();
-            
-        }
+						}
 
-    }
+						lock.lock();
+						try {
+							ndone.incrementAndGet();
+							done.signal();
+						} finally {
+							lock.unlock();
+						}
+
+					}
+
+				};
+
+				Thread t2 = new Thread() {
+
+					public void run() {
+						for (int i = ntasks / 2; i < ntasks; i++) {
+
+							// resource names are non-overlapping.
+							final String resource = "" + i;
+
+							final UUID indexUUID = UUID.randomUUID();
+
+							final BTree ndx = BTree.create(journal, new IndexMetadata(resource, indexUUID));
+
+							journal.registerIndex(resource, ndx);
+
+						}
+
+						lock.lock();
+						try {
+							ndone.incrementAndGet();
+							done.signal();
+						} finally {
+							lock.unlock();
+						}
+
+					}
+
+				};
+
+				t1.setDaemon(true);
+				t2.setDaemon(true);
+
+				t1.start();
+				t2.start();
+
+				lock.lock();
+				try {
+					while (ndone.get() < 2) {
+						done.await();
+					}
+				} finally {
+					lock.unlock();
+				}
+
+				// unchanged (no commit was performed).
+				assertEquals(beginCommitCounter, journal.getRootBlockView().getCommitCounter());
+
+				final long now = System.currentTimeMillis();
+
+				final long elapsed1 = now - begin;
+
+				journal.commit();
+
+				final long elapsed2 = now - begin;
+
+				System.err.println("#tasks=" + ntasks + ", elapsed=" + elapsed1 + ", #indices created per second="
+						+ (int) (1000d * ntasks / elapsed1) + ", commit=" + elapsed2 + "ms");
+
+			} finally {
+
+				journal.destroy();
+
+			}
+
+		}
+
+	}
     
     /**
      * Runs a single condition.

@@ -39,6 +39,7 @@ import com.bigdata.ha.pipeline.HAReceiveService;
 import com.bigdata.ha.pipeline.HASendService;
 import com.bigdata.ha.pipeline.HAWriteMessageBase;
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.TestCase3;
 import com.bigdata.util.ChecksumUtility;
 
@@ -294,11 +295,13 @@ public class TestHASendAndReceive extends TestCase3 {
      */
     public void testStressDirectBuffers() throws InterruptedException {
 
-        ByteBuffer tst = null, rcv = null;
+        IBufferAccess tstdb = null, rcvdb = null;
         int i = -1, sze = -1;
         try {
-            tst = DirectBufferPool.INSTANCE.acquire();
-            rcv = DirectBufferPool.INSTANCE.acquire();
+        	tstdb = DirectBufferPool.INSTANCE.acquire();
+        	rcvdb = DirectBufferPool.INSTANCE.acquire();
+        	final ByteBuffer tst = tstdb.buffer();
+        	final ByteBuffer rcv = rcvdb.buffer();
             for (i = 0; i < 1000; i++) {
                 sze = 1 + r.nextInt(tst.capacity());
                 getRandomData(tst, sze);
@@ -329,12 +332,12 @@ public class TestHASendAndReceive extends TestCase3 {
             throw new RuntimeException("i=" + i + ", sze=" + sze + " : " + t, t);
         } finally {
             try {
-                if (tst != null) {
-                    DirectBufferPool.INSTANCE.release(tst);
+                if (tstdb != null) {
+                    tstdb.release();
                 }
             } finally {
-                if (rcv != null) {
-                    DirectBufferPool.INSTANCE.release(rcv);
+                if (rcvdb != null) {
+                    rcvdb.release();
                 }
             }
         }

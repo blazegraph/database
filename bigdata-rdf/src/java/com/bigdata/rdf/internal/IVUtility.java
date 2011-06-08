@@ -31,12 +31,17 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
+import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -44,6 +49,7 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.NullOutputStream;
 import com.bigdata.io.compression.BOCU1Compressor;
 import com.bigdata.io.compression.UnicodeHelper;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.TermsIndexHelper;
@@ -206,6 +212,74 @@ public class IVUtility {
         
     }
     
+	public static IV literalMath(final Literal l1, final Literal l2, 
+			final MathOp op)
+	{
+		final URI dt1 = l1.getDatatype();
+		final URI dt2 = l2.getDatatype();
+	
+		// Only numeric value can be used in math expressions
+		if (dt1 == null || !XMLDatatypeUtil.isNumericDatatype(dt1)) {
+			throw new IllegalArgumentException("Not a number: " + l1);
+		}
+		if (dt2 == null || !XMLDatatypeUtil.isNumericDatatype(dt2)) {
+			throw new IllegalArgumentException("Not a number: " + l2);
+		}
+	
+		// Determine most specific datatype that the arguments have in common,
+		// choosing from xsd:integer, xsd:decimal, xsd:float and xsd:double as
+		// per the SPARQL/XPATH spec
+		URI commonDatatype;
+	
+		if (dt1.equals(XMLSchema.DOUBLE) || dt2.equals(XMLSchema.DOUBLE)) {
+			commonDatatype = XMLSchema.DOUBLE;
+		} else if (dt1.equals(XMLSchema.FLOAT) || dt2.equals(XMLSchema.FLOAT)) {
+			commonDatatype = XMLSchema.FLOAT;
+		} else if (dt1.equals(XMLSchema.DECIMAL) || dt2.equals(XMLSchema.DECIMAL)) {
+			commonDatatype = XMLSchema.DECIMAL;
+		} else if (op == MathOp.DIVIDE) {
+			// Result of integer divide is decimal and requires the arguments to
+			// be handled as such, see for details:
+			// http://www.w3.org/TR/xpath-functions/#func-numeric-divide
+			commonDatatype = XMLSchema.DECIMAL;
+		} else {
+			commonDatatype = XMLSchema.INTEGER;
+		}
+	
+		// Note: Java already handles cases like divide-by-zero appropriately
+		// for floats and doubles, see:
+		// http://www.particle.kth.se/~lindsey/JavaCourse/Book/Part1/Tech/
+		// Chapter02/floatingPt2.html
+	
+		try {
+			if (commonDatatype.equals(XMLSchema.DOUBLE)) {
+				double left = l1.doubleValue();
+				double right = l2.doubleValue();
+				return IVUtility.numericalMath(left, right, op);
+			}
+			else if (commonDatatype.equals(XMLSchema.FLOAT)) {
+				float left = l1.floatValue();
+				float right = l2.floatValue();
+				return IVUtility.numericalMath(left, right, op);
+			}
+			else if (commonDatatype.equals(XMLSchema.DECIMAL)) {
+				BigDecimal left = l1.decimalValue();
+				BigDecimal right = l2.decimalValue();
+				return IVUtility.numericalMath(left, right, op);
+			}
+			else { // XMLSchema.INTEGER
+				BigInteger left = l1.integerValue();
+				BigInteger right = l2.integerValue();
+				return IVUtility.numericalMath(left, right, op);
+			}
+		} catch (NumberFormatException e) {
+			throw new SparqlTypeErrorException();
+		} catch (ArithmeticException e) {
+			throw new SparqlTypeErrorException();
+		}
+		
+	}
+    
     public static final IV numericalMath(final IV iv1, final IV iv2, 
     		final MathOp op) {
     	
@@ -239,34 +313,53 @@ public class IVUtility {
         final AbstractLiteralIV num1 = (AbstractLiteralIV) iv1; 
         final AbstractLiteralIV num2 = (AbstractLiteralIV) iv2; 
         
-        // if one's a BigDecimal we should use the BigDecimal comparator for both
-        if (dte1 == DTE.XSDDecimal || dte2 == DTE.XSDDecimal) {
-            return numericalMath(num1.decimalValue(), num2.decimalValue(), op);
-        }
+		// Determine most specific datatype that the arguments have in common,
+		// choosing from xsd:integer, xsd:decimal, xsd:float and xsd:double as
+		// per the SPARQL/XPATH spec
         
-        // same for BigInteger
-        if (dte1 == DTE.XSDInteger || dte2 == DTE.XSDInteger) {
-            return numericalMath(num1.integerValue(), num2.integerValue(), op);
-        }
-        
-        // fixed length numerics
-        if (dte1.isFloatingPointNumeric() || dte2.isFloatingPointNumeric()) {
-            // non-BigDecimal floating points
-        	if (dte1 == DTE.XSDFloat || dte2 == DTE.XSDFloat)
-        		return numericalMath(num1.floatValue(), num2.floatValue(), op);
-        	else
-        		return numericalMath(num1.doubleValue(), num2.doubleValue(), op);
+        if (dte1 == DTE.XSDDouble || dte2 == DTE.XSDDouble) {
+        	return numericalMath(num1.doubleValue(), num2.doubleValue(), op);
+        } else if (dte1 == DTE.XSDFloat || dte2 == DTE.XSDFloat) {
+        	return numericalMath(num1.floatValue(), num2.floatValue(), op);
+        } if (dte1 == DTE.XSDDecimal || dte2 == DTE.XSDDecimal) {
+        	return numericalMath(num1.decimalValue(), num2.decimalValue(), op);
+        } if (op == MathOp.DIVIDE) {
+			// Result of integer divide is decimal and requires the arguments to
+			// be handled as such, see for details:
+			// http://www.w3.org/TR/xpath-functions/#func-numeric-divide
+        	return numericalMath(num1.decimalValue(), num2.decimalValue(), op);
         } else {
-            // non-BigInteger integers
-        	if (dte1 == DTE.XSDInt && dte2 == DTE.XSDInt)
-        		return numericalMath(num1.intValue(), num2.intValue(), op);
-        	else
-        		return numericalMath(num1.longValue(), num2.longValue(), op);
+        	return numericalMath(num1.integerValue(), num2.integerValue(), op);
         }
+        	
+//        // if one's a BigDecimal we should use the BigDecimal comparator for both
+//        if (dte1 == DTE.XSDDecimal || dte2 == DTE.XSDDecimal) {
+//            return numericalMath(num1.decimalValue(), num2.decimalValue(), op);
+//        }
+//        
+//        // same for BigInteger
+//        if (dte1 == DTE.XSDInteger || dte2 == DTE.XSDInteger) {
+//            return numericalMath(num1.integerValue(), num2.integerValue(), op);
+//        }
+//        
+//        // fixed length numerics
+//        if (dte1.isFloatingPointNumeric() || dte2.isFloatingPointNumeric()) {
+//            // non-BigDecimal floating points
+//        	if (dte1 == DTE.XSDFloat || dte2 == DTE.XSDFloat)
+//        		return numericalMath(num1.floatValue(), num2.floatValue(), op);
+//        	else
+//        		return numericalMath(num1.doubleValue(), num2.doubleValue(), op);
+//        } else {
+//            // non-BigInteger integers
+//        	if (dte1 == DTE.XSDInt && dte2 == DTE.XSDInt)
+//        		return numericalMath(num1.intValue(), num2.intValue(), op);
+//        	else
+//        		return numericalMath(num1.longValue(), num2.longValue(), op);
+//        }
         
     }
     
-    private static final IV numericalMath(final BigDecimal left, 
+    public static final IV numericalMath(final BigDecimal left, 
     		final BigDecimal right, final MathOp op) {
     	
     	switch(op) {
@@ -277,7 +370,7 @@ public class IVUtility {
     	case MULTIPLY:
     		return new XSDDecimalIV(left.multiply(right));
     	case DIVIDE:
-    		return new XSDDecimalIV(left.divide(right));
+    		return new XSDDecimalIV(left.divide(right, RoundingMode.HALF_UP));
     	case MIN:
     		return new XSDDecimalIV(left.compareTo(right) < 0 ? left : right);
     	case MAX:
@@ -288,7 +381,7 @@ public class IVUtility {
     	
     }
     
-    private static final IV numericalMath(final BigInteger left, 
+    public static final IV numericalMath(final BigInteger left, 
     		final BigInteger right, final MathOp op) {
     	
     	switch(op) {
@@ -310,7 +403,7 @@ public class IVUtility {
     	
     }
     
-    private static final IV numericalMath(final float left, 
+    public static final IV numericalMath(final float left, 
     		final float right, final MathOp op) {
     	
     	switch(op) {
@@ -332,7 +425,7 @@ public class IVUtility {
     	
     }
     
-    private static final IV numericalMath(final double left, 
+    public static final IV numericalMath(final double left, 
     		final double right, final MathOp op) {
     	
     	switch(op) {
@@ -354,49 +447,49 @@ public class IVUtility {
     	
     }
     
-    private static final IV numericalMath(final int left, 
-    		final int right, final MathOp op) {
-    	
-    	switch(op) {
-    	case PLUS:
-    		return new XSDIntIV(left+right);
-    	case MINUS:
-    		return new XSDIntIV(left-right);
-    	case MULTIPLY:
-    		return new XSDIntIV(left*right);
-    	case DIVIDE:
-    		return new XSDIntIV(left/right);
-    	case MIN:
-    		return new XSDIntIV(Math.min(left,right));
-    	case MAX:
-    		return new XSDIntIV(Math.max(left,right));
-    	default:
-    		throw new UnsupportedOperationException();
-    	}
-    	
-    }
-    
-    private static final IV numericalMath(final long left, 
-    		final long right, final MathOp op) {
-    	
-    	switch(op) {
-    	case PLUS:
-    		return new XSDLongIV(left+right);
-    	case MINUS:
-    		return new XSDLongIV(left-right);
-    	case MULTIPLY:
-    		return new XSDLongIV(left*right);
-    	case DIVIDE:
-    		return new XSDLongIV(left/right);
-    	case MIN:
-    		return new XSDLongIV(Math.min(left,right));
-    	case MAX:
-    		return new XSDLongIV(Math.max(left,right));
-    	default:
-    		throw new UnsupportedOperationException();
-    	}
-    	
-    }
+//    private static final IV numericalMath(final int left, 
+//    		final int right, final MathOp op) {
+//    	
+//    	switch(op) {
+//    	case PLUS:
+//    		return new XSDIntIV(left+right);
+//    	case MINUS:
+//    		return new XSDIntIV(left-right);
+//    	case MULTIPLY:
+//    		return new XSDIntIV(left*right);
+//    	case DIVIDE:
+//    		return new XSDIntIV(left/right);
+//    	case MIN:
+//    		return new XSDIntIV(Math.min(left,right));
+//    	case MAX:
+//    		return new XSDIntIV(Math.max(left,right));
+//    	default:
+//    		throw new UnsupportedOperationException();
+//    	}
+//    	
+//    }
+//    
+//    private static final IV numericalMath(final long left, 
+//    		final long right, final MathOp op) {
+//    	
+//    	switch(op) {
+//    	case PLUS:
+//    		return new XSDLongIV(left+right);
+//    	case MINUS:
+//    		return new XSDLongIV(left-right);
+//    	case MULTIPLY:
+//    		return new XSDLongIV(left*right);
+//    	case DIVIDE:
+//    		return new XSDLongIV(left/right);
+//    	case MIN:
+//    		return new XSDLongIV(Math.min(left,right));
+//    	case MAX:
+//    		return new XSDLongIV(Math.max(left,right));
+//    	default:
+//    		throw new UnsupportedOperationException();
+//    	}
+//    	
+//    }
     
     /**
      * Used to test whether a given value constant can be used in an inline

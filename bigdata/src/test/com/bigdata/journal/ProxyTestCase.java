@@ -143,12 +143,47 @@ public abstract class ProxyTestCase<S extends IIndexManager>
      * an entire suite of tests.)
      */
     
+    int startupActiveThreads = 0;
     public void setUp() throws Exception {
+    	startupActiveThreads = Thread.currentThread().getThreadGroup().activeCount();
+    	
         getOurDelegate().setUp(this);
     }
 
+    static boolean s_checkThreads = false;
     public void tearDown() throws Exception {
         getOurDelegate().tearDown(this);
+        
+        if (s_checkThreads) {
+	        final ThreadGroup grp = Thread.currentThread().getThreadGroup();
+	    	int tearDownActiveThreads = grp.activeCount();
+	    	if (startupActiveThreads != tearDownActiveThreads) {
+	    		final Thread[] threads = new Thread[tearDownActiveThreads];
+	    		grp.enumerate(threads);
+	    		final StringBuilder info = new StringBuilder();
+	    		for(Thread t: threads) {
+	    			info.append(t.getName() + "\n");
+	    		}
+	    		
+	    		String failMessage = "Threads left active after task, startupCount: " 
+	    				+ startupActiveThreads
+	    				+ ", teardownCount: " + tearDownActiveThreads
+	    				+ ", threads: " + info;
+	    		// Wait upto 2 seconds for threads to die off
+	    		for (int i = 0; i < 20; i++) {
+	    			Thread.currentThread().sleep(100);
+	    			if (grp.activeCount() != startupActiveThreads)
+	    				break;
+	    		}
+	    		
+	    		if (grp.activeCount() != startupActiveThreads)
+	    			fail(failMessage);  
+	    		else
+	    			log.warn(failMessage);
+	    	}
+        }
+    	
+    	super.tearDown();
     }
 
     public Properties getProperties() {
