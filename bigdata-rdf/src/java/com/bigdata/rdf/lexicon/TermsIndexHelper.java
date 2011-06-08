@@ -204,18 +204,25 @@ public class TermsIndexHelper {
 		// fast range count. this tells us how many collisions there are.
 		// this is an exact collision count since we are not deleting tuples
 		// from the TERMS index.
-		final long rangeCount = termsIndex.rangeCount(fromKey, toKey);
+        final long rangeCount = termsIndex.rangeCount(fromKey, toKey);
+        
+        if (rangeCount == 0 && readOnly) {
 
-		if (rangeCount >= 255/* unsigned byte */) {
+            // Fast path.
+            return null; // Not found.
+            
+        }
+        
+        if (rangeCount >= 255/* unsigned byte */) {
 
-			/*
-			 * Impose a hard limit on the #of hash collisions we will accept in
-			 * this utility.
-			 * 
-			 * TODO We do not need to have a hard limit if we use BigInteger for
-			 * the counter, but the performance will go through the floor if we
-			 * have to scan 32k entries on a hash collision!
-			 */
+            /*
+             * Impose a hard limit on the #of hash collisions we will accept in
+             * this utility.
+             * 
+             * TODO We do not need to have a hard limit if we use BigInteger for
+             * the counter, but the performance will go through the floor if we
+             * have to scan 32k entries on a hash collision!
+             */
 
 			throw new CollisionBucketSizeException(rangeCount);
 		}
@@ -225,12 +232,14 @@ public class TermsIndexHelper {
 		
 		if (rangeCount == 0) {
 
-			if(readOnly) {
-				
-				// Not found.
-				return null;
-				
-			}
+		    assert !readOnly;
+		    
+//			if(readOnly) {
+//				
+//				// Not found.
+//				return null;
+//				
+//			}
 			
 			/*
 			 * This is the first time we have observed a Value which

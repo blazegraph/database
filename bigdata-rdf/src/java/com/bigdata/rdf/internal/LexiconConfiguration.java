@@ -265,6 +265,8 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         final URI datatype = value.getDatatype();
 
+        IV<BigdataLiteral, ?> iv = null;
+        
         if (datatype != null && datatype2ext.containsKey(datatype.stringValue())) {
 
             /*
@@ -272,47 +274,11 @@ public class LexiconConfiguration<V extends BigdataValue>
              * 
              * Note: optimized xsd:string support is provided via a registered
              * extension. See XSDStringExtension.
-             * 
-             * TODO Should we explicitly disallow extensions which override the
-             * basic inlining behavior for xsd datatypes?
              */
-
-            final IExtension<BigdataValue> xFactory = 
-                datatype2ext.get(datatype.stringValue());
-
-            try {
-
-                @SuppressWarnings("unchecked")
-                final IV<BigdataLiteral, ?> iv = xFactory.createIV(value);
-
+        
+            if ((iv = createExtensionIV(value, datatype)) != null)
                 return iv;
-
-            } catch (Throwable t) {
-
-                if(InnerCause.isInnerCause(t, InterruptedException.class)) {
-
-                    // Propagate interrupt.
-                    throw new RuntimeException(t);
-                    
-                }
-                
-                if(InnerCause.isInnerCause(t, Error.class)) {
-
-                    // Propagate error to preserve a stable encoding behavior.
-                    throw new Error(t);
-
-                }
-
-                /*
-                 * Some sort of parse error in the literal value most likely.
-                 */
-                
-                log.error(t.getMessage() + ": value=" + value.stringValue(), t);
-
-                // fall through.
-                
-            }
-
+            
         }
 
         /*
@@ -323,39 +289,111 @@ public class LexiconConfiguration<V extends BigdataValue>
          * Note: Optimized xsd:string inlining is handled by the
          * XSDStringExtension (above).
          */
-        IV<BigdataLiteral, ?> iv = createInlineDatatypeIV(value, datatype);
-
-        if (iv != null)
+        if ((iv = createInlineDatatypeIV(value, datatype)) != null)
             return iv;
 
-		/*
-		 * Attempt to fully inline the literal.
-		 */
-		if (maxInlineStringLength > 0) {
+        if (maxInlineStringLength > 0) {
+         
+            /*
+             * Attempt to fully inline the literal.
+             */
 
-			final String label = value.getLabel();
+            if ((iv = createInlineUnicodeLiteral(value)) != null)
+                return iv;
 
-			final int datatypeLength = value.getDatatype() == null ? 0 : value
-					.getDatatype().stringValue().length();
-
-			final int languageLength = value.getLanguage() == null ? 0 : value
-					.getLanguage().length();
-
-			final long totalLength = label.length() + datatypeLength
-					+ languageLength;
-
-			if (totalLength <= maxInlineStringLength) {
-
-				return new InlineLiteralIV<BigdataLiteral>(label, value
-						.getLanguage(), value.getDatatype());
-
-			}
-
-		}
+        }
 
         // Literal was not inlined.
         return null;
 
+    }
+
+    /**
+     * Test the registered {@link IExtension} handlers. If one handles this
+     * datatype, then delegate to that {@link IExtension}.
+     * 
+     * @return The {@link ExtensionIV} -or- <code>null</code> if no
+     *         {@link IExtension} was registered for that datatype.
+     * 
+     *         TODO Should we explicitly disallow extensions which override the
+     *         basic inlining behavior for xsd datatypes?
+     */
+    private AbstractInlineIV<BigdataLiteral, ?> createExtensionIV(
+            final Literal value, final URI datatype) {
+
+        final IExtension<BigdataValue> xFactory = 
+            datatype2ext.get(datatype.stringValue());
+
+        try {
+
+            return xFactory.createIV(value);
+
+        } catch (Throwable t) {
+
+            if(InnerCause.isInnerCause(t, InterruptedException.class)) {
+
+                // Propagate interrupt.
+                throw new RuntimeException(t);
+                
+            }
+            
+            if(InnerCause.isInnerCause(t, Error.class)) {
+
+                // Propagate error to preserve a stable encoding behavior.
+                throw new Error(t);
+
+            }
+
+            /*
+             * Some sort of parse error in the literal value most likely.
+             * 
+             * TODO Should this error be thrown out instead?
+             */
+            
+            log.error(t.getMessage() + ": value=" + value.stringValue(), t);
+
+            // fall through.
+            return null;
+            
+        }
+
+    }
+
+    /**
+     * If the total length of the Unicode components of the {@link Literal} is
+     * less than {@link #maxInlineStringLength} then return an fully inline
+     * version of the {@link Literal}.
+     * 
+     * @param value
+     *            The literal.
+     *            
+     * @return The fully inline IV -or- <code>null</code> if the {@link Literal}
+     *         could not be inlined within the configured constraints.
+     */
+    private AbstractInlineIV<BigdataLiteral, ?> createInlineUnicodeLiteral(
+            final Literal value) {
+
+        final String label = value.getLabel();
+
+        final int datatypeLength = value.getDatatype() == null ? 0 : value
+                .getDatatype().stringValue().length();
+
+        final int languageLength = value.getLanguage() == null ? 0 : value
+                .getLanguage().length();
+
+        final long totalLength = label.length() + datatypeLength
+                + languageLength;
+
+        if (totalLength <= maxInlineStringLength) {
+
+            return new InlineLiteralIV<BigdataLiteral>(label, value
+                    .getLanguage(), value.getDatatype());
+
+        }
+
+        // Will not inline as Unicode.
+        return null;
+        
     }
 
     /**

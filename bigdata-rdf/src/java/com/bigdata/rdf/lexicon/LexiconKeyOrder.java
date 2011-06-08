@@ -18,9 +18,6 @@ import com.bigdata.striterator.AbstractKeyOrder;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo define a BigdataValuePredicate that interoperates with this class to
- *       support joins against the lexicon.
  */
 public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> {
 

@@ -2082,8 +2082,11 @@ abstract public class AbstractTripleStore extends
     }
 
     /**
-     * This method is extremely inefficient for scale-out as it does one RMI per
+     * <strong>WARNING DO NOT USE OUTSIDE OF THE UNIT TESTS: </strong> This
+     * method is extremely inefficient for scale-out as it does one RMI per
      * request!
+     * 
+     * @deprecated Not even the unit tests should be doing this.
      */
     final public IV getIV(final Value value) {
 

@@ -94,13 +94,13 @@ public class TermsWriteTask implements Callable<Void> {
             
             final KVO<BigdataValue>[] b;
 
-			/*
-			 * Make sure that each term has an assigned sort key.
-			 * 
-			 * FIXME This should first remove any duplicates and anything with
-			 * an pre-assigned IV. That will let us avoid any further costs
-			 * associated with those Values.
-			 */
+            /*
+             * Make sure that each term has an assigned sort key.
+             * 
+             * Note: The caller SHOULD first remove anything with an
+             * pre-assigned IV. That will let us avoid any further costs
+             * associated with those Values (LexiconRelation is doing this.)
+             */
             {
 
                 long _begin = System.currentTimeMillis();
@@ -127,13 +127,16 @@ public class TermsWriteTask implements Callable<Void> {
 
             }
 
-			/*
-			 * For each distinct term that does not have a pre-assigned IV, add
-			 * it to a remote unisolated batch operation that assigns IVs.
-			 * 
-			 * Note: Both duplicate term references and terms with their IVs
-			 * already assigned are dropped out in this step.
-			 */
+            /*
+             * For each distinct term that does not have a pre-assigned IV, add
+             * it to a remote unisolated batch operation that assigns IVs.
+             * 
+             * Note: Both duplicate term references and terms with their IVs
+             * already assigned are dropped out in this step.
+             * 
+             * FIXME Caller SHOULD first remove any duplicates, which is what we
+             * are doing here.
+             */
             {
 
                 final long _begin = System.currentTimeMillis();

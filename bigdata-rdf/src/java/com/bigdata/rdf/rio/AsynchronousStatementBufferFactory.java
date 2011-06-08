@@ -79,7 +79,6 @@ import com.bigdata.btree.AsynchronousIndexWriteConfiguration;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
-import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.IAsyncResultHandler;
 import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.counters.CounterSet;
@@ -88,16 +87,14 @@ import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractTask;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.lexicon.LexiconKeyBuilder;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.lexicon.Term2IdTupleSerializer;
-import com.bigdata.rdf.lexicon.Term2IdWriteProc;
-import com.bigdata.rdf.lexicon.Id2TermWriteProc.Id2TermWriteProcConstructor;
-import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
-import com.bigdata.rdf.lexicon.Term2IdWriteTask.AssignTermId;
+import com.bigdata.rdf.lexicon.TermsIndexHelper;
+import com.bigdata.rdf.lexicon.TermsTupleSerializer;
+import com.bigdata.rdf.lexicon.TermsWriteProc;
+import com.bigdata.rdf.lexicon.TermsWriteProc.TermsWriteProcConstructor;
+import com.bigdata.rdf.lexicon.TermsWriteTask.AssignTermId;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataResource;
@@ -105,7 +102,6 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
@@ -156,9 +152,7 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * Do:
  * 
- * value[] =&gt; TERM2ID (Sync RPC, assigning TIDs)
- * 
- * value[] =&gt; ID2TERM (Async)
+ * value[] =&gt; TERMS (Sync RPC, assigning TIDs)
  * 
  * value[] =&gt; Text (Async, iff enabled)
  * 
@@ -178,8 +172,13 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @param <S>
+ *            The generic type of the statement objects.
+ * @param <R>
+ *            The generic type of the resource identifier (File, URL, etc).
+ *            
  * FIXME Modify to support SIDs. We basically need to loop in the
- * {@link #workflowLatch_bufferTerm2Id} workflow state until all SIDs have been
+ * {@link #workflowLatch_bufferTerms} workflow state until all SIDs have been
  * assigned. However, the termination conditions will be a little more complex.
  * During termination, if we have the TIDs but not yet the SIDs then we need to
  * flush the SID requests rather than allowing them to timeout. Since SID
@@ -246,9 +245,7 @@ import cutthecrap.utils.striterators.Striterator;
  * // remove blank nodes serving as SIDs from the value[].
  * value[] := value[] - unresolvedRef[];
  * 
- * value[] =&gt; TERM2ID (Sync RPC, assigning TIDs)
- * 
- * value[] =&gt; ID2TERM (Async)
+ * value[] =&gt; TERMS (Sync RPC, assigning TIDs)
  * 
  * value[] =&gt; Text (Async, iff enabled)
  * 
@@ -258,11 +255,11 @@ import cutthecrap.utils.striterators.Striterator;
  * while(!groundedStatements.isEmpty() &amp;&amp; !referencedStatements.isEmpty()
  *    &amp;&amp; !deferredStatements.isEmpty()) {
  * 
- *   groundedStatement[] =&gt; TERM2ID (async)
+ *   groundedStatement[] =&gt; TERMS (async)
  * 
  *   groundedStatement[] := []; // empty.
  * 
- *   referencedStatement[] =&gt; TERM2ID (Sync RPC, assigning SIDs)
+ *   referencedStatement[] =&gt; TERMS (Sync RPC, assigning SIDs)
  * 
  *   foreach spo : referencedStatements {
  * 
@@ -302,19 +299,11 @@ import cutthecrap.utils.striterators.Striterator;
  * @todo evaluate this approach for writing on a local triple store. if there is
  *       a performance benefit then refactor accordingly (requires asynchronous
  *       write API for BTree and friends).
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
- * 
- * @param <S>
- *            The generic type of the statement objects.
- * @param <R>
- *            The generic type of the resource identifier (File, URL, etc).
  */
 public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         implements IAsynchronousWriteStatementBufferFactory<S> {
 
-    final protected transient static Logger log = Logger
+    final private transient static Logger log = Logger
             .getLogger(AsynchronousStatementBufferFactory.class);
     
     /**
@@ -397,8 +386,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * Asynchronous index write buffers.
      */
     
-    private IRunnableBuffer<KVO<BigdataValue>[]> buffer_t2id;
-    private IRunnableBuffer<KVO<BigdataValue>[]> buffer_id2t;
+    private IRunnableBuffer<KVO<BigdataValue>[]> buffer_terms;
+//    private IRunnableBuffer<KVO<BigdataValue>[]> buffer_id2t;
     private IRunnableBuffer<KVO<BigdataValue>[]> buffer_text;
 
     /**
@@ -412,26 +401,26 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 //    private IRunnableBuffer<KVO<ISPO>[]> buffer_osp;
 
     /**
-     * If the TERM2ID asynchronous write buffer is open, then close it to flush
+     * If the TERMS asynchronous write buffer is open, then close it to flush
      * any buffered writes and, regardless, re-open the buffer if it is
      * configured for use.
      * 
      * @todo re-opening is not required so this could be moved into the ctor and
      *       the fields made final.
      */
-    private void reopenBuffer_term2Id() {
+    private void reopenBuffer_terms() {
 
         if (!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
 
-        if (buffer_t2id != null) {
+        if (buffer_terms != null) {
 
-            buffer_t2id.close();
+            buffer_terms.close();
 
         }
 
         final AsynchronousIndexWriteConfiguration config = tripleStore
-                .getLexiconRelation().getTerm2IdIndex().getIndexMetadata()
+                .getLexiconRelation().getTermsIndex().getIndexMetadata()
                 .getAsynchronousIndexWriteConfiguration();
         
 //        if(true||BigdataStatics.debug)
@@ -440,11 +429,11 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         if (config.getSinkIdleTimeoutNanos() > TimeUnit.SECONDS.toNanos(60)) {
 
             /*
-             * Note: If there is a large sink idle timeout on the TERM2ID index
+             * Note: If there is a large sink idle timeout on the TERMS index
              * then the sink will not flush itself automatically once its master
              * is no longer pushing data. This situation can occur any time the
              * parser pool is paused. A low sink idle timeout is required for
-             * the TERM2ID sink to flush its writes to the database, so the TIDs
+             * the TERMS sink to flush its writes to the database, so the TIDs
              * will be assigned, statements for the parsed documents will be
              * buffered, and new parser threads can begin.
              * 
@@ -459,39 +448,38 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
         }
         
-        buffer_t2id = ((IScaleOutClientIndex) lexiconRelation.getTerm2IdIndex())
+        buffer_terms = ((IScaleOutClientIndex) lexiconRelation.getTermsIndex())
                 .newWriteBuffer(
-                        new Term2IdWriteProcAsyncResultHandler(false/* readOnly */),
+                        new TermsWriteProcAsyncResultHandler(false/* readOnly */),
                         new DefaultDuplicateRemover<BigdataValue>(true/* testRefs */),
-                        new Term2IdWriteProcConstructor(false/* readOnly */,
-                                lexiconRelation.isStoreBlankNodes(),
-                                lexiconRelation.getTermIdBitsToReverse()));
+                        new TermsWriteProcConstructor(false/* readOnly */,
+                                lexiconRelation.isStoreBlankNodes()));
 
     }
 
     /**
-     * For each of the non-TERM2ID asynchronous write buffers, if it is open,
-     * then close it to flush any buffered writes and, regardless, re-open the
-     * buffer if it is configured for use.
+     * For each of the non-TERMS asynchronous write buffers, if it is open, then
+     * close it to flush any buffered writes and, regardless, re-open the buffer
+     * if it is configured for use.
      * 
      * @todo re-opening is not required so this could be moved into the ctor and
      *       the fields made final.
      */
     private final void reopenBuffer_others() {
 
-        if (buffer_id2t != null) {
-
-            buffer_id2t.close();
-
-            buffer_id2t = null;
-
-        }
-
-        buffer_id2t = ((IScaleOutClientIndex) lexiconRelation.getId2TermIndex())
-                .newWriteBuffer(
-                        null/* resultHandler */,
-                        new DefaultDuplicateRemover<BigdataValue>(true/* testRefs */),
-                        Id2TermWriteProcConstructor.INSTANCE);
+//        if (buffer_id2t != null) {
+//
+//            buffer_id2t.close();
+//
+//            buffer_id2t = null;
+//
+//        }
+//
+//        buffer_id2t = ((IScaleOutClientIndex) lexiconRelation.getId2TermIndex())
+//                .newWriteBuffer(
+//                        null/* resultHandler */,
+//                        new DefaultDuplicateRemover<BigdataValue>(true/* testRefs */),
+//                        Id2TermWriteProcConstructor.INSTANCE);
 
         if (buffer_text != null) {
 
@@ -658,7 +646,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
         parserService.shutdownNow();
         
-        term2IdWriterService.shutdownNow();
+        termsWriterService.shutdownNow();
         
         otherWriterService.shutdownNow();
 
@@ -709,13 +697,13 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
     /**
      * The #of documents that are waiting on their TIDs (current value). The
      * counter is incremented when a document begins to buffer writes on the
-     * TERM2ID index. The counter is decremented as soon as those writes are
+     * TERMS index. The counter is decremented as soon as those writes are
      * restart safe.
      * <p>
-     * Note: The {@link #workflowLatch_bufferTerm2Id} is only decremented when
+     * Note: The {@link #workflowLatch_bufferTerms} is only decremented when
      * the document begins to write on the other indices, so
      * {@link #documentTIDsWaitingCount} will be decremented before
-     * {@link #workflowLatch_bufferTerm2Id}. The two counters will track very
+     * {@link #workflowLatch_bufferTerms}. The two counters will track very
      * closely unless the {@link #otherWriterService} has a backlog.
      * <p>
      * Note: The {@link #workflowLatch_bufferOther} is decremented as soon as
@@ -760,7 +748,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * You MUST own the {@link #lock} when incrementing or decrementing any of
      * the {@link Latch}s. The {@link Latch} transitions must be accomplished
      * while you are holding the lock. For example, the transition between
-     * <i>parsing</i> and <i>buffering TERM2ID writes</i> requires that we
+     * <i>parsing</i> and <i>buffering TERMS writes</i> requires that we
      * decrement one latch and increment the other while hold the {@link #lock}.
      * <p>
      * The counter associated with each {@link Latch} indicates the total #of
@@ -784,7 +772,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
     /**
      * A {@link Latch} guarding documents which have been accepted for parsing
-     * but have not been transferred to the {@link #workflowLatch_bufferTerm2Id}.
+     * but have not been transferred to the {@link #workflowLatch_bufferTerms}.
      * 
      * @todo We could add a resolver latch for network IO required to buffer the
      *       document locally. E.g., a read from a DFS or a web page.
@@ -793,11 +781,11 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
     /**
      * A {@link Latch} guarding documents that have begun to buffering their
-     * writes on the TERM2ID index but have not been transferred to the
+     * writes on the TERMS index but have not been transferred to the
      * {@link #workflowLatch_bufferOther}.
      */
-    private final Latch workflowLatch_bufferTerm2Id = new Latch(
-            "bufferTerm2Id", lock);
+    private final Latch workflowLatch_bufferTerms = new Latch(
+            "bufferTerms", lock);
 
     /**
      * A {@link Latch} guarding documents that have begun to buffer their writes
@@ -808,7 +796,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
     /*
      * Latches used to guard tasks buffering writes. There is one such latch for
-     * TERM2ID and one for the rest of the buffers. During close() we will close
+     * TERMS and one for the rest of the buffers. During close() we will close
      * the buffers to flush their writes as soon as these latches hit zero.
      * 
      * Note: These latches allow us to close the buffers in a timely manner. The
@@ -819,11 +807,11 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
     /**
      * {@link Latch} guarding tasks until they have buffered their writes on the
-     * TERM2ID index.  This latch is decremented as soon as the writes for a given
-     * document have been buffered.  This is used to close the TERM2ID buffer in
+     * TERMS index.  This latch is decremented as soon as the writes for a given
+     * document have been buffered.  This is used to close the TERMS buffer in
      * a timely manner in {@link #close()}.
      */
-    private final Latch guardLatch_term2Id = new Latch("guard_term2Id", lock);
+    private final Latch guardLatch_terms = new Latch("guard_terms", lock);
 
     /**
      * {@link Latch} guarding tasks until they have buffered their writes on the
@@ -850,10 +838,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * The RAM demand of the buffered statements is controlled by the capacity
      * of the master and sink queues on which those statements are buffered.
      * 
-     * @todo it is possible that the buffered writes on term2id could limit
+     * @todo it is possible that the buffered writes on terms could limit
      *       throughput when the parser pool is paused since the decision to
      *       pause the parser pool is based on the #of unbuffered statements
-     *       overall not just those staged for the term2id or the other indices.
+     *       overall not just those staged for the terms or the other indices.
      */
     private final long pauseParserPoolStatementThreshold;
 
@@ -914,7 +902,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
          * across all documents.
          */
         final long n1 = workflowLatch_parser.get()//
-                + workflowLatch_bufferTerm2Id.get()//
+                + workflowLatch_bufferTerms.get()//
                 + workflowLatch_bufferOther.get()//
         ;
         
@@ -941,10 +929,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
     
     /**
      * Bounded thread pool using an unbounded work queue to buffer writes for
-     * the TERM2ID index. Tasks are added to the work queue by the parser task
+     * the TERMS index. Tasks are added to the work queue by the parser task
      * in {@link AsynchronousStatementBufferImpl#flush()}.
      */
-    private final ThreadPoolExecutor term2IdWriterService;
+    private final ThreadPoolExecutor termsWriterService;
 
     /**
      * Bounded thread pool using an unbounded work queue to run
@@ -1368,7 +1356,6 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * load and data verify is just the behavior of the {@link IStatementBuffer}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     protected class ParserTask implements Callable<Void> {
 
@@ -1440,8 +1427,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                     // done parsing this document.
                     documentsParsedCount.incrementAndGet();
                     // queue task to buffer the writes.
-                    term2IdWriterService
-                            .submit(new BufferTerm2IdWrites(buffer));
+                    termsWriterService
+                            .submit(new BufferTermsWrites(buffer));
                     // increment #of outstanding statements (parsed but not restart safe). 
                     outstandingStatementCount.addAndGet(buffer.statementCount);
                     // increment #of unbuffered statements.
@@ -1510,9 +1497,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * @param parserQueueCapacity
      *            The capacity of the bounded work queue for the service running
      *            the parser tasks.
-     * @param term2IdWriterPoolSize
+     * @param termsWriterPoolSize
      *            The #of worker threads in the thread pool for buffering
-     *            asynchronous writes on the TERM2ID index.
+     *            asynchronous writes on the TERMS index.
      * @param otherWriterPoolSize
      *            The #of worker threads in the thread pool for buffering
      *            asynchronous index writes on the other indices.
@@ -1538,7 +1525,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             final boolean deleteAfter,//
             final int parserPoolSize,//
             final int parserQueueCapacity,//
-            final int term2IdWriterPoolSize,//
+            final int termsWriterPoolSize,//
             final int otherWriterPoolSize,//
             final int notifyPoolSize,//
             final long pauseParsedPoolStatementThreshold//
@@ -1599,7 +1586,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         lock.lock();
         try {
 
-            reopenBuffer_term2Id();
+            reopenBuffer_terms();
 
             /*
              * Allocate and populate map with the SPOKeyOrders that we will be
@@ -1673,13 +1660,13 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
          * threads will be created. Therefore we interpret the caller's argument
          * as both the corePoolSize and the maximumPoolSize.
          */
-        term2IdWriterService = new ThreadPoolExecutor(//
-                term2IdWriterPoolSize, // corePoolSize
-                term2IdWriterPoolSize, // maximumPoolSize
+        termsWriterService = new ThreadPoolExecutor(//
+                termsWriterPoolSize, // corePoolSize
+                termsWriterPoolSize, // maximumPoolSize
                 1, // keepAliveTime
                 TimeUnit.MINUTES, // keepAlive units.
                 new LinkedBlockingQueue<Runnable>(/* unbounded */),// workQueue
-                new DaemonThreadFactory(getClass().getName()+"_term2IdWriteService") // threadFactory
+                new DaemonThreadFactory(getClass().getName()+"_termsWriteService") // threadFactory
         );
 
         /*
@@ -1753,9 +1740,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             tasks.put("parserService",
                     new ThreadPoolExecutorBaseStatisticsTask(parserService));
 
-            tasks.put("term2IdWriterService",
+            tasks.put("termsWriterService",
                     new ThreadPoolExecutorBaseStatisticsTask(
-                            term2IdWriterService));
+                            termsWriterService));
 
             tasks.put("otherWriterService",
                             new ThreadPoolExecutorBaseStatisticsTask(
@@ -1828,12 +1815,12 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         lock.lock();
         try {
 
-            if (buffer_t2id != null)
-                if (buffer_t2id.getFuture().isDone())
+            if (buffer_terms != null)
+                if (buffer_terms.getFuture().isDone())
                     return true;
 
-            if (buffer_id2t.getFuture().isDone())
-                return true;
+//            if (buffer_id2t.getFuture().isDone())
+//                return true;
 
             if (buffer_text != null)
                 if (buffer_text.getFuture().isDone())
@@ -1852,7 +1839,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             if (parserService.isTerminated())
                 return true;
 
-            if (term2IdWriterService.isTerminated())
+            if (termsWriterService.isTerminated())
                 return true;
 
             if (otherWriterService.isTerminated())
@@ -1876,10 +1863,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         if(log.isInfoEnabled())
             log.info("Cancelling futures.");
         
-        if (buffer_t2id != null)
-            buffer_t2id.getFuture().cancel(mayInterruptIfRunning);
+        if (buffer_terms != null)
+            buffer_terms.getFuture().cancel(mayInterruptIfRunning);
 
-        buffer_id2t.getFuture().cancel(mayInterruptIfRunning);
+//        buffer_id2t.getFuture().cancel(mayInterruptIfRunning);
 
         if (buffer_text != null)
             buffer_text.getFuture().cancel(mayInterruptIfRunning);
@@ -1912,31 +1899,31 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                 assertSumOfLatchs();
                 
-                // not decremented until doc fails parse or is doing TERM2ID writes.
+                // not decremented until doc fails parse or is doing TERMS writes.
                 workflowLatch_parser.await();
 
                 assertSumOfLatchs();
 
                 /*
-                 * No more tasks will request TIDs, so close the TERM2ID master.
+                 * No more tasks will request TIDs, so close the TERMS master.
                  * It will flush its writes. 
                  */
-                guardLatch_term2Id.await();
+                guardLatch_terms.await();
                 {
-                    if (buffer_t2id != null) {
+                    if (buffer_terms != null) {
                         if (log.isInfoEnabled()) {
-                            log.info("Closing TERM2ID buffer.");
+                            log.info("Closing TERMS buffer.");
                         }
-                        buffer_t2id.close();
+                        buffer_terms.close();
                     }
 
-                    workflowLatch_bufferTerm2Id.await();
-                    term2IdWriterService.shutdown();
-                    new ShutdownHelper(term2IdWriterService, 10L,
+                    workflowLatch_bufferTerms.await();
+                    termsWriterService.shutdown();
+                    new ShutdownHelper(termsWriterService, 10L,
                             TimeUnit.SECONDS) {
                         protected void logTimeout() {
                             log
-                                    .warn("Waiting for term2Id write service shutdown.");
+                                    .warn("Waiting for terms write service shutdown.");
                         }
                     };
 
@@ -1952,7 +1939,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                     if (log.isInfoEnabled())
                         log.info("Closing remaining buffers.");
 
-                    buffer_id2t.close();
+//                    buffer_id2t.close();
 
                     if (buffer_text != null)
                         buffer_text.close();
@@ -1970,9 +1957,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                     
                     workflowLatch_bufferOther.await();
                     otherWriterService.shutdown();
-                    new ShutdownHelper(term2IdWriterService, 10L, TimeUnit.SECONDS) {
+                    new ShutdownHelper(termsWriterService, 10L, TimeUnit.SECONDS) {
                         protected void logTimeout() {
-                            log.warn("Waiting for term2Id write service shutdown.");
+                            log.warn("Waiting for terms write service shutdown.");
                         }
                     };
 
@@ -2024,10 +2011,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         if(log.isInfoEnabled())
             log.info("Awaiting futures.");
 
-        if (buffer_t2id != null)
-            buffer_t2id.getFuture().get();
+        if (buffer_terms != null)
+            buffer_terms.getFuture().get();
 
-        buffer_id2t.getFuture().get();
+//        buffer_id2t.getFuture().get();
 
         if (buffer_text != null)
             buffer_text.getFuture().get();
@@ -2257,7 +2244,6 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * Task deletes a resource from the local file system.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     protected class DeleteTask implements Runnable {
 
@@ -2327,7 +2313,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         });
 
         /**
-         * The #of documents whose TERM2ID writes have begun to be buffered but
+         * The #of documents whose TERMS writes have begun to be buffered but
          * are not yet restart-safe on the database.
          */
         counterSet.addCounter("documentTIDsWaitingCount", new Instrument<Long>() {
@@ -2338,7 +2324,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         });
 
         /**
-         * The #of documents whose TERM2ID writes are restart-safe on the
+         * The #of documents whose TERMS writes are restart-safe on the
          * database.
          */
         counterSet.addCounter("documentTIDsReadyCount", new Instrument<Long>() {
@@ -2438,10 +2424,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                 }
             });
 
-            workflowLatchSet.addCounter("bufferTerm2Id", new Instrument<Long>() {
+            workflowLatchSet.addCounter("bufferTerms", new Instrument<Long>() {
                 @Override
                 protected void sample() {
-                    setValue(workflowLatch_bufferTerm2Id.get());
+                    setValue(workflowLatch_bufferTerms.get());
                 }
             });
 
@@ -2469,10 +2455,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             
             final CounterSet bufferGuardSet = counterSet.makePath("bufferGuard");
 
-            bufferGuardSet.addCounter("guardTerm2Id", new Instrument<Long>() {
+            bufferGuardSet.addCounter("guardTerms", new Instrument<Long>() {
                 @Override
                 protected void sample() {
-                    setValue(guardLatch_term2Id.get());
+                    setValue(guardLatch_terms.get());
                 }
             });
 
@@ -2708,7 +2694,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
     /**
      * Class applies the term identifiers assigned by the
-     * {@link Term2IdWriteProc} to the {@link BigdataValue} references in the
+     * {@link TermsWriteProc} to the {@link BigdataValue} references in the
      * {@link KVO} correlated with each {@link Split} of data processed by that
      * procedure.
      * <p>
@@ -2719,21 +2705,20 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * the array is given by {@link Split#fromIndex}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
-    static private class Term2IdWriteProcAsyncResultHandler
+    static private class TermsWriteProcAsyncResultHandler
             implements
-            IAsyncResultHandler<Term2IdWriteProc.Result, Void, BigdataValue, KVO<BigdataValue>> {
+            IAsyncResultHandler<TermsWriteProc.Result, Void, BigdataValue, KVO<BigdataValue>> {
 
         private final boolean readOnly;
 
         /**
          * 
          * @param readOnly
-         *            if readOnly was specified for the {@link Term2IdWriteProc}
+         *            if readOnly was specified for the {@link TermsWriteProc}
          *            .
          */
-        public Term2IdWriteProcAsyncResultHandler(final boolean readOnly) {
+        public TermsWriteProcAsyncResultHandler(final boolean readOnly) {
 
             this.readOnly = readOnly;
 
@@ -2743,9 +2728,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
          * NOP
          * 
          * @see #aggregateAsync(KVO[],
-         *      com.bigdata.rdf.lexicon.Term2IdWriteProc.Result, Split)
+         *      com.bigdata.rdf.lexicon.TermsWriteProc.Result, Split)
          */
-        public void aggregate(final Term2IdWriteProc.Result result,
+        public void aggregate(final TermsWriteProc.Result result,
                 final Split split) {
 
         }
@@ -2755,7 +2740,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
          * corresponding elements of the terms[].
          */
         public void aggregateAsync(final KVO<BigdataValue>[] chunk,
-                final Term2IdWriteProc.Result result, final Split split) {
+                final TermsWriteProc.Result result, final Split split) {
 
             for (int i = 0; i < chunk.length; i++) {
 
@@ -2825,7 +2810,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 						 * configuration and returns true iff the value CAN NOT
 						 * be inlined. Thus, inlining is doing as a side effect
 						 * while the caller sees only those Values which need to
-						 * be written onto the TERM2ID index.
+						 * be written onto the TERMS index.
 						 */
 						return r.getInlineIV((Value) obj) == null;
 					}
@@ -2833,51 +2818,50 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
     }
 
+//    /**
+//     * Wrap a {@link BigdataValue}[] with a chunked iterator which filters out
+//     * blank nodes (blank nodes are not written onto the reverse index).
+//     */
+//    @SuppressWarnings("unchecked")
+//    static <V extends BigdataValue> IChunkedIterator<V> newId2TIterator(
+//            final Iterator<V> itr, final int chunkSize) {
+//
+//        return new ChunkedWrappedIterator(new Striterator(itr)
+//                .addFilter(new Filter() {
+//
+//                    private static final long serialVersionUID = 1L;
+//
+//                    /*
+//                     * Filter hides blank nodes since we do not write them onto
+//                     * the reverse index.
+//                     */
+//                    @Override
+//                    public boolean isValid(Object obj) {
+//
+//                        return !(obj instanceof BNode);
+//
+//                    }
+//
+//                }), chunkSize, BigdataValue.class);
+//
+//    }
+
     /**
-     * Wrap a {@link BigdataValue}[] with a chunked iterator which filters out
-     * blank nodes (blank nodes are not written onto the reverse index).
-     */
-    @SuppressWarnings("unchecked")
-    static <V extends BigdataValue> IChunkedIterator<V> newId2TIterator(
-            final Iterator<V> itr, final int chunkSize) {
-
-        return new ChunkedWrappedIterator(new Striterator(itr)
-                .addFilter(new Filter() {
-
-                    private static final long serialVersionUID = 1L;
-
-                    /*
-                     * Filter hides blank nodes since we do not write them onto
-                     * the reverse index.
-                     */
-                    @Override
-                    public boolean isValid(Object obj) {
-
-                        return !(obj instanceof BNode);
-
-                    }
-
-                }), chunkSize, BigdataValue.class);
-
-    }
-
-    /**
-     * Asynchronous writes on the TERM2ID index.
+     * Asynchronous writes on the TERMS index.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
-     * 
-     * @todo something similar for the SIDs
      */
-    static class AsyncTerm2IdIndexWriteTask implements Callable<Void> {
+    static class AsyncTermsIndexWriteTask implements Callable<Void> {
 
-        final protected transient static Logger log = Logger
-                .getLogger(AsyncTerm2IdIndexWriteTask.class);
+        final private transient static Logger log = Logger
+                .getLogger(AsyncTermsIndexWriteTask.class);
 
         private final KVOLatch latch;
 
-        private final Term2IdTupleSerializer tupleSer;
+        private final BigdataValueSerializer valSer;
+        
+        private final TermsTupleSerializer tupleSer;
 
         private final IChunkedIterator<BigdataValue> src;
 
@@ -2891,7 +2875,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
          *            The visits chunks of distinct {@link Value}s.
          * @param buffer
          */
-        public AsyncTerm2IdIndexWriteTask(final KVOLatch latch,
+        public AsyncTermsIndexWriteTask(final KVOLatch latch,
                 final LexiconRelation r,
                 final IChunkedIterator<BigdataValue> src,
                 final IRunnableBuffer<KVO<BigdataValue>[]> buffer) {
@@ -2910,8 +2894,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
             this.latch = latch;
 
-            this.tupleSer = (Term2IdTupleSerializer) r.getIndex(
-                    LexiconKeyOrder.TERM2ID).getIndexMetadata()
+            this.valSer = r.getValueFactory().getValueSerializer();
+            
+            this.tupleSer = (TermsTupleSerializer) r.getIndex(
+                    LexiconKeyOrder.TERMS).getIndexMetadata()
                     .getTupleSerializer();
 
             this.src = src;
@@ -2922,16 +2908,22 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
         /**
          * Reshapes the {@link #src} into {@link KVOC}[]s a chunk at a time and
-         * submits each chunk to the write buffer for the TERM2ID index.
+         * submits each chunk to the write buffer for the TERMS index.
          */
         public Void call() throws Exception {
 
+            // This is thread-safe (stateless).
+            final TermsIndexHelper h = new TermsIndexHelper();
+
             /*
-             * This is a thread-local instance, which is why we defer obtaining
-             * this object until call() is executing.
+             * These are thread-local instances, which is why we defer obtaining
+             * them until call() is executing.
              */
-            final LexiconKeyBuilder keyBuilder = tupleSer
-                    .getLexiconKeyBuilder();
+//            final LexiconKeyBuilder keyBuilder = tupleSer
+//                    .getLexiconKeyBuilder();
+            final IKeyBuilder keyBuilder = h.newKeyBuilder();
+            final DataOutputBuffer out = new DataOutputBuffer(512);
+            final ByteArrayBuffer tmp = new ByteArrayBuffer(512);
 
             latch.inc();
 
@@ -2947,9 +2939,13 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                     for (BigdataValue v : chunkIn) {
 
+                        final byte[] key = h.makePrefixKey(keyBuilder, v);
+                        
+                        final byte[] val = valSer.serialize(v, out.reset(), tmp);
+                        
                         // Assign a sort key to each Value.
-                        chunkOut[i++] = new KVOC<BigdataValue>(keyBuilder
-                                .value2Key(v), null/* val */, v, latch)
+                        chunkOut[i++] = new KVOC<BigdataValue>(key, val, v,
+                                latch)
                         // {
                         // @Override
                         // public void done() {
@@ -2971,7 +2967,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                     Arrays.sort(chunkOut);
 
                     if (log.isInfoEnabled())
-                        log.info("Adding chunk to TERM2ID master: chunkSize="
+                        log.info("Adding chunk to TERMS master: chunkSize="
                                 + chunkOut.length);
 
                     // add chunk to async write buffer
@@ -2992,153 +2988,152 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
     }
 
-    /**
-     * Asynchronous writes on the ID2TERM index.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id$
-     */
-    static class AsyncId2TermIndexWriteTask implements Callable<Void> {
-
-        final protected transient static Logger log = Logger
-                .getLogger(AsyncId2TermIndexWriteTask.class);
-
-        private final KVOLatch latch;
-
-        private final BigdataValueFactory valueFactory;
-
-        private final IChunkedIterator<BigdataValue> src;
-
-        private final IRunnableBuffer<KVO<BigdataValue>[]> buffer;
-
-        /**
-         * 
-         * @param src
-         *            The visits chunks of distinct {@link Value}s with their
-         *            TIDs assigned. Blank nodes will automatically be filtered
-         *            out.
-         */
-        public AsyncId2TermIndexWriteTask(final KVOLatch latch,
-                final BigdataValueFactory valueFactory,
-                final IChunkedIterator<BigdataValue> src,
-                final IRunnableBuffer<KVO<BigdataValue>[]> buffer) {
-
-            if (latch == null)
-                throw new IllegalArgumentException();
-
-            if (valueFactory == null)
-                throw new IllegalArgumentException();
-
-            if (src == null)
-                throw new IllegalArgumentException();
-
-            if (buffer == null)
-                throw new IllegalArgumentException();
-
-            this.latch = latch;
-
-            this.valueFactory = valueFactory;
-
-            this.src = src;
-
-            this.buffer = buffer;
-
-        }
-
-        public Void call() throws Exception {
-
-            // used to serialize the Values for the BTree.
-            final BigdataValueSerializer<BigdataValue> ser = valueFactory
-                    .getValueSerializer();
-
-            // thread-local key builder removes single-threaded constraint.
-            final IKeyBuilder tmp = KeyBuilder.newInstance(Bytes.SIZEOF_LONG);
-
-            // buffer is reused for each serialized term.
-            final DataOutputBuffer out = new DataOutputBuffer();
-            final ByteArrayBuffer tbuf = new ByteArrayBuffer();
-
-            latch.inc();
-
-            try {
-
-                while (src.hasNext()) {
-
-                    final BigdataValue[] chunkIn = src.nextChunk();
-
-                    final KVOC<BigdataValue>[] chunkOut = new KVOC[chunkIn.length];
-
-                    int i = 0;
-
-                    for (BigdataValue v : chunkIn) {
-
-                        assert v != null;
-
-                        if (v instanceof BNode) {
-
-                            // Do not write blank nodes on the reverse index.
-                            continue;
-
-                        }
-
-                        if (v.getIV() == null) {
-
-                            throw new RuntimeException("No TID: " + v);
-
-                        }
-
-                        if (v.getIV().isInline()) {
-
-                        	// Do not write inline values on the reverse index.
-                            continue;
-
-                        }
-
-                        final byte[] key = v.getIV().encode(tmp.reset())
-                                .getKey();
-
-                        // Serialize the term.
-                        final byte[] val = ser.serialize((BigdataValueImpl) v,
-                                out.reset(), tbuf);
-
-                        /*
-                         * Note: The BigdataValue instance is NOT supplied to
-                         * the KVO since we do not want it to be retained and
-                         * since there is no side-effect on the BigdataValue for
-                         * writes on ID2TERM (unlike the writes on TERM2ID).
-                         */
-                        chunkOut[i++] = new KVOC<BigdataValue>(key, val,
-                                null/* v */, latch);
-
-                    }
-
-                    // make dense.
-                    final KVO<BigdataValue>[] dense = KVO.dense(chunkOut, i);
-
-                    /*
-                     * Put into key order in preparation for writing on the
-                     * reverse index.
-                     */
-                    Arrays.sort(dense);
-
-                    // add chunk to asynchronous write buffer
-                    buffer.add(dense);
-
-                }
-
-            } finally {
-
-                latch.dec();
-
-            }
-
-            // Done.
-            return null;
-
-        }
-
-    }
+//    /**
+//     * Asynchronous writes on the ID2TERM index.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+//     *         Thompson</a>
+//     */
+//    static class AsyncId2TermIndexWriteTask implements Callable<Void> {
+//
+//        final protected transient static Logger log = Logger
+//                .getLogger(AsyncId2TermIndexWriteTask.class);
+//
+//        private final KVOLatch latch;
+//
+//        private final BigdataValueFactory valueFactory;
+//
+//        private final IChunkedIterator<BigdataValue> src;
+//
+//        private final IRunnableBuffer<KVO<BigdataValue>[]> buffer;
+//
+//        /**
+//         * 
+//         * @param src
+//         *            The visits chunks of distinct {@link Value}s with their
+//         *            TIDs assigned. Blank nodes will automatically be filtered
+//         *            out.
+//         */
+//        public AsyncId2TermIndexWriteTask(final KVOLatch latch,
+//                final BigdataValueFactory valueFactory,
+//                final IChunkedIterator<BigdataValue> src,
+//                final IRunnableBuffer<KVO<BigdataValue>[]> buffer) {
+//
+//            if (latch == null)
+//                throw new IllegalArgumentException();
+//
+//            if (valueFactory == null)
+//                throw new IllegalArgumentException();
+//
+//            if (src == null)
+//                throw new IllegalArgumentException();
+//
+//            if (buffer == null)
+//                throw new IllegalArgumentException();
+//
+//            this.latch = latch;
+//
+//            this.valueFactory = valueFactory;
+//
+//            this.src = src;
+//
+//            this.buffer = buffer;
+//
+//        }
+//
+//        public Void call() throws Exception {
+//
+//            // used to serialize the Values for the BTree.
+//            final BigdataValueSerializer<BigdataValue> ser = valueFactory
+//                    .getValueSerializer();
+//
+//            // thread-local key builder removes single-threaded constraint.
+//            final IKeyBuilder tmp = KeyBuilder.newInstance(Bytes.SIZEOF_LONG);
+//
+//            // buffer is reused for each serialized term.
+//            final DataOutputBuffer out = new DataOutputBuffer();
+//            final ByteArrayBuffer tbuf = new ByteArrayBuffer();
+//
+//            latch.inc();
+//
+//            try {
+//
+//                while (src.hasNext()) {
+//
+//                    final BigdataValue[] chunkIn = src.nextChunk();
+//
+//                    final KVOC<BigdataValue>[] chunkOut = new KVOC[chunkIn.length];
+//
+//                    int i = 0;
+//
+//                    for (BigdataValue v : chunkIn) {
+//
+//                        assert v != null;
+//
+//                        if (v instanceof BNode) {
+//
+//                            // Do not write blank nodes on the reverse index.
+//                            continue;
+//
+//                        }
+//
+//                        if (v.getIV() == null) {
+//
+//                            throw new RuntimeException("No TID: " + v);
+//
+//                        }
+//
+//                        if (v.getIV().isInline()) {
+//
+//                        	// Do not write inline values on the reverse index.
+//                            continue;
+//
+//                        }
+//
+//                        final byte[] key = v.getIV().encode(tmp.reset())
+//                                .getKey();
+//
+//                        // Serialize the term.
+//                        final byte[] val = ser.serialize((BigdataValueImpl) v,
+//                                out.reset(), tbuf);
+//
+//                        /*
+//                         * Note: The BigdataValue instance is NOT supplied to
+//                         * the KVO since we do not want it to be retained and
+//                         * since there is no side-effect on the BigdataValue for
+//                         * writes on ID2TERM (unlike the writes on TERM2ID).
+//                         */
+//                        chunkOut[i++] = new KVOC<BigdataValue>(key, val,
+//                                null/* v */, latch);
+//
+//                    }
+//
+//                    // make dense.
+//                    final KVO<BigdataValue>[] dense = KVO.dense(chunkOut, i);
+//
+//                    /*
+//                     * Put into key order in preparation for writing on the
+//                     * reverse index.
+//                     */
+//                    Arrays.sort(dense);
+//
+//                    // add chunk to asynchronous write buffer
+//                    buffer.add(dense);
+//
+//                }
+//
+//            } finally {
+//
+//                latch.dec();
+//
+//            }
+//
+//            // Done.
+//            return null;
+//
+//        }
+//
+//    }
 
     /**
      * Writes the statement chunks onto the specified statement index using the
@@ -3149,7 +3144,6 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     static class AsyncSPOIndexWriteTask implements Callable<Void> {
 
@@ -3284,7 +3278,6 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      * @param <S>
      * @param <F>
      */
@@ -3709,11 +3702,11 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         }
 
         /**
-         * Buffers the asynchronous writes on the TERM2ID index.
+         * Buffers the asynchronous writes on the TERMS index.
          * 
          * @throws Exception
          */
-        private void bufferTerm2IdWrites() throws Exception {
+        private void bufferTermsWrites() throws Exception {
 
             if (log.isInfoEnabled()) {
                 final Map<String, BigdataBNode> bnodes = this.bnodes.get();
@@ -3729,7 +3722,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             }
 
             /*
-             * Run task which will queue BigdataValue[] chunks onto the TERM2ID
+             * Run task which will queue BigdataValue[] chunks onto the TERMS
              * async write buffer.
              * 
              * Note: This is responsible for assigning the TIDs (term
@@ -3740,15 +3733,15 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
              * write then it can wait up to its idle/chunk timeout. Normally we
              * want to use an infinite chunk timeout so that all chunks written
              * on the index partitions are as full as possible. Therefore, the
-             * TERM2ID async writer should use a shorter idle timeout or it can
+             * TERMS async writer should use a shorter idle timeout or it can
              * live lock. Ideally, there should be some explicit notice when we
-             * are done queuing writes on TERM2ID across all source documents.
+             * are done queuing writes on TERMS across all source documents.
              * Even then we can live lock if the input queue is not large
              * enough.
              */
 
             /*
-             * Latch notifies us when all writes for _this_ document on TERM2ID
+             * Latch notifies us when all writes for _this_ document on TERMS
              * are complete such that we have the assigned term identifiers for
              * all BigdataValues appearing in the document. This event is used
              * to transfer the document to another queue.
@@ -3796,12 +3789,12 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
             try {
 
-                final Callable<Void> task = new AsyncTerm2IdIndexWriteTask(
+                final Callable<Void> task = new AsyncTermsIndexWriteTask(
                         tidsLatch, lexiconRelation, newT2IdIterator(//
                         		lexiconRelation,//
                         		values.values().iterator(),//
                         		producerChunkSize),
-                        buffer_t2id);
+                        buffer_terms);
 
                 // queue chunks onto the write buffer.
                 task.call();
@@ -3818,14 +3811,14 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             }
 
             /*
-             * Note: At this point the writes on TERM2ID have been buffered.
+             * Note: At this point the writes on TERMS have been buffered.
              */
 
         }
 
         /**
          * Buffers write requests for the remaining indices (everything except
-         * TERM2ID).
+         * TERMS).
          * 
          * @throws InterruptedException
          * @throws ExecutionException
@@ -3924,9 +3917,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
             };
 
-            tasks.add(new AsyncId2TermIndexWriteTask(documentRestartSafeLatch,
-                    valueFactory, newId2TIterator(values.values().iterator(),
-                            producerChunkSize), buffer_id2t));
+//            tasks.add(new AsyncId2TermIndexWriteTask(documentRestartSafeLatch,
+//                    valueFactory, newId2TIterator(values.values().iterator(),
+//                            producerChunkSize), buffer_id2t));
 
             if (buffer_text != null) {
 
@@ -4018,13 +4011,13 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
     }// StatementBuffer impl.
 
     /**
-     * Task buffers the asynchronous writes on the TERM2ID index.
+     * Task buffers the asynchronous writes on the TERMS index.
      */
-    private class BufferTerm2IdWrites implements Callable<Void> {
+    private class BufferTermsWrites implements Callable<Void> {
 
         private final AsynchronousStatementBufferImpl buffer;
 
-        public BufferTerm2IdWrites(final AsynchronousStatementBufferImpl buffer) {
+        public BufferTermsWrites(final AsynchronousStatementBufferImpl buffer) {
 
             if (buffer == null)
                 throw new IllegalArgumentException();
@@ -4038,9 +4031,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             // new workflow state.
             lock.lock();
             try {
-                guardLatch_term2Id.inc();
+                guardLatch_terms.inc();
                 workflowLatch_parser.dec();
-                workflowLatch_bufferTerm2Id.inc();
+                workflowLatch_bufferTerms.inc();
                 documentTIDsWaitingCount.incrementAndGet();
                 assertSumOfLatchs();
             } finally {
@@ -4049,11 +4042,11 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
             try {
 
-                buffer.bufferTerm2IdWrites();
+                buffer.bufferTermsWrites();
 
                 lock.lock();
                 try {
-                    guardLatch_term2Id.dec();
+                    guardLatch_terms.dec();
                 } finally {
                     lock.unlock();
                 }
@@ -4064,8 +4057,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                 lock.lock();
                 try {
-                    guardLatch_term2Id.dec();
-                    workflowLatch_bufferTerm2Id.dec();
+                    guardLatch_terms.dec();
+                    workflowLatch_bufferTerms.dec();
                     documentTIDsWaitingCount.decrementAndGet();
                     documentError(buffer.getDocumentIdentifier(), t);
                     outstandingStatementCount.addAndGet(-buffer.statementCount);
@@ -4086,11 +4079,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
     /**
      * Task which buffers index writes for the remaining indices (everything
-     * other than TERM2ID).
+     * other than TERMS).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     private class BufferOtherWritesTask implements Callable<Void> {
 
@@ -4111,7 +4103,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             lock.lock();
             try {
                 guardLatch_other.inc();
-                workflowLatch_bufferTerm2Id.dec();
+                workflowLatch_bufferTerms.dec();
                 workflowLatch_bufferOther.inc();
                 assertSumOfLatchs();
             } finally {
@@ -4160,7 +4152,6 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     private class ParserThreadPoolExecutor extends ThreadPoolExecutor {
 

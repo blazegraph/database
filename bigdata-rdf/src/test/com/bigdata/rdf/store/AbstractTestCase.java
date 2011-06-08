@@ -101,6 +101,7 @@ abstract public class AbstractTestCase
     extends TestCase2
 {
 
+    /** A <code>null</code> {@link IV} reference (NOT a NullIV object). */
     protected final IV NULL = null;
     
     //
