@@ -66,13 +66,9 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.filter.PrefixFilter;
 import com.bigdata.btree.filter.TupleFilter;
-import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
@@ -143,6 +139,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     private final List<IKeyOrder<BigdataValue>> keyOrders;
     
     private final AtomicReference<ITextIndexer> viewRef = new AtomicReference<ITextIndexer>();
+
+    /**
+     * Note: This is a stateless class.
+     */
+    private final TermsIndexHelper h = new TermsIndexHelper();
 
 	@SuppressWarnings("unchecked")
     protected Class<BigdataValueFactory> determineValueFactoryClass() {
@@ -533,9 +534,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 			 * TERMS index.
 			 */
 			{
-				final TermsIndexHelper helper = new TermsIndexHelper();
 
-				final IKeyBuilder keyBuilder = helper.newKeyBuilder();
+				final IKeyBuilder keyBuilder = h.newKeyBuilder();
 
 				final byte[] key = TermId.NullIV.encode(keyBuilder).getKey();
 				
@@ -833,98 +833,96 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     /** @deprecated by {@link #getTermsIndex()}. */
     final public IIndex getTerm2IdIndex() {
         
-        if(TERMS)
-            throw new UnsupportedOperationException();
+        throw new UnsupportedOperationException();
         
-        if (term2id == null) {
-
-            synchronized (this) {
-
-                if (term2id == null) {
-
-                    final long timestamp = getTimestamp();
-                    
-                    if (TimestampUtility.isReadWriteTx(timestamp)) {
-                        /*
-                         * We always use the unisolated view of the lexicon
-                         * indices for mutation and the lexicon indices do NOT
-                         * set the [isolatable] flag even if the kb supports
-                         * full tx isolation. This is because we use an
-                         * eventually consistent strategy to write on the
-                         * lexicon indices.
-                         * 
-                         * Note: It appears that we have already ensured that
-                         * we will be using the unisolated view of the lexicon
-                         * relation in AbstractTripleStore#getLexiconRelation()
-                         * so this code path should not be evaluated.
-                         */
-                        term2id = AbstractRelation
-                                .getIndex(getIndexManager(),
-                                        getFQN(LexiconKeyOrder.TERM2ID),
-                                        ITx.UNISOLATED);
-                    } else {
-                        term2id = super.getIndex(LexiconKeyOrder.TERM2ID);
-                    }
-
-                    if (term2id == null)
-                        throw new IllegalStateException();
-
-                }
-
-            }
-            
-        }
-
-        return term2id;
+//        if (term2id == null) {
+//
+//            synchronized (this) {
+//
+//                if (term2id == null) {
+//
+//                    final long timestamp = getTimestamp();
+//                    
+//                    if (TimestampUtility.isReadWriteTx(timestamp)) {
+//                        /*
+//                         * We always use the unisolated view of the lexicon
+//                         * indices for mutation and the lexicon indices do NOT
+//                         * set the [isolatable] flag even if the kb supports
+//                         * full tx isolation. This is because we use an
+//                         * eventually consistent strategy to write on the
+//                         * lexicon indices.
+//                         * 
+//                         * Note: It appears that we have already ensured that
+//                         * we will be using the unisolated view of the lexicon
+//                         * relation in AbstractTripleStore#getLexiconRelation()
+//                         * so this code path should not be evaluated.
+//                         */
+//                        term2id = AbstractRelation
+//                                .getIndex(getIndexManager(),
+//                                        getFQN(LexiconKeyOrder.TERM2ID),
+//                                        ITx.UNISOLATED);
+//                    } else {
+//                        term2id = super.getIndex(LexiconKeyOrder.TERM2ID);
+//                    }
+//
+//                    if (term2id == null)
+//                        throw new IllegalStateException();
+//
+//                }
+//
+//            }
+//            
+//        }
+//
+//        return term2id;
 
     }
 
 	/** @deprecated by {@link #getTermsIndex()} */
     final public IIndex getId2TermIndex() {
 
-        if(TERMS)
-            throw new UnsupportedOperationException();
+        throw new UnsupportedOperationException();
         
-        if (id2term == null) {
-
-            synchronized (this) {
-                
-                if (id2term == null) {
-
-                    final long timestamp = getTimestamp();
-                    
-                    if (TimestampUtility.isReadWriteTx(timestamp)) {
-                        /*
-                         * We always use the unisolated view of the lexicon
-                         * indices for mutation and the lexicon indices do NOT
-                         * set the [isolatable] flag even if the kb supports
-                         * full tx isolation. This is because we use an
-                         * eventually consistent strategy to write on the
-                         * lexicon indices.
-                         * 
-                         * Note: It appears that we have already ensured that
-                         * we will be using the unisolated view of the lexicon
-                         * relation in AbstractTripleStore#getLexiconRelation()
-                         * so this code path should not be evaluated.
-                         */
-                        id2term = AbstractRelation
-                                .getIndex(getIndexManager(),
-                                        getFQN(LexiconKeyOrder.ID2TERM),
-                                        ITx.UNISOLATED);
-                    } else {
-                        id2term = super.getIndex(LexiconKeyOrder.ID2TERM);
-                    }
-                
-                    if (id2term == null)
-                        throw new IllegalStateException();
-
-                }
-
-            }
-
-        }
-
-        return id2term;
+//        if (id2term == null) {
+//
+//            synchronized (this) {
+//                
+//                if (id2term == null) {
+//
+//                    final long timestamp = getTimestamp();
+//                    
+//                    if (TimestampUtility.isReadWriteTx(timestamp)) {
+//                        /*
+//                         * We always use the unisolated view of the lexicon
+//                         * indices for mutation and the lexicon indices do NOT
+//                         * set the [isolatable] flag even if the kb supports
+//                         * full tx isolation. This is because we use an
+//                         * eventually consistent strategy to write on the
+//                         * lexicon indices.
+//                         * 
+//                         * Note: It appears that we have already ensured that
+//                         * we will be using the unisolated view of the lexicon
+//                         * relation in AbstractTripleStore#getLexiconRelation()
+//                         * so this code path should not be evaluated.
+//                         */
+//                        id2term = AbstractRelation
+//                                .getIndex(getIndexManager(),
+//                                        getFQN(LexiconKeyOrder.ID2TERM),
+//                                        ITx.UNISOLATED);
+//                    } else {
+//                        id2term = super.getIndex(LexiconKeyOrder.ID2TERM);
+//                    }
+//                
+//                    if (id2term == null)
+//                        throw new IllegalStateException();
+//
+//                }
+//
+//            }
+//
+//        }
+//
+//        return id2term;
 
     }
 
@@ -1032,28 +1030,28 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     }
 
-	/** @deprecated by {@link #getTermsIndexMetadata(String)} */
-    protected IndexMetadata getTerm2IdIndexMetadata(final String name) {
-
-        final IndexMetadata metadata = newIndexMetadata(name);
-
-        metadata.setTupleSerializer(new Term2IdTupleSerializer(getProperties()));
-        
-        return metadata;
-
-    }
-
-	/** @deprecated by {@link #getTermsIndexMetadata(String)} */
-    protected IndexMetadata getId2TermIndexMetadata(final String name) {
-
-        final IndexMetadata metadata = newIndexMetadata(name);
-
-        metadata.setTupleSerializer(new Id2TermTupleSerializer(
-                getNamespace(), getValueFactory()));
-
-        return metadata;
-
-    }
+//	/** @deprecated by {@link #getTermsIndexMetadata(String)} */
+//    protected IndexMetadata getTerm2IdIndexMetadata(final String name) {
+//
+//        final IndexMetadata metadata = newIndexMetadata(name);
+//
+//        metadata.setTupleSerializer(new Term2IdTupleSerializer(getProperties()));
+//        
+//        return metadata;
+//
+//    }
+//
+//	/** @deprecated by {@link #getTermsIndexMetadata(String)} */
+//    protected IndexMetadata getId2TermIndexMetadata(final String name) {
+//
+//        final IndexMetadata metadata = newIndexMetadata(name);
+//
+//        metadata.setTupleSerializer(new Id2TermTupleSerializer(
+//                getNamespace(), getValueFactory()));
+//
+//        return metadata;
+//
+//    }
 
     public Set<String> getIndexNames() {
 
@@ -1152,131 +1150,130 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     @SuppressWarnings("unchecked")
     public Iterator<IV> prefixScan(final Literal[] lits) {
 
-        if (lits == null || lits.length == 0)
-            throw new IllegalArgumentException();
-
-        if(TERMS)
-            throw new UnsupportedOperationException();
+        throw new UnsupportedOperationException();
         
-        if (log.isInfoEnabled()) {
-
-            log.info("#lits=" + lits.length);
-
-        }
-
-        /*
-         * The KeyBuilder used to form the prefix keys.
-         * 
-         * Note: The prefix keys are formed with IDENTICAL strength. This is
-         * necessary in order to match all keys in the index since it causes the
-         * secondary characteristics to NOT be included in the prefix key even
-         * if they are present in the keys in the index.
-         */
-        final LexiconKeyBuilder keyBuilder;
-        {
-
-            final Properties properties = new Properties();
-
-            properties.setProperty(KeyBuilder.Options.STRENGTH,
-                    StrengthEnum.Primary.toString());
-
-            keyBuilder = new Term2IdTupleSerializer(
-                    new DefaultKeyBuilderFactory(properties)).getLexiconKeyBuilder();
-
-        }
-
-        /*
-         * Formulate the keys[].
-         * 
-         * Note: Each key is encoded with the appropriate bytes to indicate the
-         * kind of literal (plain, languageCode, or datatype literal).
-         * 
-         * Note: The key builder was chosen to only encode the PRIMARY
-         * characteristics so that we obtain a prefix[] suitable for the
-         * completion scan.
-         */
-
-        final byte[][] keys = new byte[lits.length][];
-
-        for (int i = 0; i < lits.length; i++) {
-
-            final Literal lit = lits[i];
-
-            if (lit == null)
-                throw new IllegalArgumentException();
-
-            keys[i] = keyBuilder.value2Key(lit);
-
-        }
-
-        final IIndex ndx = getTerm2IdIndex();
-
-        final Iterator<IV> termIdIterator = new Striterator(
-                ndx
-                        .rangeIterator(
-                                null/* fromKey */,
-                                null/* toKey */,
-                                0/* capacity */,
-                                IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
-                                // prefix filter.
-                                new PrefixFilter<BigdataValue>(keys)))
-                .addFilter(new Resolver() {
-
-                    private static final long serialVersionUID = 1L;
-
-                    /**
-                     * Decode the value, which is the term identifier.
-                     */
-                    @Override
-                    protected Object resolve(final Object arg0) {
-
-                        final byte[] bytes = ((ITuple) arg0).getValue(); 
-                        
-                        return IVUtility.decode(bytes);
-
-                    }
-                });
-
-        return termIdIterator;
+//        if (lits == null || lits.length == 0)
+//            throw new IllegalArgumentException();
+//
+//        if (log.isInfoEnabled()) {
+//
+//            log.info("#lits=" + lits.length);
+//
+//        }
+//
+//        /*
+//         * The KeyBuilder used to form the prefix keys.
+//         * 
+//         * Note: The prefix keys are formed with IDENTICAL strength. This is
+//         * necessary in order to match all keys in the index since it causes the
+//         * secondary characteristics to NOT be included in the prefix key even
+//         * if they are present in the keys in the index.
+//         */
+//        final LexiconKeyBuilder keyBuilder;
+//        {
+//
+//            final Properties properties = new Properties();
+//
+//            properties.setProperty(KeyBuilder.Options.STRENGTH,
+//                    StrengthEnum.Primary.toString());
+//
+//            keyBuilder = new Term2IdTupleSerializer(
+//                    new DefaultKeyBuilderFactory(properties)).getLexiconKeyBuilder();
+//
+//        }
+//
+//        /*
+//         * Formulate the keys[].
+//         * 
+//         * Note: Each key is encoded with the appropriate bytes to indicate the
+//         * kind of literal (plain, languageCode, or datatype literal).
+//         * 
+//         * Note: The key builder was chosen to only encode the PRIMARY
+//         * characteristics so that we obtain a prefix[] suitable for the
+//         * completion scan.
+//         */
+//
+//        final byte[][] keys = new byte[lits.length][];
+//
+//        for (int i = 0; i < lits.length; i++) {
+//
+//            final Literal lit = lits[i];
+//
+//            if (lit == null)
+//                throw new IllegalArgumentException();
+//
+//            keys[i] = keyBuilder.value2Key(lit);
+//
+//        }
+//
+//        final IIndex ndx = getTerm2IdIndex();
+//
+//        final Iterator<IV> termIdIterator = new Striterator(
+//                ndx
+//                        .rangeIterator(
+//                                null/* fromKey */,
+//                                null/* toKey */,
+//                                0/* capacity */,
+//                                IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
+//                                // prefix filter.
+//                                new PrefixFilter<BigdataValue>(keys)))
+//                .addFilter(new Resolver() {
+//
+//                    private static final long serialVersionUID = 1L;
+//
+//                    /**
+//                     * Decode the value, which is the term identifier.
+//                     */
+//                    @Override
+//                    protected Object resolve(final Object arg0) {
+//
+//                        final byte[] bytes = ((ITuple) arg0).getValue(); 
+//                        
+//                        return IVUtility.decode(bytes);
+//
+//                    }
+//                });
+//
+//        return termIdIterator;
             
     }
     
-    /**
-     * Generate the sort keys for the terms.
-     * 
-     * @param keyBuilder
-     *            The object used to generate the sort keys.
-     * @param terms
-     *            The terms whose sort keys will be generated.
-     * @param numTerms
-     *            The #of terms in that array.
-     * 
-     * @return An array of correlated key-value-object tuples.
-     *         <p>
-     *         Note that {@link KVO#val} is <code>null</code> until we know
-     *         that we need to write it on the reverse index.
-     * 
-     * @see LexiconKeyBuilder
-     */
-    @SuppressWarnings("unchecked")
-    final public KVO<BigdataValue>[] generateSortKeys(
-            final LexiconKeyBuilder keyBuilder, final BigdataValue[] terms,
-            final int numTerms) {
-
-		final KVO<BigdataValue>[] a = new KVO[numTerms];
-        
-        for (int i = 0; i < numTerms; i++) {
-
-            final BigdataValue term = terms[i];
-
-            a[i] = new KVO<BigdataValue>(keyBuilder.value2Key(term),
-                    null/* val */, term);
-
-        }
-        
-        return a;
-
-    }
+//    /**
+//     * Generate the sort keys for the terms.
+//     * 
+//     * @param keyBuilder
+//     *            The object used to generate the sort keys.
+//     * @param terms
+//     *            The terms whose sort keys will be generated.
+//     * @param numTerms
+//     *            The #of terms in that array.
+//     * 
+//     * @return An array of correlated key-value-object tuples.
+//     *         <p>
+//     *         Note that {@link KVO#val} is <code>null</code> until we know
+//     *         that we need to write it on the reverse index.
+//     * 
+//     * @see LexiconKeyBuilder
+//     */
+//    @SuppressWarnings("unchecked")
+//    final public KVO<BigdataValue>[] generateSortKeys(
+//            final LexiconKeyBuilder keyBuilder, final BigdataValue[] terms,
+//            final int numTerms) {
+//
+//		final KVO<BigdataValue>[] a = new KVO[numTerms];
+//        
+//        for (int i = 0; i < numTerms; i++) {
+//
+//            final BigdataValue term = terms[i];
+//
+//            a[i] = new KVO<BigdataValue>(keyBuilder.value2Key(term),
+//                    null/* val */, term);
+//
+//        }
+//        
+//        return a;
+//
+//    }
 
     /**
      * See {@link IDatatypeURIResolver}.
@@ -2688,11 +2685,16 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     }
 
     /**
+     * <strong>WARNING DO NOT USE OUTSIDE OF THE UNIT TESTS: </strong> This
+     * method is extremely inefficient for scale-out as it does one RMI per
+     * request!
+     * <p>
      * Note: If {@link BigdataValue#getIV()} is set, then returns that value
      * immediately. Next, try to get an inline internal value for the value.
-     * Otherwise looks up the termId in the index and 
-     * {@link BigdataValue#setIV(IV) sets the term identifier} as a
-     * side-effect.
+     * Otherwise looks up the termId in the index and
+     * {@link BigdataValue#setIV(IV) sets the term identifier} as a side-effect.
+     * 
+     * @deprecated Not even the unit tests should be doing this.
      */
     final public IV getIV(final Value value) {
 
@@ -2707,12 +2709,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         }
 
         // see if it can be assigned an inline value
-        final IV iv = getInlineIV(value);
+        IV iv = getInlineIV(value);
         if (iv != null)
             return iv;
         
         // go to the index
-        return getTermId(value);
+        iv = getTermId(value);
+        
+        return iv;
         
     }
         
@@ -2741,11 +2745,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *          the term identifier for the value
      */
     private TermId getTermId(final Value value) {
-
         
-        
-        final TermsIndexHelper h = new TermsIndexHelper();
-
         final IKeyBuilder keyBuilder = h.newKeyBuilder();
         
         final BigdataValue asValue = valueFactory.asValue(value);
@@ -2758,8 +2758,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 true/* readOnly */, keyBuilder, baseKey, val);
         
         if( key == null ) {
+
             // Not found.
             return null;
+            
         }
 
 //        final IIndex ndx = getTerm2IdIndex();

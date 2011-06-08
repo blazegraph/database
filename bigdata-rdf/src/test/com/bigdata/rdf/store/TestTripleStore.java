@@ -48,9 +48,7 @@ import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.lexicon.Id2TermWriteProc;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.lexicon.Term2IdWriteProc;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -154,8 +152,10 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         if (store.getLexiconRelation().isStoreBlankNodes()
                 || !(term instanceof BNode)) {
 
+            final IV actual = store.getIV(term);
+            
             // test lookup in the forward mapping (term -> id)
-            assertEquals("forward mapping", id, store.getIV(term));
+            assertEquals("forward mapping", id, actual);
 
         }
 

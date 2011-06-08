@@ -337,7 +337,7 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
 	 */
-    static class Result implements Externalizable {
+    public static class Result implements Externalizable {
 
         public IV[] ivs;
         
