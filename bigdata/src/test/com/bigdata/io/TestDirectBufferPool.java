@@ -175,33 +175,4 @@ public class TestDirectBufferPool extends TestCase2 {
 
     }
 
-    /**
-     * Unit test to verify that a pool will reject a buffer not acquired from
-     * that pool.
-     */
-    public void test_rejectBufferFromAnotherPool() throws InterruptedException {
-
-        // A distinct pool with the same buffer capacity
-        final DirectBufferPool testPool = new DirectBufferPool("test",
-                1/* poolCapacity */, DirectBufferPool.INSTANCE
-                        .getBufferCapacity());
-
-        IBufferAccess b = null;
-        try {
-            b = DirectBufferPool.INSTANCE.acquire();
-            try {
-            	// Only possible to test since in same package
-                testPool.release(b.buffer());
-                fail("Release should not be permitted to a different pool. Expecting: "
-                        + IllegalArgumentException.class);
-            } catch (IllegalArgumentException ex) {
-                if (log.isInfoEnabled())
-                    log.info("Ignoring expected exception: " + ex);
-            }
-        } finally {
-            b.release();
-        }
-
-    }
-
 }

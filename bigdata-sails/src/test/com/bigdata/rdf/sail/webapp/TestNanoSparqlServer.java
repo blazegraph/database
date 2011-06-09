@@ -671,7 +671,8 @@ public class TestNanoSparqlServer extends TestCase2 {
 		
 		final String txt = getStreamContents(conn.getInputStream());
 		
-		System.out.println(txt);
+        if (log.isInfoEnabled())
+            log.info(txt);
 
 	}
 

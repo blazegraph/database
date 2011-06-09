@@ -284,7 +284,7 @@ public class TestUnions extends QuadsTestCase {
                 tupleQuery.setIncludeInferred(true /* includeInferred */);
                 tupleQuery.evaluate(new SPARQLResultsXMLWriter(new XMLWriter(sw)));
     
-                System.err.println(sw.toString());
+                if(log.isInfoEnabled())log.info(sw.toString());
             }
             
         } finally {

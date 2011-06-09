@@ -27,11 +27,45 @@ package com.bigdata.io;
 import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Interface for access to and release of a direct {@link ByteBuffer} managed by
+ * the {@link DirectBufferPool}.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public interface IBufferAccess {
-	// return the byte buffer
-	public ByteBuffer buffer();
-	
-	// release the ByteBuffer, returning to owning pool
-	public void release() throws InterruptedException;
-	public void release(long time, TimeUnit unit) throws InterruptedException;
+
+    /**
+     * Return the direct {@link ByteBuffer}.
+     * <p>
+     * <strong>Caution:</strong> DO NOT hold onto a reference to the returned
+     * {@link ByteBuffer} without also retaining the {@link IBufferAccess}
+     * object. This can cause the backing {@link ByteBuffer} to be returned to
+     * the pool, after which it may be handed off to another thread leading to
+     * data corruption through concurrent modification to the backing bytes!
+     * 
+     * @throws IllegalStateException
+     *             if the buffer has been released.
+     */
+    public ByteBuffer buffer();
+
+    /**
+     * Release the {@link ByteBuffer}, returning to owning pool.
+     * 
+     * @throws IllegalStateException
+     *             if the buffer has been released.
+     */
+    public void release() throws InterruptedException;
+
+    /**
+     * Release the {@link ByteBuffer}, returning to owning pool.
+     *
+     * @param time
+     * @param unit
+     * @throws IllegalStateException
+     *             if the buffer has been released.
+     */
+    public void release(long time, TimeUnit unit) throws InterruptedException;
+
 }

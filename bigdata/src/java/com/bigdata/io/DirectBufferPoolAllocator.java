@@ -293,7 +293,7 @@ public class DirectBufferPoolAllocator {
          *       released.
          */
         // Note: package private for the unit tests.
-        final /*private*/ ByteBuffer nativeBuffer;
+        final /*private*/ IBufferAccess nativeBuffer;
 
         /**
          * A {@link ByteBuffer#slice()} onto the allocated region of the
@@ -325,7 +325,7 @@ public class DirectBufferPoolAllocator {
         }
 
         private Allocation(final AllocationContext allocationContext,
-                final ByteBuffer nativeBuffer, final ByteBuffer allocatedSlice) {
+                final IBufferAccess nativeBuffer, final ByteBuffer allocatedSlice) {
 
             if (allocationContext == null)
                 throw new IllegalArgumentException();
@@ -465,7 +465,7 @@ public class DirectBufferPoolAllocator {
                     nativeBuffer.limit(limit);
 
                     // create the slice.
-                    final Allocation a = new Allocation(this, nativeBuffer,
+                    final Allocation a = new Allocation(this, directBuffer,
                             nativeBuffer.slice());
                     
                     // restore limit to the remaining capacity.

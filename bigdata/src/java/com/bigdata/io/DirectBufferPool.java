@@ -2,7 +2,6 @@ package com.bigdata.io;
 
 import java.nio.ByteBuffer;
 import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -17,7 +16,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.TemporaryRawStore;
@@ -73,14 +71,34 @@ public class DirectBufferPool {
     private class BufferState implements IBufferAccess {
      
         /**
-         * The buffer instance.
+         * The buffer instance. This is guarded by the monitor of the
+         * {@link BufferState} object.
          */
         private ByteBuffer buf;
+
+        /**
+         * The stack trace where the {@link ByteBuffer} was acquired IFF DEBUG
+         * and otherwise <code>null</code>.
+         */
+        private final Throwable allocationStack;
+
+        /**
+         * The stack trace where the {@link ByteBuffer} was released IFF DEBUG
+         * and otherwise <code>null</code>. This is guarded by the monitor of
+         * the {@link BufferState} object.
+         */
+        private Throwable releaseStack;
         
         BufferState(final ByteBuffer buf) {
+
             if (buf == null)
                 throw new IllegalArgumentException();
+            
             this.buf = buf;
+            
+            this.allocationStack = (DEBUG ? new RuntimeException("Allocation")
+                    : null);
+            
         }
         
         /**
@@ -101,7 +119,7 @@ public class DirectBufferPool {
          * result depends on the data actually in the buffer at the time the
          * operation is evaluated!
          */
-        public boolean equals(Object o) {
+        public boolean equals(final Object o) {
             if (this == o) {
                 // Same BufferState, must be the same buffer.
                 return true;
@@ -110,45 +128,139 @@ public class DirectBufferPool {
                 return false;
             }
             if (this.buf == ((BufferState) o).buf) {
-                return true;
+                /*
+                 * We have two distinct BufferState references for the same
+                 * ByteBuffer reference. This is an error. There should be a
+                 * one-to-one correspondence.
+                 */
+                throw new AssertionError();
             }
-            /*
-             * We have two distinct BufferState references for the same
-             * ByteBuffer reference. This is an error. There should be a
-             * one-to-one correspondence.
-             */
-            throw new AssertionError();
+            return false;
         }
 
         // Implement IDirectBuffer methods
-		public ByteBuffer buffer() {
-			return buf;
+        public ByteBuffer buffer() {
+            synchronized (this) {
+                if (buf == null)
+                    throw new IllegalStateException();
+			    return buf;
+			}
 		}
 
 		public void release() throws InterruptedException {
 			release(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
 		}
 
-		public void release(long timeout, TimeUnit units) throws InterruptedException {
-			if (buf != null) {
-				DirectBufferPool.this.release(buf, timeout, units);
-				buf = null;
-			} else {
-				throw new IllegalStateException("Buffer has already been released");
-			}
+        public void release(long timeout, TimeUnit units)
+                throws InterruptedException {
+
+            synchronized (this) {
+                if (buf == null) {
+                    if (DEBUG) {
+                        log.error("Double release: AllocationTrace",
+                                allocationStack);
+                        if (releaseStack == null)
+                            log
+                                    .error("Double release: FirstReleaseStack NOT available");
+                        else
+                            log.error("Double release: FirstReleaseStack: "
+                                    + releaseStack, releaseStack);
+                        log.error("Double release: DoubleReleaseStack",
+                                new RuntimeException("DoubleReleaseStack"));
+                    }
+                    throw new IllegalStateException();
+                }
+                DirectBufferPool.this.release(buf, timeout, units);
+                buf = null;
+                if (DEBUG) {
+                    /*
+                     * The stack frame where the ByteBuffer was released.
+                     */
+                    releaseStack = new RuntimeException("ReleaseTrace");
+                }
+            }
+            
 		}
-        
-		protected void finalize() {
-			if (buf != null) {
-				try {
-					DirectBufferPool.this.release(buf);
-				} catch (InterruptedException e) {
-					// ignore
-				}
-				log.warn("Buffer released on finalize");
-			} 
-		}
-        
+
+        /*
+         * Note: It is apparent that the JVM can order things such that the
+         * finalize() method can be called before an invocation of release() on
+         * the BufferState object. Presumably this arises when a set of
+         * references are all due to be finalized because none of them are more
+         * than weakly reachable from a GC root. At that point, the JVM is faced
+         * with the (impossible) task of ordering their finalizer() invocations.
+         * Since object references are (in general) an undirected graph, it
+         * seems that Java will invoke the finalizers on those references in
+         * some undefined (and perhaps not definable) order. This can lead to a
+         * "double-release" situation where the first release was the JVM
+         * invoking the finalizer and the second release was a different
+         * finalizer invoking release() on this BufferState object.
+         * 
+         * Given this state of affairs, the "right" thing to do is write the
+         * finalizer defensively for a concurrent environment. It should
+         * atomically release the buffer back to the pool and clear the buffer
+         * reference. We should then ignore the double-release request rather
+         * than throwing out an IllegalStateException.
+         * 
+         * This appears to be the right thing to do if the application holds a
+         * hard reference to the BufferState object until it has release()ed the
+         * buffer. If the application fails to hold that hard reference, then
+         * putting the ByteBuffer back on the pool will cause concurrent data
+         * modification problems within the ByteBuffer. Applications MUST verify
+         * that they correctly hold that hard reference!
+         */
+		protected void finalize() throws Throwable {
+            /*
+             * Ultra paranoid block designed to ensure that we do not double
+             * release the ByteBuffer to the owning pool via the action of
+             * another finalized.
+             */
+		    final ByteBuffer buf;
+		    final int nacquired;
+		    synchronized(this) {
+                buf = this.buf;
+                this.buf = null;
+                nacquired = DirectBufferPool.this.acquired;
+                if (buf != null && releaseStack == null) {
+                    releaseStack = new RuntimeException("ReleasedInFinalizer");
+                }
+            }
+            if (buf == null)
+                return;
+            if (DEBUG) {
+                /*
+                 * Note: This code path WILL NOT return the buffer to the pool.
+                 * This is deliberate. When DEBUG is true we do not permit a
+                 * buffer which was not correctly release to be reused.
+                 * 
+                 * Note: A common cause of this is that the caller is holding
+                 * onto the acquired ByteBuffer object rather than the
+                 * IBufferAccess object. This permits the IBufferAccess
+                 * reference to be finalized. When the IBufferAccess object is
+                 * finalized, it will attempt to release the buffer (except in
+                 * DEBUG mode). However, if the caller is holding onto the
+                 * ByteBuffer then this is an error which can rapidly lead to
+                 * corrupt data through concurrent modification (what happens is
+                 * that the ByteBuffer is handed out to another thread in
+                 * response to another acquire() and we now have two threads
+                 * using the same ByteBuffer, each of which believes that they
+                 * "own" the reference).
+                 */
+                leaked.increment();
+                final long nleaked = leaked.get();
+                log.error("Buffer release on finalize (nacquired=" + nacquired
+                        + ",nleaked=" + nleaked + "): AllocationStack",
+                        allocationStack);
+            } else {
+                log.error("Buffer release on finalize.");
+                /*
+                 * TODO We do not currently set this.buf = buf if we are
+                 * interrupted in release(buf) here, so this is not acid. But
+                 * maybe we should accept the memory leak on that code path?
+                 */
+                DirectBufferPool.this.release(buf);
+            }
+        }
         
     }
     
@@ -181,6 +293,12 @@ public class DirectBufferPool {
      * is released.
      */
     private int acquired = 0;
+
+    /**
+     * The #of buffers leaked out of {@link BufferState#finalize()} when
+     * {@link #DEBUG} is <code>true</code>.
+     */
+    private final CAT leaked = new CAT();
     
     /**
      * The maximum #of {@link ByteBuffer}s that will be allocated. 
@@ -322,9 +440,23 @@ public class DirectBufferPool {
          * The default capacity of the allocated buffers.
          */
         String DEFAULT_BUFFER_CAPACITY = "" + Bytes.megabyte32 * 1;
+
+        /**
+         * Option to use conservative assumptions about buffer release and to
+         * report allocation stack traces for undesired events (double-release,
+         * never released, etc).
+         */
+        String DEBUG = DirectBufferPool.class.getName() + ".debug";
+
+        String DEFAULT_DEBUG = "true";
         
     }
 
+    /**
+     * @see Options#DEBUG
+     */
+    private final static boolean DEBUG;
+    
     /**
      * A JVM-wide pool of direct {@link ByteBuffer}s used for a variety of
      * purposes with a default {@link Options#BUFFER_CAPACITY} of
@@ -362,12 +494,15 @@ public class DirectBufferPool {
         if (log.isInfoEnabled())
             log.info(Options.BUFFER_CAPACITY + "=" + bufferCapacity);
 
+        DEBUG = Boolean.valueOf(System.getProperty(Options.DEBUG,
+                Options.DEFAULT_DEBUG));
+        
         INSTANCE = new DirectBufferPool(//
                 "default",//
                 poolCapacity,//
                 bufferCapacity//
                 );
-
+        
 //        INSTANCE_10M = new DirectBufferPool(//
 //                "10M",//
 //                Integer.MAX_VALUE, // poolCapacity
@@ -434,7 +569,7 @@ public class DirectBufferPool {
         this.bufferCapacity = bufferCapacity;
 
         this.pool = new LinkedBlockingQueue<ByteBuffer>(poolCapacity);
-
+        
         pools.add(this);
         
     }
@@ -553,7 +688,7 @@ public class DirectBufferPool {
      *             if the buffer has already been released.
      * @throws InterruptedException
      */
-    final protected void release(final ByteBuffer b) throws InterruptedException {
+    final private void release(final ByteBuffer b) throws InterruptedException {
 
         if (!release(b, Long.MAX_VALUE, TimeUnit.MILLISECONDS)) {
 
@@ -670,7 +805,7 @@ public class DirectBufferPool {
 
             // add to the pool.
             pool.add(b);
-
+            
             /*
              * There is now a buffer in the pool and the caller will get it
              * since they hold the lock.
@@ -751,6 +886,8 @@ public class DirectBufferPool {
             final int bufferCapacity = p.getBufferCapacity();
 
             final int acquired = p.getAcquiredBufferCount();
+
+            final long nleaked = p.leaked.get();
             
             final long bytesUsed = poolSize * bufferCapacity;
             
@@ -765,26 +902,16 @@ public class DirectBufferPool {
             c.addCounter("bufferCapacity", new OneShotInstrument<Integer>(
                     bufferCapacity));
 
-            c.addCounter("acquired", new Instrument<Integer>() {
-                public void sample() {
-                    setValue(acquired);
-                }
-            });
+            c.addCounter("acquired", new OneShotInstrument<Integer>(acquired));
 
-            c.addCounter("poolSize", new Instrument<Integer>() {
-                public void sample() {
-                    setValue(poolSize);
-                }
-            });
+            c.addCounter("leaked", new OneShotInstrument<Long>(nleaked));
+        
+            c.addCounter("poolSize", new OneShotInstrument<Integer>(poolSize));
 
             /*
              * #of bytes allocated and held by the DirectBufferPool.
              */
-            c.addCounter("bytesUsed", new Instrument<Long>() {
-                public void sample() {
-                    setValue(bytesUsed);
-                }
-            });
+            c.addCounter("bytesUsed", new OneShotInstrument<Long>(bytesUsed));
         
         } // next DirectBufferPool
 
@@ -801,11 +928,8 @@ public class DirectBufferPool {
         tmp.addCounter("bufferInUseCount", new OneShotInstrument<Integer>(
                 bufferInUseCount));
 
-        tmp.addCounter("totalBytesUsed", new Instrument<Long>() {
-            public void sample() {
-                setValue(totalBytesUsed.get());
-            }
-        });
+        tmp.addCounter("totalBytesUsed", new OneShotInstrument<Long>(
+                totalBytesUsed.get()));
 
         return tmp;
 

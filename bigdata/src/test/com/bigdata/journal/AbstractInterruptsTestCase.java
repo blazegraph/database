@@ -72,159 +72,166 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
         super(name);
     }
 
-    /**
-     * Runs {@link #doChannelOpenAfterInterrupt()} N times.
+    /*
+     * It would seem to me that the 1st task never makes it into the commit
+     * group since it does not exit doTask() normally. Also, the 2nd task is in
+     * fact interrupted in a timely basis.
      * 
-     * @throws InterruptedException
-     * @throws ExecutionException
+     * See https://sourceforge.net/apps/trac/bigdata/ticket/310
      */
-    public void test_channelOpenAfterInterrupt() throws InterruptedException,
-            ExecutionException {
-
-        for (int i = 0; i < 10; i++) {
-
-            doChannelOpenAfterInterrupt();
-
-        }
-        
-    }
-
-    /**
-     * Verifies that the backing {@link Channel} is re-opened after an abort.
-     * The test is designed to provoke a {@link ClosedByInterruptException} that
-     * causes the backing channel to be closed. This in turn causes an abort to
-     * discard the commit group. Afterwards we verify that the {@link Channel}
-     * has been re-opened.
-     * 
-     * @param properties
-     * 
-     * @throws InterruptedException
-     */
-    public void doChannelOpenAfterInterrupt() throws InterruptedException {
-
-        final IRawStore store = getStore();
-        
-        try {
-
-            if (!store.isStable() || !(store instanceof IJournal)) {
-
-                // Note: This test requires a journal backed by stable storage.
-                return;
-
-            }
-
-            final Journal journal = (Journal) store;
-            
-            final String[] resource = new String[]{"foo"};//,"bar","baz"};
-            
-            // register the indices.
-            for (int i = 0; i < resource.length; i++) {
-             
-                journal.registerIndex(resource[i]);
-                
-            }
-
-            // and commit (but NOT using the writeService).
-            journal.commit();
-
-            // verify counters.
-
-            assertEquals("abortCount", 0,
-                    journal.getConcurrencyManager().writeService
-                            .getAbortCount());
-            
-            assertEquals("commitCount", 0,
-                    journal.getConcurrencyManager().writeService
-                            .getGroupCommitCount());
-
-            /*
-             * Submit a task that waits for 10 seconds or until interrupted. It
-             * will be in the same commit group as the next task since it is
-             * just waiting around.
-             * 
-             * Note: This MUST run on the write service so that it is the commit
-             * group. However it MUST NOT declare a lock on the named index or
-             * the 'interrupt' task will not get to execute. Also, do NOT
-             * "get()" this task since that will block and the 'interrupt' task
-             * will not run.
-             */
-            final long maxWaitMillis = 5 * 1000;
-            journal.submit(new AbstractTask(journal,ITx.UNISOLATED,new String[]{}){
-
-                protected Object doTask() throws Exception {
-                    
-                    // sleep for a bit.
-                    Thread.sleep(maxWaitMillis/*millis*/);
-                    
-                    throw new AssertionError("Not expecting to wake up.");
-                    
-                }});
-            
-            /*
-             * Run a task that interrupts itself causing the commit group to be
-             * discarded.
-             */
-            try {
-                
-                journal.submit(
-                        new InterruptMyselfTask(journal, ITx.UNISOLATED,
-                                resource[0])).get();
-                
-                fail("Not expecting success");
-                
-            } catch (ExecutionException ex) {
-                
-                log.warn(ex, ex);
-                
-                assertTrue(isInnerCause(ex, ClosedByInterruptException.class)
-                        || isInnerCause(ex, InterruptedException.class));
-                
-            }
-
-            // Wait until the write service either commits or aborts.
-            
-            log.warn("Waiting for the write service to commit or abort");
-            
-            final long begin = System.currentTimeMillis();
-            while (journal.getConcurrencyManager().writeService.getAbortCount() == 0
-                    && journal.getConcurrencyManager().writeService
-                            .getGroupCommitCount() == 0) {
-                
-                final long elapsed = System.currentTimeMillis() - begin;
-
-                if (elapsed > maxWaitMillis) {
-                    fail("Did not abort/commit after " + elapsed + "ms");
-                }
-                
-                Thread.sleep(10/*ms*/);
-                
-            }
-            
-            // did abort.
-            assertEquals("abortCount", 1,
-                    journal.getConcurrencyManager().writeService
-                            .getAbortCount());
-
-            // did not commit.
-            assertEquals("commitCount", 0,
-                    journal.getConcurrencyManager().writeService.getGroupCommitCount());
-            
-            /*
-             * write on the store and flush the store to disk in order to provoke an
-             * exception if the channel is still closed.
-             */
-
-            journal.write(ByteBuffer.wrap(new byte[]{1,2,3}));
-            
-            journal.force(true);
-
-        } finally {
-
-            store.destroy();
-            
-        }
-
-    }
+//    /**
+//     * Runs {@link #doChannelOpenAfterInterrupt()} N times.
+//     * 
+//     * @throws InterruptedException
+//     * @throws ExecutionException
+//     */
+//    public void test_channelOpenAfterInterrupt() throws InterruptedException,
+//            ExecutionException {
+//
+//        for (int i = 0; i < 10; i++) {
+//
+//            doChannelOpenAfterInterrupt();
+//
+//        }
+//        
+//    }
+//
+//    /**
+//     * Verifies that the backing {@link Channel} is re-opened after an abort.
+//     * The test is designed to provoke a {@link ClosedByInterruptException} that
+//     * causes the backing channel to be closed. This in turn causes an abort to
+//     * discard the commit group. Afterwards we verify that the {@link Channel}
+//     * has been re-opened.
+//     * 
+//     * @param properties
+//     * 
+//     * @throws InterruptedException
+//     */
+//    public void doChannelOpenAfterInterrupt() throws InterruptedException {
+//
+//        final IRawStore store = getStore();
+//        
+//        try {
+//
+//            if (!store.isStable() || !(store instanceof IJournal)) {
+//
+//                // Note: This test requires a journal backed by stable storage.
+//                return;
+//
+//            }
+//
+//            final Journal journal = (Journal) store;
+//            
+//            final String[] resource = new String[]{"foo"};//,"bar","baz"};
+//            
+//            // register the indices.
+//            for (int i = 0; i < resource.length; i++) {
+//             
+//                journal.registerIndex(resource[i]);
+//                
+//            }
+//
+//            // and commit (but NOT using the writeService).
+//            journal.commit();
+//
+//            // verify counters.
+//
+//            assertEquals("abortCount", 0,
+//                    journal.getConcurrencyManager().writeService
+//                            .getAbortCount());
+//            
+//            assertEquals("commitCount", 0,
+//                    journal.getConcurrencyManager().writeService
+//                            .getGroupCommitCount());
+//
+//            /*
+//             * Submit a task that waits for 10 seconds or until interrupted. It
+//             * will be in the same commit group as the next task since it is
+//             * just waiting around.
+//             * 
+//             * Note: This MUST run on the write service so that it is the commit
+//             * group. However it MUST NOT declare a lock on the named index or
+//             * the 'interrupt' task will not get to execute. Also, do NOT
+//             * "get()" this task since that will block and the 'interrupt' task
+//             * will not run.
+//             */
+//            final long maxWaitMillis = 5 * 1000;
+//            journal.submit(new AbstractTask(journal,ITx.UNISOLATED,new String[]{}){
+//
+//                protected Object doTask() throws Exception {
+//                    
+//                    // sleep for a bit.
+//                    Thread.sleep(maxWaitMillis/*millis*/);
+//                    
+//                    throw new AssertionError("Not expecting to wake up.");
+//                    
+//                }});
+//            
+//            /*
+//             * Run a task that interrupts itself causing the commit group to be
+//             * discarded.
+//             */
+//            try {
+//                
+//                journal.submit(
+//                        new InterruptMyselfTask(journal, ITx.UNISOLATED,
+//                                resource[0])).get();
+//                
+//                fail("Not expecting success");
+//                
+//            } catch (ExecutionException ex) {
+//                
+//                log.warn(ex, ex);
+//                
+//                assertTrue(isInnerCause(ex, ClosedByInterruptException.class)
+//                        || isInnerCause(ex, InterruptedException.class));
+//                
+//            }
+//
+//            // Wait until the write service either commits or aborts.
+//            
+//            log.warn("Waiting for the write service to commit or abort");
+//            
+//            final long begin = System.currentTimeMillis();
+//            while (journal.getConcurrencyManager().writeService.getAbortCount() == 0
+//                    && journal.getConcurrencyManager().writeService
+//                            .getGroupCommitCount() == 0) {
+//                
+//                final long elapsed = System.currentTimeMillis() - begin;
+//
+//                if (elapsed > maxWaitMillis) {
+//                    fail("Did not abort/commit after " + elapsed + "ms");
+//                }
+//                
+//                Thread.sleep(10/*ms*/);
+//                
+//            }
+//            
+//            // did abort.
+//            assertEquals("abortCount", 1,
+//                    journal.getConcurrencyManager().writeService
+//                            .getAbortCount());
+//
+//            // did not commit.
+//            assertEquals("commitCount", 0,
+//                    journal.getConcurrencyManager().writeService.getGroupCommitCount());
+//            
+//            /*
+//             * write on the store and flush the store to disk in order to provoke an
+//             * exception if the channel is still closed.
+//             */
+//
+//            journal.write(ByteBuffer.wrap(new byte[]{1,2,3}));
+//            
+//            journal.force(true);
+//
+//        } finally {
+//
+//            store.destroy();
+//            
+//        }
+//
+//    }
     
     /**
      * Task interrupts itself and then forces an IO operation on the

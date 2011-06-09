@@ -23,31 +23,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import java.io.InputStream;
 import java.io.StringReader;
-import java.util.Iterator;
 import java.util.Properties;
+
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
-import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.LiteralImpl;
-import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
-import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
-import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
-import com.bigdata.rdf.axioms.NoAxioms;
+
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
@@ -115,7 +106,7 @@ public class TestSetBinding extends ProxyBigdataSailTestCase {
                 "    ns:buffy rdfs:label \"Buffy\"; " +
                 "                ns:weight \"8\".";
             
-            System.err.println("Loading data"); 
+            if(log.isInfoEnabled())log.info("Loading data"); 
 //            final ClassLoader cl = getClass().getClassLoader(); 
 //            final InputStream is = cl.getResourceAsStream("data.ttl"); 
 //            cxn.add(is, "", RDFFormat.TURTLE, new Resource[0]);
@@ -125,7 +116,9 @@ public class TestSetBinding extends ProxyBigdataSailTestCase {
             RepositoryResult<Statement> stmts = 
                 cxn.getStatements(null, null, null, false);
             while(stmts.hasNext()) {
-                System.err.println(stmts.next());
+                final Statement tmp = stmts.next();
+                if(log.isInfoEnabled())
+                    log.info(tmp);
             }
             
             // Second step, query data. Load query from resource and execute. 
@@ -133,8 +126,11 @@ public class TestSetBinding extends ProxyBigdataSailTestCase {
                 + "\nPREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>" 
                 + "\nSELECT ?name ?weight WHERE {" 
                 + "\n?uri rdfs:label ?name." + "\n?uri ns:weight ?weight." 
-                + "\n}"; System.err.println("Executing query: " + query); 
-                
+                + "\n}"; 
+            
+            if (log.isInfoEnabled())
+                log.info("Executing query: " + query);
+
             final TupleQuery q = cxn.prepareTupleQuery( QueryLanguage.SPARQL, query);
             
             Literal snowball = vf.createLiteral("Snowball");
@@ -151,11 +147,12 @@ public class TestSetBinding extends ProxyBigdataSailTestCase {
             final TupleQueryResult res = q.evaluate(); 
             while (res.hasNext()) { 
                 final BindingSet set = (BindingSet) res.next(); 
-                System.err.println("Found: " + set.getValue("name") 
-                        + " = " + set.getValue("weight")); 
+                if (log.isInfoEnabled())
+                    log.info("Found: " + set.getValue("name") + " = "
+                            + set.getValue("weight")); 
             } 
             
-            System.err.println("Done..."); 
+//            System.err.println("Done..."); 
             
         } finally {
             cxn.close();

@@ -126,7 +126,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                     final TupleQuery tupleQuery = cxn.prepareTupleQuery(
                             QueryLanguage.SPARQL, query);
                     tupleQuery.evaluate(handler);
-                    System.err.println(sw.toString());
+                    if(log.isInfoEnabled())log.info(sw.toString());
 
                 }
                 
@@ -222,7 +222,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                     
                     tupleQuery.evaluate(handler);
                     
-                    System.err.println(sw.toString());
+                    if(log.isInfoEnabled())log.info(sw.toString());
 
                 }
                 
@@ -326,7 +326,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                     
                     tupleQuery.evaluate(handler);
                     
-                    System.err.println(sw.toString());
+                    if(log.isInfoEnabled()) log.info(sw.toString());
 
                 }
                 
@@ -426,7 +426,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                     
                     tupleQuery.evaluate(handler);
                     
-                    System.err.println(sw.toString());
+                    if(log.isInfoEnabled()) log.info(sw.toString());
 
                 }
                 
@@ -521,7 +521,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                     
                     tupleQuery.evaluate(handler);
                     
-                    System.err.println(sw.toString());
+                    if(log.isInfoEnabled()) log.info(sw.toString());
 
                 }
                 
@@ -618,7 +618,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                     
                     tupleQuery.evaluate(handler);
                     
-                    System.err.println(sw.toString());
+                    if(log.isInfoEnabled()) log.info(sw.toString());
 
                 }
                 
@@ -701,10 +701,10 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                 
                 cxn.commit();
                 
-                System.err.println("<mike> = " + sail.getDatabase().getIV(mike));
-                System.err.println("<jane> = " + sail.getDatabase().getIV(jane));
-                System.err.println("\"Mike\" = " + sail.getDatabase().getIV(new LiteralImpl("Mike")));
-                System.err.println("\"Jane\" = " + sail.getDatabase().getIV(new LiteralImpl("Jane")));
+                if(log.isInfoEnabled()) log.info("<mike> = " + sail.getDatabase().getIV(mike));
+                if(log.isInfoEnabled()) log.info("<jane> = " + sail.getDatabase().getIV(jane));
+                if(log.isInfoEnabled()) log.info("\"Mike\" = " + sail.getDatabase().getIV(new LiteralImpl("Mike")));
+                if(log.isInfoEnabled()) log.info("\"Jane\" = " + sail.getDatabase().getIV(new LiteralImpl("Jane")));
                 
                 final double minRelevance = 0d;
                 final String query = 
@@ -728,7 +728,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                     
                     tupleQuery.evaluate(handler);
                     
-                    System.err.println(sw.toString());
+                    if(log.isInfoEnabled()) log.info(sw.toString());
 
                 }
                 
@@ -1050,7 +1050,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                     final TupleQuery tupleQuery = cxn.prepareTupleQuery(
                             QueryLanguage.SPARQL, query);
                     tupleQuery.evaluate(handler);
-                    System.err.println(sw.toString());
+                    if(log.isInfoEnabled()) log.info(sw.toString());
 
                 }
                 

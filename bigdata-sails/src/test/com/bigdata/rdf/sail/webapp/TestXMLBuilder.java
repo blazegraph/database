@@ -78,7 +78,8 @@ public class TestXMLBuilder extends TestCase2 {
         
         assertTrue(close == null);
         
-        System.out.println(xml.toString());
+        if(log.isInfoEnabled())
+            log.info(xml.toString());
 
     }
 

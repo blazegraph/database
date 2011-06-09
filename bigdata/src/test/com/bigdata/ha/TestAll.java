@@ -39,6 +39,7 @@ import junit.framework.TestSuite;
  */
 public class TestAll extends TestCase {
 
+	public static boolean s_includeHA = false;
     /**
      * 
      */
@@ -61,7 +62,8 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("high availability");
 
-        suite.addTest(com.bigdata.ha.pipeline.TestAll.suite());
+        if (s_includeHA)
+        	suite.addTest(com.bigdata.ha.pipeline.TestAll.suite());
 
         return suite;
 

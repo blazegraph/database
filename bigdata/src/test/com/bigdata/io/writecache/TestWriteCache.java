@@ -920,42 +920,46 @@ public class TestWriteCache extends TestCase3 {
 
             final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
             final IBufferAccess buf2 = DirectBufferPool.INSTANCE.acquire();
-
-    	long addr1 = 12800;
-    	ByteBuffer data1 = getRandomData(20 * 1024);
-    	int chk1 = ChecksumUtility.threadChk.get().checksum(data1, 0/* offset */, data1.limit());
-    	ByteBuffer data2 = getRandomData(20 * 1024);
-    	int chk2 = ChecksumUtility.threadChk.get().checksum(data2, 0/* offset */, data2.limit());
-    	WriteCache cache1 = new WriteCache.FileChannelScatteredWriteCache(buf, true, true,
-    			false, opener, null);   	
-    	WriteCache cache2 = new WriteCache.FileChannelScatteredWriteCache(buf2, true, true,
-    			false, opener, null);
-    	
-    	// write first data buffer
-    	cache1.write(addr1, data1, chk1);
-    	data1.flip();
-    	buf2.buffer().limit(buf.buffer().position());
-    	buf2.buffer().position(0);
-    	cache2.resetRecordMapFromBuffer();
-       	assertEquals(cache1.read(addr1), data1);
-       	assertEquals(cache2.read(addr1), data1);
-    	
-    	// now simulate removal/delete
-    	cache1.clearAddrMap(addr1);
-    	buf2.buffer().limit(buf.buffer().position());
-    	buf2.buffer().position(0);
-    	cache2.resetRecordMapFromBuffer();
-    	assertTrue(cache2.read(addr1) == null);
-    	assertTrue(cache1.read(addr1) == null);
-    	
-    	// now write second data buffer
-    	cache1.write(addr1, data2, chk2);
-    	data2.flip();
-    	buf2.buffer().limit(buf.buffer().position());
-    	buf2.buffer().position(0);
-    	cache2.resetRecordMapFromBuffer();
-    	assertEquals(cache2.read(addr1), data2);
-    	assertEquals(cache1.read(addr1), data2);
+		    try {
+		    	long addr1 = 12800;
+		    	ByteBuffer data1 = getRandomData(20 * 1024);
+		    	int chk1 = ChecksumUtility.threadChk.get().checksum(data1, 0/* offset */, data1.limit());
+		    	ByteBuffer data2 = getRandomData(20 * 1024);
+		    	int chk2 = ChecksumUtility.threadChk.get().checksum(data2, 0/* offset */, data2.limit());
+		    	WriteCache cache1 = new WriteCache.FileChannelScatteredWriteCache(buf, true, true,
+		    			false, opener, null);   	
+		    	WriteCache cache2 = new WriteCache.FileChannelScatteredWriteCache(buf2, true, true,
+		    			false, opener, null);
+		    	
+		    	// write first data buffer
+		    	cache1.write(addr1, data1, chk1);
+		    	data1.flip();
+		    	buf2.buffer().limit(buf.buffer().position());
+		    	buf2.buffer().position(0);
+		    	cache2.resetRecordMapFromBuffer();
+		       	assertEquals(cache1.read(addr1), data1);
+		       	assertEquals(cache2.read(addr1), data1);
+		    	
+		    	// now simulate removal/delete
+		    	cache1.clearAddrMap(addr1);
+		    	buf2.buffer().limit(buf.buffer().position());
+		    	buf2.buffer().position(0);
+		    	cache2.resetRecordMapFromBuffer();
+		    	assertTrue(cache2.read(addr1) == null);
+		    	assertTrue(cache1.read(addr1) == null);
+		    	
+		    	// now write second data buffer
+		    	cache1.write(addr1, data2, chk2);
+		    	data2.flip();
+		    	buf2.buffer().limit(buf.buffer().position());
+		    	buf2.buffer().position(0);
+		    	cache2.resetRecordMapFromBuffer();
+		    	assertEquals(cache2.read(addr1), data2);
+		    	assertEquals(cache1.read(addr1), data2);
+            } finally {
+                buf.release();
+                buf2.release();
+            }
         } finally {
             opener.destroy();
         }

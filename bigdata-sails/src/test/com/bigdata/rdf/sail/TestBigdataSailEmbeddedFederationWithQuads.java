@@ -308,7 +308,8 @@ public class TestBigdataSailEmbeddedFederationWithQuads extends AbstractBigdataS
             
         }
         
-        System.err.println("Removing: "+f);
+        if(log.isInfoEnabled())
+            log.info("Removing: "+f);
         
         if (!f.delete())
             throw new RuntimeException("Could not remove: " + f);

@@ -56,7 +56,17 @@ public class TestDirectBufferPoolAllocator extends TestCase2 {
         super(name);
     }
 
-    final DirectBufferPool pool = DirectBufferPool.INSTANCE;
+    private final DirectBufferPool pool = DirectBufferPool.INSTANCE;
+
+    @Override
+    protected void tearDown() throws Exception {
+
+        // Verify that all allocated buffers were released.
+        DirectBufferPoolTestHelper.checkBufferPools(this);
+        
+        super.tearDown();
+        
+    }
 
     /**
      * Opens and closes the allocator.
@@ -230,10 +240,10 @@ public class TestDirectBufferPoolAllocator extends TestCase2 {
             assertTrue(x0.nativeBuffer == x1.nativeBuffer);
             
             // the position was advanced by the #of bytes allocated.
-            assertEquals(allocSize * 2, x0.nativeBuffer.position());
+            assertEquals(allocSize * 2, x0.nativeBuffer.buffer().position());
 
             // the limit on the native byte buffer has not been changed.
-            assertEquals(x0.nativeBuffer.capacity(), x0.nativeBuffer.limit());
+            assertEquals(x0.nativeBuffer.buffer().capacity(), x0.nativeBuffer.buffer().limit());
             
         } finally {
 

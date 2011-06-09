@@ -40,6 +40,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.util.InnerCause;
 
 /**
  * Helper class for {@link IIndexStore#getTempStore()}. This class is very light
@@ -302,6 +303,8 @@ public class TemporaryStoreFactory {
      */
     synchronized public void closeAll() {
         
+        boolean interrupted = false;
+
         final Iterator<Map.Entry<UUID,WeakReference<TemporaryStore>>> itr = stores.entryIterator();
         
         while(itr.hasNext()) {
@@ -318,14 +321,24 @@ public class TemporaryStoreFactory {
             }
 
             // close the temporary store (it will be deleted synchronously).
-            if(store.isOpen()) {
+            if (store.isOpen()) {
 
-                store.close();
-            
+                try {
+                    store.close();
+                } catch (Throwable t) {
+                    if (InnerCause.isInnerCause(t, InterruptedException.class))
+                        interrupted = true;
+                }
+
             }
-            
+
         }
         
+        if (interrupted) {
+            // Propagate the interrupt.
+            Thread.currentThread().interrupt();
+        }
+
     }
-    
+
 }
