@@ -43,6 +43,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.rules.AbstractInferenceEngineTestCase;
 import com.bigdata.rdf.rules.RuleRdfs11;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -96,8 +97,6 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
     
     final org.deri.iris.api.basics.IPredicate TRIPLE = BASIC.createPredicate("triple", 3);
     
-
-    
     /**
      * 
      */
@@ -110,6 +109,18 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
      */
     public TestMagicStore(String name) {
         super(name);
+    }
+
+    private MockTermIdFactory f;
+    
+    protected void setUp() throws Exception {
+        super.setUp();
+        f = new MockTermIdFactory();
+    }
+
+    protected void tearDown() throws Exception {
+        super.tearDown();
+        f = null;
     }
 
     public void testMagicStore() {
@@ -134,7 +145,7 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
             
             final String symbol = "magic_xXx_prefix_xXx_triple_bbb";
             final int arity = 3;
-            final IMagicTuple tuple = new MagicTuple(96, 44, 108);
+            final IMagicTuple tuple = new MagicTuple(f, 96, 44, 108);
             tempStore.createRelation(symbol, arity);
             MagicRelation relation = tempStore.getMagicRelation(symbol);
             tempStore.createRelation("label_xXx_prefix_xXx_triple_1_fbb", 2);
@@ -204,11 +215,11 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
             }
 
             final IMagicTuple[] tuples = {
-                new MagicTuple(96, 44, 108, 31),
-                new MagicTuple(14, 44, 82, 31),
-                new MagicTuple(14, 73, 65, 31),
-                new MagicTuple(50, 10, 65, 49),
-                new MagicTuple(36, 13, 18, 49)
+                new MagicTuple(f, 96, 44, 108, 31),
+                new MagicTuple(f, 14, 44, 82, 31),
+                new MagicTuple(f, 14, 73, 65, 31),
+                new MagicTuple(f, 50, 10, 65, 49),
+                new MagicTuple(f, 36, 13, 18, 49)
             };
                 
             relation.insert(tuples, tuples.length);
