@@ -64,7 +64,6 @@ import com.bigdata.journal.Options;
 import com.bigdata.journal.TestHelper;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -901,11 +900,6 @@ abstract public class AbstractTestCase
     /**
      * Helper class verifies that all statements identified by a re-parse of
      * some RDF/XML file are present in the KB.
-     * 
-     * @todo the self-consistency of the {@link LexiconRelation} should be
-     *       checked by another class in order to have complete coverage of the
-     *       lexicon, just like we have a method to check the self-consistency
-     *       of the statement indices.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
