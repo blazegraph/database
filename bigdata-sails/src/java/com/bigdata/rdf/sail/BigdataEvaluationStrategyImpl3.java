@@ -97,7 +97,6 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.solutions.ISortOrder;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
-import com.bigdata.rdf.internal.DummyIV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
@@ -1460,7 +1459,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         if (expander == null) {
             p = toVE(stmtPattern.getPredicateVar());
         } else {
-            p = new Constant(DummyIV.INSTANCE);
+            p = new Constant(TermId.mockIV(VTE.BNODE));
         }
         if (p == null) {
             return null;
@@ -1470,7 +1469,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         if (expander == null) {
             o = toVE(stmtPattern.getObjectVar());
         } else {
-            o = new Constant(DummyIV.INSTANCE);
+            o = new Constant(TermId.mockIV(VTE.BNODE));
         }
         if (o == null) {
             return null;
@@ -1688,7 +1687,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         final IVariableOrConstant<IV> search = 
         	com.bigdata.bop.Var.var(subjVar.getName());
         
-        IVariableOrConstant<IV> relevance = new Constant(DummyIV.INSTANCE);
+        IVariableOrConstant<IV> relevance = new Constant(TermId.mockIV(VTE.BNODE));
         Literal minRank = null;
         Literal maxRank = null;
         Literal minRelevance = null;
@@ -1746,8 +1745,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         final BOp[] vars = new BOp[] {
 	        search, // s = searchVar
 	        relevance, // p = relevanceVar
-	        new Constant(DummyIV.INSTANCE), // o = reserved
-	        new Constant(DummyIV.INSTANCE), // c = reserved
+	        new Constant(TermId.mockIV(VTE.BNODE)), // o = reserved
+	        new Constant(TermId.mockIV(VTE.BNODE)), // c = reserved
         };
         
         // The annotations for the predicate.

@@ -949,6 +949,7 @@ public class HashCollisionUtility {
 				64,   // maxInlineStringLength
 				true, // inlineBNodes
 				false, // inlineDateTimes
+				false, // rejectInvalidXSDValues
 				xFactory, // extension factory
 				vocab     // predefined vocabulary
 				);

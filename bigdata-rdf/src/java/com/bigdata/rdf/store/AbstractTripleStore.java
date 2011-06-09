@@ -987,6 +987,21 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_EXTENSION_FACTORY_CLASS = DefaultExtensionFactory.class
                 .getName();
 
+        /**
+         * When <code>true</code> AND {@value #INLINE_LITERALS} is
+         * <code>true</code>, literals having an xsd datatype URI which can not
+         * be validated against that datatype will be rejected (default
+         * {@link #DEFAULT_REJECT_INVALID_XSD_VALUES}). FOr example, when
+         * <code>true</code> <code>abc^^xsd:int</code> would be rejected. When
+         * <code>false</code> the literal will be accepted, but it will not be
+         * inlined with the rest of the literals for that value space and will
+         * typically encounter an SPARQL type error during query evaluation.
+         */
+        String REJECT_INVALID_XSD_VALUES = AbstractTripleStore.class.getName()
+                + ".rejectInvalidXSDValues";
+
+        String DEFAULT_REJECT_INVALID_XSD_VALUES = "false";
+        
         /*
          * Options for shard split behavior.
          */

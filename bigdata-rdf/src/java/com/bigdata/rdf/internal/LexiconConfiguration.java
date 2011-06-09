@@ -44,6 +44,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.util.InnerCause;
 
@@ -70,6 +71,11 @@ public class LexiconConfiguration<V extends BigdataValue>
      */
     private final boolean inlineBNodes;
 
+    /**
+     * @see AbstractTripleStore.Options#REJECT_INVALID_XSD_VALUES
+     */
+    final boolean rejectInvalidXSDValues;
+    
     /**
      * The maximum length of a Unicode string which may be inlined into the
      * statement indices. This applies to blank node IDs, literal labels
@@ -111,6 +117,7 @@ public class LexiconConfiguration<V extends BigdataValue>
             final int maxInlineStringLength,//
             final boolean inlineBNodes,//
             final boolean inlineDateTimes,//
+            final boolean rejectInvalidXSDValues,
             final IExtensionFactory xFactory,//
             final Vocabulary vocab//
             ) {
@@ -124,6 +131,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         this.inlineLiterals = inlineLiterals;
         this.maxInlineStringLength = maxInlineStringLength;
         this.inlineBNodes = inlineBNodes;
+        this.rejectInvalidXSDValues = rejectInvalidXSDValues;
         this.xFactory = xFactory;
         this.vocab = vocab;
 
@@ -467,19 +475,21 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         } catch (NumberFormatException ex) {
 
+            if (rejectInvalidXSDValues) {
+            
+                throw new RuntimeException(ex + ": value=" + v, ex);
+                
+            }
+
             /*
-             * Note: This winds up accepting the Value, but it gets handled as a
-             * TermId instead of being inlined.
-             * 
-             * TODO Should we reject the Value instead since it does not
-             * validate against the xsd schema datatype?
+             * Note: By falling through here, we wind up accepting the Value,
+             * but it gets handled as a TermId instead of being inlined.
              */
 
-//            log.error(ex + ": value=" + v);
-//
-//            return null;
+            if (log.isInfoEnabled())
+                log.warn("Value does not validate against datatype: " + value);
 
-            throw new RuntimeException(ex + ": value=" + v, ex);
+            return null;
             
         }
 
