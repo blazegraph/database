@@ -683,8 +683,14 @@ public class IVUtility {
 				 */ 
 
             	o--; // back up one byte to the flags byte.
-				final byte[] termIdKey = Arrays.copyOfRange(key, o/* from */, o
-						+ TermsIndexHelper.TERMS_INDEX_KEY_SIZE/* to */);
+                final byte[] termIdKey = Arrays.copyOfRange(//
+                        // The unsigned byte[] key.
+                        key,
+                        // from: inclusive lower bound.
+                        o,
+                        // to : exclusive upper bound.
+                        o + TermsIndexHelper.TERMS_INDEX_KEY_SIZE //+ 1//
+                        );
 
 				return new TermId(termIdKey);
 				

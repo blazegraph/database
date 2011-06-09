@@ -2939,7 +2939,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                     for (BigdataValue v : chunkIn) {
 
-                        final byte[] key = h.makePrefixKey(keyBuilder, v);
+                        final byte[] key = h.makePrefixKey(keyBuilder.reset(), v);
                         
                         final byte[] val = valSer.serialize(v, out.reset(), tmp);
                         

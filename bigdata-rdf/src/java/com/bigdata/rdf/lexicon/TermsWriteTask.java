@@ -13,6 +13,7 @@ import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.TermsWriteProc.TermsWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 import com.bigdata.service.ndx.pipeline.KVOC;
@@ -28,17 +29,24 @@ public class TermsWriteTask implements Callable<Void> {
 
     private static transient final Logger log = Logger.getLogger(TermsWriteTask.class);
             
-    private final LexiconRelation r;
+//    private final LexiconRelation r;
+    final IIndex ndx;
+    final BigdataValueFactory valueFactory;
     private final boolean readOnly;
+    private final boolean storeBlankNodes;
     private final int numTerms;
     private final BigdataValue[] terms;
     private final WriteTaskStats stats;
     
-    public TermsWriteTask(final LexiconRelation r,
-            final boolean readOnly, final int numTerms,
+    public TermsWriteTask(final IIndex ndx, final BigdataValueFactory valueFactory,
+            final boolean readOnly,
+            final boolean storeBlankNodes, final int numTerms,
             final BigdataValue[] terms, final WriteTaskStats stats) {
 
-        if (r == null)
+        if (ndx == null)
+            throw new IllegalArgumentException();
+
+        if (valueFactory == null)
             throw new IllegalArgumentException();
 
         if (terms == null)
@@ -50,9 +58,15 @@ public class TermsWriteTask implements Callable<Void> {
         if (stats == null)
             throw new IllegalArgumentException();
 
-        this.r = r;
+//        this.r = r;
+        
+        this.ndx = ndx;
+        
+        this.valueFactory = valueFactory;
 
         this.readOnly = readOnly;
+        
+        this.storeBlankNodes = storeBlankNodes;
         
         this.numTerms = numTerms;
         
@@ -106,8 +120,8 @@ public class TermsWriteTask implements Callable<Void> {
                 long _begin = System.currentTimeMillis();
                 
                 // may contain duplicates and/or terms with pre-assigned term identifiers.
-				b = new TermsIndexHelper().generateKVOs(r.getValueFactory()
-						.getValueSerializer(), terms, numTerms);
+                b = new TermsIndexHelper().generateKVOs(valueFactory
+                        .getValueSerializer(), terms, numTerms);
 
                 stats.keyGenTime = System.currentTimeMillis() - _begin;
 
@@ -141,7 +155,7 @@ public class TermsWriteTask implements Callable<Void> {
 
                 final long _begin = System.currentTimeMillis();
 
-                final IIndex termsIndex = r.getTermsIndex();
+//                final IIndex termsIndex = r.getTermsIndex();
 
                 /*
                  * Create a key buffer holding the sort keys. This does not
@@ -209,13 +223,13 @@ public class TermsWriteTask implements Callable<Void> {
                     
                 }
                 
-				final AbstractKeyArrayIndexProcedureConstructor ctor = new TermsWriteProcConstructor(
-						readOnly, r.storeBlankNodes);
-                
+                final AbstractKeyArrayIndexProcedureConstructor ctor = new TermsWriteProcConstructor(
+                        readOnly, storeBlankNodes);
+
 				// run the procedure.
-				termsIndex.submit(0/* fromIndex */, ndistinct/* toIndex */,
-						keys, vals, ctor, new TermsWriteProcResultHandler(a,
-								readOnly, stats.nunknown));
+                ndx.submit(0/* fromIndex */, ndistinct/* toIndex */, keys,
+                        vals, ctor, new TermsWriteProcResultHandler(a,
+                                readOnly, stats.nunknown));
 
                 stats.indexTime = stats.forwardIndexTime = System.currentTimeMillis()
                         - _begin;

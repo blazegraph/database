@@ -1408,7 +1408,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 	 *            into the database. Otherwise unknown terms are inserted into
 	 *            the database.
 	 */
-    @SuppressWarnings("unchecked")
+//    @SuppressWarnings("unchecked")
     private void _addTerms(final BigdataValue[] terms, final int numTerms,
             final boolean readOnly) {
 
@@ -1424,8 +1424,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         try {
             // write on the TERMS index (rync sharded RPC in scale-out)
-            new TermsWriteTask(this, readOnly, numTerms, terms, stats)
-                    .call();
+            new TermsWriteTask(getTermsIndex(), valueFactory, readOnly,
+                    storeBlankNodes, numTerms, terms, stats).call();
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
@@ -2750,7 +2750,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
         final BigdataValue asValue = valueFactory.asValue(value);
         
-        final byte[] baseKey = h.makePrefixKey(keyBuilder, asValue);
+        final byte[] baseKey = h.makePrefixKey(keyBuilder.reset(), asValue);
 
         final byte[] val = valueFactory.getValueSerializer().serialize(asValue);
 
@@ -2763,26 +2763,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             return null;
             
         }
-
-//        final IIndex ndx = getTerm2IdIndex();
-//
-//        final byte[] key;
-//        {
-//        
-//            final Term2IdTupleSerializer tupleSer = (Term2IdTupleSerializer) ndx
-//                    .getIndexMetadata().getTupleSerializer();
-//
-//            // generate key iff not on hand.
-//            key = tupleSer.getLexiconKeyBuilder().value2Key(value);
-//        
-//        }
-//        
-//        // lookup in the forward index.
-//        final byte[] tmp = ndx.lookup(key);
-
-//        if (tmp == null)
-//            return null;
-
+        
         final TermId tid = (TermId) IVUtility.decode(key);
 
         if(value instanceof BigdataValue) {

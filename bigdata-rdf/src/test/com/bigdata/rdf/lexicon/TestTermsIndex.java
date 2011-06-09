@@ -198,9 +198,9 @@ public class TestTermsIndex extends TestCase2 {
      *            
      * @return The {@link IndexMetadata}.
      */
-	private IndexMetadata getTermsIndexMetadata(final String namespace) {
+	static IndexMetadata getTermsIndexMetadata(final String namespace) {
 	    
-        final String name = namespace+".TERMS";
+        final String name = namespace + ".TERMS";
 
         final BigdataValueFactory valueFactory = BigdataValueFactoryImpl
                 .getInstance(namespace);
@@ -245,6 +245,32 @@ public class TestTermsIndex extends TestCase2 {
 
 	}
 
+    /**
+     * Create a TERMS index.
+     * 
+     * @param namespace
+     *            The namespace of the TERMS index (e.g., for "kb.lex" the fully
+     *            qualified name of the index would be "kb.lex.TERMS").
+     * 
+     * @return The terms index.
+     */
+	static BTree createTermsIndex(final IRawStore store, final String namespace) {
+
+        final IndexMetadata metadata = getTermsIndexMetadata(namespace);
+
+        final BTree ndx = BTree.create(store, metadata);
+
+        final IKeyBuilder keyBuilder = new TermsIndexHelper().newKeyBuilder();
+
+        final byte[] key = TermId.NullIV.encode(keyBuilder).getKey();
+
+        // Insert a tuple for the NullIV mapping it to a null value.
+        ndx.insert(key/* NullIV */, null/* value */);
+        
+        return ndx;
+
+    }
+	
 	/**
 	 * Unit test for lookup and adding values to the TERMS index when blank
 	 * nodes are NOT stored in the TERMS index.
@@ -630,8 +656,8 @@ public class TestTermsIndex extends TestCase2 {
                     assertNotNull(ivs1[i]);
                     assertNotNull(ivs2[i]);
                     assertNotSame(ivs1[i], ivs2[i]);
-                    assertNotNull(h.lookup(ndx, ivs1[i], keyBuilder));
-                    assertNotNull(h.lookup(ndx, ivs2[i], keyBuilder));
+                    assertNotNull(h.lookup(ndx, (TermId<?>)ivs1[i], keyBuilder));
+                    assertNotNull(h.lookup(ndx, (TermId<?>)ivs2[i], keyBuilder));
                 }
                 
             }
@@ -991,5 +1017,5 @@ public class TestTermsIndex extends TestCase2 {
 		return a;
 
 	}
-
+    
 }

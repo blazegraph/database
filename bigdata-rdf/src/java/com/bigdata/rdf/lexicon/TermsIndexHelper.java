@@ -158,6 +158,11 @@ public class TermsIndexHelper {
             final boolean readOnly, final IKeyBuilder keyBuilder,
             final byte[] baseKey, final byte[] val) {
 
+        assert baseKey.length == TermsIndexHelper.TERMS_INDEX_KEY_SIZE - 1 : "Expecting "
+                + (TermsIndexHelper.TERMS_INDEX_KEY_SIZE - 1)
+                + " bytes, not "
+                + baseKey.length;
+
 		/*
 		 * This is the fixed length hash code prefix. When a collision
 		 * exists we can either append a counter -or- use more bits from the
@@ -198,8 +203,10 @@ public class TermsIndexHelper {
 		 */
 		final byte[] fromKey = baseKey;
 
-		// key strictly LT any successor of the hash code of this val.
-		final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
+        // key strictly LT any successor of the hash code of this val TODO More
+        // efficient if we reuse the caller's fixed length buffer for this for
+        // each call in a batch.
+        final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
 		// fast range count. this tells us how many collisions there are.
 		// this is an exact collision count since we are not deleting tuples
@@ -280,14 +287,16 @@ public class TermsIndexHelper {
 			
 			final ITuple<?> tuple = itr.next();
 			
-			// raw bytes
-			final byte[] tmp = tuple.getValue();
-			
+            // raw bytes TODO More efficient if we can compare without
+            // materializing the tuple's value, or compare reusing a temporary
+            // buffer either from the caller or for the iterator.
+            final byte[] tmp = tuple.getValue();
+
 			// Note: Compares the compressed values ;-)
 			if(BytesUtil.bytesEqual(val, tmp)) {
 				
 				// Already in the index.
-				return tuple.getKey();
+				final byte[] key = tuple.getKey(); return key;
 				
 			}
 			
@@ -414,7 +423,7 @@ public class TermsIndexHelper {
     }
 
 	/**
-	 * Return the value associated with the {@link IV} in the TERMS index.
+	 * Return the value associated with the {@link TermId} in the TERMS index.
 	 * <p>
 	 * Note: The returned <code>byte[]</code> may be decoded using the
 	 * {@link BigdataValueSerializer} associated with the
@@ -432,7 +441,7 @@ public class TermsIndexHelper {
 	 * @return The byte[] value -or- <code>null</code> if there is no entry for
 	 *         that {@link IV} in the index.
 	 */
-	public byte[] lookup(final IIndex ndx, final IV iv,
+	public byte[] lookup(final IIndex ndx, final TermId iv,
 			final IKeyBuilder keyBuilder) {
 
 		final byte[] key = iv.encode(keyBuilder.reset()).getKey();
@@ -515,7 +524,7 @@ public class TermsIndexHelper {
 		return keyBuilder.getKey();
 		
 	}
-	
+
     /**
      * Create a prefix key for the TERMS index from the {@link BigdataValue}.
      * 
@@ -527,83 +536,86 @@ public class TermsIndexHelper {
      * 
      * @return The prefix key.
      */
-	public byte[] makePrefixKey(final IKeyBuilder keyBuilder, final BigdataValue value) {
+    public byte[] makePrefixKey(final IKeyBuilder keyBuilder,
+            final BigdataValue value) {
 
-	    final VTE vte = VTE.valueOf(value);
+        final VTE vte = VTE.valueOf(value);
 
-	    return makePrefixKey(keyBuilder, vte, value.hashCode());
-	    
-	}
-	
-	/**
-	 * Return a new {@link IKeyBuilder} suitable for formatting keys for the
-	 * TERMS index.
-	 * 
-	 * @return The {@link IKeyBuilder}.
-	 */
-	public IKeyBuilder newKeyBuilder() {
-		
-		return new KeyBuilder(TERMS_INDEX_KEY_SIZE);
-		
-	}
+        return makePrefixKey(keyBuilder, vte, value.hashCode());
 
-	public StringBuilder dump(final String namespace, final IIndex ndx) {
-		
-		final StringBuilder sb = new StringBuilder(100 * Bytes.kilobyte32);
-		
-		final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance(namespace);
+    }
 
-		final BigdataValueSerializer<BigdataValue> valSer = vf.getValueSerializer();
-		
-		final StringBuilder tmp = new StringBuilder();
-		
-		final ITupleIterator<TermId<?>> itr = ndx.rangeIterator();
-		
-		while(itr.hasNext()) {
-			
-			final ITuple<TermId<?>> tuple = itr.next();
-			
-			final TermId iv = new TermId(tuple.getKey());
-			
-			final BigdataValue value;
-			
-			if(tuple.isNull()) {
-				
-				value = null;
-				
-			} else {
-				
-				value = valSer.deserialize(tuple.getValueStream(), tmp);
-				
-			}
+    /**
+     * Return a new {@link IKeyBuilder} suitable for formatting keys for the
+     * TERMS index.
+     * 
+     * @return The {@link IKeyBuilder}.
+     */
+    public IKeyBuilder newKeyBuilder() {
 
-			sb.append(iv.toString() + " => " + value);
-			
-			sb.append("\n");
+        return new KeyBuilder(TERMS_INDEX_KEY_SIZE);
 
-		}
-		
-		return sb;
-		
-	}
+    }
 
-	/**
-	 * Exception thrown if the maximum size of the collision bucket would be
-	 * exceeded for some {@link BigdataValue}.
-	 * 
-	 * @author thompsonbry
-	 */
-	public static class CollisionBucketSizeException extends RuntimeException {
+    public StringBuilder dump(final String namespace, final IIndex ndx) {
 
-		/**
+        final StringBuilder sb = new StringBuilder(100 * Bytes.kilobyte32);
+
+        final BigdataValueFactory vf = BigdataValueFactoryImpl
+                .getInstance(namespace);
+
+        final BigdataValueSerializer<BigdataValue> valSer = vf
+                .getValueSerializer();
+
+        final StringBuilder tmp = new StringBuilder();
+
+        final ITupleIterator<TermId<?>> itr = ndx.rangeIterator();
+
+        while (itr.hasNext()) {
+
+            final ITuple<TermId<?>> tuple = itr.next();
+
+            final TermId iv = new TermId(tuple.getKey());
+
+            final BigdataValue value;
+
+            if (tuple.isNull()) {
+
+                value = null;
+
+            } else {
+
+                value = valSer.deserialize(tuple.getValueStream(), tmp);
+
+            }
+
+            sb.append(iv.toString() + " => " + value);
+
+            sb.append("\n");
+
+        }
+
+        return sb;
+
+    }
+
+    /**
+     * Exception thrown if the maximum size of the collision bucket would be
+     * exceeded for some {@link BigdataValue}.
+     * 
+     * @author thompsonbry
+     */
+    public static class CollisionBucketSizeException extends RuntimeException {
+
+        /**
 		 * 
 		 */
-		private static final long serialVersionUID = 1L;
+        private static final long serialVersionUID = 1L;
 
-		public CollisionBucketSizeException(final long rangeCount) {
-			super("ncoll=" + rangeCount);
-		}
+        public CollisionBucketSizeException(final long rangeCount) {
+            super("ncoll=" + rangeCount);
+        }
 
-	}
+    }
 
 }
