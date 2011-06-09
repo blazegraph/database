@@ -236,7 +236,9 @@ public class TestOptionals extends QuadsTestCase {
             q.setBinding("subj", vf.createURI("u:1"));
             TupleQueryResult tqr = q.evaluate();
             assertTrue(tqr.hasNext());
-            System.err.println(tqr.next());
+            final BindingSet tmp = tqr.next();
+            if (log.isInfoEnabled())
+                log.info(tmp);
             tqr.close();
             
         } finally {

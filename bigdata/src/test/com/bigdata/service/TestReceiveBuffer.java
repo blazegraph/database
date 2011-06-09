@@ -85,11 +85,13 @@ public class TestReceiveBuffer extends TestCase3 {
         
         final UUID allowedUUID = UUID.randomUUID();
 
-        final IBufferAccess allowedBufferdb = DirectBufferPool.INSTANCE.acquire(1,
-                TimeUnit.SECONDS);
-        final ByteBuffer allowedBuffer = allowedBufferdb.buffer();
+        final IBufferAccess allowedBufferdb = DirectBufferPool.INSTANCE
+                .acquire();
+
         try {
 
+            final ByteBuffer allowedBuffer = allowedBufferdb.buffer();
+            
             // populate with some random data.
             fillBufferWithRandomData(allowedBuffer);
             

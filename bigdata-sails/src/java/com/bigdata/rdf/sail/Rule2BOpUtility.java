@@ -696,7 +696,11 @@ public class Rule2BOpUtility {
 //					IPredicate.Annotations.CONSTRAINTS, constraints
 //							.toArray(new IConstraint[constraints.size()]));
 			
-			final Iterator<IConstraint> it = constraints.iterator();
+    		// create a mutable version
+    		final Collection<IConstraint> tmp = new LinkedList<IConstraint>();
+    		tmp.addAll(constraints);
+    		
+			final Iterator<IConstraint> it = tmp.iterator();
 			
 			while (it.hasNext()) {
 				
@@ -717,7 +721,7 @@ public class Rule2BOpUtility {
 			// add constraints to the join for that predicate.
 			anns.add(new NV(
 					PipelineJoin.Annotations.CONSTRAINTS,
-					constraints.toArray(new IConstraint[constraints.size()])));
+					tmp.toArray(new IConstraint[tmp.size()])));
 			
 		}
 

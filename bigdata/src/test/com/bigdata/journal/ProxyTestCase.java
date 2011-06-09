@@ -150,7 +150,7 @@ public abstract class ProxyTestCase<S extends IIndexManager>
         getOurDelegate().setUp(this);
     }
 
-    static boolean s_checkThreads = false;
+    static boolean s_checkThreads = true;
     public void tearDown() throws Exception {
         getOurDelegate().tearDown(this);
         

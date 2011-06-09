@@ -34,6 +34,7 @@ import junit.framework.Test;
 import junit.framework.TestSuite;
 import net.jini.config.ConfigurationException;
 
+import org.apache.log4j.Logger;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.parser.sparql.ManifestTest;
 import org.openrdf.query.parser.sparql.SPARQLQueryTest;
@@ -67,6 +68,8 @@ import com.bigdata.service.IBigdataFederation;
  */
 public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
 
+    private static final Logger log = Logger.getLogger(BigdataEmbeddedFederationSparqlTest.class);
+    
     public BigdataEmbeddedFederationSparqlTest(String testURI, String name, String queryFileURL,
             String resultFileURL, Dataset dataSet, boolean laxCardinality) {
 
@@ -273,7 +276,8 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
             
         }
         
-        System.err.println("Removing: "+f);
+        if(log.isInfoEnabled())
+            log.info("Removing: "+f);
         
         if (!f.delete())
             throw new RuntimeException("Could not remove: " + f);

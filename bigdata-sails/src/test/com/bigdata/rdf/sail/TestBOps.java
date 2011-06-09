@@ -29,7 +29,7 @@ package com.bigdata.rdf.sail;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Properties;
-import org.apache.log4j.Level;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
@@ -44,10 +44,7 @@ import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.impl.BindingImpl;
-import org.openrdf.repository.sail.SailRepository;
-import org.openrdf.repository.sail.SailRepositoryConnection;
-import org.openrdf.sail.Sail;
-import org.openrdf.sail.memory.MemoryStore;
+
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.store.BD;
@@ -552,7 +549,8 @@ public class TestBOps extends ProxyBigdataSailTestCase {
                 TupleQueryResult result = tupleQuery.evaluate();
                 
                 while (result.hasNext()) {
-                    System.err.println(result.next());
+                    final BindingSet tmp = result.next();
+                    if(log.isInfoEnabled())log.info(tmp.toString());
                 }
  
 //                Collection<BindingSet> solution = new LinkedList<BindingSet>();

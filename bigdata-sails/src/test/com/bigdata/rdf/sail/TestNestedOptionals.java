@@ -30,7 +30,6 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -48,17 +47,12 @@ import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.sail.SailTupleQuery;
 
-import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.sop.SOp;
-import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree;
+import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroups;
-import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
@@ -629,10 +623,10 @@ public class TestNestedOptionals extends QuadsTestCase {
             final SOpTreeBuilder stb = new SOpTreeBuilder();
             final SOpTree tree = stb.collectSOps(tupleExpr);
             
-            if (INFO) {
-                System.err.println(query);
+            if (log.isInfoEnabled()) {
+                log.info(query);
                 for (SOp bop : tree) {
-                    System.err.println(bop);    
+                    log.info(bop);    
                 }
             }
               
@@ -792,21 +786,21 @@ public class TestNestedOptionals extends QuadsTestCase {
             final SOpTreeBuilder stb = new SOpTreeBuilder();
             final SOpTree tree = stb.collectSOps(tupleExpr);
             
-            if (INFO) {
-                System.err.println(query);
+            if (log.isInfoEnabled()) {
+                log.info(query);
                 for (SOp bop : tree) {
-                    System.err.println(bop);    
+                    log.info(bop);    
                 }
                 
                 for (Map.Entry<Integer, SOpGroup> e : tree.allGroups.entrySet()) {
                 	final SOpGroup g = e.getValue();
-                	System.err.println(e.getKey() + ": g=" + g.getGroup() + " pg=" + g.getParentGroup());
+                	log.info(e.getKey() + ": g=" + g.getGroup() + " pg=" + g.getParentGroup());
                 	for (SOp sop : e.getValue()) {
-                		System.err.println("  " + sop);
+                		log.info("  " + sop);
                 	}
                 }
                 for (Map.Entry<Integer, SOpGroup> e : tree.parents.entrySet()) {
-                	System.err.println(e.getKey() + ": " + e.getValue().getGroup());
+                	log.info(e.getKey() + ": " + e.getValue().getGroup());
                 }
                 for (Map.Entry<Integer, SOpGroups> e : tree.children.entrySet()) {
                 	final SOpGroups groups = e.getValue();
@@ -815,7 +809,7 @@ public class TestNestedOptionals extends QuadsTestCase {
                 		sb.append(g.getGroup()).append(", ");
                 	}
                 	sb.setLength(sb.length()-2);
-                	System.err.println(e.getKey() + ": {" + sb.toString() + "}");
+                	log.info(e.getKey() + ": {" + sb.toString() + "}");
                 }
             }
             

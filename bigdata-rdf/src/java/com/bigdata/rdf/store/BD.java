@@ -220,7 +220,7 @@ public interface BD {
 	 */
     final URI MIN_RELEVANCE = new URIImpl(SEARCH_NAMESPACE+"minRelevance");
 
-    final double DEFAULT_MIN_RELEVANCE = 0.25d;
+    final double DEFAULT_MIN_RELEVANCE = 0.0d;
 
 	/**
 	 * Magic predicate used to query for free text search metadata. Use in

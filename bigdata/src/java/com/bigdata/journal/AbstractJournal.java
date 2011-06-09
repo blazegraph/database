@@ -1123,7 +1123,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * 
 	 * @see #shutdownNow()
 	 */
-	public void shutdown() {
+	synchronized public void shutdown() {
 
 		// Note: per contract for shutdown.
 		if (!isOpen())
@@ -1362,12 +1362,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			deleteResources();
 
 		}
-
-        int cl = nclose.incrementAndGet();
-        if (cl > nopen.get()) {
-        	throw new IllegalStateException("More calls to close than open!");
-        }
         
+        nclose.incrementAndGet();
 	}
 
 	/**

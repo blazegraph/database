@@ -39,7 +39,8 @@ import junit.framework.TestSuite;
  */
 public class TestAll extends TestCase {
 
-    /**
+	public static boolean s_includeQuorum = false;
+   /**
      * 
      */
     public TestAll() {
@@ -61,30 +62,32 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("quorum");
 
-        /*
-         * Test the fixture used to test the quorums (the fixture builds on the
-         * same base class).
-         */
-        suite.addTestSuite(TestMockQuorumFixture.class);
-
-        /*
-         * Test the quorum semantics for a singleton quorum. This unit test
-         * allows us to verify that each quorum state change is translated into
-         * the appropriate methods against the public API of the quorum client
-         * or quorum member.
-         */
-        suite.addTestSuite(TestSingletonQuorumSemantics.class);
-
-        /*
-         * Test the quorum semantics for a highly available quorum of 3
-         * nodes. The main points to test here are the particulars of events not
-         * observable with a singleton quorum, including a service join which
-         * does not trigger a quorum meet, a service leave which does not
-         * trigger a quorum break, a leader leave, etc.
-         */
-        suite.addTestSuite(TestHA3QuorumSemantics.class);
-
-        suite.addTest(StressTestHA3.suite());
+        if (s_includeQuorum) {
+	        /*
+	         * Test the fixture used to test the quorums (the fixture builds on the
+	         * same base class).
+	         */
+	        suite.addTestSuite(TestMockQuorumFixture.class);
+	
+	        /*
+	         * Test the quorum semantics for a singleton quorum. This unit test
+	         * allows us to verify that each quorum state change is translated into
+	         * the appropriate methods against the public API of the quorum client
+	         * or quorum member.
+	         */
+	        suite.addTestSuite(TestSingletonQuorumSemantics.class);
+	
+	        /*
+	         * Test the quorum semantics for a highly available quorum of 3
+	         * nodes. The main points to test here are the particulars of events not
+	         * observable with a singleton quorum, including a service join which
+	         * does not trigger a quorum meet, a service leave which does not
+	         * trigger a quorum break, a leader leave, etc.
+	         */
+	        suite.addTestSuite(TestHA3QuorumSemantics.class);
+	
+	        suite.addTest(StressTestHA3.suite());
+        }
         
         return suite;
         

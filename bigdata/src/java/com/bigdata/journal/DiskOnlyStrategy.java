@@ -236,7 +236,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     /**
      * Optional {@link WriteCache}.
      */
-    private WriteCache writeCache = null;
+    final private WriteCache writeCache;
     
     /**
      * The next offset at which data in the {@link #writeCache} will be written

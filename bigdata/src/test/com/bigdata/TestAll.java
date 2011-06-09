@@ -45,8 +45,6 @@ public class TestAll extends TestCase {
 	/**
 	 * Static flags to HA and/or Quorum to be excluded, preventing hangs in CI
 	 */
-	static boolean s_includeHA = false;
-	static boolean s_includeQuorum = false;
 
     /**
      * 
@@ -103,12 +101,8 @@ public class TestAll extends TestCase {
         suite.addTest( com.bigdata.rawstore.TestAll.suite() );
         suite.addTest( com.bigdata.btree.TestAll.suite() );
         suite.addTest( com.bigdata.concurrent.TestAll.suite() );
-        if (s_includeQuorum) {
-        	suite.addTest( com.bigdata.quorum.TestAll.suite() );
-        }
-        if (s_includeHA) {
-        	suite.addTest( com.bigdata.ha.TestAll.suite() );
-        }
+        suite.addTest( com.bigdata.quorum.TestAll.suite() );
+        suite.addTest( com.bigdata.ha.TestAll.suite() );
         // Note: this has a dependency on the quorum package.
         suite.addTest(com.bigdata.io.writecache.TestAll.suite());
         suite.addTest( com.bigdata.journal.TestAll.suite() );
