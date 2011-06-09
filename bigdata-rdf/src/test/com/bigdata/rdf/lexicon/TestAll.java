@@ -63,14 +63,9 @@ public class TestAll extends TestCase {
 
         // Unit tests for operations on the TERMS index.
         suite.addTestSuite(TestTermsIndex.class);
-
-//        suite.addTestSuite(TestSerialization.class);
-//
-//        suite.addTestSuite(TestTermIdEncoder.class);
-//        
-//        suite.addTestSuite(TestTerm2IdTupleSerializer.class);
-//
-//        suite.addTestSuite(TestId2TermTupleSerializer.class);
+        
+        // Unit tests for the TermsWriteTask.
+        suite.addTestSuite(TestTermsWriteTask.class);
 
         // integration tests for adding terms to the lexicon.
         suite.addTestSuite(TestAddTerms.class);

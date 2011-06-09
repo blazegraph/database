@@ -1074,7 +1074,7 @@ abstract public class AbstractTestCase
                     
                     final IV iv = term.getIV();
                     
-                    if (iv == null) {
+                    if (iv == null || iv.isNullIV()) {
 
                         // ignore terms that we know were not found.
                         continue;

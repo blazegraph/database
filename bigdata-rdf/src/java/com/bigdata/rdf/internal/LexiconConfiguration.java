@@ -475,10 +475,12 @@ public class LexiconConfiguration<V extends BigdataValue>
              * validate against the xsd schema datatype?
              */
 
-            log.error(ex + ": value=" + v);
+//            log.error(ex + ": value=" + v);
+//
+//            return null;
 
-            return null;
-
+            throw new RuntimeException(ex + ": value=" + v, ex);
+            
         }
 
     }

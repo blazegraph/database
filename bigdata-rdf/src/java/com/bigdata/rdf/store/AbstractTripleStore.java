@@ -98,7 +98,6 @@ import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSDStringExtension;
 import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
-import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataResource;
@@ -1999,7 +1998,10 @@ abstract public class AbstractTripleStore extends
 
         final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-        return getLexiconRelation().getTermsIndex().rangeCount(fromKey, toKey);
+        /*
+         * Subtract out ONE for the NullIV (it's flag bits mark it as a URI).
+         */
+        return getLexiconRelation().getTermsIndex().rangeCount(fromKey, toKey) - 1;
 
     }
 

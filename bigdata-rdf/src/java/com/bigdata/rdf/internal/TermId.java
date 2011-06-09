@@ -219,7 +219,12 @@ public class TermId<V extends BigdataValue> extends
 		super(data[0]/* flags */);
     	
 		this.data = data;
-    	
+		
+        assert TermsIndexHelper.TERMS_INDEX_KEY_SIZE == data.length : "Expecting "
+                + TermsIndexHelper.TERMS_INDEX_KEY_SIZE
+                + " bytes, not "
+                + data.length;
+		
     }
 
 	/**
@@ -247,6 +252,8 @@ public class TermId<V extends BigdataValue> extends
 	 *            The string representation.
 	 *            
 	 * @return The {@link TermId}.
+	 * 
+	 * TODO Only the {@link VTE} from the flags byte is represented by {@link #toString()}.  If we use other bits in the flags for a {@link TermId} then they will NOT be recovered by {@link #fromString(String)} unless they are represented by {@link #toString()} and this method is modified to handle that additional information.
 	 */
     public static TermId fromString(final String s) {
 
@@ -364,7 +371,7 @@ public class TermId<V extends BigdataValue> extends
      */
     public int counter() {
 
-    	final byte b = data[data.length - 1];
+    	final byte b = data[data.length - 1]; // TODO Support multi-byte counter.
     	
     	return KeyBuilder.decodeByte(b);
 //    	return b;

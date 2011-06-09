@@ -185,7 +185,11 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
         // used to store the discovered / assigned term identifiers.
         final IV[] ivs = new IV[numTerms];
         
-		final byte[] baseKey = new byte[keyBuilder.capacity()];
+        /*
+         * Note: The baseKey should be one byte shorter than the full key (since
+         * it does not include the one byte counter).
+         */
+        final byte[] baseKey = new byte[keyBuilder.capacity() - 1];
         
         for (int i = 0; i < numTerms; i++) {
 

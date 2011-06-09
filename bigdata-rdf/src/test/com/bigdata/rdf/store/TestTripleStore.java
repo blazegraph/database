@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
@@ -49,6 +50,7 @@ import org.openrdf.model.vocabulary.XMLSchema;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.lexicon.TermsIndexHelper;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -80,6 +82,8 @@ import com.bigdata.striterator.ChunkedArrayIterator;
  */
 public class TestTripleStore extends AbstractTripleStoreTestCase {
 
+    private static final Logger log = Logger.getLogger(TestTripleStore.class);
+    
     /**
      * 
      */
@@ -494,6 +498,187 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         
     }
 
+    public void test_rangeCounts_standardBNodes() {
+        
+        final Properties properties = super.getProperties();
+
+        // override the default vocabulary.
+        properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
+                NoVocabulary.class.getName());
+
+        // override the default axiom model.
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
+        
+        // Do not inline strings.
+        properties
+                .setProperty(
+                        com.bigdata.rdf.store.AbstractTripleStore.Options.MAX_INLINE_STRING_LENGTH,
+                        "0");
+
+        // Do not inline bnodes.
+        properties
+                .setProperty(
+                        com.bigdata.rdf.store.AbstractTripleStore.Options.INLINE_BNODES,
+                        "false");
+
+        properties
+                .setProperty(
+                        com.bigdata.rdf.store.AbstractTripleStore.Options.STORE_BLANK_NODES,
+                        "false");
+
+        doTestRangeCounts(properties);
+        
+    }
+
+    public void test_rangeCounts_toldBNodes() {
+        
+        final Properties properties = super.getProperties();
+
+        // override the default vocabulary.
+        properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
+                NoVocabulary.class.getName());
+
+        // override the default axiom model.
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
+
+        // Do not inline strings.
+        properties
+                .setProperty(
+                        com.bigdata.rdf.store.AbstractTripleStore.Options.MAX_INLINE_STRING_LENGTH,
+                        "0");
+
+        // Do not inline bnodes.
+        properties
+                .setProperty(
+                        com.bigdata.rdf.store.AbstractTripleStore.Options.INLINE_BNODES,
+                        "false");
+
+        properties
+                .setProperty(
+                        com.bigdata.rdf.store.AbstractTripleStore.Options.STORE_BLANK_NODES,
+                        "true");
+
+        doTestRangeCounts(properties);
+        
+    }
+
+    /**
+     * Test helper for verifying the correct reporting of range counts from the
+     * lexicon.
+     * 
+     * @param properties
+     */
+    private void doTestRangeCounts(final Properties properties) {
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+//            final boolean storeBlankNodes = store.getLexiconRelation()
+//                    .isStoreBlankNodes();
+
+            /*
+             * Declare 8 URIs.
+             */
+            final int nuris = 8;
+            final URI x = new URIImpl("http://www.foo.org/x");
+            final URI y = new URIImpl("http://www.foo.org/y");
+            final URI z = new URIImpl("http://www.foo.org/z");
+            final URI A = new URIImpl("http://www.foo.org/A");
+            final URI B = new URIImpl("http://www.foo.org/B");
+            final URI C = new URIImpl("http://www.foo.org/C");
+            final URI rdfType = RDF.TYPE;
+            final URI rdfsSubClassOf = RDFS.SUBCLASSOF;
+
+            /*
+             * Declare 3 literals.
+             */
+            final int nliterals = 3;
+            final Literal lit1 = new LiteralImpl("abc");
+            final Literal lit2 = new LiteralImpl("abc", A);
+            final Literal lit3 = new LiteralImpl("abc", "en");
+
+            /*
+             * Declare two blank nodes.
+             */
+            final int nbnodes = 2;
+            final BNode bn1 = new BNodeImpl(UUID.randomUUID().toString());
+            final BNode bn2 = new BNodeImpl("a12");
+
+            // Create an array of those Value objects.
+            final Value[] values = new Value[] {//
+                    x, y, z, A, B, C,
+                    rdfsSubClassOf, rdfType,//
+                    lit1, lit2, lit3,//
+                    bn1, bn2,//
+            };
+
+            /*
+             * Create a variant array of BigdataValues whose IVs are set as a
+             * side-effect.
+             */
+            final BigdataValue[] terms = new BigdataValue[values.length];
+            for (int i = 0; i < values.length; i++) {
+                terms[i] = store.getLexiconRelation().getValueFactory()
+                        .asValue(values[i]);
+            }
+
+            /*
+             * Write on the lexicon.
+             */
+            store.getLexiconRelation()
+                    .addTerms(terms, terms.length, false/* readOnly */);
+            
+            /*
+             * Verify the various "count()" methods, which are based on the
+             * range count of the appropriate section of the lexicon index.
+             */
+            {
+
+                if (log.isInfoEnabled()) {
+                    log.info("#uris=" + store.getURICount());
+                    log.info("#lits=" + store.getLiteralCount());
+                    log.info("#bnds=" + store.getBNodeCount());
+                    log.info("#vals=" + store.getTermCount());
+                    log.info("\n"
+                            + new TermsIndexHelper().dump(store
+                                    .getLexiconRelation().getNamespace(), store
+                                    .getLexiconRelation().getTermsIndex()));
+                }
+
+                assertEquals("#uris", nuris, store.getURICount());
+
+                assertEquals("#lits", nliterals, store.getLiteralCount());
+
+                /*
+                 * Note: Even when we are not using told bnodes, we still insert
+                 * the blank nodes into the lexicon and they should be reported
+                 * back here? With the standard bnodes semantics, inserting the
+                 * same BNode object multiple times will cause a new BNode to be
+                 * entered into the lexicon each time. For told bnodes
+                 * semantics, we will unify the blank node with the same blank
+                 * node in the lexicon.
+                 */
+                assertEquals("#bnodes", nbnodes, store.getBNodeCount());
+                
+                final int nterms = nuris + nliterals + nbnodes;
+
+                assertEquals("#terms", nterms, store.getTermCount());
+
+            }
+
+        } finally {
+
+            store.__tearDownUnitTest();
+            
+        }
+
+    }
+    
     /**
      * Test of {@link ITripleStore#addStatement(Resource, URI, Value)} and
      * {@link ITripleStore#hasStatement(Resource, URI, Value)}.
@@ -510,6 +695,11 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         properties.setProperty(
                 com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
                 NoAxioms.class.getName());
+        
+        properties
+                .setProperty(
+                        com.bigdata.rdf.store.AbstractTripleStore.Options.STORE_BLANK_NODES,
+                        "false");
 
         final AbstractTripleStore store = getStore(properties);
 
@@ -518,33 +708,26 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             final boolean storeBlankNodes = store.getLexiconRelation()
                     .isStoreBlankNodes();
             
-            URI x = new URIImpl("http://www.foo.org/x");
-            URI y = new URIImpl("http://www.foo.org/y");
-            URI z = new URIImpl("http://www.foo.org/z");
+            final URI x = new URIImpl("http://www.foo.org/x");
+            final URI y = new URIImpl("http://www.foo.org/y");
+            final URI z = new URIImpl("http://www.foo.org/z");
+            final URI A = new URIImpl("http://www.foo.org/A");
+            final URI B = new URIImpl("http://www.foo.org/B");
+            final URI C = new URIImpl("http://www.foo.org/C");
+            final URI rdfType = RDF.TYPE;
+            final URI rdfsSubClassOf = RDFS.SUBCLASSOF;
+            final int nuris = 8;
     
-            URI A = new URIImpl("http://www.foo.org/A");
-            URI B = new URIImpl("http://www.foo.org/B");
-            URI C = new URIImpl("http://www.foo.org/C");
-    
-            URI rdfType = RDF.TYPE;
-    
-            URI rdfsSubClassOf = RDFS.SUBCLASSOF;
-    
-            Literal lit1 = new LiteralImpl("abc");
-            Literal lit2 = new LiteralImpl("abc", A);
-            Literal lit3 = new LiteralImpl("abc", "en");
-    
-            BNode bn1 = new BNodeImpl(UUID.randomUUID().toString());
-            BNode bn2 = new BNodeImpl("a12");
-    
+            // add statements using the URIs declared above.
             store.addStatement(x, rdfType, C);
-            
             store.addStatement(y, rdfType, B);
             store.addStatement(z, rdfType, A);
-    
             store.addStatement(B, rdfsSubClassOf, A);
             store.addStatement(C, rdfsSubClassOf, B);
     
+            /* 
+             * Resolve the IVs for those URIs.
+             */
             final IV x_termId;
             {
     
@@ -558,7 +741,6 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                 assertTrue(x_termId != NULL);
     
             }
-    
             final IV x_id = store.getIV(x);
             assertTrue(x_id != NULL);
             assertEquals(x_termId, x_id);
@@ -577,32 +759,40 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             final IV rdfsSubClassOf_id = store.getIV(rdfsSubClassOf);
             assertTrue(rdfsSubClassOf_id != NULL);
     
+            /*
+             * Declare 3 literals and add them to the lexicon.
+             */
+            final Literal lit1 = new LiteralImpl("abc");
+            final Literal lit2 = new LiteralImpl("abc", A);
+            final Literal lit3 = new LiteralImpl("abc", "en");
+            final int nliterals = 3;
+
+            // 3 literals.
             final IV lit1_id = store.addTerm(lit1);
             assertTrue(lit1_id != NULL);
             final IV lit2_id = store.addTerm(lit2);
             assertTrue(lit2_id != NULL);
             final IV lit3_id = store.addTerm(lit3);
             assertTrue(lit3_id != NULL);
-    
+
+            /*
+             * Declare two blank nodes and add them to the lexicon.
+             */
+            final BNode bn1 = new BNodeImpl(UUID.randomUUID().toString());
+            final BNode bn2 = new BNodeImpl("a12");
+            final int nbnodes = 2;
+            
+            // 2 blank nodes.
             final IV bn1_id = store.addTerm(bn1);
             assertTrue(bn1_id != NULL);
-            System.err.println(bn1_id);
             final IV bn2_id = store.addTerm(bn2);
             assertTrue(bn2_id != NULL);
-            System.err.println(bn2_id);
-            System.err.println(storeBlankNodes);
-
-            assertEquals("#terms", 8 + 3 + (store.getLexiconRelation()
-                    .isStoreBlankNodes() ? 2 : 0), store.getTermCount());
-            assertEquals("#uris", 8, store.getURICount());
-            assertEquals("#lits", 3, store.getLiteralCount());
-            if (storeBlankNodes) {
-                assertEquals("#bnodes", 2, store.getBNodeCount());
-            } else {
-                // Note: None found since not stored.
-                assertEquals("#bnodes", 0, store.getBNodeCount());
+            if (log.isInfoEnabled()) {
+                log.info(bn1_id);
+                log.info(bn2_id);
+                log.info(storeBlankNodes);
             }
-    
+
             assertEquals(x_id, store.getIV(x));
             assertEquals(y_id, store.getIV(y));
             assertEquals(z_id, store.getIV(z));
@@ -661,16 +851,6 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             assertTrue(store.hasStatement(z, rdfType, A));
             assertTrue(store.hasStatement(B, rdfsSubClassOf, A));
             assertTrue(store.hasStatement(C, rdfsSubClassOf, B));
-    
-            assertEquals("#terms", 8 + 3 + (storeBlankNodes ? 2 : 0), store.getTermCount());
-            assertEquals("#uris", 8, store.getURICount());
-            assertEquals("#lits", 3, store.getLiteralCount());
-            if (storeBlankNodes) {
-                assertEquals("#bnodes", 2, store.getBNodeCount());
-            } else {
-                // Note: None found since not stored.
-                assertEquals("#bnodes", 0, store.getBNodeCount());
-            }
     
         } finally {
 

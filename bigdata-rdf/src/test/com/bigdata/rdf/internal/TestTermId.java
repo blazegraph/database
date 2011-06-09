@@ -34,6 +34,7 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rdf.lexicon.TermsIndexHelper;
 import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataURI;
 
 /**
  * Unit tests for {@link TermId}.
@@ -90,8 +91,10 @@ public class TestTermId extends TestCase2 {
     	
 		final byte[] key = helper.makeKey(keyBuilder, vte, hashCode,
 				counter);
+		
+        assertEquals(TermsIndexHelper.TERMS_INDEX_KEY_SIZE, key.length);
 
-		final TermId<BigdataBNode> iv = new TermId<BigdataBNode>(key);
+        final TermId<?> iv = new TermId<BigdataURI>(key);
 
 		assertEquals(vte, iv.getVTE());
 
@@ -99,8 +102,20 @@ public class TestTermId extends TestCase2 {
 		
 		assertEquals(counter, iv.counter());
 		
-		assertEquals(iv,TermId.fromString(iv.toString()));
-		
+        assertEquals(iv, TermId.fromString(iv.toString()));
+
+        final TermId<?> iv2 = (TermId<?>) IVUtility.decode(key);
+
+        assertEquals(vte, iv2.getVTE());
+
+        assertEquals(hashCode, iv2.hashCode());
+        
+        assertEquals(counter, iv2.counter());
+
+        assertEquals(iv, TermId.fromString(iv2.toString()));
+
+        assertEquals(iv, iv2);
+
     }
 
     public void test_TermId_Literal() {
