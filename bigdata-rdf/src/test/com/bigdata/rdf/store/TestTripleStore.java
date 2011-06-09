@@ -202,7 +202,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         try {
 
             doAddTermTest(store, new LiteralImpl("abc"));
-            doAddTermTest(store, new LiteralImpl("abc", XMLSchema.DECIMAL));
+            doAddTermTest(store, new LiteralImpl("abc", XMLSchema.STRING));
             doAddTermTest(store, new LiteralImpl("abc", "en"));
     
             doAddTermTest(store, new URIImpl("http://www.bigdata.com"));
@@ -225,7 +225,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
             assertTrue(store.getIV(new LiteralImpl("abc")).isLiteral());
             
-            assertTrue(store.getIV(new LiteralImpl("abc",XMLSchema.DECIMAL)).isLiteral());
+            assertTrue(store.getIV(new LiteralImpl("abc",XMLSchema.STRING)).isLiteral());
             
             assertTrue(store.getIV(new LiteralImpl("abc", "en")).isLiteral());
 
@@ -236,6 +236,54 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 //            assertFalse(VTE.isLiteral(store.getIV(new BNodeImpl(UUID.randomUUID().toString())).getTermId()));
             
 //            assertFalse(VTE.isLiteral(store.getIV(new BNodeImpl("a12")).getTermId()));
+            
+        } finally {
+            
+            store.__tearDownUnitTest();
+
+        }
+
+    }
+
+    /**
+     * Simple test of some bad data (literals which can not be validated against
+     * their datatype).
+     */
+    public void test_addBadTerm() {
+
+        final Properties properties = super.getProperties();
+        
+        // override the default vocabulary.
+        properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
+                NoVocabulary.class.getName());
+
+        // override the default axiom model.
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
+
+        // allow literals which do not validate against their datatype.
+        properties
+                .setProperty(
+                        com.bigdata.rdf.store.AbstractTripleStore.Options.REJECT_INVALID_XSD_VALUES,
+                        "false");
+
+        final AbstractTripleStore store = getStore(properties);
+        
+        try {
+
+            doAddTermTest(store, new LiteralImpl("abc", XMLSchema.DECIMAL));
+    
+            if(log.isInfoEnabled()) {
+                log.info(store.getLexiconRelation().dumpTerms());
+            }
+            
+            /*
+             * verify that we can detect literals by examining the term identifier.
+             */
+
+            assertTrue(store.getIV(new LiteralImpl("abc", XMLSchema.DECIMAL))
+                    .isLiteral());
             
         } finally {
             
@@ -265,7 +313,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                 valueFactory.createURI(XMLSchema.DECIMAL.stringValue()),//
 
                 valueFactory.createLiteral("abc"),//
-                valueFactory.createLiteral("abc", XMLSchema.DECIMAL),//
+                valueFactory.createLiteral("abc", XMLSchema.STRING),//
                 valueFactory.createLiteral("abc", "en"),//
 
                 valueFactory.createBNode(UUID.randomUUID().toString()),//
@@ -323,7 +371,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
             assertTrue(store.getIV(new LiteralImpl("abc")).isLiteral());
             
-            assertTrue(store.getIV(new LiteralImpl("abc",XMLSchema.DECIMAL)).isLiteral());
+            assertTrue(store.getIV(new LiteralImpl("abc",XMLSchema.STRING)).isLiteral());
             
             assertTrue(store.getIV(new LiteralImpl("abc", "en")).isLiteral());
 

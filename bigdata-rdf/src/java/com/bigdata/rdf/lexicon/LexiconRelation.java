@@ -433,6 +433,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     AbstractTripleStore.Options.INLINE_DATE_TIMES_TIMEZONE,
                     AbstractTripleStore.Options.DEFAULT_INLINE_DATE_TIMES_TIMEZONE));
             
+            rejectInvalidXSDValues = Boolean.parseBoolean(getProperty(
+                    AbstractTripleStore.Options.REJECT_INVALID_XSD_VALUES,
+                    AbstractTripleStore.Options.DEFAULT_REJECT_INVALID_XSD_VALUES));
+            
             try {
                 
                 final Class<IExtensionFactory> xfc = 
@@ -441,6 +445,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 
                 lexiconConfiguration = new LexiconConfiguration(inlineLiterals,
                         maxInlineStringLength, inlineBNodes, inlineDateTimes,
+                        rejectInvalidXSDValues,
                         xFactory, getContainer().getVocabulary());
 
             } catch (InstantiationException e) {
@@ -673,6 +678,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * {@link AbstractTripleStore.Options#INLINE_DATE_TIMES}
      */
     final private boolean inlineDateTimes;
+
+    /**
+     * When <code>true</code>, XSD datatype literals which do not validate
+     * against their datatype will be rejected rather than inlined.
+     * 
+     * {@link AbstractTripleStore.Options#REJECT_INVALID_XSD_VALUES}
+     */
+    final private boolean rejectInvalidXSDValues;
     
 	/**
 	 * The default time zone to be used for decoding inline xsd:datetime

@@ -629,7 +629,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 			 */
 //            keyBuilder.append(getTermId());
 //            return keyBuilder;
-            throw new AssertionError();
+            throw new AssertionError(getClass().getName() + ":" + toString());
         }
         
         if (isURI()) {
