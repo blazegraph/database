@@ -433,4 +433,18 @@ public class TestTermId extends TestCase2 {
 
 	}
 
+    public void test_NullIV_decode_as_null_reference() {
+        
+        final TermsIndexHelper h = new TermsIndexHelper();
+        
+        final IV iv = TermId.NullIV;
+        
+        final IKeyBuilder keyBuilder = h.newKeyBuilder();
+
+        final byte[] key = IVUtility.encode(keyBuilder, iv).getKey();
+        
+        assertNull(IVUtility.decode(key));
+        
+    }
+    
 }

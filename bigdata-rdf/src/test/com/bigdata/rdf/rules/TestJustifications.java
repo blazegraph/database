@@ -29,11 +29,14 @@ package com.bigdata.rdf.rules;
 
 import java.util.Arrays;
 import java.util.Properties;
+
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
+
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.Var;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.FullyBufferedJustificationIterator;
@@ -237,13 +240,16 @@ public class TestJustifications extends AbstractRuleTestCase {
              */
             {
 
-                final ITupleIterator itr = store.getSPORelation().getJustificationIndex()
+                final ITupleIterator<Justification> itr = store
+                        .getSPORelation().getJustificationIndex()
                         .rangeIterator();
 
                 while (itr.hasNext()) {
 
+                    final ITuple<Justification> tuple = itr.next();
+                    
                     // de-serialize the justification from the key.
-                    final Justification tmp = (Justification)itr.next().getObject();
+                    final Justification tmp = tuple.getObject();
                     
                     // verify the same.
                     assertEquals(jst, tmp);
