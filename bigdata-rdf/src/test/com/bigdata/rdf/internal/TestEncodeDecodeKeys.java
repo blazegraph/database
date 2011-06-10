@@ -311,7 +311,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                 
                 if(!expected.equals(actual)) {
                  
-                    fail("Round trip serialization problem: expected"
+                    fail("Round trip serialization problem: expected="
                             + expected + ", actual=" + actual);
                     
                 }
@@ -1064,7 +1064,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     /**
      * Unit test for {@link SidIV}.
      */
-    public void test_encodeDecodeSids() {
+    public void test_encodeDecode_sids() {
         
         final TermId<?> s1 = newTermId(VTE.URI);
         final TermId<?> s2 = newTermId(VTE.URI);

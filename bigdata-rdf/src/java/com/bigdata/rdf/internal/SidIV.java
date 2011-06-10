@@ -23,15 +23,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+import java.io.ObjectStreamException;
+import java.io.Serializable;
 import java.math.BigInteger;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.io.LongPacker;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOComparator;
@@ -60,15 +68,15 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
  * <p>
  * {@inheritDoc}
  */
-public class SidIV<V extends BigdataBNode> extends
-        AbstractInlineIV<V, ISPO> {
+public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
+        implements Serializable {
 
     /**
 	 * 
 	 */
 	private static final long serialVersionUID = 685148537376856907L;
 	
-	protected static final Logger log = Logger.getLogger(SidIV.class);
+	private static final transient Logger log = Logger.getLogger(SidIV.class);
 
 	/**
 	 * The inline spo.
@@ -149,11 +157,11 @@ public class SidIV<V extends BigdataBNode> extends
 	public int hashCode() {
 		return spo.hashCode();
 	}
-	
-	/**
-	 * Using the BigInteger class to create a unique bnode id based on the 
-	 * byte[] key of the inline spo.
-	 */
+
+    /**
+     * Using the {@link BigInteger} class to create a unique bnode id based on
+     * the <code>unsigned byte[]</code> key of the inline {@link SPO}.
+     */
 	private String bnodeId() {
 //		// just use the hash code.  can result in collisions
 //		return String.valueOf(hashCode());
@@ -176,8 +184,20 @@ public class SidIV<V extends BigdataBNode> extends
 	}
 
 	protected int _compareTo(IV o) {
-		final ISPO spo2 = ((SidIV) o).spo;
+
+	    /*
+	     * Note: This works, but it might be more expensive.
+	     */
+//	    return UnsignedByteArrayComparator.INSTANCE.compare(key(), ((SidIV)o).key());
+
+        /*
+         * This should work as soon as we fix the other IV Comparable
+         * implementations.
+         */
+        final ISPO spo2 = ((SidIV) o).spo;
+        
         return SPOComparator.INSTANCE.compare(spo, spo2);
+        
 	}
 	
     /**
@@ -208,6 +228,62 @@ public class SidIV<V extends BigdataBNode> extends
     		key = SPOKeyOrder.SPO.encodeKey(new KeyBuilder(), spo);
     	}
     	return key;
+    }
+
+    /**
+     * Object provides serialization for {@link SidIV} via the write-replace
+     * and read-replace pattern.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private static class SidIVState implements Externalizable {
+
+//        private byte flags;
+        private byte[] key;
+        
+        /**
+         * De-serialization constructor.
+         */
+        public SidIVState() {
+            
+        }
+        
+        private SidIVState(final SidIV iv) {
+//            this.flags = flags;
+            this.key = iv.key();
+        }
+        
+        public void readExternal(ObjectInput in) throws IOException,
+                ClassNotFoundException {
+//            flags = in.readByte();
+            final int nbytes = LongPacker.unpackInt(in);
+            key = new byte[nbytes];
+            in.readFully(key);
+        }
+
+        public void writeExternal(ObjectOutput out) throws IOException {
+//            out.writeByte(flags);
+            LongPacker.packLong(out, key.length);
+            out.write(key);
+        }
+        
+        private Object readResolve() throws ObjectStreamException {
+
+            final ISPO spo = SPOKeyOrder.SPO.decodeKey(key);
+            
+            // SIDs are always explicit statements.
+            spo.setStatementType(StatementEnum.Explicit);
+            
+            return new SidIV(spo);
+            
+        }
+
+    }
+    
+    private Object writeReplace() throws ObjectStreamException {
+        
+        return new SidIVState(this);
+        
     }
 
 }
