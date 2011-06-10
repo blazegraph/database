@@ -81,6 +81,19 @@ public class TestTermsWriteTask extends TestCase2 {
         
     }
     
+    public void test_add_emptyLiteral() {
+
+        // The values that we will be testing with.
+        final Value[] valuesIn = new Value[] {//
+          
+                new LiteralImpl("") //
+                
+        };
+
+        doAddTermsTest(valuesIn, false/* toldBNodes */);
+        
+    }
+    
     public void test_add_various_toldBNodes() {
 
         // The values that we will be testing with.
@@ -243,6 +256,9 @@ public class TestTermsWriteTask extends TestCase2 {
                     final IV iv = value.getIV();
 
                     assertNotNull(iv);
+
+                    if (iv.isNullIV())
+                        fail("Not expecting NullIV for " + value);
 
                     expectedIVs[i] = iv;
 

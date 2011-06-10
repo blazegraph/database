@@ -42,6 +42,7 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -103,26 +104,31 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
         	final IKeyBuilder keyBuilder = helper.newKeyBuilder();
         	
         	final IIndex ndx = store.getLexiconRelation().getTermsIndex();
-        	
-        	assertEquals(1L,ndx.rangeCount());
-        	
-        	final byte[] key = TermId.NullIV.encode(keyBuilder).getKey();
-        	
-        	// The NullIV is paired with a [null] value.
-			assertNull(ndx.lookup(key));
 
-			// Visit the tuples in the index.
-			final ITupleIterator<TermId> itr = ndx.rangeIterator();
-			
-			assertTrue(itr.hasNext());
+           for (VTE vte : VTE.values()) {
+                
+                // Each VTE has an associated NullIV (mapped to a [null]).
+                assertNull(ndx.lookup(TermId.mockIV(vte).encode(
+                        keyBuilder.reset()).getKey()));
+                
+            }
+            
+            // Should be one entry for each type of NullIV.
+            assertEquals(4L, ndx.rangeCount());
 
-			final ITuple<TermId> tuple = itr.next();
-			
-			assertEquals(key, tuple.getKey());
-			assertEquals(null, tuple.getValue());
-			assertFalse(tuple.isDeletedVersion());
-			
-			assertFalse(itr.hasNext());
+            // Verify we visit each of those NullIVs.
+            final ITupleIterator<BigdataValue> itr = ndx.rangeIterator();
+
+            while(itr.hasNext()) {
+                
+                final ITuple<BigdataValue> tuple = itr.next();
+                
+                assertTrue(tuple.isNull());
+                
+                // The tuple is deserialized as a [null] reference.
+                assertNull(tuple.getObject());
+
+            }
 			
         } finally {
         	
