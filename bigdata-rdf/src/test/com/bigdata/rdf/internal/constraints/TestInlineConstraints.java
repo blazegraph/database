@@ -88,7 +88,7 @@ import com.sun.org.apache.xerces.internal.jaxp.datatype.XMLGregorianCalendarImpl
  */
 public class TestInlineConstraints extends ProxyTestCase {
 
-	protected static final Logger log = Logger.getLogger(TestInlineConstraints.class);
+	private static final Logger log = Logger.getLogger(TestInlineConstraints.class);
 	
     /**
      * 
