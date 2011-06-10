@@ -34,9 +34,12 @@ import junit.framework.TestCase2;
 import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
+import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.IRawStore;
@@ -169,19 +172,37 @@ public class TestTermsIndex extends TestCase2 {
 			
 		    final String namespace = getName();
 		    
-		    final IndexMetadata metadata = getTermsIndexMetadata(namespace);
-		    
-			final BTree ndx = BTree.create(store, metadata);
-			
-			final TermsIndexHelper helper = new TermsIndexHelper();
-			
-			final IKeyBuilder keyBuilder = helper.newKeyBuilder();
+			final BTree ndx = createTermsIndex(store, namespace);
 
-			final byte[] key = TermId.NullIV.encode(keyBuilder).getKey();
+			final TermsIndexHelper h = new TermsIndexHelper();
 			
-			// Insert a tuple for the NullIV mapping it to a null value.
-			ndx.insert(key/*NullIV*/, null/*value*/);
+			final IKeyBuilder keyBuilder = h.newKeyBuilder();
 			
+	        for (VTE vte : VTE.values()) {
+	            
+                // Each VTE has an associated NullIV (mapped to a [null]).
+                assertNull(ndx.lookup(TermId.mockIV(vte).encode(
+                        keyBuilder.reset()).getKey()));
+	            
+	        }
+			
+            // Should be one entry for each type of NullIV.
+            assertEquals(4L, ndx.rangeCount());
+
+            // Verify we visit each of those NullIVs.
+	        final ITupleIterator<BigdataValue> itr = ndx.rangeIterator();
+
+	        while(itr.hasNext()) {
+	            
+	            final ITuple<BigdataValue> tuple = itr.next();
+	            
+	            assertTrue(tuple.isNull());
+	            
+	            // The tuple is deserialized as a [null] reference.
+                assertNull(tuple.getObject());
+
+	        }
+	        
 		} finally {
 			
 			store.destroy();
@@ -260,13 +281,37 @@ public class TestTermsIndex extends TestCase2 {
 
         final BTree ndx = BTree.create(store, metadata);
 
+        /*
+         * Insert a tuple for each kind of VTE having a ZERO hash code and a
+         * ZERO counter and thus qualifying it as a NullIV. Each of these tuples
+         * is mapped to a null value in the index. This reserves the possible
+         * distinct NullIV keys so they can not be assigned to real Values.
+         * 
+         * Note: The hashCode of "" is ZERO, so an empty Literal would otherwise
+         * be assigned the same key as mockIV(VTE.LITERAL).
+         */
+
         final IKeyBuilder keyBuilder = new TermsIndexHelper().newKeyBuilder();
 
-        final byte[] key = TermId.NullIV.encode(keyBuilder).getKey();
-
-        // Insert a tuple for the NullIV mapping it to a null value.
-        ndx.insert(key/* NullIV */, null/* value */);
+        final byte[][] keys = new byte[][] {
+            TermId.mockIV(VTE.URI).encode(keyBuilder.reset()).getKey(), //
+            TermId.mockIV(VTE.BNODE).encode(keyBuilder.reset()).getKey(), //
+            TermId.mockIV(VTE.LITERAL).encode(keyBuilder.reset()).getKey(), //
+            TermId.mockIV(VTE.STATEMENT).encode(keyBuilder.reset()).getKey(), //
+        };
+        final byte[][] vals = new byte[][] { null, null, null, null };
         
+        // submit the task and wait for it to complete.
+        ndx.submit(0/* fromIndex */, keys.length/* toIndex */, keys, vals,
+                BatchInsertConstructor.RETURN_NO_VALUES, null/* aggregator */);
+
+//        for (VTE vte : VTE.values()) {
+//        
+//            ndx.insert(TermId.mockIV(vte).encode(keyBuilder.reset())
+//                    .getKey(), null/* value */);
+//            
+//        }        
+
         return ndx;
 
     }
@@ -310,9 +355,7 @@ public class TestTermsIndex extends TestCase2 {
 			
 		    final String namespace = getName();
 		    
-		    final IndexMetadata metadata = getTermsIndexMetadata(namespace);
-
-			final BTree ndx = BTree.create(store, metadata);
+			final BTree ndx = createTermsIndex(store, namespace);
 
 			final BigdataValueFactory vf = BigdataValueFactoryImpl
 					.getInstance(namespace);
@@ -843,22 +886,11 @@ public class TestTermsIndex extends TestCase2 {
         
         try {
             
-            final TermsIndexHelper h = new TermsIndexHelper();
-
             final String namespace = getName();
 
-            final IndexMetadata metadata = getTermsIndexMetadata(namespace);
+            final BTree ndx = createTermsIndex(store, namespace);
 
-            final BTree ndx = BTree.create(store, metadata);
-
-            final IKeyBuilder keyBuilder = h.newKeyBuilder();
-
-            {
-                final byte[] key = TermId.NullIV.encode(keyBuilder).getKey();
-
-                // Insert a tuple for the NullIV mapping it to a null value.
-                ndx.insert(key/* NullIV */, null/* value */);
-            }
+            final TermsIndexHelper h = new TermsIndexHelper();
 
             final BigdataValueFactory vf = BigdataValueFactoryImpl
                     .getInstance(namespace);

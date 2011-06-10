@@ -93,7 +93,8 @@ public class TermId<V extends BigdataValue> extends
 	 * @see DatatypeBOp
 	 * @see FuncBOp
 	 * @see BigdataEvaluationStrategyImpl3
-	 * @see DummyIV
+	 * 
+	 * TODO Consider caching the result of this computation, or perhaps doing it in the ctor.
 	 */
     @Override
 	final public boolean isNullIV() {

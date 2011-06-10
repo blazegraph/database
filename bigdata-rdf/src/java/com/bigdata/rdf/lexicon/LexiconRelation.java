@@ -71,6 +71,7 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
+import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
@@ -86,6 +87,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.LexiconConfiguration;
 import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSDStringExtension;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -540,10 +542,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 			 */
 			{
 
-				final IKeyBuilder keyBuilder = h.newKeyBuilder();
-
-				final byte[] key = TermId.NullIV.encode(keyBuilder).getKey();
-				
                 if (terms == null) {
                     /*
                      * Scale-out (will not have been reported by registerIndex
@@ -553,8 +551,32 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     terms = getIndex(getFQN(LexiconKeyOrder.TERMS));
                 }
 
-				// Insert a tuple for the NullIV mapping it to a null value.
-				terms.insert(key/* NullIV */, null/* value */);
+                /*
+                 * Insert a tuple for each kind of VTE having a ZERO hash code
+                 * and a ZERO counter and thus qualifying it as a NullIV. Each
+                 * of these tuples is mapped to a null value in the index. This
+                 * reserves the possible distinct NullIV keys so they can not be
+                 * assigned to real Values.
+                 * 
+                 * Note: The hashCode of "" is ZERO, so an empty Literal would
+                 * otherwise be assigned the same key as mockIV(VTE.LITERAL).
+                 */
+
+                final IKeyBuilder keyBuilder = h.newKeyBuilder();
+
+                final byte[][] keys = new byte[][] {
+                        TermId.mockIV(VTE.URI).encode(keyBuilder.reset()).getKey(), //
+                        TermId.mockIV(VTE.BNODE).encode(keyBuilder.reset()).getKey(), //
+                        TermId.mockIV(VTE.LITERAL).encode(keyBuilder.reset()).getKey(), //
+                        TermId.mockIV(VTE.STATEMENT).encode(keyBuilder.reset()).getKey(), //
+                    };
+                
+                final byte[][] vals = new byte[][] { null, null, null, null };
+                
+                // submit the task and wait for it to complete.
+                terms.submit(0/* fromIndex */, keys.length/* toIndex */, keys, vals,
+                        BatchInsertConstructor.RETURN_NO_VALUES, null/* aggregator */);
+                
 			}
 
 //            indexManager

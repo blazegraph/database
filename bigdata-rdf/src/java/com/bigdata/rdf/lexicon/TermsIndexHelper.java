@@ -286,6 +286,11 @@ public class TermsIndexHelper {
 		while(itr.hasNext()) {
 			
 			final ITuple<?> tuple = itr.next();
+
+            if (tuple.isNull()) {
+                // Can not match a NullIV.
+                continue;
+			}
 			
             // raw bytes TODO More efficient if we can compare without
             // materializing the tuple's value, or compare reusing a temporary

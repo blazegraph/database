@@ -1688,7 +1688,7 @@ abstract public class AbstractTripleStore extends
                                 + this);
                     
                     if (log.isInfoEnabled())
-                        log.info("read vocabular: "+vocab.size());
+                        log.info("read vocabulary: "+vocab.size());
                     
                 }
                 
@@ -1996,8 +1996,8 @@ abstract public class AbstractTripleStore extends
 //        return getLexiconRelation().getTermsIndex()
 //                .rangeCount(fromKey, toKey);
         
-        // Report everything except the NullIV.
-        return getLexiconRelation().getTermsIndex().rangeCount() - 1;
+        // Report everything except the NullIVs.
+        return getLexiconRelation().getTermsIndex().rangeCount() - 4;
 
     }
 
@@ -2014,7 +2014,7 @@ abstract public class AbstractTripleStore extends
         final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
         /*
-         * Subtract out ONE for the NullIV (it's flag bits mark it as a URI).
+         * Subtract out ONE for the NullIV.
          */
         return getLexiconRelation().getTermsIndex().rangeCount(fromKey, toKey) - 1;
 
@@ -2037,7 +2037,10 @@ abstract public class AbstractTripleStore extends
 
         final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-        return getLexiconRelation().getTermsIndex().rangeCount(fromKey, toKey);
+        /*
+         * Subtract out ONE for the NullIV.
+         */
+        return getLexiconRelation().getTermsIndex().rangeCount(fromKey, toKey) - 1;
 
     }
 
@@ -2062,7 +2065,10 @@ abstract public class AbstractTripleStore extends
 
         final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-        return getLexiconRelation().getTermsIndex().rangeCount(fromKey, toKey);
+        /*
+         * Subtract out ONE for the NullIV.
+         */
+        return getLexiconRelation().getTermsIndex().rangeCount(fromKey, toKey) - 1;
 
     }
 
