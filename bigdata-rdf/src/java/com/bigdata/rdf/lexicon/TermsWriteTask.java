@@ -25,7 +25,7 @@ import com.bigdata.service.ndx.pipeline.KVOList;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: Term2IdWriteTask.java 3408 2010-08-04 18:53:35Z thompsonbry $
  */
-public class TermsWriteTask implements Callable<Void> {
+public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
 
     private static transient final Logger log = Logger.getLogger(TermsWriteTask.class);
             
@@ -76,13 +76,17 @@ public class TermsWriteTask implements Callable<Void> {
         
     }
 
-	/**
-	 * Unify the {@link BigdataValue}s with the TERMS index, setting the
-	 * {@link IV}s on the {@link BigdataValue}s as a side-effect.
-	 * 
-	 * @throws Exception
-	 */
-    public Void call() throws Exception {
+    /**
+     * Unify the {@link BigdataValue}s with the TERMS index, setting the
+     * {@link IV}s on the {@link BigdataValue}s as a side-effect.
+     * 
+     * @return A dense {@link KVO}[] chunk consisting of only those distinct
+     *         {@link BigdataValue}s whose {@link IV}s were not already known.
+     *         (This may be used to write on the full text index).
+     * 
+     * @throws Exception
+     */
+    public KVO<BigdataValue>[] call() throws Exception {
 
 		/*
 		 * Insert into the TERMS index ({termCode,hash(Value),counter} ->
@@ -154,8 +158,6 @@ public class TermsWriteTask implements Callable<Void> {
             {
 
                 final long _begin = System.currentTimeMillis();
-
-//                final IIndex termsIndex = r.getTermsIndex();
 
                 /*
                  * Create a key buffer holding the sort keys. This does not
@@ -231,7 +233,7 @@ public class TermsWriteTask implements Callable<Void> {
                         vals, ctor, new TermsWriteProcResultHandler(a,
                                 readOnly, stats.nunknown));
 
-                stats.indexTime = stats.forwardIndexTime = System.currentTimeMillis()
+                stats.indexTime = stats.termsIndexTime = System.currentTimeMillis()
                         - _begin;
 
             }
@@ -240,7 +242,7 @@ public class TermsWriteTask implements Callable<Void> {
         
         stats.ndistinct = ndistinct;
 
-        return null;//KVO.dense(a, ndistinct);
+        return KVO.dense(a, ndistinct);
         
     } // call
 

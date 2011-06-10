@@ -11,49 +11,37 @@ import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.io.DataInputBuffer;
-import com.bigdata.rawstore.Bytes;
 
 /**
  * Procedure reads on the terms index, aggregating data on a per-{@link Hit}
  * basis.
  * <p>
- * The procedure uses an {@link IRangeQuery#rangeIterator(byte[], byte[])}
- * to perform a key range scan for a specific term. The range iterator will
- * automatically issue queries, obtaining a "chunk" of results at a time.
- * Those results are aggregated on the {@link Hit} collection, which is
- * maintained in a thread-safe hash map.
+ * The procedure uses an {@link IRangeQuery#rangeIterator(byte[], byte[])} to
+ * perform a key range scan for a specific term. The range iterator will
+ * automatically issue queries, obtaining a "chunk" of results at a time. Those
+ * results are aggregated on the {@link Hit} collection, which is maintained in
+ * a thread-safe hash map.
  * <p>
  * Note: An {@link ISimpleSplitHandler} imposes the constraint that index
- * partitions may only fall on a term boundary, hence all tuples for any
- * given term will always be found on the same index partition.
+ * partitions may only fall on a term boundary, hence all tuples for any given
+ * term will always be found on the same index partition.
  * 
+ * @param <V>
+ *            The generic type of the document identifier.
+ *            
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReadIndexTask implements Callable<Object> {
+public class ReadIndexTask<V extends Comparable<V>> implements Callable<Object> {
 
     final private static Logger log = Logger.getLogger(ReadIndexTask.class);
-
-//    /**
-//     * True iff the {@link #log} level is INFO or less.
-//     */
-//    final protected static boolean INFO = log.isInfoEnabled();
-//
-//    /**
-//     * True iff the {@link #log} level is DEBUG or less.
-//     */
-//    final protected static boolean DEBUG = log.isDebugEnabled();
 
     private final String queryTerm;
 //    private final boolean prefixMatch;
 //    private final int exactMatchLength;
     private final double queryTermWeight;
-    private final boolean fieldsEnabled;
-//    private final FullTextIndex searchEngine;
-    private final ConcurrentHashMap<Long, Hit> hits;
+    private final IRecordBuilder<V> recordBuilder;
+    private final ConcurrentHashMap<V, Hit<V>> hits;
     private final ITupleIterator itr;
 
     /**
@@ -63,7 +51,7 @@ public class ReadIndexTask implements Callable<Object> {
      * inserted, the {@link Hit#setDocId(long) docId} is set on the {@link Hit}
      * and a new instance is assigned to {@link #tmp}.
      */
-    private Hit tmp = new Hit();
+    private Hit<V> tmp = new Hit<V>();
 
     /**
      * Setup a task that will perform a range scan for entries matching the
@@ -83,8 +71,8 @@ public class ReadIndexTask implements Callable<Object> {
      *            The map where the hits are being aggregated.
      */
     public ReadIndexTask(final String termText, final boolean prefixMatch,
-            final double queryTermWeight, final FullTextIndex searchEngine,
-            final ConcurrentHashMap<Long, Hit> hits) {
+            final double queryTermWeight, final FullTextIndex<V> searchEngine,
+            final ConcurrentHashMap<V, Hit<V>> hits) {
 
         if (termText == null)
             throw new IllegalArgumentException();
@@ -101,10 +89,10 @@ public class ReadIndexTask implements Callable<Object> {
         
         this.queryTermWeight = queryTermWeight;
 
-        this.fieldsEnabled = searchEngine.isFieldsEnabled();
+//        this.fieldsEnabled = searchEngine.isFieldsEnabled();
         
-//        this.searchEngine = searchEngine;
-        
+        this.recordBuilder = searchEngine.getRecordBuilder();
+
         this.hits = hits;
      
         final IKeyBuilder keyBuilder = searchEngine.getKeyBuilder();
@@ -137,33 +125,35 @@ public class ReadIndexTask implements Callable<Object> {
          * fieldId value space since I would assume that Long.MIN_VALUE is the
          * first docId.
          */
-        final byte[] fromKey = FullTextIndex.getTokenKey(keyBuilder, termText,
-                false/* successor */, fieldsEnabled, Long.MIN_VALUE/* docId */,
-                Integer.MIN_VALUE/* fieldId */);
+//        final byte[] fromKey = recordBuilder.getKey(keyBuilder, termText,
+//                false/* successor */, Long.MIN_VALUE/* docId */,
+//                Integer.MIN_VALUE/* fieldId */);
 
+        final byte[] fromKey = recordBuilder.getFromKey(keyBuilder, termText);
+        
         final byte[] toKey;
         
-        // FIXME prefixMatch can not be turned off right now.
         if (prefixMatch) {
             /*
              * Accepts anything starting with the search term. E.g., given
              * "bro", it will match "broom" and "brown" but not "break".
              */
-        toKey = FullTextIndex.getTokenKey(keyBuilder, termText,
-                true/* successor */, fieldsEnabled, Long.MIN_VALUE/* docId */,
-                Integer.MIN_VALUE/* fieldId */);
+            toKey = recordBuilder.getToKey(keyBuilder, termText);
+//            toKey = recordBuilder.getKey(keyBuilder, termText,
+//                true/* successor */, Long.MIN_VALUE/* docId */,
+//                Integer.MIN_VALUE/* fieldId */);
         } else {
             /*
              * Accepts only those entries that exactly match the search term.
              */
-            toKey = FullTextIndex.getTokenKey(keyBuilder, termText,
-                    false/* successor */, fieldsEnabled,
-                    Long.MAX_VALUE/* docId */, Integer.MAX_VALUE/* fieldId */);
+            toKey = recordBuilder.getToKey(keyBuilder, termText);
+//            toKey = recordBuilder.getKey(keyBuilder, termText,
+//                    false/* successor */, 
+//                    Long.MAX_VALUE/* docId */, Integer.MAX_VALUE/* fieldId */);
         }
 
-        if (log.isDebugEnabled()) log.debug
-//            System.err.println
-            ("termText=[" + termText + "], prefixMatch=" + prefixMatch
+        if (log.isDebugEnabled())
+            log.debug("termText=[" + termText + "], prefixMatch=" + prefixMatch
                     + ", queryTermWeight=" + queryTermWeight + "\nfromKey="
                     + BytesUtil.toString(fromKey) + "\ntoKey="
                     + BytesUtil.toString(toKey));
@@ -176,7 +166,7 @@ public class ReadIndexTask implements Callable<Object> {
          */
         itr = searchEngine.getIndex()
                 .rangeIterator(fromKey, toKey, 0/* capacity */,
-                        IRangeQuery.KEYS | IRangeQuery.VALS, null/*filter*/);
+                        IRangeQuery.KEYS | IRangeQuery.VALS, null/* filter */);
 
     }
     
@@ -202,31 +192,31 @@ public class ReadIndexTask implements Callable<Object> {
                 if (log.isInfoEnabled())
                     log.info("Interrupted: queryTerm=" + queryTerm + ", nhits="
                             + nhits);
-                
-                break;
+
+                return nhits;
                 
             }
             
             // next entry
-            final ITuple tuple = itr.next();
+            final ITuple<?> tuple = itr.next();
             
-            // key is {term,docId,fieldId}
-//            final byte[] key = tuple.getKey();
-//            
-//            // decode the document identifier.
-//            final long docId = KeyBuilder.decodeLong(key, key.length
-//                    - Bytes.SIZEOF_LONG /*docId*/ - Bytes.SIZEOF_INT/*fieldId*/);
-
-            final ByteArrayBuffer kbuf = tuple.getKeyBuffer();
-
-            /*
-             * The byte offset of the docId in the key.
-             * 
-             * Note: This is also the byte length of the match on the unicode
-             * sort key, which appears at the head of the key.
-             */
-            final int docIdOffset = kbuf.limit() - Bytes.SIZEOF_LONG /* docId */
-                    - (fieldsEnabled ? Bytes.SIZEOF_INT/* fieldId */: 0);
+//            // key is {term,docId,fieldId}
+////            final byte[] key = tuple.getKey();
+////            
+////            // decode the document identifier.
+////            final long docId = KeyBuilder.decodeLong(key, key.length
+////                    - Bytes.SIZEOF_LONG /*docId*/ - Bytes.SIZEOF_INT/*fieldId*/);
+//
+//            final ByteArrayBuffer kbuf = tuple.getKeyBuffer();
+//
+//            /*
+//             * The byte offset of the docId in the key.
+//             * 
+//             * Note: This is also the byte length of the match on the unicode
+//             * sort key, which appears at the head of the key.
+//             */
+//            final int docIdOffset = kbuf.limit() - Bytes.SIZEOF_LONG /* docId */
+//                    - (fieldsEnabled ? Bytes.SIZEOF_INT/* fieldId */: 0);
 
 //            if (!prefixMatch && docIdOffset != exactMatchLength) {
 //             
@@ -240,15 +230,18 @@ public class ReadIndexTask implements Callable<Object> {
 //            }
             
             // decode the document identifier.
-            final long docId = KeyBuilder.decodeLong(kbuf.array(), docIdOffset);
-
+//            final long docId = KeyBuilder.decodeLong(kbuf.array(), docIdOffset);
+            final V docId = recordBuilder.getDocId(tuple);
+            
             /*
              * Extract the term frequency and normalized term-frequency (term
              * weight) for this document.
              */
-            final DataInputBuffer dis = tuple.getValueStream();
-            final int termFreq = dis.readShort();
-            final double termWeight = dis.readDouble();
+            final ITermMetadata md = recordBuilder.decodeValue(tuple);
+
+            final int termFreq = md.termFreq();
+            
+            final double termWeight = md.getLocalTermWeight();
             
             if (log.isDebugEnabled())
                 log.debug("hit: term=" + queryTerm + ", docId=" + docId
@@ -260,13 +253,13 @@ public class ReadIndexTask implements Callable<Object> {
              * Play a little magic to get the docId in the hit set without race
              * conditions.
              */
-            final Hit hit;
+            final Hit<V> hit;
             {
-                Hit oldValue = hits.putIfAbsent(docId, tmp);
+                Hit<V> oldValue = hits.putIfAbsent(docId, tmp);
                 if (oldValue == null) {
                     hit = tmp;
                     hit.setDocId(docId);
-                    tmp = new Hit();
+                    tmp = new Hit<V>();
                 } else {
                     hit = oldValue;
                 }

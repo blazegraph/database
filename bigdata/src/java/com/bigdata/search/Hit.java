@@ -10,12 +10,13 @@ import org.apache.log4j.Logger;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Hit implements IHit, Comparable<Hit>{
+public class Hit<V extends Comparable<V>> implements IHit<V>,
+        Comparable<Hit<V>> {
 
     final private static transient Logger log = Logger.getLogger(Hit.class);
    
     /** note: defaults to an illegal value. */
-    private long docId = -1;
+    private V docId = null;
     
     /** #of terms reporting. */
     private int nterms;
@@ -35,7 +36,10 @@ public class Hit implements IHit, Comparable<Hit>{
 
     }
     
-    synchronized void setDocId(final long docId) {
+    synchronized void setDocId(final V docId) {
+        
+        if(docId == null)
+            throw new IllegalArgumentException();
         
         this.docId = docId;
 
@@ -56,7 +60,7 @@ public class Hit implements IHit, Comparable<Hit>{
 
     }
 
-    synchronized public long getDocId() {
+    synchronized public V getDocId() {
      
         return docId;
         
@@ -94,7 +98,7 @@ public class Hit implements IHit, Comparable<Hit>{
      * Sorts {@link Hit}s into decreasing cosine order with ties broken by the
      * the <code>docId</code>.
      */
-    public int compareTo(final Hit o) {
+    public int compareTo(final Hit<V> o) {
 
         if (cosine < o.cosine)
             return 1;
@@ -102,13 +106,15 @@ public class Hit implements IHit, Comparable<Hit>{
         if (cosine > o.cosine)
             return -1;
 
-        if (docId < o.docId)
-            return -1;
-
-        if (docId > o.docId)
-            return 1;
-
-        return 0;
+        return docId.compareTo(o.docId);
+        
+//        if (docId < o.docId)
+//            return -1;
+//
+//        if (docId > o.docId)
+//            return 1;
+//
+//        return 0;
         
     }
     

@@ -24,11 +24,8 @@ public class WriteTaskStats {
     /** time to insert terms into indices. */
     long indexTime = 0;
 
-    /** time on the forward index. */
-    long forwardIndexTime;
-
-    /** time on the reverse index. */
-    long reverseIndexTime;
+    /** time on the terms index. */
+    long termsIndexTime;
 
     /** time to insert terms into the text indexer. */
     long fullTextIndexTime;

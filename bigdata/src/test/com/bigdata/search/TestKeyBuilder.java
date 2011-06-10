@@ -111,27 +111,34 @@ public class TestKeyBuilder extends TestCase2 {
     protected void doKeyOrderTest(final long docId, final int fieldId,
             final boolean fieldsEnabled) {
 
+        final boolean doublePrecision = false;
+        
         final IKeyBuilder keyBuilder = getKeyBuilder();
         
+        final IRecordBuilder<Long> tokenKeyBuilder = new DefaultRecordBuilder<Long>(
+                fieldsEnabled,//
+                doublePrecision,//
+                new DefaultDocIdExtension()//
+        );
+
         // the full term.
-        final byte[] k0 = FullTextIndex.getTokenKey(keyBuilder, "brown",
-                false/* successor */, fieldsEnabled, docId, fieldId);
-        
+        final byte[] k0 = tokenKeyBuilder.getKey(keyBuilder, "brown",
+                false/* successor */, docId, fieldId);
+
         // the successor of the full term.
-        final byte[] k0s = FullTextIndex.getTokenKey(keyBuilder, "brown",
-                true/* successor */, fieldsEnabled, docId, fieldId);
+        final byte[] k0s = tokenKeyBuilder.getKey(keyBuilder, "brown",
+                true/* successor */, docId, fieldId);
 
         // verify sort key order for the full term and its successor.
         assertTrue(BytesUtil.compareBytes(k0, k0s) < 0);
 
-        
         // a prefix of that term.
-        final byte[] k1 = FullTextIndex.getTokenKey(keyBuilder, "bro",
-                false/* successor */, fieldsEnabled, docId, fieldId);
-        
+        final byte[] k1 = tokenKeyBuilder.getKey(keyBuilder, "bro",
+                false/* successor */, docId, fieldId);
+
         // the successor of that prefix.
-        final byte[] k1s = FullTextIndex.getTokenKey(keyBuilder, "bro",
-                true/* successor */, fieldsEnabled, docId, fieldId);
+        final byte[] k1s = tokenKeyBuilder.getKey(keyBuilder, "bro",
+                true/* successor */, docId, fieldId);
         
         // verify sort key order for prefix and its successor.
         assertTrue(BytesUtil.compareBytes(k0, k0s) < 0);

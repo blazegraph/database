@@ -1,6 +1,6 @@
 package com.bigdata.search;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 
 import org.apache.lucene.analysis.Token;
 
@@ -8,13 +8,16 @@ import org.apache.lucene.analysis.Token;
  * Models the term-frequency data associated with a single field of some
  * document.
  * 
+ * @param <V>
+ *            The generic type of the document identifier.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TermFrequencyData {
+public class TermFrequencyData<V extends Comparable<V>> {
 
     /** The document identifier. */
-    final public long docId;
+    final public V docId;
     
     /** The field identifier. */
     final public int fieldId;
@@ -23,13 +26,17 @@ public class TermFrequencyData {
     private int totalTermCount = 0;
     
     /**
-     * The set of distinct tokens and their {@link TermMetadata}.
+     * The set of distinct tokens and their {@link ITermMetadata}.
      */
-    final public HashMap<String,TermMetadata> terms = new HashMap<String,TermMetadata>(); 
+    final public LinkedHashMap<String, ITermMetadata> terms = new LinkedHashMap<String, ITermMetadata>();
     
-    public TermFrequencyData(final long docId, final int fieldId,
+    public TermFrequencyData(final V docId, final int fieldId,
             final String token) {
 
+        // Note: will be null when indexing a query.
+//        if (docId == null)
+//            throw new IllegalArgumentException();
+        
         this.docId = docId;
         
         this.fieldId = fieldId;
@@ -49,17 +56,15 @@ public class TermFrequencyData {
      */
     public boolean add(final String token) {
         
-        final String termText = token;
-        
         final boolean newTerm;
         
-        TermMetadata termMetadata = terms.get(termText);
+        ITermMetadata termMetadata = terms.get(token);
 
         if (termMetadata == null) {
             
             termMetadata = new TermMetadata();
             
-            terms.put(termText, termMetadata);
+            terms.put(token, termMetadata);
             
             newTerm = true;
             
@@ -69,7 +74,7 @@ public class TermFrequencyData {
             
         }
         
-        termMetadata.add( token );
+        termMetadata.add();
 
         totalTermCount++;
         
@@ -94,10 +99,10 @@ public class TermFrequencyData {
         return totalTermCount;
         
     }
-    
+
     /**
-     * Computes the normalized term-frequency vector. This a unit vector whose
-     * magnitude is <code>1.0</code>. The magnitude of the term frequency
+     * Computes the normalized term-frequency vector. This is a unit vector
+     * whose magnitude is <code>1.0</code>. The magnitude of the term frequency
      * vector is computed using the integer term frequency values reported by
      * {@link TermMetadata#termFreq()}. The normalized values are then set on
      * {@link TermMetadata#localTermWeight}.
@@ -112,9 +117,9 @@ public class TermFrequencyData {
          */
         double magnitude = 0d;
         
-        for(TermMetadata md : terms.values()) { 
+        for(ITermMetadata md : terms.values()) { 
             
-            int termFreq = md.termFreq();
+            final double termFreq = md.termFreq();
 
             // sum of squares.
             magnitude += (termFreq * termFreq);
@@ -127,11 +132,11 @@ public class TermFrequencyData {
          * normalizedWeight = termFreq / magnitude for each term.
          */
 
-        for(TermMetadata md : terms.values()) { 
+        for(ITermMetadata md : terms.values()) { 
             
-            final int termFreq = md.termFreq();
+            final double termFreq = md.termFreq();
 
-            md.localTermWeight = (double)termFreq / magnitude;
+            md.setLocalTermWeight(termFreq / magnitude);
             
         }
 

@@ -31,6 +31,7 @@ import java.io.StringReader;
 import java.util.Iterator;
 import java.util.Properties;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 
 import com.bigdata.journal.IIndexManager;
@@ -49,6 +50,9 @@ import com.bigdata.search.TokenBuffer;
  */
 public class BigdataRDFFullTextIndex extends FullTextIndex implements
         ITextIndexer<Hit> {
+
+    final private static transient Logger log = Logger
+            .getLogger(BigdataRDFFullTextIndex.class);
 
     static public BigdataRDFFullTextIndex getInstance(
             final IIndexManager indexManager, final String namespace,

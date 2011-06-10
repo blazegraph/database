@@ -1,6 +1,5 @@
 package com.bigdata.search;
 
-import java.util.ArrayList;
 
 /**
  * Mutable metadata for the occurrences of a term within a field of some
@@ -9,42 +8,58 @@ import java.util.ArrayList;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TermMetadata {
-    
-    public String termText() {
-        
-        return occurrences.get(0);
-        
-    }
-    
-    /**
-     * The term frequency count.
-     */
-    public int termFreq() {
-        
-        return occurrences.size();
-        
-    }
+public class TermMetadata implements ITermMetadata {
+
+//    /**
+//     * The token.
+//     */
+//    private final String token;
     
     /**
      * The local term weight, which may be computed by a variety of methods.
      */
-    public double localTermWeight;
+    private double localTermWeight;
+    private int noccurrences;
 
-    private final ArrayList<String> occurrences = new ArrayList<String>();
+//    public TermMetadata(final String token) {
+//        
+//        this.token = token;
+//    }
+//    
+//    public String termText() {
+//        
+//        return token;
+//        
+//    }
     
-    /**
-     * Add an occurrence.
-     * 
-     * @param token
-     *            The token.
-     */
-    public void add(String token) {
+    public int termFreq() {
+    
+        return noccurrences;
+        
+    }
+    
+    final public double getLocalTermWeight() {
 
-        assert token != null;
+        return localTermWeight;
         
-        occurrences.add(token);
+    }
+
+    final public void setLocalTermWeight(final double d) {
         
+        localTermWeight = d;
+        
+    }
+    
+    public void add() {
+
+        noccurrences++;
+        
+    }
+
+    public String toString() {
+
+        return "{noccur=" + noccurrences + ",weight=" + localTermWeight + "}";
+
     }
     
 }

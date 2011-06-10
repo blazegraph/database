@@ -54,15 +54,15 @@ import org.apache.lucene.analysis.tokenattributes.TermAttribute;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilderExtension;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
-import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
@@ -231,12 +231,14 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  *       Basically, it contains "document fields", or at least their indexed
  *       terms.
  * 
+ * @param <V>
+ *            The generic type of the document identifier.
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class FullTextIndex extends AbstractRelation {
+public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 
-    final protected static transient Logger log = Logger
+    final private static transient Logger log = Logger
             .getLogger(FullTextIndex.class);
 
     /**
@@ -335,6 +337,16 @@ public class FullTextIndex extends AbstractRelation {
         String DEFAULT_FIELDS_ENABLED = "true";
 
         /**
+         * When <code>true</code>, the <code>localTermWeight</code> is stored
+         * using double-precision. When <code>false</code>, it is stored using
+         * single-precision.
+         */
+        String DOUBLE_PRECISION = FullTextIndex.class.getName()
+                + ".doublePrecision";
+
+        String DEFAULT_DOUBLE_PRECISION = "false";
+        
+        /**
          * The name of the {@link IAnalyzerFactory} class which will be used to
          * obtain analyzers when tokenizing documents and queries (default
          * {@value #DEFAULT_ANALYZER_FACTORY_CLASS}).  The specified class MUST
@@ -348,7 +360,29 @@ public class FullTextIndex extends AbstractRelation {
                 + ".analyzerFactoryClass";
 
         String DEFAULT_ANALYZER_FACTORY_CLASS = DefaultAnalyzerFactory.class.getName();
-        
+
+        /**
+         * The class responsible for encoding and decoding document identifiers
+         * in the keys of the full text index (
+         * {@value #DEFAULT_DOCID_FACTORY_CLASS}). The named class MUST provide
+         * a public zero argument constructor and MUST implement
+         * {@link IKeyBuilderExtension}.
+         * 
+         * @see IKeyBuilderExtension
+         * @see DefaultKeyBuilderFactory
+         * 
+         *      TODO Since how we encode the docId can interact with how we
+         *      encode the record of the tuple (e.g. for a variable length IV),
+         *      it might be simpler to replace this with the
+         *      {@link IRecordBuilder} interface so we specify the entire
+         *      behavior of the index at one go.
+         */
+        String DOCID_FACTORY_CLASS = FullTextIndex.class.getName()
+                + ".docIdFactoryClass";
+
+        String DEFAULT_DOCID_FACTORY_CLASS = DefaultDocIdExtension.class
+                .getName();
+
     }
     
     /**
@@ -376,6 +410,11 @@ public class FullTextIndex extends AbstractRelation {
     private final boolean fieldsEnabled;
 
     /**
+     * @see Options#DOUBLE_PRECISION
+     */
+    private final boolean doublePrecision;
+
+    /**
      * Return the value configured by the {@link Options#FIELDS_ENABLED}
      * property.
      */
@@ -389,6 +428,26 @@ public class FullTextIndex extends AbstractRelation {
      * @see Options#ANALYZER_FACTORY_CLASS
      */
     private final IAnalyzerFactory analyzerFactory;
+    
+    /**
+     * @see Options#DOCID_FACTORY_CLASS
+     */
+    private final IKeyBuilderExtension<V> docIdFactory;
+    
+    /**
+     * The concrete {@link IRecordBuilder} instance.
+     */
+    private final IRecordBuilder<V> recordBuilder;
+    
+    /**
+     * Return the object responsible for encoding and decoding the tuples
+     * in the full text index.
+     */
+    public final IRecordBuilder<V> getRecordBuilder() {
+        
+        return recordBuilder;
+        
+    }
     
     /**
      * The basename of the search index.
@@ -468,6 +527,18 @@ public class FullTextIndex extends AbstractRelation {
 
         {
 
+            doublePrecision = Boolean
+                    .parseBoolean(properties.getProperty(
+                            Options.DOUBLE_PRECISION,
+                            Options.DEFAULT_DOUBLE_PRECISION));
+
+            if (log.isInfoEnabled())
+                log.info(Options.DOUBLE_PRECISION + "=" + doublePrecision);
+
+        }
+
+        {
+
             final String className = getProperty(
                     Options.ANALYZER_FACTORY_CLASS,
                     Options.DEFAULT_ANALYZER_FACTORY_CLASS);
@@ -501,6 +572,45 @@ public class FullTextIndex extends AbstractRelation {
 
         }
         
+        {
+
+            final String className = getProperty(
+                    Options.DOCID_FACTORY_CLASS,
+                    Options.DEFAULT_DOCID_FACTORY_CLASS);
+
+            final Class<IKeyBuilderExtension<V>> cls;
+            try {
+                cls = (Class<IKeyBuilderExtension<V>>) Class.forName(className);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException("Bad option: "
+                        + Options.DOCID_FACTORY_CLASS, e);
+            }
+
+            if (!IKeyBuilderExtension.class.isAssignableFrom(cls)) {
+                throw new RuntimeException(Options.DOCID_FACTORY_CLASS
+                        + ": Must extend: "
+                        + IKeyBuilderExtension.class.getName());
+            }
+
+            try {
+
+                final Constructor<? extends IKeyBuilderExtension<V>> ctor = cls
+                        .getConstructor(new Class[] { /*FullTextIndex.class */});
+
+                // save reference.
+                docIdFactory = ctor.newInstance(new Object[] { /*this*/});
+
+            } catch (Exception ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+        }
+        
+        this.recordBuilder = new DefaultRecordBuilder<V>(fieldsEnabled,
+                doublePrecision, docIdFactory);
+
         /*
          * Note: defer resolution of the index.
          */
@@ -662,11 +772,10 @@ public class FullTextIndex extends AbstractRelation {
     /**
      * See {@link #index(TokenBuffer, long, int, String, Reader, boolean)}.
      * <p>
-     * Uses a default filterStopwords value of true.
-     * 
+     * Uses a default filterStopwords value of <code>true</code>.
      */
-    public void index(final TokenBuffer buffer, final long docId, final int fieldId,
-            final String languageCode, final Reader r) {
+    public void index(final TokenBuffer<V> buffer, final V docId,
+            final int fieldId, final String languageCode, final Reader r) {
     	
     	index(buffer, docId, fieldId, languageCode, r, true/* filterStopwords */);
     	
@@ -701,8 +810,9 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @see TokenBuffer#flush()
      */
-    public void index(final TokenBuffer buffer, final long docId, final int fieldId,
-            final String languageCode, final Reader r, final boolean filterStopwords) {
+    public void index(final TokenBuffer<V> buffer, final V docId,
+            final int fieldId, final String languageCode, final Reader r,
+            final boolean filterStopwords) {
 
         /*
          * Note: You can invoke this on a read-only index. It is only overflow
@@ -715,24 +825,34 @@ public class FullTextIndex extends AbstractRelation {
         int n = 0;
         
         // tokenize (note: docId,fieldId are not on the tokenStream, but the field could be).
-        final TokenStream tokenStream = getTokenStream(languageCode, r, filterStopwords);
-        try {
-        while (tokenStream.incrementToken()) {
-            TermAttribute term=tokenStream.getAttribute(TermAttribute.class);
-            buffer.add(docId, fieldId, term.term());
-            
-            n++;
+        final TokenStream tokenStream = getTokenStream(languageCode, r,
+                filterStopwords);
 
-        }
-        }catch(IOException ioe) {
+        try {
+
+            while (tokenStream.incrementToken()) {
+                
+                final TermAttribute term = tokenStream
+                        .getAttribute(TermAttribute.class);
+                
+                buffer.add(docId, fieldId, term.term());
+
+                n++;
+
+            }
+
+        } catch (IOException ioe) {
+            
+            throw new RuntimeException(ioe);
             
         }
+
         if (log.isInfoEnabled())
             log.info("Indexed " + n + " tokens: docId=" + docId + ", fieldId="
                     + fieldId);
 
     }
-    
+
     /**
      * Tokenize text using an {@link Analyzer} that is appropriate to the
      * specified language family.
@@ -768,116 +888,21 @@ public class FullTextIndex extends AbstractRelation {
         
     }
 
-    /**
-     * Create a key for a term.
-     * 
-     * @param keyBuilder
-     *            Used to construct the key.
-     * @param token
-     *            The token whose key will be formed.
-     * @param successor
-     *            When <code>true</code> the successor of the token's text will
-     *            be encoded into the key. This is useful when forming the
-     *            <i>toKey</i> in a search.
-     * @param fieldsEnabled
-     *            When <code>true</code> the <code>fieldId</code> will be
-     *            included as a component in the generated key. When
-     *            <code>false</code> it will not be present in the generated
-     *            key.
-     * @param docId
-     *            The document identifier - use {@link Long#MIN_VALUE} when
-     *            forming a search key.
-     * @param fieldId
-     *            The field identifier - use {@link Integer#MIN_VALUE} when
-     *            forming a search key.
-     * 
-     * @return The key.
-     */
-    static protected byte[] getTokenKey(final IKeyBuilder keyBuilder,
-            final String termText, final boolean successor,
-            final boolean fieldsEnabled, final long docId, final int fieldId) {
-        
-        keyBuilder.reset();
-
-        // the token text (or its successor as desired).
-        keyBuilder.appendText(termText, true/* unicode */, successor);
-        
-        keyBuilder.append(docId);
-
-        if (fieldsEnabled)
-            keyBuilder.append(fieldId);
-        
-        final byte[] key = keyBuilder.getKey();
-
-        if (log.isDebugEnabled()) {
-
-            log.debug("{" + termText + "," + docId
-                    + (fieldsEnabled ? "," + fieldId : "") + "}, successor="
-                    + (successor ? "true " : "false") + ", key="
-                    + BytesUtil.toString(key));
-
-        }
-
-        return key;
-
-    }
-
-    /**
-     * Return the byte[] that is the encoded value for per-{token,docId,fieldId}
-     * entry in the index.
-     * 
-     * @param buf
-     *            Used to encode the value.
-     * @param metadata
-     *            Metadata about the term.
-     * 
-     * @return The encoded value.
-     * 
-     * @todo optionally record the token position metadata (sequence of token
-     *       positions in the source) and the token offset (character offsets
-     *       for the inclusive start and exclusive end of each token).
-     * 
-     * @todo value compression: 
-     * 
-     * @todo value compression: code "position" as delta from last position in
-     *       the same field or from 0 if the first token of a new document; code
-     *       "offsets" as deltas - the maximum offset between tokens will be
-     *       quite small (it depends on the #of stopwords) so use a nibble
-     *       format for this.
-     */
-    protected byte[] getTokenValue(final ByteArrayBuffer buf, final TermMetadata metadata) {
-
-        final int termFreq = metadata.termFreq();
-        
-        final double localTermWeight = metadata.localTermWeight;
-        
-        if (log.isDebugEnabled()) {
-
-            log.debug("termText=" + metadata.termText() + ", termFreq="
-                            + termFreq);
-            
-        }
-        
-        // reset for new value.
-        buf.reset();
-        
-        /*
-         * the term frequency
-         * 
-         * @todo rather the packing as a short, write an IDataSerializer to
-         * compress the whole thing onto a bit stream.
-         */
-        buf.putShort(termFreq > Short.MAX_VALUE ? Short.MAX_VALUE
-                : (short) termFreq);
-        
-        /*
-         *  
-         */
-        buf.putDouble(localTermWeight);
-        
-        return buf.toByteArray();
-        
-    }
+//    public byte[] getKey(final IKeyBuilder keyBuilder, final String termText,
+//            final boolean successor, final boolean fieldsEnabled,
+//            final V docId, final int fieldId) {
+//
+//        return tokenKeyBuilder.getKey(keyBuilder, termText, successor,
+//                fieldsEnabled, docId, fieldId);
+//
+//    }
+//
+//    public byte[] getValue(final ByteArrayBuffer buf,
+//            final ITermMetadata metadata) {
+//
+//        return tokenKeyBuilder.getValue(buf, metadata);
+//        
+//    }
     
     /**
      * Performs a full text search against indexed documents returning a hit
@@ -1354,20 +1379,24 @@ public class FullTextIndex extends AbstractRelation {
         }
         
         // tokenize the query.
-        final TermFrequencyData qdata;
+        final TermFrequencyData<V> qdata;
         {
             
-            final TokenBuffer buffer = new TokenBuffer(1, this);
-            
+            final TokenBuffer<V> buffer = new TokenBuffer<V>(1, this);
+
             /*
-             * If we are using prefix match (* operator) then we don't want
-             * to filter stopwords from the search query.
+             * If we are using prefix match ('*' operator) then we don't want to
+             * filter stopwords from the search query.
              */
             final boolean filterStopwords = !prefixMatch;
-            
-            index(buffer, Long.MIN_VALUE/* docId */,
-                    Integer.MIN_VALUE/* fieldId */, languageCode,
-                    new StringReader(query), filterStopwords);
+
+            index(buffer, //
+                    null, // docId // was Long.MIN_VALUE
+                    Integer.MIN_VALUE, // fieldId
+                    languageCode,//
+                    new StringReader(query), //
+                    filterStopwords//
+            );
 
             if (buffer.size() == 0) {
 
@@ -1386,15 +1415,15 @@ public class FullTextIndex extends AbstractRelation {
             qdata.normalize();
             
         }
-        
-        final ConcurrentHashMap<Long/*docId*/,Hit> hits;
+
+        final ConcurrentHashMap<V/* docId */, Hit<V>> hits;
         {
-       
+
             // @todo use size of collection as upper bound.
-            final int initialCapacity = Math.min(maxRank,10000);
-            
-            hits = new ConcurrentHashMap<Long, Hit>(initialCapacity);
-            
+            final int initialCapacity = Math.min(maxRank, 10000);
+
+            hits = new ConcurrentHashMap<V, Hit<V>>(initialCapacity);
+
         }
 
         // run the queries.
@@ -1403,10 +1432,14 @@ public class FullTextIndex extends AbstractRelation {
             final List<Callable<Object>> tasks = new ArrayList<Callable<Object>>(
                     qdata.distinctTermCount());
 
-            for (TermMetadata md : qdata.terms.values()) {
+            for (Map.Entry<String, ITermMetadata> e : qdata.terms.entrySet()) {
 
-                tasks.add(new ReadIndexTask(md.termText(), prefixMatch,
-                        md.localTermWeight, this, hits));
+                final String termText = e.getKey();
+
+                final ITermMetadata md = e.getValue();
+
+                tasks.add(new ReadIndexTask<V>(termText, prefixMatch, md
+                        .getLocalTermWeight(), this, hits));
 
             }
 
@@ -1418,7 +1451,8 @@ public class FullTextIndex extends AbstractRelation {
                 executionHelper.submitTasks(tasks);
                 
             } catch (InterruptedException ex) {
-                
+
+                // TODO Should we wrap and toss this interrupt instead?
                 log.warn("Interrupted - only partial results will be returned.");
                 
             } catch (ExecutionException ex) {
@@ -1440,11 +1474,11 @@ public class FullTextIndex extends AbstractRelation {
 	        if (log.isInfoEnabled())
 	        	log.info("matchAll=true, nterms=" + nterms);
 	        
-	        final Iterator<Map.Entry<Long,Hit>> it = hits.entrySet().iterator();
+	        final Iterator<Map.Entry<V,Hit<V>>> it = hits.entrySet().iterator();
 	        
 	        while (it.hasNext()) {
 	        	
-	        	final Hit hit = it.next().getValue();
+	        	final Hit<V> hit = it.next().getValue();
 	        	
 		        if (log.isInfoEnabled()) {
 		        	log.info("hit terms: " + hit.getTermCount());
@@ -1484,13 +1518,13 @@ public class FullTextIndex extends AbstractRelation {
         if (log.isInfoEnabled())
             log.info("Rank ordering "+nhits+" hits by relevance");
         
-        Hit[] a = hits.values().toArray(new Hit[nhits]);
+        Hit<V>[] a = hits.values().toArray(new Hit[nhits]);
         
         Arrays.sort(a);
         
         if (log.isDebugEnabled()) {
         	log.debug("before min/max cosine/rank pruning:");
-        	for (Hit h : a)
+        	for (Hit<V> h : a)
         		log.debug(h);
         }
 
@@ -1501,7 +1535,7 @@ public class FullTextIndex extends AbstractRelation {
 
         	// find the first occurrence of a hit that is <= maxCosine
         	int i = 0;
-        	for (Hit h : a) {
+        	for (Hit<V> h : a) {
         		if (h.getCosine() <= maxCosine)
         			break;
         		i++;
@@ -1515,7 +1549,7 @@ public class FullTextIndex extends AbstractRelation {
         	} else {
         	
 	        	// copy the hits from that first occurrence to the end
-	        	final Hit[] tmp = new Hit[a.length - i];
+	        	final Hit<V>[] tmp = new Hit[a.length - i];
 	        	System.arraycopy(a, i, tmp, 0, tmp.length);
 	        	
 	        	a = tmp;
@@ -1531,7 +1565,7 @@ public class FullTextIndex extends AbstractRelation {
 
         	// find the first occurrence of a hit that is < minCosine
         	int i = 0;
-        	for (Hit h : a) {
+        	for (Hit<V> h : a) {
         		if (h.getCosine() < minCosine)
         			break;
         		i++;
@@ -1545,7 +1579,7 @@ public class FullTextIndex extends AbstractRelation {
         	} else if (i < a.length) {
         	
 	        	// copy the hits from 0 up to that first occurrence
-	        	final Hit[] tmp = new Hit[i];
+	        	final Hit<V>[] tmp = new Hit[i];
 	        	System.arraycopy(a, 0, tmp, 0, tmp.length);
 	        	
 	        	a = tmp;
@@ -1567,7 +1601,7 @@ public class FullTextIndex extends AbstractRelation {
         	} else {
         	
 	        	// copy the hits from the minRank to the end
-	        	final Hit[] tmp = new Hit[a.length - (minRank-1)];
+	        	final Hit<V>[] tmp = new Hit[a.length - (minRank-1)];
 	        	System.arraycopy(a, minRank-1, tmp, 0, tmp.length);
 	        	
 	        	a = tmp;
@@ -1587,7 +1621,7 @@ public class FullTextIndex extends AbstractRelation {
         if (newMax < a.length) {
 
         	// copy the hits from the minRank to the end
-        	final Hit[] tmp = new Hit[newMax];
+        	final Hit<V>[] tmp = new Hit[newMax];
         	System.arraycopy(a, 0, tmp, 0, tmp.length);
         	
         	a = tmp;
