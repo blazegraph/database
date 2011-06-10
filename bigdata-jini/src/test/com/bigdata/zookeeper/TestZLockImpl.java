@@ -160,7 +160,8 @@ public class TestZLockImpl extends AbstractZooTestCase {
 
             final int n = zookeeper.getChildren(zpath, false).size();
 
-            log.info("nchildren=" + n);
+            if(log.isInfoEnabled())
+                log.info("nchildren=" + n);
 
             if (n == 2)
                 break;
@@ -224,13 +225,13 @@ public class TestZLockImpl extends AbstractZooTestCase {
 
         final Thread mainThread = Thread.currentThread();
 
-        // a node that is guarenteed to be unique w/in the test namespace.
+        // a node that is guaranteed to be unique w/in the test namespace.
         final String zpath = "/test/" + getName() + UUID.randomUUID();
 
         try {
             /*
              * verify no such node (should be unique and therefore not
-             * preexist).
+             * pre-exist).
              */
             zookeeper.getChildren(zpath, false);
             fail("zpath exists: " + zpath);
@@ -303,11 +304,18 @@ public class TestZLockImpl extends AbstractZooTestCase {
 
         // break the lock.
         {
+
             final String z = zpath + "/"
                     + ((ZLockImpl) lock1).getLockRequestZNode();
-            log.info("breaking lock: deleting " + z);
+         
+            if (log.isInfoEnabled())
+                log.info("breaking lock: deleting " + z);
+            
             zookeeper.delete(z, -1/* version */);
-            log.info("broke lock: deleted " + z);
+            
+            if (log.isInfoEnabled())
+                log.info("broke lock: deleted " + z);
+            
         }
 
         assertTrue(!lock1.isLockHeld());
@@ -375,7 +383,7 @@ public class TestZLockImpl extends AbstractZooTestCase {
     public void test_sessionExpiredBeforeLockRequest() throws IOException,
             KeeperException, InterruptedException {
 
-        // a node that is guarenteed to be unique w/in the test namespace.
+        // a node that is guaranteed to be unique w/in the test namespace.
         final String zpath = "/test/" + getName() + UUID.randomUUID();
 
         expireSession(zookeeper);
@@ -426,7 +434,7 @@ public class TestZLockImpl extends AbstractZooTestCase {
     public void test_sessionExpiredWhileHoldingLock() throws IOException,
             KeeperException, InterruptedException {
 
-        // a node that is guarenteed to be unique w/in the test namespace.
+        // a node that is guaranteed to be unique w/in the test namespace.
         final String zpath = "/test/" + getName() + UUID.randomUUID();
 
         // obtain a lock object.
@@ -475,7 +483,7 @@ public class TestZLockImpl extends AbstractZooTestCase {
     public void test_destroyLock() throws KeeperException,
             InterruptedException, ExecutionException {
 
-        // a node that is guarenteed to be unique w/in the test namespace.
+        // a node that is guaranteed to be unique w/in the test namespace.
         final String zpath = "/test/" + getName() + UUID.randomUUID();
 
         final int ntasks = 4;

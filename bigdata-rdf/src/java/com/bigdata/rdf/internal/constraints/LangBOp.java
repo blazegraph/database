@@ -113,6 +113,10 @@ public class LangBOp extends IVValueExpression<IV>
         if (val == null)
         	throw new NotMaterializedException();
         
+        if (log.isDebugEnabled()) {
+        	log.debug(val);
+        }
+
         if (val instanceof BigdataLiteral) {
         	
         	final BigdataLiteral literal = (BigdataLiteral) val;

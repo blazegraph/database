@@ -60,6 +60,11 @@ public class LangMatchesBOp extends XSDBooleanIVValueExpression
         
         this(new BOp[] { tag, range }, null/*annocations*/);
         
+        if (log.isDebugEnabled()) {
+        	log.info(tag);
+        	log.info(range);
+        }
+        
     }
     
     /**
@@ -96,8 +101,13 @@ public class LangMatchesBOp extends XSDBooleanIVValueExpression
         	throw new SparqlTypeErrorException();
 
         final BigdataValue tagVal = tag.getValue();
-        final BigdataValue rangeVal = tag.getValue();
+        final BigdataValue rangeVal = range.getValue();
         
+        if (log.isDebugEnabled()) {
+        	log.debug(tagVal);
+        	log.debug(rangeVal);
+        }
+
         // not yet materialized
         if (tagVal == null || rangeVal == null)
         	throw new NotMaterializedException();

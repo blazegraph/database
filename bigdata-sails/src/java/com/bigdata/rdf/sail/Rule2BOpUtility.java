@@ -598,7 +598,7 @@ public class Rule2BOpUtility {
 				constraints[i] = rule.getConstraint(i);
 			}
 
-			final int nknownBound = knownBound.size();
+			final int nknownBound = knownBound != null ? knownBound.size() : 0;
 			
 			// figure out which constraints are attached to which
 			// predicates.
@@ -629,8 +629,8 @@ public class Rule2BOpUtility {
         
         if (log.isInfoEnabled()) {
             // just for now while i'm debugging
-            log.info("rule=" + rule + ":::query=\n"
-                    + BOpUtility.toString(left));
+            log.info("rule: " + rule);
+            log.info("query:\n" + BOpUtility.toString(left));
         }
         
         return left;

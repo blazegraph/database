@@ -122,6 +122,8 @@ public class TestBigdataSailEmbeddedFederationWithQuads extends AbstractBigdataS
         
 		suite.addTestSuite(com.bigdata.rdf.sail.DavidsTestBOps.class);
 
+        suite.addTestSuite(com.bigdata.rdf.sail.TestLexJoinOps.class);
+        
         // The Sesame TCK, including the SPARQL test suite.
         {
 
