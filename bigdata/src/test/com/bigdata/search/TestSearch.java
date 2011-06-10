@@ -59,10 +59,6 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
         super(name);
     }
 
-    final String NAMESPACE = "test";
-
-    FullTextIndex ndx;
-
     /**
      * Note: the examples have been modified to only expose the terms that were
      * accepted by the indexer used in the book. Since the authors were using
@@ -102,10 +98,12 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
         
     }
 
-    /** all documents are in English. */
-    final String languageCode = "EN";
-
     public void test_ChildProofing() throws InterruptedException {
+
+        /** all documents are in English. */
+        final String languageCode = "EN";
+
+        final String NAMESPACE = "test";
 
         final Properties properties = getProperties();
         
@@ -114,6 +112,7 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
         try {
 
             // setup and populate the index.
+            FullTextIndex ndx;
             {
                 
                 ndx = new FullTextIndex(indexManager, NAMESPACE,
@@ -129,8 +128,8 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
                 final TokenBuffer buffer = new TokenBuffer(docs.length, ndx);
                 for (String s : docs) {
 
-                    ndx.index(buffer, docId++, fieldId, languageCode,
-                            new StringReader(s));
+                    ndx.index(buffer, Long.valueOf(docId++), fieldId,
+                            languageCode, new StringReader(s));
 
                 }
 
@@ -141,15 +140,17 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
             // run query and verify results.
             {
 
-                String query = "child proofing";
+                final String query = "child proofing";
 
-                Hiterator itr = ndx.search(query, languageCode,
-                        0d/* minCosine */, Integer.MAX_VALUE/* maxRank */);
+                final Hiterator<IHit<Long>> itr = ndx
+                        .search(query, languageCode, 0d/* minCosine */,
+                                Integer.MAX_VALUE/* maxRank */);
 
-                assertSameHits(new IHit[] { new HT(5L, .5),//
-                        new HT(6L, .5),//
-                        new HT(2L, .408248290463863d),//
-                        new HT(3L, .408248290463863d),//
+                assertSameHits(new IHit[] { //
+                        new HT<Long>(5L, .5),//
+                        new HT<Long>(6L, .5),//
+                        new HT<Long>(2L, .408248290463863d),//
+                        new HT<Long>(3L, .408248290463863d),//
                 }, itr);
             }
 
@@ -172,64 +173,73 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
      * @param itr
      *            The iterator visiting the actual hits.
      */
-    protected void assertSameHits(IHit[] hits,Iterator<? extends IHit> itr) {
-        
+    protected void assertSameHits(final IHit[] hits,
+            final Iterator<? extends IHit> itr) {
+
         final int nhits = hits.length;
-        
-        for(int i=0; i<nhits; i++) {
-            
-            assertTrue("Iterator exhausted after "+(i)+" hits out of "+nhits, itr.hasNext()); 
-            
+
+        for (int i = 0; i < nhits; i++) {
+
+            assertTrue("Iterator exhausted after " + (i) + " hits out of "
+                    + nhits, itr.hasNext());
+
             final IHit expected = hits[i];
-            
+
             final IHit actual = itr.next();
-            
-            log.info("rank="+(i+1)+", expected="+expected+", actual: "+actual);
-            
+
+            log.info("rank=" + (i + 1) + ", expected=" + expected
+                    + ", actual: " + actual);
+
             // first check the document.
-            assertEquals("wrong document: rank="+(i+1),expected.getDocId(),actual.getDocId());
+            assertEquals("wrong document: rank=" + (i + 1),
+                    expected.getDocId(), actual.getDocId());
 
             // then verify the cosine.
-            assertEquals("wrong cosine: rank="+(i+1),expected.getCosine(),actual.getCosine());
-            
+            assertEquals("wrong cosine: rank=" + (i + 1), expected.getCosine(),
+                    actual.getCosine());
+
         }
-        
+
         assertFalse("Iterator will visit too many hits - only " + nhits
                 + " are expected", itr.hasNext());
-        
+
     }
-    
-    protected static class HT implements IHit {
 
-        final private long docId;
+    private static class HT<V extends Comparable<V>> implements IHit<V> {
+
+        final private V docId;
+
         final private double cosine;
-        
-        public HT(long docId,double cosine) {
-            
+
+        public HT(final V docId, final double cosine) {
+
+            if (docId == null)
+                throw new IllegalArgumentException();
+
             this.docId = docId;
-            
+
             this.cosine = cosine;
-            
-        }
-        
-        public double getCosine() {
-            
-            return cosine;
-            
+
         }
 
-        public long getDocId() {
+        public double getCosine() {
+
+            return cosine;
+
+        }
+
+        public V getDocId() {
 
             return docId;
-            
+
         }
-        
+
         public String toString() {
-            
-            return "{docId="+docId+",cosine="+cosine+"}";
-            
+
+            return "{docId=" + docId + ",cosine=" + cosine + "}";
+
         }
-        
+
     }
-    
+
 }

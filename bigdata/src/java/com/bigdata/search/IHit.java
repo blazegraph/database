@@ -31,10 +31,13 @@ package com.bigdata.search;
 /**
  * Metadata about a search result.
  * 
+ * @param <V>
+ *            The generic type of the document identifier.
+ *            
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IHit {
+public interface IHit<V extends Comparable<V>> {
 
     /**
      * The computed relevance score.
@@ -42,8 +45,8 @@ public interface IHit {
     public double getCosine();
 
     /**
-     * The document associated with the search result.
+     * The document identifier associated with the search result.
      */
-    public long getDocId();
+    public V getDocId();
 
 }

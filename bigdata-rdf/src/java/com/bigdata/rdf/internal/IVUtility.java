@@ -640,8 +640,18 @@ public class IVUtility {
         return ivs.toArray(new IV[ivs.size()]);
         
     }
-    
-    private static IV decodeFromOffset(final byte[] key, final int offset) {
+
+    /**
+     * Decode one {@link IV}.
+     * 
+     * @param key
+     *            The unsigned byte[] key.
+     * @param offset
+     *            The offset.
+     *            
+     * @return The {@link IV} decoded from that offset.
+     */
+    public static IV decodeFromOffset(final byte[] key, final int offset) {
 
         int o = offset;
         

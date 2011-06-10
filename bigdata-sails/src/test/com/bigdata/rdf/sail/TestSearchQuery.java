@@ -27,13 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
-import info.aduna.iteration.Iteration;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -81,8 +79,6 @@ import org.openrdf.sail.SailException;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -820,7 +816,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
-                	final IV id = new TermId(VTE.LITERAL, hit.getDocId());
+                	final IV id = (IV)hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -887,7 +883,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
-                	final IV id = new TermId(VTE.LITERAL, hit.getDocId());
+                	final IV id = (IV)hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -957,7 +953,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
-                	final IV id = new TermId(VTE.LITERAL, hit.getDocId());
+                	final IV id = (IV) hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -1031,7 +1027,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
-                	final IV id = new TermId(VTE.LITERAL, hit.getDocId());
+                	final IV id = (IV) hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -1107,7 +1103,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
-                	final IV id = new TermId(VTE.LITERAL, hit.getDocId());
+                	final IV id = (IV) hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -1181,7 +1177,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
-                	final IV id = new TermId(VTE.LITERAL, hit.getDocId());
+                	final IV id = (IV) hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
@@ -1251,7 +1247,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
-                	final IV id = new TermId(VTE.LITERAL, hit.getDocId());
+                	final IV id = (IV) hit.getDocId();
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);
                     final BindingSet bs = createBindingSet(
@@ -1320,7 +1316,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
-                	final IV id = new TermId(VTE.LITERAL, hit.getDocId());
+                	final IV id = (IV) hit.getDocId();
                 	final Literal score = vf.createLiteral(hit.getCosine());
                 	final URI s = uris.get(id);
                 	final Literal o = literals.get(id);

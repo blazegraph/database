@@ -67,6 +67,7 @@ import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
@@ -109,6 +110,7 @@ import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.search.FullTextIndex;
+import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.CanonicalFactory;
@@ -131,9 +133,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     final private static Logger log = Logger.getLogger(LexiconRelation.class);
 
-    /** FIXME TERMS REFACTOR WHEN TRUE. */
-    final private static boolean TERMS = true;
-    
     private final Set<String> indexNames;
 
     private final List<IKeyOrder<BigdataValue>> keyOrders;
@@ -245,20 +244,27 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     AbstractTripleStore.Options.TEXT_INDEX,
                     AbstractTripleStore.Options.DEFAULT_TEXT_INDEX));
          
-            /*
-             * Explicitly disable overwrite for the full text index associated
-             * with the lexicon. By default, the full text index will replace
-             * the existing tuple for a key. We turn this property off because
-             * the RDF values are immutable as is the mapping from an RDF value
-             * to a term identifier. Hence if we observe the same key there is
-             * no need to update the index entry - it will only cause the
-             * journal size to grow but will not add any information to the
-             * index.
-             */
-            if (textIndex)
-                properties.setProperty(AbstractTripleStore.Options.OVERWRITE,
-                        "false");
-
+            if (textIndex) {
+                /*
+                 * Explicitly disable overwrite for the full text index associated
+                 * with the lexicon. By default, the full text index will replace
+                 * the existing tuple for a key. We turn this property off because
+                 * the RDF values are immutable as is the mapping from an RDF value
+                 * to a term identifier. Hence if we observe the same key there is
+                 * no need to update the index entry - it will only cause the
+                 * journal size to grow but will not add any information to the
+                 * index.
+                 */
+                properties
+                        .setProperty(FullTextIndex.Options.OVERWRITE, "false");
+                /*
+                 * Explicitly set the class which knows how to handle IVs in the
+                 * keys of the full text index.
+                 */
+                properties.setProperty(
+                        FullTextIndex.Options.DOCID_FACTORY_CLASS,
+                        IVDocIdExtension.class.getName());
+            }
         }
         
         this.storeBlankNodes = Boolean.parseBoolean(getProperty(
@@ -541,7 +547,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 
 			}
 
-            if (!TERMS && textIndex) {
+            if (textIndex) {
 
                 // create the full text index
 
@@ -587,7 +593,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             indexManager.dropIndex(getFQN(LexiconKeyOrder.TERMS));
             terms = null;
 
-            if (textIndex && !TERMS) {
+            if (textIndex) {
 
                 getSearchEngine().destroy();
 
@@ -803,9 +809,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      */
     public ITextIndexer<?> getSearchEngine() {
 
-        if(TERMS)
-            throw new UnsupportedOperationException();
-        
         if (!textIndex)
             return null;
 
@@ -832,8 +835,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                         if(tmp instanceof ILocatableResource<?>) {
                         	((ILocatableResource<?>)tmp).init();
                         }
-//                        new FullTextIndex(getIndexManager(),
-//                                getNamespace(), getTimestamp(), getProperties())
                         viewRef.set(tmp);
                     } catch (Throwable e) {
                         throw new IllegalArgumentException(
@@ -1218,7 +1219,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 	 *            into the database. Otherwise unknown terms are inserted into
 	 *            the database.
 	 */
-//    @SuppressWarnings("unchecked")
     private void _addTerms(final BigdataValue[] terms, final int numTerms,
             final boolean readOnly) {
 
@@ -1232,130 +1232,76 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
         final WriteTaskStats stats = new WriteTaskStats();
 
+        final KVO<BigdataValue>[] a;
         try {
             // write on the TERMS index (rync sharded RPC in scale-out)
-            new TermsWriteTask(getTermsIndex(), valueFactory, readOnly,
+            a = new TermsWriteTask(getTermsIndex(), valueFactory, readOnly,
                     storeBlankNodes, numTerms, terms, stats).call();
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
       
-//      FIXME TERMS REFACTOR : Write on the full text index (see code below).
+        /*
+         * Note: [a] is dense and its elements are distinct. It will be in TERMS
+         * index order.
+         */
+        final int ndistinct = a.length;
 
-//        final KVO<BigdataValue>[] a;
-//        try {
-//            // write on the forward index (sync RPC)
-//            a = new Term2IdWriteTask(this, readOnly, numTerms, terms, stats)
-//                    .call();
-//        } catch (Exception ex) {
-//            throw new RuntimeException(ex);
-//        }
-//        
-//        /*
-//         * Note: [a] is dense and its elements are distinct. it will be in sort
-//         * key order for the Values.
-//         */
-//        final int ndistinct = a.length;
-//
-//        if (ndistinct == 0) {
-//
-//            // Nothing left to do.
-//            return;
-//            
-//        }
-//        
-//        if(!readOnly) {
-//            
-//            {
-//    
-//                /*
-//                 * Sort terms based on their assigned termId (when interpreted
-//                 * as unsigned long integers).
-//                 * 
-//                 * Note: We sort before the index writes since we will co-thread
-//                 * the reverse index write and the full text index write.
-//                 * Sorting first let's us read from the same array.
-//                 */
-//    
-//                final long _begin = System.currentTimeMillis();
-//    
-//                Arrays.sort(a, 0, ndistinct, KVOTermIdComparator.INSTANCE);
-//                
-//                stats.sortTime += System.currentTimeMillis() - _begin;
-//    
-//            }
-//
-//            /*
-//             * Write on the reverse index and the full text index.
-//             */
-//            {
-//
-//                final long _begin = System.currentTimeMillis();
-//
-//                final List<Callable<Long>> tasks = new LinkedList<Callable<Long>>();
-//
-//                tasks.add(new ReverseIndexWriterTask(getId2TermIndex(),
-//                        valueFactory, a, ndistinct, storeBlankNodes));
-//
-//                if (textIndex) {
-//
-//                    /*
-//                     * Note: terms[] is in termId order at this point and can
-//                     * contain both duplicates and terms that already have term
-//                     * identifiers and therefore are already in the index.
-//                     * 
-//                     * Therefore, instead of terms[], we use an iterator that
-//                     * resolves the distinct terms in a[] (it is dense) to do
-//                     * the indexing.
-//                     */
-//
-//                    final Iterator<BigdataValue> itr = new Striterator(
-//                            new ChunkedArrayIterator(ndistinct, a, null/* keyOrder */))
-//                            .addFilter(new Resolver() {
-//
-//                        private static final long serialVersionUID = 1L;
-//
-//                        @Override
-//                        protected Object resolve(final Object obj) {
-//                        
-//                            return ((KVO<BigdataValue>) obj).obj;
-//                            
-//                        }
-//                        
-//                    });
-//
-//                    tasks.add(new FullTextIndexWriterTask(
-//                            ndistinct/* capacity */, itr));
-//
-//                }
-//
-//                /*
-//                 * Co-thread the reverse index writes and the search index
-//                 * writes.
-//                 */
-//                try {
-//
-//                    final List<Future<Long>> futures = getExecutorService()
-//                            .invokeAll(tasks);
-//
-//                    stats.reverseIndexTime = futures.get(0).get();
-//                    
-//                    if (textIndex)
-//                        stats.fullTextIndexTime = futures.get(1).get();
-//                    else 
-//                        stats.fullTextIndexTime = 0L;
-//
-//                } catch (Throwable t) {
-//
-//                    throw new RuntimeException(t);
-//
-//                }
-//
-//                stats.indexTime += System.currentTimeMillis() - _begin;
-//
-//            }
-//            
-//        }
+        if (ndistinct == 0) {
+
+            // Nothing left to do.
+            return;
+
+        }
+        
+        if (!readOnly && textIndex) {
+
+            /*
+             * Write on the full text index.
+             */
+            final long _begin = System.currentTimeMillis();
+
+            try {
+                /*
+                 * Note: a[] is in TERMS index order at this point and can
+                 * contain both duplicates and terms that already have term
+                 * identifiers and therefore are already in the index.
+                 * 
+                 * [TODO: Is it true that it can have duplicates? This is in
+                 * direct conflict with the comments above. Figure out what is
+                 * what and update as appropriate.]
+                 * 
+                 * Therefore, instead of a[], we use an iterator that resolves
+                 * the distinct terms in a[] (it is dense) to do the indexing.
+                 */
+                @SuppressWarnings("unchecked")
+                final Iterator<BigdataValue> itr = new Striterator(
+                        new ChunkedArrayIterator(ndistinct, a, null/* keyOrder */))
+                        .addFilter(new Resolver() {
+
+                            private static final long serialVersionUID = 1L;
+
+                            @Override
+                            protected Object resolve(final Object obj) {
+
+                                return ((KVO<BigdataValue>) obj).obj;
+
+                            }
+
+                        });
+
+                stats.fullTextIndexTime = new FullTextIndexWriterTask(
+                        ndistinct/* capacity */, itr).call();
+                
+            } catch (Exception e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+
+            stats.indexTime += System.currentTimeMillis() - _begin;
+
+        }
 
         final long elapsed = System.currentTimeMillis() - begin;
 
@@ -1368,11 +1314,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
         if (numTerms > 1000 || elapsed > 3000) {
 
-            if(log.isInfoEnabled())
-            log.info("Processed " + numTerms + " in " + elapsed
-                        + "ms; keygen=" + stats.keyGenTime + "ms, sort=" + stats.sortTime
-                        + "ms, insert=" + stats.indexTime + "ms" + " {forward="
-                        + stats.forwardIndexTime + ", reverse=" + stats.reverseIndexTime
+            if (log.isInfoEnabled())
+                log.info("Processed " + numTerms + " in " + elapsed
+                        + "ms; keygen=" + stats.keyGenTime + "ms, sort="
+                        + stats.sortTime + "ms, insert=" + stats.indexTime
+                        + "ms" + " {forward=" + stats.termsIndexTime
                         + ", fullText=" + stats.fullTextIndexTime + "}");
 
         }
@@ -1481,7 +1427,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     protected void indexTermText(final int capacity,
             final Iterator<BigdataValue> itr) {
 
-		final ITextIndexer ndx = getSearchEngine();
+		final ITextIndexer<?> ndx = getSearchEngine();
 		
 		if(ndx == null) {
 		    
@@ -1489,7 +1435,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 		    
 		}
 		
-		ndx.index(capacity, itr);
+        ndx.index(capacity, itr);
 
     }
 
@@ -1581,6 +1527,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *         internal value was not resolved then the map will not contain an
      *         entry for that internal value.
      */
+    @SuppressWarnings("unchecked")
     final public Map<IV, BigdataValue> getTerms(final Collection<IV> ivs) {
 
         if (ivs == null)
@@ -1821,6 +1768,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
          *            the operation may have been split across multiple shards,
          *            in which case the updates to the map can be concurrent.
          */
+        @SuppressWarnings("unchecked")
         ResolveTermTask(final IIndex ndx, final int fromIndex,
                 final int toIndex, final byte[][] keys, final TermId[] notFound,
                 ConcurrentHashMap<IV, BigdataValue> map) {
@@ -2091,11 +2039,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *       Or perhaps this can be rolled into the {@link ValueFactory} impl
      *       along with the reverse bnodes mapping?
      */
+    @SuppressWarnings("unchecked")
     final private ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue> termCache;
     
     /**
      * Factory used for {@link #termCache} for read-only views of the lexicon.
      */
+    @SuppressWarnings("unchecked")
     static private CanonicalFactory<NT/* key */, ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue>, Integer/* state */> termCacheFactory = new CanonicalFactory<NT, ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue>, Integer>(
             1/* queueCapacity */) {
         @Override
@@ -2150,7 +2100,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *             if iv is null, or if the iv is a {@link TermId} and it's 
      *             <i>id</i> is {@link TermId#NULL}
      */
-	private BigdataValue _getTermId(final TermId tid) {
+	@SuppressWarnings("unchecked")
+    private BigdataValue _getTermId(final TermId tid) {
 
         if (tid == null)
             throw new IllegalArgumentException();
@@ -2214,6 +2165,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * @return The {@link BigdataValue} -or- <code>null</code> iff there is no
      *         {@link BigdataValue} for that term identifier in the lexicon.
      */
+    @SuppressWarnings("unchecked")
     final public BigdataValue getTerm(final IV iv) {
     	
     	return getTerm(iv, true);
@@ -2231,6 +2183,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *            {@link IV} against the TERMS index iff none of the fast paths
      *            succeed.
      */
+    @SuppressWarnings("unchecked")
     final private BigdataValue getTerm(final IV iv, final boolean readFromIndex) {
 
         // if (false) { // alternative forces the standard code path.
@@ -2299,6 +2252,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * 
      * @deprecated Not even the unit tests should be doing this.
      */
+    @SuppressWarnings("unchecked")
     final public IV getIV(final Value value) {
 
         if (value == null)
@@ -2332,6 +2286,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *          the inline internal value, or <code>null</code> if it cannot
      *          be converted
      */
+    @SuppressWarnings("unchecked")
     final public IV getInlineIV(final Value value) {
         
         return getLexiconConfiguration().createInlineIV(value);
@@ -2347,6 +2302,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * @return
      *          the term identifier for the value
      */
+    @SuppressWarnings("unchecked")
     private TermId getTermId(final Value value) {
         
         final IKeyBuilder keyBuilder = h.newKeyBuilder();
@@ -2535,34 +2491,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * how to encode and decode terms in the key space.
      */
     public ILexiconConfiguration getLexiconConfiguration() {
-        
-//        if (lexiconConfiguration == null) {
-//            
-//            try {
-//                
-//                final Class<IExtensionFactory> xfc = 
-//                    determineExtensionFactoryClass();
-//                final IExtensionFactory xFactory = xfc.newInstance();
-//                
-//                /* 
-//                 * Allow the extensions to resolve their datatype URIs into
-//                 * term identifiers. 
-//                 */
-//                xFactory.resolveDatatypes(this);
-//                
-//                lexiconConfiguration = new LexiconConfiguration(
-//                        inlineLiterals, inlineBNodes, xFactory);
-//                
-//            } catch (InstantiationException e) {
-//                throw new IllegalArgumentException(
-//                        AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
-//            } catch (IllegalAccessException e) {
-//                throw new IllegalArgumentException(
-//                        AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
-//            }
-//            
-//        }
-        
+
         return lexiconConfiguration;
         
     }
@@ -2625,6 +2554,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * @see LexPredicate
      * @see LexiconKeyOrder
      */
+    @SuppressWarnings("unchecked")
     @Override
     public IAccessPath<BigdataValue> newAccessPath(
             final IIndexManager localIndexManager, 

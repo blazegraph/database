@@ -1,7 +1,7 @@
 package com.bigdata.search;
 
 import java.util.Arrays;
-import java.util.Iterator;
+import java.util.Map;
 
 import org.apache.log4j.Logger;
 
@@ -16,33 +16,23 @@ import com.bigdata.io.ByteArrayBuffer;
  * extracted from a field of some document. When the buffer overflows it is
  * {@link #flush()}, writing on the indices.
  * 
+ * @param <V> The generic type of the document identifier.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TokenBuffer {
+public class TokenBuffer<V extends Comparable<V>> {
 
-    final protected static Logger log = Logger.getLogger(TokenBuffer.class);
-
-//    /**
-//     * True iff the {@link #log} level is INFO or less.
-//     */
-//    final protected static  boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-//            .toInt();
-//
-//    /**
-//     * True iff the {@link #log} level is DEBUG or less.
-//     */
-//    final protected static  boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-//            .toInt();
+    final private static Logger log = Logger.getLogger(TokenBuffer.class);
 
     /** The object on which the buffer will write when it overflows. */
-    private FullTextIndex textIndexer;
+    private FullTextIndex<V> textIndexer;
     
     /** The capacity of the {@link #buffer}. */
     private final int capacity;
     
     /** Each entry models a field of some document. */
-    private final TermFrequencyData[] buffer;
+    private final TermFrequencyData<V>[] buffer;
     
     /** #of entries in the {@link #buffer}. */
     private int count = 0;
@@ -56,8 +46,8 @@ public class TokenBuffer {
     /** #of distinct {docId,fieldId,termText} tuples.*/
     private int nterms;
     
-    /** The last observed docId and -1L if none observed. */
-    private long lastDocId;
+    /** The last observed docId and <code>null</code> if none observed. */
+    private V lastDocId;
 
     /** The last observed fieldId and -1 if none observed. */
     private long lastFieldId;
@@ -73,7 +63,7 @@ public class TokenBuffer {
      *            The object on which the buffer will write when it overflows or
      *            is {@link #flush()}ed.
      */
-    public TokenBuffer(int capacity, FullTextIndex textIndexer) {
+    public TokenBuffer(final int capacity, final FullTextIndex<V> textIndexer) {
         
         if (capacity <= 0)
             throw new IllegalArgumentException();
@@ -110,7 +100,7 @@ public class TokenBuffer {
         
         nterms = 0;
 
-        lastDocId = -1L;
+        lastDocId = null;
         
         lastFieldId = -1;
         
@@ -135,7 +125,7 @@ public class TokenBuffer {
      * 
      * @throws IndexOutOfBoundsException
      */
-    public TermFrequencyData get(final int index) {
+    public TermFrequencyData<V> get(final int index) {
         
         if (index < 0 || index >= count)
             throw new IndexOutOfBoundsException(); 
@@ -164,7 +154,7 @@ public class TokenBuffer {
      * @param token
      *            The token.
      */
-    public void add(final long docId, final int fieldId, final String token) {
+    public void add(final V docId, final int fieldId, final String token) {
 
         if (log.isDebugEnabled()) {
 
@@ -230,7 +220,7 @@ public class TokenBuffer {
 
         if(newField) {
 
-            buffer[count++] = new TermFrequencyData(docId, fieldId, token);
+            buffer[count++] = new TermFrequencyData<V>(docId, fieldId, token);
             
             nterms++;
             
@@ -283,7 +273,8 @@ public class TokenBuffer {
         /*
          * Generate keys[] and vals[].
          */
-
+        final IRecordBuilder<V> recordBuilder = textIndexer.getRecordBuilder();
+        
         // array of correlated key/value tuples.
         final KV[] a = new KV[nterms];
 
@@ -299,24 +290,21 @@ public class TokenBuffer {
         // for each {doc,field} tuple.
         for (int i = 0; i < count; i++) {
 
-            final TermFrequencyData termFreq = buffer[i];
+            final TermFrequencyData<V> termFreq = buffer[i];
             
-            final long docId = termFreq.docId;
+            final V docId = termFreq.docId;
 
             final int fieldId = termFreq.fieldId;
             
-            // process in an arbitrary order.
-            final Iterator<TermMetadata> itr = termFreq.terms.values().iterator();
-
             // emit {term,doc,field} tuples.
-            while(itr.hasNext()) {
-            
-                final TermMetadata termMetadata = itr.next();
+            for(Map.Entry<String, ITermMetadata> e : termFreq.terms.entrySet()) {
 
-                final String termText = termMetadata.termText();
+                final String termText = e.getKey();
                 
-                final byte[] key = FullTextIndex.getTokenKey(keyBuilder, termText,
-                        false/* successor */, textIndexer.isFieldsEnabled(), docId, fieldId);
+                final ITermMetadata termMetadata = e.getValue();
+
+                final byte[] key = recordBuilder.getKey(keyBuilder, termText,
+                        false/* successor */, docId, fieldId);
                 
                 if(log.isDebugEnabled()) {
                     log.debug("{" + termText + "," + docId + "," + fieldId
@@ -324,7 +312,7 @@ public class TokenBuffer {
                             + termMetadata.termFreq());
                 }
                 
-                final byte[] val = textIndexer.getTokenValue(buf, termMetadata);
+                final byte[] val = recordBuilder.getValue(buf, termMetadata);
 
                 // save in the correlated array.
                 a[n++] = new KV(key, val);

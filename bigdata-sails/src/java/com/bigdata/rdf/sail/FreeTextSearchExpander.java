@@ -14,8 +14,6 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSDDoubleIV;
 import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.model.BigdataValue;
@@ -316,7 +314,7 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
             }
             final ISPO[] spos = new ISPO[hits.length];
             for (int i = 0; i < hits.length; i++) {
-                final IV s = new TermId(VTE.LITERAL, hits[i].getDocId());
+                final IV s = (IV) hits[i].getDocId();
                 final IV p = new XSDDoubleIV(hits[i].getCosine());
                 final IV o = null; // reserved
                 final IV c = null; // reserved
@@ -331,7 +329,7 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
         private ISPO[] convertWhenBound(final IHit[] hits) {
             ISPO[] result = EMPTY;
             for (IHit hit : hits) {
-                final IV s = new TermId(VTE.LITERAL, hit.getDocId());
+                final IV s = (IV)hit.getDocId();
                 if (s == boundVal) {
                     final IV p = new XSDDoubleIV(hit.getCosine());
                     final IV o = null; // reserved
