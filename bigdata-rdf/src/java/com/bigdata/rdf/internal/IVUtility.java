@@ -32,8 +32,9 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
@@ -621,7 +622,7 @@ public class IVUtility {
      */
     public static IV[] decodeAll(final byte[] key) {
 
-        final ArrayList<IV> ivs = new ArrayList<IV>();
+        final List<IV> ivs = new LinkedList<IV>();
         
         int offset = 0;
         
@@ -692,7 +693,12 @@ public class IVUtility {
                         o + TermsIndexHelper.TERMS_INDEX_KEY_SIZE //+ 1//
                         );
 
-				return new TermId(termIdKey);
+                final TermId<?> iv = new TermId(termIdKey);
+
+                if (iv.isNullIV())
+                    return null;
+
+                return iv;
 				
 //				// decode the term identifier.
 //                final long termId = KeyBuilder.decodeLong(key, o);

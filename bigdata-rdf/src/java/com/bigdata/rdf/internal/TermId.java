@@ -81,25 +81,23 @@ public class TermId<V extends BigdataValue> extends
 //    /** The term identifier. */
 //    private final long termId;
 
-	/**
-	 * {@inheritDoc}
-	 * <p>
-	 * This checks the hashCode and the counter, both of which must decode to
-	 * ZERO (0). The {@link VTE} may be any of the possible {@link VTE}s. "null"
-	 * versions of different kinds of {@link VTE}s are created by
-	 * {@link #mockIV(VTE)}.
-	 * 
-	 * @see LangBOp
-	 * @see DatatypeBOp
-	 * @see FuncBOp
-	 * @see BigdataEvaluationStrategyImpl3
-	 * 
-	 * TODO Consider caching the result of this computation, or perhaps doing it in the ctor.
-	 */
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This checks the hashCode and the counter, both of which must decode to
+     * ZERO (0). The {@link VTE} may be any of the possible {@link VTE}s. "null"
+     * versions of different kinds of {@link VTE}s are created by
+     * {@link #mockIV(VTE)}.
+     * 
+     * @see LangBOp
+     * @see DatatypeBOp
+     * @see FuncBOp
+     * @see BigdataEvaluationStrategyImpl3
+     */
     @Override
 	final public boolean isNullIV() {
 
-		return counter() == 0 && hashCode() == 0;
+        return mockIV || (counter() == 0 && hashCode() == 0);
 //		for (int i = 1; i < data.length; i++) {
 //
 //			if (data[i] != 0)
@@ -132,7 +130,7 @@ public class TermId<V extends BigdataValue> extends
 	/**
 	 * Singleton for a "null" {@link IV}.
 	 */
-	final public static transient TermId<?> NullIV = new TermId(null_key);
+	final public static transient TermId<?> NullIV = TermId.mockIV(VTE.URI);
 
 	/**
 	 * Create a mock {@link IV} having the indicated {@link VTE} which will
@@ -160,7 +158,7 @@ public class TermId<V extends BigdataValue> extends
 		final byte[] key = h
 				.makeKey(keyBuilder, vte, 0/* hashCode */, 0/* counter */);
     	
-		final TermId mockIV = new TermId(key);
+        final TermId mockIV = new TermId(key, true/* mockIV */);
 		
     	// return the mock IV.
 		return mockIV;
@@ -176,6 +174,11 @@ public class TermId<V extends BigdataValue> extends
 	 */
 	private final byte[] data;
 
+	/**
+	 * Set for a known mock IV to provide a fast path for {@link #isNullIV()}.
+	 */
+	private final boolean mockIV;
+	
 //    /**
 //     * Constructor for a term identifier when you are decoding and already have
 //     * the flags.
@@ -214,12 +217,36 @@ public class TermId<V extends BigdataValue> extends
         throw new UnsupportedOperationException();
         
     }
-    
+
+    /**
+     * Constructor used for {@link TermId}s which are NOT "MockIVs".
+     * 
+     * @param data
+     *            The key for the TERMS index.
+     */
     public TermId(final byte[] data) {
+        
+        // Not a known MockIV.
+        this(data, false/* mockIV */);
+        
+    }
+
+    /**
+     * Core impl.
+     * 
+     * @param data
+     *            The key for the TERMS index.
+     * @param mockIV
+     *            <code>true</code> iff this is known to be a MockIV (aka a
+     *            NullIV).
+     */
+    private TermId(final byte[] data, final boolean mockIV) {
 
 		super(data[0]/* flags */);
     	
 		this.data = data;
+		
+		this.mockIV = mockIV;
 		
         assert TermsIndexHelper.TERMS_INDEX_KEY_SIZE == data.length : "Expecting "
                 + TermsIndexHelper.TERMS_INDEX_KEY_SIZE
