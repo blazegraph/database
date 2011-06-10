@@ -88,6 +88,14 @@ public class DirectBufferPool {
          * the {@link BufferState} object.
          */
         private Throwable releaseStack;
+
+        /**
+         * This is set to <code>true</code> iff the buffer is released by 
+         * {@link #finalize()}.  In this case, we do not treat an invocation
+         * of {@link #release(long, TimeUnit)} <i>after</i> the finalizer has
+         * run as a double-release. (Yes, this situation can arise...).
+         */
+        private boolean releasedByFinalizer = false;
         
         BufferState(final ByteBuffer buf) {
 
@@ -156,6 +164,12 @@ public class DirectBufferPool {
 
             synchronized (this) {
                 if (buf == null) {
+                    if(releasedByFinalizer) {
+                        /*
+                         * This situation can arise.  Just return quietly.
+                         */
+                        return;
+                    }
                     if (DEBUG) {
                         log.error("Double release: AllocationTrace",
                                 allocationStack);
@@ -221,8 +235,12 @@ public class DirectBufferPool {
                 buf = this.buf;
                 this.buf = null;
                 nacquired = DirectBufferPool.this.acquired;
-                if (buf != null && releaseStack == null) {
-                    releaseStack = new RuntimeException("ReleasedInFinalizer");
+                if (buf != null) {
+                    releasedByFinalizer = true;
+                    if (releaseStack == null) {
+                        releaseStack = new RuntimeException(
+                                "ReleasedInFinalizer");
+                    }
                 }
             }
             if (buf == null)

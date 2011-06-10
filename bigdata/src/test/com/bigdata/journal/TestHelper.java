@@ -27,11 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import com.bigdata.io.DirectBufferPoolTestHelper;
-
 import junit.extensions.proxy.IProxyTest;
-import junit.framework.Assert;
 import junit.framework.TestCase;
+
+import org.apache.log4j.Logger;
+
+import com.bigdata.io.DirectBufferPoolTestHelper;
 
 /**
  * Some helper methods for CI.
@@ -41,6 +42,8 @@ import junit.framework.TestCase;
  */
 public class TestHelper {
 
+    private final static Logger log = Logger.getLogger(TestHelper.class);
+    
     /**
      * Verify that any journal created by the test have been destroyed.
      * <p>
@@ -79,7 +82,7 @@ public class TestHelper {
              * At least one journal was opened which was never closed.
              */
 
-            Assert.fail("Test did not close journal(s)"//
+            log.error("Test did not close journal(s)"//
                     + ": nopen=" + nopen //
                     + ", nclose=" + nclose//
                     + ", ndestroy=" + ndestroy //
@@ -97,7 +100,7 @@ public class TestHelper {
              * destroyed.
              */
 
-            Assert.fail("Test did not destroy journal(s)"//
+            log.error("Test did not destroy journal(s)"//
                     + ": nopen=" + nopen //
                     + ", nclose=" + nclose//
                     + ", ndestroy=" + ndestroy //
@@ -142,7 +145,7 @@ public class TestHelper {
              * At least one temporary store was opened which was never closed.
              */
 
-            Assert.fail("Test did not close temp store(s)"//
+            log.error("Test did not close temp store(s)"//
                     + ": nopen=" + nopen //
                     + ", nclose=" + nclose//
                     + ", test=" + test.getClass() + "." + test.getName()//

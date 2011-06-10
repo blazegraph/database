@@ -27,11 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
+import info.aduna.iteration.Iteration;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -301,7 +303,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
 				// Note: Whether or not this solution is present depends on the
 				// default value for minCosine.
-//                expected.add(new LiteralImpl("Yellow Rose"));
+                expected.add(new LiteralImpl("Yellow Rose"));
 
                 expected.add(new LiteralImpl("Old Yellow House"));
 
@@ -1369,6 +1371,175 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
         } finally {
             sail.__tearDownUnitTest();
         }
+        
+    }
+    
+    private final void doQuery() throws Exception {
+        
+        final BigdataSail sail = getSail();
+        
+        try {
+            
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        final BigdataSailRepositoryConnection cxn = 
+            (BigdataSailRepositoryConnection) repo.getConnection();
+        
+        try {
+            
+            cxn.setAutoCommit(false);
+
+            final String freeTextSearch = "how now brown cow";
+            
+            final String snippetVar = "target";
+            
+            final String queryTemplate = 
+                "prefix bd: <"+BD.NAMESPACE+"> " +
+                "prefix bds: <"+BD.SEARCH_NAMESPACE+"> " +
+                "prefix rdf: <"+RDF.NAMESPACE+"> " +
+                "prefix rdfs: <"+RDFS.NAMESPACE+"> " +
+                "select ?target ?o ?type ?score " + 
+                "where " +
+                "{ " +
+                "    ?o bds:search \""+freeTextSearch+"\" . " +
+                "    ?o bds:minRelevance \"0.0\" . " +
+                "    ?o bds:relevance ?score . " +
+                "    ?o bds:minRank \"MINRANK\" . " +
+                "    ?o bds:maxRank \"MAXRANK\" . " +
+                "    ?target ?p ?o . " +
+                "    ?target rdf:type ?type . " +
+                "}";
+            
+            final ITextIndexer search = 
+                sail.getDatabase().getLexiconRelation().getSearchEngine();
+            
+            final int count = search.count(
+                        freeTextSearch, 
+                        null, // languageCode
+                        true, // prefixMatch
+                        0.0d, // minCosine
+                        1.0d, // maxCosine
+                        0, // minRank
+                        Integer.MAX_VALUE, // maxRank
+                        false, // matchAllTerms
+                        BD.DEFAULT_TIMEOUT, // timeout 
+                        TimeUnit.MILLISECONDS // unit
+                        );
+
+            final Collection<BindingSet> results = new LinkedList<BindingSet>();
+            if (count < 1000) {
+                
+                // just go ahead and process the full query
+                
+                final TupleQuery tupleQuery = cxn.prepareTupleQuery(
+                        QueryLanguage.SPARQL, 
+                        queryTemplate
+                            .replace("MINRANK", "0")
+                            .replace("MAXRANK", String.valueOf(Integer.MAX_VALUE)));
+                
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                
+                final TupleQueryResult tqr = tupleQuery.evaluate();
+                
+                while (tqr.hasNext()) {
+                    results.add(tqr.next());
+                }
+                
+            } else {
+                
+                final int numSnippets = 10;
+                
+                results.addAll(processRankChunks(
+                        cxn, queryTemplate, count, numSnippets));
+                
+            }
+            
+            // do something with the results 
+            for (BindingSet bs : results) {
+                System.err.println(bs);
+            }
+
+        } finally {
+            cxn.close();
+        }
+        } finally {
+            sail.__tearDownUnitTest();
+        }
+        
+    }
+    
+    /**
+     * Process a query in min/max rank chunks, with a goal of reaching the
+     * number of snippets specified by numSnippets.
+     *  
+     * @param cxn
+     *             The sail connection.
+     * @param queryTemplate
+     *             The query template.  Uses "target" as the variable for snippets,
+     *             and the strings "MINRANK" and "MAXRANK" as the placeholders
+     *             for the rank chunk bounds.
+     * @param numFreeTextHits
+     *             The number of free text search hits this query produces if
+     *             run without min/max rank.
+     * @param numSnippets
+     *             The target number of snippets. Might produce less if all free
+     *             text search hits are processed.  Might produce more
+     *             if the rank chunk is big enough to produce excess snippets
+     *             (the entire rank chunk is always processed).
+     */
+    private Collection<BindingSet> processRankChunks(
+            final RepositoryConnection cxn, 
+            final String queryTemplate,
+            final int numFreeTextHits,
+            final int numSnippets) throws Exception {
+        
+        final Collection<BindingSet> result = new LinkedList<BindingSet>();
+        
+        // keep track of the # of snippets
+        final Set<IV> snippets = new LinkedHashSet<IV>();
+        
+        // the size of the rank chunks
+        final int chunkSize = 1000;
+        
+        int minRank = 1;
+        int maxRank = chunkSize;
+        
+        // keep doing chunks while we haven't reached our snippet goal and
+        // we haven't run out of free text search results.
+        while (snippets.size() < numSnippets && minRank < numFreeTextHits) {
+            
+            final TupleQuery tupleQuery = cxn.prepareTupleQuery(
+                    QueryLanguage.SPARQL, 
+                    queryTemplate
+                        .replace("MINRANK", String.valueOf(minRank))
+                        .replace("MAXRANK", String.valueOf(maxRank)));
+            
+            tupleQuery.setIncludeInferred(true /* includeInferred */);
+            
+            final TupleQueryResult chunk = tupleQuery.evaluate();
+            
+            while (chunk.hasNext()) {
+                
+                final BindingSet bs = chunk.next();
+                
+                final BigdataValue val = (BigdataValue) 
+                    bs.getBinding("target").getValue();
+                
+                final IV iv = val.getIV();
+                
+                // LinkedHashSet<IV> will guarantee uniqueness
+                snippets.add(iv);
+                
+                result.add(bs);
+                
+            }
+            
+            minRank = maxRank+1;
+            maxRank = maxRank+chunkSize;
+            
+        }
+        
+        return result;
         
     }
     
