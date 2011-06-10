@@ -191,12 +191,15 @@ public interface ISPO extends IElement {
 //    void setStatementIdentifier(final IV sid);
 
     /**
-     * Set the statement identifier. This sets the 4th position of the quad, but
-     * some constraints are imposed on its argument.
+     * Mark whether or not the {@link SPO} will permit the statement identifier
+     * to be lazily materialized (default <code>false</code>).
      * 
      * @param sid
      *            If sid is true, this ISPO will produce a sid on-demand when
      *            requested.
+     * 
+     * @throws IllegalStateException
+     *             unless this is a {@link StatementEnum#Explicit} {@link ISPO}.
      */
     void setStatementIdentifier(final boolean sidable);
     

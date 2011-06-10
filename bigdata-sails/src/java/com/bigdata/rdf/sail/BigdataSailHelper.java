@@ -428,13 +428,13 @@ public class BigdataSailHelper {
     }
 
     /**
-     * Shows some interesting details about the term2id index.
+     * Shows some interesting details about the terms index.
      * 
      * @param sail
      */
     public static void showLexiconIndexDetails(BigdataSail sail) {
         
-        IIndex ndx = sail.getDatabase().getLexiconRelation().getTerm2IdIndex();
+        IIndex ndx = sail.getDatabase().getLexiconRelation().getTermsIndex();
         IndexMetadata md = ndx.getIndexMetadata();
         
         System.out.println("Lexicon:");

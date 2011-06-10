@@ -89,8 +89,7 @@ public class XSDStringExtension<V extends BigdataValue> implements IExtension<V>
                 null // no datatype
         );
 
-        return new ExtensionIV<BigdataLiteral>(delegate, (TermId) getDatatype()
-                .getIV());
+        return new ExtensionIV<BigdataLiteral>(delegate, getDatatype().getIV());
 
     }
     

@@ -106,7 +106,7 @@ public class EDSAsyncLoader {
             final String pname = com.bigdata.config.Configuration
                     .getOverrideProperty(namespace + "."
                             + LexiconRelation.NAME_LEXICON_RELATION + "."
-                            + LexiconKeyOrder.TERM2ID,
+                            + LexiconKeyOrder.TERMS,
                             IndexMetadata.Options.SINK_IDLE_TIMEOUT_NANOS);
 
             final String pval = "" + TimeUnit.SECONDS.toNanos(1);

@@ -107,7 +107,7 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
 
         final AbstractLiteralIV delegate = new XSDLongIV(l);
 
-        return new ExtensionIV(delegate, (TermId) getDatatype().getIV());
+        return new ExtensionIV(delegate, getDatatype().getIV());
         
     }
     

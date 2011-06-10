@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.store;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,10 +49,7 @@ import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.helpers.RDFHandlerBase;
 
 import com.bigdata.LRUNexus;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
@@ -373,74 +369,74 @@ abstract public class AbstractTestCase
 //        assertEquals("#terms", store.getIdTermIndex().rangeCount(null, null),
 //                store.getTermIdIndex().rangeCount(null, null));
         
-        /**
-         * Dumps the forward mapping.
-         */
-        {
+//        /**
+//         * Dumps the forward mapping.
+//         */
+//        {
+//
+//            System.err.println("terms index (forward mapping).");
+//
+//            final IIndex ndx = store.getLexiconRelation().getTerm2IdIndex();
+//
+//            final ITupleIterator itr = ndx.rangeIterator(null, null);
+//
+//            while (itr.hasNext()) {
+//
+//                final ITuple tuple = itr.next();
+//                
+////                // the term identifier.
+////                Object val = itr.next();
+//
+//                /*
+//                 * The sort key for the term. This is not readily decodable. See
+//                 * RdfKeyBuilder for specifics.
+//                 */
+//                final byte[] key = tuple.getKey();
+//
+//                /*
+//                 * deserialize the term identifier (packed long integer).
+//                 */
+//                final long id;
+//                
+//                try {
+//
+//                    id = tuple.getValueStream().readLong();
+////                    id = tuple.getValueStream().unpackLong();
+//
+//                } catch (IOException ex) {
+//
+//                    throw new RuntimeException(ex);
+//
+//                }
+//
+//                System.err.println(BytesUtil.toString(key) + ":" + id);
+//
+//            }
+//
+//        }
 
-            System.err.println("terms index (forward mapping).");
-
-            final IIndex ndx = store.getLexiconRelation().getTerm2IdIndex();
-
-            final ITupleIterator itr = ndx.rangeIterator(null, null);
-
-            while (itr.hasNext()) {
-
-                final ITuple tuple = itr.next();
-                
-//                // the term identifier.
-//                Object val = itr.next();
-
-                /*
-                 * The sort key for the term. This is not readily decodable. See
-                 * RdfKeyBuilder for specifics.
-                 */
-                final byte[] key = tuple.getKey();
-
-                /*
-                 * deserialize the term identifier (packed long integer).
-                 */
-                final long id;
-                
-                try {
-
-                    id = tuple.getValueStream().readLong();
-//                    id = tuple.getValueStream().unpackLong();
-
-                } catch (IOException ex) {
-
-                    throw new RuntimeException(ex);
-
-                }
-
-                System.err.println(BytesUtil.toString(key) + ":" + id);
-
-            }
-
-        }
-
-        /**
-         * Dumps the reverse mapping.
-         */
-        {
-
-            System.err.println("ids index (reverse mapping).");
-
-            final IIndex ndx = store.getLexiconRelation().getId2TermIndex();
-
-            final ITupleIterator<BigdataValue> itr = ndx.rangeIterator(null, null);
-
-            while (itr.hasNext()) {
-
-                final ITuple<BigdataValue> tuple = itr.next();
-                
-                final BigdataValue term = tuple.getObject();
-                
-                System.err.println(term.getIV()+ ":" + term);
-
-            }
-
-        }
+//        /**
+//         * Dumps the reverse mapping.
+//         */
+//        {
+//
+//            System.err.println("ids index (reverse mapping).");
+//
+//            final IIndex ndx = store.getLexiconRelation().getId2TermIndex();
+//
+//            final ITupleIterator<BigdataValue> itr = ndx.rangeIterator(null, null);
+//
+//            while (itr.hasNext()) {
+//
+//                final ITuple<BigdataValue> tuple = itr.next();
+//                
+//                final BigdataValue term = tuple.getObject();
+//                
+//                System.err.println(term.getIV()+ ":" + term);
+//
+//            }
+//
+//        }
         
         /**
          * Dumps the term:id index.

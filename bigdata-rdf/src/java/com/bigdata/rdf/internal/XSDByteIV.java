@@ -149,9 +149,9 @@ public class XSDByteIV<V extends BigdataLiteral> extends
     }
 
     @Override
-    protected int _compareTo(IV o) {
-         
-        final byte value2 = ((XSDByteIV) o).value;
+    protected int _compareTo(final IV o) {
+        
+        final byte value2 = ((XSDByteIV<?>) o).value;
         
         return value == value2 ? 0 : value < value2 ? -1 : 1;
         

@@ -165,7 +165,7 @@ public class TestConfiguration extends TestCase {
 
         final String overrideName = Configuration.getOverrideProperty(namespace
                 + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
-                + LexiconKeyOrder.TERM2ID, propertyName);
+                + LexiconKeyOrder.TERMS, propertyName);
 
         System.err.println(overrideName);
 
@@ -179,28 +179,28 @@ public class TestConfiguration extends TestCase {
         final IIndexManager indexManager = null;
 
         /*
-         * Verify override used for U8000.lex.TERM2ID (this is the specific case
+         * Verify override used for U8000.lex.TERMS (this is the specific case
          * for the override).
          */
         assertEquals("false", Configuration.getProperty(indexManager, p,
                 namespace + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
-                        + LexiconKeyOrder.TERM2ID, propertyName, defaultValue));
+                        + LexiconKeyOrder.TERMS, propertyName, defaultValue));
 
         /*
-         * Verify override ignored for U8000.lex.ID2TERM (another index in the
+         * Verify override ignored for U8000.lex.FOO (another index in the
          * same relation).
          */
         assertEquals(defaultValue, Configuration.getProperty(indexManager, p,
                 namespace + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
-                        + LexiconKeyOrder.ID2TERM, propertyName, defaultValue));
+                        + "FOO", propertyName, defaultValue));
 
         /*
-         * Verify override ignored for U100.lex.TERM2ID (an index in a different
+         * Verify override ignored for U100.lex.TERMS (an index in a different
          * relation).
          */
         assertEquals(defaultValue, Configuration.getProperty(indexManager, p,
                 namespace2 + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
-                        + LexiconKeyOrder.TERM2ID, propertyName, defaultValue));
+                        + LexiconKeyOrder.TERMS, propertyName, defaultValue));
 
     }
 
@@ -215,7 +215,7 @@ public class TestConfiguration extends TestCase {
         // override of a specific index in a specific relation.
         final String overrideName = Configuration.getOverrideProperty(namespace
                 + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
-                + LexiconKeyOrder.TERM2ID, propertyName);
+                + LexiconKeyOrder.TERMS, propertyName);
 
         // override of all indices in a different relation.
         final String overrideName2 = Configuration.getOverrideProperty(
@@ -251,7 +251,7 @@ public class TestConfiguration extends TestCase {
          */
         assertEquals("2", Configuration.getProperty(indexManager, p,
                 namespace + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
-                        + LexiconKeyOrder.TERM2ID, propertyName, defaultValue));
+                        + LexiconKeyOrder.TERMS, propertyName, defaultValue));
 
         /*
          * Verify global override used for a different index in the same
@@ -259,14 +259,14 @@ public class TestConfiguration extends TestCase {
          */
         assertEquals(globalOverride, Configuration.getProperty(indexManager, p,
                 namespace + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
-                        + LexiconKeyOrder.ID2TERM, propertyName, defaultValue));
+                        + "FOO", propertyName, defaultValue));
 
         /*
          * Verify global override used for an index in another relation.
          */
         assertEquals(globalOverride, Configuration.getProperty(indexManager, p,
                 namespace1 + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
-                        + LexiconKeyOrder.TERM2ID, propertyName, defaultValue));
+                        + LexiconKeyOrder.TERMS, propertyName, defaultValue));
 
         /*
          * Verify other override used for all indices in the namespace2
@@ -274,10 +274,10 @@ public class TestConfiguration extends TestCase {
          */
         assertEquals(otherOverride, Configuration.getProperty(indexManager, p,
                 namespace2 + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
-                        + LexiconKeyOrder.TERM2ID, propertyName, defaultValue));
+                        + LexiconKeyOrder.TERMS, propertyName, defaultValue));
         assertEquals(otherOverride, Configuration.getProperty(indexManager, p,
                 namespace2 + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
-                        + LexiconKeyOrder.ID2TERM, propertyName, defaultValue));
+                        + "FOO", propertyName, defaultValue));
 
     }
 

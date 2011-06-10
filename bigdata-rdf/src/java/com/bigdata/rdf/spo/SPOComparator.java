@@ -32,8 +32,6 @@ import com.bigdata.rdf.model.StatementEnum;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo quads : Implement a quads aware SPOC comparator?  E.g., SPOCComparator?
  */
 public class SPOComparator<T extends ISPO> implements Comparator<T> {
 
@@ -48,10 +46,6 @@ public class SPOComparator<T extends ISPO> implements Comparator<T> {
         if (stmt1 == stmt2)
             return 0;
 
-        /*
-         * Note: logic avoids possible overflow of [long] by not computing the
-         * difference between two longs.
-         */
         int ret;
         
         ret = stmt1.s().compareTo(stmt2.s());

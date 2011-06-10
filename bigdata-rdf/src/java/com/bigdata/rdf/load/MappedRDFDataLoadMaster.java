@@ -1025,9 +1025,6 @@ V extends Serializable//
         
         final Properties p = tripleStore.getProperties();
 
-        log.info(Options.TERMID_BITS_TO_REVERSE + "="
-                + p.getProperty(Options.TERMID_BITS_TO_REVERSE));
-
         // log.info(Options.INCLUDE_INFERRED + "="
         // + p.getProperty(Options.INCLUDE_INFERRED));
         //                        

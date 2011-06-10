@@ -167,14 +167,6 @@ public class SPO implements ISPO {
         
     }
 
-    /**
-     * Set the statement identifier. This sets the 4th position of the quad, but
-     * some constraints are imposed on its argument.
-     * 
-     * @param sid
-     *            If sid is true, this ISPO will produce a sid on-demand when
-     *            requested.
-     */
     public final void setStatementIdentifier(final boolean sid) {
 
         if (sid && type() != StatementEnum.Explicit) {

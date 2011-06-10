@@ -118,9 +118,9 @@ public class XSDFloatIV<V extends BigdataLiteral> extends
     }
     
     public boolean equals(final Object o) {
-        if(this==o) return true;
-        if(o instanceof XSDFloatIV<?>) {
-//            return this.value == ((XSDFloatIV<?>) o).value;
+        if (this == o)
+            return true;
+        if (o instanceof XSDFloatIV<?>) {
             // Note: This handles NaN, etc.
             return Float.compare(this.value, ((XSDFloatIV<?>) o).value) == 0;
         }
@@ -143,12 +143,11 @@ public class XSDFloatIV<V extends BigdataLiteral> extends
     }
     
     @Override
-    protected int _compareTo(IV o) {
-         
-        final float value2 = ((XSDFloatIV) o).value;
-        
-        return value == value2 ? 0 : value < value2 ? -1 : 1;
-        
+    protected int _compareTo(final IV o) {
+
+        // Note: This handles NaN, etc.
+       return Float.compare(this.value, ((XSDFloatIV<?>) o).value);
+
     }
 
 

@@ -59,11 +59,11 @@ public class EpochExtension<V extends BigdataValue> implements IExtension<V> {
         return epoch;
         
     }
-    
+
     /**
      * Attempts to convert the supplied value into an epoch representation.
-     * Tests for a literal value with the correct datatype that can be converted 
-     * to a positive long integer.  Encodes the long in a delegate 
+     * Tests for a literal value with the correct datatype that can be converted
+     * to a positive long integer. Encodes the long in a delegate
      * {@link XSDLongIV}, and returns an {@link ExtensionIV} to wrap the native
      * type.
      */
@@ -83,13 +83,9 @@ public class EpochExtension<V extends BigdataValue> implements IExtension<V> {
         
         final long l = XMLDatatypeUtil.parseLong(s);
         
-        // can't have negative epoch values
-        if (l < 0)
-            return null;
-        
         final AbstractLiteralIV delegate = new XSDLongIV(l);
 
-        return new ExtensionIV(delegate, (TermId) getDatatype().getIV());
+        return new ExtensionIV(delegate, getDatatype().getIV());
         
     }
     

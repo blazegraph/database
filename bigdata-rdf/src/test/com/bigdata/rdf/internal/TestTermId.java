@@ -40,6 +40,9 @@ import com.bigdata.rdf.model.BigdataURI;
  * Unit tests for {@link TermId}.
  * 
  * @author thompsonbry
+ * 
+ *         TODO Test toString() and fromString() for NullIV's. What should those
+ *         methods do?
  */
 public class TestTermId extends TestCase2 {
 

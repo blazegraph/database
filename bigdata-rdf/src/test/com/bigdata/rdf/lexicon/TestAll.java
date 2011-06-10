@@ -61,6 +61,11 @@ public class TestAll extends TestCase {
          * Non-proxy tests.
          */
 
+        // TODO Unit tests for LexPredicate.
+        
+        // Unit tests for recognizing TERMS index access patterns.
+        suite.addTestSuite(TestLexAccessPatternEnum.class);
+
         // Unit tests for operations on the TERMS index.
         suite.addTestSuite(TestTermsIndex.class);
         
@@ -84,6 +89,9 @@ public class TestAll extends TestCase {
 
         // test suite for the IV cache, including serialization of cached vals.
         suite.addTestSuite(TestIVCache.class);
+
+        // test suite for access paths reading on the TERMS index.
+        suite.addTestSuite(TestAccessPaths.class);
         
         return suite;
         
