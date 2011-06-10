@@ -24,20 +24,28 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal.constraints;
 
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
+
+import org.openrdf.query.algebra.evaluation.ValueExprEvaluationException;
+import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSDBooleanIV;
+import com.bigdata.rdf.model.BigdataValue;
 
 /**
  * Calculates the "effective boolean value" of an IValueExpression.  See the
  * SPARQL spec for details.
  */
-public class EBVBOp extends XSDBooleanIVValueExpression {
+public class EBVBOp extends XSDBooleanIVValueExpression 
+		implements INeedsMaterialization {
 
 	/**
 	 * 
@@ -106,12 +114,50 @@ public class EBVBOp extends XSDBooleanIVValueExpression {
 
     	final IV iv = get(0).get(bs);
     	
+    	// not yet bound
+    	if (iv == null) {
+    		
+    		throw new SparqlTypeErrorException();
+    		
+    	}
+    	
     	if (iv instanceof XSDBooleanIV) {
     		return ((XSDBooleanIV) iv).booleanValue();
     	}
     	
-        throw new SparqlTypeErrorException();
-
+    	final BigdataValue val = iv.getValue();
+    	
+    	try {
+    		
+    		return QueryEvaluationUtil.getEffectiveBooleanValue(val);
+    		
+    	} catch (ValueExprEvaluationException ex) {
+    		
+    		throw new SparqlTypeErrorException();
+    		
+    	}
+    	
+    }
+    
+    private volatile transient Set<IVariable<IV>> terms;
+    
+    public Set<IVariable<IV>> getTermsToMaterialize() {
+    
+    	if (terms == null) {
+    		
+    		terms = new LinkedHashSet<IVariable<IV>>();
+    		
+    		for (BOp bop : args()) {
+    			
+    			if (bop instanceof IVariable)
+    				terms.add((IVariable<IV>) bop);
+    		
+    		}
+    		
+    	}
+    	
+    	return terms;
+    	
     }
     
 }
