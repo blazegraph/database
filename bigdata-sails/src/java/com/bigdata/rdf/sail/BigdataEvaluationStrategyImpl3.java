@@ -1986,8 +1986,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	 */
     	final CompareOp op = compare.getOperator();
     	if (op == CompareOp.EQ || op == CompareOp.NE) {
-    	
-	    	if (left instanceof Constant) {
+
+    	    if (left instanceof Constant && !(right instanceof DatatypeBOp)) {
 	    		final IV iv = ((Constant<? extends IV>) left).get();
 //                if (iv.isURI() && iv.getTermId() != TermId.NULL) {
 	    		if (iv.isURI() && !iv.isNullIV()) {
@@ -1995,7 +1995,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	    		}
 	    	}
     	
-	    	if (right instanceof Constant) {
+    	    if (right instanceof Constant && !(left instanceof DatatypeBOp)) {
 	    		final IV iv = ((Constant<? extends IV>) right).get();
 //                if (iv.isURI() && iv.getTermId() != TermId.NULL) {
                 if (iv.isURI() && !iv.isNullIV()) {
