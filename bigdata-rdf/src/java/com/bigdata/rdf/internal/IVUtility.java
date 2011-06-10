@@ -859,9 +859,9 @@ public class IVUtility {
         
         final boolean isExtension = AbstractIV.isExtension(flags);
         
-        final TermId datatype; 
+        final IV datatype; 
         if (isExtension) {
-            datatype = (TermId) decodeFromOffset(key, o);
+            datatype = decodeFromOffset(key, o);
             o += datatype.byteLength();
         } else {
             datatype = null;

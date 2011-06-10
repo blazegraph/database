@@ -9,8 +9,8 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueIdComparator;
 import com.bigdata.striterator.AbstractKeyOrder;
 
 /**
@@ -25,29 +25,7 @@ public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> {
      * Note: these constants make it possible to use switch(index())
      * constructs.
      */
-	/** @deprecated by {@link #_TERMS}. */
-    public static final transient int _TERM2ID = 0;
-
-	/** @deprecated by {@link #_TERMS}. */
-    public static final transient int _ID2TERM = 1;
-
-    public static final transient int _TERMS = 2;
-
-    /**
-     * The index whose keys are formed from the terms (RDF {@link Value}s).
-     * 
-     * @deprecated by {@link #TERMS}.
-     */
-    public static final transient LexiconKeyOrder TERM2ID = new LexiconKeyOrder(
-            _TERM2ID);
-
-    /**
-     * The index whose keys are formed from the term identifiers.
-     * 
-     * @deprecated by {@link #TERMS}.
-     */
-    public static final transient LexiconKeyOrder ID2TERM = new LexiconKeyOrder(
-            _ID2TERM);
+    private static final transient int _TERMS = 0;
 
 	/**
 	 * The index whose keys are formed from the hash code of the RDF
@@ -62,16 +40,16 @@ public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> {
             _TERMS);
 
     /**
-     * The positional index corresponding to the RDF Value in a
-     * "lexicon predicate".
+     * The positional index corresponding to the {@link BigdataValue} in a
+     * {@link LexPredicate}.
      */
-    private final static transient int SLOT_TERM = 0;
+    public final static transient int SLOT_TERM = 0;
 
     /**
-     * The positional index corresponding to the term identifier in a
-     * "lexicon predicate".
+     * The positional index corresponding to the {@link TermId} in a
+     * {@link LexPredicate}.
      */
-    private final static transient int SLOT_ID = 1;
+    public final static transient int SLOT_ID = 1;
     
     /**
      * This is the only piece of serializable state for this class.
@@ -97,16 +75,7 @@ public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> {
      */
     static public LexiconKeyOrder valueOf(final int index) {
 
-        switch (index) {
-        case _TERM2ID:
-            return TERM2ID;
-        case _ID2TERM:
-            return ID2TERM;
-        case _TERMS:
-            return TERMS;
-        default:
-            throw new IllegalArgumentException("Unknown: index" + index);
-        }
+        return TERMS;
 
     }
 
@@ -115,16 +84,7 @@ public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> {
      */
     public String getIndexName() {
 
-        switch (index) {
-        case _TERM2ID:
-            return "TERM2ID";
-        case _ID2TERM:
-            return "ID2TERM";
-        case _TERMS:
-            return "TERMS";
-        default:
-            throw new AssertionError();
-        }
+        return "TERMS";
 
     }
 
@@ -138,9 +98,7 @@ public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> {
     }
 
     /**
-     * The integer used to represent the {@link LexiconKeyOrder} which will
-     * be one of the following symbolic constants: {@link #_TERM2ID} or
-     * {@link #ID2TERM}.
+     * The integer used to represent the {@link LexiconKeyOrder}.
      */
     public int index() {
 
@@ -149,54 +107,42 @@ public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> {
     }
 
     final public int getKeyArity() {
-        switch(index) {
-        case _TERM2ID: return 1;
-        case _ID2TERM: return 1;
-        case _TERMS: return 1;
-        default: throw new AssertionError();
-        }
+     
+        return 1;
+        
     }
 
-    /*
-     * Note: The TERM2ID and ID2TERM indices each have a single component to the
-     * key. Therefore keyPos MUST be ZERO (0).
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The TERMS index has a single key component. Therefore keyPos MUST
+     * be ZERO (0).
      */
     final public int getKeyOrder(final int keyPos) {
 
         if (keyPos != 0)
             throw new IllegalArgumentException();
         
-        switch(index) {
-        case _TERM2ID: return SLOT_TERM;
-        case _ID2TERM: return SLOT_ID;
-        case _TERMS: return SLOT_ID;
-        default: throw new AssertionError();
-        }
+        return SLOT_ID;
         
     }
-    
+
     /**
-     * Return the comparator that places {@link BigdataValue}s into the
-     * natural order for the associated index.
+     * Operation is not supported.
+     * <p>
+     * Note: The TERMS index key order is defined by the {@link TermId} keys.
+     * They are formed from the {@link VTE}, the hashCode (of the
+     * {@link BigdataValue}), and a collision counter. The collision counter is
+     * not known unless you actually scan the collision bucket in the TERMS
+     * index. So there is no way to provide a comparator for the TERMS index
+     * unless all of the {@link BigdataValue}s have been resolved to their
+     * {@link TermId}s.
+     * 
+     * @throws UnsupportedOperationException
      */
     final public Comparator<BigdataValue> getComparator() {
 
-        switch (index) {
-        case _TERMS:
-        case _TERM2ID:
-            /*
-             * FIXME Must impose unsigned byte[] comparison. That is
-             * expensive if we have to dynamically serialize the keys for
-             * each compare. The _Value object caches those serializations
-             * for efficiency and the BigdataValue object probably needs to
-             * do the same.
-             */
-            throw new UnsupportedOperationException();
-        case _ID2TERM:
-            return BigdataValueIdComparator.INSTANCE;
-        default:
-            throw new IllegalArgumentException("Unknown: " + this);
-        }
+        throw new UnsupportedOperationException();
 
     }
 
@@ -208,25 +154,17 @@ public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> {
         return LexiconKeyOrder.valueOf(index);
 
     }
-    
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to handle the encoding of the {@link TermId} for the index.
+     */
+    @Override
     protected void appendKeyComponent(final IKeyBuilder keyBuilder,
             final int i, final Object keyComponent) {
 
-        if (index == _TERM2ID) {
-        	
-        	final BigdataValue term = (BigdataValue) keyComponent;
-        	final LexiconKeyBuilder lexKeyBuilder = 
-        		new LexiconKeyBuilder(keyBuilder);
-        	lexKeyBuilder.value2Key(term);
-        	
-        } else if (index == _ID2TERM) {
-        	
-        	final TermId id = (TermId) keyComponent;
-        	id.encode(keyBuilder);
-        	
-        } else {
-        	throw new AssertionError();
-        }
+        ((TermId<?>) keyComponent).encode(keyBuilder);
 
     }
 

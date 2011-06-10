@@ -166,8 +166,8 @@ public class LexiconConfiguration<V extends BigdataValue>
     @SuppressWarnings("unchecked")
     public V asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
 
-        // The TermId for the ExtensionIV.
-        final TermId datatypeIV = iv.getExtensionIV();
+        // The datatypeIV for the ExtensionIV.
+        final IV datatypeIV = iv.getExtensionIV();
 
         // Find the IExtension from the datatype IV.
         final IExtension<BigdataValue> ext = iv2ext.get(datatypeIV);
@@ -651,7 +651,7 @@ public class LexiconConfiguration<V extends BigdataValue>
             case XSDUnsignedShort: 
             case XSDUnsignedInt:
             case XSDUnsignedLong:
-                return true;
+                return false; // FIXME Make true when supporting XSD unsigned types!
             default:
                 throw new AssertionError();
         }

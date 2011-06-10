@@ -98,6 +98,9 @@ public interface IRawTripleStore extends ITripleStore {
      * 
      * @return The pre-assigned internal value -or- null iff the term is not
      *         known to the database.
+     * 
+     * @deprecated This is only used by the unit tests. It is not efficient for
+     *             scale-out.
      */
     public IV getIV(Value value);
 

@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.internal;
 
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.vocab.Vocabulary;
@@ -66,9 +67,12 @@ public class URIByteIV<V extends BigdataURI> extends AbstractInlineIV<V, Byte> {
 	@Override
 	protected int _compareTo(final IV o) {
 
-		final byte value2 = ((URIByteIV<BigdataURI>) o).value;
+        final byte v = KeyBuilder.decodeByte(value);
 
-		return value == value2 ? 0 : value < value2 ? -1 : 1;
+        final byte v2 = KeyBuilder
+                .decodeByte(((URIByteIV<BigdataURI>) o).value);
+
+        return v == v2 ? 0 : v < v2 ? -1 : 1;
 
     }
 

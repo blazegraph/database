@@ -89,7 +89,7 @@ public class ColorsEnumExtension<V extends BigdataValue> implements IExtension<V
         
         final AbstractLiteralIV delegate = new XSDByteIV(c.getByte());
 
-        return new ExtensionIV(delegate, (TermId) getDatatype().getIV());
+        return new ExtensionIV(delegate, getDatatype().getIV());
         
     }
     
@@ -115,7 +115,7 @@ public class ColorsEnumExtension<V extends BigdataValue> implements IExtension<V
      * Simple demonstration enum for some common colors. Can fit up to 256 enum 
      * values into an enum projected onto a byte.
      */
-    public enum Color {
+    static public enum Color {
         
         Red((byte) 0),
         Blue((byte) 1),

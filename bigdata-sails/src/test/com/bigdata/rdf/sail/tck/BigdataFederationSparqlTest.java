@@ -270,22 +270,6 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
 		_properties.put(BigdataSail.Options.BLOOM_FILTER, "true");
 
 		/*
-		 * The #of low order bits from the TERM2ID index partition local counter
-		 * that will be reversed and written into the high-order bits of the
-		 * term identifier. This has a strong effect on the distribution of bulk
-		 * index read/write operations for the triple store. For a given value
-		 * of N, a bulk write will tend to touch 2^N index partitions. Therefore
-		 * if this is even roughly on the order of the number of index
-		 * partitions, each bulk write will tend to be scattered to all index
-		 * partitions.
-		 * 
-		 * Note: If this value is too large then the writes WITHIN the index
-		 * partitions will become uniformly distributed, which will negatively
-		 * impact index performance.
-		 */
-		_properties.put(BigdataSail.Options.TERMID_BITS_TO_REVERSE, "0");
-
-		/*
 		 * Option may be enabled to store blank nodes such that they are stable
 		 * (they are not stored by default).
 		 */

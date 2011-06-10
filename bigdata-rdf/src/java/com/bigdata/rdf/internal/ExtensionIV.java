@@ -31,9 +31,9 @@ public class ExtensionIV<V extends BigdataLiteral>
 
     private final AbstractLiteralIV delegate;
     
-    private final TermId datatype;
+    private final AbstractIV datatype;
     
-    public ExtensionIV(final AbstractLiteralIV delegate, final TermId datatype) {
+    public ExtensionIV(final AbstractLiteralIV delegate, final IV datatype) {
         
         super(VTE.LITERAL, true, delegate.getDTE());
         
@@ -42,7 +42,7 @@ public class ExtensionIV<V extends BigdataLiteral>
         
         this.delegate = delegate;
         
-        this.datatype = datatype;
+        this.datatype = (AbstractIV) datatype;
         
     }
     
@@ -60,7 +60,7 @@ public class ExtensionIV<V extends BigdataLiteral>
     }
     
     @Override
-    public TermId getExtensionIV() {
+    public IV getExtensionIV() {
         return datatype;
     }
     

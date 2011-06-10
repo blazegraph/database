@@ -672,12 +672,12 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
      * 
      * @param store
      * @param all
-     *            The expected statemetns (sorted into SPO order as a
+     *            The expected statements (sorted into SPO order as a
      *            side-effect).
      * @param numStmts
      *            The #of statements <i>all</i>.
      */
-    private void assertSameSPOArray(AbstractTripleStore store, SPO[] all, int numStmts) {
+    private void assertSameSPOArray(final AbstractTripleStore store, final SPO[] all, final int numStmts) {
         
         Arrays.sort(all, 0, all.length, SPOComparator.INSTANCE);
 
@@ -710,6 +710,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
             assertFalse("iterator is willing to visit more than " + numStmts
                     + " statements", itr.hasNext());
+            
         } finally {
 
             itr.close();

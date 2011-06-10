@@ -32,7 +32,7 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
-/** Implementation for inline <code>xsd:integer</code>. */
+/** Implementation for inline <code>xsd:decimal</code>. */
 public class XSDDecimalIV<V extends BigdataLiteral> extends
         AbstractLiteralIV<V, BigDecimal> {
     
@@ -165,4 +165,5 @@ public class XSDDecimalIV<V extends BigdataLiteral> extends
         return value.compareTo(((XSDDecimalIV) o).value);
         
     }
+
 }

@@ -291,19 +291,19 @@ public class TestInlining extends AbstractTripleStoreTestCase {
 
             final BigdataLiteral l1 = f.createLiteral("1", EpochExtension.EPOCH);
             final BigdataLiteral l2 = f.createLiteral(String.valueOf(System.currentTimeMillis()), EpochExtension.EPOCH);
-            final BigdataLiteral l3 = f.createLiteral("-100", EpochExtension.EPOCH);
+//            final BigdataLiteral l3 = f.createLiteral("-100", EpochExtension.EPOCH);
             final BigdataURI datatype = f.createURI(EpochExtension.EPOCH.stringValue());
 
             terms.add(l1);
             terms.add(l2);
-            terms.add(l3);
+//            terms.add(l3);
             terms.add(datatype);
 
             final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
 
             assertTrue(l1.getIV().isInline());
             assertTrue(l2.getIV().isInline());
-            assertFalse(l3.getIV().isInline());
+//            assertFalse(l3.getIV().isInline());
             
             final ExtensionIV iv1 = (ExtensionIV) l1.getIV();
             final ExtensionIV iv2 = (ExtensionIV) l2.getIV();

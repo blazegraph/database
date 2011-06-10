@@ -35,6 +35,15 @@ import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 
+/**
+ * A <code>
+ * lex(BigdataValue,IV)
+ * </code> predicate used for querying the {@link LexiconRelation}'s TERMS
+ * index.
+ * 
+ * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+ * @version $Id$
+ */
 public class LexPredicate extends Predicate<BigdataValue> {
 
     /**
@@ -115,17 +124,24 @@ public class LexPredicate extends Predicate<BigdataValue> {
         
     }
 
+    /**
+     * Return the {@link BigdataValue} at index position
+     * {@value LexiconKeyOrder#SLOT_TERM}.
+     */
     @SuppressWarnings("unchecked")
     final public IVariableOrConstant<BigdataValue> term() {
         
-        return (IVariableOrConstant<BigdataValue>) get(0/* term */);
+        return (IVariableOrConstant<BigdataValue>) get(LexiconKeyOrder.SLOT_TERM);
         
     }
     
+    /**
+     * Return the {@link IV} at index position {@value LexiconKeyOrder#SLOT_ID}.
+     */
     @SuppressWarnings("unchecked")
     final public IVariableOrConstant<IV> iv() {
         
-        return (IVariableOrConstant<IV>) get(1/* iv */);
+        return (IVariableOrConstant<IV>) get(LexiconKeyOrder.SLOT_ID);
         
     }
     
