@@ -79,12 +79,12 @@ abstract public class AbstractInlineIV<V extends BigdataValue, T>
         return false;
     }
 
-    /**
-     * No term identifier for an inline IV - throws an exception.
-     */
-    final public long getTermId() {
-        throw new UnsupportedOperationException();
-    }
+//    /**
+//     * No term identifier for an inline IV - throws an exception.
+//     */
+//    final public long getTermId() {
+//        throw new UnsupportedOperationException();
+//    }
 
     public String toString() {
         

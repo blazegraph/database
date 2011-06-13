@@ -135,17 +135,17 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
 	 */
     boolean isNullIV();
     
-	/**
-	 * Return the term identifier.
-	 * 
-	 * @return The term identifier.
-	 * 
-	 * @throws UnsupportedOperationException
-	 *             unless the RDF value is represented by a term identifier.
-	 * 
-	 * @deprecated termIds no longer exist as of the TERMS refactor.
-	 */
-    long getTermId() throws UnsupportedOperationException;
+//	/**
+//	 * Return the term identifier.
+//	 * 
+//	 * @return The term identifier.
+//	 * 
+//	 * @throws UnsupportedOperationException
+//	 *             unless the RDF value is represented by a term identifier.
+//	 * 
+//	 * @deprecated termIds no longer exist as of the TERMS refactor.
+//	 */
+//    long getTermId() throws UnsupportedOperationException;
 
     /**
      * <code>true</code> iff the RDF value is directly represented inline. When

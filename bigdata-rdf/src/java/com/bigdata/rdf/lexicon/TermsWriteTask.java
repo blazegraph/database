@@ -221,7 +221,7 @@ public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
                      * Nothing to be written.
                      */
                     
-                    return null;// new KVO[0];
+                    return new KVO[0];
                     
                 }
                 

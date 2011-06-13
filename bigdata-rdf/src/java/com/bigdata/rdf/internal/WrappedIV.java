@@ -146,10 +146,6 @@ public class WrappedIV implements IV {
 		return iv.isNullIV();
 	}
 
-	public long getTermId() {
-		return iv.getTermId();
-	}
-
 	public boolean isInline() {
 		return iv.isInline();
 	}

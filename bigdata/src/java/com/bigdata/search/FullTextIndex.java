@@ -54,11 +54,11 @@ import org.apache.lucene.analysis.tokenattributes.TermAttribute;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.IKeyBuilderExtension;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
@@ -68,7 +68,6 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.locator.DefaultResourceLocator;
-import com.bigdata.service.IBigdataClient;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.concurrent.ExecutionHelper;
@@ -294,14 +293,12 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         /**
          * Specify the collator {@link StrengthEnum strength} for the full-text
          * index (default {@value StrengthEnum#Primary}).
+         * <p>
+         * Note: {@link StrengthEnum#Primary} is generally what you want for a
+         * full text index as search will consider tokens which differ in case
+         * and other subtle features to be the same token (a 'match').
          * 
          * @see KeyBuilder.Options#STRENGTH
-         * 
-         * @todo the configuration should probably come from a configuration
-         *       properties stored for the full text indexer in the
-         *       {@link IIndexManager#getGlobalRowStore()}. The main issue is
-         *       how you want to encode unicode strings for search, which can be
-         *       different than encoding for other purposes.
          */
         String INDEXER_COLLATOR_STRENGTH = FullTextIndex.class.getName()
                 + ".collator.strength";
@@ -357,28 +354,6 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 
         String DEFAULT_ANALYZER_FACTORY_CLASS = DefaultAnalyzerFactory.class.getName();
 
-        /**
-         * The class responsible for encoding and decoding document identifiers
-         * in the keys of the full text index (
-         * {@value #DEFAULT_DOCID_FACTORY_CLASS}). The named class MUST provide
-         * a public zero argument constructor and MUST implement
-         * {@link IKeyBuilderExtension}.
-         * 
-         * @see IKeyBuilderExtension
-         * @see DefaultKeyBuilderFactory
-         * 
-         *      TODO Since how we encode the docId can interact with how we
-         *      encode the record of the tuple (e.g. for a variable length IV),
-         *      it might be simpler to replace this with the
-         *      {@link IRecordBuilder} interface so we specify the entire
-         *      behavior of the index at one go.
-         */
-        String DOCID_FACTORY_CLASS = FullTextIndex.class.getName()
-                + ".docIdFactoryClass";
-
-        String DEFAULT_DOCID_FACTORY_CLASS = DefaultDocIdExtension.class
-                .getName();
-
     }
     
     /**
@@ -400,50 +375,50 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
      */
     private final long timeout;
     
-    /**
-     * @see Options#FIELDS_ENABLED
-     */
-    private final boolean fieldsEnabled;
-
-    /**
-     * @see Options#DOUBLE_PRECISION
-     */
-    private final boolean doublePrecision;
-
-    /**
-     * Return the value configured by the {@link Options#FIELDS_ENABLED}
-     * property.
-     */
-    public boolean isFieldsEnabled() {
-        
-        return fieldsEnabled;
-        
-    }
+//    /**
+//     * @see Options#FIELDS_ENABLED
+//     */
+//    private final boolean fieldsEnabled;
+//
+//    /**
+//     * @see Options#DOUBLE_PRECISION
+//     */
+//    private final boolean doublePrecision;
+//
+//    /**
+//     * Return the value configured by the {@link Options#FIELDS_ENABLED}
+//     * property.
+//     */
+//    public boolean isFieldsEnabled() {
+//        
+//        return fieldsEnabled;
+//        
+//    }
 
     /**
      * @see Options#ANALYZER_FACTORY_CLASS
      */
     private final IAnalyzerFactory analyzerFactory;
     
-    /**
-     * @see Options#DOCID_FACTORY_CLASS
-     */
-    private final IKeyBuilderExtension<V> docIdFactory;
+//    /**
+//     * @see Options#DOCID_FACTORY_CLASS
+//     */
+//    private final IKeyBuilderExtension<V> docIdFactory;
     
-    /**
-     * The concrete {@link IRecordBuilder} instance.
-     */
-    private final IRecordBuilder<V> recordBuilder;
-    
-    /**
-     * Return the object responsible for encoding and decoding the tuples
-     * in the full text index.
-     */
-    public final IRecordBuilder<V> getRecordBuilder() {
-        
-        return recordBuilder;
-        
-    }
+//    /**
+//     * The concrete {@link IRecordBuilder} instance.
+//     */
+//    private final IRecordBuilder<V> recordBuilder;
+//    
+//    /**
+//     * Return the object responsible for encoding and decoding the tuples
+//     * in the full text index.
+//     */
+//    public final IRecordBuilder<V> getRecordBuilder() {
+//        
+//        return recordBuilder;
+//        
+//    }
     
     /**
      * The basename of the search index.
@@ -504,27 +479,27 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 
         }
 
-        {
-
-            fieldsEnabled = Boolean.parseBoolean(properties.getProperty(
-                    Options.FIELDS_ENABLED, Options.DEFAULT_FIELDS_ENABLED));
-
-            if (log.isInfoEnabled())
-                log.info(Options.FIELDS_ENABLED + "=" + fieldsEnabled);
-
-        }
-
-        {
-
-            doublePrecision = Boolean
-                    .parseBoolean(properties.getProperty(
-                            Options.DOUBLE_PRECISION,
-                            Options.DEFAULT_DOUBLE_PRECISION));
-
-            if (log.isInfoEnabled())
-                log.info(Options.DOUBLE_PRECISION + "=" + doublePrecision);
-
-        }
+//        {
+//
+//            fieldsEnabled = Boolean.parseBoolean(properties.getProperty(
+//                    Options.FIELDS_ENABLED, Options.DEFAULT_FIELDS_ENABLED));
+//
+//            if (log.isInfoEnabled())
+//                log.info(Options.FIELDS_ENABLED + "=" + fieldsEnabled);
+//
+//        }
+//
+//        {
+//
+//            doublePrecision = Boolean
+//                    .parseBoolean(properties.getProperty(
+//                            Options.DOUBLE_PRECISION,
+//                            Options.DEFAULT_DOUBLE_PRECISION));
+//
+//            if (log.isInfoEnabled())
+//                log.info(Options.DOUBLE_PRECISION + "=" + doublePrecision);
+//
+//        }
 
         {
 
@@ -560,45 +535,6 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
             }
 
         }
-        
-        {
-
-            final String className = getProperty(
-                    Options.DOCID_FACTORY_CLASS,
-                    Options.DEFAULT_DOCID_FACTORY_CLASS);
-
-            final Class<IKeyBuilderExtension<V>> cls;
-            try {
-                cls = (Class<IKeyBuilderExtension<V>>) Class.forName(className);
-            } catch (ClassNotFoundException e) {
-                throw new RuntimeException("Bad option: "
-                        + Options.DOCID_FACTORY_CLASS, e);
-            }
-
-            if (!IKeyBuilderExtension.class.isAssignableFrom(cls)) {
-                throw new RuntimeException(Options.DOCID_FACTORY_CLASS
-                        + ": Must extend: "
-                        + IKeyBuilderExtension.class.getName());
-            }
-
-            try {
-
-                final Constructor<? extends IKeyBuilderExtension<V>> ctor = cls
-                        .getConstructor(new Class[] { /*FullTextIndex.class */});
-
-                // save reference.
-                docIdFactory = ctor.newInstance(new Object[] { /*this*/});
-
-            } catch (Exception ex) {
-
-                throw new RuntimeException(ex);
-
-            }
-
-        }
-        
-        this.recordBuilder = new DefaultRecordBuilder<V>(fieldsEnabled,
-                doublePrecision, docIdFactory);
 
         /*
          * Note: defer resolution of the index.
@@ -618,6 +554,10 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
      *       allocate the text index inside of another relation and
      *       {@link #acquireExclusiveLock()} is not reentrant for zookeeper.
      */
+    /*
+     * Note: BigdataRDFFullTextIndex overrides this method to setup IV support.
+     */
+    @Override
     public void create() {
 
         assertWritable();
@@ -631,19 +571,68 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 //        try {
 
             /*
-             * FIXME register a tuple serializer that knows how to unpack the
-             * values and how to extract the bytes corresponding to the encoded
-             * text (they can not be decoded) from key and how to extract the
-             * document and field identifiers from the key. It should also
-             * encapsulate the use of PRIMARY strength for the key builder.
-             * 
-             * FIXME put the IKeyBuilderFactory on the index.
+             * Register a tuple serializer that knows how to unpack the values and
+             * how to extract the bytes corresponding to the encoded text (they can
+             * not be decoded) from key and how to extract the document and field
+             * identifiers from the key.
              */
             final Properties p = getProperties();
             
             final IndexMetadata indexMetadata = new IndexMetadata(indexManager,
                     p, name, UUID.randomUUID());
 
+            /*
+             * Override the collator strength property to use the configured
+             * value or the default for the text indexer rather than the
+             * standard default. This is done because you typically want to
+             * recognize only Primary differences for text search while you
+             * often want to recognize more differences when generating keys for
+             * a B+Tree.
+             * 
+             * Note: The choice of the language and country for the collator
+             * should not matter much for this purpose since the total ordering
+             * is not used except to scan all entries for a given term, so the
+             * relative ordering between terms does not matter.
+             */
+            final IKeyBuilderFactory keyBuilderFactory;
+            {
+            
+                final Properties tmp = new Properties(p);
+
+                tmp.setProperty(KeyBuilder.Options.STRENGTH, p.getProperty(
+                    Options.INDEXER_COLLATOR_STRENGTH,
+                    Options.DEFAULT_INDEXER_COLLATOR_STRENGTH));
+
+                keyBuilderFactory = new DefaultKeyBuilderFactory(tmp);
+
+            }
+    
+            final boolean fieldsEnabled = Boolean.parseBoolean(p
+                    .getProperty(Options.FIELDS_ENABLED,
+                            Options.DEFAULT_FIELDS_ENABLED));
+    
+            if (log.isInfoEnabled())
+                log.info(Options.FIELDS_ENABLED + "=" + fieldsEnabled);
+    
+            final boolean doublePrecision = Boolean.parseBoolean(p
+                    .getProperty(Options.DOUBLE_PRECISION,
+                            Options.DEFAULT_DOUBLE_PRECISION));
+    
+            if (log.isInfoEnabled())
+                log.info(Options.DOUBLE_PRECISION + "=" + doublePrecision);
+
+            /*
+             * FIXME Optimize. SimpleRabaCoder will be faster, but can do better
+             * with record aware coder.
+             */
+            indexMetadata.setTupleSerializer(new FullTextIndexTupleSerializer<V>(
+                    keyBuilderFactory,//
+                    DefaultTupleSerializer.getDefaultLeafKeysCoder(),//
+                    DefaultTupleSerializer.getDefaultValuesCoder(),//
+                    fieldsEnabled,//
+                    doublePrecision//
+            ));
+            
             indexManager.registerIndex(indexMetadata);
 
             if (log.isInfoEnabled())
@@ -699,52 +688,6 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         return analyzerFactory.getAnalyzer(languageCode, filterStopwords);
         
     }
-    
-    /*
-     * thread-local key builder. 
-     */
-
-    /**
-     * A {@link ThreadLocal} variable providing access to thread-specific
-     * instances of a configured {@link IKeyBuilder}.
-     * <p>
-     * Note: this {@link ThreadLocal} is not static since we need configuration
-     * properties from the constructor - those properties can be different for
-     * different {@link IBigdataClient}s on the same machine.
-     * 
-     * FIXME Configure as {@link IKeyBuilderFactory} on the backing index.
-     */
-    private ThreadLocal<IKeyBuilder> threadLocalKeyBuilder = new ThreadLocal<IKeyBuilder>() {
-
-        protected synchronized IKeyBuilder initialValue() {
-
-            /*
-             * Override the collator strength property to use the configured
-             * value or the default for the text indexer rather than the
-             * standard default. This is done because you typically want to
-             * recognize only Primary differences for text search while you
-             * often want to recognize more differences when generating keys for
-             * a B+Tree.
-             */
-
-            final Properties properties = getProperties();
-
-            properties.setProperty(KeyBuilder.Options.STRENGTH, properties
-                    .getProperty(Options.INDEXER_COLLATOR_STRENGTH,
-                            Options.DEFAULT_INDEXER_COLLATOR_STRENGTH));
-
-            /*
-             * Note: The choice of the language and country for the collator
-             * should not matter much for this purpose since the total ordering
-             * is not used except to scan all entries for a given term, so the
-             * relative ordering between terms does not matter.
-             */
-        
-            return KeyBuilder.newUnicodeInstance(properties);
-
-        }
-
-    };
 
     /**
      * Return a {@link ThreadLocal} {@link IKeyBuilder} instance configured to
@@ -754,7 +697,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
      */
     protected final IKeyBuilder getKeyBuilder() {
 
-        return threadLocalKeyBuilder.get();
+        return getIndex().getIndexMetadata().getKeyBuilder();
             
     }
 
@@ -877,81 +820,6 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         
     }
 
-//    public byte[] getKey(final IKeyBuilder keyBuilder, final String termText,
-//            final boolean successor, final boolean fieldsEnabled,
-//            final V docId, final int fieldId) {
-//
-//        return tokenKeyBuilder.getKey(keyBuilder, termText, successor,
-//                fieldsEnabled, docId, fieldId);
-//
-//    }
-//
-//    public byte[] getValue(final ByteArrayBuffer buf,
-//            final ITermMetadata metadata) {
-//
-//        return tokenKeyBuilder.getValue(buf, metadata);
-//        
-//    }
-    
-//    /**
-//     * Performs a full text search against indexed documents returning a hit
-//     * list using a default minCosine of <code>0.4</code>, a default maxRank
-//     * of <code>10,000</code>, and the configured default timeout.
-//     * 
-//     * @param query
-//     *            The query (it will be parsed into tokens).
-//     * @param languageCode
-//     *            The language code that should be used when tokenizing the
-//     *            query (an empty string will be interpreted as the default
-//     *            {@link Locale}).
-//     * 
-//     * @return A {@link Iterator} which may be used to traverse the search
-//     *         results in order of decreasing relevance to the query.
-//     * 
-//     * @see Options#INDEXER_TIMEOUT
-//     */
-//    public Hiterator search(final String query, final String languageCode) {
-//
-//        return search(query, languageCode, false/* prefixMatch */);
-//        
-//    }
-//
-//    public Hiterator search(final String query, final String languageCode,
-//            final boolean prefixMatch) {
-//
-//        return search( //
-//                query,//
-//                languageCode,//
-//                prefixMatch,//
-//                .4, // minCosine
-//                1.0d, // maxCosine
-//                1, // minRank
-//                10000, // maxRank
-//                false, // matchAllTerms
-//                this.timeout,//
-//                TimeUnit.MILLISECONDS//
-//                );
-//    
-//    }
-//    
-//    public Hiterator search(final String query, final String languageCode,
-//            final double minCosine, final boolean prefixMatch) {
-//
-//        return search( //
-//                query,//
-//                languageCode,//
-//                prefixMatch,//
-//                minCosine, // minCosine
-//                1.0d, // maxCosine
-//                1, // minRank
-//                10000, // maxRank
-//                false, // matchAllTerms
-//                this.timeout,//
-//                TimeUnit.MILLISECONDS//
-//                );
-//    
-//    }
-    
     /**
      * Performs a full text search against indexed documents returning a hit
      * list using the configured default timeout.
@@ -1053,7 +921,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
     	
         return new Hiterator<Hit<V>>(//
                 Arrays.asList(a),// 
-                0.0d,// minCosine
+                minCosine,//0.0d,// minCosine
                 Integer.MAX_VALUE // maxRank
                 ); 
 

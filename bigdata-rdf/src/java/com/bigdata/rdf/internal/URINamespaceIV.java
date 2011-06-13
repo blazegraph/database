@@ -33,8 +33,8 @@ public class URINamespaceIV<V extends BigdataURI> extends
 
     }
 
-    public long getTermId() throws UnsupportedOperationException {
-        throw new UnsupportedOperationException();
-    }
+//    public long getTermId() throws UnsupportedOperationException {
+//        throw new UnsupportedOperationException();
+//    }
 
 }

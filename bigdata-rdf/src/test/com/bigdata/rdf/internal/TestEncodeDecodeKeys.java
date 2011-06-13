@@ -150,9 +150,9 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                         return null;
                     }
 
-                    public long getTermId() {
-                        throw new UnsupportedOperationException();
-                    }
+//                    public long getTermId() {
+//                        throw new UnsupportedOperationException();
+//                    }
 
                     public boolean isInline() {
                         return true;
