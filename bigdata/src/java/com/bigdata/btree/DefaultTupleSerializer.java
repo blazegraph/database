@@ -252,7 +252,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
         return threadLocalKeyBuilderFactory.getKeyBuilder();
 
     }
-    
+
     public byte[] serializeKey(final Object obj) {
 
         if (obj == null)

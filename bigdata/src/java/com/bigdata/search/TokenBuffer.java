@@ -5,10 +5,9 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.keys.KV;
 import com.bigdata.btree.proc.IntegerAggregator;
-import com.bigdata.io.ByteArrayBuffer;
 
 /**
  * A buffer holding tokens extracted from one or more documents / fields.
@@ -277,16 +276,14 @@ public class TokenBuffer<V extends Comparable<V>> {
         /*
          * Generate keys[] and vals[].
          */
-        final IRecordBuilder<V> recordBuilder = textIndexer.getRecordBuilder();
         
         // array of correlated key/value tuples.
         final KV[] a = new KV[nterms];
 
-        // Note: reused for each {token,docId,fieldId} tuple key.
-        final IKeyBuilder keyBuilder = textIndexer.getKeyBuilder();
-
-        // Note: reused for each {token,docId,fieldId} tuple value.
-        final ByteArrayBuffer buf = new ByteArrayBuffer();
+        // Knows how to encode and decode the keys and values.
+        @SuppressWarnings("unchecked")
+        final ITupleSerializer<ITermDocKey<V>, ITermDocVal> tupleSer = textIndexer
+                .getIndex().getIndexMetadata().getTupleSerializer();
 
         // #of {token,docId,fieldId} tuples generated
         int n = 0;
@@ -307,9 +304,25 @@ public class TokenBuffer<V extends Comparable<V>> {
                 
                 final ITermMetadata termMetadata = e.getValue();
 
-                final byte[] key = recordBuilder.getKey(keyBuilder, termText,
-                        false/* successor */, docId, fieldId);
-                
+//                final byte[] key = recordBuilder.getKey(keyBuilder, termText,
+//                        false/* successor */, docId, fieldId);
+
+                /*
+                 * Note: This wraps both sides of the record together and passes
+                 * them into the tupleSerializer so it can examine both pieces
+                 * when making its decision on how to encode the information
+                 * into the key/val of the index.
+                 */
+                final ITermDocRecord<V> rec = new ReadOnlyTermDocRecord<V>(
+                        termText, docId, fieldId, termMetadata.termFreq(),
+                        termMetadata.getLocalTermWeight());
+
+                final byte[] key = tupleSer.serializeKey(rec);
+
+//              final byte[] val = recordBuilder.getValue(buf, termMetadata);
+
+                final byte[] val = tupleSer.serializeVal(rec);
+
                 if (log.isDebugEnabled()) {
                     log.debug("{" + termText + "," + docId + "," + fieldId
                             + "}: #occurences=" + termMetadata.termFreq()
@@ -317,8 +330,6 @@ public class TokenBuffer<V extends Comparable<V>> {
                             + termMetadata.getLocalTermWeight());
                 }
                 
-                final byte[] val = recordBuilder.getValue(buf, termMetadata);
-
                 // save in the correlated array.
                 a[n++] = new KV(key, val);
 
@@ -353,6 +364,36 @@ public class TokenBuffer<V extends Comparable<V>> {
         // Clear the buffer.
         reset();
         
+    }
+
+    static private class ReadOnlyTermDocKey<V extends Comparable<V>> implements
+            ITermDocKey<V> {
+
+        private final String token;
+
+        private final V docId;
+
+        private final int fieldId;
+
+        private ReadOnlyTermDocKey(final String token, final V docId,
+                final int fieldId) {
+            this.token = token;
+            this.docId = docId;
+            this.fieldId = fieldId;
+        }
+
+        public String getToken() {
+            return token;
+        }
+
+        public V getDocId() {
+            return docId;
+        }
+
+        public int getFieldId() {
+            return fieldId;
+        }
+
     }
     
     /**

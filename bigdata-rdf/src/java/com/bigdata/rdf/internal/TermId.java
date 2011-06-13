@@ -326,11 +326,6 @@ public class TermId<V extends BigdataValue> extends
 //        throw new UnsupportedOperationException();
 //    }
 
-    final public long getTermId() {
-//        return termId;
-    	throw new UnsupportedOperationException();
-    }
-    
 //    /**
 //     * Always returns <code>false</code> since the RDF value is not inline.
 //     */

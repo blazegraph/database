@@ -1,6 +1,5 @@
 package com.bigdata.search;
 
-
 /**
  * Mutable metadata for the occurrences of a term within a field of some
  * document.

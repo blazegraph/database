@@ -25,8 +25,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 13, 2011
  */
 
-package com.bigdata.search;
+package com.bigdata.rdf.lexicon;
 
+import java.io.DataInput;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
@@ -38,40 +39,49 @@ import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
-import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.io.LongPacker;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.search.FullTextIndexTupleSerializer;
+import com.bigdata.search.ITermDocKey;
+import com.bigdata.search.ITermDocRecord;
+import com.bigdata.search.ITermDocVal;
+import com.bigdata.search.ReadOnlyTermDocKey;
+import com.bigdata.search.ReadOnlyTermDocRecord;
 
 /**
- * Class manages the encoding and decoding of keys for the full text index. You
- * can override this class to change the way in which the keys and/or values of
- * the index are stored. For example, the RDF database does this to use variable
- * length document identifiers.
+ * Replaces the {@link FullTextIndexTupleSerializer} to support {@link IV}s as
+ * document identifiers.
+ * <p>
+ * Since {@link IV}s have a variable length encoding we have to indicate the
+ * length of the {@link IV} either in the key or the value of the {@link ITuple}
+ * . I've put this information into the value side of the tuple in order to keep
+ * the key format simpler.
+ * <p>
+ * Note: The RDF database does not make use of the "field" concept in the keys
+ * of the full text index. The fieldId will always be reported as -1.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: FullTextIndexTupleSerializer.java 4702 2011-06-13 16:25:38Z
- *          thompsonbry $
+ * @version $Id$
  */
-public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
-        DefaultTupleSerializer<ITermDocKey<V>, ITermDocVal> {
+public class RDFFullTextIndexTupleSerializer extends
+        DefaultTupleSerializer<ITermDocKey, ITermDocVal> {
 
     final private static transient Logger log = Logger
-            .getLogger(FullTextIndexTupleSerializer.class);
+            .getLogger(RDFFullTextIndexTupleSerializer.class);
 
-    private boolean fieldsEnabled;
     private boolean doublePrecision;
     
-    public boolean isFieldsEnabled() {
-        return fieldsEnabled;
-    }
+    static private final transient int NO_FIELD = -1;
 
     public boolean isDoublePrecision() {
         return doublePrecision;
     }
-    
+
     /**
      * Used to serialize the values for the tuples in the index.
      * <p>
@@ -83,7 +93,7 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
     /**
      * De-serialization constructor.
      */
-    public FullTextIndexTupleSerializer() {
+    public RDFFullTextIndexTupleSerializer() {
     }
 
     /**
@@ -94,7 +104,7 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
      *            The coder used for the leaf keys (prefix coding is fine).
      * @param leafValsCoder
      *            The coder used for the leaf values (custom coding may provide
-     *            tighter representations of the {@link ITermDocVal}s in the
+     *            tighter representations of the {@link ITermDocVal} s in the
      *            index entries).
      * @param fieldsEnabled
      *            When <code>true</code> the <code>fieldId</code> will be
@@ -105,30 +115,28 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
      *            When <code>true</code>, the term weight will be serialized
      *            using double precision.
      */
-    public FullTextIndexTupleSerializer(//
+    public RDFFullTextIndexTupleSerializer(//
             final IKeyBuilderFactory keyBuilderFactory,//
             final IRabaCoder leafKeysCoder, //
             final IRabaCoder leafValsCoder,//
             final boolean fieldsEnabled,//
             final boolean doublePrecision//
-            ) {
-   
+    ) {
+
         super(keyBuilderFactory, leafKeysCoder, leafValsCoder);
 
-        this.fieldsEnabled = fieldsEnabled;
         this.doublePrecision = doublePrecision;
-        
+
     }
 
     @Override
     public byte[] serializeKey(final Object obj) {
 
-        @SuppressWarnings("unchecked")
-        final ITermDocKey<V> entry = (ITermDocKey<V>) obj;
+        final ITermDocKey entry = (ITermDocKey) obj;
 
         final String termText = entry.getToken();
 
-        final V docId = entry.getDocId();
+        final IV docId = (IV)entry.getDocId();
 
         final IKeyBuilder keyBuilder = getKeyBuilder();
 
@@ -138,18 +146,14 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
         keyBuilder
                 .appendText(termText, true/* unicode */, false/* successor */);
 
-        keyBuilder.append((Long) docId);
-
-        if (fieldsEnabled)
-            keyBuilder.append(entry.getFieldId());
+        IVUtility.encode(keyBuilder, docId);
 
         final byte[] key = keyBuilder.getKey();
 
         if (log.isDebugEnabled()) {
 
-            log.debug("{" + termText + "," + docId
-                    + (fieldsEnabled ? "," + entry.getFieldId() : "")
-                    + "}, key=" + BytesUtil.toString(key));
+            log.debug("{" + termText + "," + docId + "}, key="
+                    + BytesUtil.toString(key));
 
         }
 
@@ -159,9 +163,9 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
 
     @Override
     public byte[] serializeVal(final Object obj) {
-        
+
         final ITermDocVal val = (ITermDocVal) obj;
-        
+
         if (log.isDebugEnabled()) {
             log.debug(val);
         }
@@ -172,9 +176,13 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
 
         final double localTermWeight = val.getLocalTermWeight();
 
+        // The byte length of the document identifier IV.
+        buf.packLong(((IV) ((ITermDocRecord) obj).getDocId()).byteLength());
+        
         // The term frequency
-        buf.putShort(termFreq > Short.MAX_VALUE ? Short.MAX_VALUE
-                : (short) termFreq);
+        buf.packLong(termFreq);
+//        buf.putShort(termFreq > Short.MAX_VALUE ? Short.MAX_VALUE
+//                : (short) termFreq);
 
         // The term weight
         if (doublePrecision)
@@ -187,78 +195,68 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
     }
 
     @Override
-    public ITermDocKey<V> deserializeKey(final ITuple tuple) {
+    public ITermDocKey deserializeKey(final ITuple tuple) {
 
         return deserialize(tuple, true/* keyOnly */);
-        
+
     }
 
     @Override
-    public ITermDocRecord<V> deserialize(final ITuple tuple) {
-        
-        return (ITermDocRecord<V>) deserialize(tuple, false/* keyOnly */);
+    public ITermDocRecord deserialize(final ITuple tuple) {
+
+        return (ITermDocRecord) deserialize(tuple, false/* keyOnly */);
 
     }
-    
-    protected ITermDocKey<V> deserialize(final ITuple tuple,
-            final boolean keyOnly) {
-    
-        // key is {term,docId,fieldId}
-        // final byte[] key = tuple.getKey();
-        //      
-        // // decode the document identifier.
-        // final long docId = KeyBuilder.decodeLong(key, key.length
-        // - Bytes.SIZEOF_LONG /*docId*/ - Bytes.SIZEOF_INT/*fieldId*/);
+
+    protected ITermDocKey deserialize(final ITuple tuple, final boolean keyOnly) {
 
         final ByteArrayBuffer kbuf = tuple.getKeyBuffer();
 
-        /*
-         * The byte offset of the docId in the key.
-         * 
-         * Note: This is also the byte length of the match on the unicode sort
-         * key, which appears at the head of the key.
-         */
-        final int docIdOffset = kbuf.limit() - Bytes.SIZEOF_LONG /* docId */
-                - (fieldsEnabled ? Bytes.SIZEOF_INT/* fieldId */: 0);
-
-        final V docId = (V) Long.valueOf(KeyBuilder.decodeLong(kbuf.array(),
-                docIdOffset));
-
-        // Decode field when present
-        final int fieldId;
-        if (fieldsEnabled) {
-            fieldId = KeyBuilder.decodeShort(kbuf.array(), kbuf.limit()
-                    - Bytes.SIZEOF_INT);
-        } else {
-            fieldId = -1;
+        // The byte length of the docId IV.
+        final int byteLength;
+        try {
+            byteLength = LongPacker.unpackInt((DataInput) tuple
+                    .getValueStream());
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
         }
+        
+        final int docIdOffset = kbuf.limit() - byteLength;
+
+        // Decode the IV.
+        final IV docId = (IV) IVUtility.decodeFromOffset(kbuf.array(),
+                docIdOffset);
 
         if (keyOnly) {
 
-            return new ReadOnlyTermDocKey(docId, fieldId);
-            
+            return new ReadOnlyTermDocKey(docId, NO_FIELD);
+
         }
-        
+
         final int termFreq;
         final double termWeight;
         try {
 
             final DataInputBuffer dis = tuple.getValueStream();
 
-            termFreq = dis.readShort();
+            // skip the byte length of the IV.
+            LongPacker.unpackInt((DataInput) dis);
+            
+//            termFreq = dis.readShort();
+            termFreq = LongPacker.unpackInt((DataInput) dis);
 
-            if(doublePrecision)
+            if (doublePrecision)
                 termWeight = dis.readDouble();
             else
                 termWeight = dis.readFloat();
-            
+
         } catch (IOException ex) {
-            
+
             throw new RuntimeException(ex);
 
         }
 
-        return new ReadOnlyTermDocRecord<V>(null/* token */, docId, fieldId,
+        return new ReadOnlyTermDocRecord(null/* token */, docId, NO_FIELD,
                 termFreq, termWeight);
 
     }
@@ -280,7 +278,6 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
         default:
             throw new IOException("unknown version=" + version);
         }
-        this.fieldsEnabled = in.readBoolean();
         this.doublePrecision = in.readBoolean();
 
     }
@@ -288,7 +285,6 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
     public void writeExternal(final ObjectOutput out) throws IOException {
         super.writeExternal(out);
         out.writeByte(VERSION);
-        out.writeBoolean(fieldsEnabled);
         out.writeBoolean(doublePrecision);
     }
 

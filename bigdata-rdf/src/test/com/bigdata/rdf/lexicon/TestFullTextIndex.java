@@ -31,13 +31,14 @@ import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+
 import junit.framework.AssertionFailedError;
+
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
+
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.spo.TestSPOKeyOrder;
@@ -57,7 +58,9 @@ import com.bigdata.striterator.Striterator;
  * 
  * @todo test all term types (uris, bnodes, and literals). only literals are
  *       being indexed right now, but there could be a use case for tokenizing
- *       URIs. There is never going to be any reason to tokenize BNodes.
+ *       URIs. There is never going to be any reason to tokenize BNodes. But we
+ *       DO need to support indexing fully inline plain, language code, and
+ *       datatype literals which using a Unicode representation in the IV.
  * 
  * @todo test XML literal indexing (strip out CDATA and index the tokens found
  *       therein).
@@ -149,13 +152,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
                             @Override
                             protected Object resolve(Object e) {
-                                /*
-                                 * FIXME TERMS REFACTOR : The hit will directly
-                                 * give us the IV (or a byte[] for that IV). We
-                                 * just need to return that IV here.
-                                 */
-                                throw new UnsupportedOperationException();
-//                                return new TermId(VTE.LITERAL, ((Hit) e).getDocId());
+                                return ((Hit)e).getDocId();
                             }
                         })));
 
@@ -238,7 +235,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
                     });
 
             assertExpectedHits(store, "GOOD DAY", "en", //
-                    .4f, // minCosine
+                    .5f, // minCosine
                     new BigdataValue[] {//
                     f.createLiteral("good day", "en"), //
                     });
@@ -288,7 +285,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
                         });
 
                 assertExpectedHits(store, "GOOD DAY", "en", //
-                        .4f, // minCosine
+                        .5f, // minCosine
                         new BigdataValue[] {//
                         f.createLiteral("good day", "en"), //
                         });
@@ -438,7 +435,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
                     });
 
             assertExpectedHits(store, "GOOD DAY", "en", //
-                    .4f, // minCosine
+                    .5f, // minCosine
                     new BigdataValue[] {//
                     f.createLiteral("good day", "en"), //
                     });
@@ -508,7 +505,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
                         });
 
                 assertExpectedHits(store, "GOOD DAY", "en", //
-                        .4f, // minCosine
+                        .5f, // minCosine
                         new BigdataValue[] {//
                         f.createLiteral("good day", "en"), //
                         });

@@ -62,9 +62,6 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("Full Text Index and Search");
 
-        // test key formation
-        suite.addTestSuite(TestKeyBuilder.class);
-        
         // @todo test other facets of search that do not interact with persistence.
         
         // search backed by a Journal.
@@ -76,14 +73,6 @@ public class TestAll extends TestCase {
         // search backed by EDS.
         suite.addTest(proxySuite(new TestEDS("EDS Search"),"EDS"));
 
-        /* For EDS:
-         * 
-         * @todo Test when the search index is split across a key-range
-         * partition (this can be done statically when the index is created).
-         * 
-         * @todo test overflow handing.
-         */
-        
         return suite;
 
     }
@@ -103,7 +92,10 @@ public class TestAll extends TestCase {
             final String name) {
 
         final ProxyTestSuite suite = new ProxyTestSuite(delegate, name);
-        
+
+        // test key formation
+        suite.addTestSuite(TestKeyBuilder.class);
+ 
         // test of search correctness, focusing on cosine computations.
         suite.addTestSuite(TestSearch.class);
         

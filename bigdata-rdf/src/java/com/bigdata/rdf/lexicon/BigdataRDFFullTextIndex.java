@@ -30,10 +30,16 @@ package com.bigdata.rdf.lexicon;
 import java.io.StringReader;
 import java.util.Iterator;
 import java.util.Properties;
+import java.util.UUID;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 
+import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
+import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
@@ -99,6 +105,110 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
 
     }
 
+    /**
+     * Conditionally registers the necessary index(s).
+     * 
+     * @throws IllegalStateException
+     *             if the client does not have write access.
+     * 
+     * @todo this is not using {@link #acquireExclusiveLock()} since I generally
+     *       allocate the text index inside of another relation and
+     *       {@link #acquireExclusiveLock()} is not reentrant for zookeeper.
+     */
+    @Override
+    public void create() {
+
+        assertWritable();
+        
+        final String name = getNamespace() + "."+NAME_SEARCH;
+
+        final IIndexManager indexManager = getIndexManager();
+
+//        final IResourceLock resourceLock = acquireExclusiveLock();
+//
+//        try {
+
+            /*
+             * Register a tuple serializer that knows how to unpack the values and
+             * how to extract the bytes corresponding to the encoded text (they can
+             * not be decoded) from key and how to extract the document and field
+             * identifiers from the key.
+             */
+            final Properties p = getProperties();
+            
+            final IndexMetadata indexMetadata = new IndexMetadata(indexManager,
+                    p, name, UUID.randomUUID());
+
+            /*
+             * Override the collator strength property to use the configured
+             * value or the default for the text indexer rather than the
+             * standard default. This is done because you typically want to
+             * recognize only Primary differences for text search while you
+             * often want to recognize more differences when generating keys for
+             * a B+Tree.
+             * 
+             * Note: The choice of the language and country for the collator
+             * should not matter much for this purpose since the total ordering
+             * is not used except to scan all entries for a given term, so the
+             * relative ordering between terms does not matter.
+             */
+            final IKeyBuilderFactory keyBuilderFactory;
+            {
+            
+                final Properties tmp = new Properties(p);
+
+                tmp.setProperty(KeyBuilder.Options.STRENGTH, p.getProperty(
+                    Options.INDEXER_COLLATOR_STRENGTH,
+                    Options.DEFAULT_INDEXER_COLLATOR_STRENGTH));
+
+                keyBuilderFactory = new DefaultKeyBuilderFactory(tmp);
+
+            }
+
+            final boolean fieldsEnabled = Boolean.parseBoolean(p
+                    .getProperty(Options.FIELDS_ENABLED,
+                            Options.DEFAULT_FIELDS_ENABLED));
+    
+            if (log.isInfoEnabled())
+                log.info(Options.FIELDS_ENABLED + "=" + fieldsEnabled);
+    
+            final boolean doublePrecision = Boolean.parseBoolean(p
+                    .getProperty(Options.DOUBLE_PRECISION,
+                            Options.DEFAULT_DOUBLE_PRECISION));
+    
+            if (log.isInfoEnabled())
+                log.info(Options.DOUBLE_PRECISION + "=" + doublePrecision);
+
+            /*
+             * FIXME Optimize. SimpleRabaCoder will be faster, but can do better
+             * with record aware coder.
+             */
+            indexMetadata.setTupleSerializer(new RDFFullTextIndexTupleSerializer(
+                    keyBuilderFactory,//
+                    DefaultTupleSerializer.getDefaultLeafKeysCoder(),//
+                    DefaultTupleSerializer.getDefaultValuesCoder(),//
+                    fieldsEnabled,//
+                    doublePrecision//
+            ));
+            
+            indexManager.registerIndex(indexMetadata);
+
+            if (log.isInfoEnabled())
+                log.info("Registered new text index: name=" + name);
+
+            /*
+             * Note: defer resolution of the index.
+             */
+//            ndx = getIndex(name);
+
+//        } finally {
+//
+//            unlock(resourceLock);
+//
+//        }
+        
+    }
+    
     /**
      * The full text index is currently located in the same namespace as the
      * lexicon relation.  However, the distributed zookeeper locks (ZLocks)
@@ -173,11 +283,11 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
             assert termId != null; // the termId must have been assigned.
 
             // don't bother text indexing inline values for now
-            if (termId.isInline()) {
+            if (termId.isInline()) { // FIXME TERMS REFACTOR : Index all literals.
                 continue;
             }
             
-            index(buffer, termId.getTermId(), 0/* fieldId */, languageCode,
+            index(buffer, termId, 0/* fieldId */, languageCode,
                     new StringReader(text));
 
             n++;
@@ -191,5 +301,5 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
             log.info("indexed " + n + " new terms");
 
     }
-
+    
 }

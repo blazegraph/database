@@ -257,14 +257,16 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                  */
                 properties
                         .setProperty(FullTextIndex.Options.OVERWRITE, "false");
-                /*
-                 * Explicitly set the class which knows how to handle IVs in the
-                 * keys of the full text index.
-                 */
-                properties.setProperty(
-                        FullTextIndex.Options.DOCID_FACTORY_CLASS,
-                        IVDocIdExtension.class.getName());
+//                /*
+//                 * Explicitly set the class which knows how to handle IVs in the
+//                 * keys of the full text index.
+//                 */
+//                properties.setProperty(
+//                        FullTextIndex.Options.DOCID_FACTORY_CLASS,
+//                        IVDocIdExtension.class.getName());
+
             }
+            
         }
         
         this.storeBlankNodes = Boolean.parseBoolean(getProperty(
@@ -993,7 +995,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * 
      *       FIXME TERMS REFACTOR : This was originally written to the TERM2ID
      *       index. Perhaps it can be restated as an operation against the full
-     *       text index?
+     *       text index? [Very likely. The prefix match on the full text index
+     *       will match any token appearing anywhere in a literal which starts
+     *       with one of the tokens from the given literals. In order to have
+     *       the same semantics we must also verify that (a) the prefix match is
+     *       at the start of the literal; and (b) the match is contiguous.]
+     * 
      */
     @SuppressWarnings("unchecked")
     public Iterator<IV> prefixScan(final Literal[] lits) {
@@ -1446,12 +1453,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * {@link AbstractTripleStore.Options#TEXT_INDEX} must be enabled. This
      * operation is only supported when the {@link ITextIndexer} uses the
      * {@link FullTextIndex} class.
-     * 
-     * FIXME TERMS REFACTOR: This will have to be redone once we finish
-     * http://sourceforge.net/apps/trac/bigdata/ticket/109 (store large literals
-     * as blobs) since the ID2TERM index will disappear. [Also, if we are fully
-     * inlining literals then we will have to scan one of the statement indices
-     * as well!]
      */
     @SuppressWarnings("unchecked")
     public void rebuildTextIndex() {
@@ -1491,7 +1492,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                             protected boolean isValid(
                                     final ITuple<BigdataValue> obj) {
                                 final IV iv = (IV) tupSer.deserializeKey(obj);
-                                if (!iv.isNullIV() && iv.isLiteral()) {
+                                if (iv != null && iv.isLiteral()) {
                                     return true;
                                 }
                                 return false;

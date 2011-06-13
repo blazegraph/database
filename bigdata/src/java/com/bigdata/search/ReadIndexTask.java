@@ -41,7 +41,7 @@ public class ReadIndexTask<V extends Comparable<V>> implements Callable<Object> 
 //    private final boolean prefixMatch;
 //    private final int exactMatchLength;
     private final double queryTermWeight;
-    private final IRecordBuilder<V> recordBuilder;
+//    private final IRecordBuilder<V> recordBuilder;
     private final ConcurrentHashMap<V, Hit<V>> hits;
     private final ITupleIterator<?> itr;
 
@@ -92,18 +92,21 @@ public class ReadIndexTask<V extends Comparable<V>> implements Callable<Object> 
 
 //        this.fieldsEnabled = searchEngine.isFieldsEnabled();
         
-        this.recordBuilder = searchEngine.getRecordBuilder();
+//        this.recordBuilder = searchEngine.getRecordBuilder();
 
         this.hits = hits;
      
-        final IKeyBuilder keyBuilder = searchEngine.getKeyBuilder();
+        final IKeyBuilder keyBuilder = searchEngine.getIndex()
+                .getIndexMetadata().getKeyBuilder();
 
-        final byte[] fromKey;{//= recordBuilder.getFromKey(keyBuilder, termText);
+        final byte[] fromKey;
+        {// = recordBuilder.getFromKey(keyBuilder, termText);
             keyBuilder.reset();
-            keyBuilder.appendText(termText, true/* unicode */, false/*successor*/);
-            fromKey=keyBuilder.getKey();
+            keyBuilder
+                    .appendText(termText, true/* unicode */, false/* successor */);
+            fromKey = keyBuilder.getKey();
         }
-        
+
         final byte[] toKey;
         
         if (prefixMatch) {
@@ -193,18 +196,21 @@ public class ReadIndexTask<V extends Comparable<V>> implements Callable<Object> 
             // next entry
             final ITuple<?> tuple = itr.next();
             
-            // decode the document identifier.
-            final V docId = recordBuilder.getDocId(tuple);
+            // decode the tuple.
+            final ITermDocRecord<V> rec = (ITermDocRecord<V>) tuple.getObject();
+
+            // the document identifier.
+            final V docId = rec.getDocId();
             
             /*
              * Extract the term frequency and normalized term-frequency (term
              * weight) for this document.
              */
-            final ITermMetadata md = recordBuilder.decodeValue(tuple);
+//            final ITermMetadata md = recordBuilder.decodeValue(tuple);
 
-            final int termFreq = md.termFreq();
+            final int termFreq = rec.termFreq();
             
-            final double termWeight = md.getLocalTermWeight();
+            final double termWeight = rec.getLocalTermWeight();
             
             if (log.isDebugEnabled())
                 log.debug("hit: term=" + queryTerm + ", docId=" + docId

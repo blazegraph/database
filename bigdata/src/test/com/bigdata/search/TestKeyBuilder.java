@@ -30,11 +30,16 @@ package com.bigdata.search;
 
 import java.util.Properties;
 
-import junit.framework.TestCase2;
-
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.StrengthEnum;
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.ProxyTestCase;
 import com.bigdata.search.FullTextIndex.Options;
 
 /**
@@ -43,7 +48,7 @@ import com.bigdata.search.FullTextIndex.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestKeyBuilder extends TestCase2 {
+public class TestKeyBuilder extends ProxyTestCase<IIndexManager> {
 
     /**
      * 
@@ -98,47 +103,108 @@ public class TestKeyBuilder extends TestCase2 {
      */
     public void test_keyOrder() {
 
-        doKeyOrderTest(-1L/*docId*/, 0/*fieldId*/, true/*fieldsEnabled*/);
-        doKeyOrderTest(0L/*docId*/, 0/*fieldId*/, true/*fieldsEnabled*/);
-        doKeyOrderTest(1L/*docId*/, 12/*fieldId*/, true/*fieldsEnabled*/);
+        final String namespace = getName(); 
+        
+        final Properties properties = getProperties();
 
-        doKeyOrderTest(-1L/*docId*/, 0/*fieldId*/, false/*fieldsEnabled*/);
-        doKeyOrderTest(0L/*docId*/, 0/*fieldId*/, false/*fieldsEnabled*/);
-        doKeyOrderTest(1L/*docId*/, 0/*fieldId*/, false/*fieldsEnabled*/);
+        // The default Strength should be Primary.
+        assertEquals(
+                StrengthEnum.Primary,
+                StrengthEnum
+                        .valueOf(FullTextIndex.Options.DEFAULT_INDEXER_COLLATOR_STRENGTH));
 
+        // Use the default Strength.
+        properties.setProperty(KeyBuilder.Options.STRENGTH,
+                FullTextIndex.Options.DEFAULT_INDEXER_COLLATOR_STRENGTH);
+        
+        // Use English.
+        properties.setProperty(KeyBuilder.Options.USER_LANGUAGE, "en");
+
+        final IIndexManager store = getStore();
+        
+        try {
+            
+            final FullTextIndex<Long> ndx = new FullTextIndex<Long>(store,
+                    namespace, ITx.UNISOLATED, properties);
+            
+            ndx.create();
+            
+            final IndexMetadata indexMetadata = ndx.getIndex()
+                    .getIndexMetadata();
+            
+            final FullTextIndexTupleSerializer<Long> tupleSer = (FullTextIndexTupleSerializer<Long>) indexMetadata
+                    .getTupleSerializer();
+            
+            if(log.isInfoEnabled())
+                log.info(tupleSer.toString());
+            
+//            assertEquals("en", ((DefaultKeyBuilderFactory) tupleSer
+//                    .getKeyBuilderFactory()).getLocale().getLanguage());
+//            
+//            assertEquals(
+//                    FullTextIndex.Options.DEFAULT_INDEXER_COLLATOR_STRENGTH,
+//                    ((DefaultKeyBuilderFactory) tupleSer.getKeyBuilderFactory())
+//                            .getLocale().getLanguage());
+            
+            doKeyOrderTest(ndx, -1L/* docId */, 0/* fieldId */, true/* fieldsEnabled */);
+            doKeyOrderTest(ndx, 0L/* docId */,  0/* fieldId */, true/* fieldsEnabled */);
+            doKeyOrderTest(ndx, 1L/* docId */, 12/* fieldId */, true/* fieldsEnabled */);
+
+            doKeyOrderTest(ndx, -1L/* docId */, 0/* fieldId */, false/* fieldsEnabled */);
+            doKeyOrderTest(ndx, 0L/* docId */, 0/* fieldId */, false/* fieldsEnabled */);
+            doKeyOrderTest(ndx, 1L/* docId */, 0/* fieldId */, false/* fieldsEnabled */);
+            
+        } finally {
+            store.destroy();
+        }
     }
-    
-    protected void doKeyOrderTest(final long docId, final int fieldId,
-            final boolean fieldsEnabled) {
 
-        final boolean doublePrecision = false;
-        
-        final IKeyBuilder keyBuilder = getKeyBuilder();
-        
-        final IRecordBuilder<Long> tokenKeyBuilder = new DefaultRecordBuilder<Long>(
-                fieldsEnabled,//
-                doublePrecision,//
-                new DefaultDocIdExtension()//
-        );
+    protected void doKeyOrderTest(final FullTextIndex<Long> ndx,
+            final long docId, final int fieldId, final boolean fieldsEnabled) {
 
+//        final boolean doublePrecision = false;
+//        
+//        final IKeyBuilder keyBuilder = getKeyBuilder();
+//        
+//        final IRecordBuilder<Long> tokenKeyBuilder = new DefaultRecordBuilder<Long>(
+//                fieldsEnabled,//
+//                doublePrecision,//
+//                new DefaultDocIdExtension()//
+//        );
+
+        final ITupleSerializer<ITermDocKey<Long>, ITermDocVal> tupleSer = ndx
+                .getIndex().getIndexMetadata().getTupleSerializer();
+        
         // the full term.
-        final byte[] k0 = tokenKeyBuilder.getKey(keyBuilder, "brown",
-                false/* successor */, docId, fieldId);
+        final byte[] k0 = tupleSer.serializeKey(new ReadOnlyTermDocKey<Long>(
+                "brown", docId, fieldId));
 
         // the successor of the full term.
-        final byte[] k0s = tokenKeyBuilder.getKey(keyBuilder, "brown",
-                true/* successor */, docId, fieldId);
+        final byte[] k0s;{
+            final IKeyBuilder keyBuilder = tupleSer.getKeyBuilder();
+            keyBuilder.reset();
+            keyBuilder.appendText("brown", true/* unicode */, true/*successor*/);
+            k0s = keyBuilder.getKey();
+//            SuccessorUtil.tupleSer.serializeKey(new ReadOnlyTermDocKey<Long>("brown",
+//                docId, fieldId));
 
+        }
+        
         // verify sort key order for the full term and its successor.
         assertTrue(BytesUtil.compareBytes(k0, k0s) < 0);
 
         // a prefix of that term.
-        final byte[] k1 = tokenKeyBuilder.getKey(keyBuilder, "bro",
-                false/* successor */, docId, fieldId);
+        final byte[] k1 = tupleSer.serializeKey(new ReadOnlyTermDocKey<Long>(
+                "bro", docId, fieldId));
 
         // the successor of that prefix.
-        final byte[] k1s = tokenKeyBuilder.getKey(keyBuilder, "bro",
-                true/* successor */, docId, fieldId);
+        final byte[] k1s; {
+            //k1s = tokenKeyBuilder.getKey(keyBuilder, "bro", true/* successor */, docId, fieldId);
+            final IKeyBuilder keyBuilder = tupleSer.getKeyBuilder();
+            keyBuilder.reset();
+            keyBuilder.appendText("bro", true/* unicode */, true/*successor*/);
+            k1s = keyBuilder.getKey();
+        }
         
         // verify sort key order for prefix and its successor.
         assertTrue(BytesUtil.compareBytes(k0, k0s) < 0);
@@ -187,4 +253,33 @@ public class TestKeyBuilder extends TestCase2 {
 
     }
 
+    static private class ReadOnlyTermDocKey<V extends Comparable<V>> implements
+            ITermDocKey<V> {
+
+        private final String token;
+
+        private final V docId;
+
+        private final int fieldId;
+
+        private ReadOnlyTermDocKey(final String token, final V docId,
+                final int fieldId) {
+            this.token = token;
+            this.docId = docId;
+            this.fieldId = fieldId;
+        }
+
+        public String getToken() {
+            return token;
+        }
+
+        public V getDocId() {
+            return docId;
+        }
+
+        public int getFieldId() {
+            return fieldId;
+        }
+
+    }
 }

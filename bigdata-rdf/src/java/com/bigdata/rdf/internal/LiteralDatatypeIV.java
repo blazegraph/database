@@ -33,10 +33,10 @@ public class LiteralDatatypeIV<V extends BigdataLiteral> extends
 
     }
 
-    public long getTermId() throws UnsupportedOperationException {
-
-        throw new UnsupportedOperationException();
-        
-    }
+//    public long getTermId() throws UnsupportedOperationException {
+//
+//        throw new UnsupportedOperationException();
+//        
+//    }
 
 }
