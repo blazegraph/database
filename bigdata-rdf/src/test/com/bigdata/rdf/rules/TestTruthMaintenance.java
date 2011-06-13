@@ -288,9 +288,9 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             assertTrue(store.hasStatement(U, rdfsSubClassOf, X));
             
         } finally {
-        
-            if (tempStore != null)
-                tempStore.__tearDownUnitTest();
+            // Note: This will be torn down with the [store].
+//          if (tempStore != null)
+//              tempStore.__tearDownUnitTest();
             
             store.__tearDownUnitTest();
             
