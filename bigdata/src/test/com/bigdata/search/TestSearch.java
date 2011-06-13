@@ -31,6 +31,7 @@ package com.bigdata.search;
 import java.io.StringReader;
 import java.util.Iterator;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
@@ -88,10 +89,10 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
     public Properties getProperties() {
         
         Properties properties = new Properties( super.getProperties() );
-        
+
         /*
-         * FIXME specify the desired local, global, and document normalization
-         * methods.
+         * TODO Configure and test with various local, global, and document
+         * normalization methods.
          */
         
         return properties;
@@ -105,6 +106,15 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
 
         final String NAMESPACE = "test";
 
+        final boolean prefixMatch = false;
+        final double minCosine = .4;
+        final double maxCosine = 1.0d;
+        final int minRank = 1;
+        final int maxRank = Integer.MAX_VALUE;// (was 10000)
+        final boolean matchAllTerms = false;
+        final long timeout = Long.MAX_VALUE;
+        final TimeUnit unit = TimeUnit.MILLISECONDS;
+
         final Properties properties = getProperties();
         
         final IIndexManager indexManager = getStore( properties );
@@ -112,10 +122,10 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
         try {
 
             // setup and populate the index.
-            FullTextIndex ndx;
+            FullTextIndex<Long> ndx;
             {
                 
-                ndx = new FullTextIndex(indexManager, NAMESPACE,
+                ndx = new FullTextIndex<Long>(indexManager, NAMESPACE,
                         ITx.UNISOLATED, properties );
 
                 ndx.create();
@@ -125,7 +135,7 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
                  */
                 long docId = 1;
                 final int fieldId = 0;
-                final TokenBuffer buffer = new TokenBuffer(docs.length, ndx);
+                final TokenBuffer<Long> buffer = new TokenBuffer<Long>(docs.length, ndx);
                 for (String s : docs) {
 
                     ndx.index(buffer, Long.valueOf(docId++), fieldId,
@@ -142,9 +152,11 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
 
                 final String query = "child proofing";
 
-                final Hiterator<IHit<Long>> itr = ndx
-                        .search(query, languageCode, 0d/* minCosine */,
-                                Integer.MAX_VALUE/* maxRank */);
+                final Hiterator<Hit<Long>> itr = ndx.search(query,
+                        languageCode, prefixMatch, minCosine, maxCosine,
+                        minRank, maxRank, matchAllTerms, timeout, unit);
+//                                query, languageCode, 0d/* minCosine */,
+//                                Integer.MAX_VALUE/* maxRank */);
 
                 assertSameHits(new IHit[] { //
                         new HT<Long>(5L, .5),//
@@ -187,16 +199,34 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
 
             final IHit actual = itr.next();
 
-            log.info("rank=" + (i + 1) + ", expected=" + expected
-                    + ", actual: " + actual);
+            if(log.isInfoEnabled())
+                log.info("rank=" + (i + 1) + ", expected=" + expected
+                        + ", actual: " + actual);
 
             // first check the document.
             assertEquals("wrong document: rank=" + (i + 1),
                     expected.getDocId(), actual.getDocId());
 
-            // then verify the cosine.
-            assertEquals("wrong cosine: rank=" + (i + 1), expected.getCosine(),
-                    actual.getCosine());
+            /*
+             * Verify the cosine.
+             * 
+             * Note: This allows for some variation in the computed cosine. More
+             * variation will be present when the local term weights in the
+             * index are stored using single precision (versus double precision)
+             * values.
+             */
+       
+            final double expectedCosine = expected.getCosine();
+       
+            final double actualCosine = actual.getCosine();
+            
+            if (actualCosine < expectedCosine - .01d
+                    || actualCosine > expectedCosine + .01d) {
+            
+                assertEquals("wrong cosine: rank=" + (i + 1), expected
+                        .getCosine(), actual.getCosine());
+                
+            }
 
         }
 

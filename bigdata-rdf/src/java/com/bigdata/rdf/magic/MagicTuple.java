@@ -3,20 +3,10 @@ package com.bigdata.rdf.magic;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.MockTermIdFactory;
-import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.VTE;
 
 public class MagicTuple implements IMagicTuple {
-    private IV[] terms;
-
-    public MagicTuple(MockTermIdFactory f, int... terms) {
-        IV[] ivs = new IV[terms.length];
-        for (int i = 0; i < terms.length; i++) {
-            ivs[i] = f.newTermId(VTE.URI, terms[i]);
-        }
-        this.terms = ivs;
-    }
+    
+    final private IV[] terms;
     
     public MagicTuple(IV... terms) {
         this.terms = terms;

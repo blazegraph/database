@@ -52,7 +52,7 @@ import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.CognitiveWeb.util.CaseInsensitiveStringComparator;
+
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.History;
@@ -62,6 +62,7 @@ import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.service.Event;
 import com.bigdata.service.IEventReportingService;
 import com.bigdata.service.IService;
+import com.bigdata.util.CaseInsensitiveStringComparator;
 import com.bigdata.util.httpd.NanoHTTPD;
 
 /**

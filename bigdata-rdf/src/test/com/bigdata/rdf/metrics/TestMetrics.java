@@ -32,7 +32,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
-import java.net.InetAddress;
 import java.text.NumberFormat;
 import java.util.Iterator;
 import java.util.Map;
@@ -41,13 +40,13 @@ import java.util.TreeMap;
 
 import junit.framework.TestCase2;
 
-import org.CognitiveWeb.util.PropertyUtil;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
+import com.bigdata.util.PropertyUtil;
 import com.bigdata.util.config.NicUtil;
 
 /**

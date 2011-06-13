@@ -1,0 +1,2801 @@
+
+(object Petal
+    version    	46
+    _written   	"Rose 7.7.0204.3001"
+    charSet    	0)
+
+(object Design "Logical View"
+    is_unit    	TRUE
+    is_loaded  	TRUE
+    attributes 	(list Attribute_Set
+	(object Attribute
+	    tool       	"Java"
+	    name       	"IDE"
+	    value      	"Internal Editor")
+	(object Attribute
+	    tool       	"Java"
+	    name       	"UserDefineTagName1"
+	    value      	"")
+	(object Attribute
+	    tool       	"Java"
+	    name       	"UserDefineTagText1"
+	    value      	"")
+	(object Attribute
+	    tool       	"Java"
+	    name       	"UserDefineTagApply1"
+	    value      	"")
+	(object Attribute
+	    tool       	"Java"
+	    name       	"UserDefineTagName2"
+	    value      	"")
+	(object Attribute
+	    tool       	"Java"
+	    name       	"UserDefineTagText2"
+	    value      	"")
+	(object Attribute
+	    tool       	"Java"
+	    name       	"UserDefineTagApply2"
+	    value      	"")
+	(object Attribute
+	    tool       	"Java"
+	    name       	"UserDefineTagName3"
+	    value      	"")
+	(object Attribute
+	    tool       	"Java"
+	    name       	"UserDefineTagText3"
+	    value      	"")
+	(object Attribute
+	    tool       	"Java"
+	    name       	"UserDefineTagApply3"
+	    value      	""))
+    quid       	"416EAE140322"
+    defaults   	(object defaults
+	rightMargin 	0.250000
+	leftMargin 	0.250000
+	topMargin  	0.250000
+	bottomMargin 	0.500000
+	pageOverlap 	0.250000
+	clipIconLabels 	TRUE
+	autoResize 	TRUE
+	snapToGrid 	TRUE
+	gridX      	16
+	gridY      	16
+	defaultFont 	(object Font
+	    size       	10
+	    face       	"Arial"
+	    bold       	FALSE
+	    italics    	FALSE
+	    underline  	FALSE
+	    strike     	FALSE
+	    color      	0
+	    default_color 	TRUE)
+	showMessageNum 	1
+	showClassOfObject 	TRUE
+	notation   	"Unified")
+    root_usecase_package 	(object Class_Category "Use Case View"
+	quid       	"416EAE140324"
+	exportControl 	"Public"
+	global     	TRUE
+	logical_models 	(list unit_reference_list
+	    (object UseCase "Test Feature"
+		quid       	"416ECAE30359")
+	    (object UseCase "Test Configuration"
+		quid       	"416ECAEA03A9"))
+	logical_presentations 	(list unit_reference_list
+	    (object UseCaseDiagram "Main"
+		quid       	"416EAE1502E9"
+		title      	"Main"
+		zoom       	100
+		max_height 	28350
+		max_width  	21600
+		origin_x   	0
+		origin_y   	0
+		items      	(list diagram_item_list
+		    (object UseCaseView "Use Case View::Test Feature" @1
+			location   	(544, 432)
+			font       	(object Font
+			    size       	10
+			    face       	"Arial"
+			    bold       	FALSE
+			    italics    	FALSE
+			    underline  	FALSE
+			    strike     	FALSE
+			    color      	0
+			    default_color 	TRUE)
+			label      	(object ItemLabel
+			    Parent_View 	@1
+			    location   	(544, 570)
+			    anchor_loc 	1
+			    nlines     	2
+			    max_width  	630
+			    justify    	0
+			    label      	"Test Feature")
+			icon_style 	"Icon"
+			line_color 	3342489
+			fill_color 	13434879
+			quidu      	"416ECAE30359"
+			height     	118)
+		    (object UseCaseView "Use Case View::Test Configuration" @2
+			location   	(1152, 448)
+			font       	(object Font
+			    size       	10
+			    face       	"Arial"
+			    bold       	FALSE
+			    italics    	FALSE
+			    underline  	FALSE
+			    strike     	FALSE
+			    color      	0
+			    default_color 	TRUE)
+			label      	(object ItemLabel
+			    Parent_View 	@2
+			    location   	(1152, 586)
+			    anchor_loc 	1
+			    nlines     	2
+			    max_width  	630
+			    justify    	0
+			    label      	"Test Configuration")
+			icon_style 	"Icon"
+			line_color 	3342489
+			fill_color 	13434879
+			quidu      	"416ECAEA03A9"
+			height     	118)))))
+    root_category 	(object Class_Category "Logical View"
+	quid       	"416EAE140323"
+	exportControl 	"Public"
+	global     	TRUE
+	subsystem  	"Component View"
+	quidu      	"416EAE140325"
+	logical_models 	(list unit_reference_list
+	    (object Class_Category "junit"
+		is_unit    	TRUE
+		is_loaded  	FALSE
+		file_name  	"C:\\$CVSROOT\\junit-ext\\src\\architecture\\junit.cat"
+		quid       	"416EAE30003E")
+	    (object Class_Category "java"
+		quid       	"416ECAA60365"
+		exportControl 	"Public"
+		logical_models 	(list unit_reference_list
+		    (object Class_Category "util"
+			quid       	"416ECAAD018F"
+			exportControl 	"Public"
+			logical_models 	(list unit_reference_list
+			    (object Class "Properties"
+				quid       	"416EBC180336")
+			    (object Class "Enumeration"
+				quid       	"41790B9B0195"))
+			logical_presentations 	(list unit_reference_list))
+		    (object Class_Category "io"
+			quid       	"416ECAB7037E"
+			exportControl 	"Public"
+			logical_models 	(list unit_reference_list
+			    (object Class "File"
+				quid       	"416EBC250348"
+				used_nodes 	(list uses_relationship_list
+				    (object Uses_Relationship
+					quid       	"416EBC320333"
+					supplier   	"Logical View::java::util::Properties"
+					quidu      	"416EBC180336")))
+			    (object Class "InputStream"
+				quid       	"4179504002C1")
+			    (object Class "Reader"
+				quid       	"417950490350"))
+			logical_presentations 	(list unit_reference_list)))
+		logical_presentations 	(list unit_reference_list))
+	    (object Class_Category "org"
+		quid       	"41794FA501B9"
+		exportControl 	"Public"
+		logical_models 	(list unit_reference_list
+		    (object Class_Category "apache"
+			quid       	"41794FB70061"
+			exportControl 	"Public"
+			logical_models 	(list unit_reference_list
+			    (object Class_Category "log4j"
+				quid       	"41794FBD02FE"
+				exportControl 	"Public"
+				logical_models 	(list unit_reference_list
+				    (object Class "Logger"
+					quid       	"41794FCB0132"))
+				logical_presentations 	(list unit_reference_list)))
+			logical_presentations 	(list unit_reference_list)))
+		logical_presentations 	(list unit_reference_list)))
+	logical_presentations 	(list unit_reference_list
+	    (object ClassDiagram "Main"
+		quid       	"416EAE1502F2"
+		title      	"Main"
+		zoom       	100
+		max_height 	28350
+		max_width  	21600
+		origin_x   	3
+		origin_y   	0
+		items      	(list diagram_item_list
+		    (object CategoryView "Logical View::junit::framework" @3
+			location   	(368, 896)
+			font       	(object Font
+			    size       	10
+			    face       	"Arial"
+			    bold       	FALSE
+			    italics    	FALSE
+			    underline  	FALSE
+			    strike     	FALSE
+			    color      	0
+			    default_color 	TRUE)
+			label      	(object ItemLabel
+			    Parent_View 	@3
+			    location   	(224, 812)
+			    fill_color 	13434879
+			    nlines     	2
+			    max_width  	288
+			    justify    	0
+			    label      	"framework")
+			icon_style 	"Icon"
+			line_color 	3342489
+			fill_color 	13434879
+			quidu      	"416EAE41007E"
+			width      	300
+			height     	180)
+		    (object NoteView @4
+			location   	(992, 304)
+			font       	(object Font
+			    size       	10
+			    face       	"Arial"
+			    bold       	FALSE
+			    italics    	FALSE
+			    underline  	FALSE
+			    strike     	FALSE
+			    color      	0
+			    default_color 	TRUE)
+			label      	(object ItemLabel
+			    Parent_View 	@4
+			    location   	(79, 35)
+			    fill_color 	13434879
+			    nlines     	10
+			    max_width  	1790
+			    label      	
+|This module provides some extensions to the JUnit framework, including:
+|
+| - Support for a proxy delegation pattern.  This is useful when creating a test suite for an API that will have multiple implementations.
+|
+| - Support for hierarchical properties.
+|
+| - Support for loading test resources.
+|
+| - Various trivial convenience methods.
+			    )
+			line_color 	3342489
+			fill_color 	13434879
+			width      	1850
+			height     	550)
+		    (object NoteView @5
+			location   	(352, 1248)
+			font       	(object Font
+			    size       	10
+			    face       	"Arial"
+			    bold       	FALSE
+			    italics    	FALSE
+			    underline  	FALSE
+			    strike     	FALSE
+			    color      	0
+			    default_color 	TRUE)
+			label      	(object ItemLabel
+			    Parent_View 	@5
+			    location   	(180, 1182)
+			    fill_color 	13434879
+			    nlines     	2
+			    max_width  	309
+			    label      	"Overview of the JUnit framework.")
+			line_color 	3342489
+			fill_color 	13434879
+			width      	369
+			height     	144)
+		    (object AttachView "" @6
+			stereotype 	TRUE
+			line_color 	3342489
+			client     	@3
+			supplier   	@5
+			line_style 	3
+			origin_attachment 	(366, 986)
+			terminal_attachment 	(366, 1175))
+		    (object NoteView @7
+			location   	(992, 1248)
+			font       	(object Font
+			    size       	10
+			    face       	"Arial"
+			    bold       	FALSE
+			    italics    	FALSE
+			    underline  	FALSE
+			    strike     	FALSE
+			    color      	0
+			    default_color 	TRUE)
+			label      	(object ItemLabel
+			    Parent_View 	@7
+			    location   	(742, 1164)
+			    fill_color 	13434879
+			    nlines     	3
+			    max_width  	465
+			    label      	"Presents our extension for the proxy delegation pattern.")
+			line_color 	3342489
+			fill_color 	13434879
+			width      	525
+			height     	181)
+		    (object CategoryView "Logical View::junit::extensions::proxy" @8
+			location   	(928, 928)
+			font       	(object Font
+			    size       	10
+			    face       	"Arial"
+			    bold       	FALSE
+			    italics    	FALSE
+			    underline  	FALSE
+			    strike     	FALSE
+			    color      	0
+			    default_color 	TRUE)
+			label      	(object ItemLabel
+			    Parent_View 	@8
+			    location   	(771, 844)
+			    fill_color 	13434879
+			    nlines     	2
+			    max_width  	314
+			    justify    	0
+			    label      	"proxy")
+			icon_style 	"Icon"
+			line_color 	3342489
+			fill_color 	13434879
+			quidu      	"41794A2C0381"
+			width      	326
+			height     	180)
+		    (object AttachView "" @9
+			stereotype 	TRUE
+			line_color 	3342489
+			client     	@8
+			supplier   	@7
+			line_style 	3
+			origin_attachment 	(921, 1018)
+			terminal_attachment 	(921, 1157))
+		    (object ClassView "Class" "Logical View::junit::framework::TestCase2" @10
+			ShowCompartmentStereotypes 	TRUE
+			IncludeAttribute 	TRUE
+			IncludeOperation 	TRUE
+			location   	(1648, 992)
+			font       	(object Font
+			    size       	10
+			    face       	"Arial"
+			    bold       	FALSE
+			    italics    	FALSE
+			    underline  	FALSE
+			    strike     	FALSE
+			    color      	0
+			    default_color 	TRUE)
+			label      	(object ItemLabel
+			    Parent_View 	@10
+			    location   	(1395, 788)
+			    fill_color 	13434879
+			    nlines     	1
+			    max_width  	506
+			    justify    	0
+			    label      	"TestCase2")
+			icon_style 	"Icon"
+			line_color 	3342489
+			fill_color 	13434879
+			quidu      	"41794F54018B"
+			compartment 	(object Compartment
+			    Parent_View 	@10
+			    location   	(1395, 893)
+			    font       	(object Font
+				size       	10
+				face       	"Arial"
+				bold       	FALSE
+				italics    	FALSE
+				underline  	FALSE
+				strike     	FALSE
+				color      	0
+				default_color 	TRUE)
+			    icon_style 	"Icon"
+			    fill_color 	13434879
+			    anchor     	2
+			    nlines     	6
+			    max_width  	428)
+			width      	524
+			height     	432
+			annotation 	8
+			autoResize 	TRUE)
+		    (object NoteView @11
+			location   	(1648, 1360)
+			font       	(object Font
+			    size       	10
+			    face       	"Arial"
+			    bold       	FALSE
+			    italics    	FALSE
+			    underline  	FALSE
+			    strike     	FALSE
+			    color      	0
+			    default_color 	TRUE)
+			label      	(object ItemLabel
+			    Parent_View 	@11
+			    location   	(1420, 1301)
+			    fill_color 	13434879
+			    nlines     	2
+			    max_width  	421
+			    label      	"TestCase extensions.")
+			line_color 	3342489
+			fill_color 	13434879
+			width      	481
+			height     	131)
+		    (object AttachView "" @12
+			stereotype 	TRUE
+			line_color 	3342489
+			client     	@10
+			supplier   	@11
+			line_style 	3
+			origin_attachment 	(1648, 1208)
+			terminal_attachment 	(1648, 1294))))))
+    root_subsystem 	(object SubSystem "Component View"
+	quid       	"416EAE140325"
+	physical_models 	(list unit_reference_list)
+	physical_presentations 	(list unit_reference_list
+	    (object Module_Diagram "Main"
+		quid       	"416EAE1502E8"
+		title      	"Main"
+		zoom       	100
+		max_height 	28350
+		max_width  	21600
+		origin_x   	0
+		origin_y   	0
+		items      	(list diagram_item_list))))
+    process_structure 	(object Processes
+	quid       	"416EAE140326"
+	ProcsNDevs 	(list
+	    (object Process_Diagram "Deployment View"
+		quid       	"416EAE140328"
+		title      	"Deployment View"
+		zoom       	100
+		max_height 	28350
+		max_width  	21600
+		origin_x   	0
+		origin_y   	0
+		items      	(list diagram_item_list))))
+    properties 	(object Properties
+	attributes 	(list Attribute_Set
+	    (object Attribute
+		tool       	"CORBA"
+		name       	"propertyId"
+		value      	"809135966")
+	    (object Attribute
+		tool       	"CORBA"
+		name       	"default__Project"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"CreateMissingDirectories"
+			value      	TRUE)
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"Editor"
+			value      	("EditorType" 100))
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"IncludePath"
+			value      	"")
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"StopOnError"
+			value      	TRUE)
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"EditorType"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"CORBA"
+				name       	"BuiltIn"
+				value      	100)
+			    (object Attribute
+				tool       	"CORBA"
+				name       	"WindowsShell"
+				value      	101)))
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"PathSeparator"
+			value      	"")))
+	    (object Attribute
+		tool       	"CORBA"
+		name       	"default__Class"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"ArrayDimensions"
+			value      	"")
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"ConstValue"
+			value      	"")
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"ImplementationType"
+			value      	"")))
+	    (object Attribute
+		tool       	"CORBA"
+		name       	"default__Module-Spec"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"AdditionalIncludes"
+			value      	(value Text ""))
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"CmIdentification"
+			value      	(value Text "  %X% %Q% %Z% %W%"))
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"CopyrightNotice"
+			value      	(value Text ""))
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"InclusionProtectionSymbol"
+			value      	"AUTO GENERATE")))
+	    (object Attribute
+		tool       	"CORBA"
+		name       	"default__Module-Body"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"AdditionalIncludes"
+			value      	(value Text ""))
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"CmIdentification"
+			value      	(value Text "  %X% %Q% %Z% %W%"))
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"CopyrightNotice"
+			value      	(value Text ""))
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"InclusionProtectionSymbol"
+			value      	"AUTO GENERATE")))
+	    (object Attribute
+		tool       	"CORBA"
+		name       	"default__Operation"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"Context"
+			value      	"")
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"OperationIsOneWay"
+			value      	FALSE)))
+	    (object Attribute
+		tool       	"CORBA"
+		name       	"default__Attribute"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"ArrayDimensions"
+			value      	"")
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"CaseSpecifier"
+			value      	"")
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"IsReadOnly"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"Order"
+			value      	"")))
+	    (object Attribute
+		tool       	"CORBA"
+		name       	"default__Role"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"ArrayDimensions"
+			value      	"")
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"CaseSpecifier"
+			value      	"")
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"GenerateForwardReference"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"IsReadOnly"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"Order"
+			value      	"")
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"BoundedRoleType"
+			value      	("AssocTypeSet" 47))
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"AssocTypeSet"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"CORBA"
+				name       	"Array"
+				value      	24)
+			    (object Attribute
+				tool       	"CORBA"
+				name       	"Sequence"
+				value      	47)))))
+	    (object Attribute
+		tool       	"CORBA"
+		name       	"default__Uses"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"CORBA"
+			name       	"GenerateForwardReference"
+			value      	FALSE)))
+	    (object Attribute
+		tool       	"CORBA"
+		name       	"HiddenTool"
+		value      	FALSE)
+	    (object Attribute
+		tool       	"Deploy"
+		name       	"HiddenTool"
+		value      	FALSE)
+	    (object Attribute
+		tool       	"MOF"
+		name       	"propertyId"
+		value      	"809135966")
+	    (object Attribute
+		tool       	"JCR"
+		name       	"propertyId"
+		value      	"809135966")
+	    (object Attribute
+		tool       	"MOF"
+		name       	"default__Category"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"MOF"
+			name       	"uml2mof.hasImplicitReferences"
+			value      	"true")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"uml2mof.clusteredImport"
+			value      	"")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"rose2mof.supertypes"
+			value      	"")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"mof.idl_prefix"
+			value      	"")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"mof.idl_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"mof.idl_version"
+			value      	"")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"xmi.namespace"
+			value      	"")))
+	    (object Attribute
+		tool       	"JCR"
+		name       	"default__Category"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"JCR"
+			name       	"java_prefix"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"java_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"c_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"uuid"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"versioning.package"
+			value      	"")))
+	    (object Attribute
+		tool       	"MOF"
+		name       	"default__Class"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"MOF"
+			name       	"uml2mof.corbaType"
+			value      	(value Text ""))
+		    (object Attribute
+			tool       	"MOF"
+			name       	"uml2mof.repositoryId"
+			value      	"")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"mof.idl_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"mof.idl_version"
+			value      	"")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"xmi.enumerationUnprefix"
+			value      	"")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"uml2mof.evaluationPolicy"
+			value      	"deferred")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"rose2mof.constrainedElements"
+			value      	"")))
+	    (object Attribute
+		tool       	"JCR"
+		name       	"default__Class"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"JCR"
+			name       	"java_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"c_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"cpp_substitute_type"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"cpp_substitute_base"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"uuid"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"xmi.externalizeOK"
+			value      	"true")))
+	    (object Attribute
+		tool       	"MOF"
+		name       	"default__Role"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"MOF"
+			name       	"rose2mof.isChangeable"
+			value      	"true")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"mof.idl_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"mof.idl_version"
+			value      	"")))
+	    (object Attribute
+		tool       	"JCR"
+		name       	"default__Role"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"JCR"
+			name       	"java_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"c_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"uuid"
+			value      	"")))
+	    (object Attribute
+		tool       	"MOF"
+		name       	"default__Association"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"MOF"
+			name       	"rose2mof.visibility"
+			value      	"public_vis")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"mof.idl_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"mof.idl_version"
+			value      	"")))
+	    (object Attribute
+		tool       	"JCR"
+		name       	"default__Association"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"JCR"
+			name       	"java_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"c_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"uuid"
+			value      	"")))
+	    (object Attribute
+		tool       	"MOF"
+		name       	"default__Attribute"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"MOF"
+			name       	"rose2mof.multiplicity"
+			value      	"1")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"uml2mof.isOrdered"
+			value      	"false")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"uml2mof.isUnique"
+			value      	"false")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"rose2mof.isChangeable"
+			value      	"true")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"uml2mof.referencedEnd"
+			value      	"")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"mof.idl_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"mof.idl_version"
+			value      	"")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"xmi.defaultValue"
+			value      	"")))
+	    (object Attribute
+		tool       	"JCR"
+		name       	"default__Attribute"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"JCR"
+			name       	"java_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"c_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"uuid"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"mof.object_name"
+			value      	"false")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"xmi.externalizeOK"
+			value      	"true")))
+	    (object Attribute
+		tool       	"MOF"
+		name       	"default__Operation"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"MOF"
+			name       	"rose2mof.scope"
+			value      	"instance_level")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"rose2mof.isQuery"
+			value      	"false")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"rose2mof.return.multiplicity"
+			value      	"1")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"rose2mof.return.isOrdered"
+			value      	"false")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"rose2mof.return.isUnique"
+			value      	"false")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"mof.idl_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"mof.idl_version"
+			value      	"")))
+	    (object Attribute
+		tool       	"JCR"
+		name       	"default__Operation"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"JCR"
+			name       	"java_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"c_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"uuid"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"cpp_virtual"
+			value      	"false")))
+	    (object Attribute
+		tool       	"MOF"
+		name       	"default__Param"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"MOF"
+			name       	"uml2mof.multiplicity"
+			value      	"1")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"uml2mof.isOrdered"
+			value      	"false")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"uml2mof.isUnique"
+			value      	"false")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"rose2mof.direction"
+			value      	"in_dir")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"mof.idl_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"MOF"
+			name       	"mof.idl_version"
+			value      	"")))
+	    (object Attribute
+		tool       	"JCR"
+		name       	"default__Param"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"JCR"
+			name       	"java_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"c_substitute_name"
+			value      	"")
+		    (object Attribute
+			tool       	"JCR"
+			name       	"uuid"
+			value      	"")))
+	    (object Attribute
+		tool       	"JCRMOF"
+		name       	"HiddenTool"
+		value      	FALSE)
+	    (object Attribute
+		tool       	"UML"
+		name       	"propertyId"
+		value      	"809135966")
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__Category"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"useJavaExceptions"
+			value      	"true")
+		    (object Attribute
+			tool       	"UML"
+			name       	"requiredItem"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"requiredItemType"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"DependencyStereotype"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"DependencyName"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"useSeparateDependencies"
+			value      	"true")
+		    (object Attribute
+			tool       	"UML"
+			name       	"exportableUnit"
+			value      	"true")
+		    (object Attribute
+			tool       	"UML"
+			name       	"hasImportedUUIDs"
+			value      	"false")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__Class"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"useJavaExceptions"
+			value      	"true")
+		    (object Attribute
+			tool       	"UML"
+			name       	"secondaryStereotype"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"requiredItem"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"requiredItemType"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"DependencyStereotype"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"DependencyName"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"useSeparateDependencies"
+			value      	"true")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__Role"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"changeability"
+			value      	"changeable")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__Association"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__Attribute"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"multiplicity"
+			value      	"1")
+		    (object Attribute
+			tool       	"UML"
+			name       	"DependencySupplier"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"DependencyStereotype"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"DependencyName"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"useSeparateDependencies"
+			value      	"true")
+		    (object Attribute
+			tool       	"UML"
+			name       	"changeability"
+			value      	"changeable")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__Param"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"direction"
+			value      	"")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__Operation"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"returnDefaultValue"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"MethodLanguage"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"MethodBody"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"useSeparateDependencies"
+			value      	"true")
+		    (object Attribute
+			tool       	"UML"
+			name       	"DependencyName"
+			value      	"")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__Module"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__Subsystem"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"exportableUnit"
+			value      	"true")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__Link"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__ObjectInstance"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__StateMachine"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__ActivityModel"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__SwimLane"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__UseCase"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"requiredItem"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"requiredItemType"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"DependencyStereotype"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"DependencyName"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"useSeparateDependencies"
+			value      	"true")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__StateTransition"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"SendActionName"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"ActionScriptLanguage"
+			value      	"")
+		    (object Attribute
+			tool       	"UML"
+			name       	"ActionScriptBody"
+			value      	"")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__Model"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__Dependency"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")))
+	    (object Attribute
+		tool       	"UML"
+		name       	"default__Generalization"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"UML"
+			name       	"uuid"
+			value      	"")))
+	    (object Attribute
+		tool       	"JCRUML"
+		name       	"HiddenTool"
+		value      	FALSE)
+	    (object Attribute
+		tool       	"Java"
+		name       	"propertyId"
+		value      	"809135966")
+	    (object Attribute
+		tool       	"Java"
+		name       	"default__Project"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"Java"
+			name       	"RootDir"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"CreateMissingDirectories"
+			value      	TRUE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"StopOnError"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"UsePrefixes"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"AutoSync"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"NotShowRoseIDDlg"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"ShowCodegenDlg"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"GenerateRoseID"
+			value      	TRUE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"GenerateDefaultJ2EEJavadoc"
+			value      	TRUE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"GenerateDefaultReturnLine"
+			value      	TRUE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"JavadocDefaultAuthor"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"JavadocDefaultVersion"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"JavadocDefaultSince"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"UserDefineJavaDocTags"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"JavadocNumAsterisks"
+			value      	0)
+		    (object Attribute
+			tool       	"Java"
+			name       	"MaxNumChars"
+			value      	80)
+		    (object Attribute
+			tool       	"Java"
+			name       	"Editor"
+			value      	("EditorType" 100))
+		    (object Attribute
+			tool       	"Java"
+			name       	"VM"
+			value      	("VMType" 200))
+		    (object Attribute
+			tool       	"Java"
+			name       	"ClassPath"
+			value      	"C:\\j2sdk1.4.1_02\\jre\\lib\\charsets.jar;C:\\j2sdk1.4.1_02\\jre\\lib\\jaws.jar;C:\\j2sdk1.4.1_02\\jre\\lib\\jce.jar;C:\\j2sdk1.4.1_02\\jre\\lib\\jsse.jar;C:\\j2sdk1.4.1_02\\jre\\lib\\rt.jar;C:\\j2sdk1.4.1_02\\jre\\lib\\sunrsasign.jar;C:\\j2sdk1.4.1_02\\jre\\lib\\ext\\dnsns.jar;C:\\j2sdk1.4.1_02\\jre\\lib\\ext\\ldapsec.jar;C:\\j2sdk1.4.1_02\\jre\\lib\\ext\\localedata.jar;C:\\j2sdk1.4.1_02\\jre\\lib\\ext\\sunjce_provider.jar;C:\\j2sdk1.4.1_02\\jre\\lib\\security\\local_policy.jar;C:\\j2sdk1.4.1_02\\jre\\lib\\security\\US_export_policy.jar;C:\\j2sdk1.4.1_02\\lib\\dt.jar;C:\\j2sdk1.4.1_02\\lib\\htmlconverter.jar;C:\\j2sdk1.4.1_02\\lib\\tools.jar;C:\\usr\\local\\snipsnap-0.4.2a\\src;C:\\usr\\local\\snipsnap-0.4.2a\\lib\\xmlrpc-1.1.jar;C:\\usr\\local\\snipsnap-0.4.2a\\lib\\mckoidb.jar;C:\\usr\\local\\snipsnap-0.4.2a\\lib\\muse-jabber-0.8a1.jar;C:\\usr\\local\\snipsnap-0.4.2a\\lib\\radeox.jar;C:\\usr\\local\\src\\xtm\\target\\classes;C:\\usr\\local\\src\\xpointer\\target\\cweb-xpointer-1.1-b3-dev.jar;C:\\usr\\local\\dom4j-1.4\\dom4j-full.jar;C:\\usr\\local\\antlr-2.7.4\\antlr.jar;C:\\usr\\local\\src\\commons\\target\\cweb-commons-1.1-b1-dev.jar;C:\\home\\bryan\\.maven\\repository\\log4j\\jars\\log4j-1.2.8.jar")
+		    (object Attribute
+			tool       	"Java"
+			name       	"ReferenceClasspath"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"EditorType"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"Java"
+				name       	"BuiltIn"
+				value      	100)))
+		    (object Attribute
+			tool       	"Java"
+			name       	"VMType"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"Java"
+				name       	"Sun"
+				value      	200)))
+		    (object Attribute
+			tool       	"Java"
+			name       	"VAJavaWorkingFolder"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"InstanceVariablePrefix"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"ClassVariablePrefix"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"DefaultAttributeDataType"
+			value      	"int")
+		    (object Attribute
+			tool       	"Java"
+			name       	"DefaultOperationReturnType"
+			value      	"void")
+		    (object Attribute
+			tool       	"Java"
+			name       	"NoClassCustomDlg"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"GlobalImports"
+			value      	(value Text ""))
+		    (object Attribute
+			tool       	"Java"
+			name       	"OpenBraceClassStyle"
+			value      	TRUE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"OpenBraceMethodStyle"
+			value      	TRUE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"UseTabs"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"UseSpaces"
+			value      	TRUE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"SpacingItems"
+			value      	3)
+		    (object Attribute
+			tool       	"Java"
+			name       	"RoseDefaultCommentStyle"
+			value      	TRUE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"AsteriskCommentStyle"
+			value      	TRUE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"JavaCommentStyle"
+			value      	TRUE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"JavadocAuthor"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"JavadocSince"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"JavadocVersion"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"BeanPrefix"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"BeanSuffix"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"RemotePrefix"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"RemoteSuffix"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"HomePrefix"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"HomeSuffix"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"LocalPrefix"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"LocalSuffix"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"LocalHomePrefix"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"LocalHomeSuffix"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"PrimaryKeyPrefix"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"PrimaryKeySuffix"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBDTDLocation"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletDTDLocation"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"DefaultEJBVersion"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"DefaultServletVersion"
+			value      	"")))
+	    (object Attribute
+		tool       	"Java"
+		name       	"default__Class"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"Java"
+			name       	"Final"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"Static"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"GenerateDefaultConstructor"
+			value      	TRUE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"ConstructorIs"
+			value      	("Ctor_Set" 62))
+		    (object Attribute
+			tool       	"Java"
+			name       	"Ctor_Set"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"Java"
+				name       	"public"
+				value      	62)
+			    (object Attribute
+				tool       	"Java"
+				name       	"protected"
+				value      	63)
+			    (object Attribute
+				tool       	"Java"
+				name       	"private"
+				value      	64)
+			    (object Attribute
+				tool       	"Java"
+				name       	"package"
+				value      	65)))
+		    (object Attribute
+			tool       	"Java"
+			name       	"GenerateFinalizer"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"GenerateStaticInitializer"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"GenerateInstanceInitializer"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"GenerateCode"
+			value      	TRUE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"DisableAutoSync"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"ReadOnly"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"Strictfp"
+			value      	FALSE)))
+	    (object Attribute
+		tool       	"Java"
+		name       	"Default_Servlet__Class"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletName"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletContextRef"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"IsSingleThread"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletInitParameter"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletInitParameterNames"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletIsSecure"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletRequestDispatcher"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletRequestDispatcherPath"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"DispatcherInclude"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"DispatcherForward"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletSecurityRoles"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletgetInfo"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletXMLFilePath"
+			value      	"")))
+	    (object Attribute
+		tool       	"Java"
+		name       	"Http_Servlet__Class"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletRequestAttribute"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletRequestAttributesNames"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"MethodForRequestAttributes"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletRequestParameter"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletRequestParameterNames"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"MethodForRequestParameters"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletHeader"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletHeaderNames"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"MethodForHeaders"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletIntHeader"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletDateHeader"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletCookie"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"MethodForCookie"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"ServletContentType"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"GenerateHTML"
+			value      	FALSE)))
+	    (object Attribute
+		tool       	"Java"
+		name       	"Default_EJB__Class"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"Java"
+			name       	"Generate_XML_DD"
+			value      	TRUE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBCmpField"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBEnvironmentProperties"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBCnxFactory"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBReferences"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBSecurityRoles"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBNameInJAR"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBSessionType"
+			value      	("EJBSessionType_Set" 200))
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBSessionType_Set"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"Java"
+				name       	""
+				value      	200)
+			    (object Attribute
+				tool       	"Java"
+				name       	"Stateless"
+				value      	201)
+			    (object Attribute
+				tool       	"Java"
+				name       	"Stateful"
+				value      	202)))
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBTransactionType"
+			value      	("EJBTransactionType_Set" 211))
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBTransactionType_Set"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"Java"
+				name       	"Container"
+				value      	211)
+			    (object Attribute
+				tool       	"Java"
+				name       	"Bean"
+				value      	212)))
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBPersistenceType"
+			value      	("EJBPersistenceType_Set" 220))
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBPersistenceType_Set"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"Java"
+				name       	""
+				value      	220)
+			    (object Attribute
+				tool       	"Java"
+				name       	"Bean"
+				value      	221)
+			    (object Attribute
+				tool       	"Java"
+				name       	"Container"
+				value      	222)))
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBReentrant"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBSessionSync"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBVersion"
+			value      	("EJBVersion_Set" 230))
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBVersion_Set"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"Java"
+				name       	"2.0"
+				value      	230)
+			    (object Attribute
+				tool       	"Java"
+				name       	"1.x"
+				value      	231)))
+		    (object Attribute
+			tool       	"Java"
+			name       	"EJBXMLFilePath"
+			value      	"")))
+	    (object Attribute
+		tool       	"Java"
+		name       	"default__Module-Spec"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"Java"
+			name       	"CmIdentification"
+			value      	(value Text ""))
+		    (object Attribute
+			tool       	"Java"
+			name       	"CopyrightNotice"
+			value      	(value Text ""))))
+	    (object Attribute
+		tool       	"Java"
+		name       	"default__Module-Body"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"Java"
+			name       	"CmIdentification"
+			value      	(value Text ""))
+		    (object Attribute
+			tool       	"Java"
+			name       	"CopyrightNotice"
+			value      	(value Text ""))))
+	    (object Attribute
+		tool       	"Java"
+		name       	"default__Operation"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"Java"
+			name       	"Abstract"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"Static"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"Final"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"Native"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"Synchronized"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"GenerateFullyQualifiedReturn"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"ReplaceExistingCode"
+			value      	TRUE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"Strictfp"
+			value      	FALSE)))
+	    (object Attribute
+		tool       	"Java"
+		name       	"default__Attribute"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"Java"
+			name       	"Final"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"Transient"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"Volatile"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"PropertyType"
+			value      	("BeanProperty_Set" 71))
+		    (object Attribute
+			tool       	"Java"
+			name       	"BeanProperty_Set"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"Java"
+				name       	"Not A Property"
+				value      	71)
+			    (object Attribute
+				tool       	"Java"
+				name       	"Simple"
+				value      	72)
+			    (object Attribute
+				tool       	"Java"
+				name       	"Bound"
+				value      	73)
+			    (object Attribute
+				tool       	"Java"
+				name       	"Constrained"
+				value      	74)))
+		    (object Attribute
+			tool       	"Java"
+			name       	"IndividualChangeMgt"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"Read/Write"
+			value      	("Read/Write_Set" 81))
+		    (object Attribute
+			tool       	"Java"
+			name       	"Read/Write_Set"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"Java"
+				name       	"Read & Write"
+				value      	81)
+			    (object Attribute
+				tool       	"Java"
+				name       	"Read Only"
+				value      	82)
+			    (object Attribute
+				tool       	"Java"
+				name       	"Write Only"
+				value      	83)))
+		    (object Attribute
+			tool       	"Java"
+			name       	"GenerateFullyQualifiedTypes"
+			value      	FALSE)))
+	    (object Attribute
+		tool       	"Java"
+		name       	"default__Role"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"Java"
+			name       	"ContainerClass"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"InitialValue"
+			value      	"")
+		    (object Attribute
+			tool       	"Java"
+			name       	"Final"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"Transient"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"Volatile"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"PropertyType"
+			value      	("BeanProperty_Set" 71))
+		    (object Attribute
+			tool       	"Java"
+			name       	"BeanProperty_Set"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"Java"
+				name       	"Not A Property"
+				value      	71)
+			    (object Attribute
+				tool       	"Java"
+				name       	"Simple"
+				value      	72)
+			    (object Attribute
+				tool       	"Java"
+				name       	"Bound"
+				value      	73)
+			    (object Attribute
+				tool       	"Java"
+				name       	"Constrained"
+				value      	74)))
+		    (object Attribute
+			tool       	"Java"
+			name       	"IndividualChangeMgt"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"Read/Write"
+			value      	("Read/Write_Set" 81))
+		    (object Attribute
+			tool       	"Java"
+			name       	"Read/Write_Set"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"Java"
+				name       	"Read & Write"
+				value      	81)
+			    (object Attribute
+				tool       	"Java"
+				name       	"Read Only"
+				value      	82)
+			    (object Attribute
+				tool       	"Java"
+				name       	"Write Only"
+				value      	83)))
+		    (object Attribute
+			tool       	"Java"
+			name       	"GenerateFullyQualifiedTypes"
+			value      	FALSE)
+		    (object Attribute
+			tool       	"Java"
+			name       	"IsNavigable"
+			value      	TRUE)))
+	    (object Attribute
+		tool       	"Java"
+		name       	"HiddenTool"
+		value      	FALSE)
+	    (object Attribute
+		tool       	"Rose Model Integrator"
+		name       	"HiddenTool"
+		value      	FALSE)
+	    (object Attribute
+		tool       	"Rose Web Publisher"
+		name       	"HiddenTool"
+		value      	FALSE)
+	    (object Attribute
+		tool       	"TopLink"
+		name       	"HiddenTool"
+		value      	FALSE)
+	    (object Attribute
+		tool       	"Version Control"
+		name       	"HiddenTool"
+		value      	FALSE)
+	    (object Attribute
+		tool       	"XSD"
+		name       	"propertyId"
+		value      	"809132347")
+	    (object Attribute
+		tool       	"XSD"
+		name       	"default__Project"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"XSD"
+			name       	"Editor"
+			value      	("EditorType" 100))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"IncludePath"
+			value      	"")
+		    (object Attribute
+			tool       	"XSD"
+			name       	"EditorType"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"BuiltIn"
+				value      	100)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"WindowsShell"
+				value      	101)))))
+	    (object Attribute
+		tool       	"XSD"
+		name       	"default__Category"
+		value      	(list Attribute_Set))
+	    (object Attribute
+		tool       	"XSD"
+		name       	"XSDschema__Category"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"XSD"
+			name       	"targetNamespace"
+			value      	"")
+		    (object Attribute
+			tool       	"XSD"
+			name       	"targetNamespacePrefix"
+			value      	"")
+		    (object Attribute
+			tool       	"XSD"
+			name       	"version"
+			value      	"")
+		    (object Attribute
+			tool       	"XSD"
+			name       	"elementFormDefault"
+			value      	("FormKind" 32))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"attributeFormDefault"
+			value      	("FormKind" 32))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"modelGroup"
+			value      	("ModelGroupKind" 14))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"attributeMapping"
+			value      	("StructureKind" 23))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"roleMapping"
+			value      	("StructureKind" 23))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"memberNames"
+			value      	("FormKind" 32))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"anonymousType"
+			value      	("TriStateBoolean" 102))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"anonymousRole"
+			value      	("TriStateBoolean" 102))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"typeDerivation"
+			value      	("TriStateBoolean" 102))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"typeSuffix"
+			value      	"")
+		    (object Attribute
+			tool       	"XSD"
+			name       	"refSuffix"
+			value      	"")
+		    (object Attribute
+			tool       	"XSD"
+			name       	"elementNameMapping"
+			value      	("ElementNameKind" 94))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"relaxedMultiplicity"
+			value      	("TriStateBoolean" 102))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"xmiCompliant"
+			value      	("TriStateBoolean" 102))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"ModelGroupKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"all"
+				value      	10)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"choice"
+				value      	11)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"sequence"
+				value      	12)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"none"
+				value      	13)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	14)))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"StructureKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"element"
+				value      	20)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"attribute"
+				value      	21)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"both"
+				value      	22)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	23)))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"FormKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"qualified"
+				value      	30)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"unqualified"
+				value      	31)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	32)))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"ElementNameKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"lowerCamelCase"
+				value      	90)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"upperCamelCase"
+				value      	91)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"hyphenLowerCase"
+				value      	92)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"omitElement"
+				value      	93)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	94)))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"TriStateBoolean"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"True"
+				value      	100)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"False"
+				value      	101)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	102)))))
+	    (object Attribute
+		tool       	"XSD"
+		name       	"default__Class"
+		value      	(list Attribute_Set))
+	    (object Attribute
+		tool       	"XSD"
+		name       	"XSDcomplexType__Class"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"XSD"
+			name       	"mixed"
+			value      	("TriStateBoolean" 102))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"modelGroup"
+			value      	("ModelGroupKind" 14))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"attributeMapping"
+			value      	("StructureKind" 23))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"roleMapping"
+			value      	("StructureKind" 23))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"memberNames"
+			value      	("FormKind" 32))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"elementNameMapping"
+			value      	("ElementNameKind" 94))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"ModelGroupKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"all"
+				value      	10)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"choice"
+				value      	11)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"sequence"
+				value      	12)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"none"
+				value      	13)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	14)))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"StructureKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"element"
+				value      	20)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"attribute"
+				value      	21)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"both"
+				value      	22)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	23)))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"FormKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"qualified"
+				value      	30)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"unqualified"
+				value      	31)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	32)))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"ElementNameKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"lowerCamelCase"
+				value      	90)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"upperCamelCase"
+				value      	91)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"hyphenLowerCase"
+				value      	92)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"omitElement"
+				value      	93)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	94)))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"TriStateBoolean"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"True"
+				value      	100)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"False"
+				value      	101)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	102)))))
+	    (object Attribute
+		tool       	"XSD"
+		name       	"XSDsimpleType__Class"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"XSD"
+			name       	"derivation"
+			value      	("DerivationKind" 43))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"DerivationKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"restriction"
+				value      	40)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"list"
+				value      	41)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"union"
+				value      	42)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	43)))))
+	    (object Attribute
+		tool       	"XSD"
+		name       	"enumeration__Class"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"XSD"
+			name       	"default"
+			value      	"")))
+	    (object Attribute
+		tool       	"XSD"
+		name       	"XSDany__Class"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"XSD"
+			name       	"namespace"
+			value      	"")
+		    (object Attribute
+			tool       	"XSD"
+			name       	"processContents"
+			value      	("ProcessKind" 63))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"ProcessKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"skip"
+				value      	60)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"lax"
+				value      	61)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"strict"
+				value      	62)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	63)))))
+	    (object Attribute
+		tool       	"XSD"
+		name       	"default__Attribute"
+		value      	(list Attribute_Set))
+	    (object Attribute
+		tool       	"XSD"
+		name       	"XSDelement__Attribute"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"XSD"
+			name       	"form"
+			value      	("FormKind" 32))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"position"
+			value      	0)
+		    (object Attribute
+			tool       	"XSD"
+			name       	"anonymousType"
+			value      	("TriStateBoolean" 102))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"anonymousRole"
+			value      	("TriStateBoolean" 102))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"FormKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"qualified"
+				value      	30)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"unqualified"
+				value      	31)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	32)))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"TriStateBoolean"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"True"
+				value      	100)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"False"
+				value      	101)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	102)))))
+	    (object Attribute
+		tool       	"XSD"
+		name       	"XSDattribute__Attribute"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"XSD"
+			name       	"form"
+			value      	("FormKind" 32))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"use"
+			value      	("UseKind" 54))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"FormKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"qualified"
+				value      	30)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"unqualified"
+				value      	31)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	32)))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"UseKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"prohibited"
+				value      	50)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"optional"
+				value      	51)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"required"
+				value      	52)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"fixed"
+				value      	53)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	54)))))
+	    (object Attribute
+		tool       	"XSD"
+		name       	"XSDany__Attribute"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"XSD"
+			name       	"namespace"
+			value      	"")
+		    (object Attribute
+			tool       	"XSD"
+			name       	"processContents"
+			value      	("ProcessKind" 63))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"ProcessKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"skip"
+				value      	60)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"lax"
+				value      	61)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"strict"
+				value      	62)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	63)))))
+	    (object Attribute
+		tool       	"XSD"
+		name       	"default__Role"
+		value      	(list Attribute_Set))
+	    (object Attribute
+		tool       	"XSD"
+		name       	"XSDelement__Role"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"XSD"
+			name       	"stereotype"
+			value      	("StereotypeKind" 72))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"form"
+			value      	("FormKind" 32))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"position"
+			value      	0)
+		    (object Attribute
+			tool       	"XSD"
+			name       	"anonymousType"
+			value      	("TriStateBoolean" 102))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"anonymousRole"
+			value      	("TriStateBoolean" 102))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"FormKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"qualified"
+				value      	30)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"unqualified"
+				value      	31)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	32)))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"StereotypeKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"XSDattribute"
+				value      	70)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"XSDelement"
+				value      	71)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	72)))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"TriStateBoolean"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"True"
+				value      	100)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"False"
+				value      	101)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	102)))))
+	    (object Attribute
+		tool       	"XSD"
+		name       	"XSDattribute__Role"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"XSD"
+			name       	"stereotype"
+			value      	("StereotypeKind" 72))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"form"
+			value      	("FormKind" 32))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"use"
+			value      	("UseKind" 54))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"attributeType"
+			value      	("TypeKind" 84))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"FormKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"qualified"
+				value      	30)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"unqualified"
+				value      	31)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	32)))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"UseKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"prohibited"
+				value      	50)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"optional"
+				value      	51)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"required"
+				value      	52)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"fixed"
+				value      	53)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	54)))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"StereotypeKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"XSDattribute"
+				value      	70)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"XSDelement"
+				value      	71)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	72)))
+		    (object Attribute
+			tool       	"XSD"
+			name       	"TypeKind"
+			value      	(list Attribute_Set
+			    (object Attribute
+				tool       	"XSD"
+				name       	"xs:IDREF"
+				value      	80)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"xs:QName"
+				value      	81)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"xs:anyURI"
+				value      	82)
+			    (object Attribute
+				tool       	"XSD"
+				name       	"xs:string"
+				value      	83)
+			    (object Attribute
+				tool       	"XSD"
+				name       	""
+				value      	84)))))
+	    (object Attribute
+		tool       	"XSD"
+		name       	"default__Uses"
+		value      	(list Attribute_Set
+		    (object Attribute
+			tool       	"XSD"
+			name       	"schemaLocation"
+			value      	"")))
+	    (object Attribute
+		tool       	"XMLschema"
+		name       	"HiddenTool"
+		value      	FALSE))
+	quid       	"416EAE140327"))

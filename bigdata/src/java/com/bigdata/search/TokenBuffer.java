@@ -63,6 +63,7 @@ public class TokenBuffer<V extends Comparable<V>> {
      *            The object on which the buffer will write when it overflows or
      *            is {@link #flush()}ed.
      */
+    @SuppressWarnings("unchecked")
     public TokenBuffer(final int capacity, final FullTextIndex<V> textIndexer) {
         
         if (capacity <= 0)
@@ -270,6 +271,9 @@ public class TokenBuffer<V extends Comparable<V>> {
             log.info("count=" + count + ", ndocs=" + ndocs + ", nfields="
                     + nfields + ", nterms=" + nterms);
 
+        // Normalize the last document/field in the buffer
+        buffer[count - 1].normalize();
+        
         /*
          * Generate keys[] and vals[].
          */
@@ -278,16 +282,16 @@ public class TokenBuffer<V extends Comparable<V>> {
         // array of correlated key/value tuples.
         final KV[] a = new KV[nterms];
 
-        // Note: reused for each {doc,field,token} tuple key.
+        // Note: reused for each {token,docId,fieldId} tuple key.
         final IKeyBuilder keyBuilder = textIndexer.getKeyBuilder();
 
-        // Note: reused for each {doc,field,token} tuple value.
+        // Note: reused for each {token,docId,fieldId} tuple value.
         final ByteArrayBuffer buf = new ByteArrayBuffer();
 
-        // #of {term,doc,field} tuples generated
+        // #of {token,docId,fieldId} tuples generated
         int n = 0;
 
-        // for each {doc,field} tuple.
+        // for each document in the buffer.
         for (int i = 0; i < count; i++) {
 
             final TermFrequencyData<V> termFreq = buffer[i];
@@ -296,7 +300,7 @@ public class TokenBuffer<V extends Comparable<V>> {
 
             final int fieldId = termFreq.fieldId;
             
-            // emit {term,doc,field} tuples.
+            // emit {token,docId,fieldId} tuples.
             for(Map.Entry<String, ITermMetadata> e : termFreq.terms.entrySet()) {
 
                 final String termText = e.getKey();
@@ -306,10 +310,11 @@ public class TokenBuffer<V extends Comparable<V>> {
                 final byte[] key = recordBuilder.getKey(keyBuilder, termText,
                         false/* successor */, docId, fieldId);
                 
-                if(log.isDebugEnabled()) {
+                if (log.isDebugEnabled()) {
                     log.debug("{" + termText + "," + docId + "," + fieldId
-                            + "}: #occurences="
-                            + termMetadata.termFreq());
+                            + "}: #occurences=" + termMetadata.termFreq()
+                            + ", termWeight="
+                            + termMetadata.getLocalTermWeight());
                 }
                 
                 final byte[] val = recordBuilder.getValue(buf, termMetadata);
@@ -328,8 +333,6 @@ public class TokenBuffer<V extends Comparable<V>> {
 
         /*
          * Copy the correlated key:val data into keys[] and vals[] arrays.
-         * 
-         * @todo vals[] not used if only the token presence is recorded.
          */
 
         final byte[][] keys = new byte[nterms][];

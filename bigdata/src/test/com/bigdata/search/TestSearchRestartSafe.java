@@ -30,6 +30,7 @@ package com.bigdata.search;
 
 import java.io.StringReader;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
@@ -88,6 +89,15 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
     
     public void test_simple() throws InterruptedException {
 
+        final boolean prefixMatch = false;
+        final double minCosine = .4;
+        final double maxCosine = 1.0d;
+        final int minRank = 1;
+        final int maxRank = Integer.MAX_VALUE;// (was 10000)
+        final boolean matchAllTerms = false;
+        final long timeout = Long.MAX_VALUE;
+        final TimeUnit unit = TimeUnit.MILLISECONDS;
+
         final Properties properties = getProperties();
         
         IIndexManager indexManager = getStore(properties);
@@ -105,12 +115,12 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
             final String languageCode = "EN";
             {
 
-                final FullTextIndex ndx = new FullTextIndex(indexManager,
+                final FullTextIndex<Long> ndx = new FullTextIndex<Long>(indexManager,
                         NAMESPACE, ITx.UNISOLATED, properties);
 
                 ndx.create();
 
-                final TokenBuffer buffer = new TokenBuffer(2, ndx);
+                final TokenBuffer<Long> buffer = new TokenBuffer<Long>(2, ndx);
 
                 ndx.index(buffer, docId, fieldId, languageCode,
                         new StringReader(text));
@@ -125,22 +135,29 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
             /* Search w/o restart. */
             {
 
-                final FullTextIndex ndx = new FullTextIndex(indexManager,
+                final FullTextIndex<Long> ndx = new FullTextIndex<Long>(indexManager,
                         NAMESPACE, ITx.UNISOLATED, properties);
 
-                final Hiterator<?> itr = ndx.search(text, languageCode);
-
-                assertEquals(2, itr.size());
+                final Hiterator<?> itr = 
+//                    ndx.search(
+//                        text, languageCode
+//                        );
+                ndx.search(text,
+                        languageCode, prefixMatch, minCosine, maxCosine,
+                        minRank, maxRank, matchAllTerms, timeout, unit);
+                
+                assertEquals(1, itr.size()); // Note: 2nd result pruned by cosine.
 
                 assertTrue(itr.hasNext());
 
-                final IHit hit1 = itr.next();
+                final IHit<?> hit1 = itr.next();
 
-                System.err.println("hit1:" + hit1);
+                if(log.isInfoEnabled())
+                    log.info("hit1:" + hit1);
 
-                /*
-                 * Note: with cosine computation only the first hit is visited.
-                 */
+//                /*
+//                 * Note: with cosine computation only the first hit is visited.
+//                 */
 
                 assertFalse(itr.hasNext());
 
@@ -154,22 +171,26 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
             /* Search with restart. */
             {
 
-                final FullTextIndex ndx = new FullTextIndex(indexManager,
-                        NAMESPACE, ITx.UNISOLATED, properties);
+                final FullTextIndex<Long> ndx = new FullTextIndex<Long>(
+                        indexManager, NAMESPACE, ITx.UNISOLATED, properties);
 
-                final Hiterator<?> itr = ndx.search(text, languageCode);
+                final Hiterator<?> itr = // ndx.search(text, languageCode);
+                    ndx.search(text,
+                            languageCode, prefixMatch, minCosine, maxCosine,
+                            minRank, maxRank, matchAllTerms, timeout, unit);
 
-                assertEquals(2, itr.size());
+                assertEquals(1, itr.size()); // Note: 2nd result pruned by cosine.
 
                 assertTrue(itr.hasNext());
 
-                final IHit hit1 = itr.next();
+                final IHit<?> hit1 = itr.next();
 
-                System.err.println("hit1:" + hit1);
+                if(log.isInfoEnabled())
+                    log.info("hit1:" + hit1);
 
-                /*
-                 * Note: with cosine computation only the first hit is visited.
-                 */
+//                /*
+//                 * Note: with cosine computation only the first hit is visited.
+//                 */
 
                 assertFalse(itr.hasNext());
 

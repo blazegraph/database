@@ -55,7 +55,6 @@ import org.apache.lucene.analysis.tokenattributes.TermAttribute;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -184,6 +183,12 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  * their declared language code (if any). However, once tokenized, the language
  * code is discarded and we perform search purely on the Unicode sort keys
  * resulting from the extracted tokens.
+ * <h2>Scale-out</h2>
+ * <p>
+ * Because the first component in the key is the token, both updates (when
+ * indexing document) and queries (reading against different tokens) will be
+ * scattered across shards. Therefore it is not necessary to register a split
+ * handler for the full text index.
  * 
  * @todo The key for the terms index is {term,docId,fieldId}. Since the data are
  *       not pre-aggregated by {docId,fieldId} we can not easily remove only
@@ -222,14 +227,7 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  *       Likewise, there should be support for language family specific stopword
  *       lists and language family specific exclusions.
  * 
- * @todo key compression: prefix compression, possibly with hamming codes for
- *       the docId and fieldId.
- * 
  * @todo support more term weighting schemes and make them easy to configure.
- * 
- * @todo is there an appropriate generic type for the full text index?
- *       Basically, it contains "document fields", or at least their indexed
- *       terms.
  * 
  * @param <V>
  *            The generic type of the document identifier.
@@ -304,9 +302,6 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
          *       {@link IIndexManager#getGlobalRowStore()}. The main issue is
          *       how you want to encode unicode strings for search, which can be
          *       different than encoding for other purposes.
-         * 
-         * @todo consider modifying the default system so that defaults can be
-         *       made on a per-index, per-application, or per-namespace basis.
          */
         String INDEXER_COLLATOR_STRENGTH = FullTextIndex.class.getName()
                 + ".collator.strength";
@@ -327,14 +322,15 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 
         /**
          * When <code>true</code>, the <code>fieldId</code> is stored as part of
-         * the key. When <code>false</code>, each key will be four bytes
-         * shorter. Applications which do not use <code>fieldId</code> are
-         * encouraged to disable it when creating the {@link FullTextIndex}.
+         * the key (default {@value #DEFAULT_FIELDS_ENABLED}). When
+         * <code>false</code>, each key will be four bytes shorter. Applications
+         * which do not use <code>fieldId</code> are should disable it when
+         * creating the {@link FullTextIndex}.
          */
         String FIELDS_ENABLED = FullTextIndex.class.getName()
                 + ".fieldsEnabled";
 
-        String DEFAULT_FIELDS_ENABLED = "true";
+        String DEFAULT_FIELDS_ENABLED = "false";
 
         /**
          * When <code>true</code>, the <code>localTermWeight</code> is stored
@@ -472,7 +468,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         }
         
     }
-    
+
     /**
      * Ctor specified by {@link DefaultResourceLocator}.
      * 
@@ -481,13 +477,6 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
      *            client. See {@link Options}.
      * 
      * @see Options
-     * 
-     * @todo Customize a {@link ISimpleSplitHandler} such that we never split a
-     *       {term,doc} tuple?
-     * 
-     * @todo Make sure that the defaults for the split points (in terms of the
-     *       #of entries) are reasonable. The #of entries per split could be
-     *       smaller if we know that we are storing more data in the values.
      */
     public FullTextIndex(final IIndexManager indexManager,
             final String namespace, final Long timestamp,
@@ -904,64 +893,64 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 //        
 //    }
     
-    /**
-     * Performs a full text search against indexed documents returning a hit
-     * list using a default minCosine of <code>0.4</code>, a default maxRank
-     * of <code>10,000</code>, and the configured default timeout.
-     * 
-     * @param query
-     *            The query (it will be parsed into tokens).
-     * @param languageCode
-     *            The language code that should be used when tokenizing the
-     *            query (an empty string will be interpreted as the default
-     *            {@link Locale}).
-     * 
-     * @return A {@link Iterator} which may be used to traverse the search
-     *         results in order of decreasing relevance to the query.
-     * 
-     * @see Options#INDEXER_TIMEOUT
-     */
-    public Hiterator search(final String query, final String languageCode) {
-
-        return search(query, languageCode, false/* prefixMatch */);
-        
-    }
-
-    public Hiterator search(final String query, final String languageCode,
-            final boolean prefixMatch) {
-
-        return search( //
-                query,//
-                languageCode,//
-                prefixMatch,//
-                .4, // minCosine
-                1.0d, // maxCosine
-                1, // minRank
-                10000, // maxRank
-                false, // matchAllTerms
-                this.timeout,//
-                TimeUnit.MILLISECONDS//
-                );
-    
-    }
-    
-    public Hiterator search(final String query, final String languageCode,
-            final double minCosine, final boolean prefixMatch) {
-
-        return search( //
-                query,//
-                languageCode,//
-                prefixMatch,//
-                minCosine, // minCosine
-                1.0d, // maxCosine
-                1, // minRank
-                10000, // maxRank
-                false, // matchAllTerms
-                this.timeout,//
-                TimeUnit.MILLISECONDS//
-                );
-    
-    }
+//    /**
+//     * Performs a full text search against indexed documents returning a hit
+//     * list using a default minCosine of <code>0.4</code>, a default maxRank
+//     * of <code>10,000</code>, and the configured default timeout.
+//     * 
+//     * @param query
+//     *            The query (it will be parsed into tokens).
+//     * @param languageCode
+//     *            The language code that should be used when tokenizing the
+//     *            query (an empty string will be interpreted as the default
+//     *            {@link Locale}).
+//     * 
+//     * @return A {@link Iterator} which may be used to traverse the search
+//     *         results in order of decreasing relevance to the query.
+//     * 
+//     * @see Options#INDEXER_TIMEOUT
+//     */
+//    public Hiterator search(final String query, final String languageCode) {
+//
+//        return search(query, languageCode, false/* prefixMatch */);
+//        
+//    }
+//
+//    public Hiterator search(final String query, final String languageCode,
+//            final boolean prefixMatch) {
+//
+//        return search( //
+//                query,//
+//                languageCode,//
+//                prefixMatch,//
+//                .4, // minCosine
+//                1.0d, // maxCosine
+//                1, // minRank
+//                10000, // maxRank
+//                false, // matchAllTerms
+//                this.timeout,//
+//                TimeUnit.MILLISECONDS//
+//                );
+//    
+//    }
+//    
+//    public Hiterator search(final String query, final String languageCode,
+//            final double minCosine, final boolean prefixMatch) {
+//
+//        return search( //
+//                query,//
+//                languageCode,//
+//                prefixMatch,//
+//                minCosine, // minCosine
+//                1.0d, // maxCosine
+//                1, // minRank
+//                10000, // maxRank
+//                false, // matchAllTerms
+//                this.timeout,//
+//                TimeUnit.MILLISECONDS//
+//                );
+//    
+//    }
     
     /**
      * Performs a full text search against indexed documents returning a hit
@@ -982,11 +971,12 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
      * 
      * @see Options#INDEXER_TIMEOUT
      */
-    public Hiterator search(final String query, final String languageCode,
+    public Hiterator<Hit<V>> search(final String query, final String languageCode,
             final double minCosine, final int maxRank) {
         
-        return search(query, languageCode, false/* prefixMatch */, minCosine, 
-        		1.0d, 1, maxRank, false, this.timeout, TimeUnit.MILLISECONDS);
+        return search(query, languageCode, false/* prefixMatch */, minCosine,
+                1.0d/* maxCosine */, 1/* minRank */, maxRank,
+                false/* matchAllTerms */, this.timeout, TimeUnit.MILLISECONDS);
 
     }
 
@@ -1048,261 +1038,24 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
      * 
      * @return The hit list.
      * 
-     * @todo Note: we can not incrementally materialize the search results since
-     *       they are being delivered in rank order and the search algorithm
-     *       achieves rank order by a post-search sort. mg4j supports
-     *       incremental evaluation and would be a full-featured replacement for
-     *       this package.
-     * 
-     * @todo Consider other kinds of queries that we might write here. For
-     *       example, full text search should support AND OR NOT operators for
-     *       tokens.
-     * 
      * @todo Allow search within field(s). This will be a filter on the range
      *       iterator that is sent to the data service such that the search
      *       terms are visited only when they occur in the matching field(s).
      */
-    public Hiterator<Hit> search(final String query, final String languageCode,
+    public Hiterator<Hit<V>> search(final String query, final String languageCode,
             final boolean prefixMatch, 
             final double minCosine, final double maxCosine,
             final int minRank, final int maxRank, final boolean matchAllTerms,
             long timeout, final TimeUnit unit) {
-
-//        final long begin = System.currentTimeMillis();
-//        
-////        if (languageCode == null)
-////            throw new IllegalArgumentException();
-//
-//        if (query == null)
-//            throw new IllegalArgumentException();
-//        
-//        if (minCosine < 0d || minCosine > 1d)
-//            throw new IllegalArgumentException();
-//
-//        if (minRank <= 0 || maxRank <= 0)
-//            throw new IllegalArgumentException();
-//
-//        if (minRank > maxRank)
-//            throw new IllegalArgumentException();
-//
-//        if (timeout < 0L)
-//            throw new IllegalArgumentException();
-//        
-//        if (unit == null)
-//            throw new IllegalArgumentException();
-//        
-//        if (log.isInfoEnabled())
-//            log.info("languageCode=[" + languageCode + "], text=[" + query
-//                    + "], minCosine=" + minCosine + ", maxRank=" + maxRank
-//                    + ", matchAllTerms=" + matchAllTerms
-//                    + ", timeout=" + timeout + ", unit=" + unit);
-//
-//        if (timeout == 0L) {
-//
-//            // treat ZERO as equivalent to MAX_LONG.
-//            timeout = Long.MAX_VALUE;
-//            
-//        }
-//        
-//        // tokenize the query.
-//        final TermFrequencyData qdata;
-//        {
-//            
-//            final TokenBuffer buffer = new TokenBuffer(1, this);
-//            
-//            /*
-//             * If we are using prefix match (* operator) then we don't want
-//             * to filter stopwords from the search query.
-//             */
-//            final boolean filterStopwords = !prefixMatch;
-//            
-//            index(buffer, Long.MIN_VALUE/* docId */,
-//                    Integer.MIN_VALUE/* fieldId */, languageCode,
-//                    new StringReader(query), filterStopwords);
-//
-//            if (buffer.size() == 0) {
-//
-//                /*
-//                 * There were no terms after stopword extration.
-//                 */
-//
-//                log.warn("No terms after stopword extraction: query=" + query);
-//
-//                final long elapsed = System.currentTimeMillis() - begin;
-//
-//                return new Hiterator<Hit>(Arrays.asList(new Hit[] {}), elapsed,
-//                        minCosine, maxRank);
-//
-//            }
-//            
-//            qdata = buffer.get(0);
-//            
-//            qdata.normalize();
-//            
-//        }
-//        
-//        final ConcurrentHashMap<Long/*docId*/,Hit> hits;
-//        {
-//       
-//            // @todo use size of collection as upper bound.
-//            final int initialCapacity = Math.min(maxRank,10000);
-//            
-//            hits = new ConcurrentHashMap<Long, Hit>(initialCapacity);
-//            
-//        }
-//
-//        // run the queries.
-//        {
-//
-//            final List<Callable<Object>> tasks = new ArrayList<Callable<Object>>(
-//                    qdata.distinctTermCount());
-//
-//            for (TermMetadata md : qdata.terms.values()) {
-//
-//                tasks.add(new ReadIndexTask(md.termText(), prefixMatch,
-//                        md.localTermWeight, this, hits));
-//
-//            }
-//
-//            final ExecutionHelper<Object> executionHelper = new ExecutionHelper<Object>(
-//                    getExecutorService(), timeout, unit);
-//
-//            try {
-//
-//                executionHelper.submitTasks(tasks);
-//                
-//            } catch (InterruptedException ex) {
-//                
-//                log.warn("Interrupted - only partial results will be returned.");
-//                
-//            } catch (ExecutionException ex) {
-//
-//                throw new RuntimeException(ex);
-//                
-//            }
-//
-//        }
-//
-//        /*
-//         * If match all is specified, remove any hits with a term count less
-//         * than the number of search tokens.
-//         */
-//        if (matchAllTerms) {
-//        	
-//	        final int nterms = qdata.terms.size();
-//	        
-//	        if (log.isInfoEnabled())
-//	        	log.info("nterms: " + nterms);
-//	        
-//	        final Iterator<Map.Entry<Long,Hit>> it = hits.entrySet().iterator();
-//	        while (it.hasNext()) {
-//	        	final Hit hit = it.next().getValue();
-//		        if (log.isInfoEnabled())
-//		        	log.info("hit terms: " + hit.getTermCount());
-//	        	if (hit.getTermCount() != nterms)
-//	        		it.remove();
-//	        }
-//	        
-//        }
-//        
-//        // #of hits.
-//        final int nhits = hits.size();
-//        
-//        if (nhits == 0) {
-//
-//            log.warn("No hits: languageCode=[" + languageCode + "], query=["
-//                    + query + "]");
-//            
-//        }
-//        
-//        /*
-//         * Rank order the hits by relevance.
-//         * 
-//         * @todo consider moving documents through a succession of N pools where
-//         * N is the #of distinct terms in the query. The read tasks would halt
-//         * if the size of the pool for N terms reached maxRank. This might (or
-//         * might not) help with triage since we could process hits by pool and
-//         * only compute the cosines for one pool at a time until we had enough
-//         * hits.
-//         */
-//        
-//        if (log.isInfoEnabled())
-//            log.info("Rank ordering "+nhits+" hits by relevance");
-//        
-//        Hit[] a = hits.values().toArray(new Hit[nhits]);
-//        
-//        Arrays.sort(a);
-//
-//        /*
-//         * If maxCosine is specified, prune the hits that are above the max
-//         */
-//        if (maxCosine < 1.0d) {
-//
-//        	// find the first occurrence of a hit that is <= maxCosine
-//        	int i = 0;
-//        	for (Hit h : a) {
-//        		if (h.getCosine() <= maxCosine)
-//        			break;
-//        		i++;
-//        	}
-//        	
-//        	// no hits with relevance less than maxCosine
-//        	if (i == a.length) {
-//        		
-//        		a = new Hit[0];
-//        		
-//        	} else {
-//        	
-//	        	// copy the hits from that first occurrence to the end
-//	        	final Hit[] tmp = new Hit[a.length - i];
-//	        	System.arraycopy(a, i, tmp, 0, tmp.length);
-//	        	
-//	        	a = tmp;
-//	        	
-//        	}
-//        	
-//        }
-//
-//        /*
-//         * If minRank is specified, prune the hits that below the min
-//         */
-//        if (minRank > 1) {
-//
-//        	// no hits above minRank
-//        	if (minRank > a.length) {
-//        		
-//        		a = new Hit[0];
-//        		
-//        	} else {
-//        	
-//	        	// copy the hits from the minRank to the end
-//	        	final Hit[] tmp = new Hit[a.length - (minRank-1)];
-//	        	System.arraycopy(a, minRank-1, tmp, 0, tmp.length);
-//	        	
-//	        	a = tmp;
-//	        	
-//        	}
-//        	
-//        }
-//
-//        final long elapsed = System.currentTimeMillis() - begin;
-//        
-//        if (log.isInfoEnabled())
-//            log.info("Done: " + nhits + " hits in " + elapsed + "ms");
-//    	
-//        /*
-//         * Note: The caller will only see those documents which satisfy both
-//         * constraints (minCosine and maxRank). Results below a threshold will
-//         * be pruned. Any relevant results exceeding the maxRank will be pruned.
-//         */
-//        return new Hiterator<Hit>(Arrays.asList(a), 
-//        		minCosine,  maxRank-minRank+1);
-
         
-		final Hit[] a = _search(query, languageCode, prefixMatch, minCosine,
+		final Hit<V>[] a = _search(query, languageCode, prefixMatch, minCosine,
 				maxCosine, minRank, maxRank, matchAllTerms, timeout, unit);
     	
-        return new Hiterator<Hit>(Arrays.asList(a), 0.0d, Integer.MAX_VALUE); 
+        return new Hiterator<Hit<V>>(//
+                Arrays.asList(a),// 
+                0.0d,// minCosine
+                Integer.MAX_VALUE // maxRank
+                ); 
 
     }
     
@@ -1332,7 +1085,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 		
     }
     
-    private Hit[] _search(
+    private Hit<V>[] _search(
     		final String query, final String languageCode, 
     		final boolean prefixMatch, 
             final double minCosine, final double maxCosine,

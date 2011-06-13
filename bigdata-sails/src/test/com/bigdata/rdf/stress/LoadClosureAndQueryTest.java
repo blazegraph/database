@@ -51,7 +51,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
-import org.CognitiveWeb.util.PropertyUtil;
+
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 import org.openrdf.query.BindingSet;
@@ -97,6 +97,7 @@ import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
 import com.bigdata.test.ExperimentDriver.Result;
 import com.bigdata.util.NV;
+import com.bigdata.util.PropertyUtil;
 
 /**
  * Parameterized test to verify load, closure, restart, and query for each of

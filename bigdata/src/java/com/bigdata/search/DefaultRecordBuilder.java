@@ -108,34 +108,14 @@ public class DefaultRecordBuilder<V extends Comparable<V>> implements
 
     }
 
-    public byte[] getFromKey(final IKeyBuilder keyBuilder, final String termText) {
-
-        keyBuilder.reset();
-
-        keyBuilder.appendText(termText, true/* unicode */, false/*successor*/);
-        
-        return keyBuilder.getKey();
-        
-    }
-
-    public byte[] getToKey(final IKeyBuilder keyBuilder, final String termText) {
-
-        keyBuilder.reset();
-
-        keyBuilder.appendText(termText, true/* unicode */, true/*successor*/);
-        
-        return keyBuilder.getKey();
-        
-    }
-
     /**
      * {@inheritDoc}
      * 
-     * @todo optionally record the token position metadata (sequence of token
+     * TODO optionally record the token position metadata (sequence of token
      *       positions in the source) and the token offset (character offsets
      *       for the inclusive start and exclusive end of each token).
      * 
-     * @todo value compression: code "position" as delta from last position in
+     * TODO value compression: code "position" as delta from last position in
      *       the same field or from 0 if the first token of a new document; code
      *       "offsets" as deltas - the maximum offset between tokens will be
      *       quite small (it depends on the #of stopwords) so use a nibble
@@ -199,8 +179,12 @@ public class DefaultRecordBuilder<V extends Comparable<V>> implements
 
             final int termFreq = dis.readShort();
 
-            final double termWeight = dis.readDouble();
-
+            final double termWeight;
+            if(doublePrecision)
+                termWeight = dis.readDouble();
+            else
+                termWeight = dis.readFloat();
+            
             return new ReadOnlyTermMetadata(termFreq, termWeight);
 
         } catch (IOException ex) {

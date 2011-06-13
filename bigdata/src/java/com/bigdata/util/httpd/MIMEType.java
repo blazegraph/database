@@ -27,16 +27,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.util.httpd;
 
-import java.util.Vector;
-import java.util.regex.*;
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.Iterator;
-import java.util.Arrays;
+import java.util.Vector;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
-import org.CognitiveWeb.util.CaseInsensitiveStringComparator;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.util.CaseInsensitiveStringComparator;
+
 
 /**
  * Parser for MIME type data.  MIME type, subtype, and MIME parameter
