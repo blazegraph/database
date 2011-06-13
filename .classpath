@@ -18,6 +18,8 @@
 	<classpathentry kind="src" path="ctc-striterators/src/java"/>
 	<classpathentry kind="src" path="ctc-striterators/src/test"/>
 	<classpathentry kind="src" path="bigdata-perf/bsbm/src/test"/>
+	<classpathentry kind="src" path="junit-ext/src/test"/>
+	<classpathentry kind="src" path="junit-ext/src/java"/>
 	<classpathentry kind="lib" path="bigdata-jini/lib/apache/zookeeper-3.2.1.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/dsi-utils-1.0.6-020610.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/lgpl-utils-1.0.6-020610.jar"/>
@@ -36,8 +38,6 @@
 	<classpathentry kind="src" path="lgpl-utils/src/java"/>
 	<classpathentry kind="src" path="lgpl-utils/src/test"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/colt-1.2.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/cweb-commons-1.1-b2-dev.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/cweb-junit-ext-1.1-b3-dev.jar" sourcepath="/junit-ext/src"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-3.8.1.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/apache/log4j-1.2.15.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-api-1.4.3.jar"/>
@@ -70,5 +70,6 @@
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/high-scale-lib-v1.1.2.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-4_8.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-charset-4_8.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-ext-1.1-b3-dev.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

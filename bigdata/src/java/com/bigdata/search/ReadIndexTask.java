@@ -11,6 +11,7 @@ import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.SuccessorUtil;
 
 /**
  * Procedure reads on the terms index, aggregating data on a per-{@link Hit}
@@ -42,7 +43,7 @@ public class ReadIndexTask<V extends Comparable<V>> implements Callable<Object> 
     private final double queryTermWeight;
     private final IRecordBuilder<V> recordBuilder;
     private final ConcurrentHashMap<V, Hit<V>> hits;
-    private final ITupleIterator itr;
+    private final ITupleIterator<?> itr;
 
     /**
      * This instance is reused until it is consumed by a successful insertion
@@ -97,39 +98,11 @@ public class ReadIndexTask<V extends Comparable<V>> implements Callable<Object> 
      
         final IKeyBuilder keyBuilder = searchEngine.getKeyBuilder();
 
-//        if (!prefixMatch) {
-//            /*
-//             * Figure out how many bytes are in the Unicode sort key for the
-//             * termText. In order to be an exact match, the visited tuples may
-//             * not have more than this many bytes before the start of the docId
-//             * field. (It is not possible for them to have fewer bytes since the
-//             * Unicode sort key prefix length will be the same for both the
-//             * fromKey and the toKey. The Unicode sort key for the toKey is
-//             * formed by adding one to the LSB position).
-//             */
-//            
-//            keyBuilder
-//                    .appendText(termText, true/* unicode */, false/* successor */);
-//            
-//            exactMatchLength = keyBuilder.getLength();
-//            
-//        } else {
-//            
-//            // ignored.
-//            exactMatchLength = -1;
-//            
-//        }
-        
-        /*
-         * FIXME This would appear to start in the middle of the docId and
-         * fieldId value space since I would assume that Long.MIN_VALUE is the
-         * first docId.
-         */
-//        final byte[] fromKey = recordBuilder.getKey(keyBuilder, termText,
-//                false/* successor */, Long.MIN_VALUE/* docId */,
-//                Integer.MIN_VALUE/* fieldId */);
-
-        final byte[] fromKey = recordBuilder.getFromKey(keyBuilder, termText);
+        final byte[] fromKey;{//= recordBuilder.getFromKey(keyBuilder, termText);
+            keyBuilder.reset();
+            keyBuilder.appendText(termText, true/* unicode */, false/*successor*/);
+            fromKey=keyBuilder.getKey();
+        }
         
         final byte[] toKey;
         
@@ -137,32 +110,36 @@ public class ReadIndexTask<V extends Comparable<V>> implements Callable<Object> 
             /*
              * Accepts anything starting with the search term. E.g., given
              * "bro", it will match "broom" and "brown" but not "break".
+             * 
+             * Note: This uses the successor of the Unicode sort key, so it will
+             * scan all keys starting with that prefix until the sucessor of
+             * that prefix.
              */
-            toKey = recordBuilder.getToKey(keyBuilder, termText);
-//            toKey = recordBuilder.getKey(keyBuilder, termText,
-//                true/* successor */, Long.MIN_VALUE/* docId */,
-//                Integer.MIN_VALUE/* fieldId */);
+            keyBuilder.reset();
+            keyBuilder.appendText(termText, true/* unicode */, true/*successor*/);
+            toKey = keyBuilder.getKey();
         } else {
             /*
              * Accepts only those entries that exactly match the search term.
+             * 
+             * Note: This uses the fixed length successor of the fromKey. That
+             * gives us a key-range scan which only access keys having the same
+             * Unicode sort key.
              */
-            toKey = recordBuilder.getToKey(keyBuilder, termText);
-//            toKey = recordBuilder.getKey(keyBuilder, termText,
-//                    false/* successor */, 
-//                    Long.MAX_VALUE/* docId */, Integer.MAX_VALUE/* fieldId */);
+            toKey = SuccessorUtil.successor(fromKey.clone());
         }
 
         if (log.isDebugEnabled())
             log.debug("termText=[" + termText + "], prefixMatch=" + prefixMatch
                     + ", queryTermWeight=" + queryTermWeight + "\nfromKey="
-                    + BytesUtil.toString(fromKey) + "\ntoKey="
+                    + BytesUtil.toString(fromKey) + "\n  toKey="
                     + BytesUtil.toString(toKey));
-        
+
         /*
-         * @todo filter by field. all we need to do is pass in an array of the
-         * fields that should be accepted and formulate and pass along an
-         * ITupleFilter which accepts only those fields. Note that the docId is
-         * in the last position of the key.
+         * TODO filter by document and/or field. all we need to do is pass in
+         * an array of the fields that should be accepted and formulate and pass
+         * along an ITupleFilter which accepts only those fields. we can also
+         * filter by document in the same manner.
          */
         itr = searchEngine.getIndex()
                 .rangeIterator(fromKey, toKey, 0/* capacity */,
@@ -176,6 +153,22 @@ public class ReadIndexTask<V extends Comparable<V>> implements Callable<Object> 
      */
     public Long call() throws Exception {
 
+        try {
+
+            final long nhits = run();
+        
+            return nhits;
+        
+        } catch (Throwable t) {
+
+            throw launderThrowable(t);
+            
+        }
+        
+    }
+    
+    private long run()  {
+        
         long nhits = 0;
 
         if (log.isDebugEnabled())
@@ -187,11 +180,11 @@ public class ReadIndexTask<V extends Comparable<V>> implements Callable<Object> 
         while (itr.hasNext()) {
 
             // don't test for interrupted on each result -- too much work.
-            if (nhits % 100 == 0 && t.isInterrupted()) {
+            if (nhits % 1000 == 0 && t.isInterrupted()) {
 
-                if (log.isInfoEnabled())
-                    log.info("Interrupted: queryTerm=" + queryTerm + ", nhits="
-                            + nhits);
+//                if (log.isInfoEnabled())
+                log.warn("Interrupted: queryTerm=" + queryTerm + ", nhits="
+                        + nhits);
 
                 return nhits;
                 
@@ -200,37 +193,7 @@ public class ReadIndexTask<V extends Comparable<V>> implements Callable<Object> 
             // next entry
             final ITuple<?> tuple = itr.next();
             
-//            // key is {term,docId,fieldId}
-////            final byte[] key = tuple.getKey();
-////            
-////            // decode the document identifier.
-////            final long docId = KeyBuilder.decodeLong(key, key.length
-////                    - Bytes.SIZEOF_LONG /*docId*/ - Bytes.SIZEOF_INT/*fieldId*/);
-//
-//            final ByteArrayBuffer kbuf = tuple.getKeyBuffer();
-//
-//            /*
-//             * The byte offset of the docId in the key.
-//             * 
-//             * Note: This is also the byte length of the match on the unicode
-//             * sort key, which appears at the head of the key.
-//             */
-//            final int docIdOffset = kbuf.limit() - Bytes.SIZEOF_LONG /* docId */
-//                    - (fieldsEnabled ? Bytes.SIZEOF_INT/* fieldId */: 0);
-
-//            if (!prefixMatch && docIdOffset != exactMatchLength) {
-//             
-//                /*
-//                 * The Unicode sort key associated with this tuple is longer
-//                 * than the given token - hence it can not be an exact match.
-//                 */
-//                
-//                continue;
-//                
-//            }
-            
             // decode the document identifier.
-//            final long docId = KeyBuilder.decodeLong(kbuf.array(), docIdOffset);
             final V docId = recordBuilder.getDocId(tuple);
             
             /*
@@ -275,4 +238,32 @@ public class ReadIndexTask<V extends Comparable<V>> implements Callable<Object> 
         
     }
     
+    /**
+     * Log an error and wrap the exception iff necessary.
+     * 
+     * @param t
+     *            The thrown error.
+     * 
+     * @return The laundered exception.
+     * 
+     * @throws Exception
+     */
+    private RuntimeException launderThrowable(final Throwable t)
+            throws Exception {
+        try {
+            // log an error
+            log.error(t, t);
+        } finally {
+            // ignore any problems here.
+        }
+        if (t instanceof RuntimeException) {
+            return (RuntimeException) t;
+        } else if (t instanceof Error) {
+            throw (Error) t;
+        } else if (t instanceof Exception) {
+            throw (Exception) t;
+        } else
+            throw new RuntimeException(t);
+    }
+
 }

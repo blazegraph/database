@@ -102,19 +102,27 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 //    private static WeakValueCache<String/* namespace */, BigdataValueFactoryImpl> cache = new WeakValueCache<String, BigdataValueFactoryImpl>(
 //            new LRUCache<String, BigdataValueFactoryImpl>(1/* capacity */));
 
-	/**
-	 * Return the instance associated with the <i>namespace</i>.
-	 * <p>
-	 * Note: This canonicalizing mapping for {@link BigdataValueFactoryImpl}s is
-	 * based on the namespace of the {@link LexiconRelation}. This makes the
-	 * instances canonical within a JVM instance, which is all that we care
-	 * about. The actual assignments of term identifiers to {@link BigdataValue}
-	 * s is performed by the {@link LexiconRelation} itself and is globally
-	 * consistent for a given lexicon.
-	 * 
-	 * @param namespace
-	 *            The namespace of the {@link LexiconRelation}.
-	 */
+    /**
+     * Return the instance associated with the <i>namespace</i>.
+     * <p>
+     * Note: This canonicalizing mapping for {@link BigdataValueFactoryImpl}s is
+     * based on the namespace of the {@link LexiconRelation}. This makes the
+     * instances canonical within a JVM instance, which is all that we care
+     * about. The actual assignments of term identifiers to {@link BigdataValue}
+     * s is performed by the {@link LexiconRelation} itself and is globally
+     * consistent for a given lexicon.
+     * 
+     * @param namespace
+     *            The namespace of the {@link LexiconRelation}.
+     * 
+     *            TODO This method introduces the possibility that two journals
+     *            in the same JVM would share the same
+     *            {@link BigdataValueFactory} for a kb with the same namespace.
+     *            This is doubtless not desired.  A workaround is to use the
+     *            {@link UUID} of the Journal as part of the namespace of the
+     *            KB, which would serve to make sure that all KB instances have
+     *            distinct namespaces.
+     */
 	public static BigdataValueFactory/* Impl */getInstance(final String namespace) {
 
 		return cache.getInstance(namespace, namespace/*state*/);

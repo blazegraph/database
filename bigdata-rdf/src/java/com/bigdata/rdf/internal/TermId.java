@@ -201,24 +201,6 @@ public class TermId<V extends BigdataValue> extends
 //    }
 
     /**
-     * Constructor for a term identifier.
-     * 
-     * @param vte
-     * @param termId
-     * 
-     * @deprecated This is an old termId variant.
-     */
-    public TermId(final VTE vte, final long termId) {
-
-		super(toFlags(vte));
-
-//        this.termId = termId;
-       
-        throw new UnsupportedOperationException();
-        
-    }
-
-    /**
      * Constructor used for {@link TermId}s which are NOT "MockIVs".
      * 
      * @param data

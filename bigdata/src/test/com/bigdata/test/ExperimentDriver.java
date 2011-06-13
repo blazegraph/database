@@ -34,8 +34,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -56,7 +54,6 @@ import javax.xml.parsers.SAXParserFactory;
 
 import junit.framework.TestCase2;
 
-import org.CognitiveWeb.util.PropertyUtil;
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 import org.xml.sax.Attributes;
@@ -68,6 +65,7 @@ import org.xml.sax.ext.EntityResolver2;
 
 import com.bigdata.journal.ProxyTestCase;
 import com.bigdata.util.NV;
+import com.bigdata.util.PropertyUtil;
 import com.bigdata.util.config.NicUtil;
 
 /**

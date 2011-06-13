@@ -74,26 +74,6 @@ public interface IRecordBuilder<V extends Comparable<V>> {
      */
     byte[] getKey(IKeyBuilder keyBuilder, String termText, boolean successor,
             V docId, int fieldId);
-
-    /**
-     * Generate the key for the inclusive lower bound of a scan of the full text
-     * index searching for the specified termText (or a prefix thereof).
-     * 
-     * @param keyBuilder
-     * @param termText
-     * @return
-     */
-    byte[] getFromKey(IKeyBuilder keyBuilder, String termText);
-
-    /**
-     * Generate the key for the exclusive upper bound of a scan of the full text
-     * index searching for the specified termText (or a prefix thereof).
-     * 
-     * @param keyBuilder
-     * @param termText
-     * @return
-     */
-    byte[] getToKey(IKeyBuilder keyBuilder, String termText);
     
     /**
      * Return the byte[] that is the encoded value for per-{token,docId,fieldId}
