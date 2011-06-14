@@ -346,10 +346,6 @@ public class TestTermsWriteTask extends TestCase2 {
      * @param vf
      * @param ndx
      * @return
-     * 
-     *         TODO Replace with batch resolution using the
-     *         {@link TermsWriteTask} since that is after all what we are trying
-     *         to test!
      */
     private IV getTermIV(final Value value, final TermsIndexHelper h,
             final BigdataValueFactory vf, final IIndex ndx) {
@@ -362,8 +358,8 @@ public class TestTermsWriteTask extends TestCase2 {
 
         final byte[] val = vf.getValueSerializer().serialize(asValue);
 
-        final byte[] key = h.resolveOrAddValue(ndx, true/* readOnly */,
-                keyBuilder, baseKey, val);
+		final byte[] key = h.resolveOrAddValue(ndx, true/* readOnly */,
+				keyBuilder, baseKey, val, null/* bucketSize */);
 
         if (key == null) {
 
@@ -407,6 +403,9 @@ public class TestTermsWriteTask extends TestCase2 {
             throw new RuntimeException(e);
         }
 
+        if(log.isInfoEnabled())
+        	log.info(stats);
+        
         return stats;
 
     }

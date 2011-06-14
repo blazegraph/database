@@ -34,7 +34,7 @@ public class TPSTupleSerializer extends DefaultTupleSerializer<Void,TPS> {
         
     }
 
-    public TPSTupleSerializer(IKeyBuilderFactory keyBuilderFactory) {
+    public TPSTupleSerializer(final IKeyBuilderFactory keyBuilderFactory) {
         
         super(keyBuilderFactory);
         
@@ -47,18 +47,21 @@ public class TPSTupleSerializer extends DefaultTupleSerializer<Void,TPS> {
      * @throws UnsupportedOperationException
      *             always.
      */
+    @Override
     public byte[] serializeKey(Object obj) {
         
         throw new UnsupportedOperationException();
         
     }
 
+    @Override
     public byte[] serializeVal(TPS obj) {
         
         return SerializerUtil.serialize(obj);
         
     }
 
+    @Override
     public TPS deserialize(ITuple tuple) {
 
         return (TPS) SerializerUtil.deserialize(
@@ -75,6 +78,7 @@ public class TPSTupleSerializer extends DefaultTupleSerializer<Void,TPS> {
      * @throws UnsupportedOperationException
      *             always.
      */
+    @Override
     public Void deserializeKey(ITuple tuple) {
 
         throw new UnsupportedOperationException();

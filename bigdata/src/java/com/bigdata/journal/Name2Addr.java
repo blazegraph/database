@@ -1267,6 +1267,7 @@ public class Name2Addr extends BTree {
          * @param entry
          *            An Entry.
          */
+        @Override
         public byte[] serializeVal(Entry entry) {
             
             return ser.serialize(entry);

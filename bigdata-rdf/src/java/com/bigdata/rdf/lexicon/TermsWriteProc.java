@@ -30,6 +30,7 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
@@ -190,6 +191,15 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
          * it does not include the one byte counter).
          */
         final byte[] baseKey = new byte[keyBuilder.capacity() - 1];
+
+        // Used to report the size of each collision bucket.
+        final AtomicInteger bucketSize = new AtomicInteger(0);
+        
+        // Incremented by the size of each collision bucket probed.
+        long totalBucketSize = 0L;
+        
+        // The size of the largest collision bucket.
+        int maxBucketSize = 0;
         
         for (int i = 0; i < numTerms; i++) {
 
@@ -240,6 +250,13 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
                             baseKey, getValue(i));
 
                     ivs[i] = new TermId<BigdataValue>(key);
+                    
+					// The size of the collision bucket.
+					final int tmp = ((TermId<?>) ivs[i]).counter();
+					if (maxBucketSize < tmp) {
+    					maxBucketSize += tmp;
+    				}
+    				totalBucketSize += tmp;
 
 //                    // assign a term identifier.
 //					final long termId = counter.incrementAndGet();
@@ -265,8 +282,14 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
             	final byte[] val = getValue(i);
             	
 				final byte[] key = helper.resolveOrAddValue(ndx, readOnly,
-						keyBuilder, baseKey, val);
+						keyBuilder, baseKey, val, bucketSize);
 
+				final int tmp = bucketSize.get();
+				if (maxBucketSize < tmp) {
+					maxBucketSize += tmp;
+				}
+				totalBucketSize += tmp;
+				
 				if (key != null) {
 
 					// Note: The first byte of the key is the IV's flags.
@@ -282,7 +305,7 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
             
         }
 
-        return new Result(ivs);
+		return new Result(totalBucketSize, maxBucketSize, ivs);
 
     } // apply(ndx)
 
@@ -343,7 +366,27 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 	 */
     public static class Result implements Externalizable {
 
-        public IV[] ivs;
+		/**
+		 * The total size of the hash collision buckets examined across all
+		 * {@link Value}s in the request. Each time a {@link Value} is resolved
+		 * to a hash collision bucket, the size of that bucket is incremented
+		 * against this field. Thus it will double count a bucket if the same
+		 * bucket is visited more than once for the request.
+		 */
+		public long totalBucketSize;
+		
+		/**
+		 * The size of the largest hash collision bucket examined across all the
+		 * {@link Value}s in the request.
+		 */
+		public int maxBucketSize;
+
+		/**
+		 * The {@link IV}s assigned to each {@link Value} in the request. The
+		 * indicates of this array are correlated with the indices of the array
+		 * provided to the request.
+		 */
+		public IV[] ivs;
         
         private static final long serialVersionUID = 1L;
 
@@ -353,12 +396,26 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
         public Result() {
             
         }
-        
-        public Result(final IV[] ivs) {
+
+		/**
+		 * 
+		 * @param totalBucketSize
+		 *            The total bucket size across all buckets examined.
+		 * @param maxBucketSize
+		 *            The size of the largest collision bucket examined.
+		 * @param ivs
+		 *            The assigned/resolved {@link IV}s.
+		 */
+		public Result(final long totalBucketSize, final int maxBucketSize,
+				final IV[] ivs) {
 
             assert ivs != null;
             
             assert ivs.length > 0;
+
+            this.totalBucketSize = totalBucketSize;
+            
+            this.maxBucketSize = maxBucketSize;
             
             this.ivs = ivs;
             
@@ -394,9 +451,16 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
             final int n = ivs.length;
             
             ShortPacker.packShort(out, VERSION0);
-            
-            LongPacker.packLong(out,n);
 
+            // The #of results.
+			LongPacker.packLong(out, n);
+
+			// The total bucket size across all buckets examined.
+			LongPacker.packLong(out, totalBucketSize);
+			
+			// The size of the largest collision bucket examined.
+			LongPacker.packLong(out, maxBucketSize);
+			
             for (int i = 0; i < n; i++) {
                                 
                 out.writeObject(ivs[i]);

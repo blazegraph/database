@@ -32,51 +32,11 @@ import java.security.NoSuchAlgorithmException;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.bfs.BigdataFileSystem;
-import com.bigdata.btree.IOverflowHandler;
-
 /**
- * Above a configured size, long literals are transparently promoted to blobs.
- * When a long literal is recognized, a hash code is computed from the literal
- * using the configured cryptographic hash function. That hash code serves as
- * the key in the TERM2ID index. The TERM2ID index assigns a term identifier,
- * just as it always does. The ID2TERM index stores the mapping from the term
- * identifier onto a blob reference for the long literal. The blob reference is
- * stored on the journal associated with the ID2TERM index / shard. On overflow,
- * the blob is copied into an index segment as part of the shard build and the
- * blob reference is updated by the {@link IOverflowHandler} so that it will now
- * resolve the blob against the index segment rather than the journal.
- * 
- * FIXME Finish long literal support, including unit tests.
- * 
- * @todo It would be nice to send the hash code rather than the literal to the
- *       TERM2ID index to avoid the overhead of sending the long literal to both
- *       the TERM2ID and ID2TERM indices.
- * 
- * @todo Above some size we need to use a hash function of the literal as the
- *       key. The literal itself will be stored in a raw record on the journal.
- *       The TERM2ID index would map the hash code of the literal onto a blob
- *       reference. The blob reference will be linked to the TERM2ID shard and
- *       will migrate naturally to an index segment on overflow. The ID2TERM
- *       index will not store the reverse mapping. Instead, the blob reference
- *       is de-referenced against the TERM2ID index. The blob reference can
- *       appear inline in the statement indices [this suggests that we need to
- *       extend from one byte to two bytes for the header.]
- *       <p>
- *       The blob reference will need the identity of the index partition
- *       against which it must be resolved. The easiest way to do this is to
- *       encode the hash code of the literal into the blob reference together
- *       with the address of the raw record for that blob. No, that does not
- *       work since the raw address needs to be updated during overflow. So we
- *       have to generate a term identifier for the literal, resolve the term
- *       identifier to a blob reference using ID2TERM, and store the raw record
- *       with the ID2TERm shards.
- *       <p>
- *       See the {@link BigdataFileSystem} for a blob reference implementation.
- *       <p>
- *       We need to use a hash function which has a low probability of
- *       collisions. E.g., MD5 or better (MD5 can be spoofed another
- *       cryptographic hash function might be better).
+ * This class contains some code which was written to see which hash functions
+ * were available on the JVM. The idea was to identify a hash function which has
+ * a low probability of collisions. E.g., MD5 or better (MD5 can be spoofed
+ * another cryptographic hash function might be better).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -150,10 +110,10 @@ public class TestLongLiterals extends TestCase2 {
 
     }
 
-    public void test_more() {
-        
-        fail("Integration test with long literals");
-        
-    }
+//    public void test_more() {
+//        
+//        fail("Integration test with long literals");
+//        
+//    }
     
 }

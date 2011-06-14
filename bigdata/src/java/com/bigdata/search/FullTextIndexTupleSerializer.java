@@ -138,7 +138,7 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
         keyBuilder
                 .appendText(termText, true/* unicode */, false/* successor */);
 
-        keyBuilder.append((Long) docId);
+        keyBuilder.append((V) docId);
 
         if (fieldsEnabled)
             keyBuilder.append(entry.getFieldId());
@@ -158,7 +158,7 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
     }
 
     @Override
-    public byte[] serializeVal(final Object obj) {
+    public byte[] serializeVal(final ITermDocVal obj) {
         
         final ITermDocVal val = (ITermDocVal) obj;
         
@@ -221,7 +221,7 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
         final int docIdOffset = kbuf.limit() - Bytes.SIZEOF_LONG /* docId */
                 - (fieldsEnabled ? Bytes.SIZEOF_INT/* fieldId */: 0);
 
-        final V docId = (V) Long.valueOf(KeyBuilder.decodeLong(kbuf.array(),
+        final V docId = (V) (Object)Long.valueOf(KeyBuilder.decodeLong(kbuf.array(),
                 docIdOffset));
 
         // Decode field when present

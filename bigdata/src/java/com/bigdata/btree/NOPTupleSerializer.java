@@ -71,20 +71,19 @@ public class NOPTupleSerializer extends DefaultTupleSerializer {
      * 
      * @see ASCIIKeyBuilderFactory
      */
-    public NOPTupleSerializer(IKeyBuilderFactory keyBuilderFactory) {
+    public NOPTupleSerializer(final IKeyBuilderFactory keyBuilderFactory) {
 
         super(keyBuilderFactory);
         
     }
 
-    /**
-     * @param obj
-     *            The key.
-     *            
-     * @return <i>obj</i> iff it is a <code>byte[]</code> and otherwise
-     *         converts <i>obj</i> to a byte[] using
-     *         {@link IKeyBuilder#append(Object)}.
-     */
+	/**
+	 * {@inheritDoc}
+	 * 
+	 * Return <i>obj</i> iff it is a <code>byte[]</code> and otherwise converts
+	 * <i>obj</i> to a byte[] using {@link IKeyBuilder#append(Object)}.
+	 */
+    @Override
     public byte[] serializeKey(Object obj) {
 
         if (obj == null)
@@ -100,12 +99,14 @@ public class NOPTupleSerializer extends DefaultTupleSerializer {
         
     }
 
+    @Override
     public byte[] serializeVal(Object obj) {
 
         return (byte[])obj;
         
     }
 
+    @Override
     public Object deserialize(ITuple tuple) {
 
         if (tuple == null)

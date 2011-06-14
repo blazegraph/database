@@ -1864,7 +1864,7 @@ abstract public class WriteCache implements IWriteCache {
 		/*
 		 * Fix up the debug flag when last address is cleared.
 		 */
-		if (m_written && recordMap.size() == 0) {
+		if (m_written && recordMap.isEmpty()) {
 			m_written = false;
 		}
 	}

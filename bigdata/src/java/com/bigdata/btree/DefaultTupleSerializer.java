@@ -271,7 +271,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      * @return The serialized representation of the object as a byte[] -or-
      *         <code>null</code> if the reference is <code>null</code>.
      */
-    public byte[] serializeVal(final Object obj) {
+    public byte[] serializeVal(final V obj) {
 
         return SerializerUtil.serialize(obj);
         

@@ -849,15 +849,15 @@ abstract public class AbstractTripleStore extends
         String MAX_INLINE_STRING_LENGTH = AbstractTripleStore.class.getName()
                 + ".maxInlineStringLength";
 
-        /**
-         * FIXME TERMS REFACTOR : Change to a non-zero default (e.g., 64). Note
-         * that there is currently an interaction when this is enabled with the
-         * full text indexer. Basically, if we inline a non-datatype literal
-         * then we need to inline the literal into the full text index as well
-         * for each keyword in that literal. That can produce quite a bit of
-         * duplication.
-         */
-        String DEFAULT_MAX_INLINE_STRING_LENGTH = "0"; // 64
+		/**
+		 * Note that there an interaction when this is enabled with the full
+		 * text indexer. When we inline a non-datatype literal then the literal
+		 * is ALSO inlined into the full text index as well for each keyword in
+		 * that literal. That can produce quite a bit of duplication. Therefore
+		 * the full text index does not play well with inlining large literals
+		 * into the statement indices.
+		 */
+        String DEFAULT_MAX_INLINE_STRING_LENGTH = "64"; // 64
         
         /**
          * Set up database to inline bnodes directly into the statement indices 
@@ -1566,7 +1566,8 @@ abstract public class AbstractTripleStore extends
                                 + this);
 
                     if (log.isInfoEnabled())
-                        log.info("read axioms: "+axioms.size());
+						log.info("read axioms: " + axioms.getClass().getName()
+								+ ", size=" + axioms.size());
                     
                 }
 
@@ -1621,9 +1622,11 @@ abstract public class AbstractTripleStore extends
                         throw new RuntimeException("No vocabulary defined? : "
                                 + this);
                     
-                    if (log.isInfoEnabled())
-                        log.info("read vocabulary: "+vocab.size());
-                    
+					if (log.isInfoEnabled())
+						log.info("read vocabulary: "
+								+ vocab.getClass().getName() + ", size="
+								+ vocab.size());
+
                 }
                 
             }

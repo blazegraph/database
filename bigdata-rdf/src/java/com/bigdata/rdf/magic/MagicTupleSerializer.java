@@ -183,6 +183,7 @@ public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,Magi
 
     }
 
+    @Override
     public byte[] serializeVal(MagicTuple spo) {
 
         return null; // new byte[0];

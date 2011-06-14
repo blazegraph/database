@@ -148,6 +148,7 @@ public class JustificationTupleSerializer extends
      * @throws UnsupportedOperationException
      *             always
      */
+    @Override
     public byte[] serializeVal(Justification jst) {
 
         throw new UnsupportedOperationException();

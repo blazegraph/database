@@ -266,7 +266,7 @@ public class DumpJournal {
 			final CommitRecordIndex commitRecordIndex = journal
 					.getCommitRecordIndex();
 
-			System.err.println("There are " + commitRecordIndex
+			System.out.println("There are " + commitRecordIndex.getEntryCount()
 					+ " commit points.");
 
 			if (dumpHistory) {
@@ -452,6 +452,8 @@ public class DumpJournal {
 			System.out.print('\t');
 			System.out.print("nleaves");
 			System.out.print('\t');
+			System.out.print("nentries");
+			System.out.print('\t');
 			System.out.print("nodeBytes");
 			System.out.print('\t');
 			System.out.print("leafBytes");
@@ -488,6 +490,8 @@ public class DumpJournal {
 				System.out.print(ndx.getNodeCount());
 				System.out.print('\t');
 				System.out.print(ndx.getLeafCount());
+				System.out.print('\t');
+				System.out.print(ndx.getEntryCount());
 				System.out.print('\t');
 				System.out.print(stats.nodeBytes);
 				System.out.print('\t');

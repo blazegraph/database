@@ -376,7 +376,7 @@ public class CounterSetBTree extends BTree {
 
                     final byte[] key = tupleSer.serializeKey(entry);
 
-                    final byte[] val = tupleSer.serializeVal(entry.value);
+                    final byte[] val = tupleSer.serializeVal(entry);//.value);
 
                     v.add(new KVO<Entry>(key, val, entry));
 
@@ -389,7 +389,7 @@ public class CounterSetBTree extends BTree {
                 
                 final byte[] key = tupleSer.serializeKey(entry);
                 
-                final byte[] val = tupleSer.serializeVal(entry.value);
+                final byte[] val = tupleSer.serializeVal(entry);//.value);
                 
                 v.add(new KVO<Entry>(key, val, entry));
                 

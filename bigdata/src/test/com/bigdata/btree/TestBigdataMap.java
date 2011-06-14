@@ -187,24 +187,28 @@ public class TestBigdataMap extends TestCase {
          * Note: The key is materialized from the value since the encoding to
          * the unsigned byte[] is not reversable.
          */
+        @Override
         public String deserializeKey(ITuple tuple) {
 
             return (String) SerializerUtil.deserialize(tuple.getValue());
 
         }
 
+        @Override
         public byte[] serializeKey(Object key) {
             
             return getKeyBuilder().reset().append((String) key).getKey();
             
         }
 
+        @Override
         public byte[] serializeVal(String obj) {
             
             return SerializerUtil.serialize(obj);
             
         }
 
+        @Override
         public String deserialize(ITuple tuple) {
 
             return (String) SerializerUtil.deserialize(tuple.getValue());

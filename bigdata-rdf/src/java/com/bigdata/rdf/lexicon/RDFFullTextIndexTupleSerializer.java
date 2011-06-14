@@ -162,7 +162,7 @@ public class RDFFullTextIndexTupleSerializer extends
     }
 
     @Override
-    public byte[] serializeVal(final Object obj) {
+    public byte[] serializeVal(final ITermDocVal obj) {
 
         final ITermDocVal val = (ITermDocVal) obj;
 
