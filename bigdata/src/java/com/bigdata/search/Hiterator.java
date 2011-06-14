@@ -14,8 +14,8 @@ public class Hiterator<A extends IHit> implements Iterator<A> {
 
     final private Collection<A> hits;
     final private Iterator<A> src;
-    final private double minCosine;
-    final private int maxRank;
+//    final private double minCosine;
+//    final private int maxRank;
 
     /**
      * The rank of the last hit returned by {@link #next()}. The rank is in
@@ -32,50 +32,48 @@ public class Hiterator<A extends IHit> implements Iterator<A> {
 //    /** set by {@link #next()}. */
 //    private A lastHit = null;
 
-    /**
-     * The minimum cosine that will be visited as specified to
-     * {@link FullTextIndex#search(String, String, double, int)}
-     */
-    public double minCosine() {
-        
-        return minCosine;
-        
-    }
-    
-    /**
-     * The maximum rank that will be visited as specified to
-     * {@link FullTextIndex#search(String, String, double, int)}
-     */
-    public int maxRank() {
-        
-        return maxRank;
-        
-    }
+//    /**
+//     * The minimum cosine that will be visited as specified to
+//     * {@link FullTextIndex#search(String, String, double, int)}
+//     */
+//    public double minCosine() {
+//        
+//        return minCosine;
+//        
+//    }
+//    
+//    /**
+//     * The maximum rank that will be visited as specified to
+//     * {@link FullTextIndex#search(String, String, double, int)}
+//     */
+//    public int maxRank() {
+//        
+//        return maxRank;
+//        
+//    }
 
     /**
      * 
      * @param hits
-     * @param elapsed
-     * @param minCosine
-     * @param maxRank
      */
-    public Hiterator(final Collection<A> hits, 
-            final double minCosine, final int maxRank) {
+    public Hiterator(final Collection<A> hits
+//            ,final double minCosine, final int maxRank
+            ) {
 
         if (hits == null)
             throw new IllegalArgumentException();
 
-        if (minCosine < 0d || minCosine > 1d)
-            throw new IllegalArgumentException();
+//        if (minCosine < 0d || minCosine > 1d)
+//            throw new IllegalArgumentException();
 
-        if (maxRank <= 0)
-            throw new IllegalArgumentException();
+//        if (maxRank <= 0)
+//            throw new IllegalArgumentException();
 
         this.hits = hits;
 
-        this.minCosine = minCosine;
-        
-        this.maxRank = maxRank;
+//        this.minCosine = minCosine;
+//        
+//        this.maxRank = maxRank;
         
         this.src = hits.iterator();
         
@@ -112,13 +110,13 @@ public class Hiterator<A extends IHit> implements Iterator<A> {
 
         nextHit = src.next();
 
-        if (rank + 1 > maxRank || nextHit.getCosine() < minCosine) {
-
-            exhausted = true;
-
-            return false;
-
-        }
+//        if (rank + 1 > maxRank || nextHit.getCosine() < minCosine) {
+//
+//            exhausted = true;
+//
+//            return false;
+//
+//        }
 
         return true;
         
@@ -164,8 +162,8 @@ public class Hiterator<A extends IHit> implements Iterator<A> {
 
     public String toString() {
         
-        return "Hiterator{minCosine=" + minCosine
-                + ", maxRank=" + maxRank + ", nhits=" + hits.size() + "} : "
+        return "Hiterator{"+/*minCosine=" + minCosine
+                + ", maxRank=" + maxRank + ",*/" nhits=" + hits.size() + "} : "
                 + hits;
         
     }

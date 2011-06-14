@@ -870,7 +870,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 //		final int m = 1024;
 //		final int q = 8000;
 //		final int ratio = 32;
-		final int maxRecLen = 16;
+		final int maxRecLen = 64; // CONFIG via index property override.
 
         /*
          * TODO Examine performance for different node and leaf key and value

@@ -920,9 +920,9 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 				maxCosine, minRank, maxRank, matchAllTerms, timeout, unit);
     	
         return new Hiterator<Hit<V>>(//
-                Arrays.asList(a),// 
-                minCosine,//0.0d,// minCosine
-                Integer.MAX_VALUE // maxRank
+                Arrays.asList(a)// 
+//                ,minCosine,//0.0d,// minCosine
+//                Integer.MAX_VALUE // maxRank
                 ); 
 
     }
