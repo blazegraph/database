@@ -26,6 +26,8 @@
  */
 package com.bigdata.rdf.lexicon;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Value;
@@ -140,6 +142,9 @@ public class TermsIndexHelper {
 	 *            The base key for the hash code (without the counter suffix).
 	 * @param val
 	 *            The (serialized and compressed) RDF Value.
+	 * @param bucketSize
+	 *            The size of the collision bucket is reported as a side-effect
+	 *            (optional).
 	 * 
 	 * @return The key under which the {@link Value} was found -or-
 	 *         <code>null</code> iff the {@link Value} is not in the index and
@@ -154,9 +159,10 @@ public class TermsIndexHelper {
 	 *             could be an int[] return here (assuming up to an int counter,
 	 *             or a short[], or a byte[]).
 	 */
-    public byte[] resolveOrAddValue(final IIndex termsIndex,
-            final boolean readOnly, final IKeyBuilder keyBuilder,
-            final byte[] baseKey, final byte[] val) {
+	public byte[] resolveOrAddValue(final IIndex termsIndex,
+			final boolean readOnly, final IKeyBuilder keyBuilder,
+			final byte[] baseKey, final byte[] val,
+			final AtomicInteger bucketSize) {
 
         assert baseKey.length == TermsIndexHelper.TERMS_INDEX_KEY_SIZE - 1 : "Expecting "
                 + (TermsIndexHelper.TERMS_INDEX_KEY_SIZE - 1)
@@ -212,6 +218,9 @@ public class TermsIndexHelper {
 		// this is an exact collision count since we are not deleting tuples
 		// from the TERMS index.
         final long rangeCount = termsIndex.rangeCount(fromKey, toKey);
+        
+		if (bucketSize != null)
+			bucketSize.set((int) rangeCount);
         
         if (rangeCount == 0 && readOnly) {
 

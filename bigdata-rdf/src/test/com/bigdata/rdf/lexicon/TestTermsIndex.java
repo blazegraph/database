@@ -414,7 +414,7 @@ public class TestTermsIndex extends TestCase2 {
 
 				ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
 						vals, ctor, new TermsWriteProcResultHandler(a,
-								readOnly, stats.nunknown));
+								readOnly, stats));
 
 				for (int i = 0; i < a.length; i++) {
 					
@@ -438,7 +438,7 @@ public class TestTermsIndex extends TestCase2 {
 
 				ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
 						vals, ctor, new TermsWriteProcResultHandler(a,
-								readOnly, stats.nunknown));
+								readOnly, stats));
 
 				// Note: [nunknown] is only set on read.
 				assertEquals(0, stats.nunknown.get());
@@ -521,7 +521,7 @@ public class TestTermsIndex extends TestCase2 {
 
 				ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
 						vals, ctor, new TermsWriteProcResultHandler(a,
-								readOnly, stats.nunknown));
+								readOnly, stats));
 
 				int nnotfound = 0;
 				for (int i = 0; i < a.length; i++) {
@@ -621,7 +621,7 @@ public class TestTermsIndex extends TestCase2 {
 
                 ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
                         vals, ctor, new TermsWriteProcResultHandler(a,
-                                readOnly, stats.nunknown));
+                                readOnly, stats));
 
                 // Copy out the assigned IVs.
                 ivs1 = new IV[a.length];
@@ -671,7 +671,7 @@ public class TestTermsIndex extends TestCase2 {
 
                 ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
                         vals, ctor, new TermsWriteProcResultHandler(a,
-                                readOnly, stats.nunknown));
+                                readOnly, stats));
 
                 // Copy out the assigned IVs.
                 ivs2 = new IV[a.length];
@@ -821,7 +821,7 @@ public class TestTermsIndex extends TestCase2 {
 
 				ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
 						vals, ctor, new TermsWriteProcResultHandler(a,
-								readOnly, stats.nunknown));
+								readOnly, stats));
 
 				// Note: [nunknown] is only set on read.
 				assertEquals(0, stats.nunknown.get());
@@ -946,7 +946,7 @@ public class TestTermsIndex extends TestCase2 {
 
                 ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
                         vals, ctor, new TermsWriteProcResultHandler(a,
-                                readOnly, stats.nunknown));
+                                readOnly, stats));
 
             }
             

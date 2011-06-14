@@ -33,6 +33,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+
+import org.apache.log4j.Logger;
+
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.ColorsEnumExtension;
 import com.bigdata.rdf.internal.EpochExtension;
@@ -58,6 +61,9 @@ import com.bigdata.rdf.vocab.NoVocabulary;
  */
 public class TestInlining extends AbstractTripleStoreTestCase {
 
+	private static final transient Logger log = Logger
+			.getLogger(TestInlining.class);
+	
     /**
      * 
      */
@@ -234,7 +240,7 @@ public class TestInlining extends AbstractTripleStoreTestCase {
                 
                 for (IV iv : ids.keySet()) {
 
-                    System.err.println(iv);
+                    if(log.isInfoEnabled()) log.info(iv);
                     
                     assertEquals("Id mapped to a different term? : iv="
                             + iv, ids.get(iv), ids2.get(iv));
@@ -326,7 +332,7 @@ public class TestInlining extends AbstractTripleStoreTestCase {
                 
                 for (IV iv : ids.keySet()) {
 
-                    System.err.println(iv);
+                    if(log.isInfoEnabled()) log.info(iv);
                     
                     assertEquals("Id mapped to a different term? : iv="
                             + iv, ids.get(iv), ids2.get(iv));
@@ -407,9 +413,9 @@ public class TestInlining extends AbstractTripleStoreTestCase {
             final ExtensionIV iv2 = (ExtensionIV) l2.getIV();
             final ExtensionIV iv3 = (ExtensionIV) l3.getIV();
             
-            System.err.println(l1.getLabel() + ": " + iv1.getDelegate().byteValue());
-            System.err.println(l2.getLabel() + ": " + iv2.getDelegate().byteValue());
-            System.err.println(l3.getLabel() + ": " + iv3.getDelegate().byteValue());
+            if(log.isInfoEnabled()) log.info(l1.getLabel() + ": " + iv1.getDelegate().byteValue());
+            if(log.isInfoEnabled()) log.info(l2.getLabel() + ": " + iv2.getDelegate().byteValue());
+            if(log.isInfoEnabled()) log.info(l3.getLabel() + ": " + iv3.getDelegate().byteValue());
             
             assertTrue(iv1.getExtensionIV().equals(datatype.getIV()));
             assertTrue(iv2.getExtensionIV().equals(datatype.getIV()));
@@ -430,7 +436,7 @@ public class TestInlining extends AbstractTripleStoreTestCase {
                 
                 for (IV iv : ids.keySet()) {
 
-                    System.err.println(iv);
+                    if(log.isInfoEnabled()) log.info(iv);
                     
                     assertEquals("Id mapped to a different term? : iv="
                             + iv, ids.get(iv), ids2.get(iv));
@@ -559,8 +565,8 @@ public class TestInlining extends AbstractTripleStoreTestCase {
                 
                 for (IV id : ids.keySet()) {
 
-                	System.err.println(ids.get(id));
-                	System.err.println(ids2.get(id));
+                	if(log.isInfoEnabled()) log.info(ids.get(id));
+                	if(log.isInfoEnabled()) log.info(ids2.get(id));
                 	
                     assertEquals("Id mapped to a different term? : termId="
                             + id, ids.get(id), ids2.get(id));

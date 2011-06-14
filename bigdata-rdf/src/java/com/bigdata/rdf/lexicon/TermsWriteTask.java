@@ -2,7 +2,6 @@ package com.bigdata.rdf.lexicon;
 
 import java.util.Arrays;
 import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 
@@ -141,7 +140,7 @@ public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
 
                 Arrays.sort(b);
 
-                stats.sortTime += System.currentTimeMillis() - _begin;
+                stats.keySortTime += System.currentTimeMillis() - _begin;
 
             }
 
@@ -231,7 +230,7 @@ public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
 				// run the procedure.
                 ndx.submit(0/* fromIndex */, ndistinct/* toIndex */, keys,
                         vals, ctor, new TermsWriteProcResultHandler(a,
-                                readOnly, stats.nunknown));
+                                readOnly, stats));
 
                 stats.indexTime = stats.termsIndexTime = System.currentTimeMillis()
                         - _begin;
@@ -271,32 +270,32 @@ public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
          * @todo this could be the value returned by {@link #getResult()} which
          *       would make the API simpler.
          */ 
-        private final AtomicInteger nunknown;
-        
-        /**
-         * 
-         * @param a
-         *            A dense array of {@link KVO}s.
-         * @param readOnly
-         *            if readOnly was specified for the {@link Term2IdWriteProc}.
-         * @param nunknown
-         *            Incremented as a side effect for each terms that could not
-         *            be resolved (iff readOnly == true).
-         */
+        private final WriteTaskStats stats;
+
+		/**
+		 * 
+		 * @param a
+		 *            A dense array of {@link KVO}s.
+		 * @param readOnly
+		 *            if readOnly was specified for the {@link Term2IdWriteProc}
+		 *            .
+		 * @param stats
+		 *            Various atomic fields are updated as a side effect.
+		 */
 		public TermsWriteProcResultHandler(final KVO<BigdataValue>[] a,
-				final boolean readOnly, final AtomicInteger nunknown) {
+				final boolean readOnly, final WriteTaskStats stats) {
 
             if (a == null)
                 throw new IllegalArgumentException();
 
-            if (nunknown == null)
+            if (stats == null)
                 throw new IllegalArgumentException();
 
             this.a = a;
 
             this.readOnly = readOnly;
             
-            this.nunknown = nunknown;
+            this.stats = stats;
             
         }
 
@@ -307,6 +306,24 @@ public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
         public void aggregate(final TermsWriteProc.Result result,
                 final Split split) {
 
+			stats.totalBucketSize.add(result.totalBucketSize);
+
+			/*
+			 * Update the maximum bucket size. There is a data race here, but
+			 * conflicts should be rare and this loop will eventually resolve
+			 * any conflict.
+			 */
+			while (true) {
+				final int tmp = stats.maxBucketSize.get();
+				if (tmp < result.maxBucketSize) {
+					if (!stats.maxBucketSize.compareAndSet(tmp/* expect */,
+							result.maxBucketSize/* newValue */)) {
+						continue;
+					}
+				}
+				break;
+			}
+
             for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
 
                 final IV iv = result.ivs[j];
@@ -316,7 +333,7 @@ public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
                     if (!readOnly)
                         throw new AssertionError();
 
-                    nunknown.incrementAndGet();
+                    stats.nunknown.incrementAndGet();
 
                 } else {
 

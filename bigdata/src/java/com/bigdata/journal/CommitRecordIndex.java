@@ -646,6 +646,7 @@ public class CommitRecordIndex extends BTree {
          * @param entry
          *            An Entry.
          */
+        @Override
         public byte[] serializeVal(Entry entry) {
             
             return ser.serializeEntry(entry);

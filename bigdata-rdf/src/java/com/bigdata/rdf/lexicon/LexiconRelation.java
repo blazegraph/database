@@ -870,7 +870,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 //		final int m = 1024;
 //		final int q = 8000;
 //		final int ratio = 32;
-		final int maxRecLen = 64; // CONFIG via index property override.
+//		final int maxRecLen = 64; // CONFIG via index property override.
 
         /*
          * TODO Examine performance for different node and leaf key and value
@@ -882,8 +882,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 		// enable raw record support.
 		metadata.setRawRecords(true);
 
-		// set the maximum length of a byte[] value in a leaf.
-		metadata.setMaxRecLen(maxRecLen);
+//		// set the maximum length of a byte[] value in a leaf.
+//		metadata.setMaxRecLen(maxRecLen);
 
 //		/*
 //		 * increase the branching factor since leaf size is smaller w/o large
@@ -1322,13 +1322,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         if (numTerms > 1000 || elapsed > 3000) {
 
             if (log.isInfoEnabled())
-                log.info("Processed " + numTerms + " in " + elapsed
-                        + "ms; keygen=" + stats.keyGenTime + "ms, sort="
-                        + stats.sortTime + "ms, insert=" + stats.indexTime
-                        + "ms" + " {forward=" + stats.termsIndexTime
-                        + ", fullText=" + stats.fullTextIndexTime + "}");
+                log.info(stats.toString());
 
         }
+//        System.err.println(stats.toString());
 
     }
 
@@ -2314,9 +2311,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         final byte[] val = valueFactory.getValueSerializer().serialize(asValue);
 
-        final byte[] key = h.resolveOrAddValue(getTermsIndex(),
-                true/* readOnly */, keyBuilder, baseKey, val);
-        
+		final byte[] key = h
+				.resolveOrAddValue(getTermsIndex(), true/* readOnly */,
+						keyBuilder, baseKey, val, null/* bucketSize */);
+
         if( key == null ) {
 
             // Not found.

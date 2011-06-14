@@ -159,6 +159,7 @@ public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValu
      * 
      * @return The {@link TermId}.
      */
+    @Override
     public IV deserializeKey(final ITuple tuple) {
 
         final byte[] key = tuple.getKeyBuffer().array();
@@ -173,6 +174,7 @@ public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValu
      * @param obj
      *            The {@link TermId}.
      */
+    @Override
     public byte[] serializeKey(final Object obj) {
 
         return ((TermId<?>) obj).encode(getKeyBuilder().reset()).getKey();
@@ -186,6 +188,7 @@ public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValu
      * @param obj
      *            An RDF {@link Value}.
      */
+    @Override
     public byte[] serializeVal(final BigdataValue obj) {
         
         buf.reset();
@@ -199,6 +202,7 @@ public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValu
      * the term identifier extracted from the unsigned byte[] key, and sets
      * the appropriate {@link BigdataValueFactoryImpl} reference on that object.
      */
+    @Override
     public BigdataValue deserialize(final ITuple tuple) {
 
         if(tuple.isNull()) {

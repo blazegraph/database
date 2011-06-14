@@ -138,6 +138,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         
     }
     
+    @Override
     public byte[] serializeKey(final Object obj) {
 
         if (obj == null)
@@ -165,9 +166,17 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
     }
 
     /**
-     * Encodes the {@link StatementEnum} and the optional statement identifier.
+     * Variant forces type cast to {@link SPO}.
      */
     public byte[] serializeVal(final ISPO spo) {
+    	return serializeVal((SPO)spo);
+    }
+    
+    /**
+     * Encodes the {@link StatementEnum} and the optional statement identifier.
+     */
+    @Override
+    public byte[] serializeVal(final SPO spo) {
 
         if (spo == null)
             throw new IllegalArgumentException();
