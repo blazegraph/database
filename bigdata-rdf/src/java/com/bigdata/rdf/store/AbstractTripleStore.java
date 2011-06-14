@@ -869,7 +869,7 @@ abstract public class AbstractTripleStore extends
         String INLINE_BNODES = (AbstractTripleStore.class.getName()
                 + ".inlineBNodes").intern();
 
-        String DEFAULT_INLINE_BNODES = "false";
+        String DEFAULT_INLINE_BNODES = "true";
 
         /**
          * Set up database to inline date/times directly into the statement
@@ -885,7 +885,7 @@ abstract public class AbstractTripleStore extends
         String INLINE_DATE_TIMES = (AbstractTripleStore.class.getName()
                 + ".inlineDateTimes").intern();
 
-        String DEFAULT_INLINE_DATE_TIMES = "false";
+        String DEFAULT_INLINE_DATE_TIMES = "true";
 
         /**
          * The default timezone to be used to a) encode inline xsd:datetime
