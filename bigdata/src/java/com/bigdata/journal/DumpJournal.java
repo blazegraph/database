@@ -102,11 +102,11 @@ public class DumpJournal {
      *            <dd>Dump the records in the indices.</dd>
      *            </dl>
      */
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
         
-        if(args.length==0) {
+		if (args.length == 0) {
             
-            System.err.println("usage: (-history) <filename>+");
+            System.err.println("usage: (-history|-indices|-pages|-tuples) <filename>+");
             
             System.exit(1);
             
