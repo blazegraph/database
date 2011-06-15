@@ -32,7 +32,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
@@ -50,10 +49,10 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.NullOutputStream;
 import com.bigdata.io.compression.BOCU1Compressor;
 import com.bigdata.io.compression.UnicodeHelper;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
-import com.bigdata.rdf.lexicon.TermsIndexHelper;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -691,20 +690,28 @@ public class IVUtility {
 
 				/*
 				 * Handle a TermId, including a NullIV.
+				 * 
+				 * Note: This MUST be consistent with TermsIndexHelper#makeKey()
+				 * and TermId.
 				 */ 
 
-            	o--; // back up one byte to the flags byte.
-                final byte[] termIdKey = Arrays.copyOfRange(//
-                        // The unsigned byte[] key.
-                        key,
-                        // from: inclusive lower bound.
-                        o,
-                        // to : exclusive upper bound.
-                        o + TermsIndexHelper.TERMS_INDEX_KEY_SIZE //+ 1//
-                        );
+//            	o--; // back up one byte to the flags byte.
+//                final byte[] termIdKey = Arrays.copyOfRange(//
+//                        // The unsigned byte[] key.
+//                        key,
+//                        // from: inclusive lower bound.
+//                        o,
+//                        // to : exclusive upper bound.
+//                        o + TermsIndexHelper.TERMS_INDEX_KEY_SIZE //+ 1//
+//                        );
+//
+//                final TermId<?> iv = new TermId(termIdKey);
 
-                final TermId<?> iv = new TermId(termIdKey);
-
+            	final int hashCode = KeyBuilder.decodeInt(key, o);
+				o += Bytes.SIZEOF_INT;
+            	final byte counter = KeyBuilder.decodeByte(key[o++]);
+				final TermId<?> iv = new TermId(flags, hashCode, counter);
+            	
                 if (iv.isNullIV())
                     return null;
 
@@ -971,7 +978,7 @@ public class IVUtility {
             // Note: The 'delegate' will be an InlineLiteralIV w/o a datatype.
             final InlineLiteralIV<BigdataLiteral> iv = new InlineLiteralIV<BigdataLiteral>(
                     str1, null/* languageCode */, null/* datatype */,
-                    1/* flags */+ nread);
+					1/* flags */+ 1/* termCode */+ nread);
             return isExtension ? new ExtensionIV<BigdataLiteral>(iv, datatype)
                     : iv;
             }

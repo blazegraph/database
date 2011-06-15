@@ -18,7 +18,7 @@ abstract public class AbstractExtensionIV<V extends BigdataValue, T> extends
 
     private final AbstractIV delegate;
     
-    private final IV extensionIv;
+    private final IV extensionIV;
     
     protected AbstractExtensionIV(final VTE vte,
             final AbstractIV delegate, final IV extensionIv) {
@@ -30,7 +30,7 @@ abstract public class AbstractExtensionIV<V extends BigdataValue, T> extends
         
         this.delegate = delegate;
         
-        this.extensionIv = extensionIv;
+        this.extensionIV = extensionIv;
         
     }
     
@@ -43,7 +43,7 @@ abstract public class AbstractExtensionIV<V extends BigdataValue, T> extends
     @Override
     public IV getExtensionIV() {
 
-        return extensionIv;
+        return extensionIV;
         
     }
     
@@ -57,8 +57,8 @@ abstract public class AbstractExtensionIV<V extends BigdataValue, T> extends
         if (o instanceof AbstractExtensionIV<?, ?>) {
             return this.delegate
                     .equals(((AbstractExtensionIV<?, ?>) o).delegate)
-                    && this.extensionIv
-                            .equals(((AbstractExtensionIV<?, ?>) o).extensionIv);
+                    && this.extensionIV
+                            .equals(((AbstractExtensionIV<?, ?>) o).extensionIV);
         }
         return false;
     }
@@ -67,8 +67,8 @@ abstract public class AbstractExtensionIV<V extends BigdataValue, T> extends
 
 //        int ret = extensionIv._compareTo(((AbstractExtensionIV) o).extensionIv);
 
-    	final int ret = extensionIv
-				.compareTo(((AbstractExtensionIV) o).extensionIv);
+    	final int ret = extensionIV
+				.compareTo(((AbstractExtensionIV) o).extensionIV);
 
         if (ret != 0)
             return ret;
@@ -77,12 +77,13 @@ abstract public class AbstractExtensionIV<V extends BigdataValue, T> extends
 
     }
 
-    /**
-     * Return the length of the datatype IV plus the length of the delegate IV.
-     */
+	/**
+	 * Return one (for the flags) plus the length of the extension IV plus the
+	 * length of the delegate IV.
+	 */
     final public int byteLength() {
 
-        return extensionIv.byteLength() + delegate.byteLength();
+		return 1/* flags */+ extensionIV.byteLength() + delegate.byteLength();
         
     }
 

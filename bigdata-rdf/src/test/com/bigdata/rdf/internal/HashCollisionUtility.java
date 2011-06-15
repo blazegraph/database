@@ -945,7 +945,8 @@ public class HashCollisionUtility {
 		 * since the DateTimeExtension uses the LexiconRelation to do its work.
 		 */
 		conf = new LexiconConfiguration<BigdataValue>(
-				true, // inlineLiterals
+				true, // inlineXSDDatatypeLiterals
+				true, // inlineTextLiterals
 				64,   // maxInlineStringLength
 				true, // inlineBNodes
 				false, // inlineDateTimes

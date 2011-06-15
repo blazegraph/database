@@ -41,8 +41,8 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
@@ -358,17 +358,20 @@ public class TestTermsWriteTask extends TestCase2 {
 
         final byte[] val = vf.getValueSerializer().serialize(asValue);
 
-		final byte[] key = h.resolveOrAddValue(ndx, true/* readOnly */,
+		final int counter = h.resolveOrAddValue(ndx, true/* readOnly */,
 				keyBuilder, baseKey, val, null/* bucketSize */);
 
-        if (key == null) {
+        if (counter == TermsIndexHelper.NOT_FOUND) {
 
             // Not found.
             return null;
 
         }
 
-        final TermId<?> iv = (TermId<?>) IVUtility.decode(key);
+//        final TermId<?> iv = (TermId<?>) IVUtility.decode(key);
+
+		final TermId<?> iv = new TermId<BigdataValue>(VTE.valueOf(asValue),
+				asValue.hashCode(), (byte) counter);
 
         return iv;
 

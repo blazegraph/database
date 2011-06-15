@@ -60,32 +60,57 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     private static final Logger log = 
         Logger.getLogger(LexiconConfiguration.class);
-    
-    /**
-     * <code>true</code> if datatype literals will be inlined.
-     */
-    private final boolean inlineLiterals;
+
+	/**
+	 * <code>true</code> if xsd primitive and numeric xsd datatype literals will
+	 * be inlined.
+	 * 
+	 * @see AbstractTripleStore.Options#INLINE_XSD_DATATYPE_LITERALS
+	 */
+    private final boolean inlineXSDDatatypeLiterals;
 
     /**
-     * <code>true</code> if (conforming) blank nodes will inlined.
+     * <code>true</code> if textual literals will be inlined.
+     *  
+     * @see AbstractTripleStore.Options#INLINE_TEXT_LITERALS
      */
-    private final boolean inlineBNodes;
-
-    /**
-     * @see AbstractTripleStore.Options#REJECT_INVALID_XSD_VALUES
-     */
-    final boolean rejectInvalidXSDValues;
+    final private boolean inlineTextLiterals;
     
     /**
      * The maximum length of a Unicode string which may be inlined into the
      * statement indices. This applies to blank node IDs, literal labels
      * (including the {@link XSDStringExtension}), local names of {@link URI}s,
      * etc.
+     * 
+     * @see AbstractTripleStore.Options#MAX_INLINE_TEXT_LENGTH
      */
-    final private int maxInlineStringLength;
+    final private int maxInlineTextLength;
 
+    /**
+     * <code>true</code> if (conforming) blank nodes will inlined.
+     * 
+     * @see AbstractTripleStore.Options#INLINE_BNODES
+     */
+    private final boolean inlineBNodes;
+    
+	/**
+	 * @see AbstractTripleStore.Options#INLINE_BNODES
+	 */
+	private final boolean inlineDateTimes;
+    
+    /**
+     * @see AbstractTripleStore.Options#REJECT_INVALID_XSD_VALUES
+     */
+    final boolean rejectInvalidXSDValues;
+
+    /**
+     * @see AbstractTripleStore.Options#EXTENSION_FACTORY_CLASS
+     */
     private final IExtensionFactory xFactory;
 
+    /**
+     * @see AbstractTripleStore.Options#VOCABULARY_CLASS
+     */
     private final Vocabulary vocab;
     
     /**
@@ -105,16 +130,66 @@ public class LexiconConfiguration<V extends BigdataValue>
      * the statement indices. This applies to blank node IDs, literal labels
      * (including the {@link XSDStringExtension}), local names of {@link URI}s,
      * etc.
+     * 
+     * @see AbstractTripleStore.Options#MAX_INLINE_TEXT_LENGTH
      */
     public int getMaxInlineStringLength() {
 
-        return maxInlineStringLength;
+        return maxInlineTextLength;
         
+    }
+
+    /**
+     * 
+     * @see AbstractTripleStore.Options#INLINE_TEXT_LITERALS
+     */
+    public boolean isInlineTextLiterals() {
+    	
+    	return inlineTextLiterals;
+    	
+    }
+
+    public String toString() {
+    	
+    	final StringBuilder sb = new StringBuilder();
+    	
+    	sb.append(getClass().getName());
+    	
+		sb.append("{ "
+				+ AbstractTripleStore.Options.INLINE_XSD_DATATYPE_LITERALS
+				+ "=" + inlineXSDDatatypeLiterals);
+
+		sb.append(", " + AbstractTripleStore.Options.INLINE_TEXT_LITERALS + "="
+				+ inlineTextLiterals);
+
+		sb.append(", " + AbstractTripleStore.Options.MAX_INLINE_TEXT_LENGTH+ "="
+				+ maxInlineTextLength);
+
+		sb.append(", " + AbstractTripleStore.Options.INLINE_BNODES + "="
+				+ inlineBNodes);
+
+		sb.append(", " + AbstractTripleStore.Options.INLINE_DATE_TIMES + "="
+				+ inlineDateTimes);
+
+		sb.append(", " + AbstractTripleStore.Options.REJECT_INVALID_XSD_VALUES + "="
+				+ rejectInvalidXSDValues);
+
+		sb.append(", " + AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS+ "="
+				+ xFactory.getClass().getName());
+
+		sb.append(", " + AbstractTripleStore.Options.VOCABULARY_CLASS + "="
+				+ vocab.getClass().getName());
+
+		sb.append("}");
+		
+    	return sb.toString();
+    	
     }
     
     public LexiconConfiguration(//
-            final boolean inlineLiterals,//
-            final int maxInlineStringLength,//
+            final boolean inlineXSDDatatypeLiterals,//
+            final boolean inlineTextLiterals,//
+            final int maxInlineTextLength,//
             final boolean inlineBNodes,//
             final boolean inlineDateTimes,//
             final boolean rejectInvalidXSDValues,
@@ -122,15 +197,17 @@ public class LexiconConfiguration<V extends BigdataValue>
             final Vocabulary vocab//
             ) {
         
-        if (maxInlineStringLength < 0)
+        if (maxInlineTextLength < 0)
             throw new IllegalArgumentException();
 
         if (vocab == null)
             throw new IllegalArgumentException();
 
-        this.inlineLiterals = inlineLiterals;
-        this.maxInlineStringLength = maxInlineStringLength;
+        this.inlineXSDDatatypeLiterals = inlineXSDDatatypeLiterals;
+        this.inlineTextLiterals = inlineTextLiterals;
+        this.maxInlineTextLength = maxInlineTextLength;
         this.inlineBNodes = inlineBNodes;
+        this.inlineDateTimes = inlineDateTimes;
         this.rejectInvalidXSDValues = rejectInvalidXSDValues;
         this.xFactory = xFactory;
         this.vocab = vocab;
@@ -139,7 +216,9 @@ public class LexiconConfiguration<V extends BigdataValue>
 		 * Note: These collections are read-only so we do NOT need additional
 		 * synchronization.
 		 */
+
         iv2ext = new LinkedHashMap<IV, IExtension<BigdataValue>>();
+        
         datatype2ext = new LinkedHashMap<String, IExtension<BigdataValue>>();
 
     }
@@ -248,7 +327,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 	 */
     private IV<BigdataURI, ?> createInlineURIIV(final URI value) {
 
-        if (value.stringValue().length() <= maxInlineStringLength) {
+        if (value.stringValue().length() <= maxInlineTextLength) {
 
             return new InlineURIIV<BigdataURI>(value);
 
@@ -300,7 +379,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         if ((iv = createInlineDatatypeIV(value, datatype)) != null)
             return iv;
 
-        if (maxInlineStringLength > 0) {
+        if (inlineTextLiterals && maxInlineTextLength > 0) {
          
             /*
              * Attempt to fully inline the literal.
@@ -369,7 +448,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     /**
      * If the total length of the Unicode components of the {@link Literal} is
-     * less than {@link #maxInlineStringLength} then return an fully inline
+     * less than {@link #maxInlineTextLength} then return an fully inline
      * version of the {@link Literal}.
      * 
      * @param value
@@ -392,7 +471,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         final long totalLength = label.length() + datatypeLength
                 + languageLength;
 
-        if (totalLength <= maxInlineStringLength) {
+        if (totalLength <= maxInlineTextLength) {
 
             return new InlineLiteralIV<BigdataLiteral>(label, value
                     .getLanguage(), value.getDatatype());
@@ -577,7 +656,7 @@ public class LexiconConfiguration<V extends BigdataValue>
             
         }
         
-        if (maxInlineStringLength > 0 && id.length() <= maxInlineStringLength) {
+        if (maxInlineTextLength > 0 && id.length() <= maxInlineTextLength) {
 
             /*
              * Inline as [Unicode].
@@ -607,7 +686,7 @@ public class LexiconConfiguration<V extends BigdataValue>
             case BNODE:
                 return inlineBNodes && isSupported(dte);
             case LITERAL:
-                return inlineLiterals && isSupported(dte);
+                return inlineXSDDatatypeLiterals && isSupported(dte);
             default:
                 return false;
         }
@@ -657,5 +736,5 @@ public class LexiconConfiguration<V extends BigdataValue>
         }
 
     }
-
+    
 }

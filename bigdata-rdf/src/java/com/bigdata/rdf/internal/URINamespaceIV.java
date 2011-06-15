@@ -27,14 +27,10 @@ public class URINamespaceIV<V extends BigdataURI> extends
      */
     public String toString() {
 
-        return "URI(namespace" + getExtensionIV()
+        return "URI(namespaceIV=" + getExtensionIV()
                 + String.valueOf(getVTE().getCharCode()) + ", localName="
                 + getDelegate() + ")";
 
     }
-
-//    public long getTermId() throws UnsupportedOperationException {
-//        throw new UnsupportedOperationException();
-//    }
 
 }

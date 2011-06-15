@@ -33,7 +33,6 @@ import junit.framework.TestCase2;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rdf.lexicon.TermsIndexHelper;
-import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataURI;
 
 /**
@@ -82,123 +81,108 @@ public class TestTermId extends TestCase2 {
 		
     }
 
+	private void doTermIdTest(final VTE vte, final int hashCode,
+			final int counter) {
+
+		final IKeyBuilder keyBuilder = helper.newKeyBuilder();
+
+		// final byte[] key = helper.makeKey(keyBuilder, vte, hashCode,
+		// counter);
+		//		
+		// assertEquals(TermsIndexHelper.TERMS_INDEX_KEY_SIZE, key.length);
+		//
+		// final TermId<?> iv = new TermId<BigdataURI>(key);
+		final TermId<?> iv = new TermId<BigdataURI>(vte, hashCode,
+				(byte) counter);
+
+		assertEquals(TermId.toFlags(vte), iv.flags());
+
+		assertEquals(vte, iv.getVTE());
+
+		assertEquals(hashCode, iv.hashCode());
+
+		assertEquals(counter, iv.counter());
+
+		assertEquals(iv, TermId.fromString(iv.toString()));
+
+		final byte[] a = iv.encode(keyBuilder.reset()).getKey();
+		
+		final byte[] key = helper.makeKey(keyBuilder.reset(), vte, hashCode,
+				counter);
+
+		if (!BytesUtil.bytesEqual(a, key)) {
+
+			fail("Encoding differs: iv=" + iv + ", expected="
+					+ BytesUtil.toString(a) + ", actual="
+					+ BytesUtil.toString(key));
+			
+		}
+
+		final TermId<?> iv2 = (TermId<?>) IVUtility.decode(key);
+
+		assertEquals(vte, iv2.getVTE());
+
+		assertEquals(hashCode, iv2.hashCode());
+
+		assertEquals(counter, iv2.counter());
+
+		assertEquals(iv, TermId.fromString(iv2.toString()));
+
+		assertEquals(iv, iv2);
+
+    }
+    
     public void test_TermId_URI() {
-    	
-    	final IKeyBuilder keyBuilder = helper.newKeyBuilder();
     	
     	final VTE vte = VTE.URI;
     	
     	final int hashCode = 12;
     	
     	final int counter = 1;
-    	
-		final byte[] key = helper.makeKey(keyBuilder, vte, hashCode,
-				counter);
-		
-        assertEquals(TermsIndexHelper.TERMS_INDEX_KEY_SIZE, key.length);
 
-        final TermId<?> iv = new TermId<BigdataURI>(key);
-
-		assertEquals(vte, iv.getVTE());
-
-		assertEquals(hashCode, iv.hashCode());
-		
-		assertEquals(counter, iv.counter());
-		
-        assertEquals(iv, TermId.fromString(iv.toString()));
-
-        final TermId<?> iv2 = (TermId<?>) IVUtility.decode(key);
-
-        assertEquals(vte, iv2.getVTE());
-
-        assertEquals(hashCode, iv2.hashCode());
-        
-        assertEquals(counter, iv2.counter());
-
-        assertEquals(iv, TermId.fromString(iv2.toString()));
-
-        assertEquals(iv, iv2);
+    	doTermIdTest(vte,hashCode,counter);
 
     }
 
     public void test_TermId_Literal() {
-    	
-    	final IKeyBuilder keyBuilder = helper.newKeyBuilder();
     	
     	final VTE vte = VTE.LITERAL;
     	
     	final int hashCode = 12;
     	
     	final int counter = 1;
+
+    	doTermIdTest(vte, hashCode, counter);
     	
-		final byte[] key = helper.makeKey(keyBuilder, vte, hashCode,
-				counter);
-
-		final TermId<BigdataBNode> iv = new TermId<BigdataBNode>(key);
-
-		assertEquals(vte, iv.getVTE());
-
-		assertEquals(hashCode, iv.hashCode());
-		
-		assertEquals(counter, iv.counter());
-
-		assertEquals(iv,TermId.fromString(iv.toString()));
-		
     }
 
     public void test_TermId_BNode() {
-    	
-    	final IKeyBuilder keyBuilder = helper.newKeyBuilder();
     	
     	final VTE vte = VTE.BNODE;
     	
     	final int hashCode = 12;
     	
     	final int counter = 1;
-    	
-		final byte[] key = helper.makeKey(keyBuilder, vte, hashCode,
-				counter);
 
-		final TermId<BigdataBNode> iv = new TermId<BigdataBNode>(key);
+    	doTermIdTest(vte, hashCode, counter);
 
-		assertEquals(vte, iv.getVTE());
-
-		assertEquals(hashCode, iv.hashCode());
+		// TODO test iv.bnodeId() here.
 		
-		assertEquals(counter, iv.counter());
-		
-		assertEquals(iv,TermId.fromString(iv.toString()));
-
     }
 
     public void test_TermId_URI_Counter_ZERO() {
-    	
-    	final IKeyBuilder keyBuilder = helper.newKeyBuilder();
     	
     	final VTE vte = VTE.URI;
     	
     	final int hashCode = 12;
     	
     	final int counter = 0;
+
+    	doTermIdTest(vte, hashCode, counter);
     	
-		final byte[] key = helper.makeKey(keyBuilder, vte, hashCode,
-				counter);
-
-		final TermId<BigdataBNode> iv = new TermId<BigdataBNode>(key);
-
-		assertEquals(vte, iv.getVTE());
-
-		assertEquals(hashCode, iv.hashCode());
-		
-		assertEquals(counter, iv.counter());
-
-		assertEquals(iv,TermId.fromString(iv.toString()));
-		
     }
 
     public void test_TermId_URI_Counter_ONE() {
-    	
-    	final IKeyBuilder keyBuilder = helper.newKeyBuilder();
     	
     	final VTE vte = VTE.URI;
     	
@@ -206,68 +190,31 @@ public class TestTermId extends TestCase2 {
     	
     	final int counter = 1;
     	
-		final byte[] key = helper.makeKey(keyBuilder, vte, hashCode,
-				counter);
-
-		final TermId<BigdataBNode> iv = new TermId<BigdataBNode>(key);
-
-		assertEquals(vte, iv.getVTE());
-
-		assertEquals(hashCode, iv.hashCode());
-		
-		assertEquals(counter, iv.counter());
-
-		assertEquals(iv,TermId.fromString(iv.toString()));
+    	doTermIdTest(vte, hashCode, counter);
 		
     }
 
     public void test_TermId_URI_Counter_MIN_VALUE() {
-    	
-    	final IKeyBuilder keyBuilder = helper.newKeyBuilder();
     	
     	final VTE vte = VTE.URI;
     	
     	final int hashCode = 12;
     	
     	final int counter = Byte.MIN_VALUE;
-    	
-		final byte[] key = helper.makeKey(keyBuilder, vte, hashCode,
-				counter);
 
-		final TermId<BigdataBNode> iv = new TermId<BigdataBNode>(key);
-
-		assertEquals(vte, iv.getVTE());
-
-		assertEquals(hashCode, iv.hashCode());
-		
-		assertEquals(counter, iv.counter());
-
-		assertEquals(iv,TermId.fromString(iv.toString()));
-		
+    	doTermIdTest(vte, hashCode, counter);
+ 		
     }
 
     public void test_TermId_URI_Counter_MAX_VALUE() {
-    	
-    	final IKeyBuilder keyBuilder = helper.newKeyBuilder();
     	
     	final VTE vte = VTE.URI;
     	
     	final int hashCode = 12;
     	
     	final int counter = Byte.MAX_VALUE;
-    	
-		final byte[] key = helper.makeKey(keyBuilder, vte, hashCode,
-				counter);
-
-		final TermId<BigdataBNode> iv = new TermId<BigdataBNode>(key);
-
-		assertEquals(vte, iv.getVTE());
-
-		assertEquals(hashCode, iv.hashCode());
-		
-		assertEquals(counter, iv.counter());
-
-		assertEquals(iv,TermId.fromString(iv.toString()));
+ 
+    	doTermIdTest(vte, hashCode, counter);
 		
     }
 
@@ -365,10 +312,10 @@ public class TestTermId extends TestCase2 {
 			// TODO Change range if the counter can overflow.
 			final int counter = 127 - r.nextInt(255);
 
-			final byte[] key = helper.makeKey(keyBuilder.reset(), vte,
-					hashCode, counter);
+//			final byte[] key = helper.makeKey(keyBuilder.reset(), vte,
+//					hashCode, counter);
 
-			final TermId<?> v = new TermId(key);
+			final TermId<?> v = new TermId(vte, hashCode, (byte) counter);
 
 			assertTrue(v.isTermId());
 
@@ -376,14 +323,28 @@ public class TestTermId extends TestCase2 {
 
 			if (!vte.equals(v.getVTE())) {
 				fail("Expected=" + vte + ", actual=" + v.getVTE() + " : iv="
-						+ v+", key="+BytesUtil.toString(key));
+						+ v);//+", key="+BytesUtil.toString(key));
 			}
 
 			assertEquals(hashCode, v.hashCode());
 
 			assertEquals(counter, v.counter());
-			
-			// assertEquals(termId, v.getTermId());
+
+			// Verify we can encode/decode the TermId.
+	        {
+		     
+				final byte[] key = helper.makeKey(keyBuilder.reset(), vte,
+						hashCode, counter);
+
+		        final TermId<?> iv2 = (TermId<?>) IVUtility.decode(key);
+
+		        assertEquals(v, iv2);
+		        
+		        assertEquals(0,v.compareTo(iv2));
+
+		        assertEquals(0,iv2.compareTo(v));
+		        
+	        }
 
 			try {
 				v.getInlineValue();

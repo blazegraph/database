@@ -208,7 +208,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
      * @see VTE
      * @see DTE
      */
-    private final byte flags;
+    protected final byte flags;
 
     /**
      * The RDF Value type (URI, BNode, Literal or Statement) and the data type
@@ -550,8 +550,13 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         if (this == o)
             return 0;
 
-        if (o == null)
+        if (o == null) {
+			/*
+			 * TODO This is ordering NULLs last. Why is this code even seeing
+			 * null references?
+			 */
             return 1;
+        }
         
         /*
          * First order based on the flags byte. This is the first byte of the
@@ -563,7 +568,10 @@ public abstract class AbstractIV<V extends BigdataValue, T>
          * sort out extension types and datatype literals with a natural
          * datatype.
          */
-        final int ret = (int) flags - (int) o.flags();
+		
+        final AbstractIV<?, ?> t = (AbstractIV<?, ?>) o;
+
+		final int ret = (int) flags - (int) t.flags;
 
         if (ret < 0)
             return -1;
@@ -582,7 +590,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
          * ordering preserving compression so comparing the Strings is the right
          * thing to do.
          */
-        return _compareTo(o);
+        return _compareTo( t );
 
     }
 

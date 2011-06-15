@@ -34,9 +34,16 @@ public class DefaultExtensionFactory implements IExtensionFactory {
     		extensions.add(new DateTimeExtension<BigdataLiteral>(
     				lex, lex.getInlineDateTimesTimeZone()));
 
-        if (lex.getMaxInlineStringLength() > 0)
+        if (lex.getMaxInlineStringLength() > 0) {
+			/*
+			 * Note: This extension is used for both literals and URIs. It MUST
+			 * be enabled when MAX_INLINE_TEXT_LENGTH is GT ZERO (0). Otherwise
+			 * we will not be able to inline either the local names or the full
+			 * text of URIs.
+			 */
             extensions.add(new XSDStringExtension<BigdataLiteral>(lex, lex
                     .getMaxInlineStringLength()));
+        }
 
 		extensionsArray = extensions.toArray(new IExtension[extensions.size()]);
         

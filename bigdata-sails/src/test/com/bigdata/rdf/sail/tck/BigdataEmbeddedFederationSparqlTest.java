@@ -205,9 +205,11 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
 
         final Properties properties = getProperties();
 
-        if (cannotInlineTests.contains(testURI))
-            properties.setProperty(Options.INLINE_LITERALS, "false");
-
+        if (cannotInlineTests.contains(testURI)) {
+        	properties.setProperty(Options.INLINE_XSD_DATATYPE_LITERALS, "false");
+        	properties.setProperty(Options.INLINE_DATE_TIMES, "false");
+        }
+        
         if(unicodeStrengthIdentical.contains(testURI)) {
             // Force identical Unicode comparisons.
             properties.setProperty(Options.COLLATOR, CollatorEnum.JDK.toString());

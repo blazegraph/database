@@ -27,16 +27,10 @@ public class LiteralDatatypeIV<V extends BigdataLiteral> extends
      */
     public String toString() {
 
-        return "Literal(namespace" + getExtensionIV()
+        return "Literal(datatypeIV=" + getExtensionIV()
                 + String.valueOf(getVTE().getCharCode()) + ", localName="
                 + getDelegate() + ")";
 
     }
-
-//    public long getTermId() throws UnsupportedOperationException {
-//
-//        throw new UnsupportedOperationException();
-//        
-//    }
 
 }

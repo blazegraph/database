@@ -78,7 +78,7 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
 	 * Verify that a {@link TermId#NullIV} was entered into the TERMS index when
 	 * the lexicon was created.
 	 */
-    public void test_NullIV() {
+	public void test_NullIV() {
     
         final Properties properties = getProperties();
         
@@ -92,8 +92,13 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
         // test w/o the full text index.
         properties.setProperty(Options.TEXT_INDEX, "false");
 
-        // test w/o inlining
-        properties.setProperty(Options.INLINE_LITERALS, "false");
+		// test w/o date time inlining (since this causes xsd:dateTime to be
+		// inserted into the TERMS index).
+        properties.setProperty(Options.INLINE_DATE_TIMES, "false");
+
+        // test w/o unicode inlining (since this causes xsd:string to be
+		// inserted into the TERMS index).
+        properties.setProperty(Options.MAX_INLINE_TEXT_LENGTH, "0");
 
         final AbstractTripleStore store = getStore(properties);
         
@@ -105,7 +110,13 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
         	
         	final IIndex ndx = store.getLexiconRelation().getTermsIndex();
 
-           for (VTE vte : VTE.values()) {
+			if (log.isInfoEnabled())
+				log
+						.info("dump:\n"
+								+ helper.dump(store.getLexiconRelation()
+										.getNamespace(), ndx));
+
+        	for (VTE vte : VTE.values()) {
                 
                 // Each VTE has an associated NullIV (mapped to a [null]).
                 assertNull(ndx.lookup(TermId.mockIV(vte).encode(
@@ -117,6 +128,7 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
             assertEquals(4L, ndx.rangeCount());
 
             // Verify we visit each of those NullIVs.
+            @SuppressWarnings("unchecked")
             final ITupleIterator<BigdataValue> itr = ndx.rangeIterator();
 
             while(itr.hasNext()) {
@@ -153,7 +165,7 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
         properties.setProperty(Options.TEXT_INDEX, "false");
 
         // test w/o inlining
-        properties.setProperty(Options.INLINE_LITERALS, "false");
+        properties.setProperty(Options.INLINE_XSD_DATATYPE_LITERALS, "false");
 
         AbstractTripleStore store = getStore(properties);
         

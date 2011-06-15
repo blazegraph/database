@@ -419,8 +419,6 @@ abstract public class AbstractTripleStore extends
     /**
      * Configuration options.
      * 
-     * @todo refactor options to/from {@link SPORelation} and {@link LexiconRelation}?
-     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
@@ -453,8 +451,7 @@ abstract public class AbstractTripleStore extends
          * @see LexiconRelation
          * @see KeyBuilder.Options
          */
-        String LEXICON = (AbstractTripleStore.class.getName() + ".lexicon")
-                .intern();
+        String LEXICON = AbstractTripleStore.class.getName() + ".lexicon";
 
         String DEFAULT_LEXICON = "true";
 
@@ -477,40 +474,17 @@ abstract public class AbstractTripleStore extends
          * this option in order to spend less time writing the forward lexicon
          * index (and it will also take up less space).
          */
-        String STORE_BLANK_NODES = (AbstractTripleStore.class.getName() + ".storeBlankNodes")
-                .intern();
+        String STORE_BLANK_NODES = AbstractTripleStore.class.getName() + ".storeBlankNodes";
         
         String DEFAULT_STORE_BLANK_NODES = "false";
 
-        /**
-         * Boolean option (default <code>true</code>) enables support for a
-         * full text index that may be used to lookup literals by tokens found
-         * in the text of those literals.
-         * 
-         * @see #TEXT_INDEXER_CLASS
-         */
-        String TEXT_INDEX = (AbstractTripleStore.class.getName() + ".textIndex")
-                .intern();
-
-        String DEFAULT_TEXT_INDEX = "true";
-
-        /**
-         * Boolean option (default <code>false</code>) enables support for a
-         * full text index that may be used to lookup datatype literals by
-         * tokens found in the text of those literals.
-         */
-        String TEXT_INDEX_DATATYPE_LITERALS = (AbstractTripleStore.class
-                .getName() + ".textIndex.datatypeLiterals").intern();
-
-        String DEFAULT_TEXT_INDEX_DATATYPE_LITERALS = "true";
-        
         /**
          * Integer option whose value is the capacity of the term cache. This
          * cache provides fast lookup of frequently used RDF {@link Value}s by
          * their term identifier.
          */
-        String TERM_CACHE_CAPACITY = (AbstractTripleStore.class.getName()
-                + ".termCache.capacity").intern();
+        String TERM_CACHE_CAPACITY = AbstractTripleStore.class.getName()
+                + ".termCache.capacity";
         
         String DEFAULT_TERM_CACHE_CAPACITY = "10000";//"50000";
 
@@ -543,8 +517,7 @@ abstract public class AbstractTripleStore extends
          * {@link VocabularyDecl} classes and combine them within your own
          * {@link Vocabulary}, but it must extend {@link BaseVocabulary}.
          */
-        String VOCABULARY_CLASS = (AbstractTripleStore.class.getName() + ".vocabularyClass")
-                .intern();
+        String VOCABULARY_CLASS = AbstractTripleStore.class.getName() + ".vocabularyClass";
 
         /**
          * Note: The default {@link Vocabulary} class may be changed from time
@@ -565,8 +538,7 @@ abstract public class AbstractTripleStore extends
          * {@link BaseAxioms}. This option is ignored if the lexicon is
          * disabled.  Use {@link NoAxioms} to disable inference.
          */
-        String AXIOMS_CLASS = (AbstractTripleStore.class.getName() + ".axiomsClass")
-                .intern();
+        String AXIOMS_CLASS = AbstractTripleStore.class.getName() + ".axiomsClass";
 
         String DEFAULT_AXIOMS_CLASS = OwlAxioms.class.getName();
 
@@ -598,8 +570,7 @@ abstract public class AbstractTripleStore extends
          * at query time. Both {@link FastClosure} and {@link FullClosure} are
          * aware of this and handle it correctly (e.g., as configured).
          */
-        String CLOSURE_CLASS = (AbstractTripleStore.class.getName() + ".closureClass")
-                .intern();
+        String CLOSURE_CLASS = AbstractTripleStore.class.getName() + ".closureClass";
         
         String DEFAULT_CLOSURE_CLASS = FastClosure.class.getName();
 
@@ -619,8 +590,7 @@ abstract public class AbstractTripleStore extends
          * use the {@link #BLOOM_FILTER}. Otherwise it may be turned off to
          * realize some (minimal) performance gain.
          */
-        String ONE_ACCESS_PATH = (AbstractTripleStore.class.getName() + ".oneAccessPath")
-                .intern();
+        String ONE_ACCESS_PATH = AbstractTripleStore.class.getName() + ".oneAccessPath";
 
         String DEFAULT_ONE_ACCESS_PATH = "false";
 
@@ -656,8 +626,7 @@ abstract public class AbstractTripleStore extends
          *       which of them would benefit from the SPO bloom filter (TM,
          *       backchainers, SIDs fixed point, etc).
          */
-        String BLOOM_FILTER = (AbstractTripleStore.class.getName() + ".bloomFilter")
-                .intern();
+        String BLOOM_FILTER = AbstractTripleStore.class.getName() + ".bloomFilter";
 
         String DEFAULT_BLOOM_FILTER = "true";
         
@@ -675,8 +644,7 @@ abstract public class AbstractTripleStore extends
          * justifications are maintained in a distinct index and are only used
          * when retracting assertions.
          */
-        String JUSTIFY = (AbstractTripleStore.class.getName() + ".justify")
-                .intern();
+        String JUSTIFY = AbstractTripleStore.class.getName() + ".justify";
 
         String DEFAULT_JUSTIFY = "true";
 
@@ -725,8 +693,7 @@ abstract public class AbstractTripleStore extends
          * <p>
          * There are examples for using the provenance mode online.
          */
-        String STATEMENT_IDENTIFIERS = (AbstractTripleStore.class.getName() + ".statementIdentifiers")
-                .intern();
+        String STATEMENT_IDENTIFIERS = AbstractTripleStore.class.getName() + ".statementIdentifiers";
 
         String DEFAULT_STATEMENT_IDENTIFIERS = "false";
 
@@ -736,8 +703,7 @@ abstract public class AbstractTripleStore extends
          * {@link #STATEMENT_IDENTIFIERS} option determines whether or not the
          * provenance mode is enabled.
          */
-        String QUADS = (AbstractTripleStore.class.getName() + ".quads")
-                .intern();
+        String QUADS = AbstractTripleStore.class.getName() + ".quads";
         
         String DEFAULT_QUADS = "false";
         
@@ -752,8 +718,7 @@ abstract public class AbstractTripleStore extends
          *          = <code>false</code></li>
          * </ul> 
          */
-        String TRIPLES_MODE = (AbstractTripleStore.class.getName() + ".triplesMode")
-                .intern();
+        String TRIPLES_MODE = AbstractTripleStore.class.getName() + ".triplesMode";
         
         String DEFAULT_TRIPLES_MODE = "false";
 
@@ -768,11 +733,10 @@ abstract public class AbstractTripleStore extends
          *          = <code>true</code></li>
          * </ul> 
          */
-        String TRIPLES_MODE_WITH_PROVENANCE = (AbstractTripleStore.class
-                .getName() + ".triplesModeWithProvenance").intern();
+        String TRIPLES_MODE_WITH_PROVENANCE = AbstractTripleStore.class
+                .getName() + ".triplesModeWithProvenance";
         
         String DEFAULT_TRIPLES_MODE_WITH_PROVENANCE = "false";
-
         
         /**
          * Set up database in quads mode.  Quads mode means no provenance,
@@ -787,8 +751,7 @@ abstract public class AbstractTripleStore extends
          *          = <code>com.bigdata.rdf.store.AbstractTripleStore.NoAxioms</code></li>
          * </ul> 
          */
-        String QUADS_MODE = (AbstractTripleStore.class.getName() + ".quadsMode")
-                .intern();
+        String QUADS_MODE = AbstractTripleStore.class.getName() + ".quadsMode";
 
         String DEFAULT_QUADS_MODE = "false";
 
@@ -803,12 +766,43 @@ abstract public class AbstractTripleStore extends
          * 
          * @see #DEFAULT_VALUE_FACTORY_CLASS
          */
-        String VALUE_FACTORY_CLASS = (AbstractTripleStore.class.getName() + ".valueFactoryClass")
-                .intern();
+		String VALUE_FACTORY_CLASS = AbstractTripleStore.class.getName()
+				+ ".valueFactoryClass";
 
-        String DEFAULT_VALUE_FACTORY_CLASS = BigdataValueFactoryImpl.class
-                .getName();
+		String DEFAULT_VALUE_FACTORY_CLASS = BigdataValueFactoryImpl.class
+				.getName();
 
+		/*
+		 * Full text index options.
+		 */
+		
+        /**
+         * Boolean option (default <code>true</code>) enables support for a
+         * full text index that may be used to lookup literals by tokens found
+         * in the text of those literals.
+         * 
+         * @see #TEXT_INDEXER_CLASS
+         * @see #TEXT_INDEX_DATATYPE_LITERALS
+         * @see #INLINE_TEXT_LITERALS
+         * @see #MAX_INLINE_TEXT_LENGTH
+         */
+        String TEXT_INDEX = AbstractTripleStore.class.getName() + ".textIndex";
+
+        String DEFAULT_INLINE_TEXT_INDEX = "true";
+
+		/**
+		 * Boolean option enables support for a full text index that may be used
+		 * to lookup datatype literals by tokens found in the text of those
+		 * literals (default {@value #DEFAULT_TEXT_INDEX_DATATYPE_LITERALS}).
+		 * This option will cause ALL datatype literals to be presented to the
+		 * full text indexer, including <code>xsd:string</code>,
+		 * <code>xsd:int</code>, etc.
+		 */
+        String TEXT_INDEX_DATATYPE_LITERALS = AbstractTripleStore.class
+                .getName() + ".textIndex.datatypeLiterals";
+
+        String DEFAULT_TEXT_INDEX_DATATYPE_LITERALS = "true";
+        
         /**
          * The name of the {@link ITextIndexer} class. The implementation MUST
          * declare a method with the following signature which will be used to
@@ -822,32 +816,77 @@ abstract public class AbstractTripleStore extends
          * 
          * @see #DEFAULT_TEXT_INDEXER_CLASS
          */
-        String TEXT_INDEXER_CLASS = (AbstractTripleStore.class.getName() + ".textIndexerClass")
-                .intern();
+		String TEXT_INDEXER_CLASS = AbstractTripleStore.class.getName()
+				+ ".textIndexerClass";
 
-        String DEFAULT_TEXT_INDEXER_CLASS = BigdataRDFFullTextIndex.class
-                .getName();
+		String DEFAULT_TEXT_INDEXER_CLASS = BigdataRDFFullTextIndex.class
+				.getName();
 
-        /**
-         * Set up database to inline certain datatype literals directly into the 
-         * statement indices rather than using the lexicon to map them to term 
-         * identifiers and back.
+        /*
+         * Inlining options.
          */
-        String INLINE_LITERALS = (AbstractTripleStore.class.getName() + ".inlineLiterals")
-                .intern();
 
-        String DEFAULT_INLINE_LITERALS = "true";
+		/**
+		 * Set up database to inline XSD datatype literals corresponding to
+		 * primitives (boolean) and numerics (byte, short, int, etc) directly
+		 * into the statement indices (default
+		 * {@value #DEFAULT_INLINE_XSD_DATATYPE_LITERALS}).
+		 * <p>
+		 * Note: <code>xsd:dateTime</code> inlining is controlled by a distinct
+		 * option. See {@link #INLINE_DATE_TIMES}.
+		 * <p>
+		 * Note: <code>xsd:string</code> inlining and the inlining of non-xsd
+		 * literals are controlled by {@link #INLINE_TEXT_LITERALS} and
+		 * {@link #MAX_INLINE_TEXT_LENGTH}.
+		 */
+		String INLINE_XSD_DATATYPE_LITERALS = AbstractTripleStore.class
+				.getName() + ".inlineXSDDatatypeLiterals";
 
-        /**
-         * The maximum length of a String value which may be inlined into the
-         * statement indices (default {@value #DEFAULT_MAX_INLINE_STRING_LENGTH}
-         * ). Depending on the configuration, this may applies to literal label
-         * (and datatypeURI or language code), URI local names, full URIs, blank
-         * node IDs, etc. The {@link XSDStringExtension} is registered when GT
-         * ZERO.
-         */
-        String MAX_INLINE_STRING_LENGTH = AbstractTripleStore.class.getName()
-                + ".maxInlineStringLength";
+        String DEFAULT_INLINE_XSD_DATATYPE_LITERALS = "true";
+
+		/**
+		 * Inline ANY literal having fewer than {@link #MAX_INLINE_TEXT_LENGTH}
+		 * characters (default {@value #DEFAULT_INLINE_TEXT_LITERALS}).
+		 * <p>
+		 * Note: This option exists mainly to support a scale-out design in
+		 * which everything is inlined into the statement indices. This design
+		 * extreme is similar to the YARS2 system with its ISAM files and has
+		 * the advantage that little or nothing is stored within the lexicon.
+		 * <p>
+		 * Inlining of large literals via this option is NOT compatible with
+		 * {@link #TEXT_INDEX}. The problem is that we need to index literals
+		 * which are inlined as well as those which are not inlined. While the
+		 * full text index does support this, indexing fully inline literals
+		 * only makes sense for reasonably short literals. This is because the
+		 * {@link IV} of the inlined literal (a) embeds its (compressed) Unicode
+		 * representation; and (b) is replicated for each token within that
+		 * literal. For large literals, this causes a substantial expansion in
+		 * the full text index.
+		 */
+		String INLINE_TEXT_LITERALS = AbstractTripleStore.class.getName()
+				+ ".inlineTextLiterals";
+
+		String DEFAULT_INLINE_TEXT_LITERALS = "false";
+
+		/**
+		 * The maximum length of a String value which may be inlined into the
+		 * statement indices (default {@value #DEFAULT_MAX_INLINE_STRING_LENGTH}
+		 * ). Depending on the configuration, this may applies to literal label
+		 * (and datatypeURI or language code), URI local names, full URIs, blank
+		 * node IDs, etc. The {@link XSDStringExtension} is registered by the
+		 * {@link DefaultExtensionFactory} when GT ZERO (0).
+		 * <p>
+		 * Note: URIs may be readily inlined using this mechansim without
+		 * causing an interaction with the full text index since they are not
+		 * indexed by the full text index. However, inlining literals in this
+		 * manner causes the compressed Unicode representation of the literal to
+		 * be duplicated within the full text index for each token in that
+		 * literal. See {@link #TEXT_INDEX} and {@link #INLINE_TEXT_LITERALS}.
+		 * 
+		 * @see DefaultExtensionFactory
+		 */
+        String MAX_INLINE_TEXT_LENGTH = AbstractTripleStore.class.getName()
+                + ".maxInlineTextLength";
 
 		/**
 		 * Note that there an interaction when this is enabled with the full
@@ -857,7 +896,7 @@ abstract public class AbstractTripleStore extends
 		 * the full text index does not play well with inlining large literals
 		 * into the statement indices.
 		 */
-        String DEFAULT_MAX_INLINE_STRING_LENGTH = "64"; // 64
+        String DEFAULT_MAX_INLINE_STRING_LENGTH = "16";
         
         /**
          * Set up database to inline bnodes directly into the statement indices 
@@ -866,24 +905,25 @@ abstract public class AbstractTripleStore extends
          * <p>
          * See {@link Options#STORE_BLANK_NODES}.
          */
-        String INLINE_BNODES = (AbstractTripleStore.class.getName()
-                + ".inlineBNodes").intern();
+		String INLINE_BNODES = AbstractTripleStore.class.getName()
+				+ ".inlineBNodes";
 
         String DEFAULT_INLINE_BNODES = "true";
 
-        /**
-         * Set up database to inline date/times directly into the statement
-         * indices rather than using the lexicon to map them to term identifiers
-         * and back (default {@value #DEFAULT_INLINE_DATE_TIMES}). Date times
-         * will be converted to UTC, then stored as milliseconds since the
-         * epoch. Thus if you inline date/times you will lose the canonical
-         * representation of the date/time, and you will not be able to recover
-         * the original time zone of the date/time.
-         * 
-         * @see #INLINE_DATE_TIMES_TIMEZONE
-         */
-        String INLINE_DATE_TIMES = (AbstractTripleStore.class.getName()
-                + ".inlineDateTimes").intern();
+		/**
+		 * Set up database to inline date/times directly into the statement
+		 * indices rather than using the lexicon to map them to term identifiers
+		 * and back (default {@value #DEFAULT_INLINE_DATE_TIMES}). Date times
+		 * will be converted to UTC, then stored as milliseconds since the
+		 * epoch. Thus if you inline date/times you will lose the canonical
+		 * representation of the date/time. This has two consequences: (1) you
+		 * will not be able to recover the original time zone of the date/time;
+		 * and (2) greater than millisecond precision will be lost.
+		 * 
+		 * @see #INLINE_DATE_TIMES_TIMEZONE
+		 */
+		String INLINE_DATE_TIMES = AbstractTripleStore.class.getName()
+				+ ".inlineDateTimes";
 
         String DEFAULT_INLINE_DATE_TIMES = "true";
 
@@ -896,8 +936,8 @@ abstract public class AbstractTripleStore extends
          * 
          * @see #INLINE_DATE_TIMES
          */
-        String INLINE_DATE_TIMES_TIMEZONE = (AbstractTripleStore.class.getName()
-                + ".inlineDateTimesTimezone").intern();
+        String INLINE_DATE_TIMES_TIMEZONE = AbstractTripleStore.class.getName()
+                + ".inlineDateTimesTimezone";
 
         /**
          * @see #INLINE_DATE_TIMES_TIMEZONE
@@ -915,17 +955,17 @@ abstract public class AbstractTripleStore extends
          * 
          * @see #DEFAULT_EXTENSION_FACTORY_CLASS
          */
-        String EXTENSION_FACTORY_CLASS = (AbstractTripleStore.class.getName() + ".extensionFactoryClass")
-                .intern();
+		String EXTENSION_FACTORY_CLASS = AbstractTripleStore.class.getName()
+				+ ".extensionFactoryClass";
 
         String DEFAULT_EXTENSION_FACTORY_CLASS = DefaultExtensionFactory.class
                 .getName();
 
         /**
-         * When <code>true</code> AND {@value #INLINE_LITERALS} is
+         * When <code>true</code> AND {@value #INLINE_XSD_DATATYPE_LITERALS} is
          * <code>true</code>, literals having an xsd datatype URI which can not
          * be validated against that datatype will be rejected (default
-         * {@link #DEFAULT_REJECT_INVALID_XSD_VALUES}). FOr example, when
+         * {@link #DEFAULT_REJECT_INVALID_XSD_VALUES}). For example, when
          * <code>true</code> <code>abc^^xsd:int</code> would be rejected. When
          * <code>false</code> the literal will be accepted, but it will not be
          * inlined with the rest of the literals for that value space and will
@@ -1309,7 +1349,7 @@ abstract public class AbstractTripleStore extends
         tmp.setProperty(RelationSchema.CONTAINER, getNamespace());
 
         if (Boolean.valueOf(tmp.getProperty(Options.TEXT_INDEX,
-                Options.DEFAULT_TEXT_INDEX))) {
+                Options.DEFAULT_INLINE_TEXT_INDEX))) {
 
             /*
              * If the text index is enabled for a new kb instance, then disable
@@ -1946,7 +1986,9 @@ abstract public class AbstractTripleStore extends
 //        final byte[] toKey = new byte[] { KeyBuilder
 //                .encodeByte((byte) (ITermIndexCodes.TERM_CODE_URI + 1)) };
 
-        final byte[] fromKey = new byte[] { TermId.toFlags(VTE.URI) };
+		final byte[] fromKey = new byte[] {//
+		KeyBuilder.encodeByte(TermId.toFlags(VTE.URI)) //
+		};
 
         final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
@@ -1970,7 +2012,9 @@ abstract public class AbstractTripleStore extends
 //        return getLexiconRelation().getTerm2IdIndex()
 //                .rangeCount(fromKey, toKey);
 
-        final byte[] fromKey = new byte[] { TermId.toFlags(VTE.LITERAL) };
+		final byte[] fromKey = new byte[] {//
+				KeyBuilder.encodeByte(TermId.toFlags(VTE.LITERAL)) //
+				};
 
         final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
@@ -1998,7 +2042,9 @@ abstract public class AbstractTripleStore extends
 //        return getLexiconRelation().getTerm2IdIndex()
 //                .rangeCount(fromKey, toKey);
 
-        final byte[] fromKey = new byte[] { TermId.toFlags(VTE.BNODE) };
+		final byte[] fromKey = new byte[] {//
+				KeyBuilder.encodeByte(TermId.toFlags(VTE.BNODE)) //
+				};
 
         final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 

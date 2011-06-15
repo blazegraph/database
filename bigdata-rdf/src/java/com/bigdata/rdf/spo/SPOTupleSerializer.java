@@ -165,11 +165,18 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         
     }
 
-    /**
-     * Variant forces type cast to {@link SPO}.
-     */
+	/**
+	 * Variant duplicates the behavior of {@link #serializeVal(SPO)} to provide
+	 * support for non-{@link SPO} {@link ISPO}s.
+	 */
     public byte[] serializeVal(final ISPO spo) {
-    	return serializeVal((SPO)spo);
+
+    	if (spo == null)
+            throw new IllegalArgumentException();
+
+		return serializeVal(buf,
+				spo.isOverride(), spo.getUserFlag(), spo.getStatementType());
+		
     }
     
     /**

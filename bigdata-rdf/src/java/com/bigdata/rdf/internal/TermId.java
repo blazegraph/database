@@ -24,18 +24,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.internal;
 
 import java.io.IOException;
-import java.math.BigInteger;
 
 import org.openrdf.model.Value;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.constraints.DatatypeBOp;
 import com.bigdata.rdf.internal.constraints.FuncBOp;
 import com.bigdata.rdf.internal.constraints.LangBOp;
-import com.bigdata.rdf.lexicon.TermsIndexHelper;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataEvaluationStrategyImpl3;
 
@@ -72,14 +68,6 @@ public class TermId<V extends BigdataValue> extends
 		return AbstractIV.toFlags(vte, false/* inline */,
 				false/* extension */, DTE.XSDBoolean);
 	}
-    
-//    /**
-//     * Value used for a "NULL" term identifier.
-//     */
-//    public static final transient long NULL = 0L;
-//
-//    /** The term identifier. */
-//    private final long termId;
 
     /**
      * {@inheritDoc}
@@ -97,35 +85,28 @@ public class TermId<V extends BigdataValue> extends
     @Override
 	final public boolean isNullIV() {
 
-        return mockIV || (counter() == 0 && hashCode() == 0);
-//		for (int i = 1; i < data.length; i++) {
-//
-//			if (data[i] != 0)
-//				return false;
-//
-//		}
-//
-//		return true;
+//        return mockIV || (counter() == 0 && hashCode() == 0);
+        return (counter() == 0 && hashCode() == 0);
 
 	}
 
-	/**
-	 * Note: This key has a ZERO hashCode and a ZERO counter. It also uses
-	 * {@link VTE#URI}, which is a ZERO (byte). However, when we encode the
-	 * hashCode and the counter, the zeros get converted from signed to
-	 * unsigned.
-	 */
-    static private final byte[] null_key;
-    static {
-
-		final TermsIndexHelper h = new TermsIndexHelper();
-
-		final IKeyBuilder keyBuilder = h.newKeyBuilder();
-
-		null_key = h
-				.makeKey(keyBuilder, VTE.URI, 0/* hashCode */, 0/* counter */);
-
-    }
+//	/**
+//	 * Note: This key has a ZERO hashCode and a ZERO counter. It also uses
+//	 * {@link VTE#URI}, which is a ZERO (byte). However, when we encode the
+//	 * hashCode and the counter, the zeros get converted from signed to
+//	 * unsigned.
+//	 */
+//    static private final byte[] null_key;
+//    static {
+//
+//		final TermsIndexHelper h = new TermsIndexHelper();
+//
+//		final IKeyBuilder keyBuilder = h.newKeyBuilder();
+//
+//		null_key = h
+//				.makeKey(keyBuilder, VTE.URI, 0/* hashCode */, 0/* counter */);
+//
+//    }
 
 	/**
 	 * Singleton for a "null" {@link IV}.
@@ -145,23 +126,23 @@ public class TermId<V extends BigdataValue> extends
 	 */
     static public TermId mockIV(final VTE vte) {
 
-//    	// start with the NullIV's key.
-//    	final TermId mockIV = new TermId(null_key.clone());
+//		final TermsIndexHelper h = new TermsIndexHelper();
+//
+//		final IKeyBuilder keyBuilder = h.newKeyBuilder();
 //		
-//    	// override the flags byte.
-//    	mockIV.data[0] = KeyBuilder.encodeByte(toFlags(vte));
+//		final byte[] key = h
+//				.makeKey(keyBuilder, vte, 0/* hashCode */, 0/* counter */);
+//    	
+//        final TermId mockIV = new TermId(key, true/* mockIV */);
+//		
+//    	// return the mock IV.
+//		return mockIV;
 
-		final TermsIndexHelper h = new TermsIndexHelper();
-
-		final IKeyBuilder keyBuilder = h.newKeyBuilder();
-		
-		final byte[] key = h
-				.makeKey(keyBuilder, vte, 0/* hashCode */, 0/* counter */);
+    	/*
+    	 * Note: This MUST be consistent with TermsIndexHelper#makeKey() !!!
+    	 */
     	
-        final TermId mockIV = new TermId(key, true/* mockIV */);
-		
-    	// return the mock IV.
-		return mockIV;
+		return new TermId(vte, 0/* hashCode */, (byte) 0/* counter */);
 		
 	}
     
@@ -172,70 +153,84 @@ public class TermId<V extends BigdataValue> extends
 	 * {@link BigdataValue} inserted into the TERMS index which have the same
 	 * flags and hashCode.
 	 */
-	private final byte[] data;
+//	private final byte[] data;
 
-	/**
-	 * Set for a known mock IV to provide a fast path for {@link #isNullIV()}.
-	 */
-	private final boolean mockIV;
+    private final int hash;
+    private final byte counter;
+    
+//	/**
+//	 * Set for a known mock IV to provide a fast path for {@link #isNullIV()}.
+//	 */
+//	private final boolean mockIV;
 	
 //    /**
-//     * Constructor for a term identifier when you are decoding and already have
-//     * the flags.
+//     * Constructor used for {@link TermId}s which are NOT "MockIVs".
 //     * 
-//     * @param flags
-//     *            The flags
-//     * @param termId
-//     * 
-//     * @deprecated This is an old termId variant.
+//     * @param data
+//     *            The key for the TERMS index.
 //     */
-//    public TermId(final byte flags, final long termId) {
-//
-//        super(flags);
-//
-////        this.termId = termId;
-//
-//        throw new UnsupportedOperationException();
-////        this.dataTypeId = 0L;
+//    public TermId(final byte[] data) {
+//        
+//        // Not a known MockIV.
+//        this(data, false/* mockIV */);
 //        
 //    }
 
-    /**
-     * Constructor used for {@link TermId}s which are NOT "MockIVs".
-     * 
-     * @param data
-     *            The key for the TERMS index.
-     */
-    public TermId(final byte[] data) {
-        
-        // Not a known MockIV.
-        this(data, false/* mockIV */);
-        
-    }
+//    /**
+//     * Core impl.
+//     * 
+//     * @param data
+//     *            The key for the TERMS index.
+//     * @param mockIV
+//     *            <code>true</code> iff this is known to be a MockIV (aka a
+//     *            NullIV).
+//     */
+//    private TermId(final byte[] data, final boolean mockIV) {
+//
+//		super(data[0]/* flags */);
+//    	
+//		this.data = data;
+//		
+//		this.mockIV = mockIV;
+//		
+//        assert TermsIndexHelper.TERMS_INDEX_KEY_SIZE == data.length : "Expecting "
+//                + TermsIndexHelper.TERMS_INDEX_KEY_SIZE
+//                + " bytes, not "
+//                + data.length;
+//
+//	}
 
     /**
-     * Core impl.
-     * 
-     * @param data
-     *            The key for the TERMS index.
-     * @param mockIV
-     *            <code>true</code> iff this is known to be a MockIV (aka a
-     *            NullIV).
-     */
-    private TermId(final byte[] data, final boolean mockIV) {
+	 * @param vte
+	 *            The {@link VTE}.
+	 * @param hash
+	 *            The hash code.
+	 * @param counter
+	 *            The counter.
+	 */
+	public TermId(final VTE vte, final int hash, final byte counter) {
 
-		super(data[0]/* flags */);
-    	
-		this.data = data;
-		
-		this.mockIV = mockIV;
-		
-        assert TermsIndexHelper.TERMS_INDEX_KEY_SIZE == data.length : "Expecting "
-                + TermsIndexHelper.TERMS_INDEX_KEY_SIZE
-                + " bytes, not "
-                + data.length;
-		
-    }
+		this(TermId.toFlags(vte), hash, counter);
+
+	}
+
+    /**
+	 * @param flags
+	 *            The flags byte.
+	 * @param hash
+	 *            The hash code.
+	 * @param counter
+	 *            The counter.
+	 */
+	public TermId(final byte flags, final int hash, final byte counter) {
+
+		super(flags);
+
+		this.hash = hash;
+
+		this.counter = counter;
+
+	}
 
 	/**
 	 * Human readable representation includes the term identifier, whether this
@@ -288,14 +283,16 @@ public class TermId<V extends BigdataValue> extends
 
 		final int counter = Integer.valueOf(cstr);
 
-		final TermsIndexHelper helper = new TermsIndexHelper();
-		
-		final IKeyBuilder keyBuilder = helper.newKeyBuilder();
+//		final TermsIndexHelper helper = new TermsIndexHelper();
+//		
+//		final IKeyBuilder keyBuilder = helper.newKeyBuilder();
+//
+//		final byte[] key = helper.makeKey(keyBuilder, vte, hashCode, counter);
+//		
+//		return new TermId(key);
 
-		final byte[] key = helper.makeKey(keyBuilder, vte, hashCode, counter);
+		return new TermId(vte, hashCode, (byte) counter);
 		
-		return new TermId(key);
-
 	}
     
 //    /**
@@ -342,19 +339,16 @@ public class TermId<V extends BigdataValue> extends
         return true;
     }
 
-//    /**
-//     * {@inheritDoc
-//     * 
-//     * Note: only the termId matters for equality (unless we also have a
-//     * transient reference to the value factory which stands in as a proxy for
-//     * the KB instance).
-//     */
     public boolean equals(final Object o) {
         if (this == o)
             return true;
         if (o instanceof TermId<?>) {
-			return BytesUtil.bytesEqual(data, ((TermId<?>) o).data);
-//            return termId == ((TermId<?>) o).termId;
+        	final TermId<?> t = (TermId<?>)o;
+        	if(this.hash!=t.hash) return false;
+        	if(this.counter!=t.counter) return false;
+        	if(this.flags()!=t.flags()) return false;
+        	return true;
+//			return BytesUtil.bytesEqual(data, ((TermId<?>) o).data);
         }
         return false;
     }
@@ -364,36 +358,47 @@ public class TermId<V extends BigdataValue> extends
      */
     public int hashCode() {
 //        return (int) (termId ^ (termId >>> 32));
-		if (hash == 0) {
-			hash = KeyBuilder.decodeInt(data, 1/* off */);
-		}
+//		if (hash == 0) {
+//			hash = KeyBuilder.decodeInt(data, 1/* off */);
+//		}
 		return hash;
     }
-    private int hash = 0;
+//    private int hash = 0;
 
     /**
      * The hash collision counter.
      */
     public int counter() {
 
-    	final byte b = data[data.length - 1]; // TODO Support multi-byte counter.
-    	
-    	return KeyBuilder.decodeByte(b);
-//    	return b;
-    	
+//    	final byte b = data[data.length - 1]; // TODO Support multi-byte counter.
+//    	
+//    	return KeyBuilder.decodeByte(b);
+
+    	return counter;
     }
     
     public int byteLength() {
-    	return data.length;
-//        return 1/* flags */+ Bytes.SIZEOF_LONG;
+//    	return data.length;
+		return 1/* flags */+ Bytes.SIZEOF_INT + Bytes.SIZEOF_BYTE;
         
     }
 
     @Override
     protected int _compareTo(final IV o) {
 
-		return UnsignedByteArrayComparator.INSTANCE.compare(data,
-				((TermId<?>) o).data);
+    	final TermId<?> t = (TermId<?>) o;
+    	
+    	 // TODO Must impose correct order. Sign extension on the flags might make that order wrong.
+		if( flags < t.flags ) return -1;
+		if( flags > t.flags ) return 1;
+		if(hash<t.hash) return -1;
+		if(hash>t.hash) return 1;
+		if(counter<t.counter) return -1;
+		if(counter>t.counter) return 1;
+		return 0;
+
+//		return UnsignedByteArrayComparator.INSTANCE.compare(data,
+//				((TermId<?>) o).data);
 		
 //        final long termId2 = ((TermId<?>) o).termId;
 //        
@@ -412,17 +417,14 @@ public class TermId<V extends BigdataValue> extends
     @Override
     final public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
 
-//		/*
-//		 * Assuming that we store the byte[] where we used to store the
-//		 * termId this just becomes keyBuilder.append(data).
-//		 */
-//
-//        // First emit the flags byte.
-//        keyBuilder.appendSigned(flags());
-//
-//        keyBuilder.append(getTermId());
+    	/*
+    	 * Note: This MUST be consistent with TermsIndexHelper#makeKey() !!!
+    	 */
+        keyBuilder.appendSigned(flags);
+        keyBuilder.append(hash);
+        keyBuilder.appendSigned(counter);
 
-    	keyBuilder.append(data);
+//    	keyBuilder.append(data);
     	
         return keyBuilder;
         
@@ -460,17 +462,22 @@ public class TermId<V extends BigdataValue> extends
 	}
 
     /**
-     * Using the {@link BigInteger} class to create a unique bnode id based on
-     * the byte[] key of the {@link TermId}.
+     * Create a unique bnode id based on the {@link TermId}'s internal data.
      */
     public String bnodeId() {
         
-        final int signum = data.length > 0 ? 1 : 0;
-        
-        final BigInteger bi = new BigInteger(signum, data);
-        
-        return "B" + bi.toString();
-        
-    }
+//        final int signum = data.length > 0 ? 1 : 0;
+//        
+//        final BigInteger bi = new BigInteger(signum, data);
+//        
+//        return "B" + bi.toString();
+
+		final long id = ((long) flags()) << 48 | ((long) hash) << 8 | counter;
+
+		final String idStr = Long.toString(id);
+		
+		return idStr;
+
+	}
 
 }

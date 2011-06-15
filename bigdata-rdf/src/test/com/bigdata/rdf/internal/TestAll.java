@@ -68,6 +68,15 @@ public class TestAll extends TestCase {
 
         // basic test suite for TermId.
         suite.addTestSuite(TestTermId.class);
+
+        // unit tests for fully inline literals.
+        suite.addTestSuite(TestInlineLiteralIV.class);
+
+        // unit tests for fully inline URIs.
+        suite.addTestSuite(TestInlineURIIV.class);
+
+        // unit tests for inline literals with a datatype IV.
+        suite.addTestSuite(TestLiteralDatatypeIV.class);
         
         // test suite for encode/decode of IVs.
         suite.addTestSuite(TestEncodeDecodeKeys.class);

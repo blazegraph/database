@@ -279,9 +279,11 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
 		 * Turn inlining on or off depending on _this_ test.
 		 */
 		if (BigdataSparqlTest.cannotInlineTests.contains(testURI)) {
-			_properties.setProperty(Options.INLINE_LITERALS, "false");
+			_properties.setProperty(Options.INLINE_XSD_DATATYPE_LITERALS, "false");
+			_properties.setProperty(Options.INLINE_DATE_TIMES, "false");
 		} else {
-			_properties.setProperty(Options.INLINE_LITERALS, "true");
+			_properties.setProperty(Options.INLINE_XSD_DATATYPE_LITERALS, "true");
+			_properties.setProperty(Options.INLINE_DATE_TIMES, "true");
 		}
 
 		if (BigdataSparqlTest.unicodeStrengthIdentical.contains(testURI)) {

@@ -197,6 +197,12 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                 com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
                 NoAxioms.class.getName());
 
+        // do not inline unicode data.
+		properties
+				.setProperty(
+						com.bigdata.rdf.store.AbstractTripleStore.Options.MAX_INLINE_TEXT_LENGTH,
+						"0");
+        
         final AbstractTripleStore store = getStore(properties);
         
         try {
@@ -216,7 +222,8 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 //            store.commit();
     
             if(log.isInfoEnabled()) {
-                log.info(store.getLexiconRelation().dumpTerms());
+				log.info(new TermsIndexHelper()
+						.dump(store.getLexiconRelation()));
             }
             
             /*
@@ -275,7 +282,8 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             doAddTermTest(store, new LiteralImpl("abc", XMLSchema.DECIMAL));
     
             if(log.isInfoEnabled()) {
-                log.info(store.getLexiconRelation().dumpTerms());
+				log.info(new TermsIndexHelper()
+						.dump(store.getLexiconRelation()));
             }
             
             /*
@@ -361,7 +369,8 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             }
 
             if(log.isInfoEnabled()) {
-                log.info(store.getLexiconRelation().dumpTerms());
+				log.info(new TermsIndexHelper()
+						.dump(store.getLexiconRelation()));
             }
             
             /*
@@ -562,7 +571,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         // Do not inline strings.
         properties
                 .setProperty(
-                        com.bigdata.rdf.store.AbstractTripleStore.Options.MAX_INLINE_STRING_LENGTH,
+                        com.bigdata.rdf.store.AbstractTripleStore.Options.MAX_INLINE_TEXT_LENGTH,
                         "0");
 
         // Do not inline bnodes.
@@ -571,7 +580,13 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                         com.bigdata.rdf.store.AbstractTripleStore.Options.INLINE_BNODES,
                         "false");
 
-        properties
+        // Do not inline data types (causes xsd:dateTime to be inserted into the index).
+		properties
+				.setProperty(
+						com.bigdata.rdf.store.AbstractTripleStore.Options.INLINE_DATE_TIMES,
+						"false");
+
+		properties
                 .setProperty(
                         com.bigdata.rdf.store.AbstractTripleStore.Options.STORE_BLANK_NODES,
                         "false");
@@ -596,7 +611,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         // Do not inline strings.
         properties
                 .setProperty(
-                        com.bigdata.rdf.store.AbstractTripleStore.Options.MAX_INLINE_STRING_LENGTH,
+                        com.bigdata.rdf.store.AbstractTripleStore.Options.MAX_INLINE_TEXT_LENGTH,
                         "0");
 
         // Do not inline bnodes.
@@ -604,6 +619,12 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                 .setProperty(
                         com.bigdata.rdf.store.AbstractTripleStore.Options.INLINE_BNODES,
                         "false");
+
+        // Do not inline data types (causes xsd:dateTime to be inserted into the index).
+		properties
+				.setProperty(
+						com.bigdata.rdf.store.AbstractTripleStore.Options.INLINE_DATE_TIMES,
+						"false");
 
         properties
                 .setProperty(

@@ -38,7 +38,7 @@
 	<classpathentry kind="src" path="lgpl-utils/src/java"/>
 	<classpathentry kind="src" path="lgpl-utils/src/test"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/colt-1.2.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-3.8.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-3.8.1.jar" sourcepath="/root/.m2/repository/junit/junit/3.8.1/junit-3.8.1-sources.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/apache/log4j-1.2.15.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-api-1.4.3.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-log4j12-1.4.3.jar"/>

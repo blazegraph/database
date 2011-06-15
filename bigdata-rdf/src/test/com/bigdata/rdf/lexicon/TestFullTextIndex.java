@@ -56,12 +56,6 @@ import com.bigdata.striterator.Striterator;
  * Test of adding terms with the full text index enabled and of lookup of terms
  * by tokens which appear within those terms.
  * 
- * @todo test all term types (uris, bnodes, and literals). only literals are
- *       being indexed right now, but there could be a use case for tokenizing
- *       URIs. There is never going to be any reason to tokenize BNodes. But we
- *       DO need to support indexing fully inline plain, language code, and
- *       datatype literals which using a Unicode representation in the IV.
- * 
  * @todo test XML literal indexing (strip out CDATA and index the tokens found
  *       therein).
  * 
@@ -108,7 +102,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
         assertEquals(NULL, store.getIV(term));
 
-        final IV id = store.addTerm(term);
+        final IV<?,?> id = store.addTerm(term);
 
         assertNotSame(NULL, id);
 
@@ -202,8 +196,9 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
             store.addTerms(terms);
 
-            if(log.isInfoEnabled()) {
-                log.info(store.getLexiconRelation().dumpTerms());
+			if (log.isInfoEnabled()) {
+				log.info(new TermsIndexHelper()
+						.dump(store.getLexiconRelation()));
             }
 
             /*
@@ -306,15 +301,105 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
     }
 
+    /**
+     * Unit text for full text indexing of xsd datatype literals.
+     */
     public void test_text_index_datatype_literals() {
 
         final Properties properties = getProperties();
 
-        // explicitly enable full text indexing of data type literals.
+		/*
+		 * Explicitly enable full text indexing of data type literals.
+		 */
         properties.setProperty(
                 AbstractTripleStore.Options.TEXT_INDEX_DATATYPE_LITERALS,
                 "true");
+
+		/*
+		 * Explicitly disable inlining of unicode data in the statement indices
+		 * (this is not what we are trying to text here.)
+		 */
+        properties.setProperty(
+                AbstractTripleStore.Options.MAX_INLINE_TEXT_LENGTH,
+                "0");
+
+        AbstractTripleStore store = getStore();
+
+        try {
+
+            assertNotNull(store.getLexiconRelation().getSearchEngine());
+            
+            final BigdataValueFactory f = store.getValueFactory();
+            
+            final BigdataValue[] terms = new BigdataValue[] {//
+                    
+                    f.createLiteral("quick brown fox"),//
+
+                    f.createLiteral("slow brown dog", f
+                            .asValue(XMLSchema.STRING)),//
+                    
+                    f.createLiteral("http://www.bigdata.com/mangy/yellow/cat",
+                            f.asValue(XMLSchema.ANYURI)),//
+            };
+
+            store.addTerms(terms);
+
+            assertExpectedHits(store, "brown", "en", //
+                    0f, // minCosine,
+                    new BigdataValue[] {//
+                    f.createLiteral("quick brown fox"), //
+                    f.createLiteral("slow brown dog", XMLSchema.STRING) //
+                    });
+            
+            assertExpectedHits(store, "cat", "en", //
+//                    0f, // minCosine,
+                    new BigdataValue[] {//
+                    f.createLiteral("http://www.bigdata.com/mangy/yellow/cat",
+                            f.asValue(XMLSchema.ANYURI))//
+                    });
+            
+            if(store.isStable()) {
+                
+                store.commit();
+                
+                store = reopenStore(store);
+
+                assertNotNull(store.getLexiconRelation().getSearchEngine());
+                
+                // @todo retest.
+                
+            }
+            
+        } finally {
+
+            store.__tearDownUnitTest();
+
+        }
         
+    }
+
+	/**
+	 * Unit test for indexing fully inline plain, language code, and datatype
+	 * literals which using a Unicode representation in the {@link IV}.
+	 */
+    public void test_text_index_inline_unicode_literals() {
+
+        final Properties properties = getProperties();
+
+		/*
+		 * Explicitly disable inlining of xsd primitive and numeric datatypes.
+		 */
+        properties.setProperty(
+                AbstractTripleStore.Options.INLINE_XSD_DATATYPE_LITERALS,
+                "false");
+
+		/*
+		 * Explicitly enable inlining of unicode data in the statement indices.
+		 */
+        properties.setProperty(
+                AbstractTripleStore.Options.MAX_INLINE_TEXT_LENGTH,
+                "256");
+
         AbstractTripleStore store = getStore();
 
         try {
@@ -402,9 +487,10 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
             store.addTerms(terms);
 
-            if(log.isInfoEnabled()) {
-                log.info(store.getLexiconRelation().dumpTerms());
-            }
+			if (log.isInfoEnabled()) {
+				log.info(new TermsIndexHelper()
+						.dump(store.getLexiconRelation()));
+			}
 
             /*
              * Note: the language code is only used when tokenizing literals. It

@@ -177,7 +177,9 @@ public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValu
     @Override
     public byte[] serializeKey(final Object obj) {
 
-        return ((TermId<?>) obj).encode(getKeyBuilder().reset()).getKey();
+    	final TermId<?> iv = (TermId<?>)obj;
+    	
+        return iv.encode(getKeyBuilder().reset()).getKey();
 
     }
 

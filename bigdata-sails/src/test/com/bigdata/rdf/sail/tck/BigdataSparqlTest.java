@@ -96,6 +96,7 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/distinct/manifest#distinct-1",
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/distinct/manifest#no-distinct-9",
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/distinct/manifest#distinct-9",
+          "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#date-2",
     });
 
 	/**
@@ -488,7 +489,8 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
             
             if (cannotInlineTests.contains(testURI)){
             	// The test can not be run using XSD inlining.
-                props.setProperty(Options.INLINE_LITERALS, "false");
+                props.setProperty(Options.INLINE_XSD_DATATYPE_LITERALS, "false");
+            	props.setProperty(Options.INLINE_DATE_TIMES, "false");
             }
             
             if(unicodeStrengthIdentical.contains(testURI)) {
