@@ -182,6 +182,9 @@ public class TestInlining extends AbstractTripleStoreTestCase {
         // inline the bnodes
         properties.setProperty(Options.INLINE_BNODES, "true");
 
+        // Do not inline unicode data.
+        properties.setProperty(Options.MAX_INLINE_TEXT_LENGTH, "0");
+        
         AbstractTripleStore store = getStore(properties);
         
         try {
@@ -271,6 +274,9 @@ public class TestInlining extends AbstractTripleStoreTestCase {
         // test w/o the full text index.
         properties.setProperty(Options.TEXT_INDEX, "false");
 
+        // do not inline unicode data.
+        properties.setProperty(Options.MAX_INLINE_TEXT_LENGTH, "0");
+
         // test with the sample extension factory
         properties.setProperty(Options.EXTENSION_FACTORY_CLASS, 
                 SampleExtensionFactory.class.getName());
@@ -314,9 +320,9 @@ public class TestInlining extends AbstractTripleStoreTestCase {
             final ExtensionIV iv1 = (ExtensionIV) l1.getIV();
             final ExtensionIV iv2 = (ExtensionIV) l2.getIV();
             
-            assertTrue(iv1.getExtensionIV().equals(datatype.getIV()));
-            assertTrue(iv2.getExtensionIV().equals(datatype.getIV()));
-            
+			assertEquals(iv1.getExtensionIV(), datatype.getIV());
+			assertEquals(iv2.getExtensionIV(), datatype.getIV());
+
             if (store.isStable()) {
                 
                 store.commit();
@@ -362,6 +368,9 @@ public class TestInlining extends AbstractTripleStoreTestCase {
         
         // test w/o the full text index.
         properties.setProperty(Options.TEXT_INDEX, "false");
+
+        // do not inline unicode data.
+        properties.setProperty(Options.MAX_INLINE_TEXT_LENGTH, "0");
 
         // test with the sample extension factory
         properties.setProperty(Options.EXTENSION_FACTORY_CLASS, 
@@ -417,9 +426,9 @@ public class TestInlining extends AbstractTripleStoreTestCase {
             if(log.isInfoEnabled()) log.info(l2.getLabel() + ": " + iv2.getDelegate().byteValue());
             if(log.isInfoEnabled()) log.info(l3.getLabel() + ": " + iv3.getDelegate().byteValue());
             
-            assertTrue(iv1.getExtensionIV().equals(datatype.getIV()));
-            assertTrue(iv2.getExtensionIV().equals(datatype.getIV()));
-            assertTrue(iv3.getExtensionIV().equals(datatype.getIV()));
+            assertEquals(iv1.getExtensionIV(),datatype.getIV());
+            assertEquals(iv2.getExtensionIV(),datatype.getIV());
+            assertEquals(iv3.getExtensionIV(),datatype.getIV());
             
             if (store.isStable()) {
                 

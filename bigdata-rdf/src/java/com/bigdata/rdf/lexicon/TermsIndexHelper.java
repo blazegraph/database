@@ -26,6 +26,9 @@
  */
 package com.bigdata.rdf.lexicon;
 
+import java.io.IOException;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
@@ -45,6 +48,7 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
@@ -60,6 +64,9 @@ public class TermsIndexHelper {
 
     private static final Logger log = Logger.getLogger(TermsIndexHelper.class);
 
+	public static final transient int SIZEOF_HASH = Bytes.SIZEOF_INT;
+	public static final transient int SIZEOF_COUNTER = Bytes.SIZEOF_BYTE;
+
 	/**
 	 * The size of a key in the TERMS index.
 	 * <P>
@@ -67,8 +74,15 @@ public class TermsIndexHelper {
 	 * bytes for the hash code, plus a ONE (1) byte counter (to break ties
 	 * within a collision bucket).
 	 */
-	public static final transient int TERMS_INDEX_KEY_SIZE = 1 + Bytes.SIZEOF_INT + 1;
+	public static final transient int TERMS_INDEX_KEY_SIZE = 1 + SIZEOF_HASH
+			+ SIZEOF_COUNTER;
 
+	/**
+	 * Used to signal that the {@link Value} was not found on a read-only
+	 * request.
+	 */
+	public static final transient int NOT_FOUND = Integer.MIN_VALUE;
+	
 	/**
 	 * Generate the sort keys for {@link BigdataValue}s to be represented as
 	 * {@link TermId}s. The sort key is formed from the {@link VTE} of the
@@ -146,20 +160,17 @@ public class TermsIndexHelper {
 	 *            The size of the collision bucket is reported as a side-effect
 	 *            (optional).
 	 * 
-	 * @return The key under which the {@link Value} was found -or-
-	 *         <code>null</code> iff the {@link Value} is not in the index and
-	 *         the operation is read-only.
+	 * @return The collision counter for the key under which the {@link Value}
+	 *         was found (if pre-existing), the collision counter assigned to
+	 *         the {@link Value} iff the value was not found and the operation
+	 *         permitted writes -or- {@link Integer#MIN_VALUE} iff the
+	 *         {@link Value} is not in the index and the operation is read-only.
 	 * 
 	 * @throws CollisionBucketSizeException
 	 *             if an attempt is made to insert a {@link Value} into a
 	 *             collision bucket which is full.
-	 * 
-	 *             TODO All we really need to return is the counter since the
-	 *             client already has the baseKey. That would be less NIO and
-	 *             could be an int[] return here (assuming up to an int counter,
-	 *             or a short[], or a byte[]).
 	 */
-	public byte[] resolveOrAddValue(final IIndex termsIndex,
+	public int resolveOrAddValue(final IIndex termsIndex,
 			final boolean readOnly, final IKeyBuilder keyBuilder,
 			final byte[] baseKey, final byte[] val,
 			final AtomicInteger bucketSize) {
@@ -209,9 +220,10 @@ public class TermsIndexHelper {
 		 */
 		final byte[] fromKey = baseKey;
 
-        // key strictly LT any successor of the hash code of this val TODO More
-        // efficient if we reuse the caller's fixed length buffer for this for
-        // each call in a batch.
+        // key strictly LT any successor of the hash code of this val.
+		//
+		// TODO This would be more efficient if we reuse the caller's fixed
+		// length buffer for this for each call in a batch.
         final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
 		// fast range count. this tells us how many collisions there are.
@@ -225,7 +237,7 @@ public class TermsIndexHelper {
         if (rangeCount == 0 && readOnly) {
 
             // Fast path.
-            return null; // Not found.
+            return NOT_FOUND;
             
         }
         
@@ -243,20 +255,13 @@ public class TermsIndexHelper {
 			throw new CollisionBucketSizeException(rangeCount);
 		}
 
-		// Force range count into (signed) byte
-		final byte counter = (byte) rangeCount;
+//		// Force range count into (signed) byte
+//		final byte counter = (byte) rangeCount;
 		
 		if (rangeCount == 0) {
 
 		    assert !readOnly;
 		    
-//			if(readOnly) {
-//				
-//				// Not found.
-//				return null;
-//				
-//			}
-			
 			/*
 			 * This is the first time we have observed a Value which
 			 * generates this hash code, so append a [short] ZERO (0) to
@@ -266,15 +271,16 @@ public class TermsIndexHelper {
 			 * index for the value before inserting the value into the
 			 * index.
 			 */
-			final byte[] key = makeKey(keyBuilder.reset(), baseKey, counter);
-			
+			final byte[] key = makeKey(keyBuilder.reset(), baseKey,
+					(int) rangeCount);
+
 			if (termsIndex.insert(key, val) != null) {
 
 				throw new AssertionError();
 				
 			}
 			
-			return key;
+			return (int) rangeCount;
 			
 		}
 
@@ -308,9 +314,15 @@ public class TermsIndexHelper {
 
 			// Note: Compares the compressed values ;-)
 			if(BytesUtil.bytesEqual(val, tmp)) {
-				
+
+				// Offset at which the counter occurs in the key.
+				final int offset = 1/* flags */+ Bytes.SIZEOF_INT;
+
 				// Already in the index.
-				final byte[] key = tuple.getKey(); return key;
+				final byte asFoundCounter = KeyBuilder.decodeByte(tuple
+						.getKeyBuffer().array()[offset]);
+
+				return asFoundCounter;
 				
 			}
 			
@@ -319,7 +331,7 @@ public class TermsIndexHelper {
 		if(readOnly) {
 
 			// Not found.
-			return null;
+			return NOT_FOUND;
 			
 		}
 		
@@ -327,7 +339,8 @@ public class TermsIndexHelper {
 		 * Hash collision.
 		 */
 
-		final byte[] key = makeKey(keyBuilder.reset(), baseKey, counter);
+		final byte[] key = makeKey(keyBuilder.reset(), baseKey,
+				(int) rangeCount);
 
 		// Insert into the index.
 		if (termsIndex.insert(key, val) != null) {
@@ -343,7 +356,7 @@ public class TermsIndexHelper {
 		
 		}
 
-		return key;
+		return (int) rangeCount;
 
 	}
 
@@ -369,18 +382,13 @@ public class TermsIndexHelper {
      * @param val
      *            The (serialized and compressed) RDF {@link BNode}.
      * 
-     * @return The key for the distinct bnode.
+     * @return The collision counter.
      * 
      * @throws CollisionBucketSizeException
      *             if an attempt is made to insert a {@link Value} into a
      *             collision bucket which is full.
-     * 
-     *             TODO All we really need to return is the counter since the
-     *             client already has the baseKey. That would be less NIO and
-     *             could be an int[] return here (assuming up to an int counter,
-     *             or a short[], or a byte[]).
      */
-    public byte[] addBNode(final IIndex ndx, final IKeyBuilder keyBuilder,
+    public int addBNode(final IIndex ndx, final IKeyBuilder keyBuilder,
             final byte[] baseKey, final byte[] val) {
 
         /*
@@ -410,13 +418,15 @@ public class TermsIndexHelper {
              */
 
             throw new CollisionBucketSizeException(rangeCount);
+            
         }
 
-        // Force range count into (signed) byte
-        final byte counter = (byte) rangeCount;
+//        // Force range count into (signed) byte
+//        final byte counter = (byte) rangeCount;
 
         // Form a key using the collision counter (guaranteed distinct).
-        final byte[] key = makeKey(keyBuilder.reset(), baseKey, counter);
+		final byte[] key = makeKey(keyBuilder.reset(), baseKey,
+				(int) rangeCount);
 
         // Insert into the index.
         if (ndx.insert(key, val) != null) {
@@ -432,7 +442,7 @@ public class TermsIndexHelper {
         
         }
 
-        return key;
+		return (int) rangeCount;
 
     }
 
@@ -455,7 +465,7 @@ public class TermsIndexHelper {
 	 * @return The byte[] value -or- <code>null</code> if there is no entry for
 	 *         that {@link IV} in the index.
 	 */
-	public byte[] lookup(final IIndex ndx, final TermId iv,
+	public byte[] lookup(final IIndex ndx, final TermId<?> iv,
 			final IKeyBuilder keyBuilder) {
 
 		final byte[] key = iv.encode(keyBuilder.reset()).getKey();
@@ -504,7 +514,11 @@ public class TermsIndexHelper {
 	public byte[] makeKey(final IKeyBuilder keyBuilder, final VTE vte,
 			final int hashCode, final int counter) {
 
-		keyBuilder.append(TermId.toFlags(vte)); // flags byte
+		/*
+		 * Note: This MUST agree with TermId#encode().
+		 */
+		
+		keyBuilder.appendSigned(TermId.toFlags(vte)); // flags byte
 		
 		keyBuilder.append(hashCode); // hashCode
 		
@@ -531,7 +545,11 @@ public class TermsIndexHelper {
 	public byte[] makePrefixKey(final IKeyBuilder keyBuilder, final VTE vte,
 			final int hashCode) {
 
-		keyBuilder.append(TermId.toFlags(vte)); // flags byte
+		/*
+		 * Note: This MUST agree with TermId#encode().
+		 */
+
+		keyBuilder.appendSigned(TermId.toFlags(vte)); // flags byte
 		
 		keyBuilder.append(hashCode); // hashCode
 		
@@ -571,45 +589,175 @@ public class TermsIndexHelper {
 
     }
 
-    public StringBuilder dump(final String namespace, final IIndex ndx) {
+	/**
+	 * Dump the TERMS index.
+	 * 
+	 * @param r
+	 *            The lexicon relation.
+	 *            
+	 * @return The dump.
+	 */
+	public Appendable dump(final LexiconRelation r) {
 
-        final StringBuilder sb = new StringBuilder(100 * Bytes.kilobyte32);
+		final StringWriter w = new StringWriter(//
+				100 * Bytes.kilobyte32// initialCapacity
+		);
 
-        final BigdataValueFactory vf = BigdataValueFactoryImpl
-                .getInstance(namespace);
+		w.append(r.getLexiconConfiguration().toString());
+		
+		w.append("\n");
+		
+		dump(w, true/*showEntries*/, r.getNamespace(), r.getTermsIndex());
+		
+		return w.getBuffer();
 
-        final BigdataValueSerializer<BigdataValue> valSer = vf
-                .getValueSerializer();
+	}
 
-        final StringBuilder tmp = new StringBuilder();
+	/**
+	 * Dump the TERMS index.
+	 * 
+	 * @param namespace
+	 * @param ndx
+	 * @return
+	 */
+	public Appendable dump(final String namespace, final IIndex ndx) {
+		
+		final StringWriter w = new StringWriter(//
+				100 * Bytes.kilobyte32// initialCapacity
+		);
+		
+		dump(w, true/*showEntries*/, namespace, ndx);
+		
+		return w.getBuffer();
+		
+	}
 
-        final ITupleIterator<TermId<?>> itr = ndx.rangeIterator();
+	/**
+	 * Core implementation
+	 * 
+	 * @param w
+	 *            Where to write the data.
+	 * @param showEntries
+	 *            When <code>true</code> the individual entries in the TERMS
+	 *            index will be reported. When <code>false</code> only metadata
+	 *            about the scanned entries will be reported.
+	 * @param namespace
+	 *            The namespace of the {@link LexiconRelation}.
+	 * @param ndx
+	 *            The TERMS index for that {@link LexiconRelation}.
+	 */
+	public void dump(final Writer w, final boolean showEntries,
+			final String namespace, final IIndex ndx) {
 
-        while (itr.hasNext()) {
+		final int BIN_SIZE = 8;
 
-            final ITuple<TermId<?>> tuple = itr.next();
+		final int NBINS = 256 / BIN_SIZE;
 
-            final TermId iv = new TermId(tuple.getKey());
+		try {
 
-            final BigdataValue value;
+			int maxCollisionCounter = 0;
 
-            if (tuple.isNull()) {
+			/*
+			 * An array of bins reporting the #of TERMS having the #of collision
+			 * counters for that bin. The bins are each BIN_SIZE wide. There are
+			 * NBINS bins. For a given counter value, the bin is selected by
+			 * floor(counter/binSize).
+			 */
+			final long[] bins = new long[NBINS];
 
-                value = null;
+			final BigdataValueFactory vf = BigdataValueFactoryImpl
+					.getInstance(namespace);
 
-            } else {
+			final BigdataValueSerializer<BigdataValue> valSer = vf
+					.getValueSerializer();
 
-                value = valSer.deserialize(tuple.getValueStream(), tmp);
+			// Used to decode the Values.
+			final StringBuilder tmp = new StringBuilder();
 
-            }
+			w.append("fastRangeCount=" + ndx.rangeCount()+"\n");
+			
+			@SuppressWarnings("unchecked")
+			final ITupleIterator<TermId<?>> itr = ndx.rangeIterator();
 
-            sb.append(iv.toString() + " => " + value);
+			long nvisited = 0L;
+			
+			while (itr.hasNext()) {
 
-            sb.append("\n");
+				final ITuple<TermId<?>> tuple = itr.next();
+				
+				nvisited++;
 
-        }
+				if (tuple.isNull()) {
 
-        return sb;
+					if (showEntries) {
+						w.append("NullIV: key=");
+						w.append(BytesUtil.toString(tuple.getKey()));
+						w.append("\n");
+					}
+
+				} else {
+
+					final TermId<?> iv = (TermId<?>) IVUtility
+							.decodeFromOffset(tuple.getKeyBuffer().array(), 0/* offset */);
+					// new TermId(tuple.getKey());
+
+					final BigdataValue value = valSer.deserialize(tuple
+							.getValueStream(), tmp);
+
+					if (showEntries) {
+						w.append(iv.toString());
+						w.append(" => ");
+						w.append(value.toString());
+						w.append("\n");
+					}
+
+					final int counter = iv.counter();
+
+					if (counter > maxCollisionCounter) {
+
+						maxCollisionCounter = counter;
+
+					}
+					
+					final int bin = (int) (counter / BIN_SIZE);
+					
+					bins[bin]++;
+
+				}
+
+			}
+
+			w.append("nvisited=" + nvisited+"\n");
+			
+			w.append("binSize=" + BIN_SIZE+"\n");
+
+			w.append("nbins=" + NBINS + "\n");
+
+			// #of non-zero bins.
+			int nnzero = 0;
+			
+			for (int bin = 0; bin < NBINS; bin++) {
+
+				final long numberInBin = bins[bin];
+
+				if (numberInBin == 0)
+					continue;
+
+				w.append("bins[" + bin + "]=" + numberInBin + "\n");
+
+				nnzero++;
+				
+			}
+			
+			w.append("numNonZeroBins=" + nnzero + "\n");
+			
+			w.append("maxCollisionCounter=" + maxCollisionCounter + "\n");
+
+		} catch (IOException e) {
+		
+			throw new RuntimeException(e);
+			
+		}
 
     }
 
@@ -627,7 +775,9 @@ public class TermsIndexHelper {
         private static final long serialVersionUID = 1L;
 
         public CollisionBucketSizeException(final long rangeCount) {
-            super("ncoll=" + rangeCount);
+
+        	super("ncoll=" + rangeCount);
+        	
         }
 
     }

@@ -24,9 +24,9 @@ public class SampleExtensionFactory implements IExtensionFactory {
     
     public void init(final LexiconRelation lex) {
 
-       	if (lex.isInlineDateTimes())
-    		extensions.add(new DateTimeExtension(
-    				lex, lex.getInlineDateTimesTimeZone()));
+//       	if (lex.isInlineDateTimes())
+//    		extensions.add(new DateTimeExtension(
+//    				lex, lex.getInlineDateTimesTimeZone()));
 		extensions.add(new EpochExtension(lex));
 		extensions.add(new ColorsEnumExtension(lex));
 		extensionsArray = extensions.toArray(new IExtension[2]);

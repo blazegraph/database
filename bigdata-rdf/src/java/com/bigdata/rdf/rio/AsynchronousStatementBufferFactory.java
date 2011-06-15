@@ -88,6 +88,8 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.lexicon.TermsIndexHelper;
@@ -2744,17 +2746,24 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
             for (int i = 0; i < chunk.length; i++) {
 
-                final IV iv = result.ivs[i];
+                final int counter = result.counters[i];
 
-                if (iv == null) {
+                if (counter == TermsIndexHelper.NOT_FOUND) {
 
                     if (!readOnly)
                         throw new AssertionError();
 
                 } else {
 
+					// The value whose IV we have discovered/asserted.
+                	final BigdataValue value = chunk[i].obj;
+                	
+					// Rebuild the IV.
+					final TermId<?> iv = new TermId(VTE.valueOf(value), value
+							.hashCode(), (byte) counter);
+
                     // assign the term identifier.
-                    chunk[i].obj.setIV(iv);
+                    value.setIV(iv);
 
                     if (chunk[i] instanceof KVOList) {
 

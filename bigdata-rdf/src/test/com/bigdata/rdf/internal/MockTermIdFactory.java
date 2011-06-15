@@ -60,12 +60,14 @@ public class MockTermIdFactory {
         // the math here is just to mix up the counter values a bit.
         final byte counter = (byte) ((nextHashCode + 12) % 7);
         
-        final IKeyBuilder keyBuilder = helper.newKeyBuilder();
-
-        final byte[] key = helper.makeKey(keyBuilder, vte, hashCode, counter);
+//        final IKeyBuilder keyBuilder = helper.newKeyBuilder();
+//
+//        final byte[] key = helper.makeKey(keyBuilder, vte, hashCode, counter);
+//        
+//        return new TermId(key);
         
-        return new TermId(key);
-
+		return new TermId(vte, hashCode, counter);
+        
     }
 
     /**
@@ -135,11 +137,13 @@ public class MockTermIdFactory {
 
         final byte counter = 0;
 
-        final IKeyBuilder keyBuilder = helper.newKeyBuilder();
-
-        final byte[] key = helper.makeKey(keyBuilder, vte, hashCode, counter);
+//        final IKeyBuilder keyBuilder = helper.newKeyBuilder();
+//
+//        final byte[] key = helper.makeKey(keyBuilder, vte, hashCode, counter);
+//        
+//        return new TermId(key);
         
-        return new TermId(key);
+        return new TermId(vte,hashCode,counter);
 
     }
 

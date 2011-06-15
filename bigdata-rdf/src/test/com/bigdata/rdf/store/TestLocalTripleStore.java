@@ -34,7 +34,6 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 
 /**

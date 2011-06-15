@@ -234,7 +234,7 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
     public void index(final int capacity,
             final Iterator<BigdataValue> valuesIterator) {
         
-        final TokenBuffer buffer = new TokenBuffer(capacity, this);
+        final TokenBuffer<?> buffer = new TokenBuffer(capacity, this);
 
         int n = 0;
 
@@ -282,10 +282,10 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
 
             assert termId != null; // the termId must have been assigned.
 
-            // don't bother text indexing inline values for now
-            if (termId.isInline()) { // FIXME TERMS REFACTOR : Index all literals.
-                continue;
-            }
+//            // don't bother text indexing inline values for now
+//            if (termId.isInline()) {
+//                continue;
+//            }
             
             index(buffer, termId, 0/* fieldId */, languageCode,
                     new StringReader(text));

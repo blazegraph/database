@@ -39,6 +39,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.lexicon.TermsIndexHelper;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -317,9 +318,10 @@ public class TestAsynchronousStatementBufferFactory extends
         
                 log.debug("dumping store...");
                 
-                log.debug("LEXICON:\n"
-                                + store.getLexiconRelation().dumpTerms());
-                
+				log.debug("LEXICON:\n"
+								+ new TermsIndexHelper().dump(store
+										.getLexiconRelation()));
+
                 // raw statement indices.
                 {
                     

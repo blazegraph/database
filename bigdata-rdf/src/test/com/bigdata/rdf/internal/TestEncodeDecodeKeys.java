@@ -1143,7 +1143,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final XSDStringExtension<BigdataValue> ext = 
             new XSDStringExtension<BigdataValue>(
                 new IDatatypeURIResolver() {
-                    public BigdataURI resolve(URI uri) {
+                    public BigdataURI resolve(final URI uri) {
                         final BigdataURI buri = vf.createURI(uri.stringValue());
                         buri.setIV(newTermId(VTE.URI));
                         return buri;
@@ -1211,9 +1211,11 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                 new InlineLiteralIV<BigdataLiteral>("123", null/* language */,
                         null/* datatype */),//
                 new InlineLiteralIV<BigdataLiteral>("23", null/* language */,
-                        null/* datatype */),//
-                new InlineLiteralIV<BigdataLiteral>("3", null/* language */,
-                        null/* datatype */),//
+						null/* datatype */),//
+				new InlineLiteralIV<BigdataLiteral>("3", null/* language */,
+						null/* datatype */),//
+				new InlineLiteralIV<BigdataLiteral>("", null/* language */,
+						null/* datatype */),//
         };
 
         doEncodeDecodeTest(e);
@@ -1247,8 +1249,20 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                         null/* datatype */),//
                 new InlineLiteralIV<BigdataLiteral>("goo", "de"/* language */,
                         null/* datatype */),//
-                new InlineLiteralIV<BigdataLiteral>("baz", "de"/* language */,
-                        null/* datatype */),//
+				new InlineLiteralIV<BigdataLiteral>("baz", "de"/* language */,
+						null/* datatype */),//
+				new InlineLiteralIV<BigdataLiteral>("", "en"/* language */,
+						null/* datatype */),//
+				new InlineLiteralIV<BigdataLiteral>("", "de"/* language */,
+						null/* datatype */),//
+				new InlineLiteralIV<BigdataLiteral>("1", "en"/* language */,
+						null/* datatype */),//
+				new InlineLiteralIV<BigdataLiteral>("1", "de"/* language */,
+						null/* datatype */),//
+				new InlineLiteralIV<BigdataLiteral>("12", "en"/* language */,
+						null/* datatype */),//
+				new InlineLiteralIV<BigdataLiteral>("12", "de"/* language */,
+						null/* datatype */),//
         };
 
         doEncodeDecodeTest(e);
@@ -1272,23 +1286,29 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final URI dt1 = new URIImpl("http://www.bigdata.com/mock-datatype-1");
         final URI dt2 = new URIImpl("http://www.bigdata.com/mock-datatype-2");
         
-        final IV<?, ?>[] e = {//
-                new InlineLiteralIV<BigdataLiteral>("foo", null/* language */,
-                        dt1),//
-                new InlineLiteralIV<BigdataLiteral>("bar", null/* language */,
-                        dt1),//
-                new InlineLiteralIV<BigdataLiteral>("baz", null/* language */,
-                        dt1),//
-                new InlineLiteralIV<BigdataLiteral>("goo", null/* language */,
-                        dt1),//
-                new InlineLiteralIV<BigdataLiteral>("foo", null/* language */,
-                        dt2),//
-                new InlineLiteralIV<BigdataLiteral>("bar", null/* language */,
-                        dt2),//
-                new InlineLiteralIV<BigdataLiteral>("baz", null/* language */,
-                        dt2),//
-                new InlineLiteralIV<BigdataLiteral>("goo", null/* language */,
-                        dt2),//
+		final IV<?, ?>[] e = {//
+				new InlineLiteralIV<BigdataLiteral>("foo", null/* language */,
+						dt1),//
+				new InlineLiteralIV<BigdataLiteral>("bar", null/* language */,
+						dt1),//
+				new InlineLiteralIV<BigdataLiteral>("baz", null/* language */,
+						dt1),//
+				new InlineLiteralIV<BigdataLiteral>("goo", null/* language */,
+						dt1),//
+				new InlineLiteralIV<BigdataLiteral>("foo", null/* language */,
+						dt2),//
+				new InlineLiteralIV<BigdataLiteral>("bar", null/* language */,
+						dt2),//
+				new InlineLiteralIV<BigdataLiteral>("baz", null/* language */,
+						dt2),//
+				new InlineLiteralIV<BigdataLiteral>("goo", null/* language */,
+						dt2),//
+				new InlineLiteralIV<BigdataLiteral>("", null/* language */, dt2),//
+				new InlineLiteralIV<BigdataLiteral>("", null/* language */, dt2),//
+				new InlineLiteralIV<BigdataLiteral>("1", null/* language */, dt2),//
+				new InlineLiteralIV<BigdataLiteral>("1", null/* language */, dt2),//
+				new InlineLiteralIV<BigdataLiteral>("12", null/* language */, dt2),//
+				new InlineLiteralIV<BigdataLiteral>("12", null/* language */, dt2),//
         };
 
         doEncodeDecodeTest(e);
@@ -1503,6 +1523,14 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final TermId<?> datatypeIV2 = newTermId(VTE.URI);
         
         final IV<?, ?>[] e = {//
+                new LiteralDatatypeIV<BigdataLiteral>(
+                        new InlineLiteralIV<BigdataLiteral>(""), datatypeIV),//
+                new LiteralDatatypeIV<BigdataLiteral>(
+                        new InlineLiteralIV<BigdataLiteral>(" "), datatypeIV2),//
+                new LiteralDatatypeIV<BigdataLiteral>(
+                        new InlineLiteralIV<BigdataLiteral>("1"), datatypeIV),//
+                new LiteralDatatypeIV<BigdataLiteral>(
+                        new InlineLiteralIV<BigdataLiteral>("12"), datatypeIV2),//
                 new LiteralDatatypeIV<BigdataLiteral>(
                         new InlineLiteralIV<BigdataLiteral>("bar"), datatypeIV),//
                 new LiteralDatatypeIV<BigdataLiteral>(

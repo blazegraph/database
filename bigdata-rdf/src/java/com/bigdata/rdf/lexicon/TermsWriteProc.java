@@ -30,13 +30,13 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
@@ -46,9 +46,7 @@ import com.bigdata.io.LongPacker;
 import com.bigdata.io.ShortPacker;
 import com.bigdata.rdf.internal.AbstractIV;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**
@@ -183,17 +181,18 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 		// used to format the keys for the TERMS index.
 		final IKeyBuilder keyBuilder = helper.newKeyBuilder();
 
-        // used to store the discovered / assigned term identifiers.
-        final IV[] ivs = new IV[numTerms];
+        // used to store the discovered / assigned hash collision counters.
+        final int[] counters = new int[numTerms];
         
         /*
          * Note: The baseKey should be one byte shorter than the full key (since
          * it does not include the one byte counter).
          */
-        final byte[] baseKey = new byte[keyBuilder.capacity() - 1];
+		final byte[] baseKey = new byte[keyBuilder.capacity()
+				- TermsIndexHelper.SIZEOF_COUNTER];
 
-        // Used to report the size of each collision bucket.
-        final AtomicInteger bucketSize = new AtomicInteger(0);
+//        // Used to report the size of each collision bucket.
+//        final AtomicInteger bucketSize = new AtomicInteger(0);
         
         // Incremented by the size of each collision bucket probed.
         long totalBucketSize = 0L;
@@ -205,11 +204,14 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 
             // Copy key into reused buffer to reduce allocation.
 //            final byte[] baseKey = getKey(i);
-			getKeys().copy(i, new DataOutputBuffer(0, baseKey));
+			getKeys().copy(i,
+					new DataOutputBuffer(0/* existingDataLength */, baseKey));
 
 			// decode the VTE from the flags.
-			final VTE vte = AbstractIV.getVTE(baseKey[0]);
-            
+			final VTE vte = AbstractIV
+					.getVTE(KeyBuilder.decodeByte(baseKey[0]));
+
+			final int counter;
 			if (!toldBNodes && vte == VTE.BNODE) {
 
                 /*
@@ -228,7 +230,7 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
                 if (readOnly) {
                 
                     // blank nodes can not be resolved by the index.
-                    ivs[i] = null;
+                    counter = TermsIndexHelper.NOT_FOUND;
 
                     /*
                      * FIXME Use this to track down people who pass in a blank
@@ -237,35 +239,24 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
                      * node with the TERMS index so the node should not have
                      * been passed in at all (for efficiency reasons).
                      */
-//                    throw new UnsupportedOperationException();
+                    //throw new UnsupportedOperationException();
 
                 } else {
 
-                    /*
-                     * We are not in a told bnode mode and this is not a
-                     * read-only request.
-                     */
+					/*
+					 * We are not in a told bnode mode and this is not a
+					 * read-only request. The TERMS index will be used to assign
+					 * a unique counter to complete the blank node's key. That
+					 * counter is just the current size of the collision bucket
+					 * at the time that we check the index. The collision bucket
+					 * is increased by ONE since we insert the blank node into
+					 * the index.
+					 */
 
-                    final byte[] key = helper.addBNode(ndx, keyBuilder,
-                            baseKey, getValue(i));
+					// The size of the collision bucket (aka the assigned ctr).
+					counter = helper.addBNode(ndx, keyBuilder, baseKey,
+							getValue(i));
 
-                    ivs[i] = new TermId<BigdataValue>(key);
-                    
-					// The size of the collision bucket.
-					final int tmp = ((TermId<?>) ivs[i]).counter();
-					if (maxBucketSize < tmp) {
-    					maxBucketSize += tmp;
-    				}
-    				totalBucketSize += tmp;
-
-//                    // assign a term identifier.
-//					final long termId = counter.incrementAndGet();
-//
-//                    ivs[i] = new TermId(VTE(code), termId);
-                    
-//                	final BNode bnode = (BNode)BigdataValueFactoryImpl.getInstance("test").getValueSerializer().deserialize(getValue(i));
-//                	throw new UnsupportedOperationException("BNode: ID="+bnode.getID());
-                    
                 }
                 
             } else {
@@ -281,31 +272,39 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 				 */
             	final byte[] val = getValue(i);
             	
-				final byte[] key = helper.resolveOrAddValue(ndx, readOnly,
-						keyBuilder, baseKey, val, bucketSize);
+				counter = helper.resolveOrAddValue(ndx, readOnly,
+						keyBuilder, baseKey, val, null/* bucketSize */);
 
-				final int tmp = bucketSize.get();
-				if (maxBucketSize < tmp) {
-					maxBucketSize += tmp;
-				}
-				totalBucketSize += tmp;
-				
-				if (key != null) {
-
-					// Note: The first byte of the key is the IV's flags.
-					ivs[i] = new TermId<BigdataValue>(key);
-					
-				} else {
-					
-					// Not found (and read-only).
-					
-				}
-    
             }
+
+			if (!readOnly && counter < 0)
+				throw new AssertionError("counter=" + counter);
+
+			counters[i] = counter;
+
+			if (counter != TermsIndexHelper.NOT_FOUND) {
+
+				/*
+				 * TODO This does not update the bucketSize when the Value was
+				 * not found in the index. We could do this by changing the
+				 * return value of resolveOrAddValue() to -rangeCount and
+				 * casting to an (int). The (-rangeCount) could then be
+				 * normalized to a marker as we pass the information back to the
+				 * client. [Or just enable the bucketSize argument above.]
+				 */
+				if (maxBucketSize < counter) {
+
+					maxBucketSize += counter;
+
+				}
+
+				totalBucketSize += counter;
+				
+			}
             
         }
 
-		return new Result(totalBucketSize, maxBucketSize, ivs);
+		return new Result(totalBucketSize, maxBucketSize, counters);
 
     } // apply(ndx)
 
@@ -336,26 +335,6 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
         out.writeBoolean(readOnly);
 
     }
-    
-//    final private static VTE VTE(final byte code) {
-//        
-//        switch(code) {
-//        case ITermIndexCodes.TERM_CODE_URI:
-//            return VTE.URI;
-//        case ITermIndexCodes.TERM_CODE_BND:
-//            return VTE.BNODE;
-//        case ITermIndexCodes.TERM_CODE_STMT:
-//            return VTE.STATEMENT;
-//        case ITermIndexCodes.TERM_CODE_DTL:
-////        case ITermIndexCodes.TERM_CODE_DTL2:
-//        case ITermIndexCodes.TERM_CODE_LCL:
-//        case ITermIndexCodes.TERM_CODE_LIT:
-//            return VTE.LITERAL;
-//        default:
-//            throw new IllegalArgumentException();
-//        }
-//        
-//    }
 
 	/**
 	 * Object encapsulates the discovered / assigned {@link IV}s and provides
@@ -382,11 +361,11 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 		public int maxBucketSize;
 
 		/**
-		 * The {@link IV}s assigned to each {@link Value} in the request. The
+		 * The counters assigned to each {@link Value} in the request. The
 		 * indicates of this array are correlated with the indices of the array
 		 * provided to the request.
 		 */
-		public IV[] ivs;
+		public int[] counters;
         
         private static final long serialVersionUID = 1L;
 
@@ -404,20 +383,19 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 		 * @param maxBucketSize
 		 *            The size of the largest collision bucket examined.
 		 * @param ivs
-		 *            The assigned/resolved {@link IV}s.
+		 *            The assigned/resolved collision counters.
 		 */
 		public Result(final long totalBucketSize, final int maxBucketSize,
-				final IV[] ivs) {
+				final int[] counters) {
 
-            assert ivs != null;
+			if(counters == null)
+				throw new IllegalArgumentException();
             
-            assert ivs.length > 0;
-
             this.totalBucketSize = totalBucketSize;
             
             this.maxBucketSize = maxBucketSize;
             
-            this.ivs = ivs;
+            this.counters = counters;
             
         }
 
@@ -436,11 +414,14 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 
 			final int n = (int) LongPacker.unpackLong(in);
 
-			ivs = new IV[n];
+			counters = new int[n];
 
             for (int i = 0; i < n; i++) {
                 
-                ivs[i] = (IV) in.readObject();
+				final short tmp = ShortPacker.unpackShort(in);
+
+				counters[i] = tmp == Short.MAX_VALUE ? TermsIndexHelper.NOT_FOUND
+						: tmp;
                 
             }
             
@@ -448,7 +429,7 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         public void writeExternal(final ObjectOutput out) throws IOException {
 
-            final int n = ivs.length;
+            final int n = counters.length;
             
             ShortPacker.packShort(out, VERSION0);
 
@@ -460,10 +441,25 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 			
 			// The size of the largest collision bucket examined.
 			LongPacker.packLong(out, maxBucketSize);
-			
-            for (int i = 0; i < n; i++) {
-                                
-                out.writeObject(ivs[i]);
+
+			/*
+			 * Write out the assigned/resolved collision counters.
+			 * 
+			 * Note: This uses a packed short encoding for the collision
+			 * counters. If we see the marker for an unresolved collision
+			 * counter (NOT_FOUND) then it is replaced with [Short.MAX_VALUE].
+			 * This is fine as long as the collision counter is a byte. Since
+			 * the [short] value is in [0:Short.MAX_VALUE] we can then pack it
+			 * into the output stream.
+			 */
+			for (int i = 0; i < n; i++) {
+
+				final int c = counters[i];
+
+				final short tmp = c == TermsIndexHelper.NOT_FOUND ? Short.MAX_VALUE
+						: (short) c;
+
+				ShortPacker.packShort(out, tmp);
                 
             }
             

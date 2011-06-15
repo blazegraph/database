@@ -10,6 +10,8 @@ import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.TermsWriteProc.TermsWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -326,19 +328,26 @@ public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
 
             for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
 
-                final IV iv = result.ivs[j];
+                final int counter = result.counters[j];
 
-                if (iv == null) {
+                if (counter == TermsIndexHelper.NOT_FOUND) {
 
                     if (!readOnly)
                         throw new AssertionError();
 
                     stats.nunknown.incrementAndGet();
 
-                } else {
+				} else {
 
-                    // assign the term identifier.
-                    a[i].obj.setIV(iv);
+					// The value whose IV we have discovered/asserted.
+					final BigdataValue value = a[i].obj;
+
+					// Rebuild the IV.
+					final TermId<?> iv = new TermId(VTE.valueOf(value), value
+							.hashCode(), (byte) counter);
+
+					// assign the term identifier.
+					value.setIV(iv);
 
                     if(a[i] instanceof KVOList) {
                         

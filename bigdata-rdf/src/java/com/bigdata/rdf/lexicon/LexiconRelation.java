@@ -242,7 +242,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             this.textIndex = Boolean.parseBoolean(getProperty(
                     AbstractTripleStore.Options.TEXT_INDEX,
-                    AbstractTripleStore.Options.DEFAULT_TEXT_INDEX));
+                    AbstractTripleStore.Options.DEFAULT_INLINE_TEXT_INDEX));
          
             if (textIndex) {
                 /*
@@ -386,11 +386,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         {
             
             inlineLiterals = Boolean.parseBoolean(getProperty(
-                    AbstractTripleStore.Options.INLINE_LITERALS,
-                    AbstractTripleStore.Options.DEFAULT_INLINE_LITERALS));
+                    AbstractTripleStore.Options.INLINE_XSD_DATATYPE_LITERALS,
+                    AbstractTripleStore.Options.DEFAULT_INLINE_XSD_DATATYPE_LITERALS));
 
-            maxInlineStringLength = Integer.parseInt(getProperty(
-                    AbstractTripleStore.Options.MAX_INLINE_STRING_LENGTH,
+            inlineTextLiterals = Boolean.parseBoolean(getProperty(
+                    AbstractTripleStore.Options.INLINE_TEXT_LITERALS,
+                    AbstractTripleStore.Options.DEFAULT_INLINE_TEXT_LITERALS));
+            
+            maxInlineTextLength = Integer.parseInt(getProperty(
+                    AbstractTripleStore.Options.MAX_INLINE_TEXT_LENGTH,
                     AbstractTripleStore.Options.DEFAULT_MAX_INLINE_STRING_LENGTH));
             
             inlineBNodes = storeBlankNodes && Boolean.parseBoolean(getProperty(
@@ -411,12 +415,19 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             
             try {
                 
+            	/*
+            	 * Setup the extension factory.
+            	 */
                 final Class<IExtensionFactory> xfc = 
                     determineExtensionFactoryClass();
+
                 final IExtensionFactory xFactory = xfc.newInstance();
-                
+
+                /*
+                 * Setup the lexicon configuration.
+                 */
                 lexiconConfiguration = new LexiconConfiguration<BigdataValue>(
-                        inlineLiterals, maxInlineStringLength, inlineBNodes,
+                        inlineLiterals, inlineTextLiterals, maxInlineTextLength, inlineBNodes,
                         inlineDateTimes, rejectInvalidXSDValues, xFactory,
                         getContainer().getVocabulary());
 
@@ -427,7 +438,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 throw new IllegalArgumentException(
                         AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
             }
-            
+
         }
         
     }
@@ -490,6 +501,37 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         try {
 
             super.create();
+
+			if (textIndex && inlineTextLiterals
+					&& maxInlineTextLength > (4 * Bytes.kilobyte32)) {
+				/*
+				 * Log message if full text index is enabled and we are inlining
+				 * textual literals and MAX_INLINE_TEXT_LENGTH is GT some
+				 * threshold value (e.g., 4096). This combination represents an
+				 * unresonable configuration due to the data duplication in the
+				 * full text index. (The large literals will be replicated
+				 * within the full text index for each token extracted from the
+				 * literal by the text analyzer.)
+				 */
+				log
+						.error("Configuration will duplicate large literals within the full text index"
+								+ //
+								": "
+								+ AbstractTripleStore.Options.TEXT_INDEX
+								+ "="
+								+ textIndex
+								+ //
+								", "
+								+ AbstractTripleStore.Options.INLINE_TEXT_LITERALS
+								+ "="
+								+ inlineTextLiterals
+								+ //
+								", "
+								+ AbstractTripleStore.Options.MAX_INLINE_TEXT_LENGTH
+								+ "=" + maxInlineTextLength//
+						);
+
+			}
 
             final IIndexManager indexManager = getIndexManager();
 
@@ -636,18 +678,25 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     private final boolean storeBlankNodes;
     
     /**
-     * Are datatyped literals being inlined into the statement indices.
+     * Are xsd datatype primitive and numeric literals being inlined into the statement indices.
      * 
-     * {@link AbstractTripleStore.Options#INLINE_LITERALS}
+     * {@link AbstractTripleStore.Options#INLINE_XSD_DATATYPE_LITERALS}
      */
     final private boolean inlineLiterals;
+    
+    /**
+     * Are textual literals being inlined into the statement indices.
+     * 
+     * {@link AbstractTripleStore.Options#INLINE_TEXT_LITERALS}
+     */
+    final private boolean inlineTextLiterals;
 
     /**
      * The maximum length of <code>xsd:string</code> literals which will be
      * inlined into the statement indices. The {@link XSDStringExtension} is
      * registered when GT ZERO.
      */
-    final private int maxInlineStringLength;
+    final private int maxInlineTextLength;
     
     /**
      * Are bnodes being inlined into the statement indices.
@@ -695,7 +744,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      */
     final public int getMaxInlineStringLength() {
         
-        return maxInlineStringLength;
+        return maxInlineTextLength;
         
     }
 
@@ -867,32 +916,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         final IndexMetadata metadata = new IndexMetadata(getIndexManager(),
                 getProperties(), name, UUID.randomUUID());
 
-//		final int m = 1024;
-//		final int q = 8000;
-//		final int ratio = 32;
-//		final int maxRecLen = 64; // CONFIG via index property override.
-
-        /*
-         * TODO Examine performance for different node and leaf key and value
-         * serializers and coding ratios.
-         */
         metadata.setTupleSerializer(new TermsTupleSerializer(getNamespace(),
                 valueFactory));
 
 		// enable raw record support.
 		metadata.setRawRecords(true);
-
-//		// set the maximum length of a byte[] value in a leaf.
-//		metadata.setMaxRecLen(maxRecLen);
-
-//		/*
-//		 * increase the branching factor since leaf size is smaller w/o large
-//		 * records.
-//		 */
-//		metadata.setBranchingFactor(m);
-//
-//		// Note: You need to give sufficient heap for this option!
-//		metadata.setWriteRetentionQueueCapacity(q);
 
 		return metadata;
 
@@ -2293,7 +2321,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     
     /**
      * This method assumes we've already exhausted all other possibilities
-     * and need to go to the index for the IV.
+     * and need to go to the index for the {@link IV}.
      * 
      * @param value
      *          the value to lookup
@@ -2311,18 +2339,20 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         final byte[] val = valueFactory.getValueSerializer().serialize(asValue);
 
-		final byte[] key = h
+		final int counter = h
 				.resolveOrAddValue(getTermsIndex(), true/* readOnly */,
 						keyBuilder, baseKey, val, null/* bucketSize */);
 
-        if( key == null ) {
+		if (counter == TermsIndexHelper.NOT_FOUND) {
 
             // Not found.
             return null;
             
         }
         
-        final TermId tid = (TermId) IVUtility.decode(key);
+//        final TermId tid = (TermId) IVUtility.decode(key);
+		final TermId tid = new TermId<BigdataValue>(VTE.valueOf(asValue),
+				asValue.hashCode(), (byte) counter);
 
         if(value instanceof BigdataValue) {
 
@@ -2440,34 +2470,34 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     }
 
-    /**
-     * Dumps the lexicon in a variety of ways (test suites only).
-     */
-    public StringBuilder dumpTerms() {
-
-        final StringBuilder sb = new StringBuilder(Bytes.kilobyte32 * 4);
-
-        /**
-         * Dumps the terms in term order.
-         */
-        sb.append("---- terms in term order ----\n");
-        for( Iterator<Value> itr = termIterator(); itr.hasNext(); ) {
-            
-            final Value val = itr.next();
-            
-            if (val == null) {
-                sb.append("NullIV");
-            } else {
-                sb.append(val.toString());
-            }
-            
-            sb.append("\n");
-            
-        }
-        
-        return sb;
-        
-    }
+//    /**
+//     * Dumps the lexicon in a variety of ways (test suites only).
+//     */
+//    public StringBuilder dumpTerms() {
+//
+//        final StringBuilder sb = new StringBuilder(Bytes.kilobyte32 * 4);
+//
+//        /**
+//         * Dumps the terms in term order.
+//         */
+//        sb.append("---- terms in term order ----\n");
+//        for( Iterator<Value> itr = termIterator(); itr.hasNext(); ) {
+//            
+//            final Value val = itr.next();
+//            
+//            if (val == null) {
+//                sb.append("NullIV");
+//            } else {
+//                sb.append(val.toString());
+//            }
+//            
+//            sb.append("\n");
+//            
+//        }
+//        
+//        return sb;
+//        
+//    }
 
     /**
      * See {@link ILexiconConfiguration#isInline(DTE)}.  Delegates to the
