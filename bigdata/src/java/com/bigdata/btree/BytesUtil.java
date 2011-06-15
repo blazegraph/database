@@ -1279,7 +1279,7 @@ public class BytesUtil {
 		if (len <= 32) {
 			ret = 0xFFFFFFFFL & getBits(a, off, len);
 		} else {
-			int hilen = len - 32;
+			final int hilen = len - 32;
 			ret = getBits(a, off, hilen);
 			ret <<= 32;
 			ret |= (0xFFFFFFFFL & getBits(a, off + hilen, 32));
