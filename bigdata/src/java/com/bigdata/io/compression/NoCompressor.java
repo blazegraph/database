@@ -43,22 +43,22 @@ import com.bigdata.io.ByteCountInputStream;
 import com.bigdata.io.ByteCountOutputStream;
 
 /**
- * BOCU-1 version.
+ * No compression version.
  * 
  * @see http://userguide.icu-project.org/conversion/compression
- *
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: BOCU1Compressor.java 4582 2011-05-31 19:12:53Z thompsonbry $
  */
-public class BOCU1Compressor implements IUnicodeCompressor, Serializable {
+public class NoCompressor implements IUnicodeCompressor, Serializable {
 
     private static final long serialVersionUID = 1L;
 
     private static final transient Logger log = Logger
-            .getLogger(BOCU1Compressor.class);
+            .getLogger(NoCompressor.class);
 
     // @todo factor out lookup? (static)
-    private final transient Charset cs = Charset.forName("BOCU-1");
+    private final transient Charset cs = Charset.forName("UTF-8");
 
 //    public void encode(final CharSequence s, final IManagedByteArray out) {
 //
@@ -74,7 +74,7 @@ public class BOCU1Compressor implements IUnicodeCompressor, Serializable {
 
         final ByteCountOutputStream bcos = new ByteCountOutputStream(os); 
         
-        // Wrap with Writer using encoder
+        // Wrap with Writer using encoder.
         final OutputStreamWriter w = new OutputStreamWriter(bcos, cs);
 
         try {
@@ -117,7 +117,7 @@ public class BOCU1Compressor implements IUnicodeCompressor, Serializable {
 
         final ByteCountInputStream bcis = new ByteCountInputStream(in);
         
-        // Wrap with decoder
+        // Wrap with decoder.
         final InputStreamReader r = new InputStreamReader(bcis, cs);
 
         try {
