@@ -77,7 +77,7 @@ public class BigdataValueSerializer<V extends Value> {
     /**
      * The current serialization version.
      */
-    private final static short currentVersion = VERSION0;
+    private final static short currentVersion = VERSION1;
     
     /**
      * Error message indicates that the version code in the serialized

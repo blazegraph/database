@@ -80,15 +80,43 @@ public class TestAll extends TestCase {
         
         // test suite for encode/decode of IVs.
         suite.addTestSuite(TestEncodeDecodeKeys.class);
-        
-        suite.addTestSuite(TestUnsignedIVs.class);
-        
-        suite.addTestSuite(TestUnsignedIntegerIVs.class);
+
+        // test suite for encode/decode of xsd:integer IVs
+        suite.addTestSuite(TestEncodeDecodeXSDIntegerIVs.class);
+
+        // test suite for encode/decode of xsd:decimal IVs
+        suite.addTestSuite(TestEncodeDecodeXSDDecimalIVs.class);
+
+        /*
+         * Test suite for encode/decode of IVs which inline Unicode data.
+         * 
+         * Note: All of these tests currently fail. The failures appear to be
+         * related to pretty much the same cause in each case. While I have not
+         * tracked down the cause, it appears to be related to the choice of the
+         * various short strings and their ordering by Java#toString() versus
+         * the encoded Unicode data.  I have filed an issue to support inlining
+         * unicode data.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/334 
+         */
+//        suite.addTestSuite(TestEncodeDecodeUnicodeIVs.class);
+
+        /*
+         * Test suite for inlining of xsd unsigned data types.
+         * 
+         * Note: This feature is not currently supported.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/246
+         */
+//        suite.addTestSuite(TestUnsignedIVs.class);
+//        suite.addTestSuite(TestUnsignedIntegerIVs.class);
         
         /*
-         * Long literal support is not yet finished. 
+         * Note: This is an old and never finished test suite. All it does is
+         * explore some of the available hash functions having more than 32 bits
+         * in the generated hash code. However, it seems like 32-bits is plenty.
          */
-        //suite.addTestSuite(TestLongLiterals.class);
+        // suite.addTestSuite(TestLongLiterals.class);
 
         return suite;
         

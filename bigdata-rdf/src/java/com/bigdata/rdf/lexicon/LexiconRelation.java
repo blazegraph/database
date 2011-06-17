@@ -65,6 +65,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
@@ -581,7 +582,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                         TermId.mockIV(VTE.BNODE).encode(keyBuilder.reset()).getKey(), //
                         TermId.mockIV(VTE.LITERAL).encode(keyBuilder.reset()).getKey(), //
                         TermId.mockIV(VTE.STATEMENT).encode(keyBuilder.reset()).getKey(), //
-                    };
+                };
+                
+                // Sort the keys for efficient insert.
+                Arrays.sort(keys,UnsignedByteArrayComparator.INSTANCE);
                 
                 final byte[][] vals = new byte[][] { null, null, null, null };
                 
