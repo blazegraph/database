@@ -48,6 +48,8 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.NullOutputStream;
 import com.bigdata.io.compression.BOCU1Compressor;
+import com.bigdata.io.compression.NoCompressor;
+import com.bigdata.io.compression.SCSUCompressor;
 import com.bigdata.io.compression.UnicodeHelper;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
@@ -70,7 +72,11 @@ public class IVUtility {
 	/**
 	 * Helper instance for compression/decompression of Unicode string data.
 	 */
-	static UnicodeHelper un = new UnicodeHelper(new BOCU1Compressor());
+	static UnicodeHelper un = new UnicodeHelper(
+	        new BOCU1Compressor()
+//          new SCSUCompressor()
+//	        new NoCompressor()
+	        );
 
     /**
      * Return the byte length of the compressed representation of a unicode

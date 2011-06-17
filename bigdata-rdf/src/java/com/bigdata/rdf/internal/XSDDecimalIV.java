@@ -132,17 +132,28 @@ public class XSDDecimalIV<V extends BigdataLiteral> extends
         if (this == o)
             return true;
         if (o instanceof XSDDecimalIV<?>) {
-            return this.value.equals(((XSDDecimalIV<?>) o).value);
+            // Note: This handles values which differ in precision.
+            return this.value.compareTo(((XSDDecimalIV<?>) o).value) == 0;
+//            return this.value.equals(((XSDDecimalIV<?>) o).value);
         }
         return false;
     }
 
     /**
-     * Return the hash code of the {@link BigDecimal}.
+     * Return the hash code of the value returned by
+     * {@link BigDecimal#stripTrailingZeros()}.
+     * <p>
+     * Note: normalization is necessary to have a stable hash code when encoding
+     * and decoding for much the same reason that we have to use
+     * {@link BigDecimal#compareTo(BigDecimal)} in {@link #equals(Object)}.
      */
     public int hashCode() {
-        return value.hashCode();
+        if (hash == 0) {
+            hash = value.stripTrailingZeros().hashCode();
+        }
+        return hash;
     }
+    private int hash = 0;
 
     public int byteLength() {
         

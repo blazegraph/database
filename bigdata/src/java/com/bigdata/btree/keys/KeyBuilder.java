@@ -956,7 +956,9 @@ public class KeyBuilder implements IKeyBuilder {
     /**
      * {@inheritDoc}
      * <p>
-     * Note: Precision is NOT preserved by this encoding.
+     * Note: Precision is NOT preserved by this encoding.  Thus <code>0.0</code>
+     * and <code>0</code> are encoded by the same representation and both will
+     * decode to <code>0</code>.
      * <h2>Implementation details</h2>
      * The encoding to a BigDecimal requires the expression of scale and length
      * {@link BigDecimal#scale()} indicates the precision of the number, where
@@ -978,7 +980,7 @@ public class KeyBuilder implements IKeyBuilder {
      * and negative representations are further encoded using
      * {@link #flipDigits(String)} for the equivalent of 2s compliment negative
      * representation.
-     * 
+     * <p>
      * There are two cases where scale and trailing zeros interact.  The
      * case of "0.000" is represented as precision of 1 and scale of 3, 
      * indicating the "0" is shifted down 3 decimal places.  While "5.000"

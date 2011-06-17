@@ -1779,6 +1779,46 @@ public class TestKeyBuilder extends TestCase2 {
         doEncodeDecodeTest(v);
 
     }
+
+    /**
+     * Unit test demonstrates that precision is not preserved by the encoding.
+     * Thus, ZEROs are encoded in the same manner regardless of their precision
+     * (this is true of other values with trailing zeros after the decimal point
+     * as well).
+     */
+    public void test_BigDecimal_zeroPrecisionNotPreserved() {
+
+        // Three ZEROs with different precision.
+        final BigDecimal z0 = new BigDecimal("0");
+        final BigDecimal z1 = new BigDecimal("0.0");
+        final BigDecimal z2 = new BigDecimal("0.00");
+
+        // Encode each of those BigDecimal values.
+        final byte[] b0 = new KeyBuilder().append(z0).getKey();
+        final byte[] b1 = new KeyBuilder().append(z1).getKey();
+        final byte[] b2 = new KeyBuilder().append(z2).getKey();
+
+        // The encoded representations are the same.
+        assertEquals(b0, b1);
+        assertEquals(b0, b2);
+        
+    }
+
+    /* Note: I've a question in to Martyn about this one.  It decodes as "5E+2"
+     * rather than "500".
+     */
+//    public void test_BigDecimal_500() {
+//
+//        final BigDecimal expected = new BigDecimal("500");
+//
+//        final byte[] key = new KeyBuilder().append(expected).getKey();
+//
+//        final BigDecimal actual = KeyBuilder.decodeBigDecimal(0/* offset */,
+//                key);
+//
+//        assertEquals(expected, actual);
+//        
+//    }
     
     public void test_BigDecimal_zeros() {
         
