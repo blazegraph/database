@@ -29,9 +29,7 @@ package com.bigdata.rdf.model;
 
 import java.io.DataInput;
 import java.io.DataOutput;
-import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 
 import org.openrdf.model.BNode;
@@ -79,7 +77,7 @@ public class BigdataValueSerializer<V extends Value> {
     /**
      * The current serialization version.
      */
-    private final static short currentVersion = VERSION1;
+    private final static short currentVersion = VERSION0;
     
     /**
      * Error message indicates that the version code in the serialized
@@ -121,6 +119,8 @@ public class BigdataValueSerializer<V extends Value> {
         this.valueFactory = valueFactory;
        
         this.uc = new UnicodeHelper(new BOCU1Compressor());
+//        this.uc = new UnicodeHelper(new NoCompressor());
+//        this.uc = new UnicodeHelper(new SCSUCompressor());
         
     }
 

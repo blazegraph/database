@@ -46,12 +46,12 @@ import com.bigdata.io.DataOutputBuffer;
  * the same collation sort keys, but does have better "natural" order than
  * SCSU).</li>
  * </ul>
- * BOCU appears to be a clear winner over SCSU, which we do not consider
- * further. Unfortunately, neither of these compression schemes is supported by
- * the native JDK.
+ * BOCU appears to be better than SCSU for most points, but is slower. Neither
+ * of these compression schemes is supported by the native JDK.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestUnicodeCompressor.java 4582 2011-05-31 19:12:53Z
+ *          thompsonbry $
  */
 public class TestUnicodeCompressor extends TestCase2 {
 
@@ -75,6 +75,22 @@ public class TestUnicodeCompressor extends TestCase2 {
         
     }
 
+    /** Note: You MUST be linked with the icu4j-charset.jar for SCSU support. */
+    public void test_SCSU_available() {
+        
+        Charset.forName("SCSU");
+        
+    }
+
+    /**
+     * {@link NoCompressor} encoding / decoding stress test.
+     */
+    public void test_None() {
+
+        doTest(new NoCompressor());
+
+    }
+
     /**
      * BOCU-1 encoding / decoding stress test.
      */
@@ -84,13 +100,22 @@ public class TestUnicodeCompressor extends TestCase2 {
 
     }
 
+    /**
+     * SCSU encoding / decoding stress test.
+     */
+    public void test_SCSU() {
+
+        doTest(new SCSUCompressor());
+
+    }
+
     private void doTest(final IUnicodeCompressor c) {
 
         final long begin = System.currentTimeMillis();
         
         final Random r = new Random();
 
-        final int ntrials = 10000;
+        final int ntrials = 100000;
 
         // The source data to be encoded.
         final StringBuilder sb = new StringBuilder();

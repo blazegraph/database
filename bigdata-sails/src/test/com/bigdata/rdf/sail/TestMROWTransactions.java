@@ -260,7 +260,7 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                                 writes.increment();
 //                                System.out.print('.');
                             }
-                            System.out.println("\n");
+//                            System.out.println("\n");
 
                         } finally {
                             origStore.commit();
