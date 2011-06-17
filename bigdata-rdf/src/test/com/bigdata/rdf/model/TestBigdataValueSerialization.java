@@ -16,6 +16,8 @@ import com.bigdata.io.SerializerUtil;
  * Test suite for {@link BigdataValueImpl} serialization semantics, including
  * the correct recovery of the {@link BigdataValueFactoryImpl} reference when
  * deserialized.
+ * 
+ * @see BigdataValueSerializer
  */
 public class TestBigdataValueSerialization extends TestCase2 {
 

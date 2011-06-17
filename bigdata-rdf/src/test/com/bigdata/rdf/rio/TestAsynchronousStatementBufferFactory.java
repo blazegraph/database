@@ -91,18 +91,18 @@ public class TestAsynchronousStatementBufferFactory extends
         super(name);
     }
 
-    final int chunkSize = 20000;
-    final int valuesInitialCapacity = 10000;
-    final int bnodesInitialCapacity = 16;
-    final long unbufferedStatementThreshold = 5000L;//Long.MAX_VALUE;
-    final long rejectedExecutionDelay = 250L; // milliseconds.
+    private static final int chunkSize = 20000;
+    private static final int valuesInitialCapacity = 10000;
+    private static final int bnodesInitialCapacity = 16;
+    private static final long unbufferedStatementThreshold = 5000L;//Long.MAX_VALUE;
+    private static final long rejectedExecutionDelay = 250L; // milliseconds.
     
     /**
      * SHOULD be <code>true</code> since the whole point of this is higher
      * concurrency. If you set this to <code>false</code> to explore some
      * issue, then change it back to <code>true</code> when you are done!
      */
-    final boolean parallel = true;
+    private static final boolean parallel = true;
     
     /**
      * Note: This is overridden to turn off features not supported by this
