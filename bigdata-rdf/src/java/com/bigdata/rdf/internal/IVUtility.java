@@ -36,7 +36,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
@@ -48,8 +47,6 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.NullOutputStream;
 import com.bigdata.io.compression.BOCU1Compressor;
-import com.bigdata.io.compression.NoCompressor;
-import com.bigdata.io.compression.SCSUCompressor;
 import com.bigdata.io.compression.UnicodeHelper;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
@@ -65,9 +62,15 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 /**
  * Helper class for {@link IV}s.
  */
+/*
+ * Note: There are a huge number of warnings in this class, all of which are
+ * related to related to IV type parameters. I've taken the liberty to suppress
+ * them all.
+ */
+@SuppressWarnings("unchecked")
 public class IVUtility {
 
-	private static final transient Logger log = Logger.getLogger(IVUtility.class);
+//	private static final transient Logger log = Logger.getLogger(IVUtility.class);
 	
 	/**
 	 * Helper instance for compression/decompression of Unicode string data.
