@@ -128,7 +128,9 @@ public class XSDIntegerIV<V extends BigdataLiteral> extends
         if (this == o)
             return true;
         if (o instanceof XSDIntegerIV<?>) {
+            // Note: I believe that equals() works just fine for BigInteger.
             return this.value.equals(((XSDIntegerIV<?>) o).value);
+//            return this.value.compareTo(((XSDIntegerIV<?>) o).value)==0;
         }
         return false;
     }
