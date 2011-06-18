@@ -2243,8 +2243,15 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		 */
 		final long commitTime = transactionManager.nextTimestamp();
 
-		// do the commit.
-		final long commitTime2 = commitNow(commitTime);
+        // do the commit.
+        final IRootBlockView lastRootBlock = _rootBlock;
+        final long commitTime2;
+        try {
+            commitTime2 = commitNow(commitTime);
+        } catch (Throwable t) {
+            throw new RuntimeException(t.getLocalizedMessage()
+                    + ": lastRootBlock=" + lastRootBlock, t);
+        }
 
 		if (commitTime2 == 0L) {
 

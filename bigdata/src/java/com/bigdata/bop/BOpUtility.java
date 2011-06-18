@@ -422,7 +422,7 @@ public class BOpUtility {
                     throw new DuplicateBOpIdException("duplicate id=" + id
                             + " for " + conflict + " and " + t);
             }
-            if (!distinct.add(t) && !(t instanceof IVariableOrConstant<?>)) {
+            if (!distinct.add(t) && !(t instanceof IValueExpression<?>)) {
                 /*
                  * BOp appears more than once. This is only allowed for
                  * constants and variables to reduce the likelihood of operator

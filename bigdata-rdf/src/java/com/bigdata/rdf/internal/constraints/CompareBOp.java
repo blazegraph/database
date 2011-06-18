@@ -41,6 +41,8 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -158,6 +160,9 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     	final BigdataValue val1 = left.getValue();
     	final BigdataValue val2 = right.getValue();
     	
+        if (val1 == null || val2 == null)
+        	throw new NotMaterializedException();
+        
     	try {
     	
     		// use the Sesame implementation directly
@@ -204,6 +209,18 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     	
     }
     
+    /**
+     * The CompareBOp can work with non-materialized terms in the case of
+     * inline numerical compare operations.  It is only when the bop encounters
+     * non-inlined numerics or needs to compare strings that it needs
+     * materialized terms.  
+     */
+    public Requirement getRequirement() {
+    	
+    	return INeedsMaterialization.Requirement.SOMETIMES;
+    	
+    }
+    
     private volatile transient Set<IVariable<IV>> terms;
     
     public Set<IVariable<IV>> getTermsToMaterialize() {
@@ -212,13 +229,12 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     		
     		terms = new LinkedHashSet<IVariable<IV>>();
     		
-    		final IValueExpression<? extends IV> left = get(0);
-    		if (left instanceof IVariable)
-    			terms.add((IVariable<IV>) left);
+    		for (BOp bop : args()) {
+    			
+    			if (bop instanceof IVariable)
+    				terms.add((IVariable<IV>) bop);
     		
-    		final IValueExpression<? extends IV> right = get(1);
-    		if (right instanceof IVariable)
-    			terms.add((IVariable<IV>) right);
+    		}
     		
     	}
     	

@@ -41,6 +41,7 @@ import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -183,6 +184,15 @@ public class DatatypeBOp extends IVValueExpression<IV>
         
         throw new SparqlTypeErrorException();
         
+    }
+    
+    /**
+     * The DatatypeBOp can evaluate against unmaterialized inline numerics.  
+     */
+    public Requirement getRequirement() {
+    	
+    	return INeedsMaterialization.Requirement.SOMETIMES;
+    	
     }
     
     private volatile transient Set<IVariable<IV>> terms;

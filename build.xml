@@ -176,6 +176,8 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
 	<target name="jar" depends="compile" description="Generates the jar (see also bundleJar).">
 		<jar destfile="${build.dir}/${version}.jar">
 			<fileset dir="${build.dir}/classes" excludes="test/**" />
+			<!-- Copy WAR resources for the embedded NanoSparqlServer -->
+			<fileset dir="." includes="bigdata-war/src/**"/>
 			<manifest>
 				<!--<attribute name="Main-Class" value="com/bigdata/rdf/rio/TestRioIntegration"/>-->
 			</manifest>

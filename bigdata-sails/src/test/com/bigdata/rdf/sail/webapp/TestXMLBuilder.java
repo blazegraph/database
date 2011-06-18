@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
+import java.io.StringWriter;
 
 import junit.framework.TestCase2;
 
@@ -61,7 +62,9 @@ public class TestXMLBuilder extends TestCase2 {
      */
     public void testXMLBuilder() throws IOException {
 
-        final XMLBuilder xml = new XMLBuilder();
+    	final StringWriter w = new StringWriter();
+    	
+        final XMLBuilder xml = new XMLBuilder(w);
         
         XMLBuilder.Node close = xml.root("data")
             .attr("id", "TheRoot")
@@ -79,7 +82,7 @@ public class TestXMLBuilder extends TestCase2 {
         assertTrue(close == null);
         
         if(log.isInfoEnabled())
-            log.info(xml.toString());
+            log.info(w.toString());
 
     }
 

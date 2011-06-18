@@ -21,15 +21,15 @@ import com.bigdata.counters.IHistoryEntry;
  */
 public class PivotTable {
 
-    protected static final Logger log = Logger.getLogger(PivotTable.class);
+    private static final Logger log = Logger.getLogger(PivotTable.class);
 
     /**
-     * The HistoryTable (converts counter heirarchy into regular table).
+     * The HistoryTable (converts counter hierarchy into regular table).
      */
     public final HistoryTable src;
 
     /**
-     * The selected counters (redundent reference to {@link HistoryTable#a}.
+     * The selected counters (redundant reference to {@link HistoryTable#a}.
      */
     public final ICounter[] a;
 

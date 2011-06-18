@@ -48,6 +48,8 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -177,6 +179,9 @@ final public class MathBOp extends IVValueExpression
         		
         		final BigdataValue val2 = right.getValue();
         		
+        		if (val1 == null || val2 == null)
+        			throw new NotMaterializedException();
+        		
         		if (!(val1 instanceof Literal) || !(val2 instanceof Literal)) {
         			throw new SparqlTypeErrorException();
         		}
@@ -273,6 +278,16 @@ final public class MathBOp extends IVValueExpression
 		
 	}
 
+    /**
+     * The MathBOp can work on inline numerics. It is only when the operands
+     * evaluate to non-inline numerics that this bop needs materialization.  
+     */
+    public Requirement getRequirement() {
+    	
+    	return INeedsMaterialization.Requirement.SOMETIMES;
+    	
+    }
+    
     private volatile transient Set<IVariable<IV>> terms;
     
     public Set<IVariable<IV>> getTermsToMaterialize() {
