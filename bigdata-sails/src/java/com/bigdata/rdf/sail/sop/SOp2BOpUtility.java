@@ -363,49 +363,10 @@ public class SOp2BOpUtility {
     
 		if (postConditionals.size() > 0) {
 			
-			final Set<IVariable<IV>> toMaterialize = 
-				new LinkedHashSet<IVariable<IV>>();
-			
-			for (IConstraint c : postConditionals) {
-				Rule2BOpUtility.gatherTermsToMaterialize(c, toMaterialize);
-			}
-			
-			final int right = idFactory.incrementAndGet();
-
-			if (toMaterialize.size() > 0) {
-				
-				left = Rule2BOpUtility.addMaterializationSteps(
-						db, queryEngine, left, right, 
-						toMaterialize, idFactory, queryHints);
-				
-		        if (log.isDebugEnabled()) {
-		      	    log.debug("added materialization steps:\n" + left);
-		        }
-		        
-			}
-			
-			boolean first = true;
-
-			for (IConstraint c : postConditionals) {
-				
-	    		final int condId = first ? right : idFactory.incrementAndGet();
-	            
-	    		final PipelineOp condOp = 
-	            	new ConditionalRoutingOp(new BOp[]{left},
-	                    NV.asMap(new NV[]{//
-	                        new NV(BOp.Annotations.BOP_ID,condId),
-	                        new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
-	                    }));
-
-	    		left = condOp;
-	            
-	            if (log.isDebugEnabled()) {
-	            	log.debug("adding post-conditional routing op: " + condOp);
-	            }
-	            
-	            first = false;
-	            
-		    }
+			left = addConditionals(
+					postConditionals, left, 
+					idFactory, db, queryEngine, queryHints
+					);  
 			
 		}
     	
@@ -632,50 +593,11 @@ public class SOp2BOpUtility {
 
 		if (preConditionals != null) { // @todo lift into CONDITION on SubqueryOp
 			
-			final Set<IVariable<IV>> toMaterialize = 
-				new LinkedHashSet<IVariable<IV>>();
-			
-			for (IConstraint c : preConditionals) {
-				Rule2BOpUtility.gatherTermsToMaterialize(c, toMaterialize);
-			}
-			
-			final int right = idFactory.incrementAndGet();
-
-			if (toMaterialize.size() > 0) {
+			left = addConditionals(
+					preConditionals, left, 
+					idFactory, db, queryEngine, queryHints
+					);  
 				
-				left = Rule2BOpUtility.addMaterializationSteps(
-						db, queryEngine, left, right, 
-						toMaterialize, idFactory, queryHints);
-				
-		        if (log.isDebugEnabled()) {
-		      	    log.debug("added materialization steps:\n" + left);
-		        }
-		        
-			}
-			
-			boolean first = true;
-			
-			for (IConstraint c : preConditionals) {
-				
-				final int condId = first ? right : idFactory.incrementAndGet();
-				
-		        final PipelineOp condOp = Rule2BOpUtility.applyQueryHints(
-		      	    new ConditionalRoutingOp(new BOp[]{left},
-		                NV.asMap(new NV[]{//
-		                    new NV(BOp.Annotations.BOP_ID,condId),
-		                    new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
-		                })), queryHints);
-		        
-		        left = condOp;
-		        
-		        if (log.isDebugEnabled()) {
-		      	    log.debug("adding conditional routing op: " + condOp);
-		        }
-		        
-	            first = false;
-	            
-			}
-			
 		}
 
 		if (hashJoins.size() > 0) {
@@ -735,6 +657,68 @@ public class SOp2BOpUtility {
     protected static final boolean isFreeTextSearch(final IPredicate pred) {
     	return pred.getAccessPathExpander() 
 			instanceof FreeTextSearchExpander;
+    }
+    
+    protected static final PipelineOp addConditionals(    		
+    		final Collection<IConstraint> constraints,
+    		final PipelineOp op,
+            final AtomicInteger idFactory, final AbstractTripleStore db,
+            final QueryEngine queryEngine, final Properties queryHints) {
+
+    	PipelineOp left = op;
+    	
+		final Map<IConstraint, Set<IVariable<IV>>> toMaterialize = 
+			new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
+		
+		for (IConstraint c : constraints) {
+			
+			final Set<IVariable<IV>> terms = 
+				new LinkedHashSet<IVariable<IV>>();
+			
+			Rule2BOpUtility.gatherTermsToMaterialize(c, terms);
+			
+			toMaterialize.put(c, terms);
+			
+		}
+		
+		final Set<IVariable<IV>> alreadyMaterialized = 
+			new LinkedHashSet<IVariable<IV>>();
+
+		for (Map.Entry<IConstraint, Set<IVariable<IV>>> e : 
+			toMaterialize.entrySet()) {
+			
+			final IConstraint c = e.getKey();
+			
+			final Set<IVariable<IV>> terms = e.getValue();
+			
+			// remove any terms already materialized
+			terms.removeAll(alreadyMaterialized);
+			
+			// add any new terms to the list of already materialized
+			alreadyMaterialized.addAll(terms);
+			
+			final int condId = idFactory.incrementAndGet();
+
+			// we might have already materialized everything we need
+			if (terms.size() > 0) {
+				
+				left = Rule2BOpUtility.addMaterializationSteps(
+						db, queryEngine, left, condId, c,
+						terms, idFactory, queryHints);
+			
+			}
+		
+			left = Rule2BOpUtility.applyQueryHints(
+              	    new ConditionalRoutingOp(new BOp[]{left},
+                        NV.asMap(new NV[]{//
+                            new NV(BOp.Annotations.BOP_ID, condId),
+                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
+                        })), queryHints);
+			
+		}
+		
+		return left;
+    	
     }
 
 	/**

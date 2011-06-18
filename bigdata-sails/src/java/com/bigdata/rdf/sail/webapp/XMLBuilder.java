@@ -1,9 +1,6 @@
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.StringWriter;
 import java.io.Writer;
 
 /**
@@ -23,7 +20,7 @@ import java.io.Writer;
  *    </div>
  *  </xml>
  *  
- *  XMLBuilder.Node closed = new XMLBuilder(false)
+ *  XMLBuilder.Node closed = new XMLBuilder(false,writer)
  *  	.root("xml")
  *  		.node("div")
  *  			.attr("attr", "attr1")
@@ -44,47 +41,67 @@ import java.io.Writer;
  */
 public class XMLBuilder {
     
+	private final boolean xml;
 	private final Writer m_writer;
 	
 //	private boolean m_pp = false;
 	
-	public XMLBuilder() throws IOException {
-		this(true, (OutputStream) null);
-	}
-	
-	public XMLBuilder(boolean xml) throws IOException {
-		this(xml, (OutputStream) null);
-	}
-	
-	public XMLBuilder(boolean xml, OutputStream outstr) throws IOException {
+//	public XMLBuilder() throws IOException {
+//
+//		this(true, (OutputStream) null);
+//		
+//	}
+//	
+//	public XMLBuilder(boolean xml) throws IOException {
+//
+//		this(xml, (OutputStream) null);
+//		
+//	}
+//	
+//	public XMLBuilder(final boolean xml, final OutputStream outstr)
+//			throws IOException {
+//
+//		this(xml, null/* encoding */, outstr);
+//		
+//	}
+//	
+//	public XMLBuilder(final boolean xml, final String encoding)
+//			throws IOException {
+//
+//	    this(xml, encoding, (OutputStream) null);
+//	    
+//	}
 
-	    if (outstr == null) {
-            m_writer = new StringWriter();
-        } else {
-            m_writer = new OutputStreamWriter(outstr);
-        }
+	public XMLBuilder(final Writer w) throws IOException {
+
+		this(true/* xml */, null/* encoding */, w/* writer */);
+		
+	}
+	
+	public XMLBuilder(final boolean xml, final String encoding,
+			final Writer w) throws IOException {
+
+		if(w == null)
+			throw new IllegalArgumentException();
+		
+		this.xml = xml;
+		
+		this.m_writer  = w;
 		
 		if (xml) {
-			m_writer.write("<?xml version=\"1.0\"?>");
-		}
-	}
-	
-	public XMLBuilder(boolean xml, String encoding) throws IOException {
-
-	    this(xml, encoding, (OutputStream) null);
-	    
-	}
-	
-	public XMLBuilder(boolean xml, String encoding, OutputStream outstr) throws IOException {
-        
-	    if (outstr == null) {
-            m_writer = new StringWriter();
-        } else {
-            m_writer = new OutputStreamWriter(outstr);
-        }
-		
-		if (xml) {
-			m_writer.write("<?xml version=\"1.0\" encoding=\"" + encoding + "\"?>");
+			if (encoding != null) {
+				m_writer.write("<?xml version=\"1.0\" encoding=\"" + encoding + "\"?>");
+			} else {
+				m_writer.write("<?xml version=\"1.0\"?>");
+			}
+		} else {
+			/*
+			 * Note: The optional encoding should also be included in a meta tag
+			 * for an HTML document.
+			 */
+			m_writer.write("<!DOCTYPE HTML PUBLIC");
+			m_writer.write(" \"-//W3C//DTD HTML 4.01 Transitional//EN\"");
+			m_writer.write(" \"http://www.w3.org/TR/html4/loose.dtd\">");
 		}
 		
 	}
@@ -96,9 +113,10 @@ public class XMLBuilder {
 //	private void initWriter(OutputStream outstr) {
 //	}
 
-	public String toString() {
-		return m_writer.toString();
-	}
+	// Note: This method assumed that m_writer was a StringWriter!!!
+//	public String toString() {
+//		return m_writer.toString();
+//	}
 	
 	public Node root(String name) throws IOException {
 		return new Node(name, null);
@@ -117,7 +135,7 @@ public class XMLBuilder {
 		}
 	}
 	
-	class Node {
+	public class Node {
 		boolean m_open = true;
 		String m_tag;
 		Node m_parent;
@@ -166,14 +184,39 @@ public class XMLBuilder {
 			
 			return tmp.close();
 		}
-		
+
+		/**
+		 * Close the open element.
+		 * 
+		 * @return The parent element.
+		 * @throws IOException
+		 */
 		public Node close() throws IOException {
+			return close(!xml);
+		}
+
+		/**
+		 * Close the open element.
+		 * 
+		 * @param simpleEnd
+		 *            When <code>true</code> an open tag without a body will be
+		 *            closed by a single &gt; symbol rather than the XML style
+		 *            &#47;&gt;.
+		 * 
+		 * @return The parent element.
+		 * @throws IOException
+		 */
+		public Node close(final boolean simpleEnd) throws IOException {
 			assert(m_open);
 			
 			if (emptyBody()) {
-				m_writer.write("/>");
+				if(simpleEnd) {
+					m_writer.write(">");
+				} else {
+					m_writer.write("/>");
+				}
 			} else {
-				m_writer.write("</" + m_tag + ">");
+				m_writer.write("</" + m_tag + "\n>");
 			}
 			
 			m_open = false;

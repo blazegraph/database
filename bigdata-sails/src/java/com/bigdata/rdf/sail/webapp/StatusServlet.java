@@ -1,8 +1,11 @@
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -11,13 +14,14 @@ import java.util.UUID;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.HTMLUtility;
+import com.bigdata.util.InnerCause;
 
 /**
  * A status page for the service.
@@ -35,40 +39,55 @@ public class StatusServlet extends BigdataRDFServlet {
 //    static private final transient Logger log = Logger
 //            .getLogger(StatusServlet.class);
 
-    /**
-     * <p>
-     * A status page. Options include:
-     * <dl>
-     * <dt>showQueries</dt>
-     * <dd>List SPARQL queries accepted by the SPARQL end point. The queries are
-     * listed in order of decreasing elapsed time.</dd>
-     * <dt>showRunningQueries</dt>
-     * <dd>List SPARQL queries accepted by the SPARQL end point which are
-     * currently executing on the {@link QueryEngine}. The queries are listed in
-     * order of decreasing elapsed time.</dd>
-     * <dt>showKBInfo</dt>
-     * <dd>Show some information about the {@link AbstractTripleStore} instance
-     * being served by this SPARQL end point.</dd>
-     * <dt>showNamespaces</dt>
-     * <dd>List the namespaces for the registered {@link AbstractTripleStore}s.</dd>
-     * </dl>
-     * </p>
-     * 
-     * @todo This status page combines information about the addressed KB and
-     *       the backing store. Those items should be split out onto different
-     *       status requests. One should be at a URI for the database. The other
-     *       should be at the URI of the SPARQL end point.
-     */
+	/**
+	 * <p>
+	 * A status page. Options include:
+	 * <dl>
+	 * <dt>showQueries</dt>
+	 * <dd>List SPARQL queries accepted by the SPARQL end point which are
+	 * currently executing on the {@link QueryEngine}. The queries are listed in
+	 * order of decreasing elapsed time. You can also specify
+	 * <code>showQueries=details</code> to get a detailed breakdown of the query
+	 * execution.</dd>
+	 * <dt>showKBInfo</dt>
+	 * <dd>Show some information about the {@link AbstractTripleStore} instance
+	 * being served by this SPARQL end point.</dd>
+	 * <dt>showNamespaces</dt>
+	 * <dd>List the namespaces for the registered {@link AbstractTripleStore}s.</dd>
+	 * </dl>
+	 * </p>
+	 * 
+	 * @todo This status page combines information about the addressed KB and
+	 *       the backing store. Those items should be split out onto different
+	 *       status requests. One should be at a URI for the database. The other
+	 *       should be at the URI of the SPARQL end point.
+	 */
     @Override
     protected void doGet(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        // SPARQL queries accepted by the SPARQL end point.
+        // IRunningQuery objects currently running on the query controller.
         final boolean showQueries = req.getParameter("showQueries") != null;
 
-        // IRunningQuery objects currently running on the query controller.
-        final boolean showRunningQueries = req
-                .getParameter("showRunningQueries") != null;
+		boolean showQueryDetails = false;
+		if (showQueries) {
+			for (String tmp : req.getParameterValues("showQueries")) {
+				if (tmp.equals("details"))
+					showQueryDetails = true;
+			}
+		}
+
+		/*
+		 * The maximum inline length of BOp#toString() visible on the page. The
+		 * entire thing is accessible via the title attribute (a flyover). Use
+		 * ZERO (0) to see everything.
+		 */
+		int maxBopLength = 64;
+		if (req.getParameter("maxBopLength") != null) {
+			maxBopLength = Integer.valueOf(req.getParameter("maxBopLength"));
+			if (maxBopLength < 0)
+				maxBopLength = 0;
+		}
 
         // Information about the KB (stats, properties).
         final boolean showKBInfo = req.getParameter("showKBInfo") != null;
@@ -76,9 +95,21 @@ public class StatusServlet extends BigdataRDFServlet {
         // bigdata namespaces known to the index manager.
         final boolean showNamespaces = req.getParameter("showNamespaces") != null;
 
-        final HTMLBuilder doc = new HTMLBuilder();
+        resp.setContentType(MIME_TEXT_HTML);
+        final Writer w = new OutputStreamWriter(resp.getOutputStream(), "UTF-8");
+        try {
+        
+        final HTMLBuilder doc = new HTMLBuilder("UTF-8", w);
 
-        XMLBuilder.Node current = doc.root("html").node("body");
+		XMLBuilder.Node current = doc.root("html");
+		{
+			current = current.node("head");
+			current.node("meta").attr("http-equiv", "Content-Type").attr(
+					"content", "text/html;charset=utf-8").close();
+			current.node("title").text("bigdata&#174;").close();
+			current = current.close();// close the head.
+		}
+		current = current.node("body");
 
         current.node("p", "Accepted query count="
                 + getBigdataRDFContext().getQueryIdFactory().get());
@@ -118,123 +149,146 @@ public class StatusServlet extends BigdataRDFServlet {
                             .getCounters().toString()));
 
         }
+        
+		if (!showQueries) {
+			// Nothing more to do.
+			return;
+		}
 
-        if (showQueries) {
+        // Marker timestamp used to report the age of queries.
+        final long now = System.nanoTime();
 
-            /*
-             * Show the queries which are currently executing (accepted by the
-             * NanoSparqlServer).
-             */
+		/*
+		 * Map providing a cross walk from the QueryEngine's
+		 * IRunningQuery.getQueryId() to NanoSparqlServer's
+		 * RunningQuery.queryId.
+		 */
+        final Map<UUID,RunningQuery> crosswalkMap = new LinkedHashMap<UUID, RunningQuery>();
 
-            final long now = System.nanoTime();
+		/*
+		 * Map providing the accepted RunningQuery objects in descending order
+		 * by their elapsed run time.
+		 */
+        final TreeMap<Long, RunningQuery> acceptedQueryAge = newQueryMap();
 
-            final TreeMap<Long, RunningQuery> ages = newQueryMap();
+        {
 
-            {
+            final Iterator<RunningQuery> itr = getBigdataRDFContext()
+                    .getQueries().values().iterator();
 
-                final Iterator<RunningQuery> itr = getBigdataRDFContext()
-                        .getQueries().values().iterator();
+            while (itr.hasNext()) {
 
-                while (itr.hasNext()) {
+                final RunningQuery query = itr.next();
 
-                    final RunningQuery query = itr.next();
+				crosswalkMap.put(query.queryId2, query);
 
-                    final long age = now - query.begin;
+				final long age = now - query.begin;
 
-                    ages.put(age, query);
+				acceptedQueryAge.put(age, query);
 
-                }
+			}
 
-            }
+		}
 
-            {
+		/*
+		 * Show the queries which are currently executing (actually running on
+		 * the QueryEngine).
+		 */
 
-                final Iterator<RunningQuery> itr = ages.values().iterator();
+		final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
+				.getQueryController(getIndexManager());
 
-                while (itr.hasNext()) {
+		final UUID[] queryIds = queryEngine.getRunningQueries();
 
-                    final RunningQuery query = (RunningQuery) itr.next();
+		// final long now = System.nanoTime();
 
-                    final long age = now - query.begin;
+		/*
+		 * Map providing the QueryEngine's IRunningQuery objects in order by
+		 * descending elapsed evaluation time.
+		 */
+		final TreeMap<Long, IRunningQuery> runningQueryAge = newQueryMap();
 
-                    current = current.node(
-                            "p",
-                            "age="
-                                    + java.util.concurrent.TimeUnit.NANOSECONDS
-                                            .toMillis(age) + "ms, queryId="
-                                    + query.queryId + "\n").node("p",
-                            HTMLUtility.escapeForXHTML(query.query) + "\n");
+		for (UUID queryId : queryIds) {
 
-                }
+			final IRunningQuery query;
+			try {
 
-            }
+				query = queryEngine.getRunningQuery(queryId);
 
-        }
+				if (query == null) {
 
-        if (showRunningQueries) {
+					// Already terminated.
+					continue;
 
-            /*
-             * Show the queries which are currently executing (actually running
-             * on the QueryEngine).
-             */
+				}
 
-            final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
-                    .getQueryController(getIndexManager());
+			} catch (RuntimeException e) {
 
-            final UUID[] queryIds = queryEngine.getRunningQueries();
+				if (InnerCause.isInnerCause(e, InterruptedException.class)) {
 
-            // final long now = System.nanoTime();
+					// Already terminated.
+					continue;
 
-            final TreeMap<Long, IRunningQuery> ages = newQueryMap();
+				}
 
-            for (UUID queryId : queryIds) {
+				throw new RuntimeException(e);
 
-                final IRunningQuery query = queryEngine
-                        .getRunningQuery(queryId);
+			}
 
-                if (query == null) {
-                    // Already terminated.
-                    continue;
-                }
+			runningQueryAge.put(query.getElapsed(), query);
 
-                ages.put(query.getElapsed(), query);
+		}
 
-            }
+		{
 
-            {
+			final Iterator<IRunningQuery> itr = runningQueryAge.values()
+					.iterator();
 
-                final Iterator<IRunningQuery> itr = ages.values().iterator();
+//			final StringWriter w = new StringWriter(Bytes.kilobyte32 * 8);
 
-                while (itr.hasNext()) {
+			while (itr.hasNext()) {
 
-                    final IRunningQuery query = itr.next();
+				final IRunningQuery query = itr.next();
 
-                    if (query.isDone() && query.getCause() != null) {
-                        // Already terminated (normal completion).
-                        continue;
-                    }
+				if (query.isDone() && query.getCause() != null) {
+					// Already terminated (normal completion).
+					continue;
+				}
 
-                    /*
-                     * @todo The runstate and stats could be formatted into an
-                     * HTML table ala QueryLog or RunState.
-                     */
-                    current = current.node("p",
-                            "age=" + query.getElapsed() + "ms").node("p",
-                            "queryId=" + query.getQueryId()).node("p",
-                            HTMLUtility.escapeForXHTML(query.toString())).node(
-                            "p",
-                            HTMLUtility.escapeForXHTML(BOpUtility
-                                    .toString(query.getQuery())));
+				// Lookup the NanoSparqlServer's RunningQuery object.
+				final RunningQuery acceptedQuery = crosswalkMap.get(query
+						.getQueryId());
 
-                }
+				final String queryStr = acceptedQuery == null ? "N/A"
+						: acceptedQuery.query;
 
-            }
+				// Format as a table, writing onto the response.
+				QueryLog.getTableXHTML(queryStr, query, w, !showQueryDetails,
+						maxBopLength);
 
-        }
+//				// Extract as String
+//				final String s = w.getBuffer().toString();
+//
+//				// Add into the HTML document.
+//				current.text(s);
+//
+//				// Clear the buffer.
+//				w.getBuffer().setLength(0);
+
+			} // next IRunningQuery.
+
+		}
 
         doc.closeAll(current);
+        
+        } finally {
+        	
+        	w.flush();
+        	w.close();
+        	
+        }
 
-        buildResponse(resp, HTTP_OK, MIME_TEXT_HTML, doc.toString());
+//        buildResponse(resp, HTTP_OK, MIME_TEXT_HTML, doc.toString());
 
     }
 

@@ -1481,7 +1481,7 @@ abstract public class WriteCacheService implements IWriteCache {
 					// A duplicate may also be indicative of an allocation
 					//	error, which we need to be pretty strict about!
 					if (old == cache) {
-						throw new AssertionError("Record already in cache: offset=" + offset);
+					    throw new AssertionError("Record already in cache: offset=" + offset+" "+addrDebugInfo(offset));
 					}
 
 					return true;
@@ -1535,7 +1535,7 @@ abstract public class WriteCacheService implements IWriteCache {
 						 */
 						if (recordMap.put(offset, cache) != null) {
 							// The record should not already be in the cache.
-							throw new AssertionError("Record already in cache: offset=" + offset);
+							throw new AssertionError("Record already in cache: offset=" + offset+" "+addrDebugInfo(offset));
 						}
 
 						return true;
@@ -1613,7 +1613,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
 							// This must be the only occurrence of this record.
 							if (recordMap.put(offset, cache) != null) {
-								throw new AssertionError("Record already in cache: offset=" + offset);
+								throw new AssertionError("Record already in cache: offset=" + offset+" "+addrDebugInfo(offset));
 							}
 
 							return true;
@@ -2037,7 +2037,13 @@ abstract public class WriteCacheService implements IWriteCache {
 				}
 			}
 		}
-		
+        /*
+         * Note: I've added in the write cache service counters here for
+         * information about the maximum #of buffers from the pool which have
+         * been in use, #of flushes, etc.
+         */
+		ret.append(":");
+		ret.append(getCounters().toString());
 		return ret.toString();
 	}
 
@@ -2117,7 +2123,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
 			root.addCounter("maxDirty", new Instrument<Integer>() {
 				public void sample() {
-					setValue(ndirty);
+					setValue(maxdirty);
 				}
 			});
 

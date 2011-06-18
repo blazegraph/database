@@ -246,7 +246,8 @@ public class NanoSparqlClient {
 			// Fully formed and encoded URL @todo use */* for ASK.
 			final String urlString = opts.serviceURL
 					+ "?query="
-					+ URLEncoder.encode(opts.queryStr, "UTF-8")
+					+ URLEncoder.encode(opts.queryStr, "UTF-8")//
+					+ (opts.explain?"&explain=":"")//
 					+ (opts.defaultGraphUri == null ? ""
 							: ("&default-graph-uri=" + URLEncoder.encode(
 									opts.defaultGraphUri, "UTF-8")));
@@ -324,7 +325,7 @@ public class NanoSparqlClient {
 					log.debug("Status Line: " + conn.getResponseMessage());
 				}
 
-				if (opts.showResults) {
+				if(opts.explain || opts.showResults) {
 
 					// Write the response body onto stdout.
 					showResults(conn);
@@ -756,6 +757,8 @@ public class NanoSparqlClient {
 		public String baseURI;
 		/** The default graph URI (optional). */
 		public String defaultGraphUri = null;
+		/** When true, request an explanation for the query. */
+		public boolean explain = false;
 		/** The connection timeout (ms). */
 		public int timeout = DEFAULT_TIMEOUT;
 		/**
@@ -1290,6 +1293,10 @@ public class NanoSparqlClient {
 				} else if (arg.equals("-showQuery")) {
 
 					opts.showQuery = true;
+
+				} else if (arg.equals("-explain")) {
+
+					opts.explain = true;
 
 				} else if (arg.equals("-showParseTree")) {
 

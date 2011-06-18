@@ -1258,6 +1258,11 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 	 * 
 	 * @return The {@link AbstractRunningQuery} -or- <code>null</code> if there
 	 *         is no query associated with that query identifier.
+	 *         
+	 * @throws InterruptedException
+	 *             if the query halted normally.
+	 * @throws RuntimeException
+	 *             if the query halted with an error.
 	 */
     public /*protected*/ AbstractRunningQuery getRunningQuery(final UUID queryId) {
 
@@ -1452,5 +1457,89 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 		return runningQueries.keySet().toArray(new UUID[0]);
 
 	}
-	
+
+//	synchronized public void addListener(final IQueryEngineListener listener) {
+//
+//		if (m_listeners == null) {
+//
+//			m_listeners = new Vector<IQueryEngineListener>();
+//
+//			m_listeners.add(listener);
+//
+//		} else {
+//
+//			if (m_listeners.contains(listener)) {
+//
+//				throw new IllegalStateException("Already registered: listener="
+//						+ listener);
+//
+//			}
+//
+//			m_listeners.add(listener);
+//
+//		}
+//
+//	}
+//
+//    synchronized public void removeListener(IQueryEngineListener listener) {
+//
+//        if( m_listeners == null ) {
+//            
+//            throw new IllegalStateException
+//                ( "Not registered: listener="+listener
+//                  );
+//            
+//        }
+//        
+//        if( ! m_listeners.remove( listener ) ) {
+//            
+//            throw new IllegalStateException
+//                ( "Not registered: listener="+listener
+//                  );
+//            
+//        }
+//        
+//        if(m_listeners.isEmpty()) {
+//
+//			/*
+//			 * Note: We can test whether or not listeners need to be notified
+//			 * simply by testing m_listeners != null.
+//			 */
+//            
+//            m_listeners = null;
+//            
+//        }
+//
+//    }
+//
+//    // TODO Must deliver events in another thread!
+//    // TODO Must drop and drop any errors.
+//    // TODO Optimize with CopyOnWriteArray
+//    // Note: Security hole if we allow notification for queries w/o queryId.
+//	protected void fireQueryEndedEvent(final IRunningQuery query) {
+//		
+//		if (m_listeners == null)
+//			return;
+//
+//		final IQueryEngineListener[] listeners = (IQueryEngineListener[]) m_listeners
+//				.toArray(new IQueryEngineListener[] {});
+//
+//		for (int i = 0; i < listeners.length; i++) {
+//
+//			final IQueryEngineListener l = listeners[i];
+//
+//			l.queryEnded(query);
+//
+//		}
+//		
+//    }
+//    
+//    private Vector<IQueryEngineListener> m_listeners;
+//
+//    public interface IQueryEngineListener {
+//
+//    	void queryEnded(final IRunningQuery q);
+//    	
+//    }
+
 }

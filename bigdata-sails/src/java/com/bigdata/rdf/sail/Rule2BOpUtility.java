@@ -33,9 +33,11 @@ import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -54,6 +56,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
@@ -78,12 +81,16 @@ import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.rdf.join.InlineMaterializeOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.IsInlineBOp;
 import com.bigdata.rdf.internal.constraints.IsMaterializedBOp;
+import com.bigdata.rdf.internal.constraints.NeedsMaterializationBOp;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
+import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
 import com.bigdata.rdf.lexicon.LexPredicate;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ISPO;
@@ -685,11 +692,9 @@ public class Rule2BOpUtility {
          * add a materialization step in between the join and the constraint
          * evaluation.
          */
-        final Collection<IConstraint> conditionals = 
-        	new LinkedList<IConstraint>();
+        final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = 
+        	new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
         
-		final Set<IVariable<IV>> terms = new LinkedHashSet<IVariable<IV>>();
-		
         if (constraints != null && !constraints.isEmpty()) {
 //			// decorate the predicate with any constraints.
 //			pred = (Predicate<?>) pred.setProperty(
@@ -700,6 +705,9 @@ public class Rule2BOpUtility {
     		final Collection<IConstraint> tmp = new LinkedList<IConstraint>();
     		tmp.addAll(constraints);
     		
+    		final Collection<IConstraint> tryBeforeMaterialization = 
+    			new LinkedList<IConstraint>();
+    		
 			final Iterator<IConstraint> it = tmp.iterator();
 			
 			while (it.hasNext()) {
@@ -708,16 +716,37 @@ public class Rule2BOpUtility {
 				
 				// if this constraint needs materialized variables, remove it
 				// from the join and run it as a ConditionalRoutingOp later
-				if (gatherTermsToMaterialize(c, terms)) {
+				
+				final Set<IVariable<IV>> terms = 
+					new LinkedHashSet<IVariable<IV>>();
+				
+				final Requirement req = gatherTermsToMaterialize(c, terms); 
+				
+				if (req != Requirement.NEVER) {
 					
 					it.remove();
+
+					if (req == Requirement.SOMETIMES) {
+						
+						tryBeforeMaterialization.add(c);
+						
+					}
 					
-					conditionals.add(c);
+					needsMaterialization.put(c, terms);
 					
 				}
 
 			}
 
+			for (IConstraint c : tryBeforeMaterialization) {
+				
+				// need to make a clone so that BOpUtility doesn't complain
+				c = (IConstraint) c.clone();
+				
+				tmp.add(new TryBeforeMaterializationConstraint(c));
+				
+			}
+			
 			// add constraints to the join for that predicate.
 			anns.add(new NV(
 					PipelineJoin.Annotations.CONSTRAINTS,
@@ -801,27 +830,40 @@ public class Rule2BOpUtility {
 
         }
         
-		if (conditionals.size() > 0) {
-			
-			final int right = idFactory.incrementAndGet();
-			
-			left = addMaterializationSteps(db, queryEngine, left, right, 
-					terms, idFactory, queryHints);
-			
-			boolean first = true;
-			
-			for (IConstraint c : conditionals) {
+		if (needsMaterialization.size() > 0) {
 
-				final int condId = first ? right : idFactory.incrementAndGet();
+			final Set<IVariable<IV>> alreadyMaterialized = 
+				new LinkedHashSet<IVariable<IV>>();
+			
+			for (Map.Entry<IConstraint, Set<IVariable<IV>>> e : 
+				needsMaterialization.entrySet()) {
 				
+				final IConstraint c = e.getKey();
+				
+				final Set<IVariable<IV>> terms = e.getValue();
+				
+				// remove any terms already materialized
+				terms.removeAll(alreadyMaterialized);
+				
+				// add any new terms to the list of already materialized
+				alreadyMaterialized.addAll(terms);
+				
+				final int condId = idFactory.incrementAndGet();
+
+				// we might have already materialized everything we need
+				if (terms.size() > 0) {
+					
+					left = addMaterializationSteps(db, queryEngine, left, 
+							condId, c, terms, idFactory, queryHints);
+				
+				}
+			
 				left = Rule2BOpUtility.applyQueryHints(
 	              	    new ConditionalRoutingOp(new BOp[]{left},
 	                        NV.asMap(new NV[]{//
 	                            new NV(BOp.Annotations.BOP_ID, condId),
 	                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
 	                        })), queryHints);
-				
-				first = false;
 				
 			}
 			
@@ -835,9 +877,10 @@ public class Rule2BOpUtility {
      * Use the {@link INeedsMaterialization} interface to find and collect
      * variables that need to be materialized for this constraint.
      */
-    public static boolean requiresMaterialization(final IConstraint c) { 
+    public static boolean requiresMaterialization(
+    		final IConstraint c) { 
 
-    	return gatherTermsToMaterialize(c, new HashSet<IVariable<IV>>());
+    	return gatherTermsToMaterialize(c, new HashSet<IVariable<IV>>()) != Requirement.NEVER;
     	
     }
  
@@ -845,10 +888,11 @@ public class Rule2BOpUtility {
      * Use the {@link INeedsMaterialization} interface to find and collect
      * variables that need to be materialized for this constraint.
      */
-    public static boolean gatherTermsToMaterialize(final IConstraint c, 
-    		final Set<IVariable<IV>> terms) {
+    public static INeedsMaterialization.Requirement gatherTermsToMaterialize(
+    		final IConstraint c, final Set<IVariable<IV>> terms) {
 
     	boolean materialize = false;
+    	boolean always = false;
     	
 		final Iterator<BOp> it = BOpUtility.preOrderIterator(c);
 		
@@ -862,8 +906,9 @@ public class Rule2BOpUtility {
 			
 			if (bop instanceof INeedsMaterialization) {
 				
-				final Set<IVariable<IV>> t = 
-					((INeedsMaterialization) bop).getTermsToMaterialize();
+				final INeedsMaterialization bop2 = (INeedsMaterialization) bop;
+				
+				final Set<IVariable<IV>> t = bop2.getTermsToMaterialize();
 				
 				if (t.size() > 0) {
 					
@@ -871,13 +916,23 @@ public class Rule2BOpUtility {
 					
 					materialize = true;
 					
+					// if any bops have terms that always needs materialization
+					// then mark the whole constraint as such
+					if (bop2.getRequirement() == Requirement.ALWAYS) {
+						
+						always = true;
+						
+					}
+					
 				}
 				
 			}
 			
 		}
 		
-		return materialize;
+		return materialize ?
+				(always ? Requirement.ALWAYS : Requirement.SOMETIMES) :
+					Requirement.NEVER;
     	
     }
  
@@ -909,6 +964,10 @@ public class Rule2BOpUtility {
      * @param right
      * 			the right (downstream) operator that immediately follows the
      * 			materialization steps
+     * @param c
+     * 			the constraint to run on the IsMaterialized op to see if the
+     * 			materialization pipeline can be bypassed (bypass if true and
+     * 			no {@link NotMaterializedException} is thrown).
      * @param varsToMaterialize
      * 			the terms to materialize
      * @param idFactory
@@ -921,9 +980,31 @@ public class Rule2BOpUtility {
     public static PipelineOp addMaterializationSteps(
     		final AbstractTripleStore db,
     		final QueryEngine queryEngine, PipelineOp left, final int right,
+    		final IConstraint c,
     		final Collection<IVariable<IV>> varsToMaterialize,
     		final AtomicInteger idFactory, final Properties queryHints) {
 
+		/*
+		 * If the constraint "c" can run without a NotMaterializedException then
+		 * bypass the pipeline
+		 */
+    	{
+    		
+			final IValueExpression ve = (IValueExpression) c.get(0);
+    		
+    		final IConstraint c2 = 
+    			new SPARQLConstraint(new NeedsMaterializationBOp(ve));
+    		
+    		left = Rule2BOpUtility.applyQueryHints(
+              	    new ConditionalRoutingOp(new BOp[]{left},
+                        NV.asMap(new NV[]{//
+                            new NV(BOp.Annotations.BOP_ID, idFactory.incrementAndGet()),
+                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c2),
+                            new NV(PipelineOp.Annotations.ALT_SINK_REF, right),
+                        })), queryHints);
+    		
+    	}
+    	
     	final Iterator<IVariable<IV>> it = varsToMaterialize.iterator();
     	
     	int firstId = idFactory.incrementAndGet();

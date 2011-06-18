@@ -40,6 +40,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 
 public class RegexBOp extends XSDBooleanIVValueExpression 
 		implements INeedsMaterialization {
@@ -94,7 +95,14 @@ public class RegexBOp extends XSDBooleanIVValueExpression
         super(op);
     }
     
-    
+    /**
+     * This bop can only work with materialized terms.  
+     */
+    public Requirement getRequirement() {
+    	
+    	return INeedsMaterialization.Requirement.ALWAYS;
+    	
+    }
     
     private volatile transient Set<IVariable<IV>> terms;
     

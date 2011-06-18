@@ -37,6 +37,38 @@ import com.bigdata.rdf.internal.IV;
  */
 public interface INeedsMaterialization {
 
-	Set<IVariable<IV>> getTermsToMaterialize();
+	public enum Requirement {
+		
+		/**
+		 * Always needs materialization.
+		 */
+		ALWAYS,
+		
+		/**
+		 * Only needs materialization if inline evaluation fails.
+		 */
+		SOMETIMES,
+		
+		/**
+		 * Never needs materialization.
+		 */
+		NEVER
+	};
+	
+	/**
+	 * Does the bop always need materialized variables, or can it sometimes
+	 * operate on inline terms without materialization?  If sometimes, we'll
+	 * run it before the materialization pipeline steps in an effort to avoid
+	 * unnecessary materialization overhead. If it fails to evaluate for a 
+	 * particular solution, then it will be run again after the materialization
+	 * steps for that solution.
+	 */
+	Requirement getRequirement(); 
 
+	/**
+	 * Provide a set of terms that need to be materialized before the bop can
+	 * evaluate.
+	 */
+	Set<IVariable<IV>> getTermsToMaterialize();
+	
 }

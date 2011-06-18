@@ -37,7 +37,9 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.XSDBooleanIV;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -127,6 +129,9 @@ public class EBVBOp extends XSDBooleanIVValueExpression
     	
     	final BigdataValue val = iv.getValue();
     	
+    	if (val == null)
+    		throw new NotMaterializedException();
+    	
     	try {
     		
     		return QueryEvaluationUtil.getEffectiveBooleanValue(val);
@@ -136,6 +141,16 @@ public class EBVBOp extends XSDBooleanIVValueExpression
     		throw new SparqlTypeErrorException();
     		
     	}
+    	
+    }
+    
+    /**
+     * The EBVBOp only needs materialization if its internal value expression
+     * does not evaluate to an XSDBooleanIV.  
+     */
+    public Requirement getRequirement() {
+    	
+    	return INeedsMaterialization.Requirement.SOMETIMES;
     	
     }
     

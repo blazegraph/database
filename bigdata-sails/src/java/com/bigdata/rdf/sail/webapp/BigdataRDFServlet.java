@@ -32,6 +32,7 @@ import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 
 import javax.servlet.Servlet;
 import javax.servlet.http.HttpServletRequest;
@@ -267,12 +268,14 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
     protected void reportModifiedCount(final HttpServletResponse resp,
             final long nmodified, final long elapsed) throws IOException {
 
-        final XMLBuilder t = new XMLBuilder();
+    	final StringWriter w = new StringWriter();
+    	
+        final XMLBuilder t = new XMLBuilder(w);
 
         t.root("data").attr("modified", nmodified)
                 .attr("milliseconds", elapsed).close();
 
-        buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, t.toString());
+        buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
 
     }
 

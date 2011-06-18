@@ -41,6 +41,7 @@ import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -153,6 +154,15 @@ public class LangBOp extends IVValueExpression<IV>
         
         throw new SparqlTypeErrorException();
         
+    }
+    
+    /**
+     * This bop can only work with materialized terms.  
+     */
+    public Requirement getRequirement() {
+    	
+    	return INeedsMaterialization.Requirement.ALWAYS;
+    	
     }
     
     private volatile transient Set<IVariable<IV>> terms;

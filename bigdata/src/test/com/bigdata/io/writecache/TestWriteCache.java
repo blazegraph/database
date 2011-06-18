@@ -928,31 +928,33 @@ public class TestWriteCache extends TestCase3 {
 		    	int chk2 = ChecksumUtility.threadChk.get().checksum(data2, 0/* offset */, data2.limit());
 		    	WriteCache cache1 = new WriteCache.FileChannelScatteredWriteCache(buf, true, true,
 		    			false, opener, null);   	
-		    	WriteCache cache2 = new WriteCache.FileChannelScatteredWriteCache(buf2, true, true,
+		    	WriteCache cache2 = new WriteCache.FileChannelScatteredWriteCache(buf, true, true,
 		    			false, opener, null);
 		    	
 		    	// write first data buffer
 		    	cache1.write(addr1, data1, chk1);
 		    	data1.flip();
-		    	buf2.buffer().limit(buf.buffer().position());
-		    	buf2.buffer().position(0);
+		    	syncBuffers(buf, buf2);
 		    	cache2.resetRecordMapFromBuffer();
+		    	
 		       	assertEquals(cache1.read(addr1), data1);
 		       	assertEquals(cache2.read(addr1), data1);
 		    	
 		    	// now simulate removal/delete
 		    	cache1.clearAddrMap(addr1);
-		    	buf2.buffer().limit(buf.buffer().position());
-		    	buf2.buffer().position(0);
+		    	
+		    	syncBuffers(buf, buf2);
+
 		    	cache2.resetRecordMapFromBuffer();
-		    	assertTrue(cache2.read(addr1) == null);
+		    	
 		    	assertTrue(cache1.read(addr1) == null);
+		    	assertTrue(cache2.read(addr1) == null);
 		    	
 		    	// now write second data buffer
 		    	cache1.write(addr1, data2, chk2);
 		    	data2.flip();
-		    	buf2.buffer().limit(buf.buffer().position());
-		    	buf2.buffer().position(0);
+		    	// buf2.buffer().limit(buf.buffer().position());
+		    	syncBuffers(buf, buf2);
 		    	cache2.resetRecordMapFromBuffer();
 		    	assertEquals(cache2.read(addr1), data2);
 		    	assertEquals(cache1.read(addr1), data2);
@@ -963,6 +965,23 @@ public class TestWriteCache extends TestCase3 {
         } finally {
             opener.destroy();
         }
+    }
+    
+    // ensure dst buffer is copy of src
+    private void syncBuffers(final IBufferAccess src, final IBufferAccess dst) {
+    	final ByteBuffer sb = src.buffer();
+    	final ByteBuffer db = dst.buffer();
+    	int sp = sb.position();
+    	int sl = sb.limit();
+    	sb.position(0);
+    	db.position(0);
+    	sb.limit(sp);
+    	db.limit(sp);
+    	db.put(sb);
+    	sb.position(sp);
+    	db.position(sp);
+    	sb.limit(sl);
+    	db.limit(sl);   	
     }
 
     /*

@@ -29,27 +29,28 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 
 /**
- * Always evaluates to false.
+ * Always throws a SparqlTypeError.
  */
-public class FalseBOp extends XSDBooleanIVValueExpression {
+public class SparqlTypeErrorBOp extends XSDBooleanIVValueExpression {
 
 	/**
 	 * 
 	 */
-	private static final long serialVersionUID = 1531344906063447800L;
+	private static final long serialVersionUID = 2699085294332649839L;
+	
+	public static final SparqlTypeErrorBOp INSTANCE = new SparqlTypeErrorBOp();
 
-	public static final FalseBOp INSTANCE = new FalseBOp();
-
-	private FalseBOp() {
+	private SparqlTypeErrorBOp() {
 		
 		this(NOARGS, NOANNS);
 		
 	}
 	
-	public FalseBOp(final IValueExpression<? extends IV> x) {
+	public SparqlTypeErrorBOp(final IValueExpression<? extends IV> x) {
 		
 		this(new BOp[] { x }, NOANNS);
 		
@@ -58,7 +59,7 @@ public class FalseBOp extends XSDBooleanIVValueExpression {
     /**
      * Required shallow copy constructor.
      */
-    public FalseBOp(final BOp[] args, final Map<String, Object> anns) {
+    public SparqlTypeErrorBOp(final BOp[] args, final Map<String, Object> anns) {
     	
         super(args, anns);
         
@@ -67,13 +68,13 @@ public class FalseBOp extends XSDBooleanIVValueExpression {
     /**
      * Required deep copy constructor.
      */
-    public FalseBOp(final FalseBOp op) {
+    public SparqlTypeErrorBOp(final SparqlTypeErrorBOp op) {
         super(op);
     }
 
     public boolean accept(final IBindingSet bs) {
 
-    	return false;
+    	throw new SparqlTypeErrorException();
 
     }
     

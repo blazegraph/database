@@ -78,7 +78,7 @@ public class HTMLUtility {
      * </p>
      */
 
-    public static String escapeForXHTML(String s) {
+    public static String escapeForXHTML(final String s) {
 
         if( s == null ) {
             
@@ -86,16 +86,16 @@ public class HTMLUtility {
             
         }
         
-        int len = s.length();
+        final int len = s.length();
 
         if (len == 0)
             return s;
 
-        StringBuffer sb = new StringBuffer(len + 20);
+        final StringBuffer sb = new StringBuffer(len + 20);
 
         for (int i = 0; i < len; i++) {
 
-            char ch = s.charAt(i);
+            final char ch = s.charAt(i);
 
             switch (ch) {
 
@@ -105,6 +105,10 @@ public class HTMLUtility {
 
             case '\'':
                 sb.append("&#39;");
+                break;
+
+            case '/':
+                sb.append("&#47;");
                 break;
 
             case '&':

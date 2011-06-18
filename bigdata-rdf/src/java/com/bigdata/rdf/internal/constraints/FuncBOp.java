@@ -45,6 +45,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
@@ -170,6 +171,15 @@ public class FuncBOp extends IVValueExpression<IV>
 	    	
 	    }
         
+    }
+    
+    /**
+     * This bop can only work with materialized terms.  
+     */
+    public Requirement getRequirement() {
+    	
+    	return INeedsMaterialization.Requirement.ALWAYS;
+    	
     }
     
     private volatile transient Set<IVariable<IV>> terms;
