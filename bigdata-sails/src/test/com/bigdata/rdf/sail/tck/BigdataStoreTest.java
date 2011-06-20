@@ -220,19 +220,19 @@ public class BigdataStoreTest extends RDFStoreTest {
         super.testQueryBindings();
     }
 
-	/**
-	 * FIXME This one is failing because we cannot handle literals longer than
-	 * 65535 characters. This is a known issue.
-	 * 
-	 * @see https://sourceforge.net/apps/trac/bigdata/ticket/109
-	 */
-    @Override
-    public void testReallyLongLiteralRoundTrip()
-        throws Exception
-    {
-        log.warn("FIXME");
-        super.testReallyLongLiteralRoundTrip();
-    }
+//	/**
+//	 * FIXME This one is failing because we cannot handle literals longer than
+//	 * 65535 characters. This is a known issue.
+//	 * 
+//	 * @see https://sourceforge.net/apps/trac/bigdata/ticket/109
+//	 */
+//    @Override
+//    public void testReallyLongLiteralRoundTrip()
+//        throws Exception
+//    {
+//        log.warn("FIXME");
+//        super.testReallyLongLiteralRoundTrip();
+//    }
 
 	/**
 	 * Bigdata uses snapshot isolation for transactions while openrdf assumes
