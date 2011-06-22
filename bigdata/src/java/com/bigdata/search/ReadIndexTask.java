@@ -208,15 +208,16 @@ public class ReadIndexTask<V extends Comparable<V>> implements Callable<Object> 
              */
 //            final ITermMetadata md = recordBuilder.decodeValue(tuple);
 
-            final int termFreq = rec.termFreq();
-            
             final double termWeight = rec.getLocalTermWeight();
             
-            if (log.isDebugEnabled())
-                log.debug("hit: term=" + queryTerm + ", docId=" + docId
-                        + ", termFreq=" + termFreq + ", termWeight="
-                        + termWeight + ", product="
-                        + (queryTermWeight * termWeight));
+            // Note: Log test shows up in profiler.
+//            if (log.isDebugEnabled()) {
+//            final int termFreq = rec.termFreq();
+//                log.debug("hit: term=" + queryTerm + ", docId=" + docId
+//                        + ", termFreq=" + termFreq + ", termWeight="
+//                        + termWeight + ", product="
+//                        + (queryTermWeight * termWeight));
+//        }
             
             /*
              * Play a little magic to get the docId in the hit set without race
