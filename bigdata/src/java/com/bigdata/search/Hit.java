@@ -79,12 +79,12 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
 
         }
 
-        if(log.isDebugEnabled()) {
-        
-            log.debug("docId=" + docId + ", term: " + term + ", nterms="
-                    + nterms + ", weight=" + weight + ", cosine=" + cosine);
-            
-        }
+//        if(log.isDebugEnabled()) {
+//        
+//            log.debug("docId=" + docId + ", term: " + term + ", nterms="
+//                    + nterms + ", weight=" + weight + ", cosine=" + cosine);
+//            
+//        }
 
     }
 

@@ -1100,10 +1100,11 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	        while (it.hasNext()) {
 	        	
 	        	final Hit<V> hit = it.next().getValue();
-	        	
-		        if (log.isInfoEnabled()) {
-		        	log.info("hit terms: " + hit.getTermCount());
-		        }
+
+	        	// Note: log test in loop shows up in profiler.
+//		        if (log.isInfoEnabled()) {
+//		        	log.info("hit terms: " + hit.getTermCount());
+//		        }
 		        
 	        	if (hit.getTermCount() != nterms) {
 	        		it.remove();
