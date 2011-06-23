@@ -227,9 +227,9 @@ public class InsertServlet extends BigdataRDFServlet {
 
 		if (uris.length == 0) {
 
-            reportModifiedCount(resp, 0L/* nmodified */, System
-                    .currentTimeMillis()
-                    - begin);
+            final long elapsed = System.currentTimeMillis() - begin;
+            
+            reportModifiedCount(resp, 0L/* nmodified */, elapsed);
 
         	return;
         	
@@ -346,7 +346,7 @@ public class InsertServlet extends BigdataRDFServlet {
                 // Commit the mutation.
                 conn.commit();
                 
-                final long elapsed = System.currentTimeMillis();
+                final long elapsed = System.currentTimeMillis() - begin;
 
                 reportModifiedCount(resp, nmodified.get(), elapsed);
 

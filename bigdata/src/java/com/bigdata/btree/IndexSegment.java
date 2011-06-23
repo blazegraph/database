@@ -441,11 +441,11 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
         
     }
 
-    final public boolean isReadOnly() {
-        
-        return true;
-        
-    }
+//    final public boolean isReadOnly() {
+//        
+//        return true;
+//        
+//    }
     
     /**
      * The value of the {@link IndexSegmentCheckpoint#commitTime} field.

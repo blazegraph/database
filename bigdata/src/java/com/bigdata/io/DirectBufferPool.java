@@ -69,12 +69,15 @@ public class DirectBufferPool {
      *         Thompson</a>
      */
     private class BufferState implements IBufferAccess {
-     
+
         /**
-         * The buffer instance. This is guarded by the monitor of the
-         * {@link BufferState} object.
+         * The buffer instance. This is guarded by the monitor of the buffer
+         * state object (changes to this field are made while holding the
+         * monitor of the {@link BufferState} object).  However, the field is
+         * marked as <code>volatile</code> so we can peek at it without holding
+         * the monitor's lock, e.g., in {@link #toString()}
          */
-        private ByteBuffer buf;
+        private volatile ByteBuffer buf;
 
         /**
          * The stack trace where the {@link ByteBuffer} was acquired IFF DEBUG
@@ -117,7 +120,9 @@ public class DirectBufferPool {
          * operation is evaluated!
          */
         public int hashCode() {
+
             return super.hashCode();
+            
         }
 
         /**
@@ -146,6 +151,13 @@ public class DirectBufferPool {
             return false;
         }
 
+        public String toString() {
+            final ByteBuffer tmp = this.buf;
+            return super.toString() + "{buf"
+                    + (tmp == null ? "N/A" : "buf.capacity=" + buf.capacity())
+                    + "}";
+        }
+        
         // Implement IDirectBuffer methods
         public ByteBuffer buffer() {
             synchronized (this) {
@@ -159,9 +171,21 @@ public class DirectBufferPool {
 			release(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
 		}
 
-        public void release(long timeout, TimeUnit units)
+        public void release(final long timeout, final TimeUnit units)
                 throws InterruptedException {
 
+            /*
+             * Note: There is a data race between finalizers whose call graphs
+             * wind up requesting the release of the buffer. This occurs when a
+             * buffer user, such as a Journal, is being finalized. At that time,
+             * the IBufferAccess object will also be finalizable. Java does not
+             * define the ordering of those finalizer invocations so either the
+             * Journal may release() the IBufferState explicitly first or the
+             * IBufferState#finalized() method may run first. In either case we
+             * go through a synchronized(this) block, return immediately if the
+             * [buf] reference has already been cleared and otherwise return the
+             * buffer to the pool and clear the [buf] reference to null.
+             */
             synchronized (this) {
                 if (buf == null) {
                     if(releasedByFinalizer) {
@@ -182,7 +206,7 @@ public class DirectBufferPool {
                         log.error("Double release: DoubleReleaseStack",
                                 new RuntimeException("DoubleReleaseStack"));
                     }
-                    throw new IllegalStateException();
+                    return;
                 }
                 DirectBufferPool.this.release(buf, timeout, units);
                 buf = null;
@@ -192,9 +216,9 @@ public class DirectBufferPool {
                      */
                     releaseStack = new RuntimeException("ReleaseTrace");
                 }
-            }
+            } // synchronized(this)
             
-		}
+		}// release(timeout,unit)
 
         /*
          * Note: It is apparent that the JVM can order things such that the
@@ -233,7 +257,7 @@ public class DirectBufferPool {
 		    final int nacquired;
 		    synchronized(this) {
                 buf = this.buf;
-                this.buf = null;
+                this.buf = null; // NB: Ignore FindBugs warning on this line!!!
                 nacquired = DirectBufferPool.this.acquired;
                 if (buf != null) {
                     releasedByFinalizer = true;
@@ -270,7 +294,7 @@ public class DirectBufferPool {
                         + ",nleaked=" + nleaked + "): AllocationStack",
                         allocationStack);
             } else {
-                log.error("Buffer release on finalize.");
+//                log.error("Buffer release on finalize."); // NB: NOT an error.
                 /*
                  * TODO We do not currently set this.buf = buf if we are
                  * interrupted in release(buf) here, so this is not acid. But
@@ -466,7 +490,7 @@ public class DirectBufferPool {
          */
         String DEBUG = DirectBufferPool.class.getName() + ".debug";
 
-        String DEFAULT_DEBUG = "true";
+        String DEFAULT_DEBUG = "false";
         
     }
 
@@ -593,17 +617,17 @@ public class DirectBufferPool {
     }
 
     /**
-     * Return a direct {@link ByteBuffer}. The capacity of the buffer is
-     * determined by the configuration of this pool. The position will be equal
-     * to zero, the limit will be equal to the capacity, and the mark will not
-     * be set.
+     * Return an {@link IBufferAccess} wrapping a direct {@link ByteBuffer}. The
+     * capacity of the buffer is determined by the configuration of this pool.
+     * The position will be equal to zero, the limit will be equal to the
+     * capacity, and the mark will not be set.
      * <p>
      * Note: This method will block if there are no free buffers in the pool and
      * the pool was configured with a maximum capacity. It WILL log an error if
-     * it blocks. While blocking is not very safe, using a heap ByteBuffer is
-     * not very safe either since Java NIO will allocate a temporary direct
-     * {@link ByteBuffer} for IOs and that can both run out of memory and leak
-     * memory.
+     * it blocks. While blocking is not very safe, using a heap (vs direct)
+     * {@link ByteBuffer} is not very safe either since Java NIO will allocate a
+     * temporary direct {@link ByteBuffer} for IOs and that can both run out of
+     * memory and leak memory.
      * 
      * @return A direct {@link ByteBuffer}.
      * 
@@ -629,32 +653,36 @@ public class DirectBufferPool {
     }
 
     /**
-     * Return a direct {@link ByteBuffer}. The capacity of the buffer is
-     * determined by the configuration of this pool. The position will be equal
-     * to zero, the limit will be equal to the capacity, and the mark will not
-     * be set.
+     * Return an {@link IBufferAccess} wrapping a direct {@link ByteBuffer}. The
+     * capacity of the buffer is determined by the configuration of this pool.
+     * The position will be equal to zero, the limit will be equal to the
+     * capacity, and the mark will not be set.
      * <p>
      * Note: This method will block if there are no free buffers in the pool and
      * the pool was configured with a maximum capacity. In addition it MAY block
      * if there is not enough free memory to fulfill the request. It WILL log an
-     * error if it blocks. While blocking is not very safe, using a heap
-     * ByteBuffer is not very safe either since Java NIO will allocate a
-     * temporary direct {@link ByteBuffer} for IOs and that can both run out of
-     * memory and leak memory.
+     * error if it blocks. While blocking is not very safe, using a heap (vs
+     * direct) {@link ByteBuffer} is not very safe either since Java NIO will
+     * allocate a temporary direct {@link ByteBuffer} for IOs and that can both
+     * run out of memory and leak memory.
      * 
      * @param timeout
+     *            The timeout.
      * @param unit
+     *            The units for that timeout.
      * 
      * @return A direct {@link ByteBuffer}.
      * 
      * @throws InterruptedException
+     *             if the caller's {@link Thread} is interrupted awaiting a
+     *             buffer.
      * @throws TimeoutException
      */
     public IBufferAccess acquire(final long timeout, final TimeUnit unit)
             throws InterruptedException, TimeoutException {
 
-        if(log.isInfoEnabled())
-            log.info("");
+//        if(log.isInfoEnabled())
+//            log.info("");
 
         lock.lock();
 
@@ -734,8 +762,8 @@ public class DirectBufferPool {
     final private boolean release(final ByteBuffer b, final long timeout,
             final TimeUnit units) throws InterruptedException {
 
-        if(log.isInfoEnabled())
-            log.info("");
+//        if(log.isInfoEnabled())
+//            log.info("");
 
         if (b == null)
             throw new IllegalArgumentException();

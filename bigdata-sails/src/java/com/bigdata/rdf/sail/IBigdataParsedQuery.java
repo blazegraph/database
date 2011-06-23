@@ -1,5 +1,6 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,34 +21,38 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+/*
+ * Created on Jun 20, 2011
+ */
 
 package com.bigdata.rdf.sail;
 
 import java.util.Properties;
 
-import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.algebra.TupleExpr;
-
 /**
- * Extension API for bigdata queries.
+ * Interface providing access to more state of the original SPARQL query AST.
+ * <p>
+ * Note: This interface is supported by various overrides of the openrdf SPARQL
+ * parser. Those overrides are required in order to gain access to the details
+ * of the AST.
  * 
- * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
  * 
- * @see IBigdataParsedQuery
+ * @see BigdataSailQuery
  */
-public interface BigdataSailQuery {
+public interface IBigdataParsedQuery {
     
     /**
-     * Returns a copy of the Sesame operator tree that will or would be
-     * evaluated by this query.
+     * The type of query.
      */
-    TupleExpr getTupleExpr() throws QueryEvaluationException;
+    QueryType getQueryType();
     
-	/**
-	 * Return query hints associated with this query. Query hints are embedded
-	 * in query strings as namespaces. See {@link QueryHints#PREFIX} for more
-	 * information.
-	 */
+    /**
+     * Return query hints associated with this query. Query hints are embedded
+     * in query strings as namespaces. See {@link QueryHints#PREFIX} for more
+     * information.
+     */
     Properties getQueryHints(); 
     
 }

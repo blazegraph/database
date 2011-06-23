@@ -106,19 +106,53 @@ public class TestRollbackCommit extends ProxyTestCase<Journal> {
                 log.info("After rollback =" + journal.getRootBlockView());
 
             // verify that the state of rootBlock0 is as before the commit.
-            assertEquals(rootBlock0, journal.getBufferStrategy().readRootBlock(
-                    true/* rootBlock0 */));
+            assertRootBlockOk(journal, rootBlock0, true/* isRootBlock0 */);
 
             // verify that the state of rootBlock1 is as before the commit.
-            assertEquals(rootBlock1, journal.getBufferStrategy().readRootBlock(
-                    false/* rootBlock0 */));
+            assertRootBlockOk(journal, rootBlock1, false/* isRootBlock0 */);
             
         } finally {
-            
+
             journal.destroy();
-            
+
         }
-        
+
     }
-        
+
+    private void assertRootBlockOk(final Journal journal,
+            final ByteBuffer expected, final boolean isRootBlock0) {
+
+        final ByteBuffer actual = journal.getBufferStrategy().readRootBlock(
+                isRootBlock0);
+
+        final boolean ok = expected.equals(actual);
+
+        if (!ok) {
+
+            final StringBuffer sb = new StringBuffer();
+
+            sb.append("Root blocks differ: delegate=" + getDelegate()
+                    + ", bufferStrategy=" + journal.getBufferStrategy());
+
+            sb
+                    .append(", expected="
+                            + new RootBlockView(isRootBlock0, expected, null/* checker */));
+            try {
+                sb
+                        .append(", actual="
+                                + new RootBlockView(isRootBlock0, expected,
+                                        null/* checker */));
+            } catch (Throwable t) {
+                /*
+                 * Show the error if we can't decode the root block.
+                 */
+                fail(sb.toString(), t);
+            }
+
+            fail(sb.toString());
+
+        }
+
+    }
+
 }

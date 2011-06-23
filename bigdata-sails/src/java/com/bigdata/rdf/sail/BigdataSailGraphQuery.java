@@ -49,7 +49,7 @@ import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 public class BigdataSailGraphQuery extends SailGraphQuery 
         implements BigdataSailQuery {
     
-	protected static Logger log = Logger.getLogger(BigdataSailGraphQuery.class);
+	private static Logger log = Logger.getLogger(BigdataSailGraphQuery.class);
 	
     /**
      * Query hints are embedded in query strings as namespaces.  

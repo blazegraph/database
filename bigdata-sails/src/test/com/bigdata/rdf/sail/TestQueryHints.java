@@ -1,5 +1,6 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -21,31 +22,36 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Sep 16, 2009
+ * Created on Jun 20, 2011
  */
 
 package com.bigdata.rdf.sail;
 
-import java.util.Collection;
-import java.util.LinkedList;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Properties;
+
+import junit.framework.TestCase2;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.query.BindingSet;
-import org.openrdf.query.QueryLanguage;
-import org.openrdf.query.TupleQuery;
-import org.openrdf.query.TupleQueryResult;
-import org.openrdf.query.impl.BindingImpl;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.query.MalformedQueryException;
 
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.rdf.sail.sparql.BigdataSPARQLParser;
+import com.bigdata.rdf.store.BD;
 
 /**
- * Unit tests the query hints aspect of the {@link BigdataSail} implementation.
+ * Unit test for {@link BigdataSPARQLParser}'s ability to report the
+ * {@link QueryHints} associated with a SPARQL query.
  * 
- * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
- * @version $Id$
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id: TestQueryHintsUtility.java 4739 2011-06-20 12:42:13Z
+ *          thompsonbry $
  */
-public class TestQueryHints extends QuadsTestCase {
+public class TestQueryHints extends TestCase2 {
 
     /**
      * 
@@ -54,83 +60,94 @@ public class TestQueryHints extends QuadsTestCase {
     }
 
     /**
-     * @param arg0
+     * @param name
      */
-    public TestQueryHints(String arg0) {
-        super(arg0);
+    public TestQueryHints(String name) {
+        super(name);
     }
 
-    /**
-     * Tests adding query hints in SPARQL.
-     * 
-     * @throws Exception
-     * 
-     * @todo Unfortunately, this does not really _test_ anything since the query
-     *       should be answered correctly regardless of the query hint(s)
-     *       specified.
-     */
-    public void testQueryHints() throws Exception {
+    public void test_selectQuery() throws MalformedQueryException {
 
-        final BigdataSail sail = getSail();
-        sail.initialize();
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-        final BigdataSailRepositoryConnection cxn = 
-            (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
-        
-        try {
-    
-            URI a = new URIImpl("_:A");
-            URI b = new URIImpl("_:B");
-            URI c = new URIImpl("_:C");
-/**/
-            cxn.add(a, b, c);
-/**/
+        final Map<String,String> expected = new LinkedHashMap<String, String>();
+        {
 
-            /*
-             * Note: The either flush() or commit() is required to flush the
-             * statement buffers to the database before executing any operations
-             * that go around the sail.
-             */
-            cxn.flush();//commit();
+            expected.put(PipelineOp.Annotations.MAX_PARALLEL,"-5");
             
-/**/            
-            if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
-            }
-
-            {
-                
-                final String query = "PREFIX " + QueryHints.PREFIX
-                        + ": " + "<http://www.bigdata.com/queryOption#" + //
-                        PipelineOp.Annotations.MAX_PARALLEL + "=-5" //
-                        + "&" + "com.bigdata.fullScanTreshold=1000" //
-                        + ">\n"//
-                        + "SELECT * " + //
-                        "WHERE { " + //
-                        "  <" + a + "> ?p ?o " + //
-                        "}";
-
-                final TupleQuery tupleQuery = 
-                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                tupleQuery.setIncludeInferred(true /* includeInferred */);
-                final TupleQueryResult result = tupleQuery.evaluate();
-    
-                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
-                answer.add(createBindingSet(
-                        new BindingImpl("p", b),
-                        new BindingImpl("o", c)
-                        ));
-                
-                compare(result, answer);
-
-            }
+            expected.put("com.bigdata.fullScanTreshold","1000");
             
-        } finally {
-            cxn.close();
-            sail.__tearDownUnitTest();
         }
 
+        final String baseURI = "http://www.bigdata.com/sparql";
+
+        final URI a = new URIImpl("_:A");
+
+        final String qs = //
+                "PREFIX " + QueryHints.PREFIX + ": " + //
+                "<http://www.bigdata.com/queryOption" + //
+                "#" + PipelineOp.Annotations.MAX_PARALLEL + "=-5" + //
+                "&" + "com.bigdata.fullScanTreshold=1000" //
+                + ">\n"//
+                + "SELECT * " + "WHERE { " + "  <" + a + "> ?p ?o " + "}";
+
+        final Properties actual = ((IBigdataParsedQuery) new BigdataSPARQLParser()
+                .parseQuery(qs, baseURI)).getQueryHints();
+
+        assertSameProperties(expected, actual);
+
     }
-    
+
+    public void test_describeQuery() throws MalformedQueryException {
+
+        final Map<String,String> expected = new LinkedHashMap<String, String>();
+        {
+
+            expected.put(PipelineOp.Annotations.MAX_PARALLEL,"-5");
+            
+            expected.put("com.bigdata.fullScanTreshold","1000");
+            
+        }
+
+        final String baseURI = "http://www.bigdata.com/sparql";
+
+        final String qs = 
+            "prefix bd: <"+BD.NAMESPACE+"> " +
+            "prefix rdf: <"+RDF.NAMESPACE+"> " +
+            "prefix rdfs: <"+RDFS.NAMESPACE+"> " +
+            "PREFIX " + QueryHints.PREFIX + ": " + //
+            "<http://www.bigdata.com/queryOption" + //
+            "#" + PipelineOp.Annotations.MAX_PARALLEL + "=-5" + //
+            "&" + "com.bigdata.fullScanTreshold=1000" //
+            + ">\n"+//
+            "describe ?x " +//
+            "WHERE { " +//
+            "  ?x rdf:type bd:Person . " +//
+            "  ?x bd:likes bd:RDF " +//
+            "}";
+
+        final Properties actual = ((IBigdataParsedQuery) new BigdataSPARQLParser()
+                .parseQuery(qs, baseURI)).getQueryHints();
+
+        assertSameProperties(expected, actual);
+
+    }
+
+    private static void assertSameProperties(
+            final Map<String, String> expected, final Properties actual) {
+
+        assertEquals("size", expected.size(), actual.size());
+
+        for (Map.Entry<String, String> e : expected.entrySet()) {
+
+            final String name = e.getKey();
+
+            final String expectedValue = e.getValue();
+
+            final String actualValue = actual.getProperty(name);
+
+            assertEquals(name, expectedValue, actualValue);
+
+        }
+        
+    }
+
 }

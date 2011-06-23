@@ -2913,6 +2913,14 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
 
+        public CloseableIteration<? extends Statement, SailException> getStatements(
+                final Resource s, final URI p, final Value o,
+                final Resource context)
+                throws SailException {
+            return getStatements(s,p,o,true/*includeInferred*/,context==null?
+                    new Resource[]{}:new Resource[]{context});
+        }
+                
         /**
          * Note: if the context is <code>null</code>, then you will see data
          * from each context in a quad store, including anything in the

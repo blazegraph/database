@@ -1570,7 +1570,8 @@ public class TestQueryEngine extends TestCase2 {
         final int predId1 = 3;
         final int joinId2 = 4;
         final int predId2 = 5;
-        final int sliceId = 6;
+        final int condId = 6;
+        final int sliceId = 7;
         
         final IVariable<?> x = Var.var("x");
         final IVariable<?> y = Var.var("y");
@@ -1611,15 +1612,22 @@ public class TestQueryEngine extends TestCase2 {
 				new BOp[] { join1Op },//
 				new NV(Predicate.Annotations.BOP_ID, joinId2),//
 				new NV(PipelineJoin.Annotations.PREDICATE, pred2Op),//
-				// constraint x == z
-				new NV(PipelineJoin.Annotations.CONSTRAINTS,
-						new IConstraint[] { Constraint.wrap(new EQ(x, z)) }),
+//				// constraint x == z
+//				new NV(PipelineJoin.Annotations.CONSTRAINTS,
+//						new IConstraint[] { Constraint.wrap(new EQ(x, z)) }),
 				// join is optional.
 				// optional target is the same as the default target.
 				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
 
+		final PipelineOp condOp = new ConditionalRoutingOp(
+				new BOp[] { join2Op }, NV.asMap(
+				new NV(ConditionalRoutingOp.Annotations.BOP_ID, condId),
+				new NV(ConditionalRoutingOp.Annotations.CONDITION,
+						Constraint.wrap(new EQ(x, z)))
+				));
+		
         final PipelineOp sliceOp = new SliceOp(//
-                new BOp[]{join2Op},
+                new BOp[]{condOp},
                 NV.asMap(new NV[] {//
                         new NV(BOp.Annotations.BOP_ID, sliceId),//
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -1699,7 +1707,7 @@ public class TestQueryEngine extends TestCase2 {
         {
             // validate the stats map.
             assertNotNull(statsMap);
-            assertEquals(4, statsMap.size());
+            assertEquals(5, statsMap.size());
             if (log.isInfoEnabled())
                 log.info(statsMap.toString());
         }
@@ -1742,7 +1750,7 @@ public class TestQueryEngine extends TestCase2 {
             // verify query solution stats details.
 //            assertEquals(1L, stats.chunksIn.get());
             assertEquals(4L, stats.unitsIn.get());
-            assertEquals(2L, stats.unitsOut.get());
+            assertEquals(4L, stats.unitsOut.get());
 //            assertEquals(1L, stats.chunksOut.get());
         }
         

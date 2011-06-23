@@ -68,7 +68,7 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("Sparse Row Store");
+        final TestSuite suite = new TestSuite("Sparse Row Store");
 
         // value encoding and decoding.
         suite.addTestSuite(TestValueType.class);

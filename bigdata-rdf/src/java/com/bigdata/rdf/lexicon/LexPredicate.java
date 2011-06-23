@@ -57,10 +57,18 @@ public class LexPredicate extends Predicate<BigdataValue> {
 	 * 
 	 * @param relationName
 	 *            the namespace of the lexicon relation
+	 * @param timestamp
+	 *            The timestamp of the view to read on. This should be the same
+	 *            as the timestamp associated with the view of the triple store
+	 *            except for a full read/write transaction. Since all writes on
+	 *            the lexicon are unisolated, a full read/write transaction must
+	 *            use the {@link ITx#UNISOLATED} view of the lexicon in order to
+	 *            ensure that any writes it performs will be visible.
 	 * @param term
 	 *            the term to resolve using forward lookup (term2id)
 	 */
-    public static LexPredicate forwardInstance(final String relationName, 
+    public static LexPredicate forwardInstance(final String relationName,
+    		final long timestamp,
     		final IVariableOrConstant<BigdataValue> term) {
 
         return new LexPredicate(
@@ -69,7 +77,7 @@ public class LexPredicate extends Predicate<BigdataValue> {
                 Var.var(), // iv 
             },
             new NV(Annotations.RELATION_NAME, new String[] { relationName }),
-            new NV(Annotations.TIMESTAMP, ITx.UNISOLATED) //
+            new NV(Annotations.TIMESTAMP, timestamp) //
         );
 
     }
@@ -80,10 +88,18 @@ public class LexPredicate extends Predicate<BigdataValue> {
 	 * 
 	 * @param relationName
 	 *            the namespace of the lexicon relation
+	 * @param timestamp
+	 *            The timestamp of the view to read on. This should be the same
+	 *            as the timestamp associated with the view of the triple store
+	 *            except for a full read/write transaction. Since all writes on
+	 *            the lexicon are unisolated, a full read/write transaction must
+	 *            use the {@link ITx#UNISOLATED} view of the lexicon in order to
+	 *            ensure that any writes it performs will be visible.
 	 * @param term
 	 *            the term to resolve using reverse lookup (id2term)
 	 */
-    public static LexPredicate reverseInstance(final String relationName, 
+    public static LexPredicate reverseInstance(final String relationName,
+    		final long timestamp,
     		final IVariableOrConstant<IV> term) {
 
         return new LexPredicate(
@@ -92,7 +108,7 @@ public class LexPredicate extends Predicate<BigdataValue> {
                 term,      // iv 
             },
             new NV(Annotations.RELATION_NAME, new String[] { relationName }),
-            new NV(Annotations.TIMESTAMP, ITx.UNISOLATED) //
+            new NV(Annotations.TIMESTAMP, timestamp) //
         );
 
     }
