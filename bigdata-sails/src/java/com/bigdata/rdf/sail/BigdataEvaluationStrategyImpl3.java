@@ -2017,11 +2017,17 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     		toVE(compare.getRightArg());
 
     	if (left.equals(right)) {
+    		
     		if (compare.getOperator() == CompareOp.EQ) {
+    			
     			return TrueBOp.INSTANCE;
+    			
     		} else {
+    			
     			return FalseBOp.INSTANCE;
+    			
     		}
+    		
     	}
     	
     	/*
@@ -2074,31 +2080,38 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	    		
     	    	}
     	    	
-                if (!iv.isNullIV()) {
-//                if (iv.getTermId() != TermId.NULL) {
+    	    	/* 
+    	    	 * DatatypeBOp is the only bop that can cast things to a URI,
+    	    	 * and that URI might not be in the database. Thus there are no
+    	    	 * optimizations we can do: we can't check term equality, and
+    	    	 * we can't assume automatic false or true.
+    	    	 */
+	    		if (!(right instanceof DatatypeBOp)) {
+	    			
+	    			if (!iv.isNullIV()) {
     	    		
-    	    		return new SameTermBOp(left, right, op);
+		    			// if it's a real term we can use SameTermBOp
+	    				return new SameTermBOp(left, right, op);
     	    		
-    	    	} else {
-    	    		
-    	    		if (!(right instanceof DatatypeBOp)) {
-    	    			
-    	        		if (op == CompareOp.EQ) {
-    	        			
+	    			} else {
+
+	    				// if it's not a real term then we can substitute false
+	    				// for EQ and true for NE
+	    				if (op == CompareOp.EQ) {
+	        			
 //    	        			return new FalseBOp(new CompareBOp(left, right, op));
-    	        			return FalseBOp.INSTANCE;
-    	        			
-    	        		} else {
-    	        			
+	    					return FalseBOp.INSTANCE;
+	        			
+	    				} else {
+	        			
 //    	        			return new TrueBOp(new CompareBOp(left, right, op));
-    	        			return TrueBOp.INSTANCE;
-    	        			
-    	        		}
+	    					return TrueBOp.INSTANCE;
+	        			
+	    				}
     	    			
-    	    			
-    	    		}
-    	    		
-    	    	}
+	    			}
+                
+	    		}
     			
     		}
     		
@@ -2117,31 +2130,38 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	    		
     	    	}
     	    	
-                if (!iv.isNullIV()) {
-//    	    	if (iv.getTermId() != TermId.NULL) {
+    	    	/* 
+    	    	 * DatatypeBOp is the only bop that can cast things to a URI,
+    	    	 * and that URI might not be in the database. Thus there are no
+    	    	 * optimizations we can do: we can't check term equality, and
+    	    	 * we can't assume automatic false or true.
+    	    	 */
+	    		if (!(left instanceof DatatypeBOp)) {
+	    			
+	    			if (!iv.isNullIV()) {
     	    		
-    	    		return new SameTermBOp(left, right, op);
+		    			// if it's a real term we can use SameTermBOp
+	    				return new SameTermBOp(left, right, op);
     	    		
-    	    	} else {
-    	    		
-    	    		if (!(left instanceof DatatypeBOp)) {
-    	    			
-    	        		if (op == CompareOp.EQ) {
-    	        			
+	    			} else {
+
+	    				// if it's not a real term then we can substitute false
+	    				// for EQ and true for NE
+	    				if (op == CompareOp.EQ) {
+	        			
 //    	        			return new FalseBOp(new CompareBOp(left, right, op));
-    	        			return FalseBOp.INSTANCE;
-    	        			
-    	        		} else {
-    	        			
+	    					return FalseBOp.INSTANCE;
+	        			
+	    				} else {
+	        			
 //    	        			return new TrueBOp(new CompareBOp(left, right, op));
-    	        			return TrueBOp.INSTANCE;
-    	        			
-    	        		}
+	    					return TrueBOp.INSTANCE;
+	        			
+	    				}
     	    			
-    	    			
-    	    		}
-    	    		
-    	    	}
+	    			}
+                
+	    		}
     			
     		}
     		
