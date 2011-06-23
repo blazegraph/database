@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal;
 
-import java.io.IOException;
-
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -430,36 +428,36 @@ public class TermId<V extends BigdataValue> extends
         
     }
 
-	/**
-	 * Override default serialization to send the cached {@link BigdataValue}.
-	 */
-	private void writeObject(final java.io.ObjectOutputStream out)
-			throws IOException {
-
-		out.defaultWriteObject();
-
-		out.writeObject(getValueCache());
-
-	}
-
-	/**
-	 * Override default serialization to recover the cached {@link BigdataValue}
-	 * .
-	 */
-	@SuppressWarnings("unchecked")
-	private void readObject(final java.io.ObjectInputStream in)
-			throws IOException, ClassNotFoundException {
-
-		in.defaultReadObject();
-
-		final V v = (V) in.readObject();
-
-		if (v != null) {
-			// set the value cache.
-			setValue(v);
-		}
-
-	}
+//	/**
+//	 * Override default serialization to send the cached {@link BigdataValue}.
+//	 */
+//	private void writeObject(final java.io.ObjectOutputStream out)
+//			throws IOException {
+//
+//		out.defaultWriteObject();
+//
+//		out.writeObject(getValueCache());
+//
+//	}
+//
+//	/**
+//	 * Override default serialization to recover the cached {@link BigdataValue}
+//	 * .
+//	 */
+//	@SuppressWarnings("unchecked")
+//	private void readObject(final java.io.ObjectInputStream in)
+//			throws IOException, ClassNotFoundException {
+//
+//		in.defaultReadObject();
+//
+//		final V v = (V) in.readObject();
+//
+//		if (v != null) {
+//			// set the value cache.
+//			setValue(v);
+//		}
+//
+//	}
 
     /**
      * Create a unique bnode id based on the {@link TermId}'s internal data.
