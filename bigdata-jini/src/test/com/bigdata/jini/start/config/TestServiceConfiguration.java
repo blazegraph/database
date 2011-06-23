@@ -73,13 +73,11 @@ public class TestServiceConfiguration extends TestCase2 {
     }
 
     /**
-     * A configuration file used by some of the unit tests in this package.
+     * A configuration file used by the unit tests in this class.
      */
-//    private final String configFile = "file:src/resources/config/bigdata.config";
-    private final String configFile = "file:bigdata-jini/src/test/com/bigdata/jini/start/config/testfed.config";
+    private final static String configFile = "file:bigdata-jini/src/test/com/bigdata/jini/start/config/testfed.config";
 
     /**
-     * 
      * 
      * @throws FileNotFoundException
      * @throws ConfigurationException
@@ -90,11 +88,22 @@ public class TestServiceConfiguration extends TestCase2 {
         final Configuration config = ConfigurationProvider
                 .getInstance(new String[] { configFile });
 
-        System.err.println(Arrays.toString((String[])config.getEntry(
-                ServiceConfiguration.class.getName(), "classpath",
-                String[].class)));
+        {
+         
+            final String[] expected = new String[] { "a", "b", "c" };
+
+            final String[] actual = (String[]) config.getEntry(
+                    ServiceConfiguration.class.getName(), "classpath",
+                    String[].class);
+
+            if (log.isInfoEnabled())
+                log.info(Arrays.toString(actual));
+
+            assertEquals(expected, actual);
+
+        }
         
-        File serviceDirFromConfig = 
+        final File serviceDirFromConfig = 
             (File)config.getEntry(ServiceConfiguration.class.getName(), "serviceDir",
                                   File.class, new File("serviceDir-NOT-SET"));
 

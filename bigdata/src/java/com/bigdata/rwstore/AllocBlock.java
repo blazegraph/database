@@ -321,14 +321,14 @@ public class AllocBlock {
 		m_saveCommit = null;
 	}
 	
-	private int clearCacheBits(RWWriteCacheService cache, final int startBit, final int chkbits) {
+	private int clearCacheBits(final RWWriteCacheService cache, final int startBit, final int chkbits) {
 		int freebits = 0;
 		
 		if (chkbits != 0) {
 			// there are writes to clear
 			for (int b = 0; b < 32; b++) {
 				if ((chkbits & (1 << b)) != 0) {
-					long clr = RWStore.convertAddr(m_addr) + ((long) m_allocator.m_size * (startBit + b));
+					final long clr = RWStore.convertAddr(m_addr) + ((long) m_allocator.m_size * (startBit + b));
 					
 					if (log.isTraceEnabled())
 						log.trace("releasing address: " + clr);
@@ -357,7 +357,7 @@ public class AllocBlock {
 	 * @param cache 
 	 * @return the number of allocations released
 	 */
-	public int releaseSession(RWWriteCacheService cache) {
+	int releaseSession(final RWWriteCacheService cache) {
 		int freebits = 0;
 		
 		if (m_addr != 0) { // check active!

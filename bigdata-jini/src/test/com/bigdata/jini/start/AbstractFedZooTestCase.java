@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.jini.start;
 
 import java.io.File;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.InetAddress;
 import java.util.List;
 import java.util.UUID;
@@ -36,6 +38,7 @@ import junit.framework.TestCase2;
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationProvider;
 
+import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.data.ACL;
@@ -46,6 +49,7 @@ import com.bigdata.resources.ResourceFileFilter;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.config.NicUtil;
+import com.bigdata.zookeeper.DumpZookeeper;
 import com.bigdata.zookeeper.ZooHelper;
 
 /**
@@ -81,21 +85,25 @@ public class AbstractFedZooTestCase extends TestCase2 {
     /**
      * A configuration file used by some of the unit tests in this package.
      */
-    protected final String configFile = "file:bigdata-jini/src/test/com/bigdata/jini/start/testfed.config";
+    private static final String configFile = "file:bigdata-jini/src/test/com/bigdata/jini/start/testfed.config";
 
     // ACL used for the unit tests.
-    protected final List<ACL> acl = Ids.OPEN_ACL_UNSAFE;
+    protected static final List<ACL> acl = Ids.OPEN_ACL_UNSAFE;
 
     protected Configuration config;
 
-    final protected MockListener listener = new MockListener();
+    protected MockListener listener = null;
 
-    protected JiniFederation<?> fed;
+    protected JiniFederation<?> fed = null;
 
-    protected String zrootname = null;
+    private String zrootname = null;
+
+    private String fedname = null;
     
     public void setUp() throws Exception {
 
+        listener = new MockListener();
+        
         zrootname = getName() + "_" + UUID.randomUUID();
 
         if (new File(zrootname).exists()) {
@@ -106,15 +114,19 @@ public class AbstractFedZooTestCase extends TestCase2 {
         // a unique zroot in the /test namespace.
         final String zroot = "/"+zrootname;//"/test/" + zrootname;
 
-        System.err.println(getName() + ": setting up zrootname=" + zrootname);
+        if(log.isInfoEnabled())
+            log.info(getName() + ": setting up zrootname=" + zrootname);
 
+        fedname = "bigdata.test.group-"
+                + InetAddress.getLocalHost().getHostName();
+        
         final String[] args = new String[] { configFile,
                 // Note: overrides the zroot to be unique.
                 ZookeeperClientConfig.Options.NAMESPACE + "."
                         + ZookeeperClientConfig.Options.ZROOT + "=" + "\""
                         + zroot + "\"" ,
-//                // Override the federation name.
-//                "bigdata.fedname=\""+fedname+"\""
+                // Override the federation name.
+                "bigdata.fedname=\""+fedname+"\""
                 };
         
         // apply the federation name to the configuration file.
@@ -122,6 +134,33 @@ public class AbstractFedZooTestCase extends TestCase2 {
 
         config = ConfigurationProvider.getInstance(args);
 
+        /*
+         * Inspect some effective configuration property values.
+         */
+        {
+            
+            final String actualFedname = (String) config.getEntry("bigdata",
+                    "fedname", String.class, ("fedname-NOT-SET"));
+            
+            final String actualZrootname = (String) config.getEntry("bigdata",
+                    ZookeeperClientConfig.Options.ZROOT, String.class,
+                    ("zroot-NOT-SET"));
+
+            if(log.isInfoEnabled()) {
+            
+                log.info("effective bigdata.fedname=[" + actualFedname + "]");
+
+                log.info("effective bigdata.zroot=[" + actualZrootname + "]");
+                
+            }
+
+            assertEquals("fedname", fedname, actualFedname);
+
+            assertEquals(ZookeeperClientConfig.Options.ZROOT, zrootname,
+                    actualZrootname);
+
+        }
+   
 //        // if necessary, start zookeeper (a server instance).
 //        ZookeeperProcessHelper.startZookeeper(config, listener);
 
@@ -141,8 +180,8 @@ public class AbstractFedZooTestCase extends TestCase2 {
         }
 
         /*
-         * FIXME We need to start a jini lookup service for groups = {fedname}
-         * for this test to succeed.
+         * Note: You MUST be running a jini lookup service for groups =
+         * {fedname} for this test to succeed.
          */
         
         fed = JiniClient.newInstance(args).connect();
@@ -161,7 +200,8 @@ public class AbstractFedZooTestCase extends TestCase2 {
 
     public void tearDown() throws Exception {
 
-        System.err.println(getName() + ": tearing down zrootname=" + zrootname);
+        if(log.isInfoEnabled())
+            log.info(getName() + ": tearing down zrootname=" + zrootname);
 
         // destroy any processes started by this test suite.
         for (ProcessHelper t : listener.running) {
@@ -172,19 +212,19 @@ public class AbstractFedZooTestCase extends TestCase2 {
 
         if (fed != null) {
 
-            /*
-             * @todo if we do this to kill zk then we must ensure that a private
-             * instance was started on the desired port. That means an override
-             * for the configuration file and an unused port assigned for the
-             * client and peers on the zk instance started for this unit test.
-             */
+//            /*
+//             * Note: if we do this to kill zk then we must ensure that a private
+//             * instance was started on the desired port. That means an override
+//             * for the configuration file and an unused port assigned for the
+//             * client and peers on the zk instance started for this unit test.
+//             */
 //            ZooHelper.kill(clientPort);
             
             fed.shutdownNow();
             
         }
 
-        if (zrootname != null && new File(zrootname).exists()) {
+        if (fedname != null && new File(fedname).exists()) {
 
             /*
              * Wait a bit and then try and delete the federation directory
@@ -197,9 +237,16 @@ public class AbstractFedZooTestCase extends TestCase2 {
                 throw new RuntimeException(e);
             }
 
-            recursiveDelete(new File(zrootname));
+            recursiveDelete(new File(fedname));
 
         }
+        
+        // clear references
+        config = null;
+        listener = null;
+        fed = null;
+        zrootname = null;
+        fedname = null;
         
     }
 
@@ -242,6 +289,41 @@ public class AbstractFedZooTestCase extends TestCase2 {
             log.warn("Could not remove: " + f);
 
         }
+
+    }
+
+    /**
+     * Helper utility for dumping the zookeeper state.
+     * 
+     * @param msg
+     *            A leading message (should end with a new line when given).
+     * @param zookeeper
+     *            The zookeeper client connection.
+     *            
+     * @return The dump.
+     * 
+     * @throws KeeperException
+     * @throws InterruptedException
+     */
+    protected StringBuffer dumpZooKeeperState(final String msg,
+            final ZooKeeper zookeeper) throws KeeperException,
+            InterruptedException {
+
+        final StringWriter w = new StringWriter();
+
+        if (msg != null)
+            w.getBuffer().append(msg);
+
+        final PrintWriter pw = new PrintWriter(w);
+
+        new DumpZookeeper(zookeeper).dump(pw, true/* showData */, fed
+                .getZooConfig().zroot, 0/* depth */);
+
+        pw.flush();
+
+        w.flush();
+
+        return w.getBuffer();
 
     }
 

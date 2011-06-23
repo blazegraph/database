@@ -84,8 +84,8 @@ public class TestServiceStarter extends AbstractFedZooTestCase {
     /**
      * Unit test verifies that we can start and destroy a service instance using
      * a {@link BigdataServiceConfiguration}. The test waits until the service
-     * has been assigned its serviceId by jini and verify that the serviceId is
-     * recorded in the physicalService znode.
+     * has been assigned its serviceId by jini and then verifies that the
+     * serviceId is recorded in the physicalService znode.
      * 
      * @throws ConfigurationException
      * @throws Exception
@@ -126,13 +126,15 @@ public class TestServiceStarter extends AbstractFedZooTestCase {
          * Create the znode that is the parent for the physical service
          * instances (direct child of the logicalSevice znode).
          */
-        final String parentZNode = logicalServiceZPath + "/" + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER;
-        final ManagedServiceStarter serviceStarter = 
-            (ManagedServiceStarter) serviceConfig.newServiceStarter
-                                        (fed, listener, logicalServiceZPath, null/* attributes */);
-        zookeeper.create(parentZNode, 
-                         SerializerUtil.serialize(serviceStarter.serviceUUID),
-                         acl, CreateMode.PERSISTENT);
+        final String parentZNode = logicalServiceZPath + "/"
+                + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER;
+
+        final ManagedServiceStarter<?> serviceStarter = (ManagedServiceStarter<?>) serviceConfig
+                .newServiceStarter(fed, listener, logicalServiceZPath, null/* attributes */);
+        
+        zookeeper.create(parentZNode, SerializerUtil
+                .serialize(serviceStarter.serviceUUID), acl,
+                CreateMode.PERSISTENT);
 
         /*
          * Create the znode for the election of the primary physical service for
@@ -144,44 +146,58 @@ public class TestServiceStarter extends AbstractFedZooTestCase {
 
         // will be zero unless we started a zookeeper server above.
         final int processCountBefore = listener.running.size();
-        
+
         // start the service.
         final ProcessHelper processHelper = serviceStarter.call();
 
         // verify listener was notified of service start.
         assertEquals(processCountBefore + 1, listener.running.size());
 
-        // verify that the physicalService was registered with zookeeper. 
+        if (log.isInfoEnabled())
+            log.info(dumpZooKeeperState("Zookeeper dump:\n", zookeeper));
+        
+        // verify that the physicalService was registered with zookeeper.
         final ServiceItem serviceItem;
         final IService proxy;
         final String physicalServiceZPath;
         {
-            
+
             final List<String> children = zookeeper.getChildren(
                     logicalServiceZPath, false/* watch */);
 
-            System.err.println("physicalServices=" + children);
-            
+            if (log.isInfoEnabled())
+                log.info("physicalServices=" + children);
+
             // will fail if the znode was not registered.
             assertEquals(2, children.size());
 
             /*
-             * There should be only one child, which is the physical service
-             * that we created.
+             * The znode which is the container for the physical service that we
+             * created.
              * 
              * Note: You could explicitly build the correct zpath using the
              * serviceUUID obtained from the service proxy.
              */
             physicalServiceZPath = logicalServiceZPath + "/"
-                    + children.get(0);
+                    + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER;
 
             // get the serviceUUID from the physicalServiceZNode's data.
-            final UUID serviceUUID = (UUID) SerializerUtil
-                    .deserialize(zookeeper.getData(physicalServiceZPath,
-                            false/* watch */, new Stat()));
-            
-            serviceItem = discoverService(serviceUUID);
+            {
 
+                final byte[] data = zookeeper.getData(physicalServiceZPath,
+                        false/* watch */, new Stat());
+
+                assertNotNull(physicalServiceZPath, data);
+
+                assertTrue(physicalServiceZPath, data.length > 0);
+
+                final UUID serviceUUID = (UUID) SerializerUtil
+                        .deserialize(data);
+               
+                serviceItem = discoverService(serviceUUID);
+                
+            }
+            
             // verify that the service item is registered with jini. 
             assertNotNull(serviceItem);
             

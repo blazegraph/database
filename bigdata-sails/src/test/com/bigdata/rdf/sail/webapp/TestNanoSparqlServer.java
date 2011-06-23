@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 
+import javax.servlet.http.HttpServletResponse;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
@@ -368,18 +369,6 @@ public class TestNanoSparqlServer extends TestCase2 {
 			// connect.
 			conn.connect();
 
-			final int rc = conn.getResponseCode();
-			if (rc < 200 || rc >= 300) {
-				throw new IOException(conn.getResponseMessage());
-			}
-
-			if (log.isDebugEnabled()) {
-				/*
-				 * write out the status list, headers, etc.
-				 */
-				log.debug("*** Response ***");
-				log.debug("Status Line: " + conn.getResponseMessage());
-			}
 			return conn;
 
 		} catch (Throwable t) {
@@ -399,6 +388,24 @@ public class TestNanoSparqlServer extends TestCase2 {
 
 	}
 
+    protected HttpURLConnection checkResponseCode(final HttpURLConnection conn)
+            throws IOException {
+        final int rc = conn.getResponseCode();
+        if (rc < 200 || rc >= 300) {
+            conn.disconnect();
+            throw new IOException(conn.getResponseMessage());
+        }
+
+        if (log.isDebugEnabled()) {
+            /*
+             * write out the status list, headers, etc.
+             */
+            log.debug("*** Response ***");
+            log.debug("Status Line: " + conn.getResponseMessage());
+        }
+        return conn;
+    }
+    
 	/**
 	 * Builds a graph from an RDF result set (statements, not binding sets).
 	 * 
@@ -412,6 +419,8 @@ public class TestNanoSparqlServer extends TestCase2 {
 	 */
 	protected Graph buildGraph(final HttpURLConnection conn) throws Exception {
 
+        checkResponseCode(conn);
+        
 		try {
 
 			final String baseURI = "";
@@ -474,6 +483,8 @@ public class TestNanoSparqlServer extends TestCase2 {
      */
     protected boolean askResults(final HttpURLConnection conn) throws Exception {
 
+        checkResponseCode(conn);
+        
         try {
 
             final String contentType = conn.getContentType();
@@ -518,6 +529,8 @@ public class TestNanoSparqlServer extends TestCase2 {
 	 */
 	protected long countResults(final HttpURLConnection conn) throws Exception {
 
+        checkResponseCode(conn);
+        
         try {
 
             final String contentType = conn.getContentType();
@@ -597,6 +610,8 @@ public class TestNanoSparqlServer extends TestCase2 {
 
     protected MutationResult getMutationResult(final HttpURLConnection conn) throws Exception {
 
+        checkResponseCode(conn);
+        
         try {
 
             final String contentType = conn.getContentType();
@@ -661,18 +676,26 @@ public class TestNanoSparqlServer extends TestCase2 {
 		// connect.
 		conn.connect();
 
-		final int rc = conn.getResponseCode();
+        try {
 
-		if (rc < 200 || rc >= 300) {
-		
-		    throw new IOException(conn.getResponseMessage());
-		    
-		}
-		
-		final String txt = getStreamContents(conn.getInputStream());
-		
-        if (log.isInfoEnabled())
-            log.info(txt);
+            final int rc = conn.getResponseCode();
+
+            if (rc < 200 || rc >= 300) {
+
+                throw new IOException(conn.getResponseMessage());
+
+            }
+
+            final String txt = getStreamContents(conn.getInputStream());
+
+            if (log.isInfoEnabled())
+                log.info(txt);
+
+        } finally {
+
+            conn.disconnect();
+
+        }
 
 	}
 
@@ -845,6 +868,68 @@ public class TestNanoSparqlServer extends TestCase2 {
 
     }
 
+    /**
+     * Test helper verifies the expected status code and optionally logs the
+     * response message and the response body.
+     * 
+     * @param conn
+     * 
+     * @throws IOException
+     */
+    private void assertErrorStatusCode(final int statusCode,
+            final HttpURLConnection conn) throws IOException {
+
+        try {
+
+            final int rc = conn.getResponseCode();
+
+            final String msg = conn.getResponseMessage();
+
+            if (log.isInfoEnabled())
+                log.info("statusCode=" + statusCode + ", msg=" + msg);
+            
+            if (rc >= 200 && rc < 300) {
+
+                fail("Not expecting success: statusCode=" + rc + ", message="
+                        + msg);
+
+            }
+
+            if (statusCode != rc) {
+
+                fail("statusCode: expected=" + statusCode + ", but actual="
+                        + rc + " (message=" + msg + ")");
+                
+            }
+
+        } finally {
+
+            conn.disconnect();
+
+        }
+
+    }
+
+    /**
+     * A GET query which should result in an error (the query is not well
+     * formed).
+     */
+    public void test_GET_SELECT_ERROR() throws Exception {
+
+        final String queryStr = "select * where {?s ?p ?o} X {}";
+
+        final QueryOptions opts = new QueryOptions();
+        opts.serviceURL = m_serviceURL;
+        opts.queryStr = queryStr;
+        opts.method = "GET";
+
+        opts.acceptHeader = TupleQueryResultFormat.SPARQL.getDefaultMIMEType();
+        
+        assertErrorStatusCode(HttpServletResponse.SC_BAD_REQUEST,
+                doSparqlQuery(opts, requestPath));
+
+    }
+    
     public void test_POST_INSERT_withBody_RDFXML() throws Exception {
 
         doInsertWithBodyTest("POST", 23, requestPath, RDFFormat.RDFXML);

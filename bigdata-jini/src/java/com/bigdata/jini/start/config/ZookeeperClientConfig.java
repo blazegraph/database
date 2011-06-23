@@ -24,7 +24,7 @@ import com.bigdata.jini.util.ConfigMath;
  */
 public class ZookeeperClientConfig {
 
-    final static protected Logger log = Logger
+    final static private Logger log = Logger
             .getLogger(ZookeeperClientConfig.class);
 
     /**
@@ -47,7 +47,7 @@ public class ZookeeperClientConfig {
         String ZROOT = "zroot";
 
         /**
-         * The "sessionTimeout" in millseconds for a {@link ZooKeeper} client.
+         * The "sessionTimeout" in milliseconds for a {@link ZooKeeper} client.
          * 
          * @see ZooKeeper#ZooKeeper(String, int, org.apache.zookeeper.Watcher)
          */
@@ -101,6 +101,48 @@ public class ZookeeperClientConfig {
      * @see Options#ACL
      */
     public final List<ACL> acl;
+    
+    /**
+     * Alternative version used to configure from System properties or as set
+     * via <code>-D</code>.
+     * @throws ConfigurationException 
+     */
+    public ZookeeperClientConfig() throws ConfigurationException {
+        
+        // root node for federation within zookeeper.
+        zroot = System.getProperty(Options.NAMESPACE+"."+Options.ZROOT);
+
+        // session timeout.
+        sessionTimeout = Integer.parseInt(System.getProperty(Options.NAMESPACE
+                + "." + Options.SESSION_TIMEOUT, ""
+                + Options.DEFAULT_SESSION_TIMEOUT));
+
+        // comma separated list of zookeeper services.
+        servers = System.getProperty(Options.NAMESPACE+"."+Options.SERVERS);
+
+        if(servers == null)
+            throw new ConfigurationException("Must specify: "
+                    + Options.NAMESPACE + "." + Options.SERVERS);
+        
+        if (servers.matches("\\s")) {
+
+            throw new ConfigurationException("Whitespace not allowed in "
+                    + Options.SERVERS + " : " + servers);
+
+        }
+        
+        // ACLs used to create various znodes
+//        acl = Arrays.asList((ACL[]) config.getEntry(Options.NAMESPACE,
+//                Options.ACL, ACL[].class,
+//                // default ACL
+//                Ids.OPEN_ACL_UNSAFE.toArray(new ACL[0])
+//                ));
+        acl = Ids.OPEN_ACL_UNSAFE; // TODO How to override?
+
+        if(log.isInfoEnabled())
+            log.info(this.toString());
+
+    }
     
     /**
      * Reads the zookeeper client configuration from a {@link Configuration}.

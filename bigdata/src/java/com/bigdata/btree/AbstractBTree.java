@@ -242,6 +242,12 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * The persistence store -or- <code>null</code> iff the B+Tree is transient.
      */
     final protected IRawStore store;
+    
+    /**
+     * When <code>true</code> the {@link AbstractBTree} does not permit
+     * mutation.
+     */
+    final protected boolean readOnly;
 
     /**
      * Optional cache for {@link INodeData} and {@link ILeafData} instances and
@@ -919,6 +925,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             throw new IllegalArgumentException();
 
         this.store = store;
+        
+        this.readOnly = readOnly;
 
 //        /*
 //         * The Memoizer is not used by the mutable B+Tree since it is not safe
@@ -1299,7 +1307,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     /**
      * Return <code>true</code> iff this B+Tree is read-only.
      */
-    abstract public boolean isReadOnly();
+    final public boolean isReadOnly() {
+        
+        return readOnly;
+        
+    }
     
     /**
      * 
@@ -3283,7 +3295,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          */
 //        touch();
 
-        if (isReadOnly()) {
+        if (readOnly) {
 
             doTouch(node);
 
@@ -3291,32 +3303,37 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-        /*
-         * Note: Synchronization appears to be necessary for the mutable BTree.
-         * I believe that the underlying reason is the UnisolatedReadWriteIndex
-         * permits concurrent readers. Reads drive evictions so current calls of
-         * touch() are possible. When the B+Tree is mutable, those calls must be
-         * coordinated via a lock to prevent concurrent modification when
-         * touches drive the eviction of a dirty node or leaf.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/71 (Concurrency
-         * problem with unisolated btree and memoizer)
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/201 (Hot spot
-         * in AbstractBTree#touch())
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/284
-         * (IndexOfOfBounds? in Node#getChild())
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/288 (Node
-         * already coded)
-         * 
-         * and possibly
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/149 (NULL
-         * passed to readNodeOrLeaf)
-         */
+        doSyncTouch(node);
+        
+    }
 
+    /**
+     * Note: Synchronization is necessary for the mutable {@link BTree}. The
+     * underlying reason is the {@link UnisolatedReadWriteIndex} permits
+     * concurrent readers. Reads drive evictions so concurrent calls of
+     * {@link #touch()} are possible. When the B+Tree is mutable, those calls
+     * must be coordinated via a lock to prevent concurrent modification when
+     * touches drive the eviction of a dirty node or leaf.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/71 (Concurrency
+     *      problem with unisolated btree and memoizer)
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/201 (Hot spot in
+     *      AbstractBTree#touch())
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/284
+     *      (IndexOfOfBounds? in Node#getChild())
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/288 (Node already
+     *      coded)
+     * 
+     *      and possibly
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/149 (NULL passed to
+     *      readNodeOrLeaf)
+     */
+    private final void doSyncTouch(final AbstractNode<?> node) {
+    
         synchronized (this) {
 
             doTouch(node);

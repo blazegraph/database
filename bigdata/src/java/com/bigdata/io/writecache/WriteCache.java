@@ -130,10 +130,6 @@ abstract public class WriteCache implements IWriteCache {
 	 * {@link #flush(boolean, long, TimeUnit)}, {@link #reset()}, and
 	 * {@link #close()}.
 	 */
-//    * <p>
-//    * Note: To avoid lock ordering problems, acquire the read lock before you
-//    * increment the latch and acquire the write lock before you await the
-//    * latch.
 	final private ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
     /**
@@ -651,7 +647,8 @@ abstract public class WriteCache implements IWriteCache {
 		// header block.
 
 		if (m_written) { // should be clean, NO WAY should this be written to!
-			log.warn("Writing to CLEAN cache: " + hashCode());
+			log.error("Writing to CLEAN cache: " + hashCode());
+			throw new IllegalStateException("Writing to CLEAN cache: " + hashCode());
 		}
 
 		if (data == null)
@@ -930,27 +927,6 @@ abstract public class WriteCache implements IWriteCache {
 	}
 
 	/**
-	 * Variant which resets the cache if it was successfully flushed.
-	 */
-	public void flushAndReset(final boolean force) throws IOException, InterruptedException {
-
-		try {
-
-			if (!flushAndReset(force, true/* reset */, Long.MAX_VALUE, TimeUnit.NANOSECONDS)) {
-
-				throw new RuntimeException();
-
-			}
-
-		} catch (TimeoutException e) {
-
-			throw new RuntimeException(e);
-
-		}
-
-	}
-
-	/**
 	 * Flush the writes to the backing channel but DOES NOT sync the channel and
 	 * DOES NOT {@link #reset()} the {@link WriteCache}. {@link #reset()} is a
 	 * separate operation because a common use is to retain recently flushed
@@ -966,30 +942,6 @@ abstract public class WriteCache implements IWriteCache {
 	 */
 	public boolean flush(final boolean force, final long timeout, final TimeUnit unit) throws IOException,
 			TimeoutException, InterruptedException {
-
-		return flushAndReset(force, false/* reset */, timeout, unit);
-
-	}
-
-	/**
-	 * Core impl.
-	 * 
-	 * @param forceIsIgnored
-	 *            ignored (deprecated).
-	 * @param reset
-	 *            When <code>true</code>, does atomic reset IFF the flush was
-	 *            successful in the allowed time while holding the lock to
-	 *            prevent new records from being written onto the buffer
-	 *            concurrently.
-	 * @param timeout
-	 * @param unit
-	 * @return
-	 * @throws IOException
-	 * @throws TimeoutException
-	 * @throws InterruptedException
-	 */
-	private boolean flushAndReset(final boolean forceIsIgnored, final boolean reset, final long timeout,
-			final TimeUnit unit) throws IOException, TimeoutException, InterruptedException {
 
 		// start time
 		final long begin = System.nanoTime();
@@ -1051,22 +1003,12 @@ abstract public class WriteCache implements IWriteCache {
 				// write the data on the disk file.
 				final boolean ret = writeOnChannel(view, getFirstOffset(), Collections.unmodifiableMap(recordMap),
 						remaining);
-
-				if(!ret)
-				    throw new TimeoutException();
 				
-				counters.nflush++;
-
-				if (ret && reset) {
-
-					/*
-					 * Atomic reset while holding the lock to prevent new
-					 * records from being written onto the buffer concurrently.
-					 */
-
-					reset();
-
+				if (!ret) {
+					throw new TimeoutException("Unable to flush WriteCache");
 				}
+
+				counters.nflush++;
 
 				return ret;
 
@@ -1294,7 +1236,6 @@ abstract public class WriteCache implements IWriteCache {
 	 * 
 	 * @param tmp
 	 */
-	// ... and having the {@link #latch} at zero.
 	private void _resetState(final ByteBuffer tmp) {
 
 		if (tmp == null)
@@ -1865,32 +1806,32 @@ abstract public class WriteCache implements IWriteCache {
                             }
                     }
                 } // synchronized(tmp)
+        		
+        		/*
+        		 * Fix up the debug flag when last address is cleared.
+        		 */
+        		if (m_written && recordMap.isEmpty()) {
+        			m_written = false;
+        		}
 			} finally {
 				release();
 			}
 		}
-		
-		/*
-		 * Fix up the debug flag when last address is cleared.
-		 */
-		if (m_written && recordMap.isEmpty()) {
-			m_written = false;
-		}
 	}
 
 	protected void registerWriteStatus(long offset, int length, char action) {
-		// NOP to be overridden for debug if required
+		// NOP to be overidden for debug if required
 	}
 
 	boolean m_written = false;
-
+	
 	private long lastOffset;
 
 	/**
 	 * Called to clear the WriteCacheService map of references to this
 	 * WriteCache.
 	 * 
-	 * @param recordMap
+	 * @param serviceRecordMap
 	 *            the map of the WriteCacheService that associates an address
 	 *            with a WriteCache
 	 * @param fileExtent
@@ -1901,7 +1842,8 @@ abstract public class WriteCache implements IWriteCache {
 			throws InterruptedException {
 
 		final Iterator<Long> entries = recordMap.keySet().iterator();
-		if (entries.hasNext()) {
+		
+		if (serviceRecordMap != null && entries.hasNext()) {
 			if (log.isInfoEnabled())
 				log.info("resetting existing WriteCache: nrecords=" + recordMap.size() + ", hashCode=" + hashCode());
 
@@ -1932,8 +1874,7 @@ abstract public class WriteCache implements IWriteCache {
 			if (m_written) {
 				log.warn("Written WriteCache but with no records");
 			}
-		}
-
+		}		
 		reset(); // must ensure reset state even if cache already empty
 
 		setFileExtent(fileExtent);

@@ -14,10 +14,12 @@ import java.util.UUID;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.HTMLUtility;
@@ -82,7 +84,7 @@ public class StatusServlet extends BigdataRDFServlet {
 		 * entire thing is accessible via the title attribute (a flyover). Use
 		 * ZERO (0) to see everything.
 		 */
-		int maxBopLength = 64;
+		int maxBopLength = 0;
 		if (req.getParameter("maxBopLength") != null) {
 			maxBopLength = Integer.valueOf(req.getParameter("maxBopLength"));
 			if (maxBopLength < 0)
@@ -163,13 +165,13 @@ public class StatusServlet extends BigdataRDFServlet {
 		 * IRunningQuery.getQueryId() to NanoSparqlServer's
 		 * RunningQuery.queryId.
 		 */
-        final Map<UUID,RunningQuery> crosswalkMap = new LinkedHashMap<UUID, RunningQuery>();
+		final Map<UUID/* IRunningQuery.queryId */, RunningQuery> crosswalkMap = new LinkedHashMap<UUID, RunningQuery>();
 
 		/*
 		 * Map providing the accepted RunningQuery objects in descending order
 		 * by their elapsed run time.
 		 */
-        final TreeMap<Long, RunningQuery> acceptedQueryAge = newQueryMap();
+        final TreeMap<Long/*elapsed*/, RunningQuery> acceptedQueryAge = newQueryMap();
 
         {
 
@@ -259,12 +261,38 @@ public class StatusServlet extends BigdataRDFServlet {
 				final RunningQuery acceptedQuery = crosswalkMap.get(query
 						.getQueryId());
 
-				final String queryStr = acceptedQuery == null ? "N/A"
-						: acceptedQuery.query;
+				final String queryStr;
+
+				if (acceptedQuery != null) {
+
+					final AbstractQueryTask queryTask = acceptedQuery.queryTask;
+					
+					queryStr = acceptedQuery.queryTask.queryStr;
+								
+					current.node("h2", "SPARQL").node("p",
+							HTMLUtility.escapeForXHTML(queryTask.queryStr));
+
+					current.node("h2", "Parsed Query").node(
+							"pre",
+							HTMLUtility.escapeForXHTML(queryTask.sailQuery
+									.toString()));
+
+					current.node("h2", "BOP Plan").node(
+							"pre",
+							HTMLUtility.escapeForXHTML(BOpUtility
+									.toString(query.getQuery())));
+					
+				} else {
+				
+					queryStr = "N/A";
+					
+				}
+
+				current.node("h2", "Query Evaluation Statistics").node("p");
 
 				// Format as a table, writing onto the response.
-				QueryLog.getTableXHTML(queryStr, query, w, !showQueryDetails,
-						maxBopLength);
+				QueryLog.getTableXHTML(queryStr, query, w,
+						!showQueryDetails, maxBopLength);
 
 //				// Extract as String
 //				final String s = w.getBuffer().toString();

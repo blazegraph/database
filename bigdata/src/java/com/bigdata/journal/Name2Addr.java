@@ -104,7 +104,7 @@ import com.bigdata.resources.ResourceManager;
  * concurrent task execution, such as arises with the group commit protocol. The
  * problem is concurrency in the data structure that keeps track of add/drop for
  * named indices and also tracks which named indices are dirty. In order to account for
- * tasks running concurent with commit processing, {@link AbstractTask} isolates
+ * tasks running concurrent with commit processing, {@link AbstractTask} isolates
  * {@link Name2Addr} and makes the set of changes {registering indices, dropping
  * indices, and updating the {@link Entry} in {@link Name2Addr} to reflect the
  * current {@link Checkpoint} record for an index) an atomic state change that
@@ -115,17 +115,17 @@ import com.bigdata.resources.ResourceManager;
  */
 public class Name2Addr extends BTree {
 
-    protected static final Logger log = Logger.getLogger(Name2Addr.class);
+    private static final Logger log = Logger.getLogger(Name2Addr.class);
 
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final static protected boolean INFO = log.isInfoEnabled();
+//    /**
+//     * True iff the {@link #log} level is INFO or less.
+//     */
+//    final static protected boolean INFO = log.isInfoEnabled();
 
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final static protected boolean DEBUG = log.isDebugEnabled();
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    final static protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Cache of added/retrieved btrees by _name_. This cache is ONLY used by the
@@ -287,7 +287,7 @@ public class Name2Addr extends BTree {
                 
                 checkpointAddr = 0L;
                     
-                if(INFO) {
+                if(log.isInfoEnabled()) {
 
                     /*
                      * Note: The size of the commit list can appear to increment
@@ -530,7 +530,7 @@ public class Name2Addr extends BTree {
          */
         Arrays.sort(a);
         
-        if (INFO) {
+        if (log.isInfoEnabled()) {
             
             log.info("Store file="+getStore().getFile());
             
@@ -544,7 +544,7 @@ public class Name2Addr extends BTree {
             
             final DirtyListener l = a[i];
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Will commit: " + l.name);
             
             final long checkpointAddr;
@@ -889,7 +889,7 @@ public class Name2Addr extends BTree {
         // add to the commit list.
         commitList.put(name, l);
      
-        if(INFO) {
+        if(log.isInfoEnabled()) {
             
             log.info("name=" + name + ", commitListSize=" + commitList.size()
                     + ", needsCheckpoint=" + needsCheckpoint + ", file="
@@ -980,7 +980,7 @@ public class Name2Addr extends BTree {
         if (name == null)
             throw new IllegalArgumentException();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("name=" + name);
         
         final byte[] key = getKey(name);

@@ -71,6 +71,9 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
         // overrides value set in the superclass.
         properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
         
+        // restrict the test to one data service [dataService0].
+        properties.setProperty(EmbeddedClient.Options.NDATA_SERVICES,"1");
+        
         return properties;
         
     }
@@ -86,6 +89,13 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
      */
     public void test_register1ThenOverflow() throws IOException,
             InterruptedException, ExecutionException {
+
+        /*
+         * This test depends on there being ONE data service so it knows on
+         * which data service the index has been registered.
+         */
+        assertEquals("dataServiceCount", 1, ((EmbeddedFederation<?>) fed)
+                .getDataServiceCount());
 
         /*
          * Register the index.
@@ -111,8 +121,8 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
             fed.registerIndex(indexMetadata,dataService0.getServiceUUID());
 
             overflowCounter1 = dataService0.getAsynchronousOverflowCounter();
-            
-            assertEquals(1,overflowCounter1);
+
+            assertEquals(1, overflowCounter1);
 
         }
 

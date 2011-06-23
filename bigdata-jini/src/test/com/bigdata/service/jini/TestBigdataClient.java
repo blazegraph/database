@@ -79,7 +79,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         helper.start();
         
     }
-    protected JiniServicesHelper helper = null;
+    private JiniServicesHelper helper = null;
 
     /**
      * Destroy the test services.
@@ -89,6 +89,8 @@ public class TestBigdataClient extends AbstractServerTestCase {
         if (helper != null) {
 
             helper.destroy();
+            
+            helper = null;
             
         }
 

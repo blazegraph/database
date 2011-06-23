@@ -64,7 +64,8 @@ public class TestZookeeperServerEntry extends TestCase2 {
             new ZookeeperServerEntry(0, null);
             fail("Expecting " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
-            log.info("Ignoring expected exception: " + ex);
+            if(log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
         }
 
     }
@@ -79,7 +80,7 @@ public class TestZookeeperServerEntry extends TestCase2 {
         final int expectedPeerPort = 233;
         final int expectedLeaderPort = 1992;
 
-        ZookeeperServerEntry entry = new ZookeeperServerEntry(expectedId,
+        final ZookeeperServerEntry entry = new ZookeeperServerEntry(expectedId,
                 expectedHostname + ":" + expectedPeerPort + ":"
                         + expectedLeaderPort);
 
@@ -88,7 +89,8 @@ public class TestZookeeperServerEntry extends TestCase2 {
         assertEquals(expectedPeerPort, entry.peerPort);
         assertEquals(expectedLeaderPort, entry.leaderPort);
 
-        log.info(entry.toString());
+        if(log.isInfoEnabled())
+            log.info(entry.toString());
         
     }
 

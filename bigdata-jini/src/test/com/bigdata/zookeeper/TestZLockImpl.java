@@ -36,6 +36,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -44,6 +46,7 @@ import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.KeeperException.SessionExpiredException;
 
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -78,18 +81,18 @@ public class TestZLockImpl extends AbstractZooTestCase {
      * 
      * @throws KeeperException
      * @throws InterruptedException
+     * @throws ExecutionException 
+     * @throws TimeoutException 
      */
-    public void test_lock() throws KeeperException, InterruptedException {
+    public void test_lock() throws KeeperException, InterruptedException, ExecutionException, TimeoutException {
 
-        final Thread mainThread = Thread.currentThread();
-
-        // a node that is guarenteed to be unique w/in the test namespace.
+        // a node that is guaranteed to be unique w/in the test namespace.
         final String zpath = "/test/" + getName() + UUID.randomUUID();
 
         try {
             /*
              * verify no such node (should be unique and therefore not
-             * preexist).
+             * pre-existing).
              */
             zookeeper.getChildren(zpath, false);
             fail("zpath exists: " + zpath);
@@ -119,9 +122,9 @@ public class TestZLockImpl extends AbstractZooTestCase {
         assertTrue(lock1.isLockHeld());
 
         // run a thread that will contend for the lock.
-        final Thread t2 = new Thread() {
+        final Callable<Void> task = new Callable<Void>() {
 
-            public void run() {
+            public Void call() throws Exception {
 
                 try {
 
@@ -138,23 +141,24 @@ public class TestZLockImpl extends AbstractZooTestCase {
                     // one child in the queue - the one that holds the lock.
                     assertEquals(1, zookeeper.getChildren(zpath, false).size());
 
+                    return null;
+                    
                 } catch (Throwable t) {
 
                     // log error
                     log.error(t, t);
 
-                    // interrupt the main thread.
-                    mainThread.interrupt();
+                    throw new RuntimeException(t);
 
                 }
             }
 
         };
 
-        t2.setDaemon(true);
+        final FutureTask<Void> ft = new FutureTask<Void>(task);
 
-        t2.start();
-
+        service.execute(ft);
+        
         // wait until the other child is also contending for the lock
         for (int i = 0; i < 10; i++) {
 
@@ -168,6 +172,15 @@ public class TestZLockImpl extends AbstractZooTestCase {
 
             Thread.sleep(10/* ms */);
 
+            // The first lock should remain help through this loop.
+            assertTrue(lock1.isLockHeld());
+
+            if (ft.isDone()) {
+                // Task should not be done yet. If done, check for error.
+                ft.get();
+                throw new AssertionError();
+            }
+            
         }
 
         // should be exactly two children in the queue.
@@ -180,12 +193,21 @@ public class TestZLockImpl extends AbstractZooTestCase {
 
         log.info("Released lock1.");
 
-        // wait until the other thread gains the lock.
-        for (int i = 0; i < 10 && !lock2.isLockHeld(); i++) {
+        // Wait a little bit for the task to gain the lock.
+        ft.get(2000, TimeUnit.MILLISECONDS);
 
-            Thread.sleep(10/* ms */);
-
-        }
+//        // wait until the other thread gains the lock.
+//        for (int i = 0; i < 10 && !lock2.isLockHeld(); i++) {
+//
+//            Thread.sleep(10/* ms */);
+//
+//            if (ft.isDone()) {
+//                // Task should not be done yet. If done, check for error.
+//                ft.get();
+//                throw new AssertionError();
+//            }
+//            
+//        }
 
         log.info("Verifying lock2 is held.");
 
@@ -220,10 +242,10 @@ public class TestZLockImpl extends AbstractZooTestCase {
      * 
      * @throws InterruptedException
      * @throws KeeperException
+     * @throws TimeoutException 
+     * @throws ExecutionException 
      */
-    public void test_breakLock() throws KeeperException, InterruptedException {
-
-        final Thread mainThread = Thread.currentThread();
+    public void test_breakLock() throws KeeperException, InterruptedException, ExecutionException, TimeoutException {
 
         // a node that is guaranteed to be unique w/in the test namespace.
         final String zpath = "/test/" + getName() + UUID.randomUUID();
@@ -261,9 +283,9 @@ public class TestZLockImpl extends AbstractZooTestCase {
         assertTrue(lock1.isLockHeld());
 
         // run a thread that will contend for the lock.
-        final Thread t2 = new Thread() {
+        final Callable<Void> task = new Callable<Void>() {
 
-            public void run() {
+            public Void call() throws Exception {
 
                 try {
 
@@ -273,29 +295,36 @@ public class TestZLockImpl extends AbstractZooTestCase {
 
                     log.info("lock2 granted.");
 
+                    return null;
+                    
                 } catch (Throwable t) {
 
                     // log error
                     log.error(t, t);
 
-                    // interrupt the main thread.
-                    mainThread.interrupt();
-
+                    throw new RuntimeException(t);
+                    
                 }
 
             }
 
         };
 
-        t2.setDaemon(true);
-
-        t2.start();
-
+        final FutureTask<Void> ft = new FutureTask<Void>(task);
+        
+        service.execute(ft);
+        
         // wait until the other child is also contending for the lock
         for (int i = 0; i < 10
                 && zookeeper.getChildren(zpath, false).size() != 2; i++) {
 
             Thread.sleep(10/* ms */);
+
+            if (ft.isDone()) {
+                // Task should not be done yet. If done, check for error.
+                ft.get();
+                throw new AssertionError();
+            }
 
         }
 
@@ -317,6 +346,9 @@ public class TestZLockImpl extends AbstractZooTestCase {
                 log.info("broke lock: deleted " + z);
             
         }
+
+        // Wait for the 2nd task.
+        ft.get(2000,TimeUnit.MILLISECONDS);
 
         assertTrue(!lock1.isLockHeld());
 
@@ -342,7 +374,7 @@ public class TestZLockImpl extends AbstractZooTestCase {
     public void test_notReentrant() throws KeeperException,
             InterruptedException {
 
-        // a node that is guarenteed to be unique w/in the test namespace.
+        // a node that is guaranteed to be unique w/in the test namespace.
         final String zpath = "/test/" + getName() + UUID.randomUUID();
 
         final ZLockImpl zlock = ZLockImpl.getLock(zookeeper, zpath, acl);
@@ -488,9 +520,6 @@ public class TestZLockImpl extends AbstractZooTestCase {
 
         final int ntasks = 4;
 
-        final ExecutorService service = Executors.newFixedThreadPool(ntasks,
-                DaemonThreadFactory.defaultThreadFactory());
-
         final LinkedList<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
 
         for (int i = 0; i < ntasks; i++) {
@@ -532,8 +561,13 @@ public class TestZLockImpl extends AbstractZooTestCase {
         }
 
         final List<Future<Void>> futures = new LinkedList<Future<Void>>();
+        final ExecutorService service = Executors.newFixedThreadPool(ntasks,
+                DaemonThreadFactory.defaultThreadFactory());
         try {
 
+            // Minimize the latency of getting new threads running.
+            ((ThreadPoolExecutor) service).prestartAllCoreThreads();
+            
             // obtain a lock object.
             final ZLockImpl zlock = ZLockImpl.getLock(zookeeper, zpath, acl);
 
@@ -572,7 +606,7 @@ public class TestZLockImpl extends AbstractZooTestCase {
 
             } finally {
 
-                // note: should quitely succeed if the lock was destroyed.
+                // note: should quietly succeed if the lock was destroyed.
                 zlock.unlock();
 
             }
@@ -597,7 +631,9 @@ public class TestZLockImpl extends AbstractZooTestCase {
                 
                 final Throwable cause = ex.getCause();
 
-                if (cause != null && cause instanceof InterruptedException) {
+                if (cause != null
+                        && InnerCause.isInnerCause(cause,
+                                InterruptedException.class)) {
 
                     /*
                      * When the lock znode is destroyed, the other processes
@@ -618,7 +654,7 @@ public class TestZLockImpl extends AbstractZooTestCase {
                 }
 
                 /*
-                 * Rethrow the execption.
+                 * Rethrow the exception.
                  * 
                  * Note: If any of the tasks gains the lock, then it will throw
                  * an AssertionFailedError.

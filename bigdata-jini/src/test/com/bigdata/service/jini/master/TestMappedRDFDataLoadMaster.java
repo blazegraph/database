@@ -80,28 +80,6 @@ public class TestMappedRDFDataLoadMaster extends TestCase2 {
         super(name);
     }
     
-    private JiniServicesHelper helper;
-    
-//    protected void setUp() throws Exception {
-//        
-//        super.setUp();
-//
-//        helper = new JiniServicesHelper();
-//
-//    }
-//
-//    protected void tearDown() throws Exception {
-//
-//        if (helper != null) {
-//
-//            helper.destroy();
-//            
-//        }
-//        
-//        super.tearDown();
-//        
-    // }
-
     /**
      * This runs a U1 data load.  
      * 
@@ -111,8 +89,6 @@ public class TestMappedRDFDataLoadMaster extends TestCase2 {
      */
     public void test() throws ConfigurationException, InterruptedException,
             IOException, ExecutionException, KeeperException {
-
-        JiniServicesHelper helper = null;
 
         final File tempConfigFile = JiniServicesHelper
                 .append(new File(
@@ -129,6 +105,8 @@ public class TestMappedRDFDataLoadMaster extends TestCase2 {
 //        		"new NV(DataServer.Options.OVERFLOW_ENABLED,false)"+//
 //        		"}",
         };
+
+        JiniServicesHelper helper = null;
 
         try {
 

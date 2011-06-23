@@ -20,11 +20,11 @@
 	<classpathentry kind="src" path="bigdata-perf/bsbm/src/test"/>
 	<classpathentry kind="src" path="junit-ext/src/test"/>
 	<classpathentry kind="src" path="junit-ext/src/java"/>
-	<classpathentry kind="lib" path="bigdata-jini/lib/apache/zookeeper-3.2.1.jar"/>
+	<classpathentry kind="lib" path="bigdata-jini/lib/apache/zookeeper-3.3.3.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/dsi-utils-1.0.6-020610.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/lgpl-utils-1.0.6-020610.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/nxparser-6-22-2010.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/tuprolog/tuprolog-v2.1.1.jar"/>
+	<classpathentry kind="lib" path="bigdata/lib/tuprolog/2p-v2.2.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-continuation-7.2.2.v20101205.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-http-7.2.2.v20101205.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-io-7.2.2.v20101205.jar"/>

@@ -49,6 +49,7 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.EQ;
@@ -1187,7 +1188,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         final int predId1 = 3;
         final int joinId2 = 4;
         final int predId2 = 5;
-        final int sliceId = 6;
+        final int condId = 6;
+        final int sliceId = 7;
         
         final IVariable<?> x = Var.var("x");
         final IVariable<?> y = Var.var("y");
@@ -1239,14 +1241,21 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 				// Note: shard-partitioned joins!
 				new NV(Predicate.Annotations.EVALUATION_CONTEXT,
 						BOpEvaluationContext.SHARDED),//
-				// constraint x == z
-				new NV(PipelineJoin.Annotations.CONSTRAINTS,
-						new IConstraint[] { Constraint.wrap(new EQ(x,z)) }),
+//				// constraint x == z
+//				new NV(PipelineJoin.Annotations.CONSTRAINTS,
+//						new IConstraint[] { Constraint.wrap(new EQ(x,z)) }),
 				// optional target is the same as the default target.
 				new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId));
 
+		final PipelineOp condOp = new ConditionalRoutingOp(
+				new BOp[] { join2Op }, NV.asMap(
+				new NV(ConditionalRoutingOp.Annotations.BOP_ID, condId),
+				new NV(ConditionalRoutingOp.Annotations.CONDITION,
+						Constraint.wrap(new EQ(x, z)))
+				));
+		
         final PipelineOp sliceOp = new SliceOp(//
-                new BOp[]{join2Op},
+                new BOp[]{condOp},
                 NV.asMap(new NV[] {//
                         new NV(BOp.Annotations.BOP_ID, sliceId),//
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -1338,7 +1347,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         {
             // validate the stats map.
             assertNotNull(statsMap);
-            assertEquals(4, statsMap.size());
+            assertEquals(5, statsMap.size());
             if (log.isInfoEnabled())
                 log.info(statsMap.toString());
         }
@@ -1381,7 +1390,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             // verify query solution stats details.
 //            assertEquals(1L, stats.chunksIn.get());
             assertEquals(5L, stats.unitsIn.get());
-            assertEquals(4L, stats.unitsOut.get());
+            assertEquals(6L, stats.unitsOut.get());
 //            assertEquals(1L, stats.chunksOut.get());
         }
         

@@ -32,8 +32,9 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.InetAddress;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
 
 import junit.framework.TestCase2;
 
@@ -48,8 +49,7 @@ import org.apache.zookeeper.KeeperException.SessionExpiredException;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.data.ACL;
 
-import com.bigdata.jini.start.MockListener;
-import com.bigdata.jini.start.process.ProcessHelper;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.config.NicUtil;
 
 /**
@@ -98,12 +98,12 @@ public abstract class AbstractZooTestCase extends TestCase2 {
 //        
 //    }
 
-    /**
-     * A configuration file used by some of the unit tests in this package. It
-     * contains a description of the zookeeper server instance in case we need
-     * to start one.
-     */
-    protected final String configFile = "file:bigdata-jini/src/test/com/bigdata/zookeeper/testzoo.config";
+//    /**
+//     * A configuration file used by some of the unit tests in this package. It
+//     * contains a description of the zookeeper server instance in case we need
+//     * to start one.
+//     */
+//    protected final String configFile = "file:bigdata-jini/src/test/com/bigdata/zookeeper/testzoo.config";
 
     /**
      * Note: The sessionTimeout is computed as 2x the tickTime as read out of
@@ -132,16 +132,21 @@ public abstract class AbstractZooTestCase extends TestCase2 {
     /**
      * ACL used by the unit tests.
      */
-    protected final List<ACL> acl = Ids.OPEN_ACL_UNSAFE;
+    protected static final List<ACL> acl = Ids.OPEN_ACL_UNSAFE;
     
-    protected final MockListener listener = new MockListener();
+//    protected final MockListener listener = new MockListener();
 
 //    private File dataDir = null;
     
     // the chosen client port.
     protected int clientPort = -1;
     
-    public void setUp() throws Exception {
+    /**
+     * A service used to run tasks for some tests.
+     */
+    protected ExecutorService service = null;
+    
+    protected void setUp() throws Exception {
 
         try {
             
@@ -240,32 +245,43 @@ public abstract class AbstractZooTestCase extends TestCase2 {
 
 //            // don't leave around the dataDir if the setup fails.
 //            recursiveDelete(dataDir);
-            
+            log.error(getName() + " : " + t, t);
             throw new Exception(t);
             
         }
+        
+        service = Executors.newCachedThreadPool(new DaemonThreadFactory(
+                getName()));
 
     }
 
-    public void tearDown() throws Exception {
+    protected void tearDown() throws Exception {
 
         try {
 
             if (log.isInfoEnabled())
                 log.info(getName());
 
+            if (service != null) {
+
+                service.shutdownNow();
+                
+                service = null;
+                
+            }
+            
             if (zookeeperAccessor != null) {
 
                 zookeeperAccessor.close();
 
             }
 
-            for (ProcessHelper h : listener.running) {
-
-                // destroy zookeeper service iff we started it.
-                h.kill(true/* immediateShutdown */);
-
-            }
+//            for (ProcessHelper h : listener.running) {
+//
+//                // destroy zookeeper service iff we started it.
+//                h.kill(true/* immediateShutdown */);
+//
+//            }
 
 //            if (dataDir != null) {
 //
@@ -481,62 +497,62 @@ public abstract class AbstractZooTestCase extends TestCase2 {
         
     }
     
-    /**
-     * Class used to test concurrency primitives.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    abstract protected class ClientThread extends Thread {
-
-        private final Thread main;
-        
-        protected final ReentrantLock lock;
-
-        /**
-         * 
-         * @param main
-         *            The thread in which the test is running.
-         * @param lock
-         *            A lock.
-         */
-        public ClientThread(final Thread main, final ReentrantLock lock) {
-
-            if (main == null)
-                throw new IllegalArgumentException();
-
-            if (lock == null)
-                throw new IllegalArgumentException();
-
-            this.main = main;
-
-            this.lock = lock;
-
-            setDaemon(true);
-
-        }
-
-        public void run() {
-
-            try { 
-
-                run2();
-
-            } catch (Throwable t) {
-
-                // log error since won't be seen otherwise.
-                log.error(t.getLocalizedMessage(), t);
-
-                // interrupt the main thread.
-                main.interrupt();
-
-            }
-
-        }
-
-        abstract void run2() throws Exception;
-
-    }
+//    /**
+//     * Class used to test concurrency primitives.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    static abstract protected class ClientThread extends Thread {
+//
+//        private final Thread mainThread;
+//        
+//        protected final ReentrantLock lock;
+//
+//        /**
+//         * 
+//         * @param main
+//         *            The thread in which the test is running.
+//         * @param lock
+//         *            A lock.
+//         */
+//        public ClientThread(final Thread main, final ReentrantLock lock) {
+//
+//            if (main == null)
+//                throw new IllegalArgumentException();
+//
+//            if (lock == null)
+//                throw new IllegalArgumentException();
+//
+//            this.mainThread = main;
+//
+//            this.lock = lock;
+//
+//            setDaemon(true);
+//
+//        }
+//
+//        public void run() {
+//
+//            try { 
+//
+//                run2();
+//
+//            } catch (Throwable t) {
+//
+//                // log error since won't be seen otherwise.
+//                log.error(t.getLocalizedMessage(), t);
+//
+//                // interrupt the main thread.
+//                mainThread.interrupt();
+//
+//            }
+//
+//        }
+//
+//        abstract void run2() throws Exception;
+//
+//    }
 
 //    /**
 //     * Recursively removes any files and subdirectories and then removes the

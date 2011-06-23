@@ -43,10 +43,10 @@ import com.bigdata.zookeeper.ZLockImpl;
  */
 public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
 
-    final static protected Logger log = Logger
+    final static private Logger log = Logger
             .getLogger(ServiceConfigurationZNodeMonitorTask.class);
 
-    protected final JiniFederation fed;
+    protected final JiniFederation<?> fed;
 
     protected final IServiceListener listener;
     
@@ -66,7 +66,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
      * @param className
      *            The class name (aka service type).
      */
-    public ServiceConfigurationZNodeMonitorTask(final JiniFederation fed,
+    public ServiceConfigurationZNodeMonitorTask(final JiniFederation<?> fed,
             final IServiceListener listener,
             final String className) {
 
@@ -125,6 +125,13 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
 
             try {
 
+                /*
+                 * Note: A NoNodeException will be thrown here (and logged
+                 * below) if the monitored znode does not exist. We will
+                 * eventually notice if that znode is created and then we can
+                 * start acquire the lock and run with it.
+                 */
+
                 acquireLockAndRun();
 
             } catch(Throwable t) {
@@ -137,7 +144,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
                     throw new RuntimeException(t);
                     
                 }
-                
+
                 log.error(this, t);
 
                 /*

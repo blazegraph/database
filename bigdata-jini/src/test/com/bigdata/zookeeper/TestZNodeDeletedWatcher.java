@@ -28,9 +28,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.zookeeper;
 
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
+import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.ZooDefs.Ids;
 
 /**
  * Test suite for {@link ZNodeDeletedWatcher}.
@@ -66,17 +72,21 @@ public class TestZNodeDeletedWatcher extends AbstractZooTestCase {
      * 
      * @throws KeeperException
      * @throws InterruptedException
+     * @throws ExecutionException 
+     * @throws TimeoutException 
      */
-    public void test_awaitDelete() throws KeeperException, InterruptedException {
+    public void test_awaitDelete() throws KeeperException, InterruptedException, ExecutionException, TimeoutException {
 
-        // a node that is guarenteed to be unique w/in the test namespace.
+        // a node that is guaranteed to be unique w/in the test namespace.
         final String zpath = "/test/" + getName() + UUID.randomUUID();
 
-        final Thread mainThread = Thread.currentThread();
-        
-        final Thread t = new Thread() {
+        // create that znode.
+        zookeeper.create(zpath, new byte[0], Ids.OPEN_ACL_UNSAFE,
+                CreateMode.PERSISTENT);
+
+        final Callable<Void> task = new Callable<Void>() {
             
-            public void run() {
+            public Void call() throws Exception {
                 
                 try {
 
@@ -84,13 +94,14 @@ public class TestZNodeDeletedWatcher extends AbstractZooTestCase {
                     
                     zookeeper.delete(zpath,-1);
                     
+                    return null;
+                    
                 } catch (Throwable t) {
                     
                     // log error 
                     log.error(t, t);
                     
-                    // interrupt the main thread.
-                    mainThread.interrupt();
+                    throw new RuntimeException(t);
                     
                 }
                 
@@ -98,15 +109,18 @@ public class TestZNodeDeletedWatcher extends AbstractZooTestCase {
 
         };
 
-        t.setDaemon(true);
-
-        t.start();
+        final FutureTask<Void> ft = new FutureTask<Void>(task);
+        
+        service.execute(ft);
 
         ZNodeDeletedWatcher.awaitDelete(zookeeper, zpath, 250,
                 TimeUnit.MILLISECONDS);
 
         // verify znode does not exist.
         assertNull(zookeeper.exists(zpath, false));
+
+        // Check for errors.
+        ft.get(2000,TimeUnit.MILLISECONDS);
         
     }
 

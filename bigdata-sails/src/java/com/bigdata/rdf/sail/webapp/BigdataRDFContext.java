@@ -6,6 +6,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,12 +24,13 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.MalformedQueryException;
-import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.impl.AbstractQuery;
 import org.openrdf.query.impl.DatasetImpl;
+import org.openrdf.query.parser.ParsedBooleanQuery;
+import org.openrdf.query.parser.ParsedGraphQuery;
 import org.openrdf.query.parser.ParsedQuery;
+import org.openrdf.query.parser.ParsedTupleQuery;
 import org.openrdf.query.parser.QueryParser;
-import org.openrdf.query.parser.sparql.SPARQLParserFactory;
 import org.openrdf.query.resultio.BooleanQueryResultFormat;
 import org.openrdf.query.resultio.BooleanQueryResultWriter;
 import org.openrdf.query.resultio.BooleanQueryResultWriterRegistry;
@@ -36,6 +38,7 @@ import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultWriter;
 import org.openrdf.query.resultio.TupleQueryResultWriterRegistry;
 import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.sail.SailQuery;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterRegistry;
@@ -61,7 +64,10 @@ import com.bigdata.rdf.sail.BigdataSailQuery;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
+import com.bigdata.rdf.sail.IBigdataParsedQuery;
 import com.bigdata.rdf.sail.QueryHints;
+import com.bigdata.rdf.sail.QueryType;
+import com.bigdata.rdf.sail.sparql.BigdataSPARQLParser;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.RelationSchema;
@@ -138,7 +144,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
 		m_config = config;
 
 		// used to parse queries.
-		m_queryParser = new SPARQLParserFactory().getParser();
+//		m_queryParser = new SPARQLParserFactory().getParser();
+		m_queryParser = new BigdataSPARQLParser();
 
         if (config.queryThreadPoolSize == 0) {
 
@@ -259,6 +266,18 @@ public class BigdataRDFContext extends BigdataBaseContext {
         protected final String queryStr;
 
         /**
+         * The baseURI is set from the effective request URI.
+         */
+        protected final String baseURI;
+
+        /**
+         * The {@link ParsedQuery}. This will be an {@link IBigdataParsedQuery}
+         * in order to provide access to the {@link QueryHints} and the
+         * {@link QueryType}.
+         */
+        protected final ParsedQuery parsedQuery;
+        
+        /**
          * A symbolic constant indicating the type of query.
          */
         protected final QueryType queryType;
@@ -287,11 +306,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
         
         /** Where to write the response. */
         protected final OutputStream os;
-
-        /**
-         * The baseURI is set from the effective request URI.
-         */
-        protected final String baseURI;
 
 //		/**
 //		 * Set to the timestamp as reported by {@link System#nanoTime()} when
@@ -357,6 +371,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 final String namespace,//
                 final long timestamp, //
                 final String queryStr,//
+                final String baseURI,
+                final ParsedQuery parsedQuery,//
                 final QueryType queryType,//
                 final String mimeType,//
                 final Charset charset,//
@@ -368,6 +384,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
             if (namespace == null)
                 throw new IllegalArgumentException();
             if (queryStr == null)
+                throw new IllegalArgumentException();
+            if (baseURI == null)
+                throw new IllegalArgumentException();
+            if (parsedQuery == null)
                 throw new IllegalArgumentException();
             if (queryType == null)
                 throw new IllegalArgumentException();
@@ -385,6 +405,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.namespace = namespace;
             this.timestamp = timestamp;
             this.queryStr = queryStr;
+            this.baseURI = baseURI;
+            this.parsedQuery = parsedQuery;
             this.queryType = queryType;
             this.mimeType = mimeType;
             this.charset = charset;
@@ -394,18 +416,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.os = os;
             this.queryId = Long.valueOf(m_queryIdFactory.incrementAndGet());
 //            this.queryId2 = UUID.randomUUID();
-
-            /*
-             * Setup the baseURI for this request. It will be set to the
-             * requestURI.
-             * 
-             * TODO This is basically a constant and should be set once rather
-             * than for each request. It should also be explicitly configurable
-             * in order to always choose a specific baseURI when there might be
-             * multiple ways in which the target service could have been
-             * addressed (e.g., different host names).
-             */
-            this.baseURI = req.getRequestURL().toString();
 
         }
 
@@ -452,13 +462,15 @@ public class BigdataRDFContext extends BigdataBaseContext {
 		 * query begins to execute and storing the {@link RunningQuery} in the
 		 * {@link #m_queries} map.
 		 * 
-         * @param query
+         * @param The connection.
          */
-        protected void setupQuery(final AbstractQuery query) {
+        AbstractQuery setupQuery(final BigdataSailRepositoryConnection cxn) {
 
-			// Note the begin time for the query.
-			final long begin =  System.nanoTime();
-			
+            // Note the begin time for the query.
+            final long begin =  System.nanoTime();
+            
+            final AbstractQuery query = newQuery(cxn);
+
         	// Figure out the UUID under which the query will execute.
         	final UUID queryId2 = setQueryId((BigdataSailQuery)query);
             
@@ -473,10 +485,52 @@ public class BigdataRDFContext extends BigdataBaseContext {
 			
 			// Stuff it in the map of running queries.
             m_queries.put(queryId, new RunningQuery(queryId.longValue(),
-                    queryId2, queryStr, begin));
+                    queryId2, queryStr, begin, this));
 
+            return sailQuery;
+            
         }
 
+        /**
+         * Wrap the {@link ParsedQuery} as a {@link SailQuery}.
+         * <p>
+         * Note: This is achieved without reparsing the query.
+         * 
+         * @param cxn
+         *            The connection.
+         *            
+         * @return The query.
+         */
+        private AbstractQuery newQuery(final BigdataSailRepositoryConnection cxn) {
+
+            final Properties queryHints = ((IBigdataParsedQuery) parsedQuery)
+                    .getQueryHints();
+
+            if (parsedQuery instanceof ParsedTupleQuery) {
+
+                return new BigdataSailTupleQuery(
+                        (ParsedTupleQuery) parsedQuery, cxn, queryHints);
+
+            } else if (parsedQuery instanceof ParsedGraphQuery) {
+
+                return new BigdataSailGraphQuery(
+                        (ParsedGraphQuery) parsedQuery, cxn, queryHints,
+                        QueryType.DESCRIBE == queryType);
+
+            } else if (parsedQuery instanceof ParsedBooleanQuery) {
+
+                return new BigdataSailBooleanQuery(
+                        (ParsedBooleanQuery) parsedQuery, cxn, queryHints);
+
+            } else {
+
+                throw new RuntimeException("Unexpected query type: "
+                        + parsedQuery.getClass());
+
+            }
+
+        }
+    
 		/**
 		 * Determines the {@link UUID} which will be associated with the
 		 * {@link IRunningQuery}. If {@link QueryHints#QUERYID} has already been
@@ -586,23 +640,22 @@ public class BigdataRDFContext extends BigdataBaseContext {
     private class AskQueryTask extends AbstractQueryTask {
 
         public AskQueryTask(final String namespace, final long timestamp,
-                final String queryStr, final QueryType queryType,
+                final String queryStr, final String baseURI,
+                final ParsedQuery parsedQuery, final QueryType queryType,
                 final BooleanQueryResultFormat format,
                 final HttpServletRequest req, final OutputStream os) {
 
-            super(namespace, timestamp, queryStr, queryType, format
-                    .getDefaultMIMEType(), format.getCharset(), format
-                    .getDefaultFileExtension(), req, os);
+            super(namespace, timestamp, queryStr, baseURI, parsedQuery,
+                    queryType, format.getDefaultMIMEType(),
+                    format.getCharset(), format.getDefaultFileExtension(), req,
+                    os);
 
         }
 
         protected void doQuery(final BigdataSailRepositoryConnection cxn,
                 final OutputStream os) throws Exception {
 
-            final BigdataSailBooleanQuery query = cxn.prepareBooleanQuery(
-                    QueryLanguage.SPARQL, queryStr, baseURI);
-
-            setupQuery(query);
+            final BigdataSailBooleanQuery query = (BigdataSailBooleanQuery) setupQuery(cxn);
             
             // Note: getQueryTask() verifies that format will be non-null.
             final BooleanQueryResultFormat format = BooleanQueryResultWriterRegistry
@@ -625,24 +678,23 @@ public class BigdataRDFContext extends BigdataBaseContext {
 	private class TupleQueryTask extends AbstractQueryTask {
 
         public TupleQueryTask(final String namespace, final long timestamp,
-                final String queryStr, final QueryType queryType,
+                final String queryStr, final String baseURI,
+                final ParsedQuery parsedQuery, final QueryType queryType,
                 final TupleQueryResultFormat format,
                 final HttpServletRequest req,
                 final OutputStream os) {
 
-            super(namespace, timestamp, queryStr, queryType, format
-                    .getDefaultMIMEType(), format.getCharset(), format
-                    .getDefaultFileExtension(), req, os);
+            super(namespace, timestamp, queryStr, baseURI, parsedQuery,
+                    queryType, format.getDefaultMIMEType(),
+                    format.getCharset(), format.getDefaultFileExtension(), req,
+                    os);
 
 		}
 
 		protected void doQuery(final BigdataSailRepositoryConnection cxn,
 				final OutputStream os) throws Exception {
 
-			final BigdataSailTupleQuery query = cxn.prepareTupleQuery(
-					QueryLanguage.SPARQL, queryStr, baseURI);
-
-            setupQuery(query);
+            final BigdataSailTupleQuery query = (BigdataSailTupleQuery) setupQuery(cxn);
 			
             // Note: getQueryTask() verifies that format will be non-null.
             final TupleQueryResultFormat format = TupleQueryResultWriterRegistry
@@ -663,14 +715,15 @@ public class BigdataRDFContext extends BigdataBaseContext {
     private class GraphQueryTask extends AbstractQueryTask {
 
         public GraphQueryTask(final String namespace, final long timestamp,
-                final String queryStr, final QueryType queryType,
-                final RDFFormat format, 
-                final HttpServletRequest req,
+                final String queryStr, final String baseURI,
+                final ParsedQuery parsedQuery, final QueryType queryType,
+                final RDFFormat format, final HttpServletRequest req,
                 final OutputStream os) {
 
-            super(namespace, timestamp, queryStr, queryType, format
-                    .getDefaultMIMEType(), format.getCharset(), format
-                    .getDefaultFileExtension(), req, os);
+            super(namespace, timestamp, queryStr, baseURI, parsedQuery,
+                    queryType, format.getDefaultMIMEType(),
+                    format.getCharset(), format.getDefaultFileExtension(), req,
+                    os);
 
         }
 
@@ -678,11 +731,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
 		protected void doQuery(final BigdataSailRepositoryConnection cxn,
 				final OutputStream os) throws Exception {
 
-			final BigdataSailGraphQuery query = cxn.prepareGraphQuery(
-					QueryLanguage.SPARQL, queryStr, baseURI);
-
-			setupQuery(query);
-
+            final BigdataSailGraphQuery query = (BigdataSailGraphQuery) setupQuery(cxn);
+            
             /*
              * FIXME An error thrown here (such as if format is null and we do
              * not check it) will cause the response to hang, at least for the
@@ -744,21 +794,25 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final HttpServletRequest req,//
             final OutputStream os) throws MalformedQueryException {
 
+
+        /*
+         * Setup the baseURI for this request. It will be set to the requestURI.
+         */
+        final String baseURI = req.getRequestURL().toString();
+
         /*
          * Parse the query so we can figure out how it will need to be executed.
          * 
-         * FIXME Parse the query once. [This will fail a query on its syntax.
-         * However, the logic used in the tasks to execute a query will not fail
-         * a bad query for some reason which I have not figured out yet.
-         * Therefore, we are in the position of having to parse the query here
-         * and then again when it is executed.]
+         * Note: This goes through some pains to make sure that we parse the
+         * query exactly once in order to minimize the resources associated with
+         * the query parser.
          */
-        final ParsedQuery q = m_queryParser.parseQuery(queryStr, null/*baseURI*/);
-        
+        final ParsedQuery parsedQuery = m_queryParser.parseQuery(queryStr, baseURI);
+
         if(log.isDebugEnabled())
-            log.debug(q.toString());
+            log.debug(parsedQuery.toString());
         
-        final QueryType queryType = QueryType.fromQuery(queryStr);
+        final QueryType queryType = ((IBigdataParsedQuery) parsedQuery).getQueryType();
 
 		/*
 		 * When true, provide an "explanation" for the query (query plan, query
@@ -788,8 +842,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final BooleanQueryResultFormat format = BooleanQueryResultFormat
                     .forMIMEType(acceptStr, BooleanQueryResultFormat.SPARQL);
 
-            return new AskQueryTask(namespace, timestamp, queryStr, queryType,
-                    format, req, os);
+            return new AskQueryTask(namespace, timestamp, queryStr, baseURI,
+                    parsedQuery, queryType, format, req, os);
 
         }
         case DESCRIBE:
@@ -798,8 +852,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final RDFFormat format = RDFFormat.forMIMEType(acceptStr,
                     RDFFormat.RDFXML);
 
-            return new GraphQueryTask(namespace, timestamp, queryStr,
-                    queryType, format, req, os);
+            return new GraphQueryTask(namespace, timestamp, queryStr, baseURI,
+                    parsedQuery, queryType, format, req, os);
 
         }
         case SELECT: {
@@ -807,8 +861,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final TupleQueryResultFormat format = TupleQueryResultFormat
                     .forMIMEType(acceptStr, TupleQueryResultFormat.SPARQL);
 
-            return new TupleQueryTask(namespace, timestamp, queryStr,
-                    queryType, format, req, os);
+            return new TupleQueryTask(namespace, timestamp, queryStr, baseURI,
+                    parsedQuery, queryType, format, req, os);
 
         }
         } // switch(queryType)
@@ -835,22 +889,30 @@ public class BigdataRDFContext extends BigdataBaseContext {
 		 */
 		final UUID queryId2;
 
-		/** The query. */
-		final String query;
+		/**
+		 * The task executing the query.
+		 */
+		final AbstractQueryTask queryTask;
+		
+//		/** The query. */
+//		final String query;
 		
 		/** The timestamp when the query was accepted (ns). */
 		final long begin;
 
 		public RunningQuery(final long queryId, final UUID queryId2,
-				final String query, final long begin) {
+				final String query, final long begin,
+				final AbstractQueryTask queryTask) {
 
 			this.queryId = queryId;
 
 			this.queryId2 = queryId2;
 			
-			this.query = query;
+//			this.query = query;
 
 			this.begin = begin;
+			
+			this.queryTask = queryTask;
 
 		}
 

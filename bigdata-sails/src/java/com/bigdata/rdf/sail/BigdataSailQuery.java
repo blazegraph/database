@@ -32,6 +32,8 @@ import org.openrdf.query.algebra.TupleExpr;
  * Extension API for bigdata queries.
  * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+ * 
+ * @see IBigdataParsedQuery
  */
 public interface BigdataSailQuery {
     

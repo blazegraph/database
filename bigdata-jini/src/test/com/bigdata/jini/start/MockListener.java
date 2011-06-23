@@ -15,17 +15,13 @@ import com.bigdata.jini.start.process.ProcessHelper;
  */
 public class MockListener implements IServiceListener {
 
-    protected static final Logger log = Logger.getLogger(MockListener.class);
-
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
+    private static final Logger log = Logger.getLogger(MockListener.class);
 
     public Queue<ProcessHelper> running = new ConcurrentLinkedQueue<ProcessHelper>();
 
     public void add(ProcessHelper service) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("adding: " + service);
 
         running.add(service);
@@ -34,7 +30,7 @@ public class MockListener implements IServiceListener {
 
     public void remove(ProcessHelper service) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("removing: " + service);
 
         running.remove(service);

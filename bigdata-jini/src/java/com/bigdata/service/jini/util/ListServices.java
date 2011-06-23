@@ -63,7 +63,7 @@ import com.bigdata.service.jini.JiniFederation;
  */
 public class ListServices {
     
-    protected static final Logger log = Logger.getLogger(ListServices.class);
+    private static final Logger log = Logger.getLogger(ListServices.class);
 
     protected static final String COMPONENT = ListServices.class.getName();
 

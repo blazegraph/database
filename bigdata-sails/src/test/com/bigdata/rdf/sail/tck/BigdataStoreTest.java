@@ -199,18 +199,33 @@ public class BigdataStoreTest extends RDFStoreTest {
         
     }
 
+//    /**
+//     * FIXME This one is failing because of this code:
+//     * <code>
+//     * bindings.addBinding("Y", painter);
+//     * iter = con.evaluate(tupleExpr, null, bindings, false);
+//     * resultCount = verifyQueryResult(iter, 1);
+//     * </code>
+//     * Adding a binding for the "Y" variable causes that binding to appear in
+//     * the result set, even though "Y" is not one of the selected variables. This
+//     * is a bigdata bug and should be fixed.
+//     * 
+//     * @see https://sourceforge.net/apps/trac/bigdata/ticket/254
+//     */
+//    @Override
+//    public void testQueryBindings()
+//        throws Exception
+//    {
+//        log.warn("FIXME");
+//        super.testQueryBindings();
+//    }
+
     /**
-     * FIXME This one is failing because of this code:
-     * <code>
-     * bindings.addBinding("Y", painter);
-     * iter = con.evaluate(tupleExpr, null, bindings, false);
-     * resultCount = verifyQueryResult(iter, 1);
-     * </code>
-     * Adding a binding for the "Y" variable causes that binding to appear in
-     * the result set, even though "Y" is not one of the selected variables. This
-     * is a bigdata bug and should be fixed.
+     * FIXME This one is failing because we cannot handle literals longer than
+     * 65535 characters. This is a known issue. It has been resolved in the
+     * TERMS branch.
      * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/254
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/109
      */
     @Override
     public void testQueryBindings()
@@ -220,6 +235,10 @@ public class BigdataStoreTest extends RDFStoreTest {
         super.testQueryBindings();
     }
 
+//  Note: This issue has been resolved in the TERMS branch.  We are getting a
+//  merge conflict here when merging from the QUADS branch. It should be resolved
+//  by just making sure that testReallyLongLiteralRoundTrip() is no longer 
+//  overridden by BigdataStoreTest.
 //	/**
 //	 * FIXME This one is failing because we cannot handle literals longer than
 //	 * 65535 characters. This is a known issue.

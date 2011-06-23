@@ -30,10 +30,15 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.OverlappingFileLockException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 
 import org.apache.log4j.Logger;
 
@@ -116,6 +121,23 @@ public class TestDoubleOpen extends ProxyTestCase<Journal> {
      *     at com.bigdata.journal.FileMetadata.<init>(FileMetadata.java:420)
      *     ... 10 more
      * </pre>
+     * Here is another odd exception which can be thrown (Windows XP)
+     * <pre>
+     * Caused by: java.lang.NullPointerException
+     *     at sun.nio.ch.FileChannelImpl$SharedFileLockTable.remove(FileChannelImpl.java:1100)
+     *     at sun.nio.ch.FileChannelImpl.tryLock(FileChannelImpl.java:881)
+     *     at com.bigdata.journal.FileMetadata.reopenChannel(FileMetadata.java:1188)
+     *     at com.bigdata.journal.FileMetadata.access$0(FileMetadata.java:1156)
+     *     at com.bigdata.journal.FileMetadata$1.reopenChannel(FileMetadata.java:1141)
+     *     at com.bigdata.journal.FileMetadata$1.reopenChannel(FileMetadata.java:1)
+     *     at com.bigdata.journal.FileMetadata.<init>(FileMetadata.java:923)
+     *     at com.bigdata.journal.FileMetadata.createInstance(FileMetadata.java:1448)
+     *     at com.bigdata.journal.AbstractJournal.<init>(AbstractJournal.java:870)
+     *     at com.bigdata.journal.Journal.<init>(Journal.java:228)
+     *     at com.bigdata.journal.Journal.<init>(Journal.java:221)
+     *     at com.bigdata.journal.TestDoubleOpen$DoubleOpenTask.call(TestDoubleOpen.java:239)
+     *     ... 6 more
+     * </pre>
      * 
      * @todo test read-only for 1st open and read-write for 2nd.
      * 
@@ -147,97 +169,59 @@ public class TestDoubleOpen extends ProxyTestCase<Journal> {
 
             p.setProperty(Journal.Options.FILE, file.toString());
 
-            final int LIMIT = 1000;
+            final int LIMIT = 5000;
+            
+            final int nthreads = 4;
+            
+            // Setup the tasks to be run.
+            final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
             
             for (int i = 0; i < LIMIT; i++) {
+            
+                tasks.add(new DoubleOpenTask(i,p));
+                
+            }
 
-                if(log.isInfoEnabled()) {
+            final ExecutorService service = Executors.newFixedThreadPool(nthreads);
+            
+            try {
+
+                ((ThreadPoolExecutor)service).prestartAllCoreThreads();
+                
+                // Run tasks.
+                final List<Future<Void>> futures = service.invokeAll(tasks);
+                
+                // Check futures.  Stops at the first error.
+                for(Future<Void> f : futures) {
                     
-                    log.info("Pass # "+i+" of "+LIMIT);
+                    if(f.isCancelled()) {
+                        // Ignore cancelled tasks.
+                        continue;
+                    }
+
+                    f.get();
                     
                 }
                 
-                /*
-                 * Try to double-open the journal.
-                 */
-                
-                final Future<Void> future = journal.getExecutorService()
-                        .submit(new Callable<Void>() {
+//                for (int i = 0; i < LIMIT; i++) {
+//
+//                    if (log.isInfoEnabled())
+//                        log.info("Pass # " + i + " of " + LIMIT);
+//
+//                    /*
+//                     * Try to double-open the journal.
+//                     */
+//
+//                    final Future<Void> future = journal.getExecutorService()
+//                            .submit(new DoubleOpenTask(p));
+//
+//                    future.get();
+//
+//                }
 
-                            //@Override
-                            public Void call() throws Exception {
+            } finally {
 
-                                Journal tmp = null;
-//                                boolean didDoubleOpen = false;
-                                try {
-
-                                    tmp = new Journal(p);
-
-//                                    /*
-//                                     * Note: An assertion will be throw after
-//                                     * the try / catch clause.
-//                                     */
-//                                    didDoubleOpen = true;
-//                                    
-//                                    if (didDoubleOpen)
-                                    fail("Double-open of journal is not allowed");
-
-                                } catch (Throwable t) {
-
-                                    Throwable cause;
-
-                                    if ((cause = InnerCause.getInnerCause(t,
-                                            OverlappingFileLockException.class)) != null) {
-
-                                        /*
-                                         * This is the expected exception per
-                                         * the javadoc.
-                                         */
-
-                                        if (log.isInfoEnabled())
-                                            log.info("Double-open refused: "
-                                                    + cause, t);
-
-                                    } else if ((cause = InnerCause
-                                            .getInnerCause(t, IOException.class)) != null) {
-
-                                        /*
-                                         * This is another exception which does
-                                         * in fact occur some percentage of the
-                                         * time.
-                                         */
-
-                                        if (log.isInfoEnabled())
-                                            log.info("Double-open refused: "
-                                                    + cause, t);
-
-                                    } else {
-
-                                        fail(
-                                                "Expecting: "
-                                                        + OverlappingFileLockException.class
-                                                        + " or "
-                                                        + IOException.class
-                                                        + " ('The handle is invalid')",
-                                                t);
-
-                                    }
-
-                                } finally {
-                                    
-                                    if (tmp != null) {
-                                        // Ensure closed if double opened.
-                                        tmp.close();
-                                    }
-                                    
-                                }
-
-                                return null;
-
-                            }
-                        });
-
-                future.get();
+                service.shutdownNow();
 
             }
 
@@ -248,5 +232,93 @@ public class TestDoubleOpen extends ProxyTestCase<Journal> {
         }
 
     }
+
+    /**
+     * Helper class attempts to open a {@link Journal} which should already be
+     * open in the main thread.
+     */
+    private static class DoubleOpenTask implements Callable<Void> {
+    
+        final int i;
+        final Properties p;
         
+        public DoubleOpenTask(final int i, final Properties p) {
+            
+            this.p = p;
+            
+            this.i = i;
+            
+        }
+        
+        //@Override
+        public Void call() throws Exception {
+
+            Journal tmp = null;
+//            boolean didDoubleOpen = false;
+            try {
+
+                tmp = new Journal(p);
+
+//                /*
+//                 * Note: An assertion will be throw after
+//                 * the try / catch clause.
+//                 */
+//                didDoubleOpen = true;
+//                
+//                if (didDoubleOpen)
+                fail("Double-open of journal is not allowed: index=" + i);
+
+            } catch (Throwable t) {
+
+                Throwable cause;
+
+                if ((cause = InnerCause.getInnerCause(t,
+                        OverlappingFileLockException.class)) != null) {
+
+                    /*
+                     * This is the expected exception per
+                     * the javadoc.
+                     */
+
+                    if (log.isInfoEnabled())
+                        log.info("Double-open refused: index=" + i + " : "
+                                + cause, t);
+
+                } else if ((cause = InnerCause
+                        .getInnerCause(t, IOException.class)) != null) {
+
+                    /*
+                     * This is another exception which does
+                     * in fact occur some percentage of the
+                     * time.
+                     */
+
+                    if (log.isInfoEnabled())
+                        log.info("Double-open refused: index=" + i + " : "
+                                + cause, t);
+
+                } else {
+
+                    fail("Expecting: index=" + i + " : "
+                            + OverlappingFileLockException.class + " or "
+                            + IOException.class + " ('The handle is invalid')",
+                            t);
+
+                }
+
+            } finally {
+                
+                if (tmp != null) {
+                    // Ensure closed if double opened.
+                    tmp.close();
+                }
+                
+            }
+
+            return null;
+
+        }
+
+    }
+    
 }

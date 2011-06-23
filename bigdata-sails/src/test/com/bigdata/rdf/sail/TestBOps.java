@@ -46,7 +46,6 @@ import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.impl.BindingImpl;
 
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
@@ -56,12 +55,12 @@ import com.bigdata.rdf.vocab.NoVocabulary;
  */
 public class TestBOps extends ProxyBigdataSailTestCase {
 
-    protected static final Logger log = Logger.getLogger(TestBOps.class);
+    private static final Logger log = Logger.getLogger(TestBOps.class);
     
     @Override
     public Properties getProperties() {
         
-        Properties props = super.getProperties();
+        final Properties props = super.getProperties();
         
         props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
         props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
@@ -89,6 +88,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
     public void testSimpleJoin() throws Exception {
 
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
@@ -97,17 +97,17 @@ public class TestBOps extends ProxyBigdataSailTestCase {
         
         try {
     
-            final ValueFactory vf = sail.getValueFactory();
+//            final ValueFactory vf = sail.getValueFactory();
             
             final String ns = BD.NAMESPACE;
             
-            URI mike = new URIImpl(ns+"Mike");
-            URI bryan = new URIImpl(ns+"Bryan");
-            URI person = new URIImpl(ns+"Person");
-            URI likes = new URIImpl(ns+"likes");
-            URI rdf = new URIImpl(ns+"RDF");
-            Literal l1 = new LiteralImpl("Mike");
-            Literal l2 = new LiteralImpl("Bryan");
+            final URI mike = new URIImpl(ns+"Mike");
+            final URI bryan = new URIImpl(ns+"Bryan");
+            final URI person = new URIImpl(ns+"Person");
+            final URI likes = new URIImpl(ns+"likes");
+            final URI rdf = new URIImpl(ns+"RDF");
+            final Literal l1 = new LiteralImpl("Mike");
+            final Literal l2 = new LiteralImpl("Bryan");
 /**/
             cxn.setNamespace("ns", ns);
             
@@ -132,7 +132,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
 
             {
                 
-                String query = 
+                final String query = 
                     "PREFIX rdf: <"+RDF.NAMESPACE+"> " +
                     "PREFIX rdfs: <"+RDFS.NAMESPACE+"> " +
                     "PREFIX ns: <"+ns+"> " +
@@ -146,13 +146,13 @@ public class TestBOps extends ProxyBigdataSailTestCase {
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                TupleQueryResult result = tupleQuery.evaluate();
+                final TupleQueryResult result = tupleQuery.evaluate();
                 
 //                while (result.hasNext()) {
 //                    System.err.println(result.next());
 //                }
  
-                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+                final Collection<BindingSet> solution = new LinkedList<BindingSet>();
                 solution.add(createBindingSet(new Binding[] {
                     new BindingImpl("s", mike),
                     new BindingImpl("likes", rdf),
@@ -167,9 +167,10 @@ public class TestBOps extends ProxyBigdataSailTestCase {
                 compare(result, solution);
                 
             }
-            
-        } finally {
+        } finally { 
             cxn.close();
+        }
+        } finally {
             sail.__tearDownUnitTest();
         }
 
@@ -178,6 +179,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
     public void testSimpleConstraint() throws Exception {
 
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
@@ -190,17 +192,17 @@ public class TestBOps extends ProxyBigdataSailTestCase {
             
             final String ns = BD.NAMESPACE;
             
-            URI jill = new URIImpl(ns+"Jill");
-            URI jane = new URIImpl(ns+"Jane");
-            URI person = new URIImpl(ns+"Person");
-            URI age = new URIImpl(ns+"age");
-            URI IQ = new URIImpl(ns+"IQ");
-            Literal l1 = new LiteralImpl("Jill");
-            Literal l2 = new LiteralImpl("Jane");
-            Literal age1 = vf.createLiteral(20);
-            Literal age2 = vf.createLiteral(30);
-            Literal IQ1 = vf.createLiteral(130);
-            Literal IQ2 = vf.createLiteral(140);
+            final URI jill = new URIImpl(ns+"Jill");
+            final URI jane = new URIImpl(ns+"Jane");
+            final URI person = new URIImpl(ns+"Person");
+            final URI age = new URIImpl(ns+"age");
+            final URI IQ = new URIImpl(ns+"IQ");
+            final Literal l1 = new LiteralImpl("Jill");
+            final Literal l2 = new LiteralImpl("Jane");
+            final Literal age1 = vf.createLiteral(20);
+            final Literal age2 = vf.createLiteral(30);
+            final Literal IQ1 = vf.createLiteral(130);
+            final Literal IQ2 = vf.createLiteral(140);
 /**/
             cxn.setNamespace("ns", ns);
             
@@ -227,7 +229,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
 
             {
                 
-                String query = 
+                final String query = 
                     "PREFIX rdf: <"+RDF.NAMESPACE+"> " +
                     "PREFIX rdfs: <"+RDFS.NAMESPACE+"> " +
                     "PREFIX ns: <"+ns+"> " +
@@ -243,13 +245,13 @@ public class TestBOps extends ProxyBigdataSailTestCase {
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                TupleQueryResult result = tupleQuery.evaluate();
+                final TupleQueryResult result = tupleQuery.evaluate();
                 
 //                while (result.hasNext()) {
 //                    System.err.println(result.next());
 //                }
  
-                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+                final Collection<BindingSet> solution = new LinkedList<BindingSet>();
                 solution.add(createBindingSet(new Binding[] {
                     new BindingImpl("s", jill),
                     new BindingImpl("age", age1),
@@ -260,9 +262,10 @@ public class TestBOps extends ProxyBigdataSailTestCase {
                 compare(result, solution);
                 
             }
-            
         } finally {
             cxn.close();
+        }
+        } finally {
             sail.__tearDownUnitTest();
         }
 
@@ -271,6 +274,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
     public void testSimpleOptional() throws Exception {
 
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
@@ -279,17 +283,17 @@ public class TestBOps extends ProxyBigdataSailTestCase {
         
         try {
     
-            final ValueFactory vf = sail.getValueFactory();
+//            final ValueFactory vf = sail.getValueFactory();
             
             final String ns = BD.NAMESPACE;
             
-            URI mike = new URIImpl(ns+"Mike");
-            URI bryan = new URIImpl(ns+"Bryan");
-            URI person = new URIImpl(ns+"Person");
-            URI likes = new URIImpl(ns+"likes");
-            URI rdf = new URIImpl(ns+"RDF");
-            Literal l1 = new LiteralImpl("Mike");
-            Literal l2 = new LiteralImpl("Bryan");
+            final URI mike = new URIImpl(ns+"Mike");
+            final URI bryan = new URIImpl(ns+"Bryan");
+            final URI person = new URIImpl(ns+"Person");
+            final URI likes = new URIImpl(ns+"likes");
+            final URI rdf = new URIImpl(ns+"RDF");
+            final Literal l1 = new LiteralImpl("Mike");
+//            final Literal l2 = new LiteralImpl("Bryan");
 /**/
             cxn.setNamespace("ns", ns);
             
@@ -314,7 +318,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
 
             {
                 
-                String query = 
+                final String query = 
                     "PREFIX rdf: <"+RDF.NAMESPACE+"> " +
                     "PREFIX rdfs: <"+RDFS.NAMESPACE+"> " +
                     "PREFIX ns: <"+ns+"> " +
@@ -328,13 +332,13 @@ public class TestBOps extends ProxyBigdataSailTestCase {
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                TupleQueryResult result = tupleQuery.evaluate();
+                final TupleQueryResult result = tupleQuery.evaluate();
                 
 //                while (result.hasNext()) {
 //                    System.err.println(result.next());
 //                }
  
-                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+                final Collection<BindingSet> solution = new LinkedList<BindingSet>();
                 solution.add(createBindingSet(new Binding[] {
                     new BindingImpl("s", mike),
                     new BindingImpl("likes", rdf),
@@ -349,9 +353,10 @@ public class TestBOps extends ProxyBigdataSailTestCase {
                 compare(result, solution);
                 
             }
-            
         } finally {
             cxn.close();
+        }
+        } finally {
             sail.__tearDownUnitTest();
         }
 
@@ -360,6 +365,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
     public void testOrEquals() throws Exception {
 
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
@@ -368,20 +374,20 @@ public class TestBOps extends ProxyBigdataSailTestCase {
         
         try {
     
-            final ValueFactory vf = sail.getValueFactory();
-    
-            final LexiconRelation lex = sail.getDatabase().getLexiconRelation();
+//            final ValueFactory vf = sail.getValueFactory();
+//    
+//            final LexiconRelation lex = sail.getDatabase().getLexiconRelation();
             
             final String ns = BD.NAMESPACE;
             
-            URI mike = new URIImpl(ns+"Mike");
-            URI bryan = new URIImpl(ns+"Bryan");
-            URI martyn = new URIImpl(ns+"Martyn");
-            URI person = new URIImpl(ns+"Person");
-            URI p = new URIImpl(ns+"p");
-            Literal l1 = new LiteralImpl("Mike");
-            Literal l2 = new LiteralImpl("Bryan");
-            Literal l3 = new LiteralImpl("Martyn");
+            final URI mike = new URIImpl(ns+"Mike");
+            final URI bryan = new URIImpl(ns+"Bryan");
+            final URI martyn = new URIImpl(ns+"Martyn");
+            final URI person = new URIImpl(ns+"Person");
+            final URI p = new URIImpl(ns+"p");
+            final Literal l1 = new LiteralImpl("Mike");
+            final Literal l2 = new LiteralImpl("Bryan");
+            final Literal l3 = new LiteralImpl("Martyn");
 /**/
             cxn.setNamespace("ns", ns);
             
@@ -420,13 +426,13 @@ public class TestBOps extends ProxyBigdataSailTestCase {
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                TupleQueryResult result = tupleQuery.evaluate();
+                final TupleQueryResult result = tupleQuery.evaluate();
                 
 //                while (result.hasNext()) {
 //                    System.err.println(result.next());
 //                }
  
-                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+                final Collection<BindingSet> solution = new LinkedList<BindingSet>();
                 solution.add(createBindingSet(new Binding[] {
                     new BindingImpl("s", mike),
                     new BindingImpl("p", RDFS.LABEL),
@@ -441,9 +447,10 @@ public class TestBOps extends ProxyBigdataSailTestCase {
                 compare(result, solution);
                 
             }
-            
         } finally {
             cxn.close();
+        }
+        } finally {
             sail.__tearDownUnitTest();
         }
 
@@ -452,6 +459,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
     public void testHashJoin() throws Exception {
 
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
@@ -460,21 +468,21 @@ public class TestBOps extends ProxyBigdataSailTestCase {
         
         try {
     
-            final ValueFactory vf = sail.getValueFactory();
-    
-            final LexiconRelation lex = sail.getDatabase().getLexiconRelation();
+//            final ValueFactory vf = sail.getValueFactory();
+//    
+//            final LexiconRelation lex = sail.getDatabase().getLexiconRelation();
             
             final String ns = BD.NAMESPACE;
             
-            URI mikeA = new URIImpl(ns+"MikeA");
-            URI mikeB = new URIImpl(ns+"MikeB");
-            URI bryan = new URIImpl(ns+"Bryan");
-            URI martyn = new URIImpl(ns+"Martyn");
-            URI person = new URIImpl(ns+"Person");
-            URI name = new URIImpl(ns+"name");
-            Literal l1 = new LiteralImpl("Mike");
-            Literal l2 = new LiteralImpl("Bryan");
-            Literal l3 = new LiteralImpl("Martyn");
+            final URI mikeA = new URIImpl(ns+"MikeA");
+            final URI mikeB = new URIImpl(ns+"MikeB");
+            final URI bryan = new URIImpl(ns+"Bryan");
+            final URI martyn = new URIImpl(ns+"Martyn");
+            final URI person = new URIImpl(ns+"Person");
+            final URI name = new URIImpl(ns+"name");
+            final Literal l1 = new LiteralImpl("Mike");
+            final Literal l2 = new LiteralImpl("Bryan");
+            final Literal l3 = new LiteralImpl("Martyn");
 /**/
             cxn.setNamespace("ns", ns);
             
@@ -525,7 +533,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
 ////                    "  filter(!bound(?s2) || ?s1 != ?s2) . " +
 //                    "}";
                 
-                String query = 
+                final String query = 
                     "PREFIX "+QueryHints.PREFIX+": <"+QueryHints.NAMESPACE+QueryHints.HASH_JOIN+"=true> " +
                     "PREFIX rdf: <"+RDF.NAMESPACE+"> " +
                     "PREFIX rdfs: <"+RDFS.NAMESPACE+"> " +
@@ -546,11 +554,12 @@ public class TestBOps extends ProxyBigdataSailTestCase {
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                TupleQueryResult result = tupleQuery.evaluate();
+                final TupleQueryResult result = tupleQuery.evaluate();
                 
                 while (result.hasNext()) {
                     final BindingSet tmp = result.next();
-                    if(log.isInfoEnabled())log.info(tmp.toString());
+                    if (log.isInfoEnabled())
+                        log.info(tmp.toString());
                 }
  
 //                Collection<BindingSet> solution = new LinkedList<BindingSet>();
@@ -568,9 +577,10 @@ public class TestBOps extends ProxyBigdataSailTestCase {
 //                compare(result, solution);
                 
             }
-            
         } finally {
             cxn.close();
+        }
+        } finally {
             sail.__tearDownUnitTest();
         }
 

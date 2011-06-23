@@ -335,7 +335,7 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
                 metadata.getBtreeRecordCompressorFactory()
                 );
 
-        this.readOnly = readOnly;
+//        this.readOnly = readOnly;
         
         if (checkpoint == null) {
 
@@ -600,11 +600,11 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
             
     }
     
-    final public boolean isReadOnly() {
-     
-        return readOnly;
-        
-    }
+//    final public boolean isReadOnly() {
+//     
+//        return readOnly;
+//        
+//    }
     
 //    /**
 //     * Mark the B+Tree as read-only. Once the B+Tree is marked as read-only,
@@ -629,7 +629,7 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
 //        this.readOnly = readOnly;
 //        
 //    }
-    final private boolean readOnly;
+//    final private boolean readOnly;
     
     final public long getLastCommitTime() {
         

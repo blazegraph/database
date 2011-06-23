@@ -31,7 +31,7 @@ package com.bigdata.sparse;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
-import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.sparse.TPS.TPV;
@@ -96,14 +96,13 @@ public class TimestampChooser implements IRowStoreConstants {
                 return MillisecondTimestampFactory.nextMillis();
                 
             }
-            
+
             /*
-             * The backing store will be some kind of AbstractJournal - either
-             * a Journal or a ManagedJournal.
+             * The backing store will be some kind of IJournal - a Journal, a
+             * ManagedJournal, an IsolatedActionJournal, etc.
              */
 
-            final AbstractJournal journal = (AbstractJournal) mutableBTree
-                    .getStore();
+            final IJournal journal = (IJournal) mutableBTree.getStore();
 
             /*
              * This will be locally unique for a Journal and federation-wide

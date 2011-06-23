@@ -28,9 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.zookeeper;
 
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.zookeeper.KeeperException;
 
@@ -63,17 +65,19 @@ public class TestZooQueue extends AbstractZooTestCase {
      * 
      * @throws KeeperException
      * @throws InterruptedException
+     * @throws TimeoutException 
+     * @throws ExecutionException 
      */
-    public void test_queue() throws KeeperException, InterruptedException {
+    public void test_queue() throws KeeperException, InterruptedException, ExecutionException, TimeoutException {
         
         final String zroot = "/test/" + getName() + UUID.randomUUID();
         
         final ZooQueue<String> queue = new ZooQueue<String>(zookeeper, zroot,
                 acl, Integer.MAX_VALUE/*capacity*/);
 
-        final ReentrantLock lock = new ReentrantLock();
-
-        final Condition consumerDone = lock.newCondition();
+//        final ReentrantLock lock = new ReentrantLock();
+//
+//        final Condition consumerDone = lock.newCondition();
 
         assertEquals(0, queue.size());
 
@@ -85,43 +89,55 @@ public class TestZooQueue extends AbstractZooTestCase {
 
         assertEquals(2, queue.size());
 
-        new ClientThread(Thread.currentThread(), lock) {
-
-            public void run2() throws Exception {
-
-                assertEquals(2, queue.size());
-
-                assertEquals("1", queue.remove());
-
-                assertEquals(1, queue.size());
-
-                assertEquals("2", queue.remove());
-
-                assertEquals(0, queue.size());
-
-                lock.lock();
+        final FutureTask<Void> ft1 = new FutureTask<Void>(new Callable<Void>() {
+            
+            public Void call() throws Exception {
+            
                 try {
-                    consumerDone.signal();
-                } finally {
-                    lock.unlock();
+                    assertEquals(2, queue.size());
+
+                    assertEquals("1", queue.remove());
+
+                    assertEquals(1, queue.size());
+
+                    assertEquals("2", queue.remove());
+
+                    assertEquals(0, queue.size());
+
+//                    lock.lock();
+//                    try {
+//                        consumerDone.signal();
+//                    } finally {
+//                        lock.unlock();
+//                    }
+
+                    return null;
+                } catch (Throwable t) {
+                    log.error(t, t);
+                    throw new RuntimeException(t);
                 }
-
             }
+        });
 
-        }.start();
+        // Run task
+        service.execute(ft1);
 
-        lock.lock();
-        try {
-            consumerDone.await(500, TimeUnit.MILLISECONDS);
-        } finally {
-            lock.unlock();
-        }
+        // Wait for future/error.
+        ft1.get(1000, TimeUnit.MILLISECONDS);
+        
+//        // The condition should have been signaled.
+//        lock.lock();
+//        try {
+//            consumerDone.await(500, TimeUnit.MILLISECONDS);
+//        } finally {
+//            lock.unlock();
+//        }
 
         assertEquals(0, queue.size());
 
     }
 
-    public void test_queueBlocks() throws KeeperException, InterruptedException {
+    public void test_queueBlocks() throws KeeperException, InterruptedException, ExecutionException, TimeoutException {
         
         final String zroot = "/test/" + getName() + UUID.randomUUID();
         
@@ -130,11 +146,12 @@ public class TestZooQueue extends AbstractZooTestCase {
         final ZooQueue<String> queue = new ZooQueue<String>(zookeeper, zroot,
                 acl, capacity);
 
-        final ReentrantLock unusedLock = new ReentrantLock();
-
-        new ClientThread(Thread.currentThread(), unusedLock) {
-
-            public void run2() throws Exception {
+//        final ReentrantLock unusedLock = new ReentrantLock();
+  
+        // task will fill the queue to its capacity and then block.
+        final FutureTask<Void> ftProducer = new FutureTask<Void>(new Callable<Void>() {
+  
+            public Void call() throws Exception {
 
                 assertEquals(2, queue.capacity());
 
@@ -154,20 +171,32 @@ public class TestZooQueue extends AbstractZooTestCase {
                 
                 log.info("Producer done.");
                 
+                return null;
+                
             }
-
-        }.start();
+        });
+        
+        // start task.
+        service.execute(ftProducer);
         
         int size;
         while ((size = queue.size()) < capacity) {
 
-            log.info("size=" + size);
+            if(log.isInfoEnabled())
+                log.info("size=" + size);
             
             Thread.sleep(10/* ms */);
             
+            if(ftProducer.isDone()) {
+                // The task SHOULD NOT be done.
+                ftProducer.get();
+                throw new AssertionError();
+            }
+            
         }
 
-        log.info("Queue is at capacity: size=" + queue.size());
+        if(log.isInfoEnabled())
+            log.info("Queue is at capacity: size=" + queue.size());
 
         /* Make sure that the producer is blocked.  If it is not blocked
          * then the producer will add another element and the queue will
@@ -178,44 +207,64 @@ public class TestZooQueue extends AbstractZooTestCase {
         // queue is still at capacity.
         assertEquals(capacity, queue.size());
         
+        if(ftProducer.isDone()) {
+            // The task SHOULD NOT be done.
+            ftProducer.get();
+            throw new AssertionError();
+        }
+
         // take an item from the queue.
         assertEquals("A",queue.remove());
         
         // producer should now complete.
-        Thread.sleep(50/* ms */);
+        ftProducer.get(1000, TimeUnit.MILLISECONDS);
 
         // queue is back at capacity.
         assertEquals(2, queue.size());
-        
+
         /*
          * Now verify that we can detect when the queue becomes empty.
          */
+
+        final FutureTask<Void> ftConsumer = new FutureTask<Void>(
+                new Callable<Void>() {
+
+                    public Void call() throws Exception {
+
+                        try {
+
+                            assertEquals(2, queue.capacity());
+
+                            assertEquals(2, queue.size());
+
+                            assertEquals("B", queue.remove());
+
+                            assertEquals(1, queue.size());
+
+                            // Wait to give awaitEmpty() a chance in the main
+                            // thread.
+                            Thread.sleep(500/* ms */);
+
+                            assertEquals("C", queue.remove());
+
+                            assertEquals(0, queue.size());
+
+                            log.info("Consumer done.");
+
+                            return null;
+
+                        } catch (Throwable t) {
+
+                            log.error(t, t);
+
+                            throw new RuntimeException(t);
+
+                        }
+                    }
+                });
+
+        service.execute(ftConsumer);
         
-        new ClientThread(Thread.currentThread(), unusedLock) {
-
-            public void run2() throws Exception {
-
-                assertEquals(2, queue.capacity());
-
-                assertEquals(2, queue.size());
-                
-                assertEquals("B", queue.remove());
-                
-                assertEquals(1, queue.size());
-                
-                // Wait to give awaitEmpty() a chance in the main thread.
-                Thread.sleep(500/*ms*/);
-                
-                assertEquals("C", queue.remove());
-                
-                assertEquals(0, queue.size());
-
-                log.info("Consumer done.");
-                
-            }
-
-        }.start();
-       
         log.info("Will wait for queue to become empty");
         
         // not empty yet.
@@ -224,6 +273,9 @@ public class TestZooQueue extends AbstractZooTestCase {
         queue.awaitEmpty();
 
         assertEquals(0, queue.size());
+        
+        // check the future.
+        ftConsumer.get(1000,TimeUnit.MILLISECONDS);
 
     }
 

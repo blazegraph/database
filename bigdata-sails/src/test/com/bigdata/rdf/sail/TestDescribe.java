@@ -49,12 +49,12 @@ import com.bigdata.rdf.vocab.NoVocabulary;
  */
 public class TestDescribe extends ProxyBigdataSailTestCase {
 
-	protected static Logger log = Logger.getLogger(TestDescribe.class);
+	private static Logger log = Logger.getLogger(TestDescribe.class);
 	
     @Override
     public Properties getProperties() {
         
-        Properties props = super.getProperties();
+        final Properties props = super.getProperties();
         
         props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
         props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
@@ -82,6 +82,7 @@ public class TestDescribe extends ProxyBigdataSailTestCase {
     public void testSingleDescribe() throws Exception {
 
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
@@ -90,14 +91,14 @@ public class TestDescribe extends ProxyBigdataSailTestCase {
         
         try {
     
-            URI mike = new URIImpl(BD.NAMESPACE+"Mike");
-            URI bryan = new URIImpl(BD.NAMESPACE+"Bryan");
-            URI person = new URIImpl(BD.NAMESPACE+"Person");
-            URI likes = new URIImpl(BD.NAMESPACE+"likes");
-            URI rdf = new URIImpl(BD.NAMESPACE+"RDF");
-            URI rdfs = new URIImpl(BD.NAMESPACE+"RDFS");
-            Literal label1 = new LiteralImpl("Mike");
-            Literal label2 = new LiteralImpl("Bryan");
+            final URI mike = new URIImpl(BD.NAMESPACE+"Mike");
+            final URI bryan = new URIImpl(BD.NAMESPACE+"Bryan");
+            final URI person = new URIImpl(BD.NAMESPACE+"Person");
+            final URI likes = new URIImpl(BD.NAMESPACE+"likes");
+            final URI rdf = new URIImpl(BD.NAMESPACE+"RDF");
+            final URI rdfs = new URIImpl(BD.NAMESPACE+"RDFS");
+            final Literal label1 = new LiteralImpl("Mike");
+            final Literal label2 = new LiteralImpl("Bryan");
 /**/
             cxn.add(mike, RDF.TYPE, person);
             cxn.add(mike, likes, rdf);
@@ -121,7 +122,7 @@ public class TestDescribe extends ProxyBigdataSailTestCase {
 
             {
                 
-                String query = 
+                final String query = 
                 	"prefix bd: <"+BD.NAMESPACE+"> " +
                 	"prefix rdf: <"+RDF.NAMESPACE+"> " +
                 	"prefix rdfs: <"+RDFS.NAMESPACE+"> " +
@@ -171,20 +172,22 @@ public class TestDescribe extends ProxyBigdataSailTestCase {
 */                
                 final BigdataSailGraphQuery graphQuery = (BigdataSailGraphQuery) 
                     cxn.prepareGraphQuery(QueryLanguage.SPARQL, query);
-                GraphQueryResult result = graphQuery.evaluate();
+                final GraphQueryResult result = graphQuery.evaluate();
                 
                 final TupleExpr tupleExpr = graphQuery.getTupleExpr();
-                log.info(tupleExpr);
+                if(log.isInfoEnabled())
+                    log.info(tupleExpr);
                 
                 while(result.hasNext()) {
-                    Statement s = result.next();
-                    log.info(s);
+                    final Statement s = result.next();
+                    if(log.isInfoEnabled())
+                        log.info(s);
                 }
             }
             
             {
                 
-                String query = 
+                final String query = 
                     "construct { " + 
                     "  ?x ?p1 ?o . " + 
                     "  ?s ?p2 ?x . " + 
@@ -220,20 +223,26 @@ public class TestDescribe extends ProxyBigdataSailTestCase {
 */                
                 final BigdataSailGraphQuery graphQuery = (BigdataSailGraphQuery) 
                     cxn.prepareGraphQuery(QueryLanguage.SPARQL, query);
-                GraphQueryResult result = graphQuery.evaluate();
+                final GraphQueryResult result = graphQuery.evaluate();
                 
                 final TupleExpr tupleExpr = graphQuery.getTupleExpr();
-                log.info(tupleExpr);
+                if(log.isInfoEnabled())
+                        log.info(tupleExpr);
                 
                 while(result.hasNext()) {
-                    Statement s = result.next();
-                    log.info(s);
+                    final Statement s = result.next();
+                    if(log.isInfoEnabled())
+                        log.info(s);
                 }
                 
             }
             
         } finally {
+            
             cxn.close();
+            
+        }
+        } finally {
             sail.__tearDownUnitTest();
         }
 
@@ -242,6 +251,7 @@ public class TestDescribe extends ProxyBigdataSailTestCase {
     public void testMultiDescribe() throws Exception {
 
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
@@ -250,13 +260,13 @@ public class TestDescribe extends ProxyBigdataSailTestCase {
         
         try {
     
-            URI mike = new URIImpl("_:Mike");
-            URI person = new URIImpl("_:Person");
-            URI likes = new URIImpl("_:likes");
-            URI rdf = new URIImpl("_:RDF");
-            URI thing = new URIImpl("_:Thing");
-            Literal l1 = new LiteralImpl("Mike");
-            Literal l2 = new LiteralImpl("RDF");
+            final URI mike = new URIImpl("_:Mike");
+            final URI person = new URIImpl("_:Person");
+            final URI likes = new URIImpl("_:likes");
+            final URI rdf = new URIImpl("_:RDF");
+            final URI thing = new URIImpl("_:Thing");
+            final Literal l1 = new LiteralImpl("Mike");
+            final Literal l2 = new LiteralImpl("RDF");
 /**/
             cxn.add(mike, RDF.TYPE, person);
             cxn.add(mike, RDFS.LABEL, l1);
@@ -279,7 +289,7 @@ public class TestDescribe extends ProxyBigdataSailTestCase {
 
             {
                 
-                String query = 
+                final String query = 
                     "describe ?x ?y " +
                     "WHERE { " +
                     "  ?x <"+likes+"> ?y . " +
@@ -311,20 +321,23 @@ public class TestDescribe extends ProxyBigdataSailTestCase {
 */                
                 final BigdataSailGraphQuery graphQuery = (BigdataSailGraphQuery) 
                     cxn.prepareGraphQuery(QueryLanguage.SPARQL, query);
-                GraphQueryResult result = graphQuery.evaluate();
+                final GraphQueryResult result = graphQuery.evaluate();
                 
                 final TupleExpr tupleExpr = graphQuery.getTupleExpr();
-                log.info(tupleExpr);
+                if(log.isInfoEnabled())
+                    log.info(tupleExpr);
                 
                 while(result.hasNext()) {
-                    Statement s = result.next();
-                    log.info(s);
+                    final Statement s = result.next();
+                    if(log.isInfoEnabled())
+                        log.info(s);
                 }
             }
             
-            
         } finally {
             cxn.close();
+        }
+        } finally {
             sail.__tearDownUnitTest();
         }
 

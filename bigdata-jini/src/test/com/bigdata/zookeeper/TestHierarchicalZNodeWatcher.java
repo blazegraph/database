@@ -134,7 +134,7 @@ public class TestHierarchicalZNodeWatcher extends AbstractZooTestCase implements
         zookeeper.create(zroot, new byte[0], acl, CreateMode.PERSISTENT);
 
         // look for the create event.
-        e= watcher.queue.poll(1000, TimeUnit.MILLISECONDS);
+        e= watcher.queue.poll(super.sessionTimeout, TimeUnit.MILLISECONDS);
 
         assertNotNull(e);
 
@@ -151,8 +151,12 @@ public class TestHierarchicalZNodeWatcher extends AbstractZooTestCase implements
         zookeeper.delete(zroot, -1/*version*/);
         
         // look for the delete event.
-        e = watcher.queue.poll(1000, TimeUnit.MILLISECONDS);
+        e = watcher.queue.poll(super.sessionTimeout, TimeUnit.MILLISECONDS);
 
+        /* FIXME There is a stochastic CI failure at the following assertion.
+         * I have increased the poll timeout to the sessionTimeout to see if
+         * that makes the problem go away. BT 6/22/2011.
+         */
         assertNotNull(e);
 
         assertEquals(zroot,e.getPath());
@@ -169,7 +173,7 @@ public class TestHierarchicalZNodeWatcher extends AbstractZooTestCase implements
         zookeeper.create(zroot, new byte[0], acl, CreateMode.PERSISTENT);
 
         // look for the create event.
-        e = watcher.queue.poll(1000, TimeUnit.MILLISECONDS);
+        e = watcher.queue.poll(super.sessionTimeout, TimeUnit.MILLISECONDS);
 
         assertNotNull(e);
 
@@ -192,7 +196,7 @@ public class TestHierarchicalZNodeWatcher extends AbstractZooTestCase implements
         zookeeper.delete(zroot, -1/*version*/);
 
         // look for the delete event.
-        e = watcher.queue.poll(1000, TimeUnit.MILLISECONDS);
+        e = watcher.queue.poll(super.sessionTimeout, TimeUnit.MILLISECONDS);
 
         assertNull(e);
 
@@ -238,7 +242,7 @@ public class TestHierarchicalZNodeWatcher extends AbstractZooTestCase implements
         zookeeper.create(zroot + "/" + "red", new byte[0], acl,
                 CreateMode.PERSISTENT);
 
-        e = watcher.queue.poll(1000,TimeUnit.MILLISECONDS);
+        e = watcher.queue.poll(super.sessionTimeout,TimeUnit.MILLISECONDS);
         assertNotNull(e);
         assertEquals(zroot,e.getPath());
         assertEquals(Event.EventType.NodeChildrenChanged,e.getType());
@@ -246,7 +250,7 @@ public class TestHierarchicalZNodeWatcher extends AbstractZooTestCase implements
         zookeeper.create(zroot + "/" + "blue", new byte[0], acl,
                 CreateMode.PERSISTENT);
 
-//        e = watcher.queue.poll(1000,TimeUnit.MILLISECONDS);
+//        e = watcher.queue.poll(super.sessionTimeout,TimeUnit.MILLISECONDS);
 //        assertNotNull(e);
 //        assertEquals(zroot+"/"+"red",e.getPath());
 //        assertEquals(Event.EventType.NodeCreated,e.getType());
@@ -269,7 +273,7 @@ public class TestHierarchicalZNodeWatcher extends AbstractZooTestCase implements
                 new byte[] { 1 }, -1/* version */);
         
         // verify event.
-        e = watcher.queue.poll(1000,TimeUnit.MILLISECONDS);
+        e = watcher.queue.poll(super.sessionTimeout,TimeUnit.MILLISECONDS);
         assertNotNull(e);
         assertEquals(zroot + "/" + "blue" + "/" + "green",e.getPath());
         assertEquals(Event.EventType.NodeDataChanged,e.getType());
@@ -341,8 +345,9 @@ public class TestHierarchicalZNodeWatcher extends AbstractZooTestCase implements
 
         while ((e = watcher.queue.poll()) != null) {
             
-            System.err.println("mockEvent: "+e);
-            
+            if (log.isInfoEnabled())
+                log.info("mockEvent: " + e);
+
         }
         
 //        // put into a set.

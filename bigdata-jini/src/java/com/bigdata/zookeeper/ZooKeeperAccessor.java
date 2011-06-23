@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.zookeeper;
 
 import java.io.IOException;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
@@ -99,19 +100,19 @@ import org.apache.zookeeper.Watcher.Event.KeeperState;
  * @see http://wiki.apache.org/hadoop/ZooKeeper/FAQ, which has a state
  *      transition diagram for the {@link ZooKeeper} client.
  * 
- * FIXME Check all use of {@link SessionExpiredException}, of
- * {@link ZooKeeper.States#CLOSED} or {@link ZooKeeper.States#isAlive()}, and
- * of {@link KeeperState#Expired}
+ *      FIXME Check all use of {@link SessionExpiredException}, of
+ *      {@link ZooKeeper.States#CLOSED} or {@link ZooKeeper.States#isAlive()},
+ *      and of {@link KeeperState#Expired}
+ * 
+ *      TODO This does not make any systematic attempt to facilitate handling
+ *      the other absorbing state which is an authentication failure.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo this does not make any systematic attempt to facilitate handling the
- *       other absorbing state which is an authentication failure.
  */
 public class ZooKeeperAccessor {
 
-    protected static final Logger log = Logger.getLogger(ZooKeeperAccessor.class);
+    private static final Logger log = Logger.getLogger(ZooKeeperAccessor.class);
     
     private volatile ZooKeeper zookeeper;
 
@@ -124,7 +125,15 @@ public class ZooKeeperAccessor {
      * The session timeout parameter.
      */
     public final int sessionTimeout;
-    
+
+    /**
+     * 
+     * @param hosts
+     * @param sessionTimeout
+     * @throws InterruptedException
+     *             if the caller's thread is interrupted while awaiting a
+     *             zookeeper client connection.
+     */
     public ZooKeeperAccessor(final String hosts, final int sessionTimeout)
             throws InterruptedException {
 
@@ -149,89 +158,141 @@ public class ZooKeeperAccessor {
         super.finalize();
         
     }
-    
+
     /**
      * Return a {@link ZooKeeper} instance that is not "dead" as reported by
      * {@link ZooKeeper.States#isAlive()}. This method will block and retry if
      * there is an {@link IOException} connecting to the ensemble and will log
      * errors during such retries.
      * 
-     * @throws InterruptedException
-     *             if interrupted while attempting to obtain a {@link ZooKeeper}
-     *             client.
      * @throws IllegalStateException
      *             if this class is closed.
+     * @throws InterruptedException
+     *             if the caller's thread is interrupted while awaiting a
+     *             zookeeper client connection.
      * 
      * @todo variant with timeout, perhaps running on an executor service.
      */
     public synchronized ZooKeeper getZookeeper() throws InterruptedException {
 
-        final long begin = System.nanoTime();
+//        final ExecutorService service = Executors
+//                .newSingleThreadExecutor(new DaemonThreadFactory(
+//                        "ZooKeeperAccessor"));
+//        try {
+//            final FutureTask<ZooKeeper> ft = new FutureTask<ZooKeeper>(
+//                    new AwaitConnectedTask());
+//            service.execute(ft);
+//            try {
+//                final ZooKeeper tmp = ft.get();
+//                return tmp;
+//            } catch (ExecutionException ex) {
+//                log.error(ex, ex);
+//                throw new RuntimeException(ex);
+//            }
+//        } finally {
+//            service.shutdownNow();
+//        }
+
+        /*
+         * Note: Significantly less overhead, but does not throw an
+         * InterruptedException out.
+         */
+        try {
+            return new AwaitConnectedTask().call();
+        } catch (Exception ex) {
+            log.error(ex, ex);
+            throw new RuntimeException(ex);
+        }
         
-        int ntries = 1;
-
-        while (true) {
-
-            if (!open)
-                throw new IllegalStateException("Closed");
-
-            lock.lockInterruptibly();
-
-            try {
-
-                if (zookeeper != null && zookeeper.getState().isAlive()) {
-
-                    if (log.isInfoEnabled())
-                        log.info("success: ntries="
-                                + ntries
-                                + ", elapsed="
-                                + TimeUnit.NANOSECONDS.toMillis((System
-                                        .nanoTime() - begin)));
-                       
-                    // success
-                    return zookeeper;
-
-                }
-
-                try {
-
-                    log.warn("Creating new client");
-
-                    zookeeper = new ZooKeeper(hosts, sessionTimeout,
-                            new ZooAliveWatcher());
-
-                    // new client counts as an "event".
-                    event.signalAll();
-                    
-                } catch (IOException ex) {
-
-                    log.error("Could not connect: ntries=" + ntries, ex);
-
-                    ntries++;
-
-                }
-
-            } finally {
-
-                lock.unlock();
-
-            }
-
-            try {
-
-                Thread.sleep(1000/* ms */);
-
-            } catch (InterruptedException e) {
-
-                throw e;
-
-            }
-
-            // try again.
-            
-        } // while
-
     }
+    
+    /**
+     * Helper class isolates interrupts of the thread running the task from
+     * the caller.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private class AwaitConnectedTask implements Callable<ZooKeeper> {
+        
+        public ZooKeeper call() throws Exception {
+        
+            final long begin = System.nanoTime();
+            
+            int ntries = 1;
+    
+            while (true) {
+    
+                if (!open)
+                    throw new IllegalStateException("Closed");
+    
+                lock.lockInterruptibly();
+    
+                try {
+    
+                    if (zookeeper != null && zookeeper.getState().isAlive()) {
+    
+                        if (log.isInfoEnabled())
+                            log.info("success: ntries="
+                                    + ntries
+                                    + ", elapsed="
+                                    + TimeUnit.NANOSECONDS.toMillis((System
+                                            .nanoTime() - begin)));
+                           
+                        // success
+                        return zookeeper;
+    
+                    }
+    
+                    try {
+    
+                        log.warn("Creating new client");
+    
+                        zookeeper = new ZooKeeper(hosts, sessionTimeout,
+                                new ZooAliveWatcher());
+    
+                        // new client counts as an "event".
+                        event.signalAll();
+                        
+                    } catch (IOException ex) {
+    
+                        log.error("Could not connect: ntries=" + ntries, ex);
+    
+                        ntries++;
+    
+                    }
+    
+                } finally {
+    
+                    lock.unlock();
+    
+                }
+    
+                try {
+    
+                    Thread.sleep(100/* ms */);
+    
+                } catch (InterruptedException e) {
+
+                    /*
+                     * Note: The thread running this task can be interrupted via
+                     * the watch mechanism when an event comes in. We have to
+                     * ignore this interrupt and retry in order to work around
+                     * problems where the interrupt was from the activity of the
+                     * same thread when the thread has been reused. This case
+                     * shows up freqently in the unit tests.
+                     */
+                    
+                    log.warn("Waking up with interrupt.");
+    
+                }
+    
+                // try again.
+                
+            } // while
+        
+        } // call()
+        
+    } // AwaitConnectedTask
 
     /**
      * If the accessor is open, then it is closed. If there is a

@@ -28,8 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.io;
 
-import java.nio.ByteBuffer;
-
 import junit.framework.TestCase2;
 
 /**
@@ -146,9 +144,7 @@ public class TestDirectBufferPool extends TestCase2 {
     }
 
     /**
-     * Unit test to verify that a pool will reject an attempt to
-     * "double release" a buffer (only currently acquired buffers can be
-     * released).
+     * Unit test to verify that a "double-release" of a buffer quietly succeeds.
      * 
      * @throws InterruptedException
      */
@@ -166,10 +162,10 @@ public class TestDirectBufferPool extends TestCase2 {
             try {
                 // Attempt to double-release the buffer.
                 b.release();
-                fail("Expecting: " + IllegalStateException.class);
-            } catch (IllegalStateException ex) {
-                if (log.isInfoEnabled())
-                    log.info("Ignoring expected exception: " + ex);
+            } catch (Throwable t) {
+                fail("No errors should be thrown by this method: "+t,t);
+//                if (log.isInfoEnabled())
+//                    log.info("Ignoring expected exception: " + ex);
             }
         }
 

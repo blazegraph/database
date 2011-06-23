@@ -445,6 +445,17 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         		
         	}
 
+        } catch (BadlyDesignedLeftJoinIteratorException ex) {
+        	
+        	log.warn("badly designed left join");
+        	
+    		// turn off native joins for the remainder, we can't do
+            // partial execution
+            nativeJoins = false;
+            
+            // defer to Sesame
+            return super.evaluate(union, bs);
+        	
         }
         
     }
@@ -502,6 +513,17 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         		
         	}
             
+        } catch (BadlyDesignedLeftJoinIteratorException ex) {
+        	
+        	log.warn("badly designed left join");
+        	
+    		// turn off native joins for the remainder, we can't do
+            // partial execution
+            nativeJoins = false;
+            
+            // defer to Sesame
+            return super.evaluate(join, bs);
+        	
         }
         
     }
@@ -559,6 +581,17 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         		
         	}
             
+        } catch (BadlyDesignedLeftJoinIteratorException ex) {
+        	
+        	log.warn("badly designed left join");
+        	
+    		// turn off native joins for the remainder, we can't do
+            // partial execution
+            nativeJoins = false;
+            
+            // defer to Sesame
+            return super.evaluate(leftJoin, bs);
+        	
         }
         
     }
@@ -612,6 +645,17 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         		
         	}
             
+        } catch (BadlyDesignedLeftJoinIteratorException ex) {
+        	
+        	log.warn("badly designed left join");
+        	
+    		// turn off native joins for the remainder, we can't do
+            // partial execution
+            nativeJoins = false;
+            
+            // defer to Sesame
+            return super.evaluate(filter, bs);
+        	
         }
         
     }
@@ -631,7 +675,13 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 			 * Note: Do not wrap as a different exception type. The caller is
 			 * looking for this.
 			 */
-			throw new UnsupportedOperatorException(ex);
+			throw ex;
+		} catch(BadlyDesignedLeftJoinIteratorException ex) {
+			/*
+			 * Note: Do not wrap as a different exception type. The caller is
+			 * looking for this.
+			 */
+			throw ex;
 		} catch (Throwable ex) {
 			throw new QueryEvaluationException(ex);
 		}
@@ -654,7 +704,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	 * to work with.
     	 */
     	sopTree = stb.collectSOps(root);
-
+    	
     	/*
     	 * We need to prune groups that contain terms that do not appear in
     	 * our lexicon.
@@ -806,10 +856,25 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 				sop.setBOp(bop);
     		} else if (op instanceof Filter) {
     			final Filter filter = (Filter) op;
-    			final ValueExpr ve = filter.getCondition();
-//    			try {
+    			
+    			/*
+    			 * If the scope binding names are empty we can definitely
+    			 * always fail the filter (since the filter's variables
+    			 * cannot be bound).
+    			 */
+    			if (filter.getBindingNames().isEmpty()) {
+    				final IConstraint bop = new SPARQLConstraint(SparqlTypeErrorBOp.INSTANCE);
+    				sop.setBOp(bop);
+    			} else {
+    				final ValueExpr ve = filter.getCondition();
     				final IConstraint bop = toConstraint(ve);
     				sop.setBOp(bop);
+    			}
+    			
+//        		try {
+//				    final ValueExpr ve = filter.getCondition();
+//				    final IConstraint bop = toConstraint(ve);
+//				    sop.setBOp(bop);
 //    			} catch (UnsupportedOperatorException ex) {
 //    				/*
 //    				 * If we encounter a sesame filter (ValueExpr) that we
@@ -832,6 +897,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 //    					throw new UnsupportedOperatorException(ex);
 //    				}
 //    			}
+    			
     		}
     	}
     	
@@ -857,6 +923,16 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 			}
 		}
     	
+		if (log.isDebugEnabled()) {
+			log.debug("\n"+sopTree);
+		}
+		
+    	/*
+    	 * Check whether optional join is "well designed" as defined in section
+		 * 4.2 of "Semantics and Complexity of SPARQL", 2006, Jorge Pérez et al.
+    	 */
+    	checkForBadlyDesignedLeftJoin(sopTree);
+
     	/*
     	 * Gather variables required by Sesame outside of the query
     	 * evaluation (projection and global sesame filters).
@@ -2620,6 +2696,126 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         	return value;
         }
         
+    }
+    
+    /**
+     * We are looking for queries of the form:
+     * 
+  	 * P = ((?X, name, paul) OPT ((?Y, name, george) OPT (?X, email, ?Z)))
+  	 * 
+  	 * i.e. variables used by the right side of a left join that are not bound
+  	 * in the parent group but are bound in groups above the parent group.
+     */
+    private static void checkForBadlyDesignedLeftJoin(final SOpTree tree) {
+    	
+    	final Set<com.bigdata.bop.Var> bindings = new LinkedHashSet<com.bigdata.bop.Var>();
+    	
+    	final SOpGroup root = tree.getRoot();
+    	
+    	addVars(bindings, root, false);
+    	
+    	if (root.getChildren() != null) {
+    	
+	    	for (SOpGroup child : root.getChildren()) {
+	    		
+	    		checkForBadlyDesignedLeftJoin(bindings, child);
+	    		
+	    	}
+
+    	}
+    	
+    }
+
+    private static void checkForBadlyDesignedLeftJoin(
+    		final Set<com.bigdata.bop.Var> bindings, final SOpGroup group) {
+    	
+    	/*
+    	 * Identify problem vars: 
+    	 * 
+    	 * 1. Add all vars used in the group (statement patterns and filters)
+    	 * 2. Remove all vars bound by the parent group (statement patterns)
+    	 * 3. Retain all vars from the grandparent groups (statement patterns)
+    	 */
+    	if (SOp2BOpUtility.isOptional(group)) {
+    		
+	    	final Set<com.bigdata.bop.Var> problemVars = 
+	    		new LinkedHashSet<com.bigdata.bop.Var>();
+	    	
+	    	addVars(problemVars, group, true);
+	    	
+	    	final Set<com.bigdata.bop.Var> parentVars = 
+	    		new LinkedHashSet<com.bigdata.bop.Var>();
+	    	
+	    	SOpGroup parent = group.getParent();
+	    	while(SOp2BOpUtility.isUnion(parent))
+	    		parent = parent.getParent();
+	    	
+	    	addVars(parentVars, parent, false);
+	    	
+	    	problemVars.removeAll(parentVars);
+	    	
+	    	problemVars.retainAll(bindings);
+	    	
+	    	if (!problemVars.isEmpty()) {
+	    		
+	    		throw new BadlyDesignedLeftJoinIteratorException();
+	    		
+	    	}
+    	
+    	}
+    	
+    	/*
+    	 * Recursively check the children.
+    	 */
+    	if (group.getChildren() != null) {
+    	
+	    	addVars(bindings, group, false);
+	    	
+	    	for (SOpGroup child : group.getChildren()) {
+	    		
+	    		checkForBadlyDesignedLeftJoin(bindings, child);
+	    		
+	    	}
+	    	
+    	}
+    	
+    }
+    	
+    private static void addVars(final Set<com.bigdata.bop.Var> bindings, 
+    		final SOpGroup group, final boolean includeFilters) {
+    	
+    	for (SOp sop : group) {
+    		
+    		final QueryModelNode op = sop.getOperator();
+    		
+    		if (!(op instanceof StatementPattern) && !includeFilters)
+    			continue;
+    		
+    		final BOp bop = sop.getBOp();
+    		
+    		if (bop != null) {
+    		
+    			final Iterator<IVariable<?>> it = 
+    				BOpUtility.getSpannedVariables(bop);
+    			
+    			while (it.hasNext()) {
+    				bindings.add((com.bigdata.bop.Var) it.next());
+    			}
+    			
+    		}
+    		
+    	}
+    	
+    }
+    
+    public static final class BadlyDesignedLeftJoinIteratorException 
+    	extends RuntimeException {
+
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 902970986041878456L;
+    	
     }
     
 }

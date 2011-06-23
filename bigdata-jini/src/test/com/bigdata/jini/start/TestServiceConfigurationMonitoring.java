@@ -99,19 +99,24 @@ public class TestServiceConfigurationMonitoring extends AbstractFedZooTestCase {
                 + BigdataZooDefs.ZSLASH
                 + TransactionServer.class.getName();
         
-        // create monitor task that will compete for locks and start procsses.
+        // create monitor task that will compete for locks and start processes.
         MonitorCreatePhysicalServiceLocksTask task1 = new MonitorCreatePhysicalServiceLocksTask(
                 fed, listener);
 
-        final Future f1 = fed.getExecutorService().submit(task1);
+        final Future<Void> f1 = fed.getExecutorService().submit(task1);
 
         assertFalse(f1.isDone());
         
-        // create monitor task for a specific service config node.
+        // create monitor task for a specific service configuration node.
         ServiceConfigurationZNodeMonitorTask task = new ServiceConfigurationZNodeMonitorTask(
                 fed, listener, TransactionServer.class.getName());
 
-        final Future f = fed.getExecutorService().submit(task);
+        /*
+         * Note: This task will log out an ERROR since the znode that it is
+         * monitoring does not yet exist.  However, the task will retry and
+         * notice once that znode is created.
+         */
+        final Future<Void> f = fed.getExecutorService().submit(task);
         
         assertFalse(f.isDone());
         
@@ -121,11 +126,15 @@ public class TestServiceConfigurationMonitoring extends AbstractFedZooTestCase {
          * Note: This should trigger the watcher. In turn, then watcher should
          * create an instance of the service on our behalf.
          */
-        log.info("Creating zpath: " + serviceConfigurationZPath);
+        if(log.isInfoEnabled())
+            log.info("Creating zpath: " + serviceConfigurationZPath);
+       
         zookeeper.create(serviceConfigurationZPath, SerializerUtil
                 .serialize(new TransactionServerConfiguration(config)), acl,
                 CreateMode.PERSISTENT);
-        log.info("Created zpath: " + serviceConfigurationZPath);
+        
+        if(log.isInfoEnabled())
+            log.info("Created zpath: " + serviceConfigurationZPath);
 
         /*
          * Verify that a logicalService znode was created for that configuration
@@ -133,9 +142,10 @@ public class TestServiceConfigurationMonitoring extends AbstractFedZooTestCase {
          */
         
         // pause a moment.
-        Thread.sleep(1000/*ms*/);
+        Thread.sleep(fed.getZooConfig().sessionTimeout/*ms*/);
 
-        log.info("logicalServices: "
+        if(log.isInfoEnabled())
+            log.info("logicalServices: "
                 + zookeeper.getChildren(serviceConfigurationZPath, false));
         
         assertEquals(1, zookeeper.getChildren(serviceConfigurationZPath, false)
@@ -167,6 +177,8 @@ public class TestServiceConfigurationMonitoring extends AbstractFedZooTestCase {
          * FIXME verify service is created, discover and query that service and
          * verify that it is the instance that we wanted, then shutdown service
          * and then verify service restart re-creates the same ephemeral node.
+         * 
+         * Could actually invoke a method on the service as well.
          */
         
         // verify a process was started.

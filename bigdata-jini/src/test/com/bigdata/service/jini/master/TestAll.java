@@ -47,7 +47,14 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("master (job) execution");
 
-        suite.addTestSuite(TestMappedRDFDataLoadMaster.class);
+        /*
+         * FIXME There appears to be a problem with this test when run as part
+         * of CI where the test does not terminate. I've noted this on the issue
+         * referenced below and removed the test from CI. for the moment.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/297#comment:17
+         */
+//        suite.addTestSuite(TestMappedRDFDataLoadMaster.class);
 
         return suite;
         

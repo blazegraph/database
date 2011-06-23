@@ -57,6 +57,7 @@ public class TestAll extends TestCase {
 
         // test suite for parsing service configurations, etc.
         suite.addTestSuite(TestServiceConfiguration.class);
+        
         return suite;
         
     }

@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.zookeeper;
 
 import java.io.IOException;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.List;
@@ -49,12 +48,15 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 
 /**
+ * Utility for dumping out the portion of a zookeeper ensemble state pertaining
+ * to a bigdata federation.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class DumpZookeeper {
 
-    protected static final Logger log = Logger.getLogger(DumpZookeeper.class);
+    private static final Logger log = Logger.getLogger(DumpZookeeper.class);
 
     final ZooKeeper z;
     
@@ -85,6 +87,12 @@ public class DumpZookeeper {
         
         final ZookeeperClientConfig zooClientConfig = new ZookeeperClientConfig(config); 
 
+        /*
+         * Note: You may temporarily uncomment this to set the zookeeper
+         * configuration via -D parameters.
+         */
+//        final ZookeeperClientConfig zooClientConfig = new ZookeeperClientConfig();
+        
         System.out.println(zooClientConfig.toString());
         
 //        System.err.println(ZooHelper.dump(InetAddress.getLocalHost(),

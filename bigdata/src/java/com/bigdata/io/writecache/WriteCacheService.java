@@ -439,8 +439,12 @@ abstract public class WriteCacheService implements IWriteCache {
         // save the current file extent.
         this.fileExtent.set(fileExtent);
 
-		// N-1 WriteCache instances.
-        for (int i = 0; i < nbuffers - 1; i++) {
+        // Add [current] WriteCache.
+        current.set(buffers[0] = newWriteCache(null/* buf */,
+                useChecksum, false/* bufferHasData */, opener));
+
+        // add remaining buffers.
+        for (int i = 1; i < nbuffers; i++) {
 
             final WriteCache tmp = newWriteCache(null/* buf */, useChecksum,
                     false/* bufferHasData */, opener);
@@ -451,9 +455,6 @@ abstract public class WriteCacheService implements IWriteCache {
 
         }
 
-        // One more WriteCache for [current].
-        current.set(buffers[nbuffers - 1] = newWriteCache(null/* buf */,
-                useChecksum, false/* bufferHasData */, opener));
 
         // Set the same counters object on each of the write cache instances.
         final WriteCacheServiceCounters counters = new WriteCacheServiceCounters(
@@ -613,6 +614,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
 					// Now written, remove from dirtylist.
 					dirtyList.take();
+					counters.get().ndirty--;
 
 					dirtyListLock.lockInterruptibly();
 					try {
@@ -910,22 +912,22 @@ abstract public class WriteCacheService implements IWriteCache {
 				t.reset();
 			}
 
-			// re-populate the clean list with N-1 of our buffers
-			for (int i = 0; i < buffers.length - 1; i++) {
-				cleanList.put(buffers[i]);
-			}
-
 			// clear the service record map.
 			recordMap.clear();
 
 			// set the current buffer.
-			current.set(buffers[buffers.length - 1]);
+			current.set(buffers[0]);
+
+			// re-populate the clean list with remaining buffers
+			for (int i = 1; i < buffers.length; i++) {
+				cleanList.put(buffers[i]);
+			}
 
 			// reset the counters.
             {
                 final WriteCacheServiceCounters c = counters.get();
                 c.ndirty = 0;
-                c.nclean = buffers.length;
+                c.nclean = buffers.length-1;
                 c.nreset++;
             }
 
@@ -1253,7 +1255,7 @@ abstract public class WriteCacheService implements IWriteCache {
 		if (!writeLock.tryLock(remaining, TimeUnit.NANOSECONDS))
 			throw new TimeoutException();
 		try {
-            final WriteCache tmp = current.get();
+            final WriteCache tmp = current.getAndSet(null);
             if (tmp.remaining() == 0) {
                 /*
                  * Handle an empty buffer by waiting until the dirtyList is
@@ -1293,6 +1295,7 @@ abstract public class WriteCacheService implements IWriteCache {
 				 * code is much less complex here.
 				 */
 				dirtyList.add(tmp);
+				counters.get().ndirty++;
 				dirtyListNotEmpty.signalAll();
 				while (!dirtyList.isEmpty() && !halt) {
 					// remaining := (total - elapsed).
@@ -1326,6 +1329,7 @@ abstract public class WriteCacheService implements IWriteCache {
 				}
 				// Guaranteed available hence non-blocking.
 				final WriteCache nxt = cleanList.take();
+				counters.get().nclean--;
 				nxt.resetWith(recordMap, fileExtent.get());
 				current.set(nxt);
 				return true;
@@ -1440,6 +1444,9 @@ abstract public class WriteCacheService implements IWriteCache {
             throw new IllegalArgumentException(
                     AbstractBufferStrategy.ERR_BUFFER_NULL);
 
+        // maintain nwrites
+        counters.get().nwrites++;
+
         // #of bytes in the record.
         final int remaining = data.remaining();
 
@@ -1481,7 +1488,7 @@ abstract public class WriteCacheService implements IWriteCache {
 					// A duplicate may also be indicative of an allocation
 					//	error, which we need to be pretty strict about!
 					if (old == cache) {
-					    throw new AssertionError("Record already in cache: offset=" + offset+" "+addrDebugInfo(offset));
+						throw new AssertionError("Record already in cache: offset=" + offset + " " + addrDebugInfo(offset));
 					}
 
 					return true;
@@ -1535,7 +1542,7 @@ abstract public class WriteCacheService implements IWriteCache {
 						 */
 						if (recordMap.put(offset, cache) != null) {
 							// The record should not already be in the cache.
-							throw new AssertionError("Record already in cache: offset=" + offset+" "+addrDebugInfo(offset));
+							throw new AssertionError("Record already in cache: offset=" + offset + " "  + addrDebugInfo(offset));
 						}
 
 						return true;
@@ -1600,7 +1607,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
 						// Take a buffer from the cleanList (guaranteed avail).
 						final WriteCache newBuffer = cleanList.take();
-
+						counters.get().nclean--;
 						// Clear the state on the new buffer and remove from
 						// cacheService map
 						newBuffer.resetWith(recordMap, fileExtent.get());
@@ -1613,7 +1620,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
 							// This must be the only occurrence of this record.
 							if (recordMap.put(offset, cache) != null) {
-								throw new AssertionError("Record already in cache: offset=" + offset+" "+addrDebugInfo(offset));
+								throw new AssertionError("Record already in cache: offset=" + offset + " " + addrDebugInfo(offset));
 							}
 
 							return true;
@@ -1629,7 +1636,7 @@ abstract public class WriteCacheService implements IWriteCache {
 					/*
 					 * Should never happen.
 					 */
-					throw new AssertionError("Unable to write into current WriteCache");
+					throw new AssertionError("Unable to write into current WriteCache " + offset + " " + addrDebugInfo(offset));
 
 				} finally {
 
@@ -1861,8 +1868,9 @@ abstract public class WriteCacheService implements IWriteCache {
 		if (!lock.isWriteLockedByCurrentThread())
 			throw new IllegalMonitorStateException();
 
-		final WriteCache cache = current.get();
+		final WriteCache cache = current.getAndSet(null);
 		assert cache != null;
+		
 		/*
 		 * Note: The lock here is required to give flush() atomic semantics with
 		 * regard to the set of dirty write buffers when flush() gained the
@@ -1897,6 +1905,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
 			// Take a buffer from the cleanList (guaranteed avail).
 			final WriteCache newBuffer = cleanList.take();
+			counters.get().nclean--;
 			
 			// Clear state on new buffer and remove from cacheService map
 			newBuffer.resetWith(recordMap, fileExtent.get());
@@ -1989,18 +1998,24 @@ abstract public class WriteCacheService implements IWriteCache {
      */
 	public boolean clearWrite(final long offset) {
 		try {
+	        counters.get().nclearRequests++;
 			final WriteCache cache = recordMap.remove(offset);
 			if (cache == null)
 				return false;
-			final WriteCache cur = acquireForWriter(); // in case current
+			
+			// Is there any point in acquiring for writer (with the readLock)?
+			// It prevents concurrent access with the write method that takes
+			//	the writeLock, but is this a problem?
+			//final WriteCache cur = acquireForWriter(); // in case current
+	        counters.get().nclears++;
+			//try {
 			debugAddrs(offset, 0, 'F');
-			try {
 				cache.clearAddrMap(offset);
 				
 				return true;
-			} finally {
-				release();
-			}
+			//} finally {
+			//	release();
+			//}
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
 		}
@@ -2100,7 +2115,19 @@ abstract public class WriteCacheService implements IWriteCache {
          * The #of {@link WriteCache} blocks sent by the leader to the first
          * downstream follower.
          */
-		public volatile long nsend;
+		public volatile long nsend;        
+		/**
+         * The #of writes made to the writeCacheService.
+         */
+		public volatile long nwrites;
+		/**
+         * The #of addresses cleared by the writeCacheService.
+         */
+		public volatile long nclearRequests;
+		/**
+         * The #of addresses cleared by the writeCacheService.
+         */
+		public volatile long nclears;
 		
 		public WriteCacheServiceCounters(final int nbuffers) {
 		    
@@ -2142,6 +2169,24 @@ abstract public class WriteCacheService implements IWriteCache {
             root.addCounter("nsend", new Instrument<Long>() {
                 public void sample() {
                     setValue(nsend);
+                }
+            });
+
+            root.addCounter("nwrites", new Instrument<Long>() {
+                public void sample() {
+                    setValue(nwrites);
+                }
+            });
+
+            root.addCounter("nclearRequests", new Instrument<Long>() {
+                public void sample() {
+                    setValue(nclearRequests);
+                }
+            });
+
+            root.addCounter("nclears", new Instrument<Long>() {
+                public void sample() {
+                    setValue(nclears);
                 }
             });
 

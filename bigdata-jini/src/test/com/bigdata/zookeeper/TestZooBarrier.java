@@ -28,7 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.zookeeper;
 
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -58,7 +62,7 @@ public class TestZooBarrier extends AbstractZooTestCase {
         super(arg0);
     }
     
-    public void test_barrier() throws KeeperException, InterruptedException {
+    public void test_barrier() throws KeeperException, InterruptedException, ExecutionException, TimeoutException {
 
         final String zroot = "/test/" + getName() + UUID.randomUUID();
         
@@ -71,56 +75,86 @@ public class TestZooBarrier extends AbstractZooTestCase {
         
         final Condition broken = lock.newCondition();
         
-        new ClientThread(Thread.currentThread(),lock) {
-          
-            public void run2() throws Exception {
-                
-                final String id = "1";
-                
-                counter.incrementAndGet();
-                
-                barrier.enter(id);
-                
-                assertEquals(2,counter.get());
-                
-                barrier.leave(id);
-                
-                lock.lock();
-                try {
-                    broken.signal();
-                } finally {
-                    lock.unlock();
-                }
-                
-            }
-            
-        }.start();
-        
-        new ClientThread(Thread.currentThread(), lock) {
-          
-            public void run2() throws Exception {
-                
-                final String id = "2";
-                
-                counter.incrementAndGet();
-                
-                barrier.enter(id);
-                
-                assertEquals(2,counter.get());
-                
-                barrier.leave(id);
-                
-                lock.lock();
-                try {
-                    broken.signal();
-                } finally {
-                    lock.unlock();
-                }
-                
-            }
-            
-        }.start();
+        final FutureTask<Void> ft1 = new FutureTask<Void>(
+                new Callable<Void>() {
 
+                    public Void call() throws Exception {
+
+                        try {
+
+                            final String id = "1";
+                            
+                            counter.incrementAndGet();
+                            
+                            barrier.enter(id);
+                            
+                            assertEquals(2,counter.get());
+                            
+                            barrier.leave(id);
+                            
+                            lock.lock();
+                            try {
+                                broken.signal();
+                            } finally {
+                                lock.unlock();
+                            }
+                            
+                            return null;
+
+                        } catch (Throwable t) {
+
+                            log.error(t, t);
+
+                            throw new RuntimeException(t);
+
+                        }
+                    }
+                });
+
+        final FutureTask<Void> ft2 = new FutureTask<Void>(
+                new Callable<Void>() {
+
+                    public Void call() throws Exception {
+
+                        try {
+
+                            final String id = "2";
+                            
+                            counter.incrementAndGet();
+                            
+                            barrier.enter(id);
+                            
+                            assertEquals(2,counter.get());
+                            
+                            barrier.leave(id);
+                            
+                            lock.lock();
+                            try {
+                                broken.signal();
+                            } finally {
+                                lock.unlock();
+                            }
+                            
+                            return null;
+
+                        } catch (Throwable t) {
+
+                            log.error(t, t);
+
+                            throw new RuntimeException(t);
+
+                        }
+                    }
+                });
+
+        /*
+         * Run both tasks. They should block until both are present at the
+         * barrier.
+         */ 
+        service.execute(ft1);
+        service.execute(ft2);
+
+        // Verify that the barrier is broken.
         lock.lock();
         try {
             broken.await(500, TimeUnit.MILLISECONDS);
@@ -130,6 +164,10 @@ public class TestZooBarrier extends AbstractZooTestCase {
 
         assertEquals(2, counter.get());
 
+        // Check their futures.
+        ft1.get(sessionTimeout,TimeUnit.MICROSECONDS);
+        ft2.get(sessionTimeout,TimeUnit.MICROSECONDS);
+        
     }
 
 }

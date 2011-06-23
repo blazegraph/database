@@ -497,8 +497,8 @@ public class QueryLog {
         w.write("<th>elapsed</th>");
         w.write("<th>serviceId</th>");
         w.write("<th>cause</th>");
-        w.write("<th>query</th>");
-        w.write("<th>bop</th>");
+//        w.write("<th>query</th>");
+//        w.write("<th>bop</th>");
         /*
          * Columns for each pipeline operator.
          */
@@ -639,44 +639,57 @@ public class QueryLog {
 
         // the operator.
         if (summary) {
-            w.write(TD);
-			w.write(queryStr == null ? cdata(NA) : prettyPrintSparql(queryStr));
-            w.write(TDx);
-            /*
-             * The entire query (recursively).
-             */
-        	final String bopStr = BOpUtility.toString(q.getQuery());
-            w.write(TD);
-            w.write("<a href=\"#\" title=\"");
-            w.write(attrib(bopStr));// the entire query as a tooltip.
-            w.write("\"\n>");
-			// A slice of the query inline on the page or everything if
-			// maxBopLength<=0.
-			w.write(cdata(bopStr.substring(0/* begin */,
-					maxBopLength <= 0 ? bopStr.length() : Math.min(
-							maxBopLength, bopStr.length()))));
-			w.write("...");
-            w.write("</a>");
-            w.write(TDx);
+//        	// The query string (SPARQL).
+//            w.write(TD);
+//			w.write(queryStr == null ? cdata(NA) : prettyPrintSparql(queryStr));
+//            w.write(TDx);
+//            // The query plan (BOPs)
+//        	{
+//				w.write(TD);
+//				final String bopStr = BOpUtility.toString(q.getQuery());
+//				if (maxBopLength == 0 || bopStr.length() <= maxBopLength) {
+//					// The entire query plan.
+//					w.write(cdata(bopStr));
+//				} else {
+//					// A slice of the query plan.
+//					w.write("<a href=\"#\" title=\"");
+//					w.write(attrib(bopStr));// the entire query as a tooltip.
+//					w.write("\"\n>");
+//					w.write(cdata(bopStr.substring(0/* begin */, Math.min(
+//							maxBopLength, bopStr.length()))));
+//					w.write("...");
+//					w.write("</a>");
+//				}
+//				w.write(TDx);
+//        	}
             w.write(TD);
             w.write("total"); // summary line.
             w.write(TDx);
         } else {
-            w.write(TD);
-            w.write("...");// elide the original query string on a detail row.
-            w.write(TDx);
-            // Otherwise show just this bop.
-        	final String bopStr = bopIndex.get(bopId).toString();
-            w.write(TD);
-            w.write("<a href=\"#\" title=\"");
-            w.write(attrib(bopStr));// the entire query as a tooltip.
-            w.write("\"\n>");
-            // A slice of the query inline on the page.
-			w.write(cdata(bopStr.substring(0/* begin */, Math.min(64, bopStr
-					.length()))));
-			w.write("...");
-            w.write("</a>");
-            w.write(TDx);
+//        	// The query string (SPARQL).
+//            w.write(TD);
+//            w.write("...");// elide the original query string on a detail row.
+//            w.write(TDx);
+//			// The query plan (BOPs)
+//			{
+//				w.write(TD);
+//				final String bopStr = bopIndex.get(bopId).toString();
+//				if (maxBopLength == 0 || bopStr.length() <= maxBopLength) {
+//					// The entire query plan.
+//					w.write(cdata(bopStr));
+//				} else {
+//					// A slice of the query plan.
+//					w.write("<a href=\"#\" title=\"");
+//					w.write(attrib(bopStr));// the entire query as a tooltip.
+//					w.write("\"\n>");
+//					// A slice of the query inline on the page.
+//					w.write(cdata(bopStr.substring(0/* begin */, Math.min(
+//							maxBopLength, bopStr.length()))));
+//					w.write("...");
+//					w.write("</a>");
+//				}
+//				w.write(TDx);
+//			}
             w.write(TD);
             w.write(Integer.toString(evalOrder)); // eval order for this bop.
             w.write(TDx);

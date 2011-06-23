@@ -4545,5 +4545,9 @@ public class RWStore implements IStore, IBufferedWriter {
 		log.warn("WriteCacheDebug: " + paddr + " - " + m_writeCache.addrDebugInfo(paddr));
 	}
 
+	public CounterSet getWriteCacheCounters() {
+		return m_writeCache.getCounters();
+	}
+
     
 }

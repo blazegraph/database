@@ -12,8 +12,10 @@ import java.io.OutputStream;
 import java.net.BindException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
+import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Queue;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -27,11 +29,9 @@ import net.jini.core.lookup.ServiceID;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
-import com.bigdata.jini.start.config.ZookeeperServerConfiguration;
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.jini.util.JiniUtil;
@@ -51,10 +51,13 @@ import com.bigdata.util.config.NicUtil;
 import com.bigdata.zookeeper.ZooHelper;
 
 /**
- * A helper class that starts all the necessary services for a Jini federation.
- * This is used when testing, but NOT for benchmarking performance. For
- * benchmarking you MUST connect to an existing federation, ideally one deployed
- * over a cluster of machines!
+ * A helper class that starts the bigdata services for a bigdata federation. The
+ * class DOES NOT start the required jini services (the lookup service and the
+ * class server) NOR does it start zookeeper. All of those services are now
+ * started and stopped during by the script which runs CI. This is used when
+ * testing, but NOT for benchmarking performance. For benchmarking you MUST
+ * connect to an existing federation, ideally one deployed over a cluster of
+ * machines!
  * <p>
  * Note: You MUST specify a sufficiently lax security policy, for example:
  * 
@@ -204,9 +207,41 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
      */
     public JiniServicesHelper() {
 
-        this(new String[] { CONFIG_STANDALONE.getPath() });
+        this(getDefaultArgs());
         
     }
+
+    /**
+     * The default Jini configuration arguments used for CI.
+     */
+    final private static String[] getDefaultArgs() {
+
+        final String configFile = CONFIG_STANDALONE.getPath();
+
+        String fedname;
+        try {
+            fedname = "bigdata.test.group-"
+                    + InetAddress.getLocalHost().getHostName();
+        } catch (UnknownHostException e) {
+            throw new RuntimeException(e);
+        }
+
+        final String zroot = "/test_" + JiniServicesHelper.class.getName()
+                + "_" + UUID.randomUUID();
+
+        final String[] args = new String[] {
+                configFile,
+                // Note: overrides the zroot to be unique.
+                ZookeeperClientConfig.Options.NAMESPACE + "."
+                        + ZookeeperClientConfig.Options.ZROOT + "=" + "\""
+                        + zroot + "\"",
+                // Override the federation name.
+                "bigdata.fedname=\"" + fedname + "\"" };
+
+        return args;
+
+    }
+
 
     /**
      * New helper instance. Use {@link #start()} and {@link #destroy()} to start
@@ -252,11 +287,9 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
     /**
      * Thread pool used to run the various services.
      */
-    private final ExecutorService threadPool = Executors
-            .newCachedThreadPool(new DaemonThreadFactory(getClass().getName()
-                    + ".threadPool"));
+    private ExecutorService threadPool = null;
     
-    private final IServiceListener serviceListener = new ServiceListener();
+//    private final IServiceListener serviceListener = new ServiceListener();
 
     /**
      * The directory in which all federation state is located.
@@ -329,6 +362,12 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
         System.setSecurityManager(new SecurityManager());
 
         /*
+         * Setup the thread pool.
+         */
+        threadPool = Executors.newCachedThreadPool(new DaemonThreadFactory(
+                getClass().getName() + ".threadPool"));
+                
+        /*
          * Pull some fields out of the configuration file that we need to
          * set things up.
          */
@@ -356,9 +395,10 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
 
             }
 
-            System.err.println("fedname=" + fedname);
-
-            System.err.println("fedServiceDir=" + fedServiceDir);
+            if (log.isInfoEnabled()) {
+                log.info("fedname=" + fedname);
+                log.info("fedServiceDir=" + fedServiceDir);
+            }
 
             this.fedServiceDir = fedServiceDir;
             
@@ -400,12 +440,17 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
                 clientPort = Integer.valueOf(System
                         .getProperty("test.zookeeper.clientPort","2181"));
 
+            /*
+             * Note: Nothing is being overridden right now. The configuration
+             * file embeds the logic to use the clientPort as specified by the
+             * test.zookeeper.clientPort property.
+             */
                 options = new String[] {
-                        // overrides the clientPort to be unique.
-                        QuorumPeerMain.class.getName()
-                                + "."
-                                + ZookeeperServerConfiguration.Options.CLIENT_PORT
-                                + "=" + clientPort,
+//                        // overrides the clientPort to be unique.
+//                        QuorumPeerMain.class.getName()
+//                                + "."
+//                                + ZookeeperServerConfiguration.Options.CLIENT_PORT
+//                                + "=" + clientPort,
 //                        // overrides servers declaration.
 //                        QuorumPeerMain.class.getName() + "."
 //                                + ZookeeperServerConfiguration.Options.SERVERS
@@ -417,10 +462,11 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
 //                                + ConfigMath.q(zooDataDir.toString()) + ")"//
                 };
                 
-                System.err.println("options=" + Arrays.toString(options));
+            if (log.isInfoEnabled())
+                log.info("options=" + Arrays.toString(options));
 
-                final Configuration config = ConfigurationProvider
-                        .getInstance(concat(args, options));
+//                final Configuration config = ConfigurationProvider
+//                        .getInstance(concat(args, options));
 
 //                // start zookeeper (a server instance).
 //                final int nstarted = ZookeeperProcessHelper.startZookeeper(
@@ -527,7 +573,7 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
                             //
                             "}\n" };
 
-            System.err.println("overrides=" + Arrays.toString(overrides));
+            if(log.isInfoEnabled()) log.info("overrides=" + Arrays.toString(overrides));
 
             threadPool.execute(dataServer1 = new DataServer(concat(args,
                     concat(overrides, options)), new FakeLifeCycle()));
@@ -567,7 +613,7 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
                             //
                             "}\n" };
 
-            System.err.println("overrides=" + Arrays.toString(overrides));
+            if(log.isInfoEnabled()) log.info("overrides=" + Arrays.toString(overrides));
 
             threadPool.execute(dataServer0 = new DataServer(concat(args,
                     concat(overrides, options)), new FakeLifeCycle()));
@@ -732,8 +778,13 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
             fedServiceDir.delete();
             
         }
-        
-        threadPool.shutdownNow();
+
+        if (threadPool != null) {
+
+            threadPool.shutdownNow();
+
+            threadPool = null;
+        }
         
     }
 

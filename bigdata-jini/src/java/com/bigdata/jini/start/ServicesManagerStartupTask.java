@@ -35,7 +35,7 @@ import com.bigdata.service.jini.JiniFederation;
  */
 public class ServicesManagerStartupTask implements Callable<Void> {
 
-    protected static final Logger log = Logger.getLogger(ServicesManagerStartupTask.class);
+    private static final Logger log = Logger.getLogger(ServicesManagerStartupTask.class);
     
     protected final JiniFederation fed;
 
@@ -169,8 +169,7 @@ public class ServicesManagerStartupTask implements Callable<Void> {
 
             final long begin = System.nanoTime();
 
-            long nanos = TimeUnit.MILLISECONDS
-                    .toNanos(selfConfig.zookeeperDiscoveryTimeoutNanos);
+            long nanos = selfConfig.zookeeperDiscoveryTimeoutNanos;
 
             // await zookeeper connection.
             if (!fed.getZookeeperAccessor().awaitZookeeperConnected(nanos,
