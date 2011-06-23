@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import org.deri.iris.basics.Literal;
@@ -826,12 +827,12 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         return null;
     }
 
-    /*
-     * Value cache (transient).
+    /**
+     * Value cache (transient, but overridden serialization is used to send this
+     * anyway for various purposes).
      * 
-     * Note: TermId overrides serialization to make this non-transient.
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/337
      */
-
 	private volatile transient V cache = null;
 
 	final public V getValue() {
@@ -884,4 +885,36 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 		
 	}
 	
+    /**
+     * Override default serialization to send the cached {@link BigdataValue}.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/337
+     */
+    private void writeObject(java.io.ObjectOutputStream out) throws IOException {
+
+        out.defaultWriteObject();
+        
+        out.writeObject(getValueCache());
+
+    }
+
+    /**
+     * Override default serialization to recover the cached {@link BigdataValue}
+     * .
+     */
+    @SuppressWarnings("unchecked")
+    private void readObject(java.io.ObjectInputStream in) throws IOException,
+            ClassNotFoundException {
+
+        in.defaultReadObject();
+
+        final V v = (V) in.readObject();
+
+        if (v != null) {
+            // set the value cache.
+            setValue(v);
+        }
+        
+    }
+
 }
