@@ -776,8 +776,18 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * "DELETE WITH QUERY" where this method is used in a context which writes
      * onto an internal pipe rather than onto the {@link HttpServletResponse}.
      * 
+     * @param namespace
+     *            The namespace associated with the {@link AbstractTripleStore}
+     *            view.
+     * @param timestamp
+     *            The timestamp associated with the {@link AbstractTripleStore}
+     *            view.
      * @param queryStr
      *            The query.
+     * @param acceptOverride
+     *            Override the Accept header (optional). This is used by UPDATE
+     *            and DELETE so they can control the {@link RDFFormat} of the
+     *            materialized query results.
      * @param req
      *            The request.
      * @param os
@@ -791,6 +801,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final String namespace,//
             final long timestamp,//
             final String queryStr,//
+            final String acceptOverride,//
             final HttpServletRequest req,//
             final OutputStream os) throws MalformedQueryException {
 
@@ -807,12 +818,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * query exactly once in order to minimize the resources associated with
          * the query parser.
          */
-        final ParsedQuery parsedQuery = m_queryParser.parseQuery(queryStr, baseURI);
+        final ParsedQuery parsedQuery = m_queryParser.parseQuery(queryStr,
+                baseURI);
 
-        if(log.isDebugEnabled())
+        if (log.isDebugEnabled())
             log.debug(parsedQuery.toString());
-        
-        final QueryType queryType = ((IBigdataParsedQuery) parsedQuery).getQueryType();
+
+        final QueryType queryType = ((IBigdataParsedQuery) parsedQuery)
+                .getQueryType();
 
 		/*
 		 * When true, provide an "explanation" for the query (query plan, query
@@ -833,8 +846,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * has some stuff related to generating Accept headers in their
          * RDFFormat which could bear some more looking into in this regard.)
          */
-		final String acceptStr = explain ? "text/html" : req
-				.getHeader("Accept");
+        final String acceptStr = explain ? "text/html"
+                : acceptOverride != null ? acceptOverride : req.getHeader("Accept");
 
         switch (queryType) {
         case ASK: {

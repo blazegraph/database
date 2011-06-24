@@ -186,6 +186,13 @@ public class InsertServlet extends BigdataRDFServlet {
                 
                 return;
 
+            } catch(Throwable t) {
+                
+                if(conn != null)
+                    conn.rollback();
+                
+                throw new RuntimeException(t);
+
             } finally {
 
                 if (conn != null)
@@ -350,6 +357,13 @@ public class InsertServlet extends BigdataRDFServlet {
 
                 reportModifiedCount(resp, nmodified.get(), elapsed);
 
+            } catch(Throwable t) {
+                
+                if(conn != null)
+                    conn.rollback();
+                
+                throw new RuntimeException(t);
+
             } finally {
 
                 if (conn != null)
@@ -369,7 +383,7 @@ public class InsertServlet extends BigdataRDFServlet {
 	/**
      * Helper class adds statements to the sail as they are visited by a parser.
      */
-    private static class AddStatementHandler extends RDFHandlerBase {
+    static class AddStatementHandler extends RDFHandlerBase {
 
         private final BigdataSailConnection conn;
         private final AtomicLong nmodified;
@@ -380,7 +394,8 @@ public class InsertServlet extends BigdataRDFServlet {
             this.nmodified = nmodified;
         }
 
-        public void handleStatement(Statement stmt) throws RDFHandlerException {
+        public void handleStatement(final Statement stmt)
+                throws RDFHandlerException {
 
             try {
 
