@@ -98,8 +98,12 @@ public class DeleteServlet extends BigdataRDFServlet {
             final InputStream is = newPipedInputStream(os);
             try {
 
+                // Use this format for the query results.
+                final RDFFormat format = RDFFormat.NTRIPLES;
+                
                 final AbstractQueryTask queryTask = getBigdataRDFContext()
                         .getQueryTask(namespace, ITx.READ_COMMITTED, queryStr,
+                                format.getDefaultMIMEType(),
                                 req, os);
 
                 switch (queryTask.queryType) {
@@ -119,21 +123,6 @@ public class DeleteServlet extends BigdataRDFServlet {
 
                     conn = getBigdataRDFContext().getUnisolatedConnection(
                             namespace);
-
-                    /*
-                     * TODO The RDF for the *query* will be generated using the
-                     * MIME type negotiated based on the Accept header (if any)
-                     * in the DELETE request. That means that we need to look at
-                     * the Accept header here and chose the right RDFFormat for
-                     * the parser. (The alternative is to have an alternative
-                     * way to run the query task where we specify the MIME Type
-                     * of the result directly. That might be better all around.)
-                     */
-
-                    final String contentType = req.getContentType();
-
-                    final RDFFormat format = RDFFormat.forMIMEType(contentType,
-                            RDFFormat.RDFXML);
 
                     final RDFParserFactory factory = RDFParserRegistry
                             .getInstance().get(format);
@@ -171,6 +160,13 @@ public class DeleteServlet extends BigdataRDFServlet {
                     final long elapsed = System.currentTimeMillis() - begin;
                     
                     reportModifiedCount(resp, nmodified.get(), elapsed);
+
+                } catch(Throwable t) {
+                    
+                    if(conn != null)
+                        conn.rollback();
+                    
+                    throw new RuntimeException(t);
                     
                 } finally {
 
@@ -200,15 +196,15 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         final String contentType = req.getContentType();
 
-        final String queryStr = req.getRequestURI();
+        final String queryStr = req.getParameter("query");
 
-        if (contentType != null) {
-
-            doDeleteWithBody(req, resp);
-
-        } else if (queryStr != null) {
+        if (queryStr != null) {
 
             doDeleteWithQuery(req, resp);
+
+        } else if (contentType != null) {
+
+            doDeleteWithBody(req, resp);
 
         } else {
 
@@ -304,6 +300,13 @@ public class DeleteServlet extends BigdataRDFServlet {
 
                 reportModifiedCount(resp, nmodified.get(), elapsed);
 
+            } catch(Throwable t) {
+                
+                if (conn != null)
+                    conn.rollback();
+
+                throw new RuntimeException(t);
+                
             } finally {
 
                 if (conn != null)
@@ -323,7 +326,7 @@ public class DeleteServlet extends BigdataRDFServlet {
     /**
      * Helper class removes statements from the sail as they are visited by a parser.
      */
-    private static class RemoveStatementHandler extends RDFHandlerBase {
+    static class RemoveStatementHandler extends RDFHandlerBase {
 
         private final BigdataSailConnection conn;
         private final AtomicLong nmodified;
@@ -337,7 +340,8 @@ public class DeleteServlet extends BigdataRDFServlet {
             
         }
 
-        public void handleStatement(Statement stmt) throws RDFHandlerException {
+        public void handleStatement(final Statement stmt)
+                throws RDFHandlerException {
 
             try {
 

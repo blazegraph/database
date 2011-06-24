@@ -130,7 +130,7 @@ public class QueryServlet extends BigdataRDFServlet {
                  * query.
                  */
                 queryTask = context.getQueryTask(namespace, timestamp,
-                        queryStr, req, os);
+                        queryStr, null/*acceptOverride*/, req, os);
             } catch (MalformedQueryException ex) {
                 /*
                  * Send back a BAD REQUEST (400) along with the text of the

@@ -36,6 +36,7 @@ import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
+import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.TupleQueryResultHandlerBase;
 import org.openrdf.query.resultio.BooleanQueryResultFormat;
 import org.openrdf.query.resultio.BooleanQueryResultParser;
@@ -45,6 +46,7 @@ import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultParser;
 import org.openrdf.query.resultio.TupleQueryResultParserFactory;
 import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
+import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParser;
@@ -54,6 +56,7 @@ import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.rio.helpers.StatementCollector;
+import org.openrdf.sail.SailException;
 import org.xml.sax.Attributes;
 import org.xml.sax.ext.DefaultHandler2;
 
@@ -65,6 +68,7 @@ import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.sparql.BigdataSPARQLParser;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.LocalTripleStore;
@@ -270,6 +274,16 @@ public class TestNanoSparqlServer extends TestCase2 {
         RDFFormat.RDFXML.getDefaultMIMEType() + ";q=1"//
         ;
 		
+        /**
+         * The Content-Type (iff there will be a request body).
+         */
+        public String contentType = null;
+        
+        /**
+         * The data to send as the request body (optional).
+         */
+        public byte[] data = null;
+        
 		/** The connection timeout (ms) -or- ZERO (0) for an infinite timeout. */
 		public int timeout = 0;
 
@@ -350,22 +364,45 @@ public class TestNanoSparqlServer extends TestCase2 {
 //                                opts.defaultGraphUri, "UTF-8")));
 		}
 
+        if (log.isDebugEnabled()) {
+            log.debug("*** Request ***");
+            log.debug(opts.serviceURL);
+            log.debug(opts.queryStr);
+        }
+
 		HttpURLConnection conn = null;
 		try {
 
-		    conn = doConnect(urlString.toString(), opts.method);
-			
-			conn.setReadTimeout(opts.timeout);
-
+//		    conn = doConnect(urlString.toString(), opts.method);
+	        final URL url = new URL(urlString.toString());
+	        conn = (HttpURLConnection) url.openConnection();
+	        conn.setRequestMethod(opts.method);
+            conn.setDoOutput(true);
+            conn.setDoInput(true);
+            conn.setUseCaches(false);
+            conn.setReadTimeout(opts.timeout);
             conn.setRequestProperty("Accept", opts.acceptHeader);
+            
+            if (opts.contentType != null) {
+            
+                if (opts.data == null)
+                    throw new AssertionError();
+                
+                conn.setRequestProperty("Content-Type", opts.contentType);
+            
+                conn.setRequestProperty("Content-Length", Integer
+                        .toString(opts.data.length));
 
-			// write out the request headers
-			if (log.isDebugEnabled()) {
-				log.debug("*** Request ***");
-				log.debug(opts.serviceURL);
-				log.debug(opts.queryStr);
-			}
-
+                final OutputStream os = conn.getOutputStream();
+                try {
+                    os.write(opts.data);
+                    os.flush();
+                } finally {
+                    os.close();
+                }
+                
+            }
+            
 			// connect.
 			conn.connect();
 
@@ -1479,8 +1516,13 @@ public class TestNanoSparqlServer extends TestCase2 {
         doConstructTest("POST",RDFFormat.TRIX);
     }
     
-    private void doConstructTest(final String method, final RDFFormat format)
-            throws Exception {
+    /**
+     * Sets up a simple data set on the server.
+     * 
+     * @throws SailException
+     * @throws RepositoryException
+     */
+    private void setupDataOnServer() throws SailException, RepositoryException {
         
         final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
         final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
@@ -1492,11 +1534,11 @@ public class TestNanoSparqlServer extends TestCase2 {
         final Literal label2 = new LiteralImpl("Bryan");
 
         final BigdataSail sail = getSail();
-        sail.initialize();
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-        
         try {
 
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            
             final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) repo
                     .getConnection();
             try {
@@ -1523,6 +1565,53 @@ public class TestNanoSparqlServer extends TestCase2 {
         } finally {
             sail.shutDown();
         }
+    }
+    
+    private void doConstructTest(final String method, final RDFFormat format)
+            throws Exception {
+        
+        setupDataOnServer();
+        final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
+        final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
+        final URI person = new URIImpl(BD.NAMESPACE + "Person");
+//        final URI likes = new URIImpl(BD.NAMESPACE + "likes");
+//        final URI rdf = new URIImpl(BD.NAMESPACE + "RDF");
+//        final URI rdfs = new URIImpl(BD.NAMESPACE + "RDFS");
+//        final Literal label1 = new LiteralImpl("Mike");
+//        final Literal label2 = new LiteralImpl("Bryan");
+//
+//        final BigdataSail sail = getSail();
+//        sail.initialize();
+//        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+//        
+//        try {
+//
+//            final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) repo
+//                    .getConnection();
+//            try {
+//
+//                cxn.setAutoCommit(false);
+//
+//                cxn.add(mike, RDF.TYPE, person);
+//                cxn.add(mike, likes, rdf);
+//                cxn.add(mike, RDFS.LABEL, label1);
+//                cxn.add(bryan, RDF.TYPE, person);
+//                cxn.add(bryan, likes, rdfs);
+//                cxn.add(bryan, RDFS.LABEL, label2);
+//
+//                /*
+//                 * Note: The either flush() or commit() is required to flush the
+//                 * statement buffers to the database before executing any
+//                 * operations that go around the sail.
+//                 */
+//                cxn.commit();
+//            } finally {
+//                cxn.close();
+//            }
+//             
+//        } finally {
+//            sail.shutDown();
+//        }
 
         // The expected results.
         final Graph expected = new GraphImpl();
@@ -1583,4 +1672,367 @@ public class TestNanoSparqlServer extends TestCase2 {
 
     }
 
+    /**
+     * Unit test for ACID UPDATE using PUT. This test is for the operation where
+     * a SPARQL selects the data to be deleted and the request body contains the
+     * statements to be inserted.
+     */
+    public void test_PUT_UPDATE_WITH_QUERY() throws Exception {
+
+        setupDataOnServer();
+
+        final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
+        final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
+//        final URI person = new URIImpl(BD.NAMESPACE + "Person");
+        final URI likes = new URIImpl(BD.NAMESPACE + "likes");
+        final URI rdf = new URIImpl(BD.NAMESPACE + "RDF");
+        final URI rdfs = new URIImpl(BD.NAMESPACE + "RDFS");
+
+        // The format used to PUT the data.
+        final RDFFormat format = RDFFormat.NTRIPLES;
+        
+        /*
+         * This is the query that we will use to delete some triples from the
+         * database.
+         */
+        final String deleteQueryStr =//
+            "prefix bd: <"+BD.NAMESPACE+"> " +//
+            "prefix rdf: <"+RDF.NAMESPACE+"> " +//
+            "prefix rdfs: <"+RDFS.NAMESPACE+"> " +//
+            "CONSTRUCT { ?x bd:likes bd:RDFS }" +//
+            "WHERE { " +//
+//            "  ?x rdf:type bd:Person . " +//
+            "  ?x bd:likes bd:RDFS " +//
+            "}";
+
+        /*
+         * First, run the query that we will use the delete the triples. This
+         * is a cross check on the expected behavior of the query.
+         */
+        {
+
+            // The expected results.
+            final Graph expected = new GraphImpl();
+            {
+//                expected.add(new StatementImpl(mike, RDF.TYPE, person));
+                expected.add(new StatementImpl(bryan, likes, rdfs));
+            }
+
+            final QueryOptions opts = new QueryOptions();
+            opts.serviceURL = m_serviceURL;
+            opts.queryStr = deleteQueryStr;
+            opts.method = "GET";
+            opts.acceptHeader = TupleQueryResultFormat.SPARQL
+                    .getDefaultMIMEType();
+            
+            assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
+                    requestPath)));
+            
+        }
+
+        /*
+         * Setup the document containing the statement to be inserted by the
+         * UPDATE operation.
+         */
+        final byte[] data;
+        {
+            final Graph g = new GraphImpl();
+            
+            // The new data.
+            g.add(new StatementImpl(bryan, likes, rdf));
+
+            final RDFWriterFactory writerFactory = RDFWriterRegistry
+                    .getInstance().get(format);
+            if (writerFactory == null)
+                fail("RDFWriterFactory not found: format=" + format);
+            final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            final RDFWriter writer = writerFactory.getWriter(baos);
+            writer.startRDF();
+            for (Statement stmt : g) {
+                writer.handleStatement(stmt);
+            }
+            writer.endRDF();
+            data = baos.toByteArray();
+        }
+
+        /*
+         * Now, run the UPDATE operation.
+         */
+        {
+
+            final QueryOptions opts = new QueryOptions();
+            opts.serviceURL = m_serviceURL;
+            opts.queryStr = deleteQueryStr;
+            opts.method = "PUT";
+            //opts.acceptHeader = ...;
+            opts.contentType = RDFFormat.NTRIPLES.getDefaultMIMEType();
+            opts.data = data;
+            final MutationResult ret = getMutationResult(doSparqlQuery(opts,
+                    requestPath));
+            assertEquals(2, ret.mutationCount);// FIXME 1 removed, but also 1 added.
+            
+        }
+        
+        /*
+         * Now verify the post-condition state.
+         */
+        {
+
+            /*
+             * This query verifies that we removed the right triple (nobody is
+             * left who likes 'rdfs').
+             */
+            {
+  
+                // The expected results.
+                final Graph expected = new GraphImpl();
+
+                final QueryOptions opts = new QueryOptions();
+                opts.serviceURL = m_serviceURL;
+                opts.queryStr = deleteQueryStr;
+                opts.method = "GET";
+                opts.acceptHeader = TupleQueryResultFormat.SPARQL
+                        .getDefaultMIMEType();
+
+                assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
+                        requestPath)));
+            }
+
+            /* This query verifies that we added the right triple (two people
+             * now like 'rdf').
+             */
+            {
+
+                final String queryStr2 = //
+                    "prefix bd: <" + BD.NAMESPACE + "> " + //
+                    "prefix rdf: <" + RDF.NAMESPACE + "> " + //
+                    "prefix rdfs: <" + RDFS.NAMESPACE + "> " + //
+                    "CONSTRUCT { ?x bd:likes bd:RDF }" + //
+                    "WHERE { " + //
+//                    "  ?x rdf:type bd:Person . " + //
+                    "  ?x bd:likes bd:RDF " + //
+                    "}";
+                
+                // The expected results.
+                final Graph expected = new GraphImpl();
+
+                expected.add(new StatementImpl(mike, likes, rdf));
+                expected.add(new StatementImpl(bryan, likes, rdf));
+
+                final QueryOptions opts = new QueryOptions();
+                opts.serviceURL = m_serviceURL;
+                opts.queryStr = queryStr2;
+                opts.method = "GET";
+                opts.acceptHeader = TupleQueryResultFormat.SPARQL
+                        .getDefaultMIMEType();
+
+                assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
+                        requestPath)));
+
+            }
+
+        }
+
+    }
+
+    /**
+     * Unit test verifies that you can have a CONSTRUCT SPARQL with an empty
+     * WHERE clause.
+     * 
+     * @throws MalformedQueryException
+     */
+    public void test_CONSTRUCT_TEMPLATE_ONLY() throws MalformedQueryException {
+
+        final String deleteQueryStr =//
+            "prefix bd: <"+BD.NAMESPACE+"> " +//
+            "CONSTRUCT { bd:Bryan bd:likes bd:RDFS }" +//
+            "{}";
+
+        new BigdataSPARQLParser().parseQuery(deleteQueryStr,
+                "http://www.bigdata.com");
+
+    }
+    
+    /**
+     * Unit test where the "query" used to delete triples from the database
+     * consists solely of a CONSTRUCT "template" without a WHERE clause (the
+     * WHERE clause is basically optional as all elements of it are optional).
+     * 
+     * @throws Exception
+     */
+    public void test_PUT_UPDATE_WITH_CONSTRUCT_TEMPLATE_ONLY() throws Exception {
+
+        setupDataOnServer();
+
+        final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
+        final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
+//        final URI person = new URIImpl(BD.NAMESPACE + "Person");
+        final URI likes = new URIImpl(BD.NAMESPACE + "likes");
+        final URI rdf = new URIImpl(BD.NAMESPACE + "RDF");
+        final URI rdfs = new URIImpl(BD.NAMESPACE + "RDFS");
+
+        // The format used to PUT the data.
+        final RDFFormat format = RDFFormat.NTRIPLES;
+        
+        /*
+         * This is the query that we will use to delete some triples from the
+         * database.
+         */
+        final String deleteQueryStr =//
+            "prefix bd: <"+BD.NAMESPACE+"> " +//
+            "CONSTRUCT { bd:Bryan bd:likes bd:RDFS }" +//
+            "{ }";
+
+        new BigdataSPARQLParser().parseQuery(deleteQueryStr,
+                "http://www.bigdata.com");
+        
+        /*
+         * First, run the query that we will use the delete the triples. This
+         * is a cross check on the expected behavior of the query.
+         */
+        {
+
+            // The expected results.
+            final Graph expected = new GraphImpl();
+            {
+//                expected.add(new StatementImpl(mike, RDF.TYPE, person));
+                expected.add(new StatementImpl(bryan, likes, rdfs));
+            }
+
+            final QueryOptions opts = new QueryOptions();
+            opts.serviceURL = m_serviceURL;
+            opts.queryStr = deleteQueryStr;
+            opts.method = "GET";
+            opts.acceptHeader = TupleQueryResultFormat.SPARQL
+                    .getDefaultMIMEType();
+            
+            assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
+                    requestPath)));
+            
+        }
+
+        /*
+         * Setup the document containing the statement to be inserted by the
+         * UPDATE operation.
+         */
+        final byte[] data;
+        {
+            final Graph g = new GraphImpl();
+            
+            // The new data.
+            g.add(new StatementImpl(bryan, likes, rdf));
+
+            final RDFWriterFactory writerFactory = RDFWriterRegistry
+                    .getInstance().get(format);
+            if (writerFactory == null)
+                fail("RDFWriterFactory not found: format=" + format);
+            final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            final RDFWriter writer = writerFactory.getWriter(baos);
+            writer.startRDF();
+            for (Statement stmt : g) {
+                writer.handleStatement(stmt);
+            }
+            writer.endRDF();
+            data = baos.toByteArray();
+        }
+
+        /*
+         * Now, run the UPDATE operation.
+         */
+        {
+
+            final QueryOptions opts = new QueryOptions();
+            opts.serviceURL = m_serviceURL;
+            opts.queryStr = deleteQueryStr;
+            opts.method = "PUT";
+            //opts.acceptHeader = ...;
+            opts.contentType = RDFFormat.NTRIPLES.getDefaultMIMEType();
+            opts.data = data;
+            final MutationResult ret = getMutationResult(doSparqlQuery(opts,
+                    requestPath));
+            assertEquals(2, ret.mutationCount);// FIXME 1 removed, but also 1 added.
+            
+        }
+        
+        /*
+         * Now verify the post-condition state.
+         */
+        {
+
+            /*
+             * This query verifies that we removed the right triple (nobody is
+             * left who likes 'rdfs').
+             */
+            {
+
+                final String queryStr2 = //
+                    "prefix bd: <" + BD.NAMESPACE + "> " + //
+                    "prefix rdf: <" + RDF.NAMESPACE + "> " + //
+                    "prefix rdfs: <" + RDFS.NAMESPACE + "> " + //
+                    "CONSTRUCT { ?x bd:likes bd:RDFS }" + //
+                    "WHERE { " + //
+//                    "  ?x rdf:type bd:Person . " + //
+                    "  ?x bd:likes bd:RDFS " + // NB: Checks the kb!
+                    "}";
+
+                // The expected results.
+                final Graph expected = new GraphImpl();
+
+                final QueryOptions opts = new QueryOptions();
+                opts.serviceURL = m_serviceURL;
+                opts.queryStr = queryStr2;
+                opts.method = "GET";
+                opts.acceptHeader = TupleQueryResultFormat.SPARQL
+                        .getDefaultMIMEType();
+
+                assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
+                        requestPath)));
+            }
+
+            /* This query verifies that we added the right triple (two people
+             * now like 'rdf').
+             */
+            {
+
+                final String queryStr2 = //
+                    "prefix bd: <" + BD.NAMESPACE + "> " + //
+                    "prefix rdf: <" + RDF.NAMESPACE + "> " + //
+                    "prefix rdfs: <" + RDFS.NAMESPACE + "> " + //
+                    "CONSTRUCT { ?x bd:likes bd:RDF }" + //
+                    "WHERE { " + //
+//                    "  ?x rdf:type bd:Person . " + //
+                    "  ?x bd:likes bd:RDF " + //
+                    "}";
+                
+                // The expected results.
+                final Graph expected = new GraphImpl();
+
+                expected.add(new StatementImpl(mike, likes, rdf));
+                expected.add(new StatementImpl(bryan, likes, rdf));
+
+                final QueryOptions opts = new QueryOptions();
+                opts.serviceURL = m_serviceURL;
+                opts.queryStr = queryStr2;
+                opts.method = "GET";
+                opts.acceptHeader = TupleQueryResultFormat.SPARQL
+                        .getDefaultMIMEType();
+
+                assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
+                        requestPath)));
+
+            }
+
+        }
+
+    }
+
+//    /**
+//     * Unit test for ACID UPDATE using PUT. This test is for the operation where
+//     * the request body is a multi-part MIME document conveying both the
+//     * statements to be removed and the statement to be inserted.
+//     */
+//    public void test_PUT_UPDATE_WITH_MULTI_PART_MIME() {
+//        fail("write test");
+//    }
+    
 }
