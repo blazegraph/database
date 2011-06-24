@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rwstore;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.io.*;
 
@@ -252,6 +253,17 @@ public class FixedAllocator implements Allocator {
                     }
 
                     if (!protectTransients) {
+                    	/**
+                    	 * This assert will trip if any address was freed under
+                    	 * session protection and therefore remained accessible
+                    	 * until released.
+                    	 * The value returned by releaseSession should be zero
+                    	 * since all "frees" should already have removed any 
+                    	 * writes to the writeCacheService
+                    	 */
+                    	assert m_sessionFrees.intValue() == 0;
+                    	// assert block.releaseSession(m_store.m_writeCache) == 0;
+                    	
                         block.m_transients = block.m_live.clone();
                     }
 
@@ -544,6 +556,9 @@ public class FixedAllocator implements Allocator {
 	}
 
 	private boolean m_freeWaiting = true;
+
+	// track number of frees to be cleared on session releases
+	private AtomicInteger m_sessionFrees = new AtomicInteger(0);
 	
 	public boolean free(final int addr, final int size) {
 		return free(addr, size, false);
@@ -566,9 +581,9 @@ public class FixedAllocator implements Allocator {
 			 * without first clearing addresses them from the writeCacheService
 			 */
 			final boolean tmp = m_sessionActive;
-			m_sessionActive = m_store.isSessionProtected();
+			m_sessionActive = tmp || m_store.isSessionProtected();
 			if (tmp && !m_sessionActive) throw new AssertionError();
-
+			
 			try {
 				if (((AllocBlock) m_allocBlocks.get(block))
 						.freeBit(offset % nbits, m_sessionActive && !overideSession)) { // bit adjust
@@ -580,7 +595,22 @@ public class FixedAllocator implements Allocator {
 					checkFreeList();
 				} else {
 					m_freeTransients++;
+					
+					if (m_sessionActive) {
+						boolean assertsEnabled = false;
+						assert assertsEnabled = true;
+						if (assertsEnabled){
+							final int sessionFrees = m_sessionFrees.incrementAndGet();
+							int sessionBits = 0;
+							for (AllocBlock ab : m_allocBlocks) {
+								sessionBits += ab.sessionBits();
+							}
+							assert sessionFrees <= sessionBits : "sessionFrees: " + sessionFrees + " > sessionBits: " + sessionBits;	
+						}
+					}
+						
 				}
+				
 				
 				if (m_statsBucket != null) {
 					m_statsBucket.delete(size);
@@ -698,16 +728,14 @@ public class FixedAllocator implements Allocator {
 			
 			return value;
 		} else {
-			if (log.isDebugEnabled()) {
-	 			StringBuilder sb = new StringBuilder();
-				sb.append("FixedAllocator returning null address, with freeBits: " + m_freeBits + "\n");
-			
-	    		for (AllocBlock ab: m_allocBlocks) {
-	    			sb.append(ab.show() + "\n");
-	    		}
-	    		
-	    		log.debug(sb);
-			}
+ 			StringBuilder sb = new StringBuilder();
+			sb.append("FixedAllocator returning null address, with freeBits: " + m_freeBits + "\n");
+		
+    		for (AllocBlock ab: m_allocBlocks) {
+    			sb.append(ab.show() + "\n");
+    		}
+    		
+    		log.error(sb);
 
 			return 0;
 		}
@@ -873,20 +901,61 @@ public class FixedAllocator implements Allocator {
 		}
 		
 		if (this.m_sessionActive) {
-			if (log.isTraceEnabled())
-				log.trace("Allocator: #" + m_index + " releasing session protection");
-			
-			int releasedAllocations = 0;
-			for (AllocBlock ab : m_allocBlocks) {
-				releasedAllocations += ab.releaseSession(cache);
-			}
-			
-			m_freeBits += releasedAllocations;
-			m_freeTransients -= releasedAllocations;
-			
-			checkFreeList();
-			
-			m_sessionActive = m_store.isSessionProtected();
+			final int start = m_sessionFrees.intValue();
+			// try {
+				if (log.isTraceEnabled())
+					log.trace("Allocator: #" + m_index + " releasing session protection");
+				
+
+				int releasedAllocations = 0;
+				for (AllocBlock ab : m_allocBlocks) {
+					releasedAllocations += ab.releaseSession(cache);
+				}
+				
+				assert !m_store.isSessionProtected() : "releaseSession called with isSessionProtected: true";
+				
+				m_sessionActive = false; // should only need indicate that it contains no cached writes
+	
+				
+				m_freeBits = freebits();
+				final int freebits = freebits();
+				if (m_freeBits > freebits)
+					log.error("m_freeBits too high: " + m_freeBits + " > (calc): " + freebits);
+				
+				m_freeTransients = transientbits();
+				
+				checkFreeList();
+				
+				// assert m_sessionFrees == releasedAllocations : "Allocator: " + hashCode() + " m_sessionFrees: " + m_sessionFrees + " != released: " + releasedAllocations;
+				if (start > releasedAllocations) {
+					log.error("BAD! Allocator: " + hashCode() + ", size: " + m_size + " m_sessionFrees: " + m_sessionFrees.intValue() + " > released: " + releasedAllocations);
+				} else {
+					// log.error("GOOD! Allocator: " + hashCode() + ", size: " + m_size + " m_sessionFrees: " + m_sessionFrees.intValue() + " <= released: " + releasedAllocations);
+				}
+			// } finally {
+				final int end = m_sessionFrees.getAndSet(0);
+				assert start == end : "SessionFrees concurrent modification: " + start + " != " + end;
+			// }
+		} else {
+			assert m_sessionFrees.intValue() == 0 : "Session Inactive with sessionFrees: " + m_sessionFrees.intValue();
 		}
+	}
+
+	private int freebits() {
+		int freeBits = 0;
+		for (AllocBlock ab : m_allocBlocks) {
+			freeBits += ab.freeBits();
+		}
+
+		return freeBits;
+	}
+
+	private int transientbits() {
+		int freeBits = 0;
+		for (AllocBlock ab : m_allocBlocks) {
+			freeBits += ab.transientBits();
+		}
+
+		return freeBits;
 	}
 }

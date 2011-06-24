@@ -18,6 +18,7 @@ import org.openrdf.sail.SailException;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.sparql.BigdataSPARQLParser;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -57,8 +58,15 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     @Override
     public BigdataSailConnection getSailConnection() {
 
-    	return (BigdataSailConnection)super.getSailConnection();
-    	
+        return (BigdataSailConnection)super.getSailConnection();
+        
+    }
+
+    @Override
+    public BigdataValueFactory getValueFactory() {
+
+        return (BigdataValueFactory) super.getValueFactory();
+        
     }
 
 	/**

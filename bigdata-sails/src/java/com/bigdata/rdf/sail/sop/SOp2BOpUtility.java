@@ -76,7 +76,7 @@ import com.bigdata.relation.rule.Rule;
 
 public class SOp2BOpUtility {
 
-    protected static final Logger log = Logger.getLogger(SOp2BOpUtility.class);
+    private static final Logger log = Logger.getLogger(SOp2BOpUtility.class);
 
     public static PipelineOp convert(final SOpTree sopTree,
     		final AtomicInteger idFactory, final AbstractTripleStore db,
@@ -962,8 +962,9 @@ public class SOp2BOpUtility {
     }    
     
     protected static boolean useHashJoin(final Properties queryHints) {
-    	final boolean hashJoin = Boolean.valueOf(queryHints.getProperty(
-    			QueryHints.HASH_JOIN, QueryHints.DEFAULT_HASH_JOIN)); 
+        final boolean hashJoin = queryHints == null ? false : Boolean
+                .valueOf(queryHints.getProperty(QueryHints.HASH_JOIN,
+                        QueryHints.DEFAULT_HASH_JOIN)); 
     	if (log.isInfoEnabled()) {
     		log.info(queryHints);
     		log.info(queryHints.getProperty(QueryHints.HASH_JOIN));

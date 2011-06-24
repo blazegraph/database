@@ -1,4 +1,28 @@
+/**
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 /*
+ * Portions of this code are:
+ *
  * Copyright Aduna (http://www.aduna-software.com/) (c) 1997-2007.
  *
  * Licensed under the Aduna BSD-style license.
@@ -121,52 +145,42 @@ public class BigdataSPARQLParser implements QueryParser {
 
     static private Properties getQueryHints(final ASTQueryContainer qc)
             throws MalformedQueryException {
-//        try {
-            final Properties queryHints = new Properties();
-//            // currently only supporting SPARQL
-//            if (ql == QueryLanguage.SPARQL) {
-//                // the next four lines were taken directly from
-//                // org.openrdf.query.parser.sparql.SPARQLParser.parseQuery(String queryStr, String baseURI)
-//                final ASTQueryContainer qc = SyntaxTreeBuilder
-//                        .parseQuery(queryString);
-//                StringEscapesProcessor.process(qc);
-//                BaseDeclProcessor.process(qc, baseURI);
-                final Map<String, String> prefixes = PrefixDeclProcessor
-                        .process(qc);
-                // iterate the namespaces
-                for (Map.Entry<String, String> prefix : prefixes.entrySet()) {
-                    // if we see one that matches the magic namespace, try
-                    // to parse it
-                    if (prefix.getKey().equalsIgnoreCase(QueryHints.PREFIX)) {
-                        String hints = prefix.getValue();
-                        // has to have a # and it can't be at the end
-                        int i = hints.indexOf('#');
-                        if (i < 0 || i == hints.length() - 1) {
-                            throw new MalformedQueryException(
-                                    "bad query hints: " + hints);
-                        }
-                        hints = hints.substring(i + 1);
-                        // properties are separated by &
-                        final StringTokenizer st = new StringTokenizer(hints,
-                                "&");
-                        while (st.hasMoreTokens()) {
-                            final String hint = st.nextToken();
-                            i = hint.indexOf('=');
-                            if (i < 0 || i == hint.length() - 1) {
-                                throw new MalformedQueryException(
-                                        "bad query hint: " + hint);
-                            }
-                            final String key = hint.substring(0, i);
-                            final String val = hint.substring(i+1);
-                            queryHints.put(key, val);
-                        }
-                    }
+        
+        final Properties queryHints = new Properties();
+        
+        final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
+        
+        // iterate the namespaces
+        for (Map.Entry<String, String> prefix : prefixes.entrySet()) {
+            // if we see one that matches the magic namespace, try
+            // to parse it
+            if (prefix.getKey().equalsIgnoreCase(QueryHints.PREFIX)) {
+                String hints = prefix.getValue();
+                // has to have a # and it can't be at the end
+                int i = hints.indexOf('#');
+                if (i < 0 || i == hints.length() - 1) {
+                    throw new MalformedQueryException("bad query hints: "
+                            + hints);
                 }
-//            }
-            return queryHints;
-//        } catch (ParseException e) {
-//            throw new MalformedQueryException(e.getMessage(), e);
-//        }
+                hints = hints.substring(i + 1);
+                // properties are separated by &
+                final StringTokenizer st = new StringTokenizer(hints, "&");
+                while (st.hasMoreTokens()) {
+                    final String hint = st.nextToken();
+                    i = hint.indexOf('=');
+                    if (i < 0 || i == hint.length() - 1) {
+                        throw new MalformedQueryException("bad query hint: "
+                                + hint);
+                    }
+                    final String key = hint.substring(0, i);
+                    final String val = hint.substring(i + 1);
+                    queryHints.put(key, val);
+                }
+            }
+        }
+     
+        return queryHints; // Note: MAY be null.
+        
     }
     
 //    public static void main(String[] args)

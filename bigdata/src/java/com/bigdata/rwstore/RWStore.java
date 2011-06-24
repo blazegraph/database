@@ -394,7 +394,7 @@ public class RWStore implements IStore, IBufferedWriter {
 	
 	private final Quorum<?,?> m_quorum;
 	
-	private final RWWriteCacheService m_writeCache;
+	final RWWriteCacheService m_writeCache;
 
 	/**
 	 * The actual allocation sizes as read from the store.
@@ -1602,8 +1602,6 @@ public class RWStore implements IStore, IBufferedWriter {
 					 * transaction protection and isolated AllocationContexts.
 					 */
 					if (this.isSessionProtected()) {
-						final boolean overrideSession = context != null && alloc.canImmediatelyFree(addr, sze, context);
-						
 						if (context != null) {
 							if (alloc.canImmediatelyFree(addr, sze, context)) {
 								immediateFree(addr, sze, true);

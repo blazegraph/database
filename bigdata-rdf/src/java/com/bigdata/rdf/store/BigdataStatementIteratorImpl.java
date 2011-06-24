@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.internal.IV;
@@ -33,6 +34,8 @@ public class BigdataStatementIteratorImpl
         extends
         AbstractChunkedResolverator<ISPO, BigdataStatement, AbstractTripleStore>
         implements BigdataStatementIterator {
+
+    final private static Logger log = Logger.getLogger(BigdataStatementIteratorImpl.class);
 
     /**
      * An optional map of known blank node term identifiers and the
@@ -100,7 +103,7 @@ public class BigdataStatementIteratorImpl
     @Override
     protected BigdataStatement[] resolveChunk(final ISPO[] chunk) {
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("chunkSize=" + chunk.length);
 
         /*
@@ -152,7 +155,7 @@ public class BigdataStatementIteratorImpl
 
         }
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("Resolving " + ivs.size() + " term identifiers");
         
         /*

@@ -141,11 +141,14 @@ import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
+import com.bigdata.rdf.store.BigdataOpenRDFBindingSetsResolverator;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
+import com.bigdata.relation.accesspath.WrappedAsynchronousIterator;
 import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IQueryOptions;
@@ -158,6 +161,7 @@ import com.bigdata.search.IHit;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.DistinctFilter;
+import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -291,19 +295,31 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     /**
      * Logger.
      */
-    protected static final Logger log = 
+    private static final Logger log = 
         Logger.getLogger(BigdataEvaluationStrategyImpl3.class);
 
     protected final BigdataTripleSource tripleSource;
 
     protected final Dataset dataset;
 
+    final private CloseableIteration<BindingSet, QueryEvaluationException> bindingSets;
+    
     private final AbstractTripleStore database;
 
     /**
+     * 
+     * @param tripleSource
+     * @param dataset
+     * @param bindingSets
+     *            An optional source for zero or more binding sets which will be
+     *            fed into the start of the native query evaluation.
+     * @param nativeJoins
+     * @param allowSesameQueryEvaluation
      */
     public BigdataEvaluationStrategyImpl3(
-            final BigdataTripleSource tripleSource, final Dataset dataset,
+            final BigdataTripleSource tripleSource,
+            final Dataset dataset,
+            final CloseableIteration<BindingSet, QueryEvaluationException> bindingSets,
             final boolean nativeJoins, 
             final boolean allowSesameQueryEvaluation) {
         
@@ -311,6 +327,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         
         this.tripleSource = tripleSource;
         this.dataset = dataset;
+        this.bindingSets = bindingSets;
         this.database = tripleSource.getDatabase();
         this.nativeJoins = nativeJoins;
         this.allowSesameQueryEvaluation = allowSesameQueryEvaluation;
@@ -345,7 +362,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 		CloseableIteration<BindingSet, QueryEvaluationException> result;
 		result = this.evaluate(projection.getArg(), bindings);
 		
-		QueryBindingSet empty = new QueryBindingSet();
+		final QueryBindingSet empty = new QueryBindingSet();
 		result = new ProjectionIterator(projection, result, empty);
 		return result;
 	}
@@ -1027,10 +1044,45 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         final UUID queryId = queryIdStr == null ? UUID.randomUUID() : UUID
                 .fromString(queryIdStr);
 
-        // Wrap the input binding sets (or an empty binding set if there is no
-        // input).
-        final IAsynchronousIterator<IBindingSet[]> source = newBindingSetIterator(bs != null ? toBindingSet(bs)
-                : new ListBindingSet());
+        /*
+         * Setup the input binding sets which will be fed into the query
+         * pipeline.
+         */
+        final IAsynchronousIterator<IBindingSet[]> source;
+        if (bs != null && bindingSets != null && bs.size() > 0)
+            throw new QueryEvaluationException(
+                    "BindingSet and BindingSets are mutually exclusive.");
+        if (bindingSets != null) {
+            /*
+             * A stream of input binding sets will be fed into the query
+             * pipeline (zero or more).
+             */
+            // align openrdf CloseableIteration with Bigdata IClosableIterator.
+            final IChunkedOrderedIterator<BindingSet> src = new ChunkedWrappedIterator<BindingSet>(
+                    new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
+                            bindingSets));
+            // efficient resolution of Value[]s to IV[]s for binding set chunks.
+            final ICloseableIterator<IBindingSet> src2 = new BigdataOpenRDFBindingSetsResolverator(
+                    database, src).start(database.getExecutorService());
+            // chunk up the binding sets. 
+            final IChunkedOrderedIterator<IBindingSet> src3 = new ChunkedWrappedIterator<IBindingSet>(
+                    src2);
+            // wrap as an asynchronous iterator.
+            source = new WrappedAsynchronousIterator<IBindingSet[], IBindingSet>(
+                    src3);
+        } else if (bs != null) {
+            /*
+             * A single input binding set will be fed into the query pipeline
+             * using the supplied bindings.
+             */
+            source = newBindingSetIterator(toBindingSet(bs));
+        } else {
+            /*
+             * A single empty input binding set will be fed into the query
+             * pipeline.
+             */
+            source = newBindingSetIterator(new ListBindingSet());
+        }
 
 	    IRunningQuery runningQuery = null;
     	try {

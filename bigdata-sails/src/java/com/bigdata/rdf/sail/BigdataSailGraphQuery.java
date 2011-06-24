@@ -230,11 +230,14 @@ public class BigdataSailGraphQuery extends SailGraphQuery
     public boolean isDescribe() {
         return describe;
     }
-    
+
     /**
-     * Overriden to use query hints from SPARQL queries. Query hints are
-     * embedded in query strings as namespaces.  
-     * See {@link QueryHints#PREFIX} for more information.
+     * {@inheritDoc}
+     * <p>
+     * Overridden to use query hints from SPARQL queries. Query hints are
+     * embedded in query strings as namespaces.
+     * 
+     * @see QueryHints
      */
     @Override
     public GraphQueryResult evaluate() throws QueryEvaluationException {
@@ -242,12 +245,14 @@ public class BigdataSailGraphQuery extends SailGraphQuery
         try {
             
         	final TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
-            final BigdataSailConnection sailCon =
+
+        	final BigdataSailConnection sailCon =
                     (BigdataSailConnection) getConnection().getSailConnection();
-            CloseableIteration<? extends BindingSet, QueryEvaluationException> bindingsIter =
-                    sailCon.evaluate(
-                            tupleExpr, getActiveDataset(), getBindings(),
-                            getIncludeInferred(), queryHints);
+            
+            CloseableIteration<? extends BindingSet, QueryEvaluationException> bindingsIter = sailCon
+                    .evaluate(tupleExpr, getActiveDataset(), getBindings(),
+                            null/* bindingSets */, getIncludeInferred(),
+                            queryHints);
             
             // Filters out all partial and invalid matches
             bindingsIter =
@@ -266,9 +271,13 @@ public class BigdataSailGraphQuery extends SailGraphQuery
             if (!useNativeConstruct) {
 
                 // Convert the BindingSet objects to actual RDF statements
+
                 final ValueFactory vf = getConnection().getRepository().getValueFactory();
+
                 final CloseableIteration<Statement, QueryEvaluationException> stIter;
-                stIter = new ConvertingIteration<BindingSet, Statement, QueryEvaluationException>(bindingsIter) {
+
+                stIter = new ConvertingIteration<BindingSet, Statement, QueryEvaluationException>(
+                        bindingsIter) {
 
                     @Override
                     protected Statement convert(BindingSet bindingSet) {
@@ -279,26 +288,34 @@ public class BigdataSailGraphQuery extends SailGraphQuery
 
                         if (context == null) {
                             return vf.createStatement(subject, predicate, object);
-                        }
-                        else {
+                        } else {
                             return vf.createStatement(subject, predicate, object, context);
                         }
                     }
-                    
+
                 };
 
-                return new GraphQueryResultImpl(getParsedQuery().getQueryNamespaces(), stIter);
-
-            } else {
-            	// native construct.
-                
-                // Convert the BindingSet objects to actual RDF statements
-                final ValueFactory vf = getConnection().getRepository().getValueFactory();
-                final CloseableIteration<? extends Statement, QueryEvaluationException> stIter;
-                stIter = new BigdataConstructIterator(sailCon.getTripleStore(),  bindingsIter, vf);
                 return new GraphQueryResultImpl(getParsedQuery()
                         .getQueryNamespaces(), stIter);
+
+            } else {
                 
+                /*
+                 * Native construct.
+                 */
+                
+                // Convert the BindingSet objects to actual RDF statements
+                final ValueFactory vf = getConnection().getRepository()
+                        .getValueFactory();
+
+                final CloseableIteration<? extends Statement, QueryEvaluationException> stIter;
+
+                stIter = new BigdataConstructIterator(sailCon.getTripleStore(),
+                        bindingsIter, vf);
+
+                return new GraphQueryResultImpl(getParsedQuery()
+                        .getQueryNamespaces(), stIter);
+
             }
             
         } catch (SailException e) {
@@ -311,16 +328,43 @@ public class BigdataSailGraphQuery extends SailGraphQuery
      * Return the same optimized operator tree as what would be executed.
      */
     public TupleExpr getTupleExpr() throws QueryEvaluationException {
+        
         TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
+        
         try {
-            BigdataSailConnection sailCon =
+       
+            final BigdataSailConnection sailCon =
                 (BigdataSailConnection) getConnection().getSailConnection();
+            
             tupleExpr = sailCon.optimize(tupleExpr, getActiveDataset(), 
                     getBindings(), getIncludeInferred(), queryHints);
+            
             return tupleExpr;
+            
         } catch (SailException e) {
+            
             throw new QueryEvaluationException(e.getMessage(), e);
+            
         }
+
     }
     
+//    synchronized public void setBindingSets(
+//            final CloseableIteration<BindingSet, QueryEvaluationException> bindings) {
+//
+//        if (this.bindings != null)
+//            throw new IllegalStateException();
+//
+//        this.bindings = bindings;
+//
+//    }
+//
+//    synchronized public CloseableIteration<BindingSet, QueryEvaluationException> getBindingSets() {
+//
+//        return bindings;
+//
+//    }
+//
+//    private CloseableIteration<BindingSet, QueryEvaluationException> bindings;
+
 }

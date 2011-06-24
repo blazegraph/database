@@ -1,6 +1,5 @@
 package com.bigdata.rdf.store;
 
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -8,6 +7,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
 import com.bigdata.bop.Constant;
@@ -31,7 +31,9 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
 public class BigdataBindingSetResolverator
         extends
         AbstractChunkedResolverator<IBindingSet, IBindingSet, AbstractTripleStore> {
-	
+
+    final private static Logger log = Logger.getLogger(BigdataBindingSetResolverator.class);
+
 	private final IVariable[] required;
 
     /**

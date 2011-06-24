@@ -50,12 +50,12 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
  */
 abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIterator<F> {
 
-    final protected static Logger log = Logger.getLogger(AbstractChunkedResolverator.class);
+    final private static Logger log = Logger.getLogger(AbstractChunkedResolverator.class);
 
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    final protected static boolean DEBUG = log.isDebugEnabled();
     
     /**
      * The source iterator.
@@ -202,7 +202,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
 
             try {
 
-                if (DEBUG)
+                if (log.isDebugEnabled())
                     log.debug("Start");
 
                 final long begin = System.currentTimeMillis();
@@ -224,7 +224,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
                     nchunks++;
                     nelements += chunk.length;
                     
-                    if (DEBUG)
+                    if (log.isDebugEnabled())
                         log.debug("nchunks="+nchunks+", chunkSize="+chunk.length);
 
                 }
@@ -307,7 +307,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
             
 //            elapsed += (now - begin);
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("nextChunk ready");
             
         }
@@ -315,7 +315,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
         // the next resolved element.
         final F f = chunk[++lastIndex];
             
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("lastIndex=" + lastIndex + ", chunk.length="
                     + chunk.length + ", stmt=" + f);
 

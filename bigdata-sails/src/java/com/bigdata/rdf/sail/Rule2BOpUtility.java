@@ -306,6 +306,9 @@ public class Rule2BOpUtility {
     public static PipelineOp applyQueryHints(PipelineOp op,
             final Properties queryHints) {
 
+        if (queryHints == null)
+            return op;
+
         final Enumeration<?> pnames = queryHints.propertyNames();
 
         while (pnames.hasMoreElements()) {
@@ -409,9 +412,10 @@ public class Rule2BOpUtility {
          */
         final BOpContextBase context = new BOpContextBase(queryEngine);
         
-        final QueryOptimizerEnum optimizer = QueryOptimizerEnum
-                .valueOf(queryHints.getProperty(QueryHints.OPTIMIZER,
-                        QueryOptimizerEnum.Static.toString()));
+        final QueryOptimizerEnum optimizer = queryHints == null ? QueryOptimizerEnum.Static
+                : QueryOptimizerEnum.valueOf(queryHints.getProperty(
+                        QueryHints.OPTIMIZER, QueryOptimizerEnum.Static
+                                .toString()));
 
         // The evaluation plan order.
         final int[] order;
