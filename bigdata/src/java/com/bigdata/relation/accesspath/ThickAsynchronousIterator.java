@@ -82,16 +82,16 @@ public class ThickAsynchronousIterator<E> implements IAsynchronousIterator<E>,
         
     }
     
-    private final void assertOpen() {
-        
-        if (!open)
-            throw new IllegalStateException();
-        
-    }
+//    private final void assertOpen() {
+//        
+//        if (!open)
+//            throw new IllegalStateException();
+//        
+//    }
 
     public boolean hasNext() {
         
-        return lastIndex + 1 < a.length;
+        return open && lastIndex + 1 < a.length;
 
     }
 

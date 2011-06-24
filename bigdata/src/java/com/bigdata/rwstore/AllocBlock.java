@@ -363,8 +363,11 @@ public class AllocBlock {
 		if (m_addr != 0) { // check active!
 			for (int i = 0; i < m_live.length; i++) {
 				int chkbits = m_transients[i];
+				// check all addresses set in m_transients NOT set in m_live
+				chkbits &= ~m_live[i];
+				
+				// reset transients to live OR commit
 				m_transients[i] = m_live[i] | m_commit[i];
-				chkbits &= ~m_transients[i];
 				
 				final int startBit = i * 32;
 				
@@ -382,6 +385,94 @@ public class AllocBlock {
 			sb.append(b + " ");
 		
 		return sb.toString();
+	}
+
+	/**
+	 * @return number of bits that will be cleared in a session release
+	 */
+	int sessionBits() {
+		int freebits = 0;
+		
+		if (m_addr != 0) { // check active!
+			for (int i = 0; i < m_live.length; i++) {
+				int chkbits = m_transients[i];
+				if (chkbits != 0) {
+					// chkbits &= ~(m_live[i] | m_commit[i]);
+					chkbits &= ~m_live[i];
+					
+					if (chkbits != 0) {
+						// there are writes to clear
+						for (int b = 0; b < 32; b++) {
+							if ((chkbits & (1 << b)) != 0) {								
+								freebits++;
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		return freebits;
+	}
+
+	/**
+	 * @return number of bits immediately available for allocation
+	 */
+	int freeBits() {
+		int freebits = 0;
+		
+		if (m_addr != 0) { // check active!
+			for (int i = 0; i < m_live.length; i++) {
+				int chkbits = ~m_transients[i];
+
+				if (chkbits != 0) {
+					if (chkbits == 0xFFFFFFFF) {
+						freebits += 32;
+					} else {
+						for (int b = 0; b < 32; b++) {
+							if ((chkbits & (1 << b)) != 0) {
+								freebits++;
+							}
+						}
+					}
+				}
+			}
+		} else {
+			freebits += m_live.length * 32;
+		}
+		
+		return freebits;
+	}
+
+	/**
+	 * transients frees as defined by those bits set in transients but NOT set
+	 * in live
+	 * @return number of transient frees
+	 */
+	int transientBits() {
+		int freebits = 0;
+		
+		if (m_addr != 0) { // check active!
+			for (int i = 0; i < m_live.length; i++) {
+				int chkbits = m_transients[i] & ~m_live[i];
+
+				if (chkbits != 0) {
+					if (chkbits == 0xFFFFFFFF) {
+						freebits += 32;
+					} else {
+						for (int b = 0; b < 32; b++) {
+							if ((chkbits & (1 << b)) != 0) {
+								freebits++;
+							}
+						}
+					}
+				}
+			}
+		} else {
+			freebits += m_live.length * 32;
+		}
+		
+		return freebits;
 	}
 
 }

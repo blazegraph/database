@@ -143,22 +143,27 @@ public class TestIVCache extends AbstractTripleStoreTestCase {
 		// this is a distinct IV instance.
 		assertTrue(iv != iv2);
 
-		if (iv.isInline()) {
-
-			/*
-			 * For an inline IV, we drop the cached value when it is serialized
-			 * in order to keep down the serialized object size since it is
-			 * basically free to re-materialize the Value from the IV.
-			 */
-			// not found in the cache.
-			try {
-				iv2.getValue();
-				fail("Expecting: " + NotMaterializedException.class);
-			} catch (NotMaterializedException e) {
-				// ignore.
-			}
-
-		} else {
+        /* Note: All IVs currently send their cached value across the wire.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/337
+         */
+		{
+//		if (iv.isInline()) {
+//
+//			/*
+//			 * For an inline IV, we drop the cached value when it is serialized
+//			 * in order to keep down the serialized object size since it is
+//			 * basically free to re-materialize the Value from the IV.
+//			 */
+//			// not found in the cache.
+//			try {
+//				iv2.getValue();
+//				fail("Expecting: " + NotMaterializedException.class);
+//			} catch (NotMaterializedException e) {
+//				// ignore.
+//			}
+//
+//		} else {
 
 			/*
 			 * For a non-inline IV, the value is found in the cache, even though

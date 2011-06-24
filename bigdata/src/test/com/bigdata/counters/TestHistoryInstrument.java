@@ -41,7 +41,7 @@ import junit.framework.TestCase2;
 public class TestHistoryInstrument extends TestCase2 {
     
     // 60 seconds.
-    final long t60 = 60*1000;
+    final private static long t60 = 60 * 1000;
     
     /**
      * Time zero is an arbitrary time occurring on an exact _hour_ boundary.
@@ -49,10 +49,10 @@ public class TestHistoryInstrument extends TestCase2 {
      * behavior. Overflow SHOULD occur immediately _before_ you add the sample
      * which would cause the sample recorded [capacity * period] units ago to be
      * overwritten (even if the sample in danger of being overwritten is a
-     * <code>null</code>. If we accept a truely random starting time then it
+     * <code>null</code>. If we accept a truly random starting time then it
      * is harder to setup the unit tests to test overflow handling.
      */
-    final long t0 = new Random().nextInt(100)*1000L*60*60;
+    final private long t0 = new Random().nextInt(100)*1000L*60*60;
     
     /**
      * 
@@ -80,7 +80,7 @@ public class TestHistoryInstrument extends TestCase2 {
         assertEquals(0,h.size());
         assertEquals(60,h.capacity());
 
-        log.info("\n"+h.toString());
+        if(log.isInfoEnabled()) log.info("\n"+h.toString());
         
         // add the first sample.
         h.add(t0,12d);
@@ -89,7 +89,7 @@ public class TestHistoryInstrument extends TestCase2 {
         assertEquals(60,h.capacity());
         assertEquals(12d,h.getAverage().doubleValue());
 
-        log.info("\n"+h.toString());
+        if(log.isInfoEnabled()) log.info("\n"+h.toString());
 
         // add a 2nd sample.
         h.add(t0+t60,6d);
@@ -98,7 +98,7 @@ public class TestHistoryInstrument extends TestCase2 {
         assertEquals(60,h.capacity());
         assertEquals(((6d+12d)/2d),h.getAverage().doubleValue());
 
-        log.info("\n"+h.toString());
+        if(log.isInfoEnabled()) log.info("\n"+h.toString());
 
         // add a 2nd sample, but skip 60 seconds.
         h.add(t0+t60*3,9d);
@@ -107,7 +107,7 @@ public class TestHistoryInstrument extends TestCase2 {
         assertEquals(60,h.capacity());
         assertEquals(((6d+12d+9d)/3d),h.getAverage().doubleValue());
 
-        log.info("\n"+h.toString());
+        if(log.isInfoEnabled()) log.info("\n"+h.toString());
 
     }
     
@@ -132,18 +132,26 @@ public class TestHistoryInstrument extends TestCase2 {
         assertEquals(0,h2.size());
         assertEquals(3,h2.capacity());
 
-        log.info("\nh="+h.toString());
-        log.info("\nh2="+h2.toString());
+        if(log.isInfoEnabled()) log.info("\nh="+h.toString());
+        if(log.isInfoEnabled()) log.info("\nh2="+h2.toString());
 
         /*
          * feed in data.
          */
 
-        // add the first sample.
+        
+        /* add the first sample.
+         * 
+         * TODO There is a stochastic test failure in CI (pretty rare). If fails on the next with:
+        
+         java.lang.IllegalArgumentException: timestamp=0, value=12.0
+           at com.bigdata.counters.History.add(History.java:726)
+           at com.bigdata.counters.TestHistoryInstrument.test_historyOverflow(TestHistoryInstrument.java:143)
+        */   
         h.add(t0,12d);
 
-        log.info("\nh="+h.toString());
-        log.info("\nh2="+h2.toString());
+        if(log.isInfoEnabled()) log.info("\nh="+h.toString());
+        if(log.isInfoEnabled()) log.info("\nh2="+h2.toString());
 
         assertEquals(1,h.size());
         assertEquals(0,h2.size());
@@ -153,8 +161,8 @@ public class TestHistoryInstrument extends TestCase2 {
         // add a 2nd sample.
         h.add(t0+t60,6d);
 
-        log.info("\nh="+h.toString());
-        log.info("\nh2="+h2.toString());
+        if(log.isInfoEnabled()) log.info("\nh="+h.toString());
+        if(log.isInfoEnabled()) log.info("\nh2="+h2.toString());
 
         assertEquals(2,h.size());
         assertEquals(0,h2.size());
@@ -170,8 +178,8 @@ public class TestHistoryInstrument extends TestCase2 {
         assertEquals(2,h.size());
         assertEquals(1,h2.size());
         
-        log.info("\nh="+h.toString());
-        log.info("\nh2="+h2.toString());
+        if(log.isInfoEnabled()) log.info("\nh="+h.toString());
+        if(log.isInfoEnabled()) log.info("\nh2="+h2.toString());
 
         // check average in the base buffer.
         assertEquals(((6d+9d)/2d),h.getAverage().doubleValue());
@@ -196,7 +204,7 @@ public class TestHistoryInstrument extends TestCase2 {
 //        assertFalse(h.minutes.isLong());
 //        assertTrue(h.minutes.isDouble());
 //
-//        log.info(h.toString());
+//        if(log.isInfoEnabled()) log.info(h.toString());
 //
 //        /*
 //         * Fill the entire buffer with per-minute samples and verify that we
@@ -223,7 +231,7 @@ public class TestHistoryInstrument extends TestCase2 {
 //            
 //        }
 //        
-//        log.info(h.toString());
+//        if(log.isInfoEnabled()) log.info(h.toString());
 //        
 //    }
     

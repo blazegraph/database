@@ -165,8 +165,8 @@ public class TestZooBarrier extends AbstractZooTestCase {
         assertEquals(2, counter.get());
 
         // Check their futures.
-        ft1.get(sessionTimeout,TimeUnit.MICROSECONDS);
-        ft2.get(sessionTimeout,TimeUnit.MICROSECONDS);
+        ft1.get(sessionTimeout,TimeUnit.MILLISECONDS);
+        ft2.get(sessionTimeout,TimeUnit.MILLISECONDS);
         
     }
 

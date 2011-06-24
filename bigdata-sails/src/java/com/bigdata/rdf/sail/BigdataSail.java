@@ -3186,20 +3186,27 @@ public class BigdataSail extends SailBase implements Sail {
          * See {@link #evaluate(TupleExpr, Dataset, BindingSet, boolean, Properties)}.
          */
         public CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(
-                TupleExpr tupleExpr, Dataset dataset,
-                final BindingSet bindings, final boolean includeInferred)
-                throws SailException {
-            return evaluate(tupleExpr, dataset, bindings, includeInferred, new Properties());
+                final TupleExpr tupleExpr, //
+                final Dataset dataset,//
+                final BindingSet bindings,//
+                final boolean includeInferred//
+        ) throws SailException {
+         
+            return evaluate(tupleExpr, dataset, bindings,
+                    null/* bindingSets */, includeInferred, new Properties());
+            
         }
         
         /**
          * Return the optimized operator tree.  Useful for debugging.
          */
-        public synchronized TupleExpr optimize(
-                TupleExpr tupleExpr, Dataset dataset,
-                BindingSet bindings, final boolean includeInferred,
-                final Properties queryHints) 
-                throws SailException {
+        /*public*/ synchronized TupleExpr optimize(
+                TupleExpr tupleExpr,//
+                Dataset dataset,//
+                BindingSet bindings,//
+                final boolean includeInferred,//
+                final Properties queryHints//
+                ) throws SailException {
 
             if (log.isInfoEnabled())
                 log.info("Optimizing query: " + tupleExpr + ", dataSet="
@@ -3228,11 +3235,9 @@ public class BigdataSail extends SailBase implements Sail {
             final BigdataTripleSource tripleSource = 
             	new BigdataTripleSource(this, includeInferred);
 
-            final BigdataEvaluationStrategy strategy = 
-            	new BigdataEvaluationStrategyImpl3(
-            			tripleSource, dataset, nativeJoins, 
-            			allowSesameQueryEvaluation
-            			);
+            final BigdataEvaluationStrategy strategy = new BigdataEvaluationStrategyImpl3(
+                    tripleSource, dataset, null/* bindingSets */, nativeJoins,
+                    allowSesameQueryEvaluation);
 
             final QueryOptimizerList optimizerList = new QueryOptimizerList();
             optimizerList.add(new BindingAssigner());
@@ -3263,29 +3268,54 @@ public class BigdataSail extends SailBase implements Sail {
         }
 
         /**
-         * Note: The <i>includeInferred</i> argument is applied in two ways.
-         * First, inferences are stripped out of the {@link AccessPath}.
-         * Second, query time expansion of
-         * <code>foo rdf:type rdfs:Resource</code>, owl:sameAs, etc.
-         * <p>
-         * Note: Query time expansion can be disabled independently using
-         * {@link Options#QUERY_TIME_EXPANDER}, but not on a per-query basis.
-         * <p>
-         * QueryHints are a set of properties that are parsed from a SPARQL 
-         * query.  See {@link QueryHints#PREFIX} for more information.
          * 
-         * @todo The [bindings] are supposed to be inputs to the query
-         *       evaluation, but I am still not quite clear what the role of the
-         *       "input" binding set is here. Based on their own code, e.g.,
-         *       MemoryStore, and the Sesame TCK, it is clear that evaluation
-         *       needs to proceed against an empty binding set once it gets
-         *       started.
+         * @param bindings
+         *            The initial binding set which will be feed into the native
+         *            query evaluation.
+         * 
+         * @param bindingSets
+         *            An optional source for zero or more binding sets which
+         *            will be fed into the start of the native query evaluation.
+         *            When non-<code>null</code> <i>bindings</i> MUST be empty.
+         * 
+         * @param includeInferred
+         *            The <i>includeInferred</i> argument is applied in two
+         *            ways. First, inferences are stripped out of the
+         *            {@link AccessPath}. Second, query time expansion of
+         *            <code>foo rdf:type rdfs:Resource</code>, owl:sameAs, etc.
+         *            <p>
+         *            Note: Query time expansion can be disabled independently
+         *            using {@link Options#QUERY_TIME_EXPANDER}, but not on a
+         *            per-query basis.
+         * 
+         * @param queryHints
+         *            A set of properties that are parsed from a SPARQL query.
+         *            See {@link QueryHints#PREFIX} for more information.
+         * 
+         * @throws SailException
+         *             if <i>bindingSets</i> is non-<code>null</code> and
+         *             <i>bindingSet</i> is non-empty.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/267
          */
         public synchronized CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(
-                TupleExpr tupleExpr, Dataset dataset,
-                BindingSet bindings, final boolean includeInferred,
-                final Properties queryHints)
-                throws SailException {
+                TupleExpr tupleExpr,//
+                Dataset dataset,//
+                BindingSet bindings,//
+                final CloseableIteration<BindingSet, QueryEvaluationException> bindingSets,
+                final boolean includeInferred,//
+                final Properties queryHints//
+                ) throws SailException {
+
+            if (tupleExpr == null)
+                throw new SailException();
+            
+            if (bindings == null) // required by optimize() and probably others.
+                throw new SailException();
+            
+            if (bindings != null && bindingSets != null && bindings.size() > 0)
+                throw new SailException(
+                        "The bindings and bindingSets options are mutually exclusive.");
 
             if (log.isInfoEnabled())
                 log.info("Evaluating query: " + tupleExpr + ", dataSet="
@@ -3318,8 +3348,11 @@ public class BigdataSail extends SailBase implements Sail {
 
                 final BigdataEvaluationStrategy strategy = 
                 	new BigdataEvaluationStrategyImpl3(
-                			tripleSource, dataset, nativeJoins, 
-                			allowSesameQueryEvaluation
+                			tripleSource, //
+                			dataset, //
+                            bindingSets,// 
+                			nativeJoins,// 
+                			allowSesameQueryEvaluation//
                 			);
 
                 final QueryOptimizerList optimizerList = new QueryOptimizerList();
@@ -3349,7 +3382,6 @@ public class BigdataSail extends SailBase implements Sail {
                 // caller's bindingSet.
                 final CloseableIteration<BindingSet, QueryEvaluationException> itr = strategy
                         .evaluate(tupleExpr,
-                                // org.openrdf.query.impl.EmptyBindingSet.getInstance(),
                                 bindings,
                                 queryHints);
 

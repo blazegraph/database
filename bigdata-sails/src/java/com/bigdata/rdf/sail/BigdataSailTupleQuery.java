@@ -25,7 +25,12 @@ public class BigdataSailTupleQuery extends SailTupleQuery
      * See {@link QueryHints#PREFIX} for more information.
      */
     private final Properties queryHints;
-
+    
+    /**
+     * Set lazily by {@link #getTupleExpr()}
+     */
+    private volatile TupleExpr tupleExpr;
+    
     public Properties getQueryHints() {
     	
     	return queryHints;
@@ -60,8 +65,9 @@ public class BigdataSailTupleQuery extends SailTupleQuery
 			final BigdataSailConnection sailCon = (BigdataSailConnection) getConnection()
 					.getSailConnection();
 
-			bindingsIter = sailCon.evaluate(tupleExpr, getActiveDataset(),
-					getBindings(), getIncludeInferred(), queryHints);
+            bindingsIter = sailCon.evaluate(tupleExpr, getActiveDataset(),
+                    getBindings(), null/* bindingSets */, getIncludeInferred(),
+                    queryHints);
 
 			bindingsIter = enforceMaxQueryTime(bindingsIter);
 
@@ -74,28 +80,51 @@ public class BigdataSailTupleQuery extends SailTupleQuery
 
 		}
 
+    }
+
+    public TupleExpr getTupleExpr() throws QueryEvaluationException {
+
+        if (tupleExpr == null) {
+            
+            TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
+
+            try {
+
+                final BigdataSailConnection sailCon = (BigdataSailConnection) getConnection()
+                        .getSailConnection();
+
+                tupleExpr = sailCon.optimize(tupleExpr, getActiveDataset(),
+                        getBindings(), getIncludeInferred(), queryHints);
+
+                this.tupleExpr = tupleExpr;
+
+            } catch (SailException e) {
+
+                throw new QueryEvaluationException(e.getMessage(), e);
+
+            }
+        }
+
+        return tupleExpr;
+
 	}
 
-	public TupleExpr getTupleExpr() throws QueryEvaluationException {
-
-		TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
-
-		try {
-
-			final BigdataSailConnection sailCon = (BigdataSailConnection) getConnection()
-					.getSailConnection();
-
-			tupleExpr = sailCon.optimize(tupleExpr, getActiveDataset(),
-					getBindings(), getIncludeInferred(), queryHints);
-
-			return tupleExpr;
-
-		} catch (SailException e) {
-
-			throw new QueryEvaluationException(e.getMessage(), e);
-			
-		}
-
-	}
+//    synchronized public void setBindingSets(
+//            final CloseableIteration<BindingSet, QueryEvaluationException> bindings) {
+//
+//        if (this.bindings != null)
+//            throw new IllegalStateException();
+//
+//        this.bindings = bindings;
+//
+//    }
+//
+//    synchronized public CloseableIteration<BindingSet, QueryEvaluationException> getBindingSets() {
+//
+//        return bindings;
+//
+//    }
+//
+//    private CloseableIteration<BindingSet, QueryEvaluationException> bindings;
 
 }

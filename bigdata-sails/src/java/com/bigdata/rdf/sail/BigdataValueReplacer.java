@@ -49,6 +49,8 @@ import org.openrdf.query.impl.MapBindingSet;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -318,6 +320,10 @@ public class BigdataValueReplacer {
         
         if (bindings != null) {
         
+            /*
+             * Replace the bindings with one's which have their IV set.
+             */
+            
             final MapBindingSet bindings2 = new MapBindingSet();
         
             final Iterator<Binding> it = bindings.iterator();
@@ -348,21 +354,32 @@ public class BigdataValueReplacer {
                     log.debug("value: " + val + " : " + val2 + " ("
                             + val2.getIV() + ")");
 
-                if (val2.getIV() == null) {
-
+//                if (val2.getIV() == null) {
+//
+//                    /*
+//                     * Since the term identifier is NULL this value is not known
+//                     * to the kb.
+//                     */
+//
+//                    if (log.isInfoEnabled())
+//                        log.info("Not in knowledge base: " + val2);
+//
+//                }
+                                
+                if(val2.getIV() == null) {
                     /*
-                     * Since the term identifier is NULL this value is
-                     * not known to the kb.
+                     * The Value is not in the database, so assign it a mock IV.
+                     * This IV will not match anything during query. However, we
+                     * can not simply fail the query since an OPTIONAL or UNION
+                     * might have solutions even though this Value is not known.
                      */
-                    
-                    if(log.isInfoEnabled())
-                        log.info("Not in knowledge base: " + val2);
-                    
+//                    val2.setIV(DummyIV.INSTANCE);
+                    val2.setIV(TermId.mockIV(VTE.valueOf(val)));
                 }
                 
-                // replace the constant in the query.
+                // rewrite the constant in the query.
                 bindings2.addBinding(binding.getName(), val2);
-                
+
             }
             
             bindings = bindings2;

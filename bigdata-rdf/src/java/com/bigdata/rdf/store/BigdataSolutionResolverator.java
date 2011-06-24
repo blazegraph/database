@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
 import com.bigdata.bop.Constant;
@@ -30,6 +31,8 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
 public class BigdataSolutionResolverator
         extends
         AbstractChunkedResolverator<ISolution, IBindingSet, AbstractTripleStore> {
+
+    final private static Logger log = Logger.getLogger(BigdataSolutionResolverator.class);
 
     /**
      * 

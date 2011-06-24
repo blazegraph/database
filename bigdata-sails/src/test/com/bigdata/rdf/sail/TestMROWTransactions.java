@@ -218,7 +218,7 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 		 *  has been freed and is no longer protected from recycling when an
 		 *  attempt is made to read from it.
 		 */
-		final int nthreads = 10; // up count to increase chance startup condition
+		final int nthreads = 5; // up count to increase chance startup condition
 								// decrement to increase chance of idle (no sessions)
 		final int nuris = 2000; // number of unique subject/objects
 		final int npreds = 50; // 
@@ -328,8 +328,19 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                         } finally {
                             ((Journal) origStore.getIndexManager()).abort(txId);
                         }
-                    } catch (Throwable t) {
-                        log.error(t, t);
+                    } catch (Throwable ise) {
+                        if (!InnerCause.isInnerCause(ise,
+                                InterruptedException.class)) {
+                            if (failex
+                                    .compareAndSet(null/* expected */, ise/* newValue */)) {
+                                log.error("firstCause:" + ise, ise);
+                            } else {
+                                if (log.isInfoEnabled())
+                                    log.info("Other error: " + ise, ise);
+                            }
+                        } else {
+                            // Ignore.
+                        }
                     }
                     return null;
                 }
@@ -347,15 +358,20 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                         DaemonThreadFactory.defaultThreadFactory());
 
                 // let's schedule a few writers and readers (more than needed)
-                for (int i = 0; i < 3000; i++) {
+                // writers.submit(new Writer(5000000/* nwrite */));
+                for (int i = 0; i < 5000; i++) {
                     writers.submit(new Writer(500/* nwrite */));
-                    for (int rdrs = 0; rdrs < 60; rdrs++) {
-                        readers.submit(new Reader(20/* nread */));
+                    for (int rdrs = 0; rdrs < 20; rdrs++) {
+                        readers.submit(new Reader(60/* nread */));
                     }
                 }
 
-                // let the writers run riot for a time
-                Thread.sleep(60 * 1000);
+                // let the writers run riot for a time, checking for failure
+                for (int i = 0; i < 60; i++) {
+                	Thread.sleep(1000);
+                	if (failex.get() != null)
+                		break;
+                }
                 writers.shutdownNow();
                 readers.shutdownNow();
                 writers.awaitTermination(5, TimeUnit.SECONDS);
