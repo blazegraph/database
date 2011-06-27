@@ -95,7 +95,7 @@ public class HTree extends AbstractHTree
      * {@link #splitDirectoryPage(DirectoryPage, int, AbstractPage)} for a write
      * up on this.
      */
-    private final int splitBits;
+    /*private*/ final int splitBits;
     
     /*
      * metadata about the index.
@@ -538,7 +538,7 @@ public class HTree extends AbstractHTree
 						 * global depth of a directory is always the same as
 						 * address bits, but maybe I am missing something....
 						 */
-                        splitDirectoryPage(current, buddyOffset, splitBits,
+                        addLevel(current, buddyOffset, splitBits,
                                 bucketPage);
 
 						// The children of [current] have changed so we will
@@ -586,46 +586,46 @@ public class HTree extends AbstractHTree
 		throw new UnsupportedOperationException();
 	}
 
-	/**
-	 * Handle split if buddy bucket is full but localDepth LT globalDepth (so
-	 * there is more than one buddy bucket on the page). This will allocate a
-	 * new bucket page; update the references in the parent, and then
-	 * redistribute buddy buckets among the old and new bucket page. The depth
-	 * of the child will be increased by one. As a post-condition, the depth of
-	 * the new child will be the same as the then current depth of the original
-	 * child. Note that this doubles the size of each buddy bucket, thus always
-	 * creating room for additional tuples.
-	 * 
-	 * @param parent
-	 *            The parent {@link DirectoryPage}.
-	 * @param buddyOffset
-	 *            The buddyOffset within the <i>parent</i>. This identifies
-	 *            which buddy hash table in the parent must be its pointers
-	 *            updated such that it points to both the original child and new
-	 *            child.
-	 * @param oldBucket
-	 *            The child {@link BucketPage}.
-	 * 
-	 * @throws IllegalArgumentException
-	 *             if any argument is <code>null</code>.
-	 * @throws IllegalStateException
-	 *             if the depth of the child is GTE the depth of the parent.
-	 * @throws IllegalStateException
-	 *             if the <i>parent<i/> is read-only.
-	 * @throws IllegalStateException
-	 *             if the <i>oldBucket</i> is read-only.
-	 * @throws IllegalStateException
-	 *             if the parent of the <oldBucket</i> is not the given
-	 *             <i>parent</i>.
-	 */
+    /**
+     * Handle split if buddy bucket is full but localDepth LT globalDepth (so
+     * there is more than one buddy bucket on the page). This will allocate a
+     * new bucket page; update the references in the parent, and then
+     * redistribute buddy buckets among the old and new bucket page. The depth
+     * of the child will be increased by one. As a post-condition, the depth of
+     * the new child will be the same as the then current depth of the original
+     * child. Note that this doubles the size of each buddy bucket, thus always
+     * creating room for additional tuples.
+     * 
+     * @param parent
+     *            The parent {@link DirectoryPage}.
+     * @param buddyOffset
+     *            The buddyOffset within the <i>parent</i>. This identifies
+     *            which buddy hash table in the parent must be its pointers
+     *            updated such that it points to both the original child and new
+     *            child.
+     * @param oldChild
+     *            The child {@link BucketPage}.
+     * 
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>.
+     * @throws IllegalStateException
+     *             if the depth of the child is GTE the depth of the parent.
+     * @throws IllegalStateException
+     *             if the <i>parent<i/> is read-only.
+     * @throws IllegalStateException
+     *             if the <i>oldChild</i> is read-only.
+     * @throws IllegalStateException
+     *             if the parent of the <i>oldChild</i> is not the given
+     *             <i>parent</i>.
+     */
 	private void splitBucketsOnPage(final DirectoryPage parent,
-			final int buddyOffset, final BucketPage oldBucket) {
+			final int buddyOffset, final BucketPage oldChild) {
 
 		if (parent == null)
 			throw new IllegalArgumentException();
-		if (oldBucket == null)
+		if (oldChild == null)
 			throw new IllegalArgumentException();
-		if (oldBucket.globalDepth >= parent.globalDepth) {
+		if (oldChild.globalDepth >= parent.globalDepth) {
 			// In this case we have to introduce a new directory page instead.
 			throw new IllegalStateException();
 		}
@@ -643,16 +643,16 @@ public class HTree extends AbstractHTree
 		}
 		if(parent.isReadOnly()) // must be mutable.
 			throw new IllegalStateException();
-		if(oldBucket.isReadOnly()) // must be mutable.
+		if(oldChild.isReadOnly()) // must be mutable.
 			throw new IllegalStateException();
-		if (oldBucket.parent != parent.self) // must be same Reference.
+		if (oldChild.parent != parent.self) // must be same Reference.
 			throw new IllegalStateException();
 		
 		if (log.isDebugEnabled())
 			log.debug("parent=" + parent.toShortString() + ", buddyOffset="
-					+ buddyOffset + ", child=" + oldBucket);
+					+ buddyOffset + ", child=" + oldChild);
 
-		final int oldDepth = oldBucket.globalDepth;
+		final int oldDepth = oldChild.globalDepth;
 		final int newDepth = oldDepth + 1;
 
 		// Allocate a new bucket page (globalDepth is increased by one).
@@ -664,16 +664,16 @@ public class HTree extends AbstractHTree
 		newBucket.parent = (Reference) parent.self;
 		
 		// Increase global depth on the old page also.
-		oldBucket.globalDepth = newDepth;
+		oldChild.globalDepth = newDepth;
 
 		nleaves++; // One more bucket page in the hash tree. 
 
 		// update the pointers in the parent.
-		updatePointersInParent(parent, buddyOffset, oldDepth, oldBucket,
+		updatePointersInParent(parent, buddyOffset, oldDepth, oldChild,
 				newBucket);
 		
 		// redistribute buddy buckets between old and new pages.
-		redistributeBuddyBuckets(oldDepth, newDepth, oldBucket, newBucket);
+		redistributeBuddyBuckets(oldDepth, newDepth, oldChild, newBucket);
 
 		// TODO assert invariants?
 		
@@ -681,12 +681,12 @@ public class HTree extends AbstractHTree
 
 	/**
 	 * Update pointers in buddy hash table in the parent in order to link the
-	 * new {@link BucketPage} into the parent {@link DirectoryPage}.
+	 * new {@link AbstractPage} into the parent {@link DirectoryPage}.
 	 * <p>
 	 * There will be [npointers] slots in the appropriate buddy hash table in
 	 * the parent {@link DirectoryPage} which point to the old
-	 * {@link BucketPage}. The upper 1/2 of those pointers will be modified to
-	 * point to the new {@link BucketPage}. The lower 1/2 of the pointers will
+	 * {@link AbstactPage}. The upper 1/2 of those pointers will be modified to
+	 * point to the new {@link AbstractPage}. The lower 1/2 of the pointers will
 	 * be unchanged.
 	 * 
 	 * @param parent
@@ -698,14 +698,14 @@ public class HTree extends AbstractHTree
 	 *            child.
 	 * @param oldDepth
 	 *            The depth of the oldBucket before the split.
-	 * @param oldBucket
-	 *            The old {@link BucketPage}.
-	 * @param newBucket
-	 *            The new {@link BucketPage}.
+	 * @param oldChild
+	 *            The old {@link AbstractPage}.
+	 * @param newChild
+	 *            The new {@link AbstractPage}.
 	 */
 	private void updatePointersInParent(final DirectoryPage parent,
 			final int buddyOffset, final int oldDepth,
-			final BucketPage oldBucket, final BucketPage newBucket) {
+			final AbstractPage oldChild, final AbstractPage newChild) {
 
 		// #of address slots in the parent buddy hash table.
 		final int slotsPerBuddy = (1 << parent.globalDepth);
@@ -738,7 +738,7 @@ public class HTree extends AbstractHTree
 		int nfound = 0;
 		boolean discontiguous = false;
 		for (int i = firstSlot; i < lastSlot; i++) {
-			if (parent.childRefs[i] == oldBucket.self) {
+			if (parent.childRefs[i] == oldChild.self) {
 				if (firstPointer == -1)
 					firstPointer = i;
 				nfound++;
@@ -764,11 +764,11 @@ public class HTree extends AbstractHTree
 		// Update the upper 1/2 of the pointers to the new bucket.
 		for (int i = firstPointer + (npointers >> 1); i < npointers; i++) {
 
-			if (parent.childRefs[i] != oldBucket.self)
+			if (parent.childRefs[i] != oldChild.self)
 				throw new RuntimeException("Does not point to old child.");
 			
 			// update the references to the new bucket.
-			parent.childRefs[i] = (Reference) newBucket.self;
+			parent.childRefs[i] = (Reference) newChild.self;
 			
 		}
 			
@@ -800,6 +800,8 @@ public class HTree extends AbstractHTree
 			final int newDepth, final BucketPage oldBucket,
 			final BucketPage newBucket) {
 
+	    assert oldDepth + 1 == newDepth;
+	    
 		// #of slots on the bucket page (invariant given addressBits).
 		final int slotsOnPage = (1 << addressBits);
 
@@ -947,7 +949,7 @@ public class HTree extends AbstractHTree
 	}
 
     /**
-     * Splits a {@link DirectoryPage} when we need to split a child but
+     * Adds a new {@link DirectoryPage} when we need to split a child but
      * <code>globalDepth == localDepth</code>. The caller must retry the insert
      * after this method makes the structural change.
      * 
@@ -1071,17 +1073,11 @@ public class HTree extends AbstractHTree
      * @throws IllegalStateException
      *             if the parent of the <oldBucket</i> is not the given
      *             <i>parent</i>.
-     * 
-     *             FIXME Add a unit test for a directory split when the global
-     *             depth == local depth, but global depth != address bits. In
-     *             this case, we should do a normal buddy table style "split" of
-     *             the directory page. That code has not been written, but it
-     *             will be very similar to the logic for splitting a bucket
-     *             page.
      */
     // Note: package private for unit tests.
-    void splitDirectoryPage(final DirectoryPage oldParent,
-            final int buddyOffset, final int splitBits, final AbstractPage childIsUnused) {
+    void addLevel(final DirectoryPage oldParent, final int buddyOffset,
+            final int splitBits, final AbstractPage childIsUnused) {
+        
         if (oldParent == null)
             throw new IllegalArgumentException();
         if (childIsUnused == null)
@@ -1250,6 +1246,288 @@ public class HTree extends AbstractHTree
                 
             }
             
+        }
+
+    }
+
+    /**
+     * Handle split if localDepth LT globalDepth (so there is more than one
+     * buddy directory on the page) but we need to increase the prefix bit
+     * length in order to make a distinction in some child of this directory
+     * page. This doubles the size of each buddy hash table, thus increasing the
+     * prefix length of the paths to the children by one bit.
+     * <p>
+     * This allocates a new directory page; updates the references to the old
+     * directory page in the parent (one half will point to the old directory
+     * page, the other half will point to the new directory page). Since the #of
+     * references to the old page has changed, its local depth is now different
+     * (there are 1/2 as many references to the old directory page, which means
+     * that it's local depth will be increased by one).
+     * <p>
+     * The buddy hash tables on the old directory page are expanded to twice
+     * their original size, and half of them wind up on the new directory page.
+     * All references in a given buddy hash table are to the same child page, so
+     * the empty slots are filled in as appropriate.
+     * 
+     * @param parent
+     *            The parent {@link DirectoryPage}.
+     * @param buddyOffset
+     *            The buddyOffset within the <i>parent</i>. This identifies
+     *            which buddy hash table in the parent must be its pointers
+     *            updated such that it points to both the original child and new
+     *            child.
+     * @param oldChild
+     *            The child {@link DirectoryPage} to be split.
+     * 
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>.
+     * @throws IllegalStateException
+     *             if the depth of the child is GTE the depth of the parent.
+     * @throws IllegalStateException
+     *             if the <i>parent<i/> is read-only.
+     * @throws IllegalStateException
+     *             if the <i>oldChild</i> is read-only.
+     * @throws IllegalStateException
+     *             if the parent of the <i>oldChild</i> is not the given
+     *             <i>parent</i>.
+     */
+    // Note: package private for unit tests.
+    void splitDirectoryPage(final DirectoryPage parent, final int buddyOffset,
+            final DirectoryPage oldChild) {
+
+        if (parent == null)
+            throw new IllegalArgumentException();
+        if (oldChild == null)
+            throw new IllegalArgumentException();
+        if (oldChild.globalDepth >= parent.globalDepth) {
+            /*
+             * In this case we have to introduce a new directory level instead
+             * (increasing the height of the tree at that point).
+             */
+            throw new IllegalStateException();
+        }
+        if (buddyOffset < 0)
+            throw new IllegalArgumentException();
+        if (buddyOffset >= (1 << addressBits)) {
+            /*
+             * Note: This check is against the maximum possible slot index. The
+             * actual max buddyOffset depends on parent.globalBits also since
+             * (1<<parent.globalBits) gives the #of slots per buddy and the
+             * allowable buddyOffset values must fall on an buddy hash table
+             * boundary.
+             */
+            throw new IllegalArgumentException();
+        }
+        if(parent.isReadOnly()) // must be mutable.
+            throw new IllegalStateException();
+        if(oldChild.isReadOnly()) // must be mutable.
+            throw new IllegalStateException();
+        if (oldChild.parent != parent.self) // must be same Reference.
+            throw new IllegalStateException();
+        
+        if (log.isDebugEnabled())
+            log.debug("parent=" + parent.toShortString() + ", buddyOffset="
+                    + buddyOffset + ", child=" + oldChild);
+
+        final int oldDepth = oldChild.globalDepth;
+        final int newDepth = oldDepth + 1;
+
+        // Allocate a new bucket page (globalDepth is increased by one).
+        final DirectoryPage newChild = new DirectoryPage(this, newDepth);
+
+        assert newChild.isDirty();
+        
+        // Set the parent reference on the new bucket.
+        newChild.parent = (Reference) parent.self;
+        
+        // Increase global depth on the old page also.
+        oldChild.globalDepth = newDepth;
+
+        nnodes++; // One more directory page in the hash tree. 
+
+        // update the pointers in the parent.
+        updatePointersInParent(parent, buddyOffset, oldDepth, oldChild,
+                newChild);
+        
+        // redistribute buddy buckets between old and new pages.
+        redistributeBuddyTables(oldDepth, newDepth, oldChild, newChild);
+
+        // TODO assert invariants?
+        
+    }
+
+    /**
+     * Redistribute the buddy hash tables in a {@link DirectoryPage}.
+     * <p>
+     * Note: We are not changing the #of hash tables, just their size and the
+     * page on which they are found. Any reference in a source buddy hash table
+     * will wind up in the "same" buddy hash table afterwards, but the page and
+     * offset on the page of the buddy hash table may have been changed and the
+     * size of the buddy hash table will have doubled.
+     * <p>
+     * When a {@link DirectoryPage} is split, the size of each buddy hash table
+     * is doubled. The additional slots in each buddy hash table are filled in
+     * by (a) spacing out the old slot entries in each buddy hash table; and (b)
+     * filling in the uncovered slot with a copy of the previous slot.
+     * <p>
+     * We proceed backwards, moving the upper half of the buddy hash tables to
+     * the new directory page first and then spreading out the lower half of the
+     * source page among the new buddy hash table boundaries on the source page.
+     * 
+     * @param oldDepth
+     *            The depth of the old {@link DirectoryPage} before the split.
+     * @param newDepth
+     *            The depth of the old and new {@link DirectoryPage} after the
+     *            split (this is just oldDepth+1).
+     * @param oldDir
+     *            The old {@link DirectoryPage}.
+     * @param newDir
+     *            The new {@link DirectoryPage}.
+     */
+    private void redistributeBuddyTables(final int oldDepth,
+            final int newDepth, final DirectoryPage oldDir,
+            final DirectoryPage newDir) {
+
+        assert oldDepth + 1 == newDepth;
+        
+        // #of slots on the directory page (invariant given addressBits).
+        final int slotsOnPage = (1 << addressBits);
+
+        // #of address slots in each old buddy hash table.
+        final int slotsPerOldBuddy = (1 << oldDepth);
+
+        // #of address slots in each new buddy hash table.
+        final int slotsPerNewBuddy = (1 << newDepth);
+
+        // #of buddy tables on the old bucket directory.
+        final int oldBuddyCount = slotsOnPage / slotsPerOldBuddy;
+
+        // #of buddy tables on the directory page after the split.
+        final int newBuddyCount = slotsOnPage / slotsPerNewBuddy;
+
+        final DirectoryPage srcPage = oldDir;
+        final long[] srcAddrs = ((MutableDirectoryPageData) oldDir.data).childAddr;
+        final Reference<AbstractPage>[] srcRefs = oldDir.childRefs;
+
+        /*
+         * Move top 1/2 of the buddy hash tables from the child to the new page.
+         */
+        {
+
+            // target is the new page.
+            final DirectoryPage dstPage = newDir;
+            final long[] dstAddrs = ((MutableDirectoryPageData) dstPage.data).childAddr;
+            final Reference<AbstractPage>[] dstRefs = dstPage.childRefs;
+
+            // index (vs offset) of first buddy in upper half of src page.
+            final int firstSrcBuddyIndex = (oldBuddyCount >> 1);
+
+            // exclusive upper bound for index (vs offset) of last buddy in
+            // upper half of src page.
+            final int lastSrcBuddyIndex = oldBuddyCount;
+
+            // exclusive upper bound for index (vs offset) of last buddy in
+            // upper half of target page.
+            final int lastDstBuddyIndex = newBuddyCount;
+
+            // work backwards over buddy buckets to avoid stomping data!
+            for (int srcBuddyIndex = lastSrcBuddyIndex - 1, dstBuddyIndex = lastDstBuddyIndex - 1; //
+            srcBuddyIndex >= firstSrcBuddyIndex; //
+            srcBuddyIndex--, dstBuddyIndex--//
+            ) {
+
+                final int firstSrcSlot = srcBuddyIndex * slotsPerOldBuddy;
+
+                final int lastSrcSlot = (srcBuddyIndex + 1) * slotsPerOldBuddy;
+
+                final int firstDstSlot = dstBuddyIndex * slotsPerNewBuddy;
+
+                for (int srcSlot = firstSrcSlot, dstSlot = firstDstSlot; srcSlot < lastSrcSlot; srcSlot++, dstSlot += 2) {
+
+                    if (log.isTraceEnabled())
+                        log.trace("moving: page(" + srcPage.toShortString()
+                                + "=>" + dstPage.toShortString() + ")"
+                                + ", buddyIndex(" + srcBuddyIndex + "=>"
+                                + dstBuddyIndex + ")" + ", slot(" + srcSlot
+                                + "=>" + dstSlot + ")");
+
+                    // Copy the data for that slot
+                    dstAddrs[dstSlot] = srcAddrs[srcSlot];
+                    dstRefs[dstSlot] = srcRefs[srcSlot];
+                    // 2nd copy of data for that slot.
+                    dstAddrs[dstSlot + 1] = srcAddrs[srcSlot];
+                    dstRefs[dstSlot + 1] = srcRefs[srcSlot];
+
+                }
+
+            }
+
+        }
+
+        /*
+         * Reposition the bottom 1/2 of the buddy buckets on the old page.
+         * 
+         * Again, we have to move backwards through the buddy tables on the
+         * source page to avoid overwrites of data which has not yet been
+         * copied. Also, notice that the buddy table at index ZERO does not
+         * move - it is already in place even though it's size has doubled.
+         */
+        {
+
+            // target is the old page.
+            final DirectoryPage dstPage = oldDir;
+            final long[] dstAddrs = ((MutableDirectoryPageData) dstPage.data).childAddr;
+            final Reference<AbstractPage>[] dstRefs = dstPage.childRefs;
+
+            // index (vs offset) of first buddy in lower half of src page.
+            final int firstSrcBuddyIndex = 0;
+
+            // exclusive upper bound for index (vs offset) of last buddy in
+            // lower half of src page.
+            final int lastSrcBuddyIndex = (oldBuddyCount >> 1);
+
+            // exclusive upper bound for index (vs offset) of last buddy in
+            // upper half of target page (which is also the source page).
+            final int lastDstBuddyIndex = newBuddyCount;
+
+            /*
+             * Work backwards over buddy buckets to avoid stomping data!
+             * 
+             * Note: Unlike with a BucketPage, we have to spread out the data in
+             * the slots of the first buddy hash table on the lower half of the
+             * page as well to fill in the uncovered slots.
+             */
+            for (int srcBuddyIndex = lastSrcBuddyIndex - 1, dstBuddyIndex = lastDstBuddyIndex - 1; //
+            srcBuddyIndex >= firstSrcBuddyIndex; // 
+            srcBuddyIndex--, dstBuddyIndex--//
+            ) {
+
+                final int firstSrcSlot = srcBuddyIndex * slotsPerOldBuddy;
+
+                final int lastSrcSlot = (srcBuddyIndex + 1) * slotsPerOldBuddy;
+
+                final int firstDstSlot = dstBuddyIndex * slotsPerNewBuddy;
+
+                for (int srcSlot = firstSrcSlot, dstSlot = firstDstSlot; srcSlot < lastSrcSlot; srcSlot++, dstSlot += 2) {
+
+                    if (log.isTraceEnabled())
+                        log.trace("moving: page(" + srcPage.toShortString()
+                                + "=>" + dstPage.toShortString() + ")"
+                                + ", buddyIndex(" + srcBuddyIndex + "=>"
+                                + dstBuddyIndex + ")" + ", slot(" + srcSlot
+                                + "=>" + dstSlot + ")");
+
+                    // Copy data for that slot.
+                    dstAddrs[dstSlot] = srcAddrs[srcSlot];
+                    dstRefs[dstSlot] = srcRefs[srcSlot];
+                    // 2nd copy of data for that slot.
+                    dstAddrs[dstSlot + 1] = srcAddrs[srcSlot];
+                    dstRefs[dstSlot + 1] = srcRefs[srcSlot];
+
+                }
+
+            }
+
         }
 
     }
