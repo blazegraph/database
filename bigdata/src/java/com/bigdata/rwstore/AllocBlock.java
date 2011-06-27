@@ -468,8 +468,6 @@ public class AllocBlock {
 					}
 				}
 			}
-		} else {
-			freebits += m_live.length * 32;
 		}
 		
 		return freebits;

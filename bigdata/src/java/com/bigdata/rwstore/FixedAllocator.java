@@ -240,6 +240,8 @@ public class FixedAllocator implements Allocator {
 			final DataOutputStream str = new DataOutputStream(new FixedOutputStream(buf));
 			try {
                 str.writeInt(m_size);
+                
+                assert m_sessionActive || m_freeTransients == transientbits();
 
     			boolean protectTransients = m_sessionActive || m_store.isSessionProtected();
     			
@@ -594,7 +596,6 @@ public class FixedAllocator implements Allocator {
 					m_freeBits++;
 					checkFreeList();
 				} else {
-					m_freeTransients++;
 					
 					if (m_sessionActive) {
 						boolean assertsEnabled = false;
@@ -607,6 +608,8 @@ public class FixedAllocator implements Allocator {
 							}
 							assert sessionFrees <= sessionBits : "sessionFrees: " + sessionFrees + " > sessionBits: " + sessionBits;	
 						}
+					} else {
+						m_freeTransients++;
 					}
 						
 				}
