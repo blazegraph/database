@@ -307,7 +307,7 @@ public class FixedAllocator implements Allocator {
 	
 				// Handle re-addition to free list once transient frees are
 				// added back
-				if ((m_freeTransients == m_freeBits) && (m_freeTransients != 0)) {
+				if (m_freeWaiting && m_freeBits >= m_store.cDefaultFreeBitsThreshold) {
 					m_freeList.add(this);
 					m_freeWaiting = false;
 				}
