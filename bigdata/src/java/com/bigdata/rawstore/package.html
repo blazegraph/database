@@ -1,0 +1,21 @@
+<html>
+<head>
+<title>Raw Store</title>
+</head>
+<body>
+
+<p>
+A set of interfaces and some simple implementations for a read-write
+store without atomic commit or transactions.  The {@link
+com.bigdata.journal.Journal} provides an implementation of this {@link
+IRawStore} interface that supports atomic commit and is restart-safe.
+</p>
+<p>
+There are some trivial implementations in the test suite that are used
+for bootstrapping classes with a dependency on {@link IRawStore}, such
+as the {@link com.bigdata.objndx.BTree}, without introducing a dependency
+on the {@link com.bigdata.journal.Journal}.
+</p>
+
+</body>
+</html>

@@ -1,0 +1,7 @@
+SELECT distinct top 10 o.nr, o.price
+FROM offer o, vendor v
+WHERE o.product=@ProductXYZ@ 
+	AND o.deliveryDays<=3 AND v.country='US'
+	AND o.validTo>'@currentDate@' AND o.vendor=v.nr
+Order BY o.price
+

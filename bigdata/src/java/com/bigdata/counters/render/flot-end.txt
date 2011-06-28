@@ -1,0 +1,125 @@
+    function showTooltip(x, y, contents) {
+        $('<div id="tooltip">' + contents + '</div>').css( {
+            position: 'absolute',
+            display: 'none',
+            top: y + 5,
+            left: x + 5,
+            border: '1px solid #fdd',
+            padding: '2px',
+            'background-color': '#fee',
+            opacity: 0.80
+        }).appendTo("body").fadeIn(100);
+    }
+    
+    function getTooltip(item) {
+    
+        return tooltips[item.seriesIndex][item.dataIndex];
+    
+    }
+
+    var options = {
+        xaxis: {
+            mode: "time"
+        },
+        yaxis: {
+            tickFormatter: function formatter(val, axis) {return "";},
+            min: 0,
+            tickSize: 1
+        },
+        points: {
+        	show: true,
+        	radius: 3,
+        	lineWidth: 2 
+        },
+        shadowSize: 0,
+        lines: { 
+            show: true, 
+            lineWidth: 2
+        },
+        selection: { 
+            mode: "xy" 
+        },
+        grid: { 
+            hoverable: true, 
+            clickable: false,
+            autoHighlight: true
+        },
+        legend: {
+ 			 /* This option controls the legend on the main event plot.
+ 			  *
+ 			  * @todo this should be controlled by a URL query parameter.
+ 			  */
+             show: true
+        }
+    };
+
+    var overviewOptions = {
+        xaxis: {
+            ticks: [],
+            mode: "time"
+        },
+        yaxis: {
+            ticks: [],
+            min: 0
+        },
+        lines: { 
+            show: true, 
+            lineWidth: 2 
+        },
+        shadowSize: 0,
+        selection: { 
+            mode: "xy" 
+        },
+        legend: {
+            show: false
+        }
+    };
+
+    var plot = $.plot($("#placeholder"), data, options);
+    
+    var overview = $.plot($("#overview"), data, overviewOptions);
+
+    $("#placeholder").bind("plotselected", function (event, ranges) {
+        // do the zooming
+        plot = $.plot($("#placeholder"), data,
+                      $.extend(true, {}, options, {
+                          xaxis: { min: ranges.xaxis.from, max: ranges.xaxis.to },
+                          yaxis: { min: ranges.yaxis.from, max: ranges.yaxis.to }
+                      }));
+
+        // don't fire event on the overview to prevent eternal loop
+        overview.setSelection(ranges, true);
+    });
+    
+    var previousPoint = null;
+    
+    $("#placeholder").bind("plothover", function (event, pos, item) {
+        if (item) {
+            if (previousPoint != item.datapoint) {
+                previousPoint = item.datapoint;
+                
+                $("#tooltip").remove();
+                var x = item.datapoint[0],
+                    y = item.datapoint[1];
+         
+                var next = item.series.data[item.dataIndex+1],
+                    prev = item.series.data[item.dataIndex-1];
+
+                if (next != null) {
+                    showTooltip(item.pageX, item.pageY, getTooltip(item));
+                }
+            }
+        }
+        else {
+            $("#tooltip").remove();
+            previousPoint = null;            
+        }
+    });
+
+    $("#overview").bind("plotselected", function (event, ranges) {
+        plot.setSelection(ranges);
+    });
+
+});
+        
+</script>

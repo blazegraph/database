@@ -1,0 +1,3 @@
+Select product, producer, vendor, price, validFrom, validTo, deliveryDays, offerWebpage, publisher, publishDate
+from offer
+where nr=@OfferXYZ@;

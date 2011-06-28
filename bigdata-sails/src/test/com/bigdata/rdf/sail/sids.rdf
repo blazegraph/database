@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<rdf:RDF
+
+            xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+
+            xmlns:bigdata="http://www.bigdata.com/rdf#">
+
+ 
+
+<rdf:Description rdf:about="http://localhost/host1">
+
+            <rdf:type bigdata:sid="S195" bigdata:statementType="Explicit" rdf:resource="http://domainnamespace.com/host#Host"/>
+
+            <connectedTo xmlns="http://mynamespace.com#" bigdata:sid="S199" bigdata:statementType="Explicit" rdf:resource="http://localhost/switch1"/>
+
+            <connectedTo xmlns="http://mynamespace.com#" bigdata:sid="S227" bigdata:statementType="Explicit" rdf:resource="http://localhost/switch2"/>
+
+</rdf:Description>
+
+ 
+
+<rdf:Description rdf:about="http://localhost/switch1">
+
+            <rdf:type bigdata:sid="S203" bigdata:statementType="Explicit" rdf:resource="http://domainnamespace.com/san#Switch"/>
+
+</rdf:Description>
+
+ 
+
+<rdf:Description rdf:nodeID="S195">
+
+            <creator xmlns="http://mynamespace.com#" bigdata:sid="S211" bigdata:statementType="Explicit" rdf:resource="http://1.com"/>
+
+            <creator xmlns="http://mynamespace.com#" bigdata:sid="S239" bigdata:statementType="Explicit" rdf:resource="http://2.com"/>
+
+</rdf:Description>
+
+ 
+
+<rdf:Description rdf:nodeID="S199">
+
+            <creator xmlns="http://mynamespace.com#" bigdata:sid="S215" bigdata:statementType="Explicit" rdf:resource="http://1.com"/>
+
+</rdf:Description>
+
+ 
+
+<rdf:Description rdf:nodeID="S203">
+
+            <creator xmlns="http://mynamespace.com#" bigdata:sid="S219" bigdata:statementType="Explicit" rdf:resource="http://1.com"/>
+
+</rdf:Description>
+
+ 
+
+<rdf:Description rdf:about="http://localhost/switch2">
+
+            <rdf:type bigdata:sid="S231" bigdata:statementType="Explicit" rdf:resource="http://domainnamespace.com/san#Switch"/>
+
+</rdf:Description>
+
+ 
+
+<rdf:Description rdf:nodeID="S227">
+
+            <creator xmlns="http://mynamespace.com#" bigdata:sid="S243" bigdata:statementType="Explicit" rdf:resource="http://2.com"/>
+
+</rdf:Description>
+
+ 
+
+<rdf:Description rdf:nodeID="S231">
+
+            <creator xmlns="http://mynamespace.com#" bigdata:sid="S247" bigdata:statementType="Explicit" rdf:resource="http://2.com"/>
+
+</rdf:Description>
+
+ 
+
+</rdf:RDF>
+

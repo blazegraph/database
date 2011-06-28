@@ -1,0 +1,180 @@
+/*
+
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+*/
+/*
+ * Created on Jul 3, 2008
+ */
+
+package com.bigdata.sparse;
+
+import java.util.UUID;
+
+import org.apache.log4j.Logger;
+
+import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
+import com.bigdata.btree.keys.CollatorEnum;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
+
+/**
+ * Helper class.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
+public class GlobalRowStoreHelper {
+
+    static final public transient String GLOBAL_ROW_STORE_INDEX = "__globalRowStore";
+
+    private final IIndexManager indexManager;
+    
+    protected static final transient Logger log = Logger.getLogger(GlobalRowStoreHelper.class);
+    
+//    protected static final boolean INFO = log.isInfoEnabled();
+    
+    public GlobalRowStoreHelper(final IIndexManager indexManager) {
+        
+        if (indexManager == null)
+            throw new IllegalArgumentException();
+
+        this.indexManager = indexManager;
+        
+    }
+    
+    /**
+     * @return
+     */
+    synchronized public SparseRowStore getGlobalRowStore() {
+
+        if (log.isInfoEnabled())
+            log.info("");
+
+        if (globalRowStore == null) {
+
+            IIndex ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX,
+                    ITx.UNISOLATED);
+
+            if (ndx == null) {
+
+                if (log.isInfoEnabled())
+                    log.info("Global row store does not exist - will try to register now");
+                
+                try {
+
+                    /*
+                     * Note: This specifies an split handler that keeps the
+                     * logical row together. This is a hard requirement. The
+                     * atomic read/update guarantee depends on this.
+                     * 
+                     * @todo The global row store does not get properties so
+                     * only system defaults are used when it is registered.
+                     */
+                    
+                    final IndexMetadata indexMetadata = new IndexMetadata(
+                            GLOBAL_ROW_STORE_INDEX, UUID.randomUUID());
+
+                    // Ensure that splits do not break logical rows.
+                    indexMetadata
+                            .setSplitHandler(LogicalRowSplitHandler.INSTANCE);
+
+/*
+ * This is now handled by using the UTF8 encoding of the primary key regardless
+ * of the collator mode chosen (this fixes the problem with embedded nuls).
+ */
+//                    if (CollatorEnum.JDK.toString().equals(
+//                            System.getProperty(KeyBuilder.Options.COLLATOR))) {
+//                        /*
+//                         * The JDK RulesBasedCollator embeds nul bytes in the
+//                         * Unicode sort keys. This makes them unsuitable for the
+//                         * SparseRowStore, which can not locate the start of the
+//                         * column name if there are embedded nuls in a Unicode
+//                         * primary key. As a work around, this forces an ASCII
+//                         * collation sequence if the JDK collator is the
+//                         * default. This is not ideal since non-ascii
+//                         * distinctions will be lost, but it is better than
+//                         * being unable to decode the column names.
+//                         */
+//                        log.warn("Forcing ASCII collator.");
+//                        indexMetadata
+//                                .setTupleSerializer(new DefaultTupleSerializer(
+//                                        new ASCIIKeyBuilderFactory()));
+//                    }
+                    
+                    // Register the index.
+                    indexManager.registerIndex(indexMetadata);
+
+                } catch (Exception ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+                ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX, ITx.UNISOLATED);
+
+                if (ndx == null) {
+
+                    throw new RuntimeException("Could not find index?");
+
+                }
+
+            }
+
+            globalRowStore = new SparseRowStore(ndx);
+
+        }
+        
+        return globalRowStore;
+
+    }
+
+    private transient SparseRowStore globalRowStore;
+
+    /**
+     * Return a view of the global row store as of the specified timestamp IFF
+     * the backing index exists as of that timestamp.
+     */
+    public SparseRowStore get(final long timestamp) {
+
+        if (log.isInfoEnabled())
+            log.info(TimestampUtility.toString(timestamp));
+
+        final IIndex ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX,
+                timestamp);
+
+        if (ndx == null) {
+
+            return null;
+
+        }
+
+        return new SparseRowStore(ndx);
+
+    }
+    
+}

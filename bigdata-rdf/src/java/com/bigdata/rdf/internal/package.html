@@ -1,0 +1,46 @@
+<html>
+<head>
+<title>RDF Value Internals</title>
+</head>
+<body>
+<p>
+This package provides an internal representation of RDF Values.  The internal
+representation of an RDF Value is either a term identifier or an inline value.
+Term identifiers are assigned by consistent writes on the TERM2ID index and
+the ID2TERM index (which maps the term identifier back onto the RDF Value).
+Inline values directly code the RDF Value and are generally used for datatype
+literals having short values (xsd:boolean, xsd:char) or numeric values (xsd:short,
+xsd:int, xsd:float, xsd:long, xsd:double).
+</p><p>
+The unsigned byte[] keys for an RDF Value are formed by appending some bit flags
+which partition the key space into URIs, blank nodes, literals, and statement
+identifiers, a bit flag indicating whether the value is inline, followed by either
+pad bits and the term identifier or a code which identifies the data type of the
+inline value and minimum length decodable representation of the data type value
+formed using {@link com.bigdata.btree.keys.IKeyBuilder}.  This design clusters
+different kinds of RDF values within different regions of the ID2TERM index.
+</p><p>
+Inline values have a significant performance advantage since the RDF Value object
+can be recovered directly from the inline value without indirection through the
+ID2TERM index.  This reduces the costs to materialize RDF Values, greatly speeds
+up aggregation style queries over numeric data, and reduces both the maintenance
+time and the size on the disk for the lexicon indices since inline values are not
+entered into the lexicon. 
+</p><p>
+Inline values also make it possible to translate a LT/GT style filter against 
+an inlined datatype into key-range queries against the OSP(C) index.  Since the
+inline values for different numeric data types are located in different parts of
+the key space, the use of a cast in the query will require either than key-range
+queries are issued against all numeric data types (UNION of access paths) or
+that the query is evaluated without the use of key-range scans on OSP(C).   
+</p><p>
+RDF Values which are inlined obey the equality and order semantics of their
+value space (think xsd:int).  One consequence of this is that comparison of
+inlined datatype literals MUST occur in the value space.  E.g., <code>005</code>
+and <code>5</code> represent the same point in the xsd:int value space.  Clients
+should be aware of this distinction as statements which have lexical distinctions
+which are not distinct in the value space will be mapped onto the same statement
+internally. 
+</p>
+</body>
+</html>

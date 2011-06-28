@@ -1,0 +1,4 @@
+Select p.nr As productNr, p.label As productlabel, v.label As vendorname, v.homepage As vendorhomepage,
+	o.offerWebpage As offerURL, o.price As price, o.deliveryDays As deliveryDays, o.validTo As validTo
+From offer o, product p, vendor v
+Where o.nr=@OfferXYZ@ AND o.product=p.nr AND o.vendor=v.nr

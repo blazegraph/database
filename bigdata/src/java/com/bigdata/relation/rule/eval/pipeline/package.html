@@ -1,0 +1,38 @@
+<html>
+<head>
+<title>pipeline joins for rule evaluation</title>
+</head>
+<body>
+
+<p>
+
+    This package implements a pipeline join.  The basic design has a join task
+    running locally on the data service for each index partition touched by the
+    rule and a join master to setup the execution of the 1st join dimension. The
+    intermediate binding sets are "pipelined" from one join dimension to the next.
+    When the index is NOT partitioned, the fan-in and fan-out are both ONE (1).
+    When the index is partitioned, the fan-in and fan-out depend on the data and
+    can be greater than one.  The master is executed by the client.  For query,
+    the buffer on which the solutions will be written is proxied and passed 
+    along until it reaches the last join dimension, which then writes on the
+    proxied query buffer.  For mutation, the join tasks in the last join 
+    dimension obtain their own solution buffers that write on the scale-out
+    view of the mutable relation identified by the head of the rule -- this
+    means that the generated solutions do not pass through the master for
+    mutation operations, but only for query.  Since the master is the client
+    (this is required for query, but optional for mutation), the solutions
+    in effect are gathered to the client which is exactly what we want.  The
+    pipeline join is MUCH more efficient than nested subquery for the scale-out
+    architecture.  There are serveral reasons why: (a) the index reads are purely
+    local; (b) the join tasks are able to order the access paths to be joined
+    with the incoming binding sets in order, which results in ordered reads on
+    the index partition and also allows us to trivally eliminate duplicate reads
+    on the same access path; (c) there are far fewer RMI calls involved; and (d)
+    each join task executes in its own thread and on the machine where the index
+    partition resides on which it will read -- the computation is therefore
+    perfectly mapped to the data.
+
+</p>
+
+</body>
+</html>

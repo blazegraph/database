@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+	xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+	xmlns:ns1="http://bigdata.com/test/ontology#"
+	xmlns:ns5="http://www.w3.org/2002/07/owl#"
+	xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+	xmlns:ns2="http://bigdata.com/test/ontology#">
+
+<!-- ONTOLOGY -->
+
+<rdf:Description rdf:about="http://bigdata.com/test/ontology#Person">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/data#mike">
+<!--	<rdfs:label>Michael Personick</rdfs:label> -->
+	<rdf:type rdf:resource="http://bigdata.com/test/ontology#Person"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/data#bryan"/>
+</rdf:Description>
+
+</rdf:RDF>

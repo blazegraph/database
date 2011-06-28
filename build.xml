@@ -1,0 +1,2233 @@
+<!-- @todo add dependencies for GOM and add GOM to sources that are compiled, jared, etc. -->
+<!-- @todo trim fastutils using a tool to chase the actual class files that we use. -->
+<!-- @todo change the release target to put release notes into the root of the archives. -->
+<!-- @todo maven2 setup so we can run and publish unit tests results. -->
+<!-- $Id$ -->
+
+<!-- Deployment models.
+
+Embedded.  Bigdata can be run as an embedded database.  You just need to bundle
+the various jars.  The jini and zookeeper dependencies are NOT required when
+used as an embedded database.  You can also use this approach to run bigdata
+using the NanoSparqlServer with an embedded jetty servlet engine.
+
+See 'bundleJar'.
+
+Webapp. Bigdata can be deployed as a web application exposing a SPARQL end point
+with a RESTful API.
+
+See 'war'.
+
+Cluster deployment.  There are two ways to deploy the cluster. One is
+using 'ant-install' from either the top-level directory (either as
+checked out from SVN or as unpacked from the distribution artifact
+DIST.${version}.tgz). The second is to use the deployment artifact
+REL.${version}.tgz.  
+
+(A) This provides deployment from the project source either as checked
+out from SVN or form a DIST.${version}.tgz file.
+
+See 'ant-install'
+
+(B) This is the new deployment model, but it is not yet complete.
+It is based on the "stage" target which provides unversioned jar
+names in dist/bigdata/lib, lib-dl, and lib-ext.  Basically, you
+unpack the archive and install onto the node. A script can then
+start the various services using pstart based on a desired node
+configuration.  See the btm branch and trac for details and code.
+
+See 'ant deploy-artifact'
+
+Source and binary releases.  There are two targets which provide source and
+binary releases.
+
+See 'ant-install-artifact' (source code artifact: DIST.${version}.tgz).
+
+See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
+
+-->
+
+<project name="bigdata" default="bundleJar" basedir=".">
+
+	<property file="build.properties" />
+
+	<!-- build-time classpath. -->
+	<path id="build.classpath">
+		<fileset dir="${bigdata.dir}/bigdata/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<fileset dir="${bigdata.dir}/bigdata-jini/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<fileset dir="${bigdata.dir}/bigdata-rdf/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<fileset dir="${bigdata.dir}/bigdata-sails/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<!--
+		<fileset dir="${bigdata.dir}/ctc-striterator/lib">
+			<include name="**/*.jar" />
+		</fileset> -->
+	</path>
+
+	<!-- runtime classpath w/o install. -->
+	<path id="runtime.classpath">
+		<pathelement location="${build.dir}/classes" />
+		<path refid="build.classpath" />
+	</path>
+
+	<!-- classpath as installed. -->
+	<!-- @todo .so and .dll -->
+	<path id="install.classpath">
+		<fileset dir="${install.lib.dir}">
+			<include name="**/*.jar" />
+		</fileset>
+	</path>
+
+	<target name="clean" description="cleans everything in [build.dir], but not the releases.">
+		<delete dir="${build.dir}" />
+		<delete dir="${bigdata.dir}/bigdata-test" quiet="true" />
+		<delete dir="${bigdata.dir}/dist" quiet="true" />
+	</target>
+
+	<target name="prepare">
+		<!-- setup ${version} for regular or snapshot. -->
+		<tstamp>
+			<format property="today" pattern="ddMMyy" locale="en,US" />
+			<format property="osgiDate" pattern="yyyyMMdd" locale="en,US" />
+		</tstamp>
+		<condition property="version" value="bigdata-${build.ver}-${today}" else="bigdata-${build.ver}">
+			<istrue value="${snapshot}" />
+		</condition>
+		<condition property="osgi.version" value="${build.ver.osgi}.${osgiDate}" else="${build.ver.osgi}.0">
+			<istrue value="${snapshot}" />
+		</condition>
+		<!--<echo message="today=${today}"/>-->
+		<echo message="version=${version}" />
+		<!-- create directories. -->
+		<mkdir dir="${build.dir}" />
+		<mkdir dir="${build.dir}/classes" />
+		<mkdir dir="${build.dir}/docs" />
+		<mkdir dir="${build.dir}/lib" />
+	</target>
+
+	<!-- Note: javac error results often if verbose is disabled. -->
+	<!-- I was able to perform a build with 1.6.0_07. -->
+	<!-- I set the target to 1.5 to support deployment on non-1.6 JVMs. -->
+	<target name="compile" depends="prepare">
+		<mkdir dir="${build.dir}" />
+		<javac destdir="${build.dir}/classes"
+			   classpathref="build.classpath"
+			   debug="${javac.debug}"
+			   debuglevel="${javac.debuglevel}"
+			   verbose="${javac.verbose}"
+			   encoding="${javac.encoding}"
+			   includeantruntime="false">
+			<!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
+			<!-- target="${javac.target}" source="${javac.source}" -->
+			<src path="${bigdata.dir}/bigdata/src/java" />
+			<src path="${bigdata.dir}/bigdata-jini/src/java" />
+			<src path="${bigdata.dir}/bigdata-rdf/src/java" />
+			<src path="${bigdata.dir}/bigdata-sails/src/java" />
+			<src path="${bigdata.dir}/ctc-striterators/src/java" />
+			<!-- Do not include the unit tests @todo conditionally include?
+            <src path="${bigdata.dir}/bigdata/src/test"/>
+            <src path="${bigdata.dir}/bigdata-jini/src/test"/>
+            <src path="${bigdata.dir}/bigdata-rdf/src/test"/>
+            <src path="${bigdata.dir}/bigdata-sails/src/test"/>
+            -->
+			<compilerarg value="-version" />
+		</javac>
+		<!-- copy resources. -->
+		<copy toDir="${build.dir}/classes">
+			<fileset dir="${bigdata.dir}/bigdata/src/java">
+				<exclude name="**/*.java" />
+				<exclude name="**/package.html" />
+				<exclude name="**/BytesUtil.c" />
+			</fileset>
+			<fileset dir="${bigdata.dir}/bigdata-jini/src/java">
+				<exclude name="**/*.java" />
+				<exclude name="**/package.html" />
+			</fileset>
+			<fileset dir="${bigdata.dir}/bigdata-rdf/src/java">
+				<exclude name="**/*.java" />
+				<exclude name="**/package.html" />
+			</fileset>
+			<fileset dir="${bigdata.dir}/bigdata-sails/src/java">
+				<exclude name="**/*.java" />
+				<exclude name="**/package.html" />
+			</fileset>
+			<fileset dir="${bigdata.dir}/bigdata-sails/src/resources/sesame-server">
+				<include name="META-INF/**" />
+			</fileset>
+		</copy>
+	</target>
+
+	<!-- Builds the bigdata JAR and bundles it together with all of its dependencies in the ${build.dir}/lib directory. -->
+	<target name="bundleJar" depends="clean, bundle, jar" description="Builds the bigdata JAR and bundles it together with all of its dependencies in the ${build.dir}/lib directory.">
+		<copy file="${build.dir}/${version}.jar" todir="${build.dir}/lib"/>
+		<!--<property name="myclasspath" refid="runtime.classpath" />
+		<echo message="${myclasspath}"/>-->
+	</target>
+
+	<!-- This generates the jar, but does not bundled the dependencies.
+		 See 'bundleJar'. -->
+	<target name="jar" depends="compile" description="Generates the jar (see also bundleJar).">
+		<jar destfile="${build.dir}/${version}.jar">
+			<fileset dir="${build.dir}/classes" excludes="test/**" />
+			<!-- Copy WAR resources for the embedded NanoSparqlServer -->
+			<fileset dir="." includes="bigdata-war/src/**"/>
+			<manifest>
+				<!--<attribute name="Main-Class" value="com/bigdata/rdf/rio/TestRioIntegration"/>-->
+			</manifest>
+		</jar>
+	</target>
+
+	<!-- This generates an osgi bundle jar, and does not bundled the dependencies.
+		 See 'bundleJar'. -->
+	<target name="osgi" depends="compile, bundle" description="Generates the osgi bundle jar (see also bundleJar).">
+		<taskdef resource="aQute/bnd/ant/taskdef.properties" classpath="bigdata/lib/bnd-0.0.384.jar" />
+		<mkdir dir="${build.dir}/bundles" />
+		<jar destfile="${build.dir}/bundles/com.bigdata.source_${osgi.version}.jar">
+			<manifest>
+				<attribute name="Eclipse-SourceBundle" value='com.bigdata;version="${osgi.version}";roots="."' />
+				<attribute name="Bundle-Vendor" value="Systap" />
+				<attribute name="Bundle-Version" value="${build.ver.osgi}" />
+				<attribute name="Bundle-ManifestVersion" value="2" />
+				<attribute name="Bundle-SymbolicName" value="com.bigdata.source" />
+				<attribute name="Bundle-DocURL" value="http://www.bigdata.com" />
+				<attribute name="Bundle-Description" value="Bigdata Source" />
+			</manifest>
+			<fileset dir="bigdata/src/java" />
+			<fileset dir="bigdata/src/java" />
+			<fileset dir="bigdata-jini/src/java" />
+			<fileset dir="bigdata-rdf/src/java" />
+			<fileset dir="bigdata-sails/src/java" />
+		</jar>
+		<bnd output="${build.dir}/bundles/com.bigata-${osgi.version}.jar" classpath="${build.dir}/classes" eclipse="false" failok="false" exceptions="true" files="${basedir}/osgi/bigdata.bnd" />
+
+		<bndwrap jars="${build.dir}/lib/colt-1.2.0.jar" output="${build.dir}/bundles/colt-1.2.0.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/fastutil-5.1.5.jar" output="${build.dir}/bundles/fastutil-5.1.5.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/dsi-utils-1.0.6-020610.jar" output="${build.dir}/bundles/dsi-utils-1.0.6-020610.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/iris-0.58.jar" output="${build.dir}/bundles/iris-0.58.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/jgrapht-jdk1.5-0.7.1.jar" output="${build.dir}/bundles/jgrapht-jdk1.5-0.7.1.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/lgpl-utils-1.0.6-020610.jar" output="${build.dir}/bundles/lgpl-utils-1.0.6-020610.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/high-scale-lib-v1.1.2.jar" output="${build.dir}/bundles/high-scale-lib-v1.1.2.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/openrdf-sesame-2.3.0-onejar.jar" output="${build.dir}/bundles/openrdf-sesame-2.3.0.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/apache/zookeeper-${zookeeper.version}.jar" output="${build.dir}/bundles/zookeeper-${zookeeper.version}.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/nxparser-6-22-2010.jar" output="${build.dir}/bundles/nxparser-2010.6.22.jar" definitions="${basedir}/osgi/" />
+	</target>
+
+
+	<!-- Note: the javadoc requires a LOT of RAM, but runs quickly on a
+		 server	class machine. 
+		 
+		 @todo man page for [bigdata] script to @{build.dir}/docs
+ 	     
+		 -->
+	<target name="javadoc" depends="prepare" if="javadoc">
+		<mkdir dir="${build.dir}/docs/api" />
+		<javadoc destdir="${build.dir}/docs/api" defaultexcludes="yes" author="true" version="true" use="true" overview="../bigdata/overview.html" windowtitle="bigdata&#174;" classpathref="build.classpath">
+			<arg value="-J-Xmx1000m" />
+			<packageset dir="${bigdata.dir}/bigdata/src/java" />
+			<packageset dir="${bigdata.dir}/bigdata-jini/src/java" />
+			<packageset dir="${bigdata.dir}/bigdata-rdf/src/java" />
+			<packageset dir="${bigdata.dir}/bigdata-sails/src/java" />
+			<packageset dir="${bigdata.dir}/bigdata-sails/src/samples" />
+			<packageset dir="${bigdata.dir}/ctc-striterators/src/java" />
+			<doctitle>
+				<![CDATA[<h1>bigdata&#174;</h1>]]></doctitle>
+		<bottom>
+			<![CDATA[<i>Copyright &#169; 2006-2009 SYSTAP, LLC. All Rights Reserved.</i>]]></bottom>
+	<tag name="todo" scope="all" description="TODO:" />
+	<tag name="issue" scope="all" description="ISSUE:" />
+	<!--tag name="FIXME" scope="all" description="FIXME:"/-->
+	<link href="http://java.sun.com/j2se/1.5.0/docs/api/" />
+	<link href="http://openrdf.org/doc/sesame/api/" />
+</javadoc>
+</target>
+
+<target name="bundle" description="Bundles all dependencies for easier deployments and releases (does not bundle the bigdata jar).">
+     <copy toDir="${build.dir}/lib" flatten="true">
+	<fileset dir="${bigdata.dir}/bigdata/lib">
+		<include name="**/*.jar" />
+		<include name="**/*.so" />
+		<include name="**/*.dll" />
+		<!-- The BytesUtil JNI class is not recommended at this time (no performance gain). -->
+		<exclude name="**/*BytesUtil*" />
+	</fileset>
+	<fileset dir="${bigdata.dir}/bigdata-rdf/lib">
+		<include name="**/*.jar" />
+	</fileset>
+	<fileset dir="${bigdata.dir}/bigdata-sails/lib">
+		<include name="**/*.jar" />
+	</fileset>
+     </copy>
+     <!-- Do NOT flatten the jini jars. We need the to preserve the -->
+     <!-- lib, lib-dl, and lib-ext distinctions.                    -->
+     <copy toDir="${build.dir}/lib" flatten="false">
+	<fileset dir="${bigdata.dir}/bigdata-jini/lib">
+		<include name="**/*.jar" />
+	</fileset>
+     </copy>
+</target>
+
+	<!-- 
+	This target produces a new jar which includes everything from the bigdata
+	jar, the dsi-util jar, the lgpl-utils jar, and exactly those class files
+	from colt and fastutil which are required by the proceeding jars.  The
+	main advantage of the resulting jar is that the vast majority of fastutil
+	is not necessary, and it is a 13M jar.
+	
+	<target name="autojar" 
+		description="Produce an expanded version of the bigdata jar which 
+		includes the data from the dsi-util and lgpl-utils jars and only
+		those classes from fastutil and colt which are required to support
+		bigdata and dsiutil at runtime.">
+		<java jar="src/build/autojar/autojar.jar" fork="true" failonerror="true">
+			<arg line="-o ${build.dir}/bigdataPlus.jar
+				-c ${bigdata.dir}/bigdata/lib/unimi/fastutil*.jar
+				-c ${bigdata.dir}/bigdata/lib/unimi/colt*.jar
+				${build.dir}/lib/bigdata*.jar
+				${bigdata.dir}/bigdata/lib/dsi-util*.jar
+				${bigdata.dir}/bigdata/lib/lgpl-utils*.jar
+				" />
+		</java>
+	</target> -->
+	<!-- java autojar.jar -vo fastutil-stripped.jar -c fastutil.jar -Y bigdata.jar -->
+	<target name="autojar-strip-fastutil" depends="prepare" 
+			description="Strip unused classes from fastutil.">
+			<java jar="src/build/autojar/autojar.jar" fork="true" failonerror="true">
+				<arg line="-o ${build.dir}/fastutil-stripped.jar
+					-c ${bigdata.dir}/bigdata/lib/unimi/fastutil*.jar
+					--
+					-Y ${build.dir}/lib/${version}.jar
+					-Y ${bigdata.dir}/bigdata/lib/dsi-util*.jar
+					-Y ${bigdata.dir}/bigdata/lib/lgpl-utils*.jar
+					" />
+			</java>
+	</target>
+
+	<!--depends="bundleJar"-->
+	<target name="war" depends="bundleJar, autojar-strip-fastutil" 
+		description="Generates a WAR artifact.">
+		<delete file="${build.dir}/bigdata.war"/>
+		<echo message="Building WAR"/>
+		<war destfile="${build.dir}/bigdata.war"
+			webxml="bigdata-war/src/resources/WEB-INF/web.xml"
+			>
+		  <fileset dir="bigdata-war/src/html"/>
+		  <fileset dir="bigdata-war/src/jsp"/>
+		  <fileset dir="bigdata-war/src/images"/>
+		  <file file="bigdata-war/src/resources/RWStore.properties"/>
+		  <!-- bigdata jar plus some dependencies as filtered by autojar.
+		  <lib file="${build.dir}/bigdataPlus.jar"/> -->
+		  <!-- The stripped version of fasutil. -->
+		  <lib file="${build.dir}/fastutil-stripped.jar"/>
+		  <lib dir="${build.dir}/lib">
+		  	<exclude name="fastutil*.jar"/>
+		  	<!-- jars bundled into "bigdata-plus" by autojar. 
+		  	<exclude name="colt*.jar"/>
+		  	<exclude name="dsi-util*.jar"/>
+		  	<exclude name="lgpl-utils*.jar"/>
+		  	<exclude name="bigdata*.jar"/>-->
+		  	<!-- jars which are not currently used. -->
+		  	<exclude name="iris*.jar"/>
+		  	<exclude name="jgrapht*.jar"/>
+		  	<exclude name="tuprolog*.jar"/>
+		  	<!-- test suite stuff is not needed. -->
+		  	<exclude name="junit*.jar"/>
+		  	<exclude name="sesame*testsuite*.jar"/>
+		  	<!-- osgi stuff is not needed. -->
+		  	<exclude name="bnd*.jar"/>
+		  	<!-- jetty / servlet API not required for the WAR. --> 
+	  		<exclude name="jetty*.jar"/>
+	  		<exclude name="servlet-api*.jar"/>
+		  	<!-- zookeeper only used in scale-out. -->
+	  		<exclude name="zookeeper*.jar"/>
+	  		<!-- jini only used in scale-out. -->
+		  	<exclude name="jini*.jar"/>
+		  	<exclude name="jsk*.jar"/>
+		  	<exclude name="mahalo*.jar"/>
+		  	<exclude name="mercury*.jar"/>
+		  	<exclude name="norm*.jar"/>
+		  	<exclude name="outrigger*.jar"/>
+		  	<exclude name="phoenix*.jar"/>
+		  	<exclude name="reggie*.jar"/>
+		  	<exclude name="sdm*.jar"/>
+		  	<exclude name="start*.jar"/>
+		  	<exclude name="sun-util*.jar"/>
+		  	<exclude name="tools*.jar"/>
+		  	<exclude name="browser*.jar"/>
+		  	<exclude name="classserver*.jar"/>
+		  	<exclude name="fiddler*.jar"/>
+		  	<exclude name="group*.jar"/>
+		  </lib>
+		  <classes file="bigdata-war/src/resources/log4j.properties"/>
+		</war>
+	</target>
+	
+<target name="release-prepare" depends="jar, bundle, javadoc" description="create a release.">
+<!-- The source tree. -->
+<copy toDir="${build.dir}/bigdata/src">
+	<fileset dir="${bigdata.dir}/bigdata/src" />
+</copy>
+<copy toDir="${build.dir}/bigdata-jini/src">
+	<fileset dir="${bigdata.dir}/bigdata-jini/src" />
+</copy>
+<copy toDir="${build.dir}/bigdata-rdf/src">
+	<fileset dir="${bigdata.dir}/bigdata-rdf/src" />
+</copy>
+<copy toDir="${build.dir}/bigdata-sails/src">
+	<fileset dir="${bigdata.dir}/bigdata-sails/src" />
+</copy>
+<!-- common files for the root of the archive. -->
+<copy tofile="${build.dir}/build.properties" file="build.properties" />
+<copy tofile="${build.dir}/build.xml" file="build.xml" />
+<copy tofile="${build.dir}/LICENSE.txt" file="LICENSE.txt" />
+<copy tofile="${build.dir}/overview.html" file="overview.html" />
+<copy tofile="${build.dir}/README-JINI" file="README-JINI" />
+<copy toDir="${build.dir}/LEGAL" flatten="true">
+	<fileset dir="${bigdata.dir}">
+		<include name="**/LEGAL/*" />
+	</fileset>
+</copy>
+</target>
+
+<target name="release" depends="release-prepare" description="create source and binary tarballs.">
+<mkdir dir="${release.dir}" />
+<!-- binary distribution. -->
+<tar destfile="${release.dir}/${version}-bin.tgz" compression="gzip">
+	<!-- binary distribution (docs, but no source). -->
+	<tarfileset dir="${build.dir}" prefix="${version}">
+		<!-- common files from the root of the archive. -->
+		<include name="build.properties" />
+		<include name="build.xml" />
+		<include name="LICENSE.txt" />
+		<include name="overview.html" />
+		<include name="README-JINI" />
+		<include name="LEGAL/*" />
+		<!-- src, classes, jar, lib, docs. -->
+		<exclude name="bigdata/src/**" />
+		<exclude name="bigdata-jini/src/**" />
+		<exclude name="bigdata-rdf/src/**" />
+		<exclude name="bigdata-sails/src/**" />
+		<exclude name="classes/**" />
+		<include name="${version}.jar" />
+		<include name="lib/**" />
+		<include name="docs/**" />
+	</tarfileset>
+</tar>
+<!-- source distribution. -->
+<!-- Note: use GNU long file names for paths GT 100 characters. -->
+<tar destfile="${release.dir}/${version}-src.tgz" compression="gzip">
+	<!-- source, but no jar, compiled, docs, etc. -->
+	<tarfileset dir="${build.dir}" prefix="${version}">
+		<!-- common files from the root of the archive. -->
+		<include name="build.properties" />
+		<include name="build.xml" />
+		<include name="LICENSE.txt" />
+		<include name="overview.html" />
+		<include name="README-JINI" />
+		<include name="LEGAL/*" />
+		<!-- src, classes, jar, lib, docs. -->
+		<include name="bigdata/src/**" />
+		<include name="bigdata-jini/src/**" />
+		<include name="bigdata-rdf/src/**" />
+		<include name="bigdata-sails/src/**" />
+		<include name="lgpl-utils/src/**" />
+		<include name="src/**" />
+		<exclude name="classes/**" />
+		<exclude name="${version}.jar" />
+		<exclude name="lib/**" />
+		<exclude name="docs/**" />
+	</tarfileset>
+</tar>
+</target>
+
+<!-- Note: I use a public/private key to do this.  You can uncomment the
+	     ssh.password lines if you are going to authenticate directly.
+	     
+	     Note: If you do not have the public key for frs.sourceforge.net cached
+	     in your SSH repository then this will not work since it requests that
+	     you confirm the public key interactively.
+	     -->
+<target name="upload" depends="release" description="copy release files to server.">
+<input message="username:" addproperty="ssh.username" defaultValue="${ssh.username}" />
+<!-- unless automated by public/private key
+		<input message="password:" addproperty="ssh.password" defaultValue="${ssh.password}"/>
+		-->
+<exec executable="${ssh.scp}">
+	<!-- verbose protocol. -->
+	<arg value="-v" />
+	<!-- compression. -->
+	<arg value="-C" />
+	<!-- pscp specific
+			<arg value="-l"/><arg value="${ssh.username}"/>
+			<arg value="-pw"/><arg value="${ssh.password}"/>
+			-->
+	<!-- from -->
+	<arg value="${release.dir}/${version}-bin.tgz" />
+	<!-- to -->
+	<arg value="${ssh.username}@frs.sourceforge.net:uploads" />
+</exec>
+<exec executable="${ssh.scp}">
+	<!-- verbose protocol. -->
+	<arg value="-v" />
+	<!-- compression. -->
+	<arg value="-C" />
+	<!-- pscp specific
+			<arg value="-l"/><arg value="${ssh.username}"/>
+			<arg value="-pw"/><arg value="${ssh.password}"/>
+			-->
+	<!-- from -->
+	<arg value="${release.dir}/${version}-src.tgz" />
+	<!-- to -->
+	<arg value="${ssh.username}@frs.sourceforge.net:uploads" />
+</exec>
+</target>
+
+<target name="publish-api" depends="javadoc" description="copy javadoc to server.">
+<fail message="Javadoc not generated.">
+	<condition>
+		<not>
+			<available file="${build.dir}/docs/api" type="dir" />
+		</not>
+	</condition>
+</fail>
+<input message="username:" addproperty="ssh.username2" defaultValue="${ssh.username2}" />
+<!--
+<input message="password:" addproperty="ssh.password2" defaultValue="${ssh.password2}" />
+-->
+<exec executable="${ssh.scp}">
+	<!-- recursive. -->
+	<arg value="-r" />
+	<!-- verbose protocol (too much info, but let's you observe progress during recursive copy). -->
+	<arg value="-v" />
+	<!-- compression. -->
+	<arg value="-C" />
+	<!-- pscp specific.
+	<arg value="-l" />
+	<arg value="${ssh.username2}" />
+	<arg value="-pw" />
+	<arg value="${ssh.password2}" />-->
+	<!-- from -->
+	<arg value="${build.dir}/docs" />
+	<!-- to -->
+	<arg value="${ssh.username2}@shell.speakeasy.net:systap.com/bigdata/" />
+</exec>
+</target>
+
+<target name="banner" depends="jar" description="Displays the banner (verifies runtime classpath).">
+
+<java classname="com.bigdata.Banner" failonerror="true" fork="false" logerror="true">
+	<classpath refid="runtime.classpath" />
+</java>
+
+</target>
+
+
+<!--                                                                   -->
+<!--                    CLUSTER INSTALL TARGETS                        -->
+<!--                                                                   -->
+
+<!--
+
+This is the cluster-based install.  You need to edit build.properties, decide
+which configuration is going to be the basis for your cluster, and then edit
+that configuration file.  When you are ready, you can use this target to install
+bigdata onto a cluster.
+
+In order to get things moving you need to setup a cron job that will run the
+'bigdata' script which is installed by this target.  Documentation on how to
+do this is written onto the console after a successfull install.  Those notes
+are in the "POST-INSTALL" file in the source distribution and are also copied
+into the $binDir when bigdata is installed.
+
+Once you have cron setup, and once you have adjusted the owner and group
+properties if you are running bigdata as root, you must edit the $stateFile
+and change the run state from 'status' to 'start'.
+
+If you want to shutdown the bigdata services, change the run state to 'stop'.
+This will halt all services, but they can be restarted by changing the run
+state back to 'start'.
+
+To remove a bigdata installation, first change the run state to 'destroy' and
+wait for all services to halt.  THIS WILL DESTROY ALL PERSISTENT STATE!!!!
+When that is done, you can remove the shared $NAS directory.  The cron job
+will still be trying to run the 'bigdata' script, so either replace it with
+an "NOP" bash script or edit your crontab. 
+-->
+<target name="install" depends="jar, banner, javadoc, bundle" description="Install bigdata on a cluster.">
+<!-- create NAS/LAS directories. -->
+<mkdir dir="${NAS}" />
+<mkdir dir="${LAS}" />
+<!-- NAS/LAS directories must be read/write for the group. -->
+<chmod perm="ug+rw,o-rw">
+	<fileset dir="${NAS}" />
+</chmod>
+<chmod perm="ug+rw,o-rw">
+	<fileset dir="${LAS}" />
+</chmod>
+<!-- create subdirectories of NAS - should inherit permissions. -->
+<mkdir dir="${install.config.dir}" />
+<mkdir dir="${install.doc.dir}" />
+<mkdir dir="${install.lib.dir}" />
+<mkdir dir="${install.bin.dir}" />
+<mkdir dir="${install.log.dir}" />
+<mkdir dir="${install.dist.dir}" />
+<!-- install configuration files. -->
+<copy toDir="${install.config.dir}">
+	<fileset dir="${bigdata.dir}/src/resources/config">
+	</fileset>
+</copy>
+<!-- install documentation. -->
+<copy toDir="${install.doc.dir}">
+	<!-- javadoc. -->
+	<fileset dir="${build.dir}/docs" />
+	<!-- common files from the root of the archive. -->
+	<!-- @todo cleanup LEGAL into one directory off the root in the src tree? -->
+	<fileset dir="${bigdata.dir}">
+		<include name="LICENSE.txt" />
+		<include name="overview.html" />
+		<include name="README-JINI" />
+		<include name="bigdata/LEGAL/*" />
+		<include name="bigdata-jini/LEGAL/*" />
+		<include name="bigdata-rdf/LEGAL/*" />
+		<include name="bigdata-sails/LEGAL/*" />
+	</fileset>
+</copy>
+<!-- install JARs. -->
+<copy toDir="${install.lib.dir}">
+	<fileset dir="${build.dir}/lib" />
+	<fileset file="${build.dir}/${version}.jar" />
+</copy>
+<!-- install scripts. -->
+<copy toDir="${install.bin.dir}">
+	<fileset dir="src/resources/scripts">
+	</fileset>
+</copy>
+<!-- parameter substitution. -->
+<property name="myclasspath" refid="install.classpath" />
+<replace dir="${install.bin.dir}" summary="true">
+	<replacefilter token="@FED@" value="${FED}" />
+	<replacefilter token="@NAS@" value="${NAS}" />
+	<replacefilter token="@LAS@" value="${LAS}" />
+	<replacefilter token="@JAVA_HOME@" value="${JAVA_HOME}" />
+	<replacefilter token="@JINI_CLASS_SERVER_PORT@" value="${JINI_CLASS_SERVER_PORT}" />
+	<replacefilter token="@LOAD_BALANCER_PORT@" value="${LOAD_BALANCER_PORT}" />
+	<replacefilter token="@SYSSTAT_HOME@" value="${SYSSTAT_HOME}" />
+	<replacefilter token="@USE_NIO@" value="${USE_NIO}" />
+	<replacefilter token="@BIN_DIR@" value="${install.bin.dir}" />
+	<replacefilter token="@LIB_DIR@" value="${install.lib.dir}" />
+	<replacefilter token="@LOG_DIR@" value="${install.log.dir}" />
+	<replacefilter token="@CONFIG_DIR@" value="${install.config.dir}" />
+	<replacefilter token="@INSTALL_USER@" value="${install.user}" />
+	<replacefilter token="@INSTALL_GROUP@" value="${install.group}" />
+	<replacefilter token="@LOCK_FILE@" value="${LOCK_FILE}" />
+	<replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}" />
+	<replacefilter token="@JINI_CONFIG@" value="${jini.config}" />
+	<replacefilter token="@POLICY_FILE@" value="${policyFile}" />
+	<replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
+	<replacefilter token="@LOG4J_SOCKET_LOGGER_PORT@" value="${LOG4J_SOCKET_LOGGER_PORT}" />
+	<replacefilter token="@LOG4J_SOCKET_LOGGER_CONFIG@" value="${log4jServer.config}" />
+	<replacefilter token="@LOG4J_DATE_PATTERN@" value="${LOG4J_DATE_PATTERN}" />
+	<replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}" />
+	<replacefilter token="@LOGGING_CONFIG@" value="${logging.config}" />
+	<replacefilter token="@ERROR_LOG@" value="${errorLog}" />
+	<replacefilter token="@DETAIL_LOG@" value="${detailLog}" />
+	<replacefilter token="@EVENT_LOG@" value="${eventLog}" />
+	<replacefilter token="@RULE_LOG@" value="${ruleLog}" />
+	<replacefilter token="@STATE_LOG@" value="${stateLog}" />
+	<replacefilter token="@STATE_FILE@" value="${stateFile}" />
+	<replacefilter token="@FORCE_KILL_ALL@" value="${forceKillAll}" />
+	<replacefilter token="@NTP_MASTER@" value="${NTP_MASTER}" />
+	<replacefilter token="@NTP_NETWORK@" value="${NTP_NETWORK}" />
+	<replacefilter token="@NTP_NETMASK@" value="${NTP_NETMASK}" />
+	<replacefilter token="@CLASSPATH@" value="${myclasspath}" />
+</replace>
+<replace dir="${install.config.dir}" summary="true">
+	<replacefilter token="@FED@" value="${FED}" />
+	<replacefilter token="@NAS@" value="${NAS}" />
+	<replacefilter token="@LAS@" value="${LAS}" />
+	<replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
+	<replacefilter token="@JAVA_HOME@" value="${JAVA_HOME}" />
+	<replacefilter token="@JINI_CLASS_SERVER_PORT@" value="${JINI_CLASS_SERVER_PORT}" />
+	<replacefilter token="@LOAD_BALANCER_PORT@" value="${LOAD_BALANCER_PORT}" />
+	<replacefilter token="@SYSSTAT_HOME@" value="${SYSSTAT_HOME}" />
+	<replacefilter token="@USE_NIO@" value="${USE_NIO}" />
+	<replacefilter token="@BIN_DIR@" value="${install.bin.dir}" />
+	<replacefilter token="@LIB_DIR@" value="${install.lib.dir}" />
+	<replacefilter token="@LOG_DIR@" value="${install.log.dir}" />
+	<replacefilter token="@CONFIG_DIR@" value="${install.config.dir}" />
+	<replacefilter token="@INSTALL_USER@" value="${install.user}" />
+	<replacefilter token="@INSTALL_GROUP@" value="${install.group}" />
+	<replacefilter token="@LOCK_FILE@" value="${LOCK_FILE}" />
+	<replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}" />
+	<replacefilter token="@JINI_CONFIG@" value="${jini.config}" />
+	<replacefilter token="@POLICY_FILE@" value="${policyFile}" />
+	<replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
+	<replacefilter token="@LOG4J_SOCKET_LOGGER_PORT@" value="${LOG4J_SOCKET_LOGGER_PORT}" />
+	<replacefilter token="@LOG4J_SOCKET_LOGGER_CONFIG@" value="${log4jServer.config}" />
+	<replacefilter token="@LOG4J_DATE_PATTERN@" value="${LOG4J_DATE_PATTERN}" />
+	<replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}" />
+	<replacefilter token="@LOGGING_CONFIG@" value="${logging.config}" />
+	<replacefilter token="@ERROR_LOG@" value="${errorLog}" />
+	<replacefilter token="@DETAIL_LOG@" value="${detailLog}" />
+	<replacefilter token="@EVENT_LOG@" value="${eventLog}" />
+	<replacefilter token="@RULE_LOG@" value="${ruleLog}" />
+	<replacefilter token="@STATE_LOG@" value="${stateLog}" />
+	<replacefilter token="@STATE_FILE@" value="${stateFile}" />
+	<replacefilter token="@FORCE_KILL_ALL@" value="${forceKillAll}" />
+	<replacefilter token="@NTP_MASTER@" value="${NTP_MASTER}" />
+	<replacefilter token="@NTP_NETWORK@" value="${NTP_NETWORK}" />
+	<replacefilter token="@NTP_NETMASK@" value="${NTP_NETMASK}" />
+	<replacefilter token="@CLASSPATH@" value="${myclasspath}" />
+	<!-- updates the configuration file to locate the lubm ontology. -->
+	<replacefilter token="@install.lubm.config.dir@" value="${install.lubm.config.dir}" />
+</replace>
+<!-- fix newlines (otherwise substitutions cause things to break). -->
+<fixcrlf srcDir="${install.config.dir}" />
+<!-- fix newlines (otherwise substitutions cause things to break). -->
+<fixcrlf srcDir="${install.bin.dir}" />
+<!-- set execute bit for scripts in this directory (must be the last step). -->
+<chmod perm="u+x,g+rx,o-rwx">
+	<fileset dir="${install.bin.dir}">
+		<exclude name="README" />
+		<exclude name="POST-INSTALL" />
+	</fileset>
+</chmod>
+<!-- Setup the status file which will be read by the bigdata script and
+		     the log on which that script will write its output.  This is used
+		     if cron, or a similar process, will execute the script on a periodic
+		     basis.  The initial state is always 'status'.  The initial stateLog
+		     is always empty.  The state file must be readable by the group, but
+		     could be restricted to write by a specific user. The stateLog must be
+		     read/write for the group. -->
+<echo file="${stateFile}">status</echo>
+<echo file="${stateLog}">
+</echo>
+<chmod perm="g+rw,o-rw" file="${stateFile}" />
+<chmod perm="g+rw,o-rw" file="${stateLog}" />
+<!-- Make sure that the entire shared directory structure is read/write for the group. -->
+<chmod perm="g+rwx" type="both" dir="${NAS}" verbose="true" />
+<!-- Make sure that it is all accessible to the install group (ant 1.6+ plus extension module required). 
+<chown file="${NAS}" type="both" owner="${install.user}.${install.group}" verbose="true"/>
+-->
+<!-- Works for earlier versions of ant LT 1.6 which do not bundle "chown". -->
+<apply executable="chown" description="set owner on NAS files" osfamily="unix">
+	<arg value="-R" />
+	<arg value="${install.user}.${install.group}" />
+	<dirset dir="${NAS}" />
+</apply>
+<!-- @todo check the installed configuration file (after parameter substitution). -->
+<!-- @todo also check the installed jini configuration files. -->
+<java classname="com.bigdata.jini.util.CheckConfiguration" failonerror="true" fork="true" logerror="true">
+	<classpath refid="install.classpath" />
+	<arg value="${bigdata.config}" />
+</java>
+<loadfile property="postInstallMessage" srcFile="${install.bin.dir}/POST-INSTALL" />
+<echo>
+
+${postInstallMessage}</echo>
+</target>
+
+<!-- This may be used to verify that statistics are being collected for the
+     target platform and diagnose errors related to a missing or incomplete
+     sysstat install or other monitoring dependencies. -->
+<target name="test-monitoring" depends="compile" description="Run the statistics collectors for the deployment platform.">
+<java classname="com.bigdata.counters.AbstractStatisticsCollector" failonerror="true" fork="true" logerror="true">
+	<classpath refid="install.classpath" />
+	<jvmarg value="-Dcom.bigdata.counters.linux.sysstat.path=${SYSSTAT_HOME}" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<jvmarg value="-Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties" />
+	<arg value="1" />
+	<!-- interval between reports. -->
+	<arg value="10" />
+	<!-- #of seconds to run. -->
+</java>
+</target>
+
+<!-- Note: we must fork the JVM to the jvmarg overrides applied. -->
+<!-- Note: We disable registration of log4j MBeans since that requires policy file. -->
+<!-- @todo add a target to launch the post-mortem counter set/events viewer. -->
+<target name="analysis" depends="bundleJar" description="Extracts performance counters from logged XML files.">
+
+<java classname="com.bigdata.counters.query.CounterSetQuery" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Xmx1500m" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<jvmarg value="-Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties" />
+	<arg value="-outputDir" />
+	<arg value="${analysis.out.dir}" />
+	<arg value="-mimeType" />
+	<arg value="text/plain" />
+	<arg value="-queries" />
+	<arg file="${analysis.queries}" />
+	<arg file="${analysis.counters.dir}" />
+</java>
+
+</target>
+	
+<!--                                                                   -->
+<!--                    MISC. UTILITY TARGETS                          -->
+<!--                                                                   -->
+
+<target name="scale-out-sample" description="Run the scale-out sample code.">
+
+<javac destdir="${build.dir}/classes"
+	   classpathref="build.classpath"
+	   debug="${javac.debug}"
+	   debuglevel="${javac.debuglevel}"
+	   verbose="${javac.verbose}"
+	   encoding="${javac.encoding}"
+	   includeantruntime="false"
+	>
+	<src path="${bigdata.dir}/bigdata-sails/src/samples" />
+</javac>
+<!-- copy resources. -->
+<copy toDir="${build.dir}/classes">
+	<fileset dir="${bigdata.dir}/bigdata-sails/src/samples">
+		<exclude name="**/*.java" />
+		<exclude name="**/package.html" />
+	</fileset>
+</copy>
+<java classname="com.bigdata.samples.ScaleOut" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Xmx1500m" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<jvmarg value="-Dlog4j.configuration=file:bigdata-sails/src/samples/com/bigdata/samples/log4j.properties" />
+	<arg value="${bigdata.config}" />
+</java>
+
+</target>
+
+    <!--                                                    -->
+    <!--                      STAGING                       -->
+    <!--                                                    -->
+    <target name="stage"
+            description="stages resources (jar, config, policy, logging files) needed to package or execute the bigdata distribution."
+            depends="jar">
+
+      <!-- Create staging directories -->
+      <property name="dist.dir" location="${bigdata.dir}/dist/bigdata" />
+
+      <property name="dist.bin" location="${dist.dir}/bin" />
+      <property name="dist.bin.config" location="${dist.bin}/config" />
+      <property name="dist.lib" location="${dist.dir}/lib" />
+      <property name="dist.lib.dl" location="${dist.dir}/lib-dl" />
+      <property name="dist.lib.ext" location="${dist.dir}/lib-ext" />
+      <property name="dist.var" location="${dist.dir}/var" />
+
+      <property name="dist.var.config" location="${dist.var}/config" />
+      <property name="dist.var.config.policy" location="${dist.var.config}/policy" />
+      <property name="dist.var.config.logging" location="${dist.var.config}/logging" />
+      <property name="dist.var.config.jini" location="${dist.var.config}/jini" />
+
+      <delete dir="${dist.dir}" quiet="true" />
+      <mkdir dir="${dist.dir}" />
+      <mkdir dir="${dist.bin}" />
+      <mkdir dir="${dist.lib}" />
+      <mkdir dir="${dist.lib.dl}" />
+      <mkdir dir="${dist.lib.ext}" />
+      <mkdir dir="${dist.var}" />
+      <mkdir dir="${dist.var.config}" />
+      <mkdir dir="${dist.var.config.policy}" />
+      <mkdir dir="${dist.var.config.logging}" />
+      <mkdir dir="${dist.var.config.jini}" />
+
+      <!-- Copy the jar files created by the jar target to        -->
+      <!-- an application-specific but non-version-specific       -->
+      <!-- jar file to either the lib or lib-dl staging           -->
+      <!-- directory. When a new version of a given application's -->
+      <!-- jar file becomes available, the version-specific jar   -->
+      <!-- file name should be changed here.                      -->
+
+      <property name="bigdata.lib" location="${bigdata.dir}/bigdata/lib" />
+      <property name="bigdata-jini.dir" location="${bigdata.dir}/bigdata-jini" />
+      <property name="bigdata-jini.lib" location="${bigdata.dir}/bigdata-jini/lib/jini/lib" />
+      <property name="bigdata-rdf.lib" location="${bigdata.dir}/bigdata-rdf/lib" />
+      <property name="bigdata-sails.lib" location="${bigdata.dir}/bigdata-sails/lib" />
+      <property name="bigdata-jetty.lib" location="${bigdata.dir}/bigdata/lib/jetty" />
+      <property name="bigdata-zookeeper.lib" location="${bigdata.dir}/bigdata-jini/lib/apache" />
+
+      <!-- Utility libraries -->
+
+      <copy file="${bigdata.lib}/unimi/colt-1.2.0.jar"
+            tofile="${dist.lib}/colt.jar" />
+      <copy file="${bigdata.lib}/high-scale-lib-v1.1.2.jar"
+            tofile="${dist.lib}/highscalelib.jar" />
+      <copy file="${bigdata.lib}/dsi-utils-1.0.6-020610.jar"
+            tofile="${dist.lib}/dsiutils.jar" />
+      <copy file="${bigdata.lib}/lgpl-utils-1.0.6-020610.jar"
+            tofile="${dist.lib}/lgplutils.jar" />
+      <copy file="${bigdata.lib}/unimi/fastutil-5.1.5.jar"
+            tofile="${dist.lib}/fastutil.jar" />
+      <copy file="${bigdata.lib}/icu/icu4j-${icu.version}.jar"
+            tofile="${dist.lib}/icu4j.jar" />
+      <copy file="${bigdata.lib}/icu/icu4j-charset-${icu.version}.jar"
+            tofile="${dist.lib}/icu4j-charset.jar" />
+      <copy file="${bigdata.lib}/apache/log4j-1.2.15.jar"
+            tofile="${dist.lib}/log4j.jar" />
+      <copy file="${bigdata.lib}/lucene/lucene-analyzers-3.0.0.jar"
+            tofile="${dist.lib}/lucene-analyzer.jar" />
+      <copy file="${bigdata.lib}/lucene/lucene-core-3.0.0.jar"
+            tofile="${dist.lib}/lucene-core.jar" />
+
+      <!-- RDF library -->
+
+      <copy file="${bigdata-rdf.lib}/iris-0.58.jar"
+            tofile="${dist.lib}/iris.jar" />
+      <copy file="${bigdata-rdf.lib}/jgrapht-jdk1.5-0.7.1.jar"
+            tofile="${dist.lib}/jgrapht.jar" />
+      <copy file="${bigdata-rdf.lib}/openrdf-sesame-2.3.0-onejar.jar"
+            tofile="${dist.lib}/openrdf-sesame.jar" />
+      <copy file="${bigdata-rdf.lib}/slf4j-api-1.4.3.jar"
+            tofile="${dist.lib}/slf4j.jar" />
+      <copy file="${bigdata-rdf.lib}/slf4j-log4j12-1.4.3.jar"
+            tofile="${dist.lib}/slf4j-log4j.jar" />
+
+      <!-- jetty library -->
+      <copy file="${bigdata-jetty.lib}/jetty-continuation-7.2.2.v20101205.jar"
+	        tofile="${dist.lib}/jetty-continuation.jar" />
+	  <copy file="${bigdata-jetty.lib}/jetty-http-7.2.2.v20101205.jar"
+	        tofile="${dist.lib}/jetty-http.jar" />
+	  <copy file="${bigdata-jetty.lib}/jetty-io-7.2.2.v20101205.jar"
+	        tofile="${dist.lib}/jetty-io.jar" />
+	  <copy file="${bigdata-jetty.lib}/jetty-server-7.2.2.v20101205.jar"
+	        tofile="${dist.lib}/jetty-server.jar" />
+  	  <copy file="${bigdata-jetty.lib}/jetty-util-7.2.2.v20101205.jar"
+  	        tofile="${dist.lib}/jetty-util.jar" />
+  	  <copy file="${bigdata-jetty.lib}/jetty-webapp-7.2.2.v20101205.jar"
+  	        tofile="${dist.lib}/jetty-webapp.jar" />
+  	  <copy file="${bigdata-jetty.lib}/jetty-servlet-7.2.2.v20101205.jar"
+  	        tofile="${dist.lib}/jetty-servlet.jar" />
+  	  <copy file="${bigdata-jetty.lib}/jetty-security-7.2.2.v20101205.jar"
+  	        tofile="${dist.lib}/jetty-security.jar" />
+  	  <copy file="${bigdata-jetty.lib}/jetty-xml-7.2.2.v20101205.jar"
+  	        tofile="${dist.lib}/jetty-xml.jar" />
+	  <copy file="${bigdata-jetty.lib}/servlet-api-2.5.jar"
+	        tofile="${dist.lib}/servlet-api.jar" />
+
+      <!-- NxParser (RDF NQuads support) -->
+      <copy file="${bigdata-rdf.lib}/nxparser-6-22-2010.jar"
+            tofile="${dist.lib}/nxparser.jar" />
+
+      <!-- Zookeeper library -->
+      <copy file="${bigdata-zookeeper.lib}/zookeeper-${zookeeper.version}.jar"
+            tofile="${dist.lib}/zookeeper.jar" />
+
+      <!-- Jini library -->
+
+      <copy file="${bigdata-jini.lib}/browser.jar"
+            todir="${dist.lib}" />
+      <copy file="${bigdata-jini.lib}/classserver.jar"
+            todir="${dist.lib}" />
+      <copy file="${bigdata-jini.lib}/jsk-lib.jar"
+            todir="${dist.lib}" />
+      <copy file="${bigdata-jini.lib}/jsk-platform.jar"
+            todir="${dist.lib}" />
+      <copy file="${bigdata-jini.lib}/jsk-resources.jar"
+            todir="${dist.lib}" />
+      <copy file="${bigdata-jini.lib}/reggie.jar"
+            todir="${dist.lib}" />
+      <copy file="${bigdata-jini.lib}/start.jar"
+            todir="${dist.lib}" />
+      <copy file="${bigdata-jini.lib}/tools.jar"
+            todir="${dist.lib}" />
+
+      <property name="bigdata-jini.lib.dl" location="${bigdata.dir}/bigdata-jini/lib/jini/lib-dl" />
+
+      <copy file="${bigdata-jini.lib.dl}/browser-dl.jar"
+            todir="${dist.lib.dl}" />
+      <copy file="${bigdata-jini.lib.dl}/group-dl.jar"
+            todir="${dist.lib.dl}" />
+      <copy file="${bigdata-jini.lib.dl}/jsk-dl.jar"
+            todir="${dist.lib.dl}" />
+      <copy file="${bigdata-jini.lib.dl}/phoenix-dl.jar"
+            todir="${dist.lib.dl}" />
+      <copy file="${bigdata-jini.lib.dl}/reggie-dl.jar/"
+            todir="${dist.lib.dl}" />
+      <copy file="${bigdata-jini.lib.dl}/sdm-dl.jar"
+            todir="${dist.lib.dl}" />
+
+      <property name="bigdata-jini.lib.ext" location="${bigdata.dir}/bigdata-jini/lib/jini/lib-ext" />
+
+      <copy file="${bigdata-jini.lib.ext}/jsk-policy.jar"
+            todir="${dist.lib.ext}" />
+
+      <!-- Bigdata library -->
+      <property name="bigdata.jar" location="${bigdata.dir}/${build.dir}/${version}.jar" />
+      <copy file="${bigdata.dir}/${build.dir}/${version}.jar"
+            tofile="${dist.lib}/bigdata.jar" />
+
+      <property name="src.resources" location="${bigdata.dir}/src/resources" />
+      <property name="src.resources.config" location="${src.resources}/config" />
+
+      <!-- Stage the top-level bigdata deployment configuration files -->
+
+      <property name="build.properties.from.file" location="${bigdata.dir}/build.properties" />
+
+      <copy file="${build.properties.from.file}"
+            todir="${dist.var.config}" />
+
+      <!-- Stage utility scripts and related resources -->
+
+      <copy file="${src.resources}/bin/disco-tool"
+            todir="${dist.bin}" />
+      <chmod file="${dist.bin}/disco-tool" perm="755" />
+
+      <copy file="${src.resources}/bin/pstart"
+            todir="${dist.bin}" />
+      <chmod file="${dist.bin}/pstart" perm="755" />
+
+      <copy file="${src.resources}/bin/config/browser.config"
+            todir="${dist.bin.config}" />
+      <copy file="${src.resources}/bin/config/reggie.config"
+            todir="${dist.bin.config}" />
+      <copy file="${src.resources}/bin/config/serviceStarter.config"
+            todir="${dist.bin.config}" />
+
+      <!-- Stage security policy (config) files -->
+
+      <copy file="${src.resources.config}/policy.all"
+            todir="${dist.var.config.policy}" />
+      <copy file="${src.resources.config}/service.policy"
+            todir="${dist.var.config.policy}" />
+
+      <!-- Stage the bigdata logging config files -->
+
+      <property name="logging.to.path" location="${dist.var.config.logging}" />
+
+      <property name="log4j.from.file" location="${bigdata.dir}/bigdata/src/resources/logging/log4j.properties" />
+      <copy file="${log4j.from.file}"
+            todir="${logging.to.path}" />
+
+      <property name="logging.from.file" location="${bigdata.dir}/bigdata/src/resources/logging/logging.properties" />
+      <copy file="${logging.from.file}"
+            todir="${logging.to.path}" />
+
+      <property name="standalone.log4j.from.file" location="${src.resources.config}/standalone/log4j.properties" />
+      <property name="standalone.log4j.to.file" location="${logging.to.path}/log4jStandalone.properties" />
+      <copy file="${standalone.log4j.from.file}"
+            tofile="${standalone.log4j.to.file}" />
+
+      <property name="server.log4j.from.file" location="${src.resources.config}/log4jServer.properties" />
+      <copy file="${server.log4j.from.file}"
+            todir="${logging.to.path}" />
+
+      <!-- Stage service-specific logging config file -->
+
+      <property name="bigdata-jini.root" location="${bigdata-jini.dir}/src/java/com/bigdata" />
+
+      <copy file="${bigdata-jini.root}/disco/config/disco.config"
+            todir="${dist.bin.config}" />
+
+      <copy file="${bigdata-jini.root}/disco/config/logging.properties"
+            tofile="${dist.bin.config}/disco-logging.properties" />
+
+      <copy file="${src.resources.config}/zookeeper-logging.properties"
+            todir="${logging.to.path}" />
+      <copy file="${src.resources.config}/reggie-logging.properties"
+            todir="${logging.to.path}" />
+      <copy file="${src.resources.config}/browser-logging.properties"
+            todir="${logging.to.path}" />
+
+      <!-- Stage the bigdata Jini config files -->
+
+      <copy file="${src.resources.config}/bigdataStandalone.config"
+            todir="${dist.var.config.jini}" />
+      <copy file="${src.resources.config}/bigdataCluster.config"
+            todir="${dist.var.config.jini}" />
+      <copy file="${src.resources.config}/bigdataCluster16.config"
+            todir="${dist.var.config.jini}" />
+
+      <!-- Stage the infrastructure service config files -->
+
+      <copy file="${src.resources.config}/jini/reggie.config"
+            todir="${dist.var.config.jini}" />
+      <copy file="${src.resources.config}/jini/browser.config"
+            todir="${dist.var.config.jini}" />
+      <copy file="${src.resources.config}/jini/startAll.config"
+            todir="${dist.var.config.jini}" />
+    </target>
+
+    <!--                                                    -->
+    <!--                      RELEASE                       -->
+    <!--                                                    -->
+	<!--
+	REL.${version}.tgz - This is basically a tarball wrapping the 'dist'
+	directory generated by "stage". It has everything you need to deploy 
+	a bigdata instance to a node.  The paradigm for a deployment based on
+	this artifact is to create an installer which will start the appropriate
+	services for each node of your cluster.  For example, based on a config
+	file in a known location on each node.  The installer can use pstart to
+	actually start the services as described by that configuration file. For
+	example, you might wrap the generated REL.${version}.tgz file with your
+	own installer.
+	
+	The structure of the archive is as follows.
+
+	bigdata
+	bigdata/bin
+	bigdata/bin/disco-tool - command line utility for DiscoveryTool.
+	bigdata/bin/pstart - python service start utility.
+	bigdata/bin/config - jini configuration for use Jini ServiceStarter.
+	bigdata/bin/config/browser.config
+	bigdata/bin/config/disco.config
+	bigdata/bin/config/disco-logging.properties
+	bigdata/bin/config/reggie.config
+	bigdata/bin/config/serviceStarter.config - Jini ServiceStarter configuration for jini core services, zookeeper, and bigdata services.
+	bigdata/lib - unversioned jars.
+	bigdata/lib-dl - downloadable jars for jini ("*-dl.jar").
+	bigdata/lib-ext - jsk-policy.jar
+	bigdata/var
+	bigdata/var/config - bigdata config files, 
+	bigdata/var/config/build.properties - a copy of the top level project build.properties file.
+	bigdata/var/jini - jini core service configuration files, including startAll.config which is used to start the core jini services.
+	bigdata/var/logging - log4j and java.util log configuration files.
+	bigdata/var/policy - java policy files
+	bigdata/var/policy/policy.all - policy with all permissions granted.
+	bigdata/var/policy/service.policy
+	-->
+    <target name="deploy-artifact" depends="clean, stage"
+            description="Create compressed tar file for deployment.">
+
+      <tar destfile="${bigdata.dir}/REL.${version}.tgz"
+           compression="gzip">
+
+        <tarfileset dir="${bigdata.dir}/dist">
+          <include name="bigdata/**" />
+          <exclude name="bigdata/bin/disco-tool" />
+          <exclude name="bigdata/bin/pstart" />
+        </tarfileset>
+
+        <!-- Add scripts separately, making them executable -->
+
+        <tarfileset dir="${bigdata.dir}/dist" filemode="755">
+          <include name="bigdata/bin/disco-tool" />
+          <include name="bigdata/bin/pstart" />
+        </tarfileset>
+      </tar>
+
+    </target>
+
+    <target name="ant-install-prepare" depends="jar, bundle"
+            description="Stage all files (src, lib, config, etc.) needed for ant based install.">
+
+      <!-- stage source files. -->
+      <copy toDir="${build.dir}/bigdata/src">
+        <fileset dir="${bigdata.dir}/bigdata/src" />
+      </copy>
+      <copy toDir="${build.dir}/bigdata-jini/src">
+        <fileset dir="${bigdata.dir}/bigdata-jini/src" />
+      </copy>
+      <copy toDir="${build.dir}/bigdata-rdf/src">
+        <fileset dir="${bigdata.dir}/bigdata-rdf/src" />
+      </copy>
+      <copy toDir="${build.dir}/bigdata-sails/src">
+        <fileset dir="${bigdata.dir}/bigdata-sails/src" />
+      </copy>
+      <copy toDir="${build.dir}/ctc-striterators/src">
+        <fileset dir="${bigdata.dir}/ctc-striterators/src" />
+      </copy>
+      <copy toDir="${build.dir}/lgpl-utils/src">
+        <fileset dir="${bigdata.dir}/lgpl-utils/src" />
+      </copy>
+
+      <!-- stage library dependencies. -->
+      <mkdir dir="${build.dir}/bigdata/lib" />
+      <copy toDir="${build.dir}/bigdata/lib">
+        <fileset dir="${bigdata.dir}/bigdata/lib" />
+      </copy>
+      <mkdir dir="${build.dir}/bigdata-jini/lib" />
+      <copy toDir="${build.dir}/bigdata-jini/lib">
+        <fileset dir="${bigdata.dir}/bigdata-jini/lib" />
+      </copy>
+      <mkdir dir="${build.dir}/bigdata-rdf/lib" />
+      <copy toDir="${build.dir}/bigdata-rdf/lib">
+        <fileset dir="${bigdata.dir}/bigdata-rdf/lib" />
+      </copy>
+      <mkdir dir="${build.dir}/bigdata-sails/lib" />
+      <copy toDir="${build.dir}/bigdata-sails/lib">
+        <fileset dir="${bigdata.dir}/bigdata-sails/lib" />
+      </copy>
+
+      <mkdir dir="${build.dir}/src" />
+      <mkdir dir="${build.dir}/src/resources" />
+      <mkdir dir="${build.dir}/src/resources/config" />
+      <copy toDir="${build.dir}/src/resources/config">
+        <fileset dir="${bigdata.dir}/src/resources/config" />
+      </copy>
+
+      <mkdir dir="${build.dir}/src/resources/scripts" />
+      <copy toDir="${build.dir}/src/resources/scripts">
+        <fileset dir="${bigdata.dir}/src/resources/scripts" />
+      </copy>
+
+      <!-- Stage all analysis tools (queries directory is required for extractCounters.sh) -->
+      <mkdir dir="${build.dir}/src/resources/analysis" />
+      <copy toDir="${build.dir}/src/resources/analysis">
+        <fileset dir="${bigdata.dir}/src/resources/analysis" />
+      </copy>
+
+      <copy tofile="${build.dir}/build.properties" file="build.properties" />
+      <copy tofile="${build.dir}/build.xml" file="build.xml" />
+      <copy tofile="${build.dir}/LICENSE.txt" file="LICENSE.txt" />
+      <copy tofile="${build.dir}/overview.html" file="overview.html" />
+      <copy tofile="${build.dir}/README-JINI" file="README-JINI" />
+      <copy toDir="${build.dir}/LEGAL" flatten="true">
+        <fileset dir="${bigdata.dir}">
+          <include name="**/LEGAL/*" />
+        </fileset>
+      </copy>
+    </target>
+
+	<!--
+	Generate DIST.${version}.tgz - This is basically a tarball containing the
+	entire source distribution.
+	-->
+    <target name="ant-install-artifact" depends="deploy-artifact, ant-install-prepare"
+            description="Create complete source tar file for ant based install.">
+
+      <mkdir dir="${release.dir}" />
+      <tar destfile="${bigdata.dir}/DIST.${version}.tgz" compression="gzip">
+        <tarfileset dir="${build.dir}" prefix="${version}">
+          <include name="build.properties" />
+          <include name="build.xml" />
+          <include name="LICENSE.txt" />
+          <include name="overview.html" />
+          <include name="README-JINI" />
+          <include name="LEGAL/*" />
+
+          <include name="bigdata/src/**" />
+          <include name="bigdata-jini/src/**" />
+          <include name="bigdata-rdf/src/**" />
+          <include name="bigdata-sails/src/**" />
+          <include name="ctc-striterators/src/**" />
+          <include name="lgpl-utils/src/**" />
+          <include name="bigdata/lib/**" />
+          <include name="bigdata-jini/lib/**" />
+          <include name="bigdata-rdf/lib/**" />
+          <include name="bigdata-sails/lib/**" />
+          <include name="src/**" />
+          <exclude name="classes/**" />
+          <exclude name="${version}.jar" />
+          <exclude name="lib/**" />
+          <exclude name="docs/**" />
+
+          <exclude name="dist/bigdata/**" />
+
+          <exclude name="dist/bigdata/bin/disco-tool" />
+          <exclude name="dist/bigdata/bin/pstart" />
+        </tarfileset>
+
+        <!-- Add dist files separately, minus scripts -->
+
+        <tarfileset dir="${bigdata.dir}" prefix="${version}">
+          <include name="dist/bigdata/**" />
+          <exclude name="dist/bigdata/bin/disco-tool" />
+          <exclude name="dist/bigdata/bin/pstart" />
+        </tarfileset>
+
+        <!-- Add dist scripts separately, making them executable -->
+
+        <tarfileset dir="${bigdata.dir}" prefix="${version}" filemode="755">
+          <include name="dist/bigdata/bin/disco-tool" />
+          <include name="dist/bigdata/bin/pstart" />
+        </tarfileset>
+      </tar>
+
+    </target>
+
+    <target name="ant-install" depends="jar, banner, bundle" description="Ant based install on a node.">
+      <mkdir dir="${NAS}" />
+      <mkdir dir="${LAS}" />
+      <chmod perm="ug+rw,o-rw">
+        <fileset dir="${NAS}" />
+      </chmod>
+      <chmod perm="ug+rw,o-rw">
+        <fileset dir="${LAS}" />
+      </chmod>
+      <mkdir dir="${install.config.dir}" />
+      <mkdir dir="${install.doc.dir}" />
+      <mkdir dir="${install.lib.dir}" />
+      <mkdir dir="${install.bin.dir}" />
+      <mkdir dir="${install.log.dir}" />
+      <mkdir dir="${install.dist.dir}" />
+      <copy toDir="${install.config.dir}">
+        <fileset dir="${bigdata.dir}/src/resources/config" />
+      </copy>
+      <copy toDir="${install.doc.dir}">
+        <fileset dir="${bigdata.dir}">
+          <include name="LICENSE.txt" />
+          <include name="overview.html" />
+          <include name="README-JINI" />
+          <include name="bigdata/LEGAL/*" />
+          <include name="bigdata-jini/LEGAL/*" />
+          <include name="bigdata-rdf/LEGAL/*" />
+          <include name="bigdata-sails/LEGAL/*" />
+        </fileset>
+      </copy>
+
+      <copy toDir="${install.lib.dir}">
+        <fileset dir="${build.dir}/lib" />
+        <fileset file="${build.dir}/${version}.jar" />
+      </copy>
+
+      <copy toDir="${install.bin.dir}">
+        <fileset dir="src/resources/scripts" />
+      </copy>
+
+      <copy toDir="${install.dist.dir}">
+        <fileset dir="${bigdata.dir}/dist">
+          <include name="bigdata/**" />
+        </fileset>
+      </copy>
+
+      <!-- parameter substitution. -->
+      <property name="myclasspath" refid="install.classpath" />
+      <replace dir="${install.bin.dir}" summary="true">
+        <replacefilter token="@FED@" value="${FED}" />
+        <replacefilter token="@NAS@" value="${NAS}" />
+        <replacefilter token="@LAS@" value="${LAS}" />
+        <replacefilter token="@JAVA_HOME@" value="${JAVA_HOME}" />
+        <replacefilter token="@JINI_CLASS_SERVER_PORT@" value="${JINI_CLASS_SERVER_PORT}" />
+        <replacefilter token="@LOAD_BALANCER_PORT@" value="${LOAD_BALANCER_PORT}" />
+        <replacefilter token="@SYSSTAT_HOME@" value="${SYSSTAT_HOME}" />
+        <replacefilter token="@USE_NIO@" value="${USE_NIO}" />
+        <replacefilter token="@BIN_DIR@" value="${install.bin.dir}" />
+        <replacefilter token="@LIB_DIR@" value="${install.lib.dir}" />
+        <replacefilter token="@LOG_DIR@" value="${install.log.dir}" />
+        <replacefilter token="@CONFIG_DIR@" value="${install.config.dir}" />
+        <replacefilter token="@INSTALL_USER@" value="${install.user}" />
+        <replacefilter token="@INSTALL_GROUP@" value="${install.group}" />
+        <replacefilter token="@LOCK_FILE@" value="${LOCK_FILE}" />
+        <replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}" />
+        <replacefilter token="@JINI_CONFIG@" value="${jini.config}" />
+        <replacefilter token="@POLICY_FILE@" value="${policyFile}" />
+        <replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
+        <replacefilter token="@LOG4J_SOCKET_LOGGER_PORT@" value="${LOG4J_SOCKET_LOGGER_PORT}" />
+        <replacefilter token="@LOG4J_SOCKET_LOGGER_CONFIG@" value="${log4jServer.config}" />
+        <replacefilter token="@LOG4J_DATE_PATTERN@" value="${LOG4J_DATE_PATTERN}" />
+        <replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}" />
+        <replacefilter token="@LOGGING_CONFIG@" value="${logging.config}" />
+        <replacefilter token="@ERROR_LOG@" value="${errorLog}" />
+        <replacefilter token="@DETAIL_LOG@" value="${detailLog}" />
+        <replacefilter token="@EVENT_LOG@" value="${eventLog}" />
+        <replacefilter token="@RULE_LOG@" value="${ruleLog}" />
+        <replacefilter token="@STATE_LOG@" value="${stateLog}" />
+        <replacefilter token="@STATE_FILE@" value="${stateFile}" />
+        <replacefilter token="@FORCE_KILL_ALL@" value="${forceKillAll}" />
+        <replacefilter token="@NTP_MASTER@" value="${NTP_MASTER}" />
+        <replacefilter token="@NTP_NETWORK@" value="${NTP_NETWORK}" />
+        <replacefilter token="@NTP_NETMASK@" value="${NTP_NETMASK}" />
+        <replacefilter token="@CLASSPATH@" value="${myclasspath}" />
+      </replace>
+
+      <replace dir="${install.config.dir}" summary="true">
+        <replacefilter token="@FED@" value="${FED}" />
+        <replacefilter token="@NAS@" value="${NAS}" />
+        <replacefilter token="@LAS@" value="${LAS}" />
+        <replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
+        <replacefilter token="@JAVA_HOME@" value="${JAVA_HOME}" />
+        <replacefilter token="@JINI_CLASS_SERVER_PORT@" value="${JINI_CLASS_SERVER_PORT}" />
+        <replacefilter token="@LOAD_BALANCER_PORT@" value="${LOAD_BALANCER_PORT}" />
+        <replacefilter token="@SYSSTAT_HOME@" value="${SYSSTAT_HOME}" />
+        <replacefilter token="@USE_NIO@" value="${USE_NIO}" />
+        <replacefilter token="@BIN_DIR@" value="${install.bin.dir}" />
+        <replacefilter token="@LIB_DIR@" value="${install.lib.dir}" />
+        <replacefilter token="@LOG_DIR@" value="${install.log.dir}" />
+        <replacefilter token="@CONFIG_DIR@" value="${install.config.dir}" />
+        <replacefilter token="@INSTALL_USER@" value="${install.user}" />
+        <replacefilter token="@INSTALL_GROUP@" value="${install.group}" />
+        <replacefilter token="@LOCK_FILE@" value="${LOCK_FILE}" />
+        <replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}" />
+        <replacefilter token="@JINI_CONFIG@" value="${jini.config}" />
+        <replacefilter token="@POLICY_FILE@" value="${policyFile}" />
+        <replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
+        <replacefilter token="@LOG4J_SOCKET_LOGGER_PORT@" value="${LOG4J_SOCKET_LOGGER_PORT}" />
+        <replacefilter token="@LOG4J_SOCKET_LOGGER_CONFIG@" value="${log4jServer.config}" />
+        <replacefilter token="@LOG4J_DATE_PATTERN@" value="${LOG4J_DATE_PATTERN}" />
+        <replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}" />
+        <replacefilter token="@LOGGING_CONFIG@" value="${logging.config}" />
+        <replacefilter token="@ERROR_LOG@" value="${errorLog}" />
+        <replacefilter token="@DETAIL_LOG@" value="${detailLog}" />
+        <replacefilter token="@EVENT_LOG@" value="${eventLog}" />
+        <replacefilter token="@RULE_LOG@" value="${ruleLog}" />
+        <replacefilter token="@STATE_LOG@" value="${stateLog}" />
+        <replacefilter token="@STATE_FILE@" value="${stateFile}" />
+        <replacefilter token="@FORCE_KILL_ALL@" value="${forceKillAll}" />
+        <replacefilter token="@NTP_MASTER@" value="${NTP_MASTER}" />
+        <replacefilter token="@NTP_NETWORK@" value="${NTP_NETWORK}" />
+        <replacefilter token="@NTP_NETMASK@" value="${NTP_NETMASK}" />
+        <replacefilter token="@CLASSPATH@" value="${myclasspath}" />
+        <!-- updates the configuration file to locate the lubm ontology. -->
+        <replacefilter token="@install.lubm.config.dir@" value="${install.lubm.config.dir}" />
+      </replace>
+
+      <!-- fix newlines (otherwise substitutions cause things to break). -->
+      <fixcrlf srcDir="${install.config.dir}" />
+      <fixcrlf srcDir="${install.bin.dir}" />
+
+      <!-- set execute bit for scripts in this directory (must be the last step). -->
+      <chmod perm="u+x,g+rx,o-rwx">
+        <fileset dir="${install.bin.dir}">
+          <exclude name="README" />
+          <exclude name="POST-INSTALL" />
+        </fileset>
+      </chmod>
+
+      <!-- Setup the status file which will be read by the bigdata script and
+           the log on which that script will write its output.  This is used
+           if cron, or a similar process, will execute the script on a periodic
+           basis.  The initial state is always 'status'.  The initial stateLog
+           is always empty.  The state file must be readable by the group, but
+           could be restricted to write by a specific user. The stateLog must be
+           read/write for the group. -->
+
+<echo file="${stateFile}">status</echo>
+<echo file="${stateLog}">
+</echo>
+
+      <chmod perm="g+rw,o-rw" file="${stateFile}" />
+      <chmod perm="g+rw,o-rw" file="${stateLog}" />
+
+      <!-- Make sure that the entire shared directory structure is read/write for the group. -->
+      <chmod perm="g+rwx" type="both" dir="${NAS}" verbose="true" />
+
+<!-- Make sure that it is all accessible to the install group (ant 1.6+ plus extension module required). 
+      <chown file="${NAS}" type="both" owner="${install.user}.${install.group}" verbose="true" />
+-->
+
+      <!-- Works for earlier versions of ant LT 1.6 which do not bundle "chown". -->
+      <apply executable="chown" description="set owner on NAS files" os="Linux">
+        <arg value="-R" />
+        <arg value="${install.user}.${install.group}" />
+        <dirset dir="${NAS}" />
+      </apply>
+
+      <!-- @todo check the installed configuration file (after parameter substitution). -->
+      <!-- @todo also check the installed jini configuration files. -->
+      <java classname="com.bigdata.jini.util.CheckConfiguration"
+            failonerror="true" fork="true" logerror="true">
+            <classpath refid="install.classpath" />
+            <arg value="${bigdata.config}" />
+      </java>
+
+      <loadfile property="postInstallMessage" srcFile="${install.bin.dir}/POST-INSTALL" />
+
+<echo>
+
+${postInstallMessage}</echo>
+
+    </target>
+
+    <!--                                                    -->
+    <!--                    UNIT TESTS                      -->
+    <!--                                                    -->
+    <target name="testCompile"
+            description="compiles the test source and generates the appropriate jar files."
+            depends="stage">
+
+      <property name="classes.dir" location="${bigdata.dir}/${build.dir}/classes" />
+
+      <!-- Some of the tests look for build.properties in the user's  -->
+      <!-- home directory, so must copy it from its location in the   -->
+      <!-- codebase to that home directory.                           -->
+
+      <property name="build.properties.test.to.path" location="${user.home}" />
+      <property name="build.properties.test.to.file" location="${build.properties.test.to.path}/build.properties" />
+
+      <!-- Want value (not location) for relative paths to log4j      -->
+      <!-- config file so the junit classloader will search for that  -->
+      <!-- file on the classpath. Thus, use location (instead of      -->
+      <!-- value) for absolute paths so fully-qualified paths are     -->
+      <!-- used when copying that file under the classes dir.         -->
+
+      <property name="bigdata.test.log4j.rel.path" value="resources/logging" />
+      <property name="bigdata.test.log4j.rel" value="${bigdata.test.log4j.rel.path}/log4j.properties" />
+
+      <property name="bigdata.test.log4j.abs.path" location="${classes.dir}/test/${bigdata.test.log4j.rel.path}" />
+      <property name="bigdata.test.log4j.abs" location="${bigdata.test.log4j.abs.path}/log4j.properties" />
+
+      <!-- Version-specific jar files that are only needed when       -->
+      <!-- running the tests. When a new version of one of these jars -->
+      <!-- is available, change the corresponding property value set  -->
+      <!-- below.                                                     -->
+
+      <property name="junit.jar" location="${bigdata.lib}/junit-3.8.1.jar" />
+      <property name="junit-ext.jar" location="${bigdata.lib}/junit-ext-1.1-b3-dev.jar" />
+      <property name="sesame-sparql-test.jar" location="${bigdata-sails.lib}/sesame-sparql-testsuite-2.3.0.jar" />
+      <property name="sesame-store-test.jar" location="${bigdata-sails.lib}/sesame-store-testsuite-2.3.0.jar" />
+
+      <property name="classes.test.dir" location="${classes.dir}/test" />
+      <mkdir dir="${classes.test.dir}" />
+
+      <property name="bigdata-test.lib" location="${bigdata.dir}/bigdata-test/lib" />
+      <mkdir dir="${bigdata-test.lib}" />
+      <property name="bigdata-test.jar" location="${bigdata-test.lib}/bigdata-test.jar" />
+
+      <property name="javac.test.classpath" value="${classes.dir}${path.separator}${junit.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar" />
+
+      <echo>javac
+</echo>
+      <echo>    javac.test.classpath="${javac.test.classpath}"
+</echo>
+      <echo>    destdir="${classes.test.dir}"
+</echo>
+      <echo>    fork="yes"
+</echo>
+      <echo>    debug="yes"
+</echo>
+      <echo>    debuglevel="${javac.debuglevel}"
+</echo>
+      <echo>    deprecation="no"
+</echo>
+      <echo>    nowarn="no"
+</echo>
+      <echo>    source="1.5"
+</echo>
+      <echo>    target="1.5"
+</echo>
+      <echo>    verbose="${javac.verbose}"
+</echo>
+
+      <javac fork="yes"
+             debug="yes"
+             debuglevel="${javac.debuglevel}"
+             deprecation="no"
+             destdir="${classes.test.dir}"
+             nowarn="no"
+             source="1.5"
+             target="1.5"
+             classpath="${javac.test.classpath}"
+             verbose="${javac.verbose}"
+      		 includeantruntime="false"
+      	>
+
+        <src path="${bigdata.dir}/bigdata/src/test" />
+        <src path="${bigdata.dir}/bigdata-jini/src/test" />
+        <src path="${bigdata.dir}/bigdata-rdf/src/test" />
+        <src path="${bigdata.dir}/bigdata-sails/src/test" />
+        <src path="${bigdata.dir}/ctc-striterators/src/test" />
+<!--
+        <src path="${bigdata.dir}/bigdata-gom/src/test" />
+-->
+        <compilerarg value="-version" />
+      </javac>
+
+      <!-- Make logging config file available to test framework -->
+
+      <delete file="${bigdata.test.log4j.abs}" quiet="true" />
+      <copy file="${dist.var.config.logging}/log4j.properties"
+            todir="${bigdata.test.log4j.abs.path}" />
+
+      <!-- Generate bigdata-test.jar file -->
+
+      <delete file="${bigdata-test.jar}" quiet="true" />
+      <jar destfile="${bigdata-test.jar}" index="false">
+        <manifest>
+          <attribute name="Manifest-Version" value="1.0" />
+        </manifest>
+
+        <fileset dir="${classes.test.dir}">
+          <include name="**/*.class" />
+          <include name="**/log4j*.properties" />
+        </fileset>
+<!--
+        <fileset dir="${bigdata.dir}/bigdata/src/test">
+          <include name="**/*.csv" />
+          <include name="**/*.xml" />
+          <include name="**/*.dtd" />
+        </fileset>
+
+        <fileset dir="${bigdata.dir}/bigdata-rdf/src/test">
+          <include name="**/*.rdf" />
+        </fileset>
+
+        <fileset dir="${bigdata.dir}">
+          <include name="**/*.owl" />
+        </fileset>
+-->
+        <fileset dir="${bigdata.dir}/bigdata/src/test">
+          <exclude name="**/*.java" />
+        </fileset>
+        <fileset dir="${bigdata.dir}/bigdata-rdf/src/test">
+          <exclude name="**/*.java" />
+        </fileset>
+        <fileset dir="${bigdata.dir}/bigdata-sails/src/test">
+          <exclude name="**/*.java" />
+        </fileset>
+        <fileset dir="${bigdata.dir}/bigdata-jini/src/test">
+          <exclude name="**/*.java" />
+        </fileset>
+      	
+      </jar>
+
+      <!-- Generate lookupstarter.jar file -->
+
+      <delete file="${bigdata-test.lib}/lookupstarter.jar" quiet="true" />
+      <jar destfile="${bigdata-test.lib}/lookupstarter.jar" index="false">
+        <manifest>
+          <attribute name="Manifest-Version" value="1.0" />
+          <attribute name="Class-Path" value="log4j.jar jsk-platform.jar jsk-lib.jar start.jar bigdata.jar" />
+          <attribute name="Main-Class" value="com.bigdata.service.jini.util.LookupStarter" />
+        </manifest>
+
+        <fileset dir="${classes.test.dir}">
+          <include name="**/LookupStarter*.class" />
+          <include name="**/LogUtil.class" />
+          <include name="**/NicUtil.class" />
+          <include name="**/log4j.properties" />
+        </fileset>
+      </jar>
+
+      <!-- For manifest Class-Path to be visible to lookupstarter.jar -->
+      <!-- the referenced jar files must be in or under the same      -->
+      <!-- directory as lookupstarter.jar itself; which is created    -->
+      <!-- in ${bigdata-test.lib}. Thus, the required jar files are   -->
+      <!-- copied into that directory.                                -->
+
+      <delete file="${bigdata-test.lib}/log4j.jar" quiet="true" />
+      <delete file="${bigdata-test.lib}/jsk-platform.jar" quiet="true" />
+      <delete file="${bigdata-test.lib}/jsk-lib.jar" quiet="true" />
+      <delete file="${bigdata-test.lib}/start.jar" quiet="true" />
+      <delete file="${bigdata-test.lib}/bigdata.jar" quiet="true" />
+
+      <copy file="${dist.lib}/log4j.jar"
+            todir="${bigdata-test.lib}" />
+      <copy file="${dist.lib}/jsk-platform.jar"
+            todir="${bigdata-test.lib}" />
+      <copy file="${dist.lib}/jsk-lib.jar"
+            todir="${bigdata-test.lib}" />
+      <copy file="${dist.lib}/start.jar"
+            todir="${bigdata-test.lib}" />
+      <copy file="${dist.lib}/bigdata.jar"
+            todir="${bigdata-test.lib}" />
+    </target>
+
+    <target name="junit"
+            description="starts http class server, lookup service, runs junit tests, stops lookup service, stops http class server."
+            depends="testCompile">
+
+      <exec executable="hostname"
+        outputproperty="this.hostname">
+      </exec>
+
+      <property name="app.home" location="${bigdata.dir}" />
+
+      <property name="test.codebase.port" value="23333" />
+      <property name="test.codebase.dir" value="${dist.lib.dl}" />
+      <property name="test.codebase" value="http://${this.hostname}:${test.codebase.port}/jsk-dl.jar" />
+
+      <!-- These zookeeper configuration properties used to inform the test -->
+      <!-- suite about the zookeeper instance which will be used by the     -->
+      <!-- tests. These properties MUST be consistent with the actual       -->
+      <!-- zookeeper configuration.  Zookeeper is assumed (by the tests) to -->
+      <!-- be running on the localhost.                                     -->
+      <property name="test.zookeeper.tickTime" value="${test.zookeeper.tickTime}" />
+      <property name="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />
+
+      <!-- The zookeeper install directory. -->
+      <property name="test.zookeeper.installDir" value="${zookeeper.installDir}" />
+
+      <property name="java.security.policy" value="${dist.var.config.policy}/policy.all" />
+      <property name="log4j.configuration" value="${bigdata.test.log4j.rel}" />
+      <property name="java.net.preferIPv4Stack" value="true" />
+      <property name="bigdata.fedname" value="bigdata.test.group-${this.hostname}" />
+
+      <delete file="${build.properties.test.to.file}" quiet="true" />
+      <copy file="${build.properties.from.file}"
+            todir="${build.properties.test.to.path}" />
+
+      <!-- Issue stop on zookeeper first since zkServer leaves a pid file   -->
+      <!-- around if the JVM is killed. That pid file needs to be cleaned   -->
+      <!-- up before we can start a new instance.                           -->
+      <!--
+      <antcall target="stopZookeeper"/>
+      <antcall target="stopLookup" />
+      <antcall target="stopHttpd" />
+  	  	
+      <antcall target="startZookeeper"/>
+      <antcall target="startHttpd"/>
+      <antcall target="startLookup"/>
+	  -->
+      <!-- Run the tests -->
+  	  <antcall target="stopTestServices"/>
+  	  <antcall target="startTestServices"/>
+      <antcall target="run-junit" />
+	  <antcall target="stopTestServices"/>
+      <!--
+      <antcall target="stopLookup" />
+      <antcall target="stopHttpd" />
+      <antcall target="stopZookeeper" />
+	  -->
+
+      <!-- This message is noticed by the hudson build and is used to trigger
+           after various after actions. -->
+      <echo>JUNIT RUN COMPLETE</echo>
+    </target>
+
+	<target name="stopTestServices" unless="${skipTestServices}">
+		  <echo message="Stopping test services."/>
+	      <antcall target="stopZookeeper"/>
+	      <antcall target="stopLookup" />
+	      <antcall target="stopHttpd" />
+	</target>
+
+	<target name="startTestServices" unless="${skipTestServices}">
+		  <echo message="Starting test services."/>
+	      <antcall target="startZookeeper"/>
+	      <antcall target="startHttpd"/>
+	      <antcall target="startLookup"/>
+	</target>
+	
+    <target name="startHttpd">
+      <echo>java -jar ${dist.lib}/classserver.jar -verbose -stoppable -port ${test.codebase.port} -dir ${test.codebase.dir}
+</echo>
+      <java jar="${dist.lib}/classserver.jar"
+            fork="true"
+            spawn="true">
+        <arg value="-verbose" />
+        <arg value="-stoppable" />
+        <arg line="-port ${test.codebase.port}" />
+        <arg line="-dir  '${test.codebase.dir}'" />
+      </java>
+    </target>
+
+    <target name="stopHttpd">
+      <echo>java -jar ${dist.lib}/classserver.jar -port ${test.codebase.port} -dir ${test.codebase.dir} -stop
+</echo>
+      <java jar="${dist.lib}/classserver.jar"
+            fork="true"
+            failonerror="true">
+        <arg line="-port ${test.codebase.port}" />
+        <arg line="-dir  '${test.codebase.dir}'" />
+        <arg value="-stop" />
+      </java>
+    </target>
+
+    <target name="startLookup">
+      <echo>java -Dapp.home=${app.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Djava.security.debug=off -Djava.protocol.handler.pkgs=net.jini.url -Dlog4j.configuration=${log4j.configuration} -Dcodebase.port=${test.codebase.port} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.fedname=${bigdata.fedname} -Ddefault.nic=${default.nic} -jar ${bigdata-test.lib}/lookupstarter.jar
+</echo>
+      <echo>
+</echo>
+
+      <java jar="${bigdata-test.lib}/lookupstarter.jar"
+            fork="true"
+            spawn="true">
+        <sysproperty key="app.home" value="${app.home}" />
+        <sysproperty key="jini.lib" value="${dist.lib}" />
+        <sysproperty key="jini.lib.dl" value="${dist.lib.dl}" />
+        <sysproperty key="java.security.policy" value="${java.security.policy}" />
+        <sysproperty key="java.security.debug" value="off" />
+        <sysproperty key="java.protocol.handler.pkgs" value="net.jini.url" />
+        <sysproperty key="log4j.configuration" value="${log4j.configuration}" />
+        <sysproperty key="codebase.port" value="${test.codebase.port}" />
+        <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}" />
+        <sysproperty key="bigdata.fedname" value="${bigdata.fedname}" />
+        <sysproperty key="default.nic" value="${default.nic}" />
+      </java>
+    </target>
+
+    <target name="stopLookup">
+      <echo>java -Dapp.home=${app.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Dlog4j.configuration=${log4j.configuration} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.fedname=${bigdata.fedname} -Ddefault.nic=${default.nic} -jar ${bigdata-test.lib}/lookupstarter.jar -stop
+</echo>
+      <echo>
+</echo>
+      <java jar="${bigdata-test.lib}/lookupstarter.jar"
+            fork="true"
+            failonerror="true">
+        <sysproperty key="app.home" value="${app.home}" />
+        <sysproperty key="jini.lib" value="${dist.lib}" />
+        <sysproperty key="jini.lib.dl" value="${dist.lib.dl}" />
+        <sysproperty key="java.security.policy" value="${java.security.policy}" />
+        <sysproperty key="log4j.configuration" value="${log4j.configuration}" />
+        <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}" />
+        <sysproperty key="bigdata.fedname" value="${bigdata.fedname}" />
+        <sysproperty key="default.nic" value="${default.nic}" />
+        <arg value="-stop" />
+      </java>
+    </target>
+
+	<!-- Note: It appears to be necessary to spawn the script which starts -->
+	<!-- zookeeper under some OS platforms (for example, Centos 5.4) even  -->
+	<!-- though it will start without being spawned under others (OSX).    -->
+	<!-- However, this change appears to result in zookeeper not running   -->
+	<!-- so I have backed it out for now.                                  -->
+    <target name="startZookeeper">
+    	<echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
+        <echo>bin/zkServer.(sh|cmd) start
+</echo>
+    	<exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
+    		<arg value="start"/>
+		</exec>
+    	<exec executable="bin/zkServer.cmd" dir="${test.zookeeper.installDir}" logerror="true" osfamily="windows">
+    		<arg value="start"/>
+		</exec>
+    </target>
+
+    <target name="stopZookeeper">
+	<echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
+    <echo>bin/zkServer.(sh|cmd) stop
+</echo>
+	<exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
+		<arg value="stop"/>
+	</exec>
+	<exec executable="bin/zkServer.cmd" dir="${test.zookeeper.installDir}" logerror="true" osfamily="windows">
+		<arg value="stop"/>
+	</exec>
+    </target>
+
+    <!-- runs all junit tests -->
+    <target name="run-junit">
+
+      <path id="run.class.path.id">
+        <pathelement location="${junit.jar}" />
+        <pathelement location="${bigdata-test.jar}" />
+        <pathelement location="${junit-ext.jar}" />
+        <pathelement location="${sesame-sparql-test.jar}" />
+        <pathelement location="${sesame-store-test.jar}" />
+        <pathelement location="${dist.lib}/bigdata.jar" />
+        <pathelement location="${dist.lib}/colt.jar" />
+        <pathelement location="${dist.lib}/highscalelib.jar" />
+        <pathelement location="${dist.lib}/dsiutils.jar" />
+        <pathelement location="${dist.lib}/lgplutils.jar" />
+        <pathelement location="${dist.lib}/fastutil.jar" />
+        <pathelement location="${dist.lib}/icu4j.jar" />
+        <pathelement location="${dist.lib}/icu4j-charset.jar" />
+        <pathelement location="${dist.lib}/iris.jar" />
+        <pathelement location="${dist.lib}/jgrapht.jar" />
+        <pathelement location="${dist.lib}/jsk-lib.jar" />
+        <pathelement location="${dist.lib}/jsk-platform.jar" />
+        <pathelement location="${dist.lib}/start.jar" />
+        <pathelement location="${dist.lib}/reggie.jar" />
+        <pathelement location="${dist.lib}/log4j.jar" />
+        <pathelement location="${dist.lib}/lucene-analyzer.jar" />
+        <pathelement location="${dist.lib}/lucene-core.jar" />
+        <pathelement location="${dist.lib}/openrdf-sesame.jar" />
+        <pathelement location="${dist.lib}/slf4j.jar" />
+        <pathelement location="${dist.lib}/slf4j-log4j.jar" />
+        <pathelement location="${dist.lib}/nxparser.jar" />
+        <pathelement location="${dist.lib}/zookeeper.jar" />
+        <pathelement location="${dist.lib}/jetty-continuation.jar" />
+        <pathelement location="${dist.lib}/jetty-http.jar" />
+        <pathelement location="${dist.lib}/jetty-io.jar" />
+        <pathelement location="${dist.lib}/jetty-server.jar" />
+        <pathelement location="${dist.lib}/jetty-util.jar" />
+        <pathelement location="${dist.lib}/jetty-webapp.jar" />
+        <pathelement location="${dist.lib}/jetty-servlet.jar" />
+        <pathelement location="${dist.lib}/jetty-security.jar" />
+        <pathelement location="${dist.lib}/jetty-xml.jar" />
+        <pathelement location="${dist.lib}/servlet-api.jar" />
+      </path>
+
+      <property name="run.class.path" value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar" />
+
+      <echo>    classpath:    ${run.class.path}
+</echo>
+      <echo>    log4j.config: ${log4j.configuration}
+</echo>
+      <echo>    log4j.abs:    ${bigdata.test.log4j.abs}
+</echo>
+      <echo>    app.home:     ${app.home}
+</echo>
+      <echo>    jini.lib:     ${dist.lib}
+</echo>
+      <echo>    jini.lib.dl:  ${dist.lib.dl}
+</echo>
+      <echo>    policy:       ${java.security.policy}
+</echo>
+      <echo>    default.nic:  ${default.nic}
+</echo>
+      <echo>    hostname:     ${this.hostname}
+</echo>
+      <echo>    preferIPv4:   ${java.net.preferIPv4Stack}
+</echo>
+      <echo>    federation:   ${bigdata.fedname}
+</echo>
+      <echo>    zkClientPort: ${test.zookeeper.clientPort}
+</echo>
+      <echo>    zkTickTime:   ${test.zookeeper.tickTime}
+</echo>
+      <echo>
+</echo>
+
+      <property name="test.results.dir" location="${classes.test.dir}/test-results" />
+      <delete dir="${test.results.dir}" quiet="true" />
+      <mkdir dir="${test.results.dir}" />
+
+      <condition property="testClass" value="${testName}">
+        <isset property="testName" />
+      </condition>
+
+      <!-- Note: timeout is milliseconds per forked JVM if specified. -->
+      <!-- We have some long running unit tests so the timeout needs  -->
+      <!-- to be more than a minute if you do specify this property.  -->
+      <!-- timeout="60000"                                            -->
+      <!--                                                            -->
+      <!-- Note: There are classloader problems with icu4j-charset    -->
+	  <!-- which make forking a JVM a requirement (the problems are   -->
+      <!-- related to the logging setup).                             -->
+ 	  <!-- dir="${classes.dir}" -->
+      <!-- Note: printsummary is either 'on' or 'off' (default).      -->
+      <!-- try reloading="true" and see if we can run w/o forking.    -->
+      <junit printsummary="on"
+      	     haltonfailure="no"
+	     logfailedtests="true"
+	     showoutput="true"
+      	     fork="yes"
+      	     forkmode="once"
+      	     clonevm="true"
+      	>
+
+	<!-- You can set JVM parameters here if fork is enabled.      -->
+	<!-- <jvmarg value="-Djava.compiler=NONE"/> -->
+
+        <formatter type="xml" />
+        <formatter type="brief"/>
+
+        <sysproperty key="java.security.policy" value="${java.security.policy}" />
+        <sysproperty key="java.net.preferIPv4Stack" value="{java.net.preferIPv4Stack}" />
+
+        <sysproperty key="log4j.configuration" value="${log4j.configuration}" />
+<!--
+        <sysproperty key="log4j.debug" value="true" />
+-->
+        <!-- There is at least one service that is started by the test  -->
+        <!-- infrastructure from within program control (zookeeper).    -->
+        <!-- Prior to starting that service, a number of values may be  -->
+        <!-- retrieved from a jini configuration file. To avoid         -->
+        <!-- hard-coding things like absolute paths and version         -->
+        <!-- information in those jini configuration files, the Java    -->
+        <!-- property substitution mechanism is employed to allow one   -->
+        <!-- to set the necessary values in a system property here, in  -->
+        <!-- one place, and then simply reference that system property  -->
+        <!-- in the appropriate places in each configuration file.      -->
+        <!--                                                            -->
+        <!-- For example, prior to starting the zookeeper component,    -->
+        <!-- the entry named 'log4j' is retrieved from a jini config    -->
+        <!-- and the system property '-Dlog4j.configuration' is set to  -->
+        <!-- the value that is retrieved. Because the ant-build/classes -->
+        <!-- directory is not included in the classpath used to start   -->
+        <!-- zookeeper, the relative path value in the                  -->
+        <!-- 'log4j.configuration' system property that is set in       -->
+        <!-- this file cannot be used in the zookeeper component of     -->
+        <!-- the jini config file; rather, the absolute path must be    -->
+        <!-- used. Because of this, the 'log4j.path' system property    -->
+        <!-- is set to the absolute path below; and will be substituted -->
+        <!-- when the 'log4j' entry is retrieved from the config file.  -->
+        <!--                                                            -->
+        <!-- To avoid having to specify a specific jar file versions    -->
+        <!-- for the classpath entry of such a config file, system      -->
+        <!-- properties referencing the absolute paths of the various   -->
+        <!-- versioned jar files referenced above are similarly set.    -->
+        <!-- In this way, when a new version of such a jar is deployed, -->
+        <!-- changing the appropriate property value above is all       -->
+        <!-- that should be required.                                   -->
+
+        <!-- This is a workaround for a JVM bug which can result in a   -->
+        <!-- lost wakeup.  This bug is fixed in JDK1.6.0_18.  However,  -->
+        <!-- JDK1.6.0_18 has other problems which result in segfaults.  -->
+        <!--                                                            -->
+        <!-- http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6822370 -->
+        <jvmarg value="-XX:+UseMembar" />
+        <jvmarg value="-Xmx4G" />
+
+        <sysproperty key="log4j.path" value="${bigdata.test.log4j.abs.path}" />
+
+        <sysproperty key="app.home" value="${app.home}" />
+        <sysproperty key="default.nic" value="${default.nic}" />
+
+        <sysproperty key="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />
+        <sysproperty key="test.zookeeper.tickTime" value="${test.zookeeper.tickTime}" />
+
+        <sysproperty key="classserver.jar" value="${dist.lib}/classserver.jar" />
+        <sysproperty key="colt.jar" value="${dist.lib}/colt.jar" />
+        <sysproperty key="highscalelib.jar" value="${dist.lib}/highscalelib.jar" />
+        <sysproperty key="dsiutils.jar" value="${dist.lib}/dsiutils.jar" />
+        <sysproperty key="lgplutils.jar" value="${dist.lib}/lgplutils.jar" />
+        <sysproperty key="fastutil.jar" value="${dist.lib}/fastutil.jar" />
+        <sysproperty key="icu4j.jar" value="${dist.lib}/icu4j.jar" />
+        <sysproperty key="icu4j-charset.jar" value="${dist.lib}/icu4j-charset.jar" />
+        <sysproperty key="jsk-lib.jar" value="${dist.lib}/jsk-lib.jar" />
+        <sysproperty key="jsk-platform.jar" value="${dist.lib}/jsk-platform.jar" />
+        <sysproperty key="log4j.jar" value="${dist.lib}/log4j.jar" />
+        <sysproperty key="iris.jar" value="${dist.lib}/iris.jar" />
+        <sysproperty key="jgrapht.jar" value="${dist.lib}/jgrapht.jar" />
+        <sysproperty key="openrdf-sesame.jar" value="${dist.lib}/openrdf-sesame.jar" />
+        <sysproperty key="slf4j.jar" value="${dist.lib}/slf4j.jar" />
+        <sysproperty key="nxparser.jar" value="${dist.lib}/nxparser.jar" />
+        <sysproperty key="zookeeper.jar" value="${dist.lib}/zookeeper.jar" />
+        <sysproperty key="jetty-continuation.jar" value="${dist.lib}/jetty-continuation.jar" />
+        <sysproperty key="jetty-http.jar" value="${dist.lib}/jetty-http.jar" />
+        <sysproperty key="jetty-io.jar" value="${dist.lib}/jetty-io.jar" />
+        <sysproperty key="jetty-server.jar" value="${dist.lib}/jetty-server.jar" />
+        <sysproperty key="jetty-util.jar" value="${dist.lib}/jetty-util.jar" />
+        <sysproperty key="jetty-webapp.jar" value="${dist.lib}/jetty-webapp.jar" />
+        <sysproperty key="jetty-servlet.jar" value="${dist.lib}/jetty-servlet.jar" />
+        <sysproperty key="jetty-security.jar" value="${dist.lib}/jetty-security.jar" />
+        <sysproperty key="jetty-xml.jar" value="${dist.lib}/jetty-xml.jar" />
+        <sysproperty key="servlet-api.jar" value="${dist.lib}/servlet-api.jar" />
+
+        <!-- Jini group name -->
+        <sysproperty key="bigdata.fedname" value="${bigdata.fedname}" />
+
+        <classpath refid="run.class.path.id" />
+        <sysproperty key="java.class.path" value="${run.class.path}" />
+
+        <!-- Individual test suite to run when -DtestName is set -->
+        <!-- to the fully-qualified name of the test suite       -->
+        <!-- ant -DtestName=com.bigdata.cache.TestAll junit      -->
+
+        <sysproperty key="testClass" value="${testClass}" />
+        <test name="${testName}" todir="${test.results.dir}" if="testName" />
+
+        <!-- Test suites to run when -DtestName is not set -->
+
+        <test name="cutthecrap.utils.striterators.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.cache.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.io.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.net.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.config.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.util.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.util.concurrent.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.striterator.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.counters.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.rawstore.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.btree.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.concurrent.TestAll" todir="${test.results.dir}" unless="testName" />
+      	<test name="com.bigdata.quorum.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.ha.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.io.writecache.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.journal.TestAll" todir="${test.results.dir}" unless="testName" />
+      	<!-- Performance of this test suite has regressed and needs to be investigated.
+ 	    <test name="com.bigdata.journal.ha.TestAll" todir="${test.results.dir}" unless="testName" />
+      	-->
+        <test name="com.bigdata.resources.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.relation.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.bop.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.relation.rule.eval.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.mdi.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.service.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.bop.fed.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.sparse.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.search.TestAll" todir="${test.results.dir}" unless="testName" />
+        <!-- not suppported yet.
+        <test name="com.bigdata.bfs.TestAll" todir="${test.results.dir}" unless="testName" />
+        -->
+
+        <!-- See https://sourceforge.net/apps/trac/bigdata/ticket/53 -->
+        <test name="com.bigdata.jini.TestAll" todir="${test.results.dir}" unless="testName" />
+
+        <test name="com.bigdata.rdf.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.rdf.sail.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.rdf.sail.webapp.TestAll" todir="${test.results.dir}" unless="testName" />
+
+<!-- All tests.
+        <test name="com.bigdata.TestAll" todir="${test.results.dir}" unless="testName" />
+-->
+      </junit>
+
+      <!-- Clean out the SPARQL test suite unpacked by Sesame. -->
+      <antcall target="clean-sparql-test-suite" />
+
+      <!-- Generate an HTML report. -->
+      <junitreport todir="${test.results.dir}">
+        <fileset dir="${test.results.dir}">
+          <include name="TEST-*.xml" />
+        </fileset>
+        <report format="frames" todir="${test.results.dir}/report" />
+      </junitreport>
+
+      <!-- Archive the generated HTML report. -->
+      <tar destfile="${test.results.dir}/report.tgz" basedir="${test.results.dir}/report" compression="gzip"/>
+
+    </target>
+
+<target name="clean-sparql-test-suite" description="delete the files unpacked by the Sesame SPARQL test suite.">
+<echo>"clearing: ${java.io.tmpdir}/sparql-*"</echo>
+<delete verbose="true">
+	<dirset dir="${java.io.tmpdir}" includes="sparql-*" />
+</delete>
+</target>
+
+<!--                                                                   -->
+<!--                    PERFORMANCE TESTS                              -->
+<!--                                                                   -->
+
+<target name="run-performance-tests" depends="testCompile" description="Runs a variety of performance tests.">
+<!-- Note: This depends on the stage target. -->
+<path id="run.class.path.id">
+	<pathelement location="${junit.jar}" />
+	<pathelement location="${bigdata-test.jar}" />
+	<pathelement location="${junit-ext.jar}" />
+	<pathelement location="${sesame-sparql-test.jar}" />
+	<pathelement location="${sesame-store-test.jar}" />
+	<pathelement location="${dist.lib}/bigdata.jar" />
+	<pathelement location="${dist.lib}/colt.jar" />
+	<pathelement location="${dist.lib}/highscalelib.jar" />
+	<pathelement location="${dist.lib}/dsiutils.jar" />
+	<pathelement location="${dist.lib}/lgplutils.jar" />
+	<pathelement location="${dist.lib}/fastutil.jar" />
+    <pathelement location="${dist.lib}/icu4j.jar" />
+	<pathelement location="${dist.lib}/icu4j-charset.jar" />
+	<pathelement location="${dist.lib}/iris.jar" />
+	<pathelement location="${dist.lib}/jgrapht.jar" />
+	<pathelement location="${dist.lib}/jsk-lib.jar" />
+	<pathelement location="${dist.lib}/jsk-platform.jar" />
+	<pathelement location="${dist.lib}/log4j.jar" />
+	<pathelement location="${dist.lib}/lucene-analyzer.jar" />
+	<pathelement location="${dist.lib}/lucene-core.jar" />
+	<pathelement location="${dist.lib}/openrdf-sesame.jar" />
+	<pathelement location="${dist.lib}/slf4j.jar" />
+	<pathelement location="${dist.lib}/slf4j-log4j.jar" />
+	<pathelement location="${dist.lib}/nxparser.jar" />
+	<pathelement location="${dist.lib}/zookeeper.jar" />
+    <pathelement location="${dist.lib}/jetty-continuation.jar" />
+    <pathelement location="${dist.lib}/jetty-http.jar" />
+    <pathelement location="${dist.lib}/jetty-io.jar" />
+    <pathelement location="${dist.lib}/jetty-server.jar" />
+    <pathelement location="${dist.lib}/jetty-util.jar" />
+    <pathelement location="${dist.lib}/jetty-webapp.jar" />
+    <pathelement location="${dist.lib}/jetty-servlet.jar" />
+    <pathelement location="${dist.lib}/jetty-security.jar" />
+    <pathelement location="${dist.lib}/jetty-xml.jar" />
+    <pathelement location="${dist.lib}/servlet-api.jar" />
+</path>
+<property name="run.class.path" value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar" />
+<!-- Generate the LUBM dataset. 
+		<mkdir dir="${data}"/>
+		<java classname="edu.lehigh.swat.bench.uba.Generator" dir="${data}" fork="yes">
+			<classpath>
+				<path refid="run.class.path.id"/>
+				<pathelement location="${build.dir}/lubm/lib/bigdata-lubm.jar"/>
+			</classpath>
+			<jvmarg value="-server"/>
+			<jvmarg value="-Xmx400m"/>
+			<jvmarg value="-Dlog4j.configuration=file:bigdata/src/resources/logging/log4j-perf-tests.properties"/>
+			<arg value="-subdirs"/>
+			<arg value="-compress"/>
+			<arg value="GZip"/>
+			<arg value="-univ"/>
+			<arg value="50"/>
+			<arg value="-onto"/>
+			<arg value="http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl"/>
+		</java>
+		-->
+<!-- Delete the generated LUBM data set.
+		<delete dir="${data}"/>
+		-->
+<!-- Run the data load, closure and query performance tests. -->
+<copy file="bigdata/src/resources/logging/log4j-perf-tests.properties" todir="${perf.run.dir}" />
+<copy file="bigdata-sails/src/test/com/bigdata/rdf/stress/testLubm.xml" todir="${perf.run.dir}" />
+<java classname="com.bigdata.test.ExperimentDriver" dir="${perf.run.dir}" fork="yes">
+	<classpath refid="run.class.path.id" />
+	<jvmarg value="-server" />
+	<jvmarg value="-Xmx2g" />
+	<!-- Override the temporary directory to the specified run directory. -->
+	<jvmarg value="-Djava.io.tmpdir=${perf.run.dir}" />
+	<jvmarg value="-Dlog4j.configuration=file:log4j-perf-tests.properties" />
+	<jvmarg value="-Dontology=${perf.data.dir}/lubm/univ-bench.owl" />
+	<jvmarg value="-Ddata=${perf.data.dir}/lubm/U50" />
+	<jvmarg value="-Dquery=${perf.data.dir}/lubm/config.query.sparql" />
+	<arg value="testLubm.xml" />
+</java>
+<!-- Copy the results from the performance run @todo w/ append! 
+		
+		Consider an after-action to do that and then delete the perf.run.dir.
+		
+		<copy file="${perf.run.dir}/com.bigdata.rdf.stress.LoadClosureAndQueryTest.exp.csv" todir="."/>
+		-->
+<!-- Delete the runs directory, but FIRST copy out the results (with append).
+		<copy></copy>
+		<delete dir=${perf.run.dir}/>
+		-->
+</target>
+
+<!--                                                                   -->
+<!--                    SESAME SERVER TARGETS                          -->
+<!--                                                                   -->
+
+<target name="install.sesame.server" depends="jar">
+
+<!-- copy resources to Sesame webapp. -->
+<copy toDir="${sesame.server.dir}/WEB-INF/lib" file="${build.dir}/${version}.jar" />
+
+<copy toDir="${sesame.server.dir}/WEB-INF/lib" flatten="true">
+	<fileset dir="${bigdata.dir}/bigdata/lib">
+		<include name="**/*.jar" />
+	</fileset>
+<!-- Jini should not be required for the Sesame WAR.
+	<fileset dir="${bigdata.dir}/bigdata-jini/lib/jini/lib">
+		<include name="jini-core.jar" />
+		<include name="jini-ext.jar" />
+	</fileset>
+	-->
+</copy>
+
+<!-- copy resources to Workbench webapp. -->
+<copy toDir="${workbench.server.dir}/WEB-INF/lib" file="${build.dir}/${version}.jar" />
+
+<copy toDir="${workbench.server.dir}/WEB-INF/lib" flatten="true">
+	<fileset dir="${bigdata.dir}/bigdata/lib">
+		<include name="**/*.jar" />
+	</fileset>
+</copy>
+
+<!-- copy template resources to ADUNA_DATA dir -->
+<copy toDir="${aduna.data.dir}">
+	<fileset dir="${bigdata.dir}/bigdata-sails/src/resources/sesame-server">
+		<include name="templates/**" />
+	</fileset>
+</copy>
+
+<!-- copy bigdata jar to Sesame installation. -->
+<copy toDir="${sesame.dir}/lib" file="${build.dir}/${version}.jar" />
+
+</target>
+
+<path id="samples.build.classpath">
+<pathelement location="${build.dir}/classes" />
+<path refid="build.classpath" />
+</path>
+
+<path id="samples.runtime.classpath">
+<pathelement location="${build.dir}/samples/classes" />
+<path refid="samples.build.classpath" />
+</path>
+
+<target name="samples.compile" depends="compile">
+<mkdir dir="${build.dir}/samples/classes" />
+<javac destdir="${build.dir}/samples/classes"
+	   classpathref="samples.build.classpath"
+	   debug="${javac.debug}"
+	   debuglevel="${javac.debuglevel}"
+	   verbose="${javac.verbose}"
+	   encoding="${javac.encoding}"
+	   includeantruntime="false"
+	>
+	<src path="${bigdata.dir}/bigdata-sails/src/samples" />
+	<compilerarg value="-version" />
+</javac>
+<!-- copy resources. -->
+<copy toDir="${build.dir}/samples/classes">
+	<fileset dir="${bigdata.dir}/bigdata-sails/src/samples">
+		<exclude name="**/*.java" />
+	</fileset>
+</copy>
+</target>
+
+<target name="DemoSesameServer" depends="samples.compile" description="Runs the DemoSesameServer sample code.">
+<java classname="com.bigdata.samples.remoting.DemoSesameServer" failonerror="true" fork="false" logerror="true">
+	<classpath refid="samples.runtime.classpath" />
+	<arg value="http://localhost:8080/openrdf-sesame" />
+	<arg value="bigdata" />
+</java>
+</target>
+
+
+
+</project>

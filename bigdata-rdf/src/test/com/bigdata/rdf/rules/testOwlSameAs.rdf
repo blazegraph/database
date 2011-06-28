@@ -1,0 +1,562 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+	xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+	xmlns:ns5="http://www.w3.org/2002/07/owl#"
+	xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+	xmlns:ns2="http://bigdata.com/foo/system#">
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#e190026e-c1cd-45d2-afd9-b408553d8bb5">
+	<rdfs:label>bigdata</rdfs:label>
+	<ns2:importedFrom>D:\server\jboss-4.2.0.GA\server\default\deploy\foo.sar\foo.war\systap\systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#3d0f8c4a-ad03-4346-a81c-f0162ff297df">
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/foo/docs#aa30df4e-43d5-4acf-9e8b-040812a6a4b7"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#e190026e-c1cd-45d2-afd9-b408553d8bb5">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#Product"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#75293261-5615-4395-a957-a20da461b6d1">
+	<ns2:importedFrom>D:\server\jboss-4.2.0.GA\server\default\deploy\foo.sar\foo.war\systap\systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#3d0f8c4a-ad03-4346-a81c-f0162ff297df">
+	<rdf:type rdf:resource="http://bigdata.com/foo/system#Document"/>
+	<ns2:contentType>text/html</ns2:contentType>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#daf64b64-82b3-4ed4-ba48-8546100e7361">
+	<rdfs:label>cognitive web</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#3d0f8c4a-ad03-4346-a81c-f0162ff297df">
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#164003db-5dc5-46a4-b0ec-d136e7045b1e">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac"/>
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#Product"/>
+	<rdfs:label>bigdata</rdfs:label>
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#e190026e-c1cd-45d2-afd9-b408553d8bb5"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#52e1f2f3-d505-49f0-a607-1f44db1c9e49">
+	<rdf:type rdf:resource="http://bigdata.com/foo/system#Document"/>
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/foo/docs#aa30df4e-43d5-4acf-9e8b-040812a6a4b7"/>
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+	<ns2:contentType>application/rdf+xml</ns2:contentType>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#25a18d39-1375-4a09-b455-b16337117676">
+	<ns2:contentLength>2124</ns2:contentLength>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#348006a2-0336-4a84-8b2f-8b77a291a6b1">
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#25a18d39-1375-4a09-b455-b16337117676">
+	<ns2:contentType>text/html</ns2:contentType>
+	<rdf:type rdf:resource="http://bigdata.com/foo/system#Document"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#e53d81d1-e088-4dc9-b0d8-fe9c2f8809b9">
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#3bbab5b6-4352-4f90-909e-4d9a5cd4c678"/>
+	<rdfs:label>SYSTAP</rdfs:label>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/foo/docs#aa30df4e-43d5-4acf-9e8b-040812a6a4b7"/>
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#CorporateEntity"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#fca17b99-ebaa-4057-aebb-0e299d569e88">
+	<ns2:lexicalForm>utah</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#efe8273f-eca3-4b4a-af38-013faaf59a70">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#CorporateEntity"/>
+	<ns2:lexicalForm>SYSTAP</ns2:lexicalForm>
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#3bbab5b6-4352-4f90-909e-4d9a5cd4c678"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#d403e227-96f2-4d62-9165-3cee93703082">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#Organization"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#51ecb04d-13bc-4ed0-a9f8-65743f728bc6">
+	<ns2:lexicalForm>semantic web</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#d403e227-96f2-4d62-9165-3cee93703082">
+	<ns2:lexicalForm>darden graduate school of business</ns2:lexicalForm>
+	<ns2:importedFrom>D:\server\jboss-4.2.0.GA\server\default\deploy\foo.sar\foo.war\systap\systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#75293261-5615-4395-a957-a20da461b6d1">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#NaturalPerson"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac">
+	<ns2:englishMicroHTMLForm rdf:resource="http://bigdata.com/foo/docs#25a18d39-1375-4a09-b455-b16337117676"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#348006a2-0336-4a84-8b2f-8b77a291a6b1">
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/jobs#f350a885-fa2f-4e6a-a80b-0011bcfb24a8">
+	<ns2:harvestedDocument rdf:resource="http://bigdata.com/foo/docs#aa30df4e-43d5-4acf-9e8b-040812a6a4b7"/>
+	<ns2:jobSeed>http://www.systap.com</ns2:jobSeed>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac">
+	<ns2:contentLength>3564</ns2:contentLength>
+	<ns2:englishTextForm rdf:resource="http://bigdata.com/foo/docs#d429c4f2-48dd-40e3-83f2-09ac14375069"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#3052b449-9105-4a78-b2ba-9d710c1e0da6">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/foo/docs#aa30df4e-43d5-4acf-9e8b-040812a6a4b7"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#c1746b4c-c736-4148-95c6-683d1c1d349e">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#CorporateEntity"/>
+	<ns2:lexicalForm>SYSTAP LLC</ns2:lexicalForm>
+	<rdfs:label>SYSTAP LLC</rdfs:label>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/foo/docs#aa30df4e-43d5-4acf-9e8b-040812a6a4b7"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#d67bf346-6908-4b78-94b8-d3b5e2de360c">
+	<rdfs:label>rdf</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#3052b449-9105-4a78-b2ba-9d710c1e0da6">
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#edc37c42-aaac-4c15-ae9e-4a9ce8923f10"/>
+	<rdfs:label>Intelligence Community</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#d67bf346-6908-4b78-94b8-d3b5e2de360c">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#Technology"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#3f2a511d-33fb-43c2-ad54-69002107d36d">
+	<ns2:lexicalForm>virginia</ns2:lexicalForm>
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#Location"/>
+	<rdfs:label>virginia</rdfs:label>
+	<ns2:importedFrom>D:\server\jboss-4.2.0.GA\server\default\deploy\foo.sar\foo.war\systap\systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#edc37c42-aaac-4c15-ae9e-4a9ce8923f10">
+	<ns2:importedFrom>D:\server\jboss-4.2.0.GA\server\default\deploy\foo.sar\foo.war\systap\systap.csv</ns2:importedFrom>
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#Government"/>
+	<rdfs:label>intelligence community</rdfs:label>
+	<ns2:lexicalForm>intelligence community</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#7171e9bd-0242-44d5-9eb7-a50ad20c5738">
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#51ecb04d-13bc-4ed0-a9f8-65743f728bc6"/>
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#Technology"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#66e5705e-4047-4c3d-b0a4-4deb3bb5b8bf"/>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac"/>
+	<ns2:lexicalForm>Semantic Web</ns2:lexicalForm>
+	<rdfs:label>Semantic Web</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#fca17b99-ebaa-4057-aebb-0e299d569e88">
+	<ns2:importedFrom>D:\server\jboss-4.2.0.GA\server\default\deploy\foo.sar\foo.war\systap\systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#d563b9c8-3efa-438d-adc5-8700a4d8da29">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#NaturalPerson"/>
+	<rdfs:label>Mike Personick</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#d403e227-96f2-4d62-9165-3cee93703082">
+	<rdfs:label>darden graduate school of business</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#b22a3bab-4d44-4a9d-a72e-0a70f6e35ea6">
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#3052b449-9105-4a78-b2ba-9d710c1e0da6"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/jobs#786ad1d5-a70b-4b00-958d-0b275e690378">
+	<ns2:jobName></ns2:jobName>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac">
+	<rdf:type rdf:resource="http://bigdata.com/foo/system#Document"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/jobs#786ad1d5-a70b-4b00-958d-0b275e690378">
+	<rdf:type rdf:resource="http://bigdata.com/foo/system#Job"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#51ecb04d-13bc-4ed0-a9f8-65743f728bc6">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#Technology"/>
+	<ns2:importedFrom>D:\server\jboss-4.2.0.GA\server\default\deploy\foo.sar\foo.war\systap\systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#d3a0f1df-bb05-48b4-ad96-912fdd2a6255">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#Technology"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#51ecb04d-13bc-4ed0-a9f8-65743f728bc6">
+	<rdfs:label>semantic web</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#daf64b64-82b3-4ed4-ba48-8546100e7361">
+	<ns2:importedFrom>D:\server\jboss-4.2.0.GA\server\default\deploy\foo.sar\foo.war\systap\systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#36798e90-e595-4ede-8bb7-853dd099e8ec">
+	<ns2:lexicalForm>Michael Personick</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#01e37e59-f2a7-4c3f-8953-f2305a933663">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#36798e90-e595-4ede-8bb7-853dd099e8ec">
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#b9d93e20-177c-4662-a1a9-d2e6fb9f14a6"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#b22a3bab-4d44-4a9d-a72e-0a70f6e35ea6">
+	<ns2:lexicalForm>Intelligence Community</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#884f2935-d7fa-49c3-bca0-1e27abc3f788">
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#348006a2-0336-4a84-8b2f-8b77a291a6b1">
+	<ns2:contentLength>5928</ns2:contentLength>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#1b80f513-bf27-4546-9a82-e82ade8d4bfe">
+	<ns2:lexicalForm>open source</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#3bbab5b6-4352-4f90-909e-4d9a5cd4c678">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#CorporateEntity"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#b22a3bab-4d44-4a9d-a72e-0a70f6e35ea6">
+	<rdfs:label>Intelligence Community</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#3bbab5b6-4352-4f90-909e-4d9a5cd4c678">
+	<rdfs:label>SYSTAP</rdfs:label>
+	<ns2:importedFrom>D:\server\jboss-4.2.0.GA\server\default\deploy\foo.sar\foo.war\systap\systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#e9adfb23-3bc3-44ac-8b81-6bb57e7913db">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac"/>
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#Technology"/>
+	<ns2:lexicalForm>open source</ns2:lexicalForm>
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#1b80f513-bf27-4546-9a82-e82ade8d4bfe"/>
+	<rdfs:label>open source</rdfs:label>
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#d3a0f1df-bb05-48b4-ad96-912fdd2a6255"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#75293261-5615-4395-a957-a20da461b6d1">
+	<ns2:lexicalForm>Bryan Thompson</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#d3a0f1df-bb05-48b4-ad96-912fdd2a6255">
+	<ns2:lexicalForm>open source</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#75293261-5615-4395-a957-a20da461b6d1">
+	<rdfs:label>Bryan Thompson</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#01e37e59-f2a7-4c3f-8953-f2305a933663">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#CorporateEntity"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/jobs#786ad1d5-a70b-4b00-958d-0b275e690378">
+	<ns2:jobStartTime>11/9/07 3:38:34 PM GMT</ns2:jobStartTime>
+	<ns2:jobSeed>http://www.systap.com/services.htm</ns2:jobSeed>
+	<ns2:harvestedDocument rdf:resource="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac"/>
+	<ns2:jobEndTime>11/9/07 3:38:37 PM GMT</ns2:jobEndTime>
+	<ns2:jobCreatedByUser rdf:resource="http://bigdata.com/foo/user#foo"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#99c512b3-5535-4f1c-b4ae-d12b4332d12b">
+	<ns2:importedFrom>D:\server\jboss-4.2.0.GA\server\default\deploy\foo.sar\foo.war\systap\systap.csv</ns2:importedFrom>
+	<ns2:lexicalForm>science applications international</ns2:lexicalForm>
+	<rdfs:label>science applications international</rdfs:label>
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#CorporateEntity"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#8447ce7b-7352-4cd7-b98a-ca9d57880035">
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+	<ns2:contentType>text/html</ns2:contentType>
+	<ns2:contentLength>5145</ns2:contentLength>
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/foo/docs#aa30df4e-43d5-4acf-9e8b-040812a6a4b7"/>
+	<rdf:type rdf:resource="http://bigdata.com/foo/system#Document"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#fb61fbd7-6d15-4822-84bd-8314096022d0">
+	<ns2:lexicalForm>Bryan B Thompson</ns2:lexicalForm>
+	<rdfs:label>Bryan B Thompson</rdfs:label>
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#NaturalPerson"/>
+	<ns2:importedFrom>D:\server\jboss-4.2.0.GA\server\default\deploy\foo.sar\foo.war\systap\systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac">
+	<ns2:nativeMicroHTMLForm rdf:resource="http://bigdata.com/foo/docs#25a18d39-1375-4a09-b455-b16337117676"/>
+	<ns2:rdfXmlForm rdf:resource="http://bigdata.com/foo/docs#884f2935-d7fa-49c3-bca0-1e27abc3f788"/>
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac"/>
+	<ns2:contentSource>http://www.systap.com/services.htm</ns2:contentSource>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#66e5705e-4047-4c3d-b0a4-4deb3bb5b8bf">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/foo/docs#aa30df4e-43d5-4acf-9e8b-040812a6a4b7"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac">
+	<ns2:contentType>text/html</ns2:contentType>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#d67bf346-6908-4b78-94b8-d3b5e2de360c">
+	<ns2:importedFrom>D:\server\jboss-4.2.0.GA\server\default\deploy\foo.sar\foo.war\systap\systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac">
+	<rdfs:label>services.htm:  SYSTAP services</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#d67bf346-6908-4b78-94b8-d3b5e2de360c">
+	<ns2:lexicalForm>rdf</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#164003db-5dc5-46a4-b0ec-d136e7045b1e">
+	<ns2:lexicalForm>bigdata</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#d429c4f2-48dd-40e3-83f2-09ac14375069">
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#348006a2-0336-4a84-8b2f-8b77a291a6b1">
+	<ns2:contentType>text/html</ns2:contentType>
+	<rdf:type rdf:resource="http://bigdata.com/foo/system#Document"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#25a18d39-1375-4a09-b455-b16337117676">
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#7f930f7d-7e3e-41fd-a129-b747dfa0f281">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#NaturalPerson"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#fca17b99-ebaa-4057-aebb-0e299d569e88">
+	<rdfs:label>utah</rdfs:label>
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#Location"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#daf64b64-82b3-4ed4-ba48-8546100e7361">
+	<ns2:lexicalForm>cognitive web</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#d563b9c8-3efa-438d-adc5-8700a4d8da29">
+	<ns2:importedFrom>D:\server\jboss-4.2.0.GA\server\default\deploy\foo.sar\foo.war\systap\systap.csv</ns2:importedFrom>
+	<ns2:lexicalForm>Mike Personick</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#3bbab5b6-4352-4f90-909e-4d9a5cd4c678">
+	<ns2:lexicalForm>SYSTAP</ns2:lexicalForm>
+	<ns2:lexicalForm>SYSTAP, LLC.</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#aa30df4e-43d5-4acf-9e8b-040812a6a4b7">
+	<ns2:contentSource>http://www.systap.com</ns2:contentSource>
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/foo/docs#aa30df4e-43d5-4acf-9e8b-040812a6a4b7"/>
+	<ns2:contentType>text/html</ns2:contentType>
+	<ns2:nativeTextForm rdf:resource="http://bigdata.com/foo/docs#b4a18c2e-e1f1-44aa-a499-8b1196bbad6f"/>
+	<ns2:englishTextForm rdf:resource="http://bigdata.com/foo/docs#b4a18c2e-e1f1-44aa-a499-8b1196bbad6f"/>
+	<ns2:ingestTimestamp>11/9/07 3:38:19 PM GMT</ns2:ingestTimestamp>
+	<ns2:nativeMicroHTMLForm rdf:resource="http://bigdata.com/foo/docs#3d0f8c4a-ad03-4346-a81c-f0162ff297df"/>
+	<ns2:rdfXmlForm rdf:resource="http://bigdata.com/foo/docs#52e1f2f3-d505-49f0-a607-1f44db1c9e49"/>
+	<ns2:nativeMentionHTMLForm rdf:resource="http://bigdata.com/foo/docs#8447ce7b-7352-4cd7-b98a-ca9d57880035"/>
+	<ns2:englishMicroHTMLForm rdf:resource="http://bigdata.com/foo/docs#3d0f8c4a-ad03-4346-a81c-f0162ff297df"/>
+	<ns2:contentLength>2632</ns2:contentLength>
+	<rdfs:label>www.systap.com:  SYSTAP, LLC</rdfs:label>
+	<ns2:contentEncoding>iso-8859-1</ns2:contentEncoding>
+	<rdf:type rdf:resource="http://bigdata.com/foo/system#Document"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#01e37e59-f2a7-4c3f-8953-f2305a933663">
+	<ns2:lexicalForm>SYSTAP LLC</ns2:lexicalForm>
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#c1746b4c-c736-4148-95c6-683d1c1d349e"/>
+	<rdfs:label>SYSTAP LLC</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/jobs#f350a885-fa2f-4e6a-a80b-0011bcfb24a8">
+	<ns2:jobName></ns2:jobName>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#b4a18c2e-e1f1-44aa-a499-8b1196bbad6f">
+	<rdf:type rdf:resource="http://bigdata.com/foo/system#Document"/>
+	<ns2:contentType>text/plain</ns2:contentType>
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/foo/docs#aa30df4e-43d5-4acf-9e8b-040812a6a4b7"/>
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+	<ns2:contentLength>1227</ns2:contentLength>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#66e5705e-4047-4c3d-b0a4-4deb3bb5b8bf">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#Technology"/>
+	<ns2:lexicalForm>Semantic Web</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#efe8273f-eca3-4b4a-af38-013faaf59a70">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#66e5705e-4047-4c3d-b0a4-4deb3bb5b8bf">
+	<rdfs:label>Semantic Web</rdfs:label>
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#51ecb04d-13bc-4ed0-a9f8-65743f728bc6"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#a229916f-0580-4576-9b1c-fb939d01815e">
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#fc75168f-4e2b-4c04-9f70-3de05432daac"/>
+	<rdfs:label>SAIC</rdfs:label>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/foo/docs#aa30df4e-43d5-4acf-9e8b-040812a6a4b7"/>
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#CorporateEntity"/>
+	<ns2:lexicalForm>SAIC</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#e190026e-c1cd-45d2-afd9-b408553d8bb5">
+	<ns2:lexicalForm>bigdata</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#efe8273f-eca3-4b4a-af38-013faaf59a70">
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#e53d81d1-e088-4dc9-b0d8-fe9c2f8809b9"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#3052b449-9105-4a78-b2ba-9d710c1e0da6">
+	<ns2:lexicalForm>Intelligence Community</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#b22a3bab-4d44-4a9d-a72e-0a70f6e35ea6">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#efe8273f-eca3-4b4a-af38-013faaf59a70">
+	<rdfs:label>SYSTAP</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/jobs#f350a885-fa2f-4e6a-a80b-0011bcfb24a8">
+	<rdf:type rdf:resource="http://bigdata.com/foo/system#Job"/>
+	<ns2:jobEndTime>11/9/07 3:38:20 PM GMT</ns2:jobEndTime>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#25a18d39-1375-4a09-b455-b16337117676">
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/jobs#f350a885-fa2f-4e6a-a80b-0011bcfb24a8">
+	<ns2:jobCreatedByUser rdf:resource="http://bigdata.com/foo/user#foo"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#fc75168f-4e2b-4c04-9f70-3de05432daac">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#CorporateEntity"/>
+	<rdfs:label>SAIC</rdfs:label>
+	<ns2:importedFrom>D:\server\jboss-4.2.0.GA\server\default\deploy\foo.sar\foo.war\systap\systap.csv</ns2:importedFrom>
+	<ns2:lexicalForm>SAIC</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#d429c4f2-48dd-40e3-83f2-09ac14375069">
+	<ns2:contentType>text/plain</ns2:contentType>
+	<ns2:contentLength>2040</ns2:contentLength>
+	<rdf:type rdf:resource="http://bigdata.com/foo/system#Document"/>
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#7f930f7d-7e3e-41fd-a129-b747dfa0f281">
+	<rdfs:label>Bryan Thompson</rdfs:label>
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#75293261-5615-4395-a957-a20da461b6d1"/>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/foo/docs#aa30df4e-43d5-4acf-9e8b-040812a6a4b7"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/jobs#f350a885-fa2f-4e6a-a80b-0011bcfb24a8">
+	<ns2:jobStartTime>11/9/07 3:38:16 PM GMT</ns2:jobStartTime>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#36798e90-e595-4ede-8bb7-853dd099e8ec">
+	<rdfs:label>Michael Personick</rdfs:label>
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#NaturalPerson"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#7f930f7d-7e3e-41fd-a129-b747dfa0f281">
+	<ns2:lexicalForm>Bryan Thompson</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#36798e90-e595-4ede-8bb7-853dd099e8ec">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/foo/docs#aa30df4e-43d5-4acf-9e8b-040812a6a4b7"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#73a85e72-3619-4091-89e8-57e156cf52ac">
+	<ns2:contentEncoding>iso-8859-1</ns2:contentEncoding>
+	<ns2:ingestTimestamp>11/9/07 3:38:37 PM GMT</ns2:ingestTimestamp>
+	<ns2:nativeTextForm rdf:resource="http://bigdata.com/foo/docs#d429c4f2-48dd-40e3-83f2-09ac14375069"/>
+	<ns2:nativeMentionHTMLForm rdf:resource="http://bigdata.com/foo/docs#348006a2-0336-4a84-8b2f-8b77a291a6b1"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#b22a3bab-4d44-4a9d-a72e-0a70f6e35ea6">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#Government"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#daf64b64-82b3-4ed4-ba48-8546100e7361">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#Technology"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#b22a3bab-4d44-4a9d-a72e-0a70f6e35ea6">
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#edc37c42-aaac-4c15-ae9e-4a9ce8923f10"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#3052b449-9105-4a78-b2ba-9d710c1e0da6">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#Government"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#d3a0f1df-bb05-48b4-ad96-912fdd2a6255">
+	<rdfs:label>open source</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#1b80f513-bf27-4546-9a82-e82ade8d4bfe">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#Technology"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#e53d81d1-e088-4dc9-b0d8-fe9c2f8809b9">
+	<ns2:lexicalForm>SYSTAP</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#d3a0f1df-bb05-48b4-ad96-912fdd2a6255">
+	<ns2:importedFrom>D:\server\jboss-4.2.0.GA\server\default\deploy\foo.sar\foo.war\systap\systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#884f2935-d7fa-49c3-bca0-1e27abc3f788">
+	<rdf:type rdf:resource="http://bigdata.com/foo/system#Document"/>
+	<ns2:contentType>application/rdf+xml</ns2:contentType>
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/docs#3d0f8c4a-ad03-4346-a81c-f0162ff297df">
+	<ns2:contentLength>1307</ns2:contentLength>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#b9d93e20-177c-4662-a1a9-d2e6fb9f14a6">
+	<rdf:type rdf:resource="http://bigdata.com/foo/domain#NaturalPerson"/>
+	<rdfs:label>Michael Personick</rdfs:label>
+	<ns2:importedFrom>D:\server\jboss-4.2.0.GA\server\default\deploy\foo.sar\foo.war\systap\systap.csv</ns2:importedFrom>
+	<ns2:lexicalForm>Michael Personick</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/foo/elm#1b80f513-bf27-4546-9a82-e82ade8d4bfe">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/foo/docs#aa30df4e-43d5-4acf-9e8b-040812a6a4b7"/>
+	<rdfs:label>open source</rdfs:label>
+	<ns5:sameAs rdf:resource="http://bigdata.com/foo/elm#d3a0f1df-bb05-48b4-ad96-912fdd2a6255"/>
+</rdf:Description>
+
+</rdf:RDF>

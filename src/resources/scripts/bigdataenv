@@ -1,0 +1,151 @@
+##
+# Sets the environment variables required to run the other scripts in
+# this directory.
+# 
+# Run as "source ./bigdataenv"
+#
+# Note: The original form of this script is a template containing parameters
+# of the form @XXX@ - the value for those parameters are substituted in when
+# the script is installed by ant.  The values to be used are specified in the
+# build.properties file when you run ant.
+#
+
+#
+# The name of the configured bigdata federation instance.
+#
+export FED=@FED@
+
+#
+# A directory on a shared volume that will be used to store JARs, scripts,
+# log files, etc.
+# 
+export NAS=@NAS@
+
+#
+# A directory on a local volume that will be used to store persistent state
+# of bigdata services on each host, including index files, transaction logs,
+# etc.  This directory will be created if it does not exist.  If a bigdata
+# instance is destroyed, then this directory will be destroyed as well.
+#
+export LAS=@LAS@
+
+#
+# The directory where sysstat is installed (open-source package for 
+# reporting on host and process performance counters).
+#
+export SYSSTAT_HOME=@SYSSTAT_HOME@
+
+#
+# The directory where java is installed.
+#
+export JAVA_HOME=@JAVA_HOME@
+
+#
+# The group on all hosts that can read the scripts, read/write the log files, etc.
+#
+export INSTALL_GROUP=@INSTALL_GROUP@
+
+#
+# The main configuration file.  This is a jini-style configuration. The
+# configuration can be stored in a file accessible to all hosts or in a
+# URL.  The value is quoted since it may have a leading file: or httpd: 
+#
+export BIGDATA_CONFIG="@BIGDATA_CONFIG@"
+
+#
+# Optional overrides for that configuration file (per jini).  
+#
+export BIGDATA_CONFIG_OVERRIDES=
+
+#
+# The jini services configuration file.
+#
+export JINI_CONFIG="@JINI_CONFIG@"
+
+#
+# The policy file used to grant permissions for Java services.  The default
+# policy grants ALL permissions.  This makes setup easy but is less secure.
+#
+export BIGDATA_POLICY=@POLICY_FILE@
+
+#
+# Setup the path.
+#
+export PATH=${JAVA_HOME}/bin:@BIN_DIR@:${PATH}
+
+#
+# Setup the classpath.
+#
+export CLASSPATH="@CLASSPATH@"
+
+#
+# Java options used to start utility classes.  The utility classes
+# typically do not have large heap demands.  This does NOT include
+# the CLASSPATH so it is easier to extend the classpath for 3rd
+# party components.
+#
+# Note: The java options for the services are configured in the main
+# configuration file.
+#
+export JAVA_OPTS="-server -ea \
+    -showversion \
+    -Dcom.sun.jini.jeri.tcp.useNIO=@USE_NIO@ \
+    -Djava.security.policy=${BIGDATA_POLICY} \
+    -Dlog4j.configuration=${BIGDATA_LOG4J_CONFIG} \
+    -Djava.util.logging.config.file=${BIGDATA_LOGGING_CONFIG} \
+    -Dcom.bigdata.counters.linux.sysstat.path=${SYSSTAT_HOME} \
+"
+
+#
+# Other things required by the 'bigdata' script.
+#
+# $lockFile - The bigdata subsystem lock file.
+# $pidFile  - The bigdata services manager pid is written on this file.
+# $stateFile  - The runstate for the bigdata services managers is read from this file.
+# 
+export lockFile=@LOCK_FILE@
+export pidFile=${LAS}/pid
+export stateFile=@STATE_FILE@
+
+#
+# Export the location of the libraries, configuration files, etc.
+#
+export binDir=@BIN_DIR@
+export libDir=@LIB_DIR@
+export configDir=@CONFIG_DIR@
+
+##
+# Log and Logger configuration.
+##
+
+# The log4j configuration for the bigdata clients and services.  You MUST
+# edit this configuration and specify WHERE it should write its log files.
+# 
+# This configuration also shows how to setup a simple socket logger. This
+# makes it easy to aggregate log messages from all services in a cluster
+# onto a single host.
+#
+# Note: The log4j.configuration property is a URL.  If you are identifying
+# a file resource use "file:" in front of the filename!
+# 
+# Note: The value is quoted since it may have a leading file: or httpd:
+#
+export BIGDATA_LOG4J_CONFIG="@LOG4J_CONFIG@"
+
+#
+# The java.util.logging configuration file (jini uses java.util.logging).
+#
+export BIGDATA_LOGGING_CONFIG=@LOGGING_CONFIG@
+
+#
+# Location of the various log files.
+# 
+export logDir=@LOG_DIR@
+export ruleLog=@RULE_LOG@
+export eventLog=@EVENT_LOG@
+export errorLog=@ERROR_LOG@
+export detailLog=@DETAIL_LOG@
+export stateLog=@STATE_LOG@
+
+# Option to use "killall -9 java" for 'bigdata destroy'.
+export FORCE_KILL_ALL=@FORCE_KILL_ALL@

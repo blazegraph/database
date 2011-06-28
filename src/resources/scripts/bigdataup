@@ -1,0 +1,93 @@
+#!/bin/bash
+
+##
+# Script brings up the bigdata services on a host.
+#
+
+# Setup the environment.
+cd `dirname $0`
+source ./bigdataenv
+
+# Verify critical environment variables.
+if [ -z "$lockFile" ]; then
+    echo $"`date` : hostname : environment not setup."
+    exit 1;
+fi
+if [ -z "$pidFile" ]; then
+    echo $"`date` : hostname : environment not setup."
+    exit 1;
+fi
+if [ -z "$LAS" ]; then
+    echo $"`date` : hostname : environment not setup."
+    exit 1;
+fi
+if [ -z "$JAVA_OPTS" ]; then
+    echo $"`date` : hostname : environment not setup."
+    exit 1;
+fi
+if [ -z "$CLASSPATH" ]; then
+    echo $"`date` : hostname : environment not setup."
+    exit 1;
+fi
+if [ -z "$BIGDATA_CONFIG" ]; then
+    echo $"`date` : hostname : environment not setup."
+    exit 1;
+fi
+
+if [ -f "$pidFile" ]; then
+    echo $"`date` : `hostname` : process running? $pidFile."
+    exit 1;
+fi
+
+# Create a local directory in which to execute the services and within
+# which they will store their persistent state.  Note: When installed
+# by a normal use the lock file is typically located within this
+# directory so we MUST create the directory (if it does not exist)
+# before attempting to create the lock file.
+
+if [ ! -d "$LAS" ]; then
+    echo $"`date` : `hostname` : creating data directory."
+    mkdir -p "$LAS"
+fi
+
+# Create the subsystem lock file IFF it does not exist.
+lockfile -r 1 -1 "$lockFile"
+if [ 0 != $? ]; then
+    echo $"`date` : `hostname` : could not obtain lock."
+    exit 1;
+fi
+echo $"`date` : `hostname` : created lock file."
+
+# @todo note the pid and look for it before attempting to start the service.
+#
+# Note: Explicitly specify a small heap.
+if [ "@LOG4J_SOCKET_LOGGER_HOST@" == "`hostname`" ]; then
+	echo $"`date` : `hostname` : starting log4j server."
+	java -cp ${CLASSPATH} \
+		-Xmx400m \
+	    org.apache.log4j.net.SimpleSocketServer \
+    	@LOG4J_SOCKET_LOGGER_PORT@ \
+    	@LOG4J_SOCKET_LOGGER_CONFIG@&
+fi
+
+# Start the services manager on this host.
+#
+# Note: This explicitly specifies a small heap for the services manager since
+# it uses very little heap space and we can avoid problems with contention for
+# virtual memory by not permitting JVM defaults to grant this a large maximum
+# heap on machines with lots of RAM.
+#
+java ${JAVA_OPTS} -Xmx400m \
+	 -cp ${CLASSPATH} \
+	 com.bigdata.jini.start.ServicesManagerServer \
+	 ${BIGDATA_CONFIG} ${BIGDATA_CONFIG_OVERRIDES} &
+
+pid=$!
+
+# Save the pid on a file and mark as read-only.
+echo $pid > "$pidFile"
+chmod ugo-w "$pidFile"
+
+echo $"`date` : `hostname` : running : pid=$pid"
+
+exit 0

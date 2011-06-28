@@ -1,0 +1,39 @@
+<html>
+<head>
+<title>Quorums</title>
+</head>
+<body>
+
+<p>
+
+This package defines interfaces and implementations for a quorum of highly
+available services.  Each quorum has a replication factor <em>k</em>, which
+must be an odd integer.  A quorum with <code>k := 1</code> is a singleton
+quorum and is not highly available.  Highly available quorums have
+<code>k := 3</code> or greater. 
+
+</p><p>
+
+Persistent bigdata&reg; services have a <i>lastCommitTime</i> in each root block.
+For the purpose of a highly available service, this timestamp provides a summary
+of the persistent state of the quorum.  When <code>(k+1)/2</code> services in the
+quorum vote for the same lastCommitTime, a simple majority exists and the quorum
+can meet.  The quorum will elect a leader, which will assign a quorum <em>token</em>,
+and followers.  Each quorum token is distinct.  Applications can read and write
+on a quorum while it is met (all writes must be directed to the quorum leader).
+If the quorum breaks, then the token is cleared and operations will fail.
+
+</p>
+
+<p>
+
+A quorum is inherently robust.  Writes are replicated from the leader to the
+followers using a write pipeline so each service in the quorum has the same
+persistent state.  If a service in a highly available quorum fails, the quorum
+will not break (unless the leader fails, in which case the quorum will meet again
+with the remaining services).
+
+</p>
+
+</body>
+</html>

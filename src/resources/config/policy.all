@@ -1,0 +1,5 @@
+/* Note: This policy grants all permissions, which makes setup easy.
+ */
+grant {
+    permission java.security.AllPermission "", "";
+};

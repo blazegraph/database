@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<project name="bigdata-jini">
+
+  <!--                                                           -->
+  <!-- This navigation model is merged into the generated site.  -->
+  <!--                                                           -->
+  <!-- You can also author and reference Anakia (XML) docs using -->
+  <!-- a very similar XML model - in fact the distinctions are   -->
+  <!-- pretty blurry.                                            -->
+  <!--                                                           -->
+  <!-- See http://maven.apache.org/start/anakia.html             -->
+  <!-- See http://maven.apache.org/site.html                     -->
+  <!-- See http://maven.apache.org/reference/plugins/xdoc/       -->
+  <!-- See http://jakarta.apache.org/site/jakarta-site-tags.html -->
+  <!--                                                           -->
+
+  <properties>
+     <author>thompsonbry@users.sourceforge.com</author>
+     <title>bigdata-jini</title>
+  </properties>
+
+  <body>
+
+    <!-- horizontal links at top of page. -->
+    <links>
+      <item name="Javadoc"
+            href="/apidocs/index.html"
+	    />
+    </links>
+
+   <!-- A top-level, hierarchical menu -->
+   <menu name="bigdata">
+     <item name="bigdata"
+           href="http://www.bigdata.com" 
+	    />
+     <item name="sourceforge"
+           href="http://sourceforge.net/projects/bigdata/"
+           img="http://sourceforge.net/sflogo.php?group_id=95673&amp;type=1"
+	    />
+   </menu>
+
+   <!-- Architecture. -->
+   <menu name="Architecture">
+     <item name="Web-published UML (zipped)"
+           href="/architecture/bigdata-published-model.zip"
+	    />
+   </menu>
+
+   <!-- References. -->
+   <!--
+   <menu name="References">
+     <item name="DBCache paper (ACM portal - full text available)"
+           href="http://portal.acm.org/citation.cfm?id=1995"
+	    />
+   </menu>
+	    -->
+
+   <!-- Add the google(tm) search widget.  There is no way to
+        position where this will appear at present. -->
+
+   <search/>
+
+  </body>
+
+</project>

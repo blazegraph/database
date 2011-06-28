@@ -1,0 +1,10 @@
+SELECT p.nr, p.label
+FROM product p, producttypeproduct ptp
+WHERE p.nr=ptp.product
+	AND productType=@ProductType@
+	AND propertyNum1>@x@
+	AND propertyNum3<@y@
+	AND @ProductFeature1@ IN (SELECT productFeature FROM productfeatureproduct WHERE product=p.nr)
+	AND @ProductFeature2@ NOT IN (SELECT productFeature FROM productfeatureproduct WHERE product=p.nr)
+ORDER BY p.label
+LIMIT 10;

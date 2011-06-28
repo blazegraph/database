@@ -1,0 +1,382 @@
+#!/bin/bash
+
+# init.d style script for bigdata services.  The script can be used
+# to 'start' or 'stop' services in a federation; to 'destroy' services
+# and their persistent state (application data), to signal ('hup') the
+# service managers (triggers a configuration push which may cause new
+# services to be started), or to report a 'status' line for each host.
+# 
+# The script can be executed directly on a host, e.g., 'bigdata start'.
+# In order to manage a cluster, this script should be executed by each
+# host in the cluster every 30-60 seconds, depending on how long you want
+# to wait for the hosts to respond to the new state.  This end can be
+# achieved in a number of ways.  For example, the script can be installed
+# as a cron job using the 'file' option to specify the name of a file on a
+# shared volume whose state is the command to be executed (stop, start,
+# destroy, status, etc).
+#
+# In order to converge the hosts on a given state (start, stop, destroy)
+# you must change the state for this command and then wait for all hosts
+# to converge on the new state.
+#
+# This script directly manages the 'services manager' for bigdata services
+# (ServicesManagerServer) along with some log files.  The services manager
+# in turn using a configuration read from a file and stored in shared state
+# within zookeeper to manage the various bigdata services, causing instances
+# of those services to be started on various hosts based on the configured
+# state.
+#
+# There are several child scripts which are executed by this script.  They
+# are:
+#
+# bigdataenv     - setup the environment required by the bigdata scripts.
+# bigdataprecond - verify preconditions for this script.
+# bigdataup      - bring up the bigdata services on a host.
+# bigdatadown    - bring down the bigdata services on a host.
+#
+# Environment:
+#
+# $MASTER - The hostname of the master.
+# $NAS - A directory on a shared volume (log files).
+# $LAS - A directory on a local volume (persistent service state).
+# $pidFile - The bigdata services manager pid is written on this file.
+# $lockFile - The bigdata subsystem lock file, e.g., /var/lock/subsys/bigdata.
+# $ruleLog - The file on which bigdata rule execution statistics are logged.
+# $eventLog - The file on which bigdata events are logged.
+# $errorLog - The file on which log messages at ERROR or above are logged.
+# $detailLog - The file on which log messages at INFO or above (or as configured) are logged.
+# 
+# Misc.
+# 
+# See http://tldp.org/LDP/abs/html/index.html
+#
+# Note: Blank lines are significant in shell scripts.
+#
+# Note: Children must do "exit 0" to indicate success.
+#
+# Note: "lockfile -r 1 -1 '$lockFile'" will create the named lock file
+# atomically iff it does not exist within one second (one retry of one
+# second).  The exit code will be 0 iff it succeeds.  The incantation
+#
+# lockfile -r 1 -1 "$lockFile"; if [ 0 == $? ]; then echo "locked"; fi
+#
+# will echo 'locked' iff the lock was obtained.  The test can be changed
+# to if [ 0 != $? ] to reverse the semantics.
+#
+# Note: when run as root we can use the standard subsystem lock file
+# but not when run as a normal user.
+#
+# Note: Convert DOS cr-lf to unix style in emacs: C-x RET f then unix 
+#
+# @todo rollover the stateLog file.  The log4j log files are rolled over by
+# the log4jServer.properties configuration.
+#
+# @todo could use nc (netcat) to read the argument file a url and thus define
+# a 'url' as well the 'file' option for this script.
+
+# Source function library (just used for 'action').  If you don't have this
+# it SHOULD automatically use the inline definition for "action()".
+if [ -f "/etc/init.d/functions" ]; then
+    . /etc/init.d/functions
+else
+# Run some action. Log its output. No fancy colors. First argument is the
+# label for the log file.  Remaining arguments are the command to execute
+# and its arguments, if any.
+    action() {
+        local STRING rc
+        STRING=$1
+        echo -n "$STRING "
+        shift
+        "$@" && echo -n "[OK]" || echo -n "[FAILED]"
+        rc=$?
+        echo
+        return $rc
+    }
+fi
+
+# Where the scripts live.
+cd `dirname $0`
+
+# Setup the environment.
+source ./bigdataenv
+
+# Lock used for exclusive operations on the log files.
+logLockFile="$logDir/.lock"
+
+# Verify critical environment variables.
+if [ -z "$lockFile" ]; then
+	echo -n $"$0 : environment not setup."
+	exit 1;
+fi
+if [ -z "$pidFile" ]; then
+	echo -n $"$0 : environment not setup."
+	exit 1;
+fi
+
+# The root install needs to chown to root.wheel which it is not
+# doing.  This affects all files created by root, including the
+# directory structure. umask could be used to correct this.  It
+# can also be corrected by "chown -R root.wheel $NAS"
+# 
+# @todo this does not seem to be sufficient.
+#
+# umask -S u=rwx,g=rwx,o=rx
+
+# Verify site-specific preconditions.
+./bigdataprecond
+
+# Create the various log files and set their permissions.
+#
+# Note: this will often result in an error message when the user is
+# not root as some users are not allowed to change the group
+# associated with a file.
+#
+if [ ! -f "$eventLog" -o ! -f "$errorLog" -o ! -f "$detailLog" -o ! -f "$ruleLog" ]; then
+    lockfile -r 1 -1 "$logLockFile"
+    if [ 0 == $? ]; then
+# Event log (where events generated by each service or client get logged).
+	if [ ! -f "$eventLog" ]; then
+	    echo $"`date` : `hostname` : creating event log."
+	    touch $eventLog
+	    chgrp $INSTALL_GROUP $eventLog
+	    chmod g+rw,o-rw $eventLog
+	fi
+# Rule log (rule execution statistics).
+	if [ ! -f "$ruleLog" ]; then
+	    echo $"`date` : `hostname` : creating rule log."
+	    touch $ruleLog
+	    chgrp $INSTALL_GROUP $ruleLog
+	    chmod g+rw,o-rw $ruleLog
+	fi
+# Error log (where ERROR and above is logged by each service or client).
+	if [ ! -f "$errorLog" ]; then
+	    echo $"`date` : `hostname` : creating error log."
+	    touch $errorLog
+	    chgrp $INSTALL_GROUP $errorLog
+	    chmod g+rw,o-rw $errorLog
+	fi
+# Detail log (where INFO and above is logged by each service or client).
+	if [ ! -f "$detailLog" ]; then
+	    echo $"`date` : `hostname` : creating detail log."
+	    touch $detailLog
+	    chgrp $INSTALL_GROUP $detailLog
+	    chmod g+rw,o-rw $detailLog
+	fi
+	rm -f "$logLockFile"
+    else
+	echo $"`date` : `hostname` : could not obtain lock: $logLogFile"
+    fi
+fi
+
+#
+# See how we were called.
+#
+case "$1" in
+    setup)
+#
+# This provides a customizable hook for setting up various things on each
+# host in the cluster.
+#
+	shift
+	action $"`date` : `hostname` : setup" ./bigdatasetup $*
+	;;
+    start)
+#
+# Start the services manager if not running.
+#
+	if [ -f "$lockFile" ]; then
+	    if [ -f "$pidFile" ]; then
+		read pid < "$pidFile"
+		pidno=$( ps ax | grep $pid | awk '{ print $1 }' | grep $pid )
+		if [ -z "$pidno" ]; then
+# The process has died so remove the pid file and the lock file before
+# calling bigdataup.
+		    echo $"`date` : `hostname` : $pid died?"
+		    rm -f "$pidFile"
+		    rm -f "$lockFile"
+		    fi
+	    fi
+	fi
+	if [ ! -f "$lockFile" ]; then
+		action $"`date` : `hostname` : bringing up services: " ./bigdataup
+	fi 
+        ;;
+    stop)
+#
+# Stop the services manager and all child processes.
+#
+	if [ -f "$lockFile" ]; then
+	    action $"`date` : `hostname` : bringing down services: " ./bigdatadown
+	else
+	    echo $"`date` : `hostname` : not running?"
+	fi
+	if [ "$FORCE_KILL_ALL" == "true" ]; then
+# Note: This is a "sure kill" but it does not play nice with other
+# java components.  This option is configured in build.properties
+# and may be overwritten in bigdataenv.
+	    if [ `ps ax | grep java | grep -v grep | wc -l` -ne 0 ]; then
+		echo $"`date` : `hostname` : killing all java processes."
+		echo $"`date` : `hostname` : `ps ax | grep java | grep -v grep`"
+		killall -v -9 java
+	    fi
+	fi
+        ;;
+ destroy)
+#
+# Stop the services manager and all child processes and destroy their
+# persistent state.
+#
+	if [ -f "$lockFile" ]; then
+	    action $"`date` : `hostname` : bringing down services: " ./bigdatadown
+	    rm -f "$lockFile"
+	fi
+	if [ "$FORCE_KILL_ALL" == "true" ]; then
+# Note: This is a "sure kill" but it does not play nice with other
+# java components.  This option is configured in build.properties
+# and may be overwritten in bigdataenv.
+	    if [ `ps ax | grep java | grep -v grep | wc -l` -ne 0 ]; then
+		echo $"`date` : `hostname` : killing all java processes."
+		echo $"`date` : `hostname` : `ps ax | grep java | grep -v grep`"
+		killall -v -9 java
+	    fi
+	fi
+	if [ -d "$LAS" ]; then
+	    echo $"`date` : `hostname` : destroying data."
+	    rm -rf "$LAS"
+	fi
+	if [ -s "$eventLog" -o -s "$errorLog" -o -s "$detailLog" -o -s "$ruleLog" ]; then
+	    lockfile -r 1 -1 "$logLockFile"
+	    if [ 0 == $? ]; then
+#           Granted lock in the log directory so we can rename the log
+#           files.
+		rm -f $detailLog ${detailLog}.* $errorLog ${errorLog}.* $eventLog $eventLog.* $ruleLog $ruleLog.*
+		rm -f "$logLockFile"
+	    fi
+	fi
+        ;;
+    hup)
+#
+# Push the service configuration & restart stopped services.  This 
+# will NOT start the ServicesManager if it is not already running.
+#
+	if [ -f "$lockFile" ]; then
+	    if [ -f "$pidFile" ]; then
+		read pid < "$pidFile"
+		pidno=$( ps ax | grep $pid | awk '{ print $1 }' | grep $pid )
+		if [ -z "$pidno" ]; then
+		    echo $"`date` : `hostname` : process died? pid=$pid."
+		else
+		    ./broadcast_sighup local servicesManager
+		    echo $"`date` : `hostname` : sent SIGHUP pid=$pid."
+		fi
+	    else
+		echo $"`date` : `hostname` : no pid?"
+	    fi
+	else
+	    echo $"`date` : `hostname` : not running."
+	fi	
+	;;
+    status)
+#
+# Report status for the ServicesManager (up or down).
+#
+	if [ -f "$lockFile" ]; then
+	    if [ -f "$pidFile" ]; then
+		read pid < "$pidFile"
+		pidno=$( ps ax | grep $pid | awk '{ print $1 }' | grep $pid )
+		if [ -z "$pidno" ]; then
+		    echo $"`date` : `hostname` : process died? pid=$pid."
+		else
+		    echo $"`date` : `hostname` : running."
+		fi
+	    else
+		echo $"`date` : `hostname` : no pid?"
+	    fi
+	else
+	    echo $"`date` : `hostname` : not running."
+	fi
+	;;
+  ntpSet)
+#
+# Stops ntpd on all hosts except the one which is specified as the
+# ntpd master and cause the date/time on each such host to be set from
+# the ntpd master using ntpdate. Once the clocks are synchronized,
+# change the run state to 'ntpStart' until ntp is running on all
+# hosts.  You can see if the clocks are mostly synchronized just by
+# watching the 'date' output or adding an [ntpdate -q] command to get
+# some exact information.  There are some sample configuration files
+# for ntp which can help you out, but also see the following resources.
+#
+# See http://www.cis.udel.edu/~mills/ntp/html/ntpdate.html
+#
+# See http://www.brennan.id.au/09-Network_Time_Protocol.html
+#
+	if [ -z "@NTP_MASTER@" ]; then
+	    echo $"`date` : `hostname` : ntp commands not enabled."
+	    exit 1;
+	fi
+# Conditionally replace the ntp configuration on the master and clients.  If
+# you need to do this more than once you will have to change the name of the
+# backup file.
+    if [ ! -f /etc/ntp.conf.backup ]; then
+        cp /etc/ntp.conf /etc/ntp.conf.backup
+	    if [ "@NTP_MASTER@" != "`hostname`" ]; then
+   		   cp --backup --update $configDir/ntpd/ntp.conf /etc/ntp.conf
+       else
+   	 	   cp --backup --update $configDir/ntpd/ntp-client.conf /etc/ntp.conf
+        fi
+        chown root.root /etc/ntp.conf
+        chmod u+rw,go+r-wx /etc/ntp.conf
+    fi
+# Uncomment if you need to put everyone into the same timezone.
+# See http://www.cyberciti.biz/faq/howto-linux-unix-change-setup-timezone-tz-variable/
+# See http://www.wikihow.com/Change-the-Timezone-in-Linux
+#   pushd /etc && ln -sf /usr/share/zoneinfo/UTC localtime && popd
+	if [ "@NTP_MASTER@" != "`hostname`" ]; then
+	    action $"`date` : `hostname` : stopping ntpd: " /etc/init.d/ntpd stop
+	    action $"`date` : `hostname` : setting clock: " /usr/sbin/ntpdate "@NTP_MASTER@"
+#	    action $"`date` : `hostname` : clock status " /usr/sbin/ntpdate -q "@NTP_MASTER@"
+	fi
+	;;
+  ntpStart)
+# Starts ntpd on all hosts other except: @NTP_MASTER@
+	if [ -z "@NTP_MASTER@" ]; then
+	    echo $"`date` : `hostname` : ntp commands not enabled."
+	    exit 1;
+	fi
+	if [ "@NTP_MASTER@" != "`hostname`" ]; then
+	    action $"`date` : `hostname` : starting ntpd: " /etc/init.d/ntpd start
+	fi
+	;;
+#    restart)
+# Note: DO NOT enable [restart].  It will kill and restart the
+# services each time the script is read so you can not reach a stable
+# state.  Instead, do [stop] until all are stopped (check the log) and
+# then [start] until all are running (again, check the log).
+##        cd "$CWD"
+#	$0 stop
+#	$0 start
+#	;;
+    file)
+#
+# The 'file' option allows the argument to be specified indirectly by 
+# overwriting the contents of the named file. Typically the named file
+# will be located on a shared volume accessible to all hosts and the
+# bigdata script will be run from a cron job ever 30-60 seconds.
+#
+	if [ -z "$2" ]; then
+	    echo "$0 : 'file' option requires additional argument."
+	    exit 1
+	fi
+	read file < "$2"
+	$0 "$file"
+	;;
+    *)
+#
+# Usage
+#
+        echo $"Usage: $0 {start|stop|hup|destroy|status|ntpd|file}"
+        exit 1
+esac
+
+exit 0
