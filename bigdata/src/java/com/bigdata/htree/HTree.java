@@ -2655,7 +2655,7 @@ public class HTree extends AbstractHTree
 			 * the global depth of the child.
 			 */
 			final int localDepth = HTreeUtil.getLocalDepth(htree.addressBits,
-					hashBits, npointers);
+					globalDepth, npointers);
 
 			child = htree
 					.readNodeOrLeaf(addr, localDepth/* globalDepthOfChild */);
