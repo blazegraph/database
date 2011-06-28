@@ -1,0 +1,19 @@
+#!/bin/bash
+if [ ! -e "./generate" ]
+then
+  echo "Please run this script from the exec directory"
+  exit 1
+fi
+if [ $# == 0 ]
+then
+  echo "For generator options type ./generate -help"
+fi
+CP=.
+SEP=':'
+if [ "$(uname)" = "Cygwin" ]; then SEP=';'; fi
+for jar in lib/*.jar
+do
+  if [ ! -e "$jar" ]; then continue; fi
+  CP="$CP$SEP$jar"
+done
+exec java -cp "$CP" -Xmx256M benchmark.generator.Generator "$@"

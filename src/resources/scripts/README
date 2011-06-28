@@ -1,0 +1,79 @@
+This directory contains some scripts which may be useful on a un*x platform.
+
+bigdataenv
+ 
+          The configuration file for the shell environment.  The other
+          scripts in this directory rely on this script to setup their
+          environment.  This is configured by editing the
+          build.properties file before running 'ant install'.  Once
+          installed, you MAY edit the file but be aware that parameter
+          substitution has taken place for files in both this
+          directory and the config directory.
+ 
+bigdata   
+
+		  An init.d style script with start, stop, status, destroy, etc. actions.
+		  In order to start up bigdata on a cluster, this script must be executed
+		  on each machine which will participate in the bigdata federation.  This
+		  can be done in a variety of ways, including cron jobs, puppet, torque,
+		  etc.
+
+	start - Starts a bigdata services manager on the local host.  The services
+			manager will discover services which are already running and will
+			attempt to start any services which may run on the local host based
+			on the current configuration.
+			
+	stop  - Stops the bigdata services manager and any services on the local host
+			which it was managing.  Services which have been stopped may be restarted
+			at a later time.
+			
+  destroy - Destroys the bigdata services manager and any services on the local
+			host which it was manager together with their data.  This action will
+			DESTROY any persistent data associated with those service(s). 
+
+   status - Reports on the run state of the bigdata services manager on the local
+   			host.
+
+      hup - Sends a HUP signal to the services manager.  This will cause a configuration
+            push (the configuration will be read from its file or URL and written into
+            zookeeper) and may cause new services to be started based on the updated
+            configuration.
+
+     file <file>
+          - Reads the desired run state from the specified file.
+
+bigdataup
+bigdatadown 
+bigdataprecond
+bigdatasetup
+          
+          These scripts are invoked automatically by the bigdata script.
+
+crontab.user
+
+		  A sample user crontab.  If installed, it will execute the 'bigdata' script
+		  once per minute specifying the desired run state indirectly using the 'file'
+		  argument and passing @stateFile@ as the file containing the desired run state.
+		  This is not installed by default.
+
+crontab.system
+
+		  A sample system crontab.  If installed, it will execute the 'bigdata' script
+		  once per minute specifying the desired run state indirectly using the 'file'
+		  argument and passing @stateFile@ as the file containing the desired run state.
+		  This is not installed by default.
+
+POST-INSTALL
+
+		  Some notes on how to get started once you have run the 'ant install'
+		  target.
+
+dumpZoo.sh
+
+		  Dumps the zookeeper state onto stdout.
+		  
+counters.sh
+
+          Starts an httpd instance which may be used to view historical or post-
+          mortem performance counters or events logged by bigdata.
+          

@@ -1,0 +1,156 @@
+# queries expressed in SPARQL
+# [query ID]
+# query
+
+#[query0]
+#PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+#PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+#SELECT ?x ?y 
+#WHERE{
+# ?x ub:takesCourse ?y  
+#}
+
+[query1]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x
+WHERE{
+ ?x a ub:GraduateStudent ;
+ 	 ub:takesCourse <http://www.Department0.University0.edu/GraduateCourse0>.
+}
+
+# historically slow for JDS, but fine with the new join.
+[query2]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x ?y ?z
+WHERE{
+	?x a ub:GraduateStudent .
+	?y a ub:University .
+	?z a ub:Department .
+	?x ub:memberOf ?z .
+	?z ub:subOrganizationOf ?y .
+	?x ub:undergraduateDegreeFrom ?y
+}
+
+[query3]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x
+WHERE{
+ ?x a ub:Publication ;
+ 	ub:publicationAuthor <http://www.Department0.University0.edu/AssistantProfessor0> .
+} 	
+
+[query4]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x ?y1 ?y2 ?y3
+WHERE{
+	?x a ub:Professor;
+		ub:worksFor <http://www.Department0.University0.edu>;
+		ub:name ?y1;
+		ub:emailAddress ?y2;
+		ub:telephone ?y3.
+}
+
+[query5]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x
+WHERE{
+	?x a ub:Person ;
+	 ub:memberOf <http://www.Department0.University0.edu> .
+}
+	 
+[query6]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x
+WHERE{
+	?x a ub:Student
+}
+
+[query7]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x ?y
+WHERE{
+	?y a ub:Course .
+	?x a ub:Student ;
+		ub:takesCourse ?y .
+	<http://www.Department0.University0.edu/AssociateProfessor0> ub:teacherOf ?y.
+}
+
+# Historically slow for JDS, but fine with the new join.
+[query8]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x ?y ?z
+WHERE{
+	?y a ub:Department .
+	?x a ub:Student;
+		ub:memberOf ?y .
+	?y ub:subOrganizationOf <http://www.University0.edu> .
+	?x ub:emailAddress ?z .
+}
+
+# 20 secs for LTS on U50, and about 3x that on JDS pipeline queries.
+[query9]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x ?y ?z
+WHERE{
+	?x a ub:Student .
+	?y a ub:Faculty .
+	?z a ub:Course .
+	?x ub:advisor ?y .
+	?y ub:teacherOf ?z .
+	?x ub:takesCourse ?z .
+}
+
+[query10]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x
+WHERE{
+	?x a ub:Student;
+	 ub:takesCourse <http://www.Department0.University0.edu/GraduateCourse0> .
+}
+
+[query11]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x
+WHERE{
+	?x a ub:ResearchGroup;
+		ub:subOrganizationOf <http://www.University0.edu> .
+}
+
+[query12]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x ?y
+WHERE{
+	?x a ub:Chair .
+	?y a ub:Department .
+	?x ub:worksFor ?y .
+	?y ub:subOrganizationOf <http://www.University0.edu> .
+}
+
+[query13]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x
+WHERE{
+	?x a ub:Person .
+	<http://www.University0.edu> ub:hasAlumnus ?x .
+}
+
+[query14]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x
+WHERE{
+	?x a ub:UndergraduateStudent .
+}

@@ -1,0 +1,168 @@
+<project xmlns:ivy="antlib:org.apache.ivy.ant" name="BSBM" default="build">
+
+  <!-- Configuration as a propertied file ? -->
+  <!-- <property file="tdb-build.properties"/> -->
+
+  <!-- ========================================== -->
+  <!-- ==== Configuration -->
+  <property name="Name"             	value="BSBM"/>
+  <property name="name"                 value="bsbm"/>
+
+  <property environment="env"/>
+
+  <!-- The major and minor version numbers  -->
+  <property name="version-major"        value="1"/>
+  <property name="version-minor"        value="0"/>
+  <property name="version-revision"     value="0"/>
+  <property name="version-status"       value=""/>
+  <property name="version"
+            value="${version-major}.${version-minor}.${version-revision}${version-status}"/>
+  
+  <!-- javadoc -->
+  <property name="copyright.text"
+	    value="Copyright &#169; Freie Universitat Berlin"/>
+  <property name="javadoc.packages"     value="benchmark.*"/>
+  
+  <target name="main" depends="jar"/>
+
+  <!-- Sources as a path -->
+  <property name="src.dir"              value="src"/>
+
+  <!-- Source code -->
+  <path id="java.source.path.main">
+    <pathelement path="${src.dir}"/>
+  </path>    
+
+  <path id="java.source.path">
+    <path refid="java.source.path.main"/>
+  </path>
+
+  <!-- Sources as fileset (want path=>fileset to avoid the duplication here) -->
+  <fileset dir="." id="fileset.src">
+    <include name="${src.dir}/**/*.java"/>
+  </fileset>
+
+  <!-- Library code -->
+
+  <!-- Set version from components (if not already set) -->
+  <property    name="version"  
+               value="${version-major}.${version-minor}.${version-revision}${version-status}"/>
+
+  <!-- Artifacts -->
+  <property name="jarfile"                value="${name}.jar"/>
+
+  <property name="javadoc.dir"            value="${doc.dir}/javadoc"/>
+  <property name="javadoc.all.dir"        value="${doc.dir}/javadoc-all"/>
+  <property name="lib.dir"                value="lib"/>
+
+  <property name="build.dir"              value="bin"/>
+  <property name="build.classes.dir"      value="${build.dir}"/>
+
+  <property name="javadoc.title"          value="${Name}"/>
+  <property name="javadoc.window.title"   value="${Name}-${version-major}.${version-minor} Javadoc"/>
+
+  <!-- ========================================== -->
+  <!-- ==== Setup  -->
+  
+  <path id="java.run.class.path">
+    <!-- jar file may, or may not, be in the lib directory -->
+    <fileset dir="${lib.dir}" includes="*.jar" excludes="${jarfile}"/>
+    <fileset dir="${build.dir}" includes="bsbm*.jar"/>
+  </path>
+
+  <tstamp>
+    <format property="build.time.xsd"  pattern="yyyy-MM-dd'T'HH:mm:ssZ"/>
+    <format property="build.time.txt"  pattern="yyyy-MM-dd HH:mm Z"/>
+  </tstamp>
+
+  <!-- <echo message="Build: ${build.time.xsd}"/> -->
+  
+  <filterset id="filters.build.metadata">
+    <filter token="VERSION"           value="${version}" />
+    <filter token="BUILD_TIME"        value="${build.time.txt}" />
+    <filter token="BUILD_TIME_XSD"    value="${build.time.xsd}" />
+  </filterset>
+  
+  <target name="javac-flags">
+    <!-- Target - so can have different javac flags (properties are set once) -->
+    <property name="java.debug"       value="true"/>
+    <property name="java.debuglevel"  value="source,lines,vars"/>
+    <property name="java.deprecation" value="true"/>
+    <property name="java.optimize"    value="true"/>
+    <property name="java.encoding"    value="UTF8"/>
+    <property name="java.source"      value="1.6"/>
+    <property name="java.target"      value="1.6"/>
+  </target>
+        
+  <target name="set-classpath">
+    <!-- This must be after IVY has done it's dependence stuff, hence as a task --> 
+    <path id="java.build.class.path">
+      <fileset dir="${lib.dir}" includes="*.jar" excludes="${jarfile}"/>
+    </path>
+  </target>          
+
+  <target name="java-init" depends="javac-flags,set-classpath"/>
+
+  <!-- ========================================== -->
+  <!-- ==== Build, compile, jar, javadoc -->
+
+  <target name="compile" depends="java-init,compile-main"  description="Compile project"/>
+  
+  <target name="compile-main">
+    <mkdir dir="${build.classes.dir}" />
+    <javac destdir="${build.classes.dir}"
+           debug="${java.debug}"
+           deprecation="${java.debuglevel}"
+           optimize="${java.optimize}"
+           encoding="${java.encoding}"
+           source="${java.source}"
+           target="${java.target}"
+           >
+      <src refid="java.source.path"/>
+      <classpath refid="java.build.class.path" />
+      <compilerarg value="-Xlint:unchecked"/>
+    </javac>
+  </target>
+
+  <target name="build.jar" depends="compile">
+    <antcall target="package.jar"/>
+  </target>
+
+  <target name="package.jar">
+    <delete file="${lib.dir}/${jarfile}" failonerror="false"/>
+    <jar destfile="${lib.dir}/${jarfile}" basedir="${build.classes.dir}" index="yes">
+       <!--<fileset file="${build.metadata.file.dest}"/>-->
+    </jar>
+  </target>
+
+  <!-- ========================================== -->
+  <!-- ==== Basic tasks -->
+
+  <!-- Not depends="build.jar" because that will always be run even if the body is "unless"'ed out -->
+
+  <target name="jar" 
+	  description="Compile and build the jar"
+	  unless="jar.run">
+    <antcall target="build.jar"/>
+    <property name="jar.run" value="done"/>
+  </target>
+
+  <target name="build" depends="clean,jar" description="Clean build of the jar"/>
+
+
+
+  <target name="clean" description="Clean (build and reports)"
+          depends="clean-build-area">
+  </target>
+
+  <target name="clean-once" unless="clean.run">
+    <antcall target="clean"/>
+    <property name="clean.run" value="set"/>
+  </target>
+
+  <target name="clean-build-area">
+    <delete quiet="true" dir="${build.dir}"/>
+    <mkdir  dir="${build.dir}/benchmark"/>
+  </target>
+
+</project>

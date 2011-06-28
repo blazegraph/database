@@ -1,0 +1,84 @@
+<html>
+<head>
+<title>Data definition layer (DDL)</title>
+</head>
+<body>
+
+<p>
+
+    This package includes an abstraction layer for declaring
+    containers of relations, relations, the relationships between the
+    relations (foreign keys), and the indices for a relation,
+    including what goes into the key and the value for the index.
+
+</p>
+
+<pre>
+
+container := relation(s)
+
+relation := generic object type / data fields, indices, foreign keys
+
+index := key order (in terms of the fields for the relation), key
+         serializer, value serializer, bloom filter (T/F), etc.
+    
+
+tripleStore := lexicon, triple
+	;
+	
+lexicon := objectType=BigdataValue.class,
+	indices={term2id, id2term},
+	;
+
+lexicon.term2id :=
+	key = {BigdataValue.stringValue()} // look at RDFKeyBuilder - it is more complex than stringValue().
+	value = {BigdataValue.getTermId()} // long integer.
+	;
+
+lexicon.id2term :=
+	key = {BigdataValue.getTermId()} // long integer.
+	val = {BigdataValue} // stores the serialized java object using a custom serializer for RDF Values.
+	;
+		
+triple :=
+	objectType=SPO.class,
+	indices={spo, pos, osp},
+	foreignKeys={
+		SPO.s := lexicon.term2id.getTermId(),
+		SPO.p := lexicon.term2id.getTermId(),
+		SPO.o := lexicon.term2id.getTermId(),
+		SPO.sid := lexicon.term2id.getTermId() // iff SIDs are enabled
+		}
+	;
+
+/* Note: For the triple relation, we reconstruct the {s,p,o} from the key.
+ * You can safely decode ASCII text from a key, as well as int, long, double,
+ * etc.  See KeyBuilder which handles all of this.
+ *
+ * Note: Multi-field keys which include one (or more) Unicode fields are the
+ * most complex.  KeyBuilder has special methods for generating Unicode sort
+ * keys which deal with this.
+ *
+ * Note: We need to be able to choose the right access path (really, the right
+ * index) for an IPredicate of the same generic type as the relation.
+ */	
+triple.spo :=
+	key = {SPO.s,SPO.p,SPO.o}, // the key order for this index.
+	val = {SPO.getStatementType(), SPO.sid} // sid iff SIDs enabled
+	bloomFilter=true
+	;
+
+triple.pos :=
+	key = {SPO.p,SPO.o,SPO.s}
+	val = {SPO.getStatementType(), SPO.sid} // sid iff SIDs enabled
+	;
+
+triple.osp :=
+	key = {SPO.o,SPO.s,SPO.p}
+	val = {SPO.getStatementType(), SPO.sid} // sid iff SIDs enabled
+	;
+
+</pre>
+
+</body>
+</html>

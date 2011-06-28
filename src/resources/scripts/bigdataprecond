@@ -1,0 +1,30 @@
+#!/bin/bash
+
+#
+# This provides an extensible hook for verifying per-conditions or taking
+# other site-specific action each time the 'bigdata' script is executed.
+#
+
+# Setup the environment.
+cd `dirname $0`
+source ./bigdataenv
+
+# Unfortunately, you can not bootstrap the shared volume mount point
+# using this script because the script itself is located on the shared
+# volume.
+#if [ ! -d /opt2 ]; then
+#    echo $"`date` : `hostname` : mounting share."
+#    mount -t nfs 192.168.6.21:/opt /opt2
+#fi
+
+# Can be used to copy a JDK from a known location onto the local host.
+#
+#if [ ! -d "/usr/java/jdk1.6.0_12" ]; then
+#    echo $"`date` : `hostname` : installing jdk."
+#    cp -r /opt2/install/jdk1.6.0_12 /usr/java
+#fi
+#
+# Echo the installed JDK version.
+#echo $"`date` : `hostname` : `java -version`"
+
+exit 0

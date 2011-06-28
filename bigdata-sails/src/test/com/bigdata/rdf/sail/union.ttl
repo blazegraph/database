@@ -1,0 +1,21 @@
+@prefix  rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix  rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+<http://example/class/Location>    rdfs:subClassOf                  <http://example/class/NamedEntity> .
+<http://example/class/Location>    rdfs:label                       "Location" .
+<http://example/class/NamedEntity> rdfs:label                       "NamedEntity" .
+<http://example/elem/loc/loc1>     rdfs:label                       "label: Amsterdam" .
+<http://example/elem/loc/loc1>     rdf:type                         <http://example/class/Location> .
+<http://example/elem/loc/loc1>     <http://example/prop/lookupName> "amsterdam" .
+<http://example/elem/loc/loc2>     rdfs:label                       "label: Den Haag" .
+<http://example/elem/loc/loc2>     rdf:type                         <http://example/class/Location> .
+<http://example/elem/loc/loc2>     <http://example/prop/lookupName> "den haag" .
+<http://example/elem/loc/loc3>     rdfs:label                       "label: IJmuiden" .
+<http://example/elem/loc/loc3>     rdf:type                         <http://example/class/Location> .
+<http://example/elem/loc/loc3>     <http://example/prop/lookupName> "ijmuiden" .
+<http://example/elem/loc/loc3>     <http://example/prop/disabled>   "true"^^<http://www.w3.org/2001/XMLSchema#boolean> .
+<http://example/class/Person>      rdfs:subClassOf                  <http://example/class/NamedEntity> .
+<http://example/class/Person>      rdfs:label                       "Person" .
+<http://example/elem/person/puk>   rdfs:label                       "label: Puk van de Petteflet" .
+<http://example/elem/person/puk>   rdf:type                         <http://example/class/Person> .
+<http://example/elem/person/puk>   <http://example/prop/lookupName> "puk van de petteflet" .

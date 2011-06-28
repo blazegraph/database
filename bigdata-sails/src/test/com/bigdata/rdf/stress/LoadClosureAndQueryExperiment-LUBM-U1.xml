@@ -1,0 +1,68 @@
+<?xml version="1.0" ?>
+<!DOCTYPE experiment PUBLIC "-//systap.com//DTD BIGDATA EXPERIMENT 0.1//EN" "Experiment.dtd">
+<!-- There are 6 conditions. -->
+<experiment class="com.bigdata.rdf.stress.LoadClosureAndQueryTest">
+ <defaults>
+  <property name="overflowEnabled">false</property>
+  <property name="statementIdentifiers">false</property>
+  <property name="nparallel">1</property>
+  <property name="query">data/lubm.query.sparql</property>
+  <property name="textIndex">false</property>
+  <property name="justify">false</property>
+  <property name="data">data//U1</property>
+  <property name="chunkCapacity">100</property>
+  <property name="forwardChainOwlInverseOf">true</property>
+  <property name="truthMaintenance">false</property>
+  <property name="nativeJoins">true</property>
+  <property name="ndataServices">1</property>
+  <property name="ntrials">10</property>
+  <property name="dataLoader.commit">None</property>
+  <property name="initialExtent">209715200</property>
+  <property name="maximumExtent">209715200</property>
+  <property name="dataLoader.closure">None</property>
+  <property name="maximumMovesPerTarget">0</property>
+  <property name="forwardChainOwlTransitiveProperty">true</property>
+  <property name="BloomFilter">true</property>
+  <property name="maxParallelSubqueries">0</property>
+ </defaults>
+ <!-- condition#1 -->
+ <condition>
+  <property name="databaseModel">LTS</property>
+  <property name="nestedSubquery">true</property>
+ </condition>
+ <!-- condition#2 -->
+ <condition>
+  <property name="databaseModel">LDS</property>
+  <property name="nestedSubquery">true</property>
+ </condition>
+ <!-- condition#3 -->
+ <condition>
+  <property name="databaseModel">EDS</property>
+  <property name="nestedSubquery">true</property>
+ </condition>
+ <!-- condition#4 -->
+ <condition>
+  <property name="databaseModel">LTS</property>
+  <property name="nestedSubquery">false</property>
+ </condition>
+ <!-- condition#5 -->
+ <condition>
+  <property name="databaseModel">LDS</property>
+  <property name="nestedSubquery">false</property>
+ </condition>
+ <!-- condition#6 -->
+ <condition>
+  <property name="databaseModel">EDS</property>
+  <property name="nestedSubquery">false</property>
+ </condition>
+ <!-- condition#7 -->
+ <condition>
+  <property name="databaseModel">JDS</property>
+  <property name="nestedSubquery">true</property>
+ </condition>
+ <!-- condition#8 -->
+ <condition>
+  <property name="databaseModel">JDS</property>
+  <property name="nestedSubquery">false</property>
+ </condition>
+</experiment>

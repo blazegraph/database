@@ -1,0 +1,20 @@
+#!/bin/bash
+if [ ! -e "./testdriver" ]
+then
+  echo "Please run this script from the BSBM root directory"
+  exit 1
+fi
+if [ $# == 0 ]
+then
+  echo "For test driver options type ./testdriver -help"
+  exit 1;
+fi
+CP=.
+SEP=':'
+if [ "$(uname)" = "Cygwin" ]; then SEP=';'; fi
+for jar in lib/*.jar
+do
+  if [ ! -e "$jar" ]; then continue; fi
+  CP="$CP$SEP$jar"
+done
+exec java -cp "$CP" -Xmx256M benchmark.testdriver.TestDriver "$@"

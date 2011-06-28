@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE counters SYSTEM "counterset.dtd">
+<?xml-stylesheet type="text/xsl" href="counterset2html.xslt"?>
+<counters xmlns:xs="http://www.w3.org/2001/XMLSchema">
+	<cs path="/www.bigdata.com/cpu">
+		<c name="availableProcessors" type="xs:int" time="1208525762336">2</c>
+	</cs>
+	<cs path="/www.bigdata.com/memory">
+		<c name="maxMemory" type="xs:long" time="1208525762336">517013504</c>
+	</cs>
+	<cs path="/">
+		<c name="elapsed" type="xs:long" time="1208525762336">1208525762336</c>
+	</cs>
+</counters>

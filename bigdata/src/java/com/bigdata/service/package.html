@@ -1,0 +1,223 @@
+<html>
+<head>
+<title>services</title>
+</head>
+<body>
+
+<p>
+This package provides implementations of bigdata services (metadata
+service, data service, transaction manager service.
+</p>
+
+<p>
+A bigdata federation is comprised of the following essential
+services:
+
+<dl>
+
+<dt>metadata service</dt><dd>The metadata service manages scale-out indices
+and is used to locate index partitions.</dd>
+
+<dt>data service</dt><dd>The data service supports reads and writes on
+index partitions.</dd>
+
+</dl>
+
+Clients are responsible for discovering the metadata service.  Clients
+then use the metadata service to manage scale-out indices and to
+locate and cache leases for data service instances having data for key
+range partitions that the client will read or write.  If a client will
+use transactions (vs ACID batch operations), then the client must also
+locate the transaction manager service. Service location is performed
+using JINI, but other service locator protocols are possible.
+</p>
+
+<p>
+
+bigdata provides the following optional services.  These are not
+considered essential since (a) they are not required by clients that
+make direct use of bigdata as a distributed database; and (b) they are
+themselves applications of the services briefly described above.
+
+<dl>
+
+<dt>transaction manager service</dt><dd>Clients use the transaction
+manager service to start new transactions and to coordinate the
+distributed commit protocol.  The transaction manager also provides a
+centralized timestamp factory.</dd>
+
+<dt>map and reduce service</dt><dd>Manages the distributed execution of a
+functional program.</dd>
+
+</dl>
+
+</p>
+
+<h2>deployment</h2>
+
+<p>
+
+In order to deploy a bigdata federation, the following preconditions
+must be met (a standalone deployment can be realized by meeting these
+preconditions on a single host).  This will go more smoothly if JINI
+is running before you start the various bigdata services since they
+will then be able to register themselves immediately on
+startup. Service discovery by default uses the local network and the
+"public" group. If you want to run more than one bigdata federation on
+the same network, then you MUST edit the configuration file.
+
+</p>
+
+<p>
+Hosts:
+
+<ul>
+
+<li>java 5 or better is installed.  The use of a server VM is highly
+recommended.  The following options are recommended for some well
+known VMs: <dl>
+
+<dt>Sun</dt><dd>-server -Xms1g -Xmx1g -XX:MaxDirectMemorySize=256M</dd>
+
+<dt>JRockit</dt><dd>-Xms1g -Xmx1g</dd>
+
+</dl>
+
+@todo review the use of -Xms (sets the initial heap size).  How much
+of a difference does this make?  Note that JRockit defaults to 75% of
+physical memory or 1G, which ever is less.</li>
+
+<li>the bigdata-server distribution is installed.</li>
+
+<li>the data service is running.</li>
+
+</ul>
+
+</p>
+
+<p>
+In addition, there must be at least one host on which the following
+preconditions are true (a different host could be used for each of
+these services, and more than one instance of these services may be
+running on the network).  These services should be started during the
+boot procedure so that they are available whenever the host is up and
+running.
+
+<ul>
+
+<li>jini 2.x is installed and running.  This will be used to register
+and lookup services.  It helps if jini is running before you try to
+start the bigdata services since they will be able to register
+themselves immediately in that case.</li>
+
+<li>a metadata server is running.</li>
+
+<li>one or more data server(s) are running.</li>
+
+<li>a transaction server is running (optional).</li>
+
+<li>one or more map and reduce servers are running (optional).</li>
+
+</ul>
+
+</p>
+
+<p>
+Clients:
+
+<ul>
+
+<li>java 5 or better is installed.  The use of a server VM
+is highly recommended</li>
+
+<li>the bigdata-client deployment package is installed.  This includes
+bigdata-client.jar, but also support for generating unicode keys
+(ICU4J), etc.</li>
+
+</ul>
+
+</p>
+
+<h2>unique identifiers</h2>
+
+<dl>
+
+<dt>Data Service</dt><dd><p>The serviceID identifies the data
+service. If the service dies and then restarts on the same host with
+the same data, then it is still the same service instance. If the
+service dies and is recreated on another host with the same data, then
+it is still the same instance. What is important is that (a) the
+service has the same data (journals, index segments, and serviceID);
+and (b) that the data for that service has not become <em>stale</em>
+(or inconsistent).</p><p> The easiest way in which the data can become
+stale is for the service to fail.  When failover is operating, clients
+will be redirected to one or more other services having consistent
+data for the same index partitions.  If clients then write on _any_ of
+those index partitions and commit, then the old service now has stale
+(aka inconsistent) data. A service with inconsistent data MUST NOT be
+used.
+</p><p>In general, the majority of state for a service will live in
+its index segments.  This can be hundreds or thousands of times more
+data in the index segments than there is in any single journal.  This
+can make it worth while to make the service consistent again.
+</p></dd>
+
+<dt>Journal</dt><dd>Each journal has a UUID that is generated when the
+journal is created (it is stored in the root block).  This serves to
+uniquely identify the journal as a resource regardless of where it may
+be located on the host or in the file system.</dd>
+
+<dt>Index Segment</dt><dd>Each index segment has a UUID that is
+generated when the index segment is created (it is stored in the fixed
+length index segment metadata record).  This serves to uniquely
+identify the index segment as a resource regardless of where it may be
+located on the host or in the file system.</dd>
+
+<dt>Index</dt><dd>Named indices are assigned UUIDs when they are
+created.  This makes it possible to rename an index, since its UUID
+remains the same.</dd>
+
+<dt>metadata service</dt><dd></dd>
+
+<dt>transaction manager service</dt><dd></dd>
+
+<dt>job scheduler service</dt><dd></dd>
+
+</dl>
+
+
+<h2>downloaded code</h2>
+
+<p>
+
+While bigdata makes use of jini for service registration and
+discovery, it does not use downloaded code for executing its basic
+services (the necessary interfaces and implementation classes are
+already bundled in bigdata.jar). However, clients MAY use downloaded
+code in order to have data servers execute remote procedures or
+extension batch operations.  In this scenario, the client will create
+and register a JINI service.  The service should perform <em>all</em>
+of its operations locally.  The data server will lookup the service
+using jini and then execute it locally.
+</p>
+
+<p>
+In order for downloaded code to work correctly, clients must ensure
+that their classes are exposed by an HTTP server accessible to bigdata
+servers and declared to the VM in which the client starts using:
+	  	
+<code>-Djava.rmi.server.codebase=...</code>
+
+</p>
+
+<p>
+
+@todo consider this use case further. Are there other/better ways for
+executing remote code on the data server?  At a minimum, we should
+supply a base class and ant script support for creating such remote
+services.
+
+</p>
+
+</body>
+</html>

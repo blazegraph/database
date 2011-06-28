@@ -1,0 +1,168 @@
+Bigdata uses Multi-Version Concurrency Control (MVCC).  MVCC is an
+optimistic concurrency control algorithm based on the assignment of
+timestamps to commit points.  Rather than obtaining write locks, MVCC
+validates the write set of a transaction during the commit protocol.
+
+!!! Note: Support for read-write transactions IS NOT complete !!!
+
+Bigdata represents both commit points and transaction by a timestamp.
+To open a transaction you invoke
+com.bigdata.service.ITransactionService#newTx(long). If you want a
+read-only transaction for the most current commit point, you specify
+com.bigdata.journal.ITx#READ_COMMITTED.  Otherwise you specify the
+timestamp of the commit point from which you want to read.  In order
+to obtain a read-write transaction, you specify ITx#UNISOLATED (0L).
+
+Regardless of the type of transaction, you are assigned a timestamp
+which uniquely identifies the transaction and the transaction will
+hold a read-lock on the commit point corresponding to that timestamp.
+Read locks are very important.  They guarantee that you have a
+consistent view of the data across the federation and prevent the data
+for the commit point from being released.  You may not notice a
+problem unless someone else is concurrently writing on the federation
+since a release is normally triggered when the write buffer fills up
+for a DataServer.
+
+Bigdata periodically releases data for older commit points based on
+the configured minimum release age (see
+com.bigdata.service.AbstractTransactionService.Option#MIN_RELEASE_AGE).
+You can set the minimum release age to ZERO (0L) if you want to
+release older commit points as soon as possible or the number of hours
+or days (expressed in milliseconds) that you want to hold onto
+historical commit points.  In fact, bigdata can operate as an immortal
+database if you specify Long#MAX_VALUE, but you have to be prepared to
+have enough (infinite) storage on hand!
+
+Validation is based on a timestamp associated with each tuple in each
+index.  A write-write conflict is detected when a transaction commits
+if the timestamp associated with a tuple is GT the timestamp assigned
+to the transaction.  If validation succeeds, then the write set of the
+transaction is merged onto the unisolated indices and each tuple in
+that write set will be annotated with the commit time of the
+transaction.  Validation can be extended to handle special cases where
+write-write conflicts can be resolved.
+
+
+Bigdata, MVCC and RDF
+
+An RDF database with inference has to make tradeoffs among several
+complex issues, as discussed below.  We chose to focus first on
+support for very high scale-out data load and eager closure.  As a
+consequence, some aspects of the concurrency control algorithm bleed
+out into the SAIL.  The planned support full transactions and
+query-time inference (below) will make some things much easier, but
+there are still performance tradeoffs.  Concurrency control and RDF
+inference is an evolving area, and we are definately interested in
+your input.
+
+MVCC and RDF Closure and Query without Full Transactions.
+
+This will be easier once we finish support for query-time inference
+and distributed read-write transactions (see below).  
+
+Only a single process may compute the RDF closure of a given triple
+store instance at a time.  This is because the RDF closure computes
+the fixed point of a set of entailment rules.  That fixed point is not
+well defined if there are concurrent writes on the triple store
+instance.  Further, since both the BigdataSail and the bulk loader use
+unisolated writes (writes whose commits are not coordinated by the
+transaction service) you need to remember the timestamp of the commit
+point corresponding to the last time you computed (or updated) the
+closure of the database.  You should hold open a read-only transaction
+for that timestamp (to protect the view) and use that timestamp for
+query until the next closure is available.  While you can ignore the
+read-lock the scale-up database, it is absolutely necessary when
+running against a bigdata federation.  If you are not holding a read
+lock then concurrent writes on the same triple store instance could
+cause the view on which the query depends to be released (depending
+on the minimum release age).
+
+Here are some design patterns which you can use:
+
+Incremental data load with or without truth-maintenance:
+
+   In this scenario you are adding data in chunks, perhaps a document
+   at a time.  If you using truth maintenance, then you must enable
+   that option for the BigdataSail.  Either way, you must serialize
+   (single-thread) operations which write on the triple store.  If
+   truth maintenance is enabled, then each time you commit() the
+   SailConnection the closure of the database will be updated. After
+   each commit(), the writer thread should note the commit time that
+   will be used for new queries.
+
+Bulk load: 
+
+   In this scenario you are adding massive amounts of data loaded by
+   coordinated tasks running on multiple machines.  The overall
+   operation is coordinated by a master and is known as a "job". Once
+   all clients for the job are done writing the database, the master
+   can (optionally) (re-)compute closure.  The master holds a global
+   synchronous lock (zlock) for the job while it is loading data and
+   while it is computing closure.  This lock prevents other instance
+   so of the same job from starting, but does not otherwise protect
+   against concurrent writes on the triple store.  When the master is
+   done, and while it is still holding the zlock, it invokes
+   success(jobState).  You can override that method to obtain the
+   commit time corresponding to the post-load, post-closure state of
+   the triple store using IBigdataFederation#getLastCommitTime().  You
+   need to make a note of that timestamp - it is the timestamp that
+   you will use for query until the next time you update the closure
+   of the database.
+
+   Note: If there are ongoing writes on the same triple store, then
+   you MUST open a read-only transaction as of that timestamp to
+   prevent data from being released before the new closure is ready.
+
+Query:
+
+   Query should always use a read-only transaction so the commit point
+   against which the query is running is protected by a read lock.
+
+Query Time Inference and Full Transactions
+
+Life will get much easier when we get these two features finished, at
+least for the incremental data load scenario.  Here is how these
+features work together to solve the problem:
+
+(A) The writes will be isolated by a transaction.  During the commit,
+    the write set is validated and most write-write conflicts will be
+    automatically resolved (this is possible for RDF, but not for all
+    data models).  You will not need to keep track of timestamps for
+    commit points since the transaction commit will be atomic and the
+    transaction itself will hold a write lock which protects the prior
+    commit point.  Queries will still be issued in read-only
+    transactions, but that is for efficiency or to deliberately query
+    some historical commit point.
+
+(B) The query and the entailment rules will be combined into a single
+    program.  That program will be re-written using magic sets into a
+    minimum effort program which will compute only those entailments
+    necessary to answer the specific query.  The program will read
+    against the start time for the read-only transaction and will
+    compute a fixed point which is isolated from the triple store,
+    concurrent writers, etc.  This approach gets around the
+    concurrency issue for computing closure.
+
+In this model, a writer obtains a new read-write transaction and
+commits when they are done.  A reader obtains a read-only transaction
+for the most current commit, and reads against that view.  This makes
+it all very simple, the concurrency control architecture does not
+bleed out into your application, and you do not need to manage read
+locks explicitly.
+
+People who need the fastest possible load rates for massive data may
+still chose to manage the commit times for query and read locks
+explicitly to avoid the overhead of full transactions.  Most
+transactions are small, and are buffered on temporary stores or in
+RAM.  Very large transactions require bigdata to buffer very large
+write sets.  The write sets are kept together with the key range
+shard(s) to which they will be applied when the transaction commits.
+This means that bigdata can manage extremely large transactions, even
+with distributed clients working on the transaction, but the commit
+protocol must still validate and then merge the entire write set of
+the transaction.  While this will be done in parallel on all machines
+touched by the transaction, and while bigdata can perform validation
+and merging for each key-range shard in parallel, you are still going
+to do two passes over the write set during the commit protocol (one to
+validate and one to merge).
+
