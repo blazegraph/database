@@ -111,6 +111,8 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * @todo Integrate a ring buffer for retention of frequently accessed pages per
  *       the weak reference policy observed by the BTree with touch()
+ *       
+ *       @deprecated This has been replaced by the {@link HTree}.
  */
 public class HashTree 
 implements ISimpleBTree // @todo rename ISimpleBTree interface

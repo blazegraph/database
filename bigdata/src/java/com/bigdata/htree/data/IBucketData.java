@@ -32,6 +32,8 @@ import java.util.Iterator;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.data.ILeafData;
+import com.bigdata.htree.HTree;
+import com.bigdata.htree.HashTree;
 
 /**
  * Interface for the data record of a hash bucket. The hash bucket extends the
@@ -51,70 +53,77 @@ import com.bigdata.btree.data.ILeafData;
  */
 public interface IBucketData extends ILeafData {
 
-	/**
-	 * {@inheritDoc}
-	 * <p>
-	 * For clarification, this returns the #of entries in the hash bucket (not
-	 * just the number of distinct keys).
-	 */
+    /**
+     * {@inheritDoc}
+     * <p>
+     * For clarification, this returns the #of entries in the hash bucket (not
+     * the number of distinct keys since duplicate keys are permitted in a hash
+     * bucket).
+     */
 	int getKeyCount();
 	
 	/**
 	 * The length (in bits) of the MSB prefix shared by the hash values of the
 	 * keys on this page.
+	 * 
+	 * @deprecated with {@link HashTree}
 	 */
 	int getLengthMSB();
 
-	/**
-	 * Return the hash value of the key at the given index.
-	 * 
-	 * @param index
-	 *            The index of the key.
-	 * 
-	 * @return The hash value of that key.
-	 * 
-	 * @deprecated This is just the int32 key for that tuple. It should be
-	 *             generalized as a byte[]. This will require us to generalize
-	 *             the handle of the LSB and MSB bits as well, all of which must
-	 *             be efficient and compact. For a {@link HTree}, we need to
-	 *             declare the bits length the key. That might be part of the
-	 *             {@link Checkpoint} or the {@link HTree}'s
-	 *             {@link IndexMetadata}. {@link HTree} should be usable with
-	 *             int32 hash codes, int64, and {@link MessageDigest} based hash
-	 *             codes, which are 20+ bytes as well as with a fixed prefix of
-	 *             a {@link MessageDigest} for shorter keys which still have
-	 *             strongly random distributions, plus order-preserving hash
-	 *             codes.
-	 */
+    /**
+     * Return the hash value of the key at the given index.
+     * 
+     * @param index
+     *            The index of the key.
+     * 
+     * @return The hash value of that key.
+     * 
+     * @deprecated with {@link HashTree}.
+     *             <p>
+     *             This is just the int32 key for that tuple. It should be
+     *             generalized as a byte[]. This will require us to generalize
+     *             the handle of the LSB and MSB bits as well, all of which must
+     *             be efficient and compact. For a {@link HTree}, we need to
+     *             declare the bits length the key. That might be part of the
+     *             {@link Checkpoint} or the {@link HTree}'s
+     *             {@link IndexMetadata}. {@link HTree} should be usable with
+     *             int32 hash codes, int64, and {@link MessageDigest} based hash
+     *             codes, which are 20+ bytes as well as with a fixed prefix of
+     *             a {@link MessageDigest} for shorter keys which still have
+     *             strongly random distributions, plus order-preserving hash
+     *             codes.
+     */
 	int getHash(int index);
 
-	/**
-	 * Return an {@link Iterator} which visits the index of each entry in the
-	 * hash bucket having the given hash code.
-	 * 
-	 * @param h
-	 *            The hash code.
-	 * 
-	 * @todo Note: There is a design tradeoff between autoboxing of the
-	 *       <code>int</code> index and allowing the {@link IBucketData} class
-	 *       to encapsulate the iterator pattern together with any setup which
-	 *       can be done once per scan for a given hash code. For example, using
-	 *       a BitInputStream. The iterator allows us to amortize the cost of
-	 *       that setup, but we pay for the autoboxing of the index values.
-	 *       However, autobox primitives tend to be quite cheap as they are
-	 *       rapidly reclaimed by GC.
-	 *       <p>
-	 *       It is possible to implement an extension interface which returns
-	 *       the [int] index without autoboxing. If this method signature is
-	 *       modified to return that interface then the implementation can avoid
-	 *       autoboxing.
-	 * 
-	 * @deprecated Since hash codes will be unsigned byte[] keys, this will have
-	 *             to be visit a read-only byte[] slice or a copy of the byte[]
-	 *             key. We already have methods for this. Those methods (and the
-	 *             leaf coder) might be more compact, e.g., for int32 keys,
-	 *             since we code a (short) fixed length key in more simply.
-	 */
+    /**
+     * Return an {@link Iterator} which visits the index of each entry in the
+     * hash bucket having the given hash code.
+     * 
+     * @param h
+     *            The hash code.
+     * 
+     * @todo Note: There is a design tradeoff between autoboxing of the
+     *       <code>int</code> index and allowing the {@link IBucketData} class
+     *       to encapsulate the iterator pattern together with any setup which
+     *       can be done once per scan for a given hash code. For example, using
+     *       a BitInputStream. The iterator allows us to amortize the cost of
+     *       that setup, but we pay for the autoboxing of the index values.
+     *       However, autobox primitives tend to be quite cheap as they are
+     *       rapidly reclaimed by GC.
+     *       <p>
+     *       It is possible to implement an extension interface which returns
+     *       the [int] index without autoboxing. If this method signature is
+     *       modified to return that interface then the implementation can avoid
+     *       autoboxing.
+     * 
+     * @deprecated With {@link HashTree}.
+     *             <p>
+     *             Since hash codes will be unsigned byte[] keys, this will have
+     *             to be visit a read-only byte[] slice or a copy of the byte[]
+     *             key. We already have methods for this. Those methods (and the
+     *             leaf coder) might be more compact, e.g., for int32 keys,
+     *             since we code a (short) fixed length key in more simply.
+     */
 	Iterator<Integer> hashIterator(int h);
 	
 //	/**

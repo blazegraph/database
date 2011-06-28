@@ -45,8 +45,12 @@ abstract class AbstractMockNodeData implements IAbstractNodeData {
         if (keys == null)
             throw new IllegalArgumentException();
 
-        if (!keys.isKeys())
-            throw new IllegalArgumentException();
+//        Note: The HTree IRaba for keys does NOT report true for isKeys() since
+//        it does not obey any of the contract for the B+Tree keys (unordered,
+//        sparse, allows duplicates and nulls, not searchable).
+//        
+//        if (!keys.isKeys())
+//            throw new IllegalArgumentException();
 
         this.keys = keys;
 

@@ -84,6 +84,8 @@ import com.bigdata.rawstore.IRawStore;
  *       During a bulk index build, the raw record must be copied to the target
  *       index store, e.g., an {@link IndexSegment} using an
  *       {@link IOverflowHandler}.
+ * 
+ * @deprecated with the {@link HashTree}.
  */
 public class HashBucket extends AbstractHashPage<HashBucket>//
 //		implements IBucketData// 

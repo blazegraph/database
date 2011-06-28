@@ -17,6 +17,8 @@ import com.bigdata.io.AbstractFixedByteArrayBuffer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: MutableNodeData.java 2265 2009-10-26 12:51:06Z thompsonbry $
+ * 
+ * @deprecated with the {@link HashTree}.
  */
 public class MutableDirectoryPageData implements IDirectoryData {
 
