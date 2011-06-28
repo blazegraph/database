@@ -789,7 +789,7 @@ public class TestHTree extends TestCase2 {
              * <pre>
              * root := [2] (d,d,b,b)     //
              * d    := [1]   (a,a;c,c)   // added new level below the root.  
-             * a    := [0]     (1;2;3;4) // local depth now 0.
+             * a    := [0]     (1;2;3;4) // local depth now 0. NB: (a) MUST BE SPLIT NEXT!!! FIXME INCONSISTENT if d(a)==0 then can not index all buddies.
              * c    := [0]     (-;-;-;-) // local depth now 0.
              * b    := [1]   (-,-;-,-)   //
              * </pre>
@@ -885,7 +885,7 @@ public class TestHTree extends TestCase2 {
             assertSameBucketData(new MockBucketData(//
                     new ReadOnlyKeysRaba(0, new byte[][] { // keys
                             null, null, null, null }),//
-                    new ReadOnlyValuesRaba(4, new byte[][] { // vals
+                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
                             null, null, null, null})),//
                     e);
 
