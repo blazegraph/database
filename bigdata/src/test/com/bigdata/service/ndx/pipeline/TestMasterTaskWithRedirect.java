@@ -359,8 +359,8 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
         masterBuffer.getFuture().get();
 
-        assertEquals("elementsIn", 3, masterStats.elementsIn.get());
-        assertEquals("chunksIn", 2, masterStats.chunksIn.get()); // Note: CI failures observed here with actual:=1.
+        assertEquals("elementsIn", 3, masterStats.elementsIn.get());// TODO Rare CI failure observed here with actual:=4.
+        assertEquals("chunksIn", 2, masterStats.chunksIn.get()); // TODO CI failures observed here with actual:=1.
         assertEquals("elementsOut", 3, masterStats.elementsOut.get());
         assertEquals("chunksOut", 3, masterStats.chunksOut.get());
         assertEquals("partitionCount", 3, masterStats.getMaximumPartitionCount());
