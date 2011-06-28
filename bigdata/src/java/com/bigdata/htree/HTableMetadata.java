@@ -32,10 +32,16 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.UUID;
 
+import com.bigdata.btree.IndexMetadata;
+import com.sun.org.apache.xml.internal.utils.Hashtree2Node;
+
 /**
  * Configuration options.
  * 
  * @todo Reconcile with IndexMetadata.
+ * 
+ * @deprecated with the {@link HashTree} but we still need to reconcile the
+ *             {@link HTree} with {@link IndexMetadata}.
  */
 public class HTableMetadata implements Externalizable {
 

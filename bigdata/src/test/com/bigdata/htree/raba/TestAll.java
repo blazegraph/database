@@ -21,7 +21,8 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.htree;
+package com.bigdata.htree.raba;
+
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -55,18 +56,22 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("HTree");
+        final TestSuite suite = new TestSuite("Random Access Byte Arrays (rabas)");
 
-        suite.addTestSuite(TestHTreeUtil.class);
+//        // note: this class is exercised by Leaf.
+//        suite.addTestSuite(TestMutableValuesRaba.class);
+        
+        // test mutable key buffer.
+        suite.addTestSuite(TestMutableKeyBuffer.class);
 
-        suite.addTest(com.bigdata.htree.raba.TestAll.suite());
+//        // test key search routines on the key buffer implementations.
+//        suite.addTestSuite(TestKeyBufferSearch.class);
+//
+//        // compressed data implementations.
+//        suite.addTest(com.bigdata.btree.raba.codec.TestAll.suite());
 
-        suite.addTest(com.bigdata.htree.data.TestAll.suite());
-
-        suite.addTestSuite(TestHTree.class);
-
-		return suite;
-
-	}
-
+        return suite;
+        
+    }
+    
 }

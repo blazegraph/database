@@ -43,6 +43,8 @@ import com.bigdata.util.concurrent.Memoizer;
 
 /**
  * A simple (flat) directory for an extensible hashing.
+ * 
+ * @deprecated with the {@link HashTree}.
  */
 public class HashDirectory extends AbstractHashPage<HashDirectory> {
 	

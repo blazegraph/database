@@ -45,14 +45,13 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.Leaf;
 import com.bigdata.btree.LeafTupleIterator;
-import com.bigdata.btree.MutableLeafData;
 import com.bigdata.btree.Node;
 import com.bigdata.btree.PO;
 import com.bigdata.btree.data.DefaultLeafCoder;
 import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.raba.IRaba;
-import com.bigdata.btree.raba.MutableKeyBuffer;
+import com.bigdata.htree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.MutableValueBuffer;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.htree.data.IDirectoryData;
@@ -80,6 +79,10 @@ import com.bigdata.rawstore.IRawStore;
  *          hash tree. You have to use an order preserving hash function, which
  *          is external to the HTree implementation. Internally, the HTree must
  *          either double-link the pages or crawl the directory structure.
+ * 
+ *          TODO The keys should be declared as a computed key based on the data
+ *          fields in the record. The {@link HTree} supports arbitrary bit
+ *          length keys, but can be optimized for int32 keys easily enough.
  */
 public class HTree extends AbstractHTree 
 //	implements 
@@ -185,6 +188,11 @@ public class HTree extends AbstractHTree
      *            an expected page size of 8k before compression.
      */
     public HTree(final IRawStore store, final int addressBits) {
+        this(store, addressBits, true/* rawRecords */);
+    }
+
+    public HTree(final IRawStore store, final int addressBits,
+            final boolean rawRecords) {
 
 //    	super(store, nodeFactory, readOnly, addressBits, metadata, recordCompressorFactory);
 		super(store, false/*readOnly*/, addressBits);
@@ -194,7 +202,7 @@ public class HTree extends AbstractHTree
         // @todo from IndexMetadata
         this.versionTimestamps = false;
         this.deleteMarkers = false;
-        this.rawRecords = true;
+        this.rawRecords = rawRecords;
 
         /*
          * The initial setup of the hash tree is a root directory page whose
@@ -618,8 +626,9 @@ public class HTree extends AbstractHTree
      *             if the parent of the <i>oldChild</i> is not the given
      *             <i>parent</i>.
      */
-	private void splitBucketsOnPage(final DirectoryPage parent,
-			final int buddyOffset, final BucketPage oldChild) {
+    // Note: package private for unit tests.
+    void splitBucketsOnPage(final DirectoryPage parent, final int buddyOffset,
+            final BucketPage oldChild) {
 
 		if (parent == null)
 			throw new IllegalArgumentException();
@@ -866,11 +875,17 @@ public class HTree extends AbstractHTree
 								+ dstBuddyIndex + ")" + ", slot(" + srcSlot
 								+ "=>" + dstSlot + ")");
 
-					// Move the tuple at that slot TODO move metadata also.
+                    // Move the tuple at that slot TODO move metadata also.
+					if(srcKeys.keys[srcSlot] == null)
+					    continue;
 					dstKeys.keys[dstSlot] = srcKeys.keys[srcSlot];
 					dstVals.values[dstSlot] = srcVals.values[srcSlot];
 					srcKeys.keys[srcSlot] = null;
 					srcVals.values[srcSlot] = null;
+                    dstKeys.nkeys++; // one more in that page.
+                    srcKeys.nkeys--; // one less in this page.
+                    dstVals.nvalues++; // one more in that page.
+                    srcVals.nvalues--; // one less in this page.
 
 				}
 
@@ -935,10 +950,13 @@ public class HTree extends AbstractHTree
 								+ "=>" + dstSlot + ")");
 
 					// Move the tuple at that slot TODO move metadata also.
+                    if(srcKeys.keys[srcSlot] == null)
+                        continue;
 					dstKeys.keys[dstSlot] = srcKeys.keys[srcSlot];
 					dstVals.values[dstSlot] = srcVals.values[srcSlot];
 					srcKeys.keys[srcSlot] = null;
 					srcVals.values[srcSlot] = null;
+					// Note: movement within same page: nkeys/nvals don't change
 
 				}
 
@@ -947,7 +965,7 @@ public class HTree extends AbstractHTree
 		}
 
 	}
-
+	
     /**
      * Adds a new {@link DirectoryPage} when we need to split a child but
      * <code>globalDepth == localDepth</code>. The caller must retry the insert
@@ -991,8 +1009,8 @@ public class HTree extends AbstractHTree
      * <pre>
      * root := [2] (d,d,b,b)
      * d    := [1]   (a,a;c,c)   // two ptrs to (d) so 2 buddies on the page
-     * a    := [0]     (1,2;3,4) // depth changes since now 2 ptrs to (a)
-     * c    := [0]     (-,-;-,-) // depth changes since now 2 ptrs to (c)
+     * a    := [0]     (1;2;3;4) // depth changes since now 2 ptrs to (a)
+     * c    := [0]     (-;-;-;-) // depth changes since now 2 ptrs to (c)
      * b    := [1]   (-,-;-,-)
      * </pre>
      * 
@@ -2048,10 +2066,10 @@ public class HTree extends AbstractHTree
     static class BucketPage extends AbstractPage implements ILeafData { // TODO IBucketData
 
         /**
-         * The data record. {@link MutableLeafData} is used for all mutation
+         * The data record. {@link MutableBucketData} is used for all mutation
          * operations. {@link ReadOnlyLeafData} is used when the {@link Leaf} is
          * made persistent. A read-only data record is automatically converted into
-         * a {@link MutableLeafData} record when a mutation operation is requested.
+         * a {@link MutableBucketData} record when a mutation operation is requested.
          * <p>
          * Note: This is package private in order to expose it to {@link Node}.
          */
@@ -2158,14 +2176,12 @@ public class HTree extends AbstractHTree
 
 			super(htree, true/* dirty */, globalDepth);
             
-			// TODO keysRaba must allow nulls!
-            data = new MutableLeafData(//
+            data = new MutableBucketData(//
             		(1<<htree.addressBits), // fan-out
                     htree.versionTimestamps,//
                     htree.deleteMarkers,//
                     htree.rawRecords//
                     );
-//            new MutableBucketData(data)
 
         }
 
@@ -2351,29 +2367,26 @@ public class HTree extends AbstractHTree
 
 			// TODO if(!mutable) copyOnWrite().insert(key,val,parent,buddyOffset);
 
-			/*
-			 * Locate the first unassigned tuple in the buddy bucket.
-			 * 
-			 * Note: Given the IRaba data structure, this will require us to
-			 * examine the keys for a null. The "keys" rabas do not allow nulls,
-			 * so we will need to use a "values" raba (nulls allowed) for the
-			 * bucket keys. Unless we keep the entries in a buddy bucket dense
-			 * (maybe making them dense when they are persisted for faster
-			 * scans, but why bother for mutable buckets?) we will have to scan
-			 * the entire buddy bucket to find an open slot (or just to count
-			 * the #of slots which are currently in use).
-			 * 
-			 * FIXME We need a modified MutableKeysRaba for this purpose. It
-			 * will have to allow nulls in the middle (unless we compact
-			 * everything). [We will have to compact prior to coding in order
-			 * for the assumptions of the values coder to be maintained.] It
-			 * would be pretty easy to just swap in the first undeleted tuple
-			 * but that will not keep things dense. Likewise, Monet style
-			 * cracking could only be done within a buddy bucket rather than
-			 * across all buddies on a page.
-			 */
-			final MutableKeyBuffer keys = (MutableKeyBuffer)getKeys();
-			final MutableValueBuffer vals = (MutableValueBuffer)getValues();
+            /*
+             * Locate the first unassigned tuple in the buddy bucket.
+             * 
+             * Note: Given the IRaba data structure, this will require us to
+             * examine the keys for a null. The "keys" rabas do not allow nulls,
+             * so we will need to use a "values" raba (nulls allowed) for the
+             * bucket keys. Unless we keep the entries in a buddy bucket dense
+             * (maybe making them dense when they are persisted for faster
+             * scans, but why bother for mutable buckets?) we will have to scan
+             * the entire buddy bucket to find an open slot (or just to count
+             * the #of slots which are currently in use).
+             * 
+             * FIXME The current raba coders assume that the keys and values are
+             * compact. That assumption is violate for an htree since the buddy
+             * buckets are inherently sparse. We can not really compact a bucket
+             * page unless we change its coding to indicate the run length of
+             * the non-null tuples within each buddy bucket.
+             */
+            final MutableKeyBuffer keys = (MutableKeyBuffer) getKeys();
+            final MutableValueBuffer vals = (MutableValueBuffer) getValues();
 			
 			for (int i = buddyOffset; i < lastSlot; i++) {
 				if (keys.isNull(i)) {

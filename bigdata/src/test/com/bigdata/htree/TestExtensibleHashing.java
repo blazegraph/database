@@ -155,6 +155,8 @@ import junit.framework.TestCase2;
  *       people seem to make this work...
  * 
  * @see https://sourceforge.net/apps/trac/bigdata/ticket/203
+ * 
+ * @deprecated with the {@link HashTree}.
  */
 public class TestExtensibleHashing extends TestCase2 {
 

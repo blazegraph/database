@@ -49,6 +49,10 @@ import com.bigdata.btree.BloomFilter;
  * 
  * @todo The hash function should be a configuration option store with the index
  *       metadata.
+ * 
+ * @deprecated with {@link HTree}. what we really need is a computed key based
+ *             on the data fields in the record. that key can be any bit length
+ *             as the {@link HTree} supports arbitrary bit length keys.
  */
 public interface HashFunction {
 

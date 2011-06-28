@@ -737,75 +737,75 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
     }
 
-	/**
-	 * Verifies details for the {@link IBucketData} interface.
-	 * 
-	 * @param b1
-	 *            A hash bucket.
-	 * @param b2
-	 *            Another hash bucket.
-	 */
-    static public void assertSameHashCodes(final IBucketData b1, final IBucketData b2) {
-
-		/*
-		 * FIXME This method needs to be updated. The hash codes are now stored
-		 * as the unsigned byte[] keys in the bucket, which reuses the design
-		 * pattern for leaves and allows us to support hash codes having various
-		 * bit lengths.
-		 */
-    	fail("Update this method");
-    	
-    	// The key and value counts must be the same.
-    	final int n = b1.getKeyCount();
-    	assertEquals("keyCount", n, b2.getKeyCount());
-    	assertEquals("valueCount", n, b1.getValueCount());
-    	assertEquals("valueCount", n, b2.getValueCount());
-
-		assertEquals("lengthMSB", b1.getLengthMSB(), b2.getLengthMSB());
-    	
-    	/*
-    	 * Verify that the same hash codes are reported at each index position.
-    	 */
-		for (int i = 0; i < n; i++) {
-
-			final int h1 = b1.getHash(i);
-
-			final int h2 = b2.getHash(i);
-			
-			if (h1 != h2) {
-			
-				assertEquals("getHash(" + i + ")", h1, h2);
-				
-			}
-
-		}
-		
-		/*
-		 * Now verify that the same hash matches are reported for each
-		 * visited hash code.
-		 */
-		for (int i = 0; i < n; i++) {
-
-			final int h1 = b1.getHash(i);
-
-			final List<Integer> indices = new LinkedList<Integer>();
-
-			final Iterator<Integer> eitr = b1.hashIterator(h1);
-
-			while (eitr.hasNext()) {
-
-				indices.add(eitr.next());
-
-			}
-
-			final Integer[] hashCodes = indices.toArray(new Integer[indices
-					.size()]);
-
-			assertSameIterator("hashCodes", hashCodes, b2.hashIterator(h1));
-
-    	}
-
-    }
+//	/**
+//	 * Verifies details for the {@link IBucketData} interface.
+//	 * 
+//	 * @param b1
+//	 *            A hash bucket.
+//	 * @param b2
+//	 *            Another hash bucket.
+//	 */
+//    static public void assertSameHashCodes(final IBucketData b1, final IBucketData b2) {
+//
+//		/*
+//		 * FIXME This method needs to be updated. The hash codes are now stored
+//		 * as the unsigned byte[] keys in the bucket, which reuses the design
+//		 * pattern for leaves and allows us to support hash codes having various
+//		 * bit lengths.
+//		 */
+//    	fail("Update this method");
+//    	
+//    	// The key and value counts must be the same.
+//    	final int n = b1.getKeyCount();
+//    	assertEquals("keyCount", n, b2.getKeyCount());
+//    	assertEquals("valueCount", n, b1.getValueCount());
+//    	assertEquals("valueCount", n, b2.getValueCount());
+//
+//		assertEquals("lengthMSB", b1.getLengthMSB(), b2.getLengthMSB());
+//    	
+//    	/*
+//    	 * Verify that the same hash codes are reported at each index position.
+//    	 */
+//		for (int i = 0; i < n; i++) {
+//
+//			final int h1 = b1.getHash(i);
+//
+//			final int h2 = b2.getHash(i);
+//			
+//			if (h1 != h2) {
+//			
+//				assertEquals("getHash(" + i + ")", h1, h2);
+//				
+//			}
+//
+//		}
+//		
+//		/*
+//		 * Now verify that the same hash matches are reported for each
+//		 * visited hash code.
+//		 */
+//		for (int i = 0; i < n; i++) {
+//
+//			final int h1 = b1.getHash(i);
+//
+//			final List<Integer> indices = new LinkedList<Integer>();
+//
+//			final Iterator<Integer> eitr = b1.hashIterator(h1);
+//
+//			while (eitr.hasNext()) {
+//
+//				indices.add(eitr.next());
+//
+//			}
+//
+//			final Integer[] hashCodes = indices.toArray(new Integer[indices
+//					.size()]);
+//
+//			assertSameIterator("hashCodes", hashCodes, b2.hashIterator(h1));
+//
+//    	}
+//
+//    }
     
     /**
      * Special purpose helper used to vet {@link Node#childAddr}.
