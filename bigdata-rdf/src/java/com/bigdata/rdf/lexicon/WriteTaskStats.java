@@ -26,6 +26,12 @@ public class WriteTaskStats {
     /** time to insert terms into indices. */
     long indexTime = 0;
 
+    /** time on the forward index. */
+    long forwardIndexTime;
+
+    /** time on the reverse index. */
+    long reverseIndexTime;
+
     /** time on the terms index. */
     long termsIndexTime;
 
@@ -43,18 +49,20 @@ public class WriteTaskStats {
 
     public String toString() {
     	final StringBuilder sb = new StringBuilder();
-    	sb.append(getClass().getSimpleName());
-    	sb.append("{ndistinct="+ndistinct);
-    	sb.append(",keyGenTime="+keyGenTime+"ms");
-    	sb.append(",keySortTime="+keySortTime+"ms");
-    	sb.append(",indexTime="+indexTime+"ms");
-    	sb.append(",termsIndexTime="+termsIndexTime+"ms");
-    	sb.append(",fullTextIndexTime="+fullTextIndexTime+"ms");
-    	sb.append(",totalBucketSize="+totalBucketSize);
-    	sb.append(",maxBucketSize="+maxBucketSize);
-    	sb.append(",nunknown="+nunknown);
-    	sb.append("}");
-    	return sb.toString();
+        sb.append(getClass().getSimpleName());
+        sb.append("{ndistinct=" + ndistinct);
+        sb.append(",keyGenTime=" + keyGenTime + "ms");
+        sb.append(",keySortTime=" + keySortTime + "ms");
+        sb.append(",indexTime=" + indexTime + "ms");
+        sb.append(",t2idIndexTime=" + forwardIndexTime + "ms");
+        sb.append(",id2tIndexTime=" + reverseIndexTime + "ms");
+        sb.append(",termsIndexTime=" + termsIndexTime + "ms");
+        sb.append(",fullTextIndexTime=" + fullTextIndexTime + "ms");
+        sb.append(",totalBucketSize=" + totalBucketSize);
+        sb.append(",maxBucketSize=" + maxBucketSize);
+        sb.append(",nunknown=" + nunknown);
+        sb.append("}");
+        return sb.toString();
     }
-    
+
 }

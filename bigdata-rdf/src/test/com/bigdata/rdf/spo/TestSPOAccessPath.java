@@ -80,13 +80,19 @@ public class TestSPOAccessPath extends AbstractTripleStoreTestCase {
     private MockTermIdFactory factory;
     
     protected void setUp() throws Exception {
+        
         super.setUp();
+        
         factory = new MockTermIdFactory();
+        
     }
 
     protected void tearDown() throws Exception {
+        
         super.tearDown();
+        
         factory = null;
+        
     }
 
     /**
@@ -98,11 +104,11 @@ public class TestSPOAccessPath extends AbstractTripleStoreTestCase {
         final AbstractTripleStore store = getStore();
 
         // constants used for s,p,o,c when bound. 0L used when unbound.
-        final IV S = factory.newTermId(VTE.URI, 1);
-        final IV P = factory.newTermId(VTE.URI, 2);
-        final IV O = factory.newTermId(VTE.URI, 3);
-        final IV C = factory.newTermId(VTE.URI, 4);
-        final IV _ = factory.newTermId(VTE.URI, 0);
+        final IV<?,?> S = factory.newTermId(VTE.URI, 1);
+        final IV<?,?> P = factory.newTermId(VTE.URI, 2);
+        final IV<?,?> O = factory.newTermId(VTE.URI, 3);
+        final IV<?,?> C = factory.newTermId(VTE.URI, 4);
+        final IV<?,?> _ = factory.newTermId(VTE.URI, 0);
 
         try {
 

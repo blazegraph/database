@@ -945,6 +945,7 @@ public class HashCollisionUtility {
 		 * since the DateTimeExtension uses the LexiconRelation to do its work.
 		 */
 		conf = new LexiconConfiguration<BigdataValue>(
+//		        256,  // blobsThreshold
 				true, // inlineXSDDatatypeLiterals
 				true, // inlineTextLiterals
 				64,   // maxInlineStringLength
@@ -1717,7 +1718,7 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		 * 
 		 * @throws InterruptedException
 		 * 
-		 *             FIXME Handle {@link TermId}, {@link URINamespaceIV}, and
+		 *             FIXME Handle {@link BlobIV}, {@link URINamespaceIV}, and
 		 *             {@link LiteralDatatypeIV}. These are three kinds of
 		 *             "non-inline" values. They will have to be queued for
 		 *             insertion into the TERMS index and Statement which depend

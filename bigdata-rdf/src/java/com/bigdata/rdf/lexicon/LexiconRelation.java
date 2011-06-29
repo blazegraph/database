@@ -65,23 +65,21 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
-import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtensionFactory;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
@@ -111,6 +109,7 @@ import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.search.FullTextIndex;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
@@ -276,9 +275,57 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
         {
 
+            blobsThreshold = Integer.parseInt(getProperty(
+                    AbstractTripleStore.Options.BLOBS_THRESHOLD,
+                    AbstractTripleStore.Options.DEFAULT_BLOBS_THRESHOLD));
+
+            if (blobsThreshold < 0 || blobsThreshold > 4 * Bytes.kilobyte) {
+
+                throw new IllegalArgumentException(
+                        AbstractTripleStore.Options.BLOBS_THRESHOLD + "="
+                                + blobsThreshold);
+
+            }
+
+        }
+
+        {
+
+            final String defaultValue;
+            if (indexManager instanceof IBigdataFederation<?>
+                    && ((IBigdataFederation<?>) indexManager).isScaleOut()) {
+
+                defaultValue = AbstractTripleStore.Options.DEFAULT_TERMID_BITS_TO_REVERSE;
+
+            } else {
+
+                // false unless this is a scale-out deployment.
+                defaultValue = "0";
+
+            }
+
+            termIdBitsToReverse = Integer
+                    .parseInt(getProperty(
+                            AbstractTripleStore.Options.TERMID_BITS_TO_REVERSE,
+                            defaultValue));
+            
+            if (termIdBitsToReverse < 0 || termIdBitsToReverse > 31) {
+
+                throw new IllegalArgumentException(
+                        AbstractTripleStore.Options.TERMID_BITS_TO_REVERSE
+                                + "=" + termIdBitsToReverse);
+                
+            }
+            
+        }
+
+        {
+
             final Set<String> set = new HashSet<String>();
 
-            set.add(getFQN(LexiconKeyOrder.TERMS));
+            set.add(getFQN(LexiconKeyOrder.TERM2ID));
+            set.add(getFQN(LexiconKeyOrder.ID2TERM));
+            set.add(getFQN(LexiconKeyOrder.BLOBS));
 
             if(textIndex) {
                 
@@ -292,7 +339,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             this.keyOrders = Arrays
                     .asList((IKeyOrder<BigdataValue>[]) new IKeyOrder[] { //
-                            LexiconKeyOrder.TERMS //
+                            LexiconKeyOrder.BLOBS //
                             });
 
         }
@@ -428,9 +475,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                  * Setup the lexicon configuration.
                  */
                 lexiconConfiguration = new LexiconConfiguration<BigdataValue>(
-                        inlineLiterals, inlineTextLiterals, maxInlineTextLength, inlineBNodes,
-                        inlineDateTimes, rejectInvalidXSDValues, xFactory,
-                        getContainer().getVocabulary());
+                        inlineLiterals, inlineTextLiterals,
+                        maxInlineTextLength, inlineBNodes, inlineDateTimes,
+                        rejectInvalidXSDValues, xFactory, getContainer()
+                                .getVocabulary());
 
             } catch (InstantiationException e) {
                 throw new IllegalArgumentException(
@@ -509,7 +557,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 				 * Log message if full text index is enabled and we are inlining
 				 * textual literals and MAX_INLINE_TEXT_LENGTH is GT some
 				 * threshold value (e.g., 4096). This combination represents an
-				 * unresonable configuration due to the data duplication in the
+				 * unreasonable configuration due to the data duplication in the
 				 * full text index. (The large literals will be replicated
 				 * within the full text index for each token extracted from the
 				 * literal by the text analyzer.)
@@ -537,63 +585,73 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             final IIndexManager indexManager = getIndexManager();
 
             // register the indices.
-            final String termsName = getFQN(LexiconKeyOrder.TERMS);
-            IIndex terms = null;
-            if (indexManager instanceof IJournal) {
-                terms = ((IJournal) indexManager).registerIndex(termsName,
-                        getTermsIndexMetadata(termsName));
-            } else {
-                /*
-                 * Scale-out an other non-transactional contexts.
-                 */
-                indexManager.registerIndex(getTermsIndexMetadata(termsName));
-            }
 
-			/*
-			 * Insert a tuple for the NullIV mapping it to a null value in the
-			 * TERMS index.
-			 */
-			{
+            indexManager
+                    .registerIndex(getTerm2IdIndexMetadata(getFQN(LexiconKeyOrder.TERM2ID)));
 
-                if (terms == null) {
-                    /*
-                     * Scale-out (will not have been reported by registerIndex
-                     * but we are not running a transaction so we can look it up
-                     * now).
-                     */
-                    terms = getIndex(getFQN(LexiconKeyOrder.TERMS));
-                }
+            indexManager
+                    .registerIndex(getId2TermIndexMetadata(getFQN(LexiconKeyOrder.ID2TERM)));
 
-                /*
-                 * Insert a tuple for each kind of VTE having a ZERO hash code
-                 * and a ZERO counter and thus qualifying it as a NullIV. Each
-                 * of these tuples is mapped to a null value in the index. This
-                 * reserves the possible distinct NullIV keys so they can not be
-                 * assigned to real Values.
-                 * 
-                 * Note: The hashCode of "" is ZERO, so an empty Literal would
-                 * otherwise be assigned the same key as mockIV(VTE.LITERAL).
-                 */
+            indexManager
+                    .registerIndex(getTermsIndexMetadata(getFQN(LexiconKeyOrder.BLOBS)));
 
-                final IKeyBuilder keyBuilder = h.newKeyBuilder();
+//            final String termsName = getFQN(LexiconKeyOrder.TERMS);
+//            IIndex terms = null;
+//            if (indexManager instanceof IJournal) {
+//                terms = ((IJournal) indexManager).registerIndex(termsName,
+//                        getTermsIndexMetadata(termsName));
+//            } else {
+//                /*
+//                 * Scale-out an other non-transactional contexts.
+//                 */
+//                indexManager.registerIndex(getTermsIndexMetadata(termsName));
+//            }
 
-                final byte[][] keys = new byte[][] {
-                        TermId.mockIV(VTE.URI).encode(keyBuilder.reset()).getKey(), //
-                        TermId.mockIV(VTE.BNODE).encode(keyBuilder.reset()).getKey(), //
-                        TermId.mockIV(VTE.LITERAL).encode(keyBuilder.reset()).getKey(), //
-                        TermId.mockIV(VTE.STATEMENT).encode(keyBuilder.reset()).getKey(), //
-                };
-                
-                // Sort the keys for efficient insert.
-                Arrays.sort(keys,UnsignedByteArrayComparator.INSTANCE);
-                
-                final byte[][] vals = new byte[][] { null, null, null, null };
-                
-                // submit the task and wait for it to complete.
-                terms.submit(0/* fromIndex */, keys.length/* toIndex */, keys, vals,
-                        BatchInsertConstructor.RETURN_NO_VALUES, null/* aggregator */);
-                
-			}
+//			/*
+//			 * Insert a tuple for the NullIV mapping it to a null value in the
+//			 * TERMS index.
+//			 */
+//			{
+//
+//                if (terms == null) {
+//                    /*
+//                     * Scale-out (will not have been reported by registerIndex
+//                     * but we are not running a transaction so we can look it up
+//                     * now).
+//                     */
+//                    terms = getIndex(getFQN(LexiconKeyOrder.TERMS));
+//                }
+//
+//                /*
+//                 * Insert a tuple for each kind of VTE having a ZERO hash code
+//                 * and a ZERO counter and thus qualifying it as a NullIV. Each
+//                 * of these tuples is mapped to a null value in the index. This
+//                 * reserves the possible distinct NullIV keys so they can not be
+//                 * assigned to real Values.
+//                 * 
+//                 * Note: The hashCode of "" is ZERO, so an empty Literal would
+//                 * otherwise be assigned the same key as mockIV(VTE.LITERAL).
+//                 */
+//
+//                final IKeyBuilder keyBuilder = h.newKeyBuilder();
+//
+//                final byte[][] keys = new byte[][] {
+//                        TermId.mockIV(VTE.URI).encode(keyBuilder.reset()).getKey(), //
+//                        TermId.mockIV(VTE.BNODE).encode(keyBuilder.reset()).getKey(), //
+//                        TermId.mockIV(VTE.LITERAL).encode(keyBuilder.reset()).getKey(), //
+//                        TermId.mockIV(VTE.STATEMENT).encode(keyBuilder.reset()).getKey(), //
+//                };
+//                
+//                // Sort the keys for efficient insert.
+//                Arrays.sort(keys,UnsignedByteArrayComparator.INSTANCE);
+//                
+//                final byte[][] vals = new byte[][] { null, null, null, null };
+//                
+//                // submit the task and wait for it to complete.
+//                terms.submit(0/* fromIndex */, keys.length/* toIndex */, keys, vals,
+//                        BatchInsertConstructor.RETURN_NO_VALUES, null/* aggregator */);
+//                
+//			}
 
             if (textIndex) {
 
@@ -638,7 +696,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             final IIndexManager indexManager = getIndexManager();
 
-            indexManager.dropIndex(getFQN(LexiconKeyOrder.TERMS));
+            indexManager.dropIndex(getFQN(LexiconKeyOrder.BLOBS));
             terms = null;
 
             if (textIndex) {
@@ -662,9 +720,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     }
     
-    /**
-     * The reference to the TERMS index.
-     */
+    /** The reference to the TERM2ID index. */
+    volatile private IIndex term2id;
+
+    /** The reference to the ID2TERM index. */
+    volatile private IIndex id2term;
+
+    /** The reference to the TERMS index. */
     volatile private IIndex terms;
     
     /**
@@ -680,6 +742,21 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * @see AbstractTripleStore.Options#STORE_BLANK_NODES
      */
     private final boolean storeBlankNodes;
+    
+    /**
+     * The maximum character length of an RDF {@link Value} before it will be
+     * inserted into the {@link LexiconKeyOrder#BLOBS} index rather than the
+     * {@link LexiconKeyOrder#TERM2ID} and {@link LexiconKeyOrder#ID2TERM}
+     * indices.
+     * 
+     * @see AbstractTripleStore.Options#BLOBS_THRESHOLD
+     */
+    private final int blobsThreshold;
+
+    /**
+     * @see AbstractTripleStore.Options#TERMID_BITS_TO_REVERSE
+     */
+    private final int termIdBitsToReverse;
     
     /**
      * Are xsd datatype primitive and numeric literals being inlined into the statement indices.
@@ -710,7 +787,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     final private boolean inlineBNodes;
     
     /**
-     * Are xsd:dateTime litersls being inlined into the statement indices.
+     * Are xsd:dateTime literals being inlined into the statement indices.
      * 
      * {@link AbstractTripleStore.Options#INLINE_DATE_TIMES}
      */
@@ -770,7 +847,19 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         return inlineDateTimesTimeZone;
         
     }
-
+    
+    /**
+     * The #of low bits from the term identifier that are reversed and
+     * rotated into the high bits when it is assigned.
+     * 
+     * @see AbstractTripleStore.Options#TERMID_BITS_TO_REVERSE
+     */
+    final public int getTermIdBitsToReverse() {
+        
+        return termIdBitsToReverse;
+        
+    }
+    
     /**
      * <code>true</code> iff blank nodes are being stored in the lexicon's
      * forward index.
@@ -800,11 +889,114 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     @Override
     public IIndex getIndex(final IKeyOrder<? extends BigdataValue> keyOrder) {
 
-        if (keyOrder != LexiconKeyOrder.TERMS)
+        if (keyOrder == LexiconKeyOrder.ID2TERM) {
+
+            return getId2TermIndex();
+
+        } else if (keyOrder == LexiconKeyOrder.TERM2ID) {
+
+            return getTerm2IdIndex();
+
+        } else if (keyOrder == LexiconKeyOrder.BLOBS) {
+
+            return getTermsIndex();
+
+        } else {
+
             throw new AssertionError("keyOrder=" + keyOrder);
 
-        return getTermsIndex();
-        
+        }
+
+    }
+
+    final public IIndex getTerm2IdIndex() {
+
+        if (term2id == null) {
+
+            synchronized (this) {
+
+                if (term2id == null) {
+
+                    final long timestamp = getTimestamp();
+                    
+                    if (TimestampUtility.isReadWriteTx(timestamp)) {
+                        /*
+                         * We always use the unisolated view of the lexicon
+                         * indices for mutation and the lexicon indices do NOT
+                         * set the [isolatable] flag even if the kb supports
+                         * full tx isolation. This is because we use an
+                         * eventually consistent strategy to write on the
+                         * lexicon indices.
+                         * 
+                         * Note: It appears that we have already ensured that
+                         * we will be using the unisolated view of the lexicon
+                         * relation in AbstractTripleStore#getLexiconRelation()
+                         * so this code path should not be evaluated.
+                         */
+                        term2id = AbstractRelation
+                                .getIndex(getIndexManager(),
+                                        getFQN(LexiconKeyOrder.TERM2ID),
+                                        ITx.UNISOLATED);
+                    } else {
+                        term2id = super.getIndex(LexiconKeyOrder.TERM2ID);
+                    }
+
+                    if (term2id == null)
+                        throw new IllegalStateException();
+
+                }
+
+            }
+            
+        }
+
+        return term2id;
+
+    }
+
+    final public IIndex getId2TermIndex() {
+
+        if (id2term == null) {
+
+            synchronized (this) {
+                
+                if (id2term == null) {
+
+                    final long timestamp = getTimestamp();
+                    
+                    if (TimestampUtility.isReadWriteTx(timestamp)) {
+                        /*
+                         * We always use the unisolated view of the lexicon
+                         * indices for mutation and the lexicon indices do NOT
+                         * set the [isolatable] flag even if the kb supports
+                         * full tx isolation. This is because we use an
+                         * eventually consistent strategy to write on the
+                         * lexicon indices.
+                         * 
+                         * Note: It appears that we have already ensured that
+                         * we will be using the unisolated view of the lexicon
+                         * relation in AbstractTripleStore#getLexiconRelation()
+                         * so this code path should not be evaluated.
+                         */
+                        id2term = AbstractRelation
+                                .getIndex(getIndexManager(),
+                                        getFQN(LexiconKeyOrder.ID2TERM),
+                                        ITx.UNISOLATED);
+                    } else {
+                        id2term = super.getIndex(LexiconKeyOrder.ID2TERM);
+                    }
+                
+                    if (id2term == null)
+                        throw new IllegalStateException();
+
+                }
+
+            }
+
+        }
+
+        return id2term;
+
     }
 
     final public IIndex getTermsIndex() {
@@ -833,10 +1025,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                          */
                         terms = AbstractRelation
                                 .getIndex(getIndexManager(),
-                                        getFQN(LexiconKeyOrder.TERMS),
+                                        getFQN(LexiconKeyOrder.BLOBS),
                                         ITx.UNISOLATED);
                     } else {
-                        terms = super.getIndex(LexiconKeyOrder.TERMS);
+                        terms = super.getIndex(LexiconKeyOrder.BLOBS);
                     }
 
                     if (terms == null)
@@ -907,6 +1099,56 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     }
 
+    /**
+     * Return the {@link IndexMetadata} for the TERM2ID index.
+     * 
+     * @param name
+     *            The name of the index.
+     *            
+     * @return The {@link IndexMetadata}.
+     */
+    protected IndexMetadata getTerm2IdIndexMetadata(final String name) {
+
+        final IndexMetadata metadata = newIndexMetadata(name);
+
+        metadata.setTupleSerializer(new Term2IdTupleSerializer(getProperties()));
+        
+        return metadata;
+
+    }
+
+    /**
+     * Return the {@link IndexMetadata} for the ID2TERM index.
+     * 
+     * @param name
+     *            The name of the index.
+     *            
+     * @return The {@link IndexMetadata}.
+     */
+    protected IndexMetadata getId2TermIndexMetadata(final String name) {
+
+        final IndexMetadata metadata = newIndexMetadata(name);
+
+        metadata.setTupleSerializer(new Id2TermTupleSerializer(
+                getNamespace(), getValueFactory()));
+
+        // enable raw record support.
+        metadata.setRawRecords(true);
+
+        /*
+         * Very small RDF values can be inlined into the index, but after that
+         * threshold we want to have the values out of line on the backing
+         * store.
+         * 
+         * TODO Tune this and the threshold at which we use the BLOBS index
+         * instead.
+         */
+        metadata.setMaxRecLen(16); 
+        
+        return metadata;
+
+    }
+
 	/**
 	 * Return the {@link IndexMetadata} for the TERMS index.
 	 * 
@@ -926,6 +1168,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 		// enable raw record support.
 		metadata.setRawRecords(true);
 
+        /*
+         * The presumption is that we are storing large literals (blobs) in this
+         * index so we always want to write them on raw records rather than have
+         * them be inline in the leaves of the index.
+         */
+        metadata.setMaxRecLen(0);
+
 		return metadata;
 
     }
@@ -944,7 +1193,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     public LexiconKeyOrder getPrimaryKeyOrder() {
         
-    	return LexiconKeyOrder.TERMS;
+    	return LexiconKeyOrder.BLOBS;
         
     }
 
@@ -1135,7 +1384,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         if (buri.getIV() == null) {
             
             // will set tid on buri as a side effect
-            final TermId<?> tid = getTermId(buri);
+            final BlobIV<?> tid = getTermId(buri);
         
             if (tid == null) {
             
@@ -1581,7 +1830,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         final ConcurrentHashMap<IV/* iv */, BigdataValue/* term */> ret = 
             new ConcurrentHashMap<IV, BigdataValue>(n);
 
-        final Collection<TermId> termIds = new LinkedList<TermId>();
+        final Collection<BlobIV> termIds = new LinkedList<BlobIV>();
         
         /*
          * Filter out the inline values first and those that have already
@@ -1605,7 +1854,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 
             } else {
                 
-                termIds.add((TermId) iv);
+                termIds.add((BlobIV) iv);
                 
             }
             
@@ -1615,11 +1864,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
          * An array of any term identifiers that were not resolved in this first
          * stage of processing. We will look these up in the index.
          */
-        final TermId[] notFound = new TermId[termIds.size()];
+        final BlobIV[] notFound = new BlobIV[termIds.size()];
 
         int numNotFound = 0;
         
-        for (TermId tid : termIds) {
+        for (BlobIV tid : termIds) {
 
 			final BigdataValue value = _getTermId(tid);
             
@@ -1772,7 +2021,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         final byte[][] keys;
 
-        final TermId[] notFound;
+        final BlobIV[] notFound;
 
         final ConcurrentHashMap<IV, BigdataValue> map;
 
@@ -1800,7 +2049,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
          */
         @SuppressWarnings("unchecked")
         ResolveTermTask(final IIndex ndx, final int fromIndex,
-                final int toIndex, final byte[][] keys, final TermId[] notFound,
+                final int toIndex, final byte[][] keys, final BlobIV[] notFound,
                 ConcurrentHashMap<IV, BigdataValue> map) {
 
             this.ndx = ndx;
@@ -1835,7 +2084,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 
                 for (int i = fromIndex; i < toIndex; i++) {
 
-                    final TermId tid = notFound[i];
+                    final BlobIV tid = notFound[i];
 
                     final byte[] data = vals.get(i);
 
@@ -2118,7 +2367,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * {@link #termCache}, then the cached {@link BigdataValue} will be
      * returned.
      * 
-     * @param TermId
+     * @param BlobIV
      *         a term identifier
      * 
      * @return The corresponding {@link BigdataValue} if the term identifier is
@@ -2127,11 +2376,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *         otherwise.
      * 
      * @throws IllegalArgumentException
-     *             if iv is null, or if the iv is a {@link TermId} and it's 
-     *             <i>id</i> is {@link TermId#NULL}
+     *             if iv is null, or if the iv is a {@link BlobIV} and it's 
+     *             <i>id</i> is {@link BlobIV#NULL}
      */
 	@SuppressWarnings("unchecked")
-    private BigdataValue _getTermId(final TermId tid) {
+    private BigdataValue _getTermId(final BlobIV tid) {
 
         if (tid == null)
             throw new IllegalArgumentException();
@@ -2226,7 +2475,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         if (iv.isInline())
             return iv.asValue(this);
 
-        final TermId tid = (TermId) iv;
+        final BlobIV tid = (BlobIV) iv;
 
         // handle NULL, bnodes, statement identifiers, and the termCache.
         BigdataValue value = _getTermId(tid);
@@ -2333,7 +2582,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *          the term identifier for the value
      */
     @SuppressWarnings("unchecked")
-    private TermId getTermId(final Value value) {
+    private BlobIV getTermId(final Value value) {
+
+        if(false) {
+            /*
+             * This needs to go to which ever index is appropriate. Why is this
+             * not just a call to addTerms(value,false)?
+             */
+            throw new UnsupportedOperationException();
+        }
         
         final IKeyBuilder keyBuilder = h.newKeyBuilder();
         
@@ -2342,10 +2599,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         final byte[] baseKey = h.makePrefixKey(keyBuilder.reset(), asValue);
 
         final byte[] val = valueFactory.getValueSerializer().serialize(asValue);
-
-		final int counter = h
-				.resolveOrAddValue(getTermsIndex(), true/* readOnly */,
-						keyBuilder, baseKey, val, null/* bucketSize */);
+        
+        final int counter = h.resolveOrAddValue(getTermsIndex(),
+                true/* readOnly */, keyBuilder, baseKey, val, null/* tmp */,
+                null/* bucketSize */);
 
 		if (counter == TermsIndexHelper.NOT_FOUND) {
 
@@ -2355,8 +2612,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         }
         
 //        final TermId tid = (TermId) IVUtility.decode(key);
-		final TermId tid = new TermId<BigdataValue>(VTE.valueOf(asValue),
-				asValue.hashCode(), (byte) counter);
+		final BlobIV tid = new BlobIV<BigdataValue>(VTE.valueOf(asValue),
+				asValue.hashCode(), (short) counter);
 
         if(value instanceof BigdataValue) {
 
@@ -2398,7 +2655,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * (efficient index scan).
      */
     @SuppressWarnings("unchecked")
-    public Iterator<TermId> termsIndexScan() {
+    public Iterator<BlobIV> termsIndexScan() {
 
         final IIndex ndx = getTermsIndex();
 
@@ -2449,7 +2706,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     public Iterator<Value> termIterator() {
 
         // visit term identifiers in term order.
-        final Iterator<TermId> itr = termsIndexScan();
+        final Iterator<BlobIV> itr = termsIndexScan();
 
         // resolve term identifiers to terms.
         return new Striterator(itr).addFilter(new Resolver() {
@@ -2462,11 +2719,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
              */
             protected Object resolve(final Object val) {
 
-                if (((TermId) val).isNullIV())
+                if (((BlobIV) val).isNullIV())
                     return null;
 
                 // resolve against the id:term index (random lookup).
-                return getTerm((TermId) val);
+                return getTerm((BlobIV) val);
 
             }
 
@@ -2530,11 +2787,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     }
 
     /**
-     * {@link LexiconKeyOrder#TERMS} is always returned.
+     * {@link LexiconKeyOrder#BLOBS} is always returned.
      */
     public IKeyOrder<BigdataValue> getKeyOrder(final IPredicate<BigdataValue> p) {
 
-        return LexiconKeyOrder.TERMS;
+        return LexiconKeyOrder.BLOBS;
 
     }
 
@@ -2560,7 +2817,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * us from wiring {@link BigdataValue} onto {@link IV}s all the
      * time.</strong>
      * <p>
-     * The lexicon has a single TERMS index. The keys are {@link TermId}s formed
+     * The lexicon has a single TERMS index. The keys are {@link BlobIV}s formed
      * from the {@link VTE} of the {@link BigdataValue},
      * {@link BigdataValue#hashCode()}, and a collision counter. The value is
      * the {@link BigdataValue} as serialized by the
@@ -2612,7 +2869,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             final BigdataValue val = (BigdataValue) predicate.get(
                     LexiconKeyOrder.SLOT_TERM).get();
 
-            final IV iv = (IV) predicate.get(LexiconKeyOrder.SLOT_ID).get();
+            final IV iv = (IV) predicate.get(LexiconKeyOrder.SLOT_IV).get();
 
             if (VTE.valueOf(val) != iv.getVTE()) {
 
@@ -2643,7 +2900,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         }
         case IVBound: {
 
-            final IV iv = (IV) predicate.get(LexiconKeyOrder.SLOT_ID).get();
+            final IV iv = (IV) predicate.get(LexiconKeyOrder.SLOT_IV).get();
             
 //            if (log.isDebugEnabled())
 //                log.debug("materializing: " + iv);

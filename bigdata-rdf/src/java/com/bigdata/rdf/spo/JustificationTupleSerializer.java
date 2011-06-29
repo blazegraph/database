@@ -43,7 +43,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.BlobIV;
 
 /**
  * (De-)serializes {@link Justification}s.

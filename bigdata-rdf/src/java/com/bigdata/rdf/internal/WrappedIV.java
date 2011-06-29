@@ -138,10 +138,6 @@ public class WrappedIV implements IV {
 		return iv.getDTE();
 	}
 
-	public boolean isTermId() {
-		return iv.isTermId();
-	}
-
 	public boolean isNullIV() {
 		return iv.isNullIV();
 	}

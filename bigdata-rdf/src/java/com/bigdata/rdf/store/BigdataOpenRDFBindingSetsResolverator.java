@@ -210,7 +210,6 @@ public class BigdataOpenRDFBindingSetsResolverator
             
             if (outVal.getIV() == null) {
 
-//                c = new Constant(DummyIV.INSTANCE);
                 c = new Constant(TermId.mockIV(VTE.valueOf(value)));
                 
             } else {

@@ -67,9 +67,9 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
+import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.eval.AbstractJoinNexus;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer;
@@ -472,7 +472,6 @@ public class RDFJoinNexus extends AbstractJoinNexus implements IJoinNexus {
 
     final private static transient IConstant<IV> fakeTermId =
         new Constant<IV>(TermId.mockIV(VTE.URI));
-//        new Constant<IV>(new TermId(VTE.URI, -1L));
 
     /**
      * FIXME unit tests for DISTINCT with a head and ELEMENT, with bindings and

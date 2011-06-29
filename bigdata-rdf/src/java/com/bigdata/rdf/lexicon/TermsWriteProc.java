@@ -183,14 +183,17 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         // used to store the discovered / assigned hash collision counters.
         final int[] counters = new int[numTerms];
-        
-        /*
-         * Note: The baseKey should be one byte shorter than the full key (since
-         * it does not include the one byte counter).
-         */
-		final byte[] baseKey = new byte[keyBuilder.capacity()
-				- TermsIndexHelper.SIZEOF_COUNTER];
 
+        /*
+         * Note: The baseKey is shorter than the full key (it does not include
+         * the hash collision counter).
+         */
+        final byte[] baseKey = new byte[keyBuilder.capacity()
+                - TermsIndexHelper.SIZEOF_COUNTER];
+
+        // Temporary buffer used to format the [toKey] for the bucket scan.
+        final byte[] tmp = new byte[TermsIndexHelper.SIZEOF_PREFIX_KEY];
+        
 //        // Used to report the size of each collision bucket.
 //        final AtomicInteger bucketSize = new AtomicInteger(0);
         
@@ -255,7 +258,7 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 
 					// The size of the collision bucket (aka the assigned ctr).
 					counter = helper.addBNode(ndx, keyBuilder, baseKey,
-							getValue(i));
+							getValue(i), tmp);
 
                 }
                 
@@ -273,7 +276,7 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
             	final byte[] val = getValue(i);
             	
 				counter = helper.resolveOrAddValue(ndx, readOnly,
-						keyBuilder, baseKey, val, null/* bucketSize */);
+						keyBuilder, baseKey, val, tmp, null/* bucketSize */);
 
             }
 

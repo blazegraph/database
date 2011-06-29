@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
-import java.math.BigInteger;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -40,8 +39,6 @@ import javax.xml.datatype.DatatypeFactory;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
-import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.rdf.internal.ColorsEnumExtension.Color;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -130,13 +127,11 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
                         return true;
                     }
 
-                    public boolean isTermId() {
+                    public boolean isNonInline() {
                         return false;
                     }
 
                 };
-
-                assertFalse(v.isTermId());
 
                 assertTrue(v.isInline());
 
@@ -192,7 +187,7 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
 
     /**
      * Unit test for encoding and decoding a statement formed from
-     * {@link TermId}s.
+     * {@link BlobIV}s.
      */
     public void test_encodeDecode_allTermIds() {
 
@@ -627,13 +622,13 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
      */
     public void test_encodeDecode_sids() {
         
-        final TermId<?> s1 = newTermId(VTE.URI);
-        final TermId<?> s2 = newTermId(VTE.URI);
-        final TermId<?> p1 = newTermId(VTE.URI);
-        final TermId<?> p2 = newTermId(VTE.URI);
-        final TermId<?> o1 = newTermId(VTE.URI);
-        final TermId<?> o2 = newTermId(VTE.BNODE);
-        final TermId<?> o3 = newTermId(VTE.LITERAL);
+        final IV<?,?> s1 = newTermId(VTE.URI);
+        final IV<?,?> s2 = newTermId(VTE.URI);
+        final IV<?,?> p1 = newTermId(VTE.URI);
+        final IV<?,?> p2 = newTermId(VTE.URI);
+        final IV<?,?> o1 = newTermId(VTE.URI);
+        final IV<?,?> o2 = newTermId(VTE.BNODE);
+        final IV<?,?> o3 = newTermId(VTE.LITERAL);
 
         final SPO spo1 = new SPO(s1, p1, o1, StatementEnum.Explicit);
         final SPO spo2 = new SPO(s1, p1, o2, StatementEnum.Explicit);

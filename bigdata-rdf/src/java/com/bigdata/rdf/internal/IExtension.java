@@ -36,10 +36,10 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  * {@link IExtension}s are responsible for round-tripping between an RDF
  * {@link Value} and an {@link ExtensionIV} for a particular datatype. Because
  * of how {@link ExtensionIV}s are encoded and decoded, the {@link IExtension}
- * will need to have on hand the {@link TermId} for its datatype. This is
+ * will need to have on hand the {@link BlobIV} for its datatype. This is
  * accomplished via the {@link IDatatypeURIResolver} - the {@link IExtension}
  * will give the resolver the datatype {@link URI} it needs resolved and the
- * resolver will lookup (or create) the {@link TermId}. This is done when the
+ * resolver will lookup (or create) the {@link BlobIV}. This is done when the
  * {@link LexiconRelation} is created since the operation must write on the
  * lexicon.
  */
@@ -47,7 +47,7 @@ public interface IExtension<V extends BigdataValue> {
 
     /**
      * Return the fully resolved datatype in the form of a {@link BigdataURI}
-     * with the {@link TermId} already set.
+     * with the {@link BlobIV} already set.
      * 
      * @return
      *          the datatype

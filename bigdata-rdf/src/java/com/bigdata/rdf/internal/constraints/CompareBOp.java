@@ -42,7 +42,7 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -133,7 +133,7 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     	
     	// handle the special case where we have exact termId equality
     	// probably would never hit this because of SameTermBOp
-    	if (op == CompareOp.EQ && left.isTermId() && right.isTermId()) {
+    	if (op == CompareOp.EQ && !left.isInline() && !right.isInline()) {
     		
 //            final long tid1 = left.getTermId();
 //            final long tid2 = right.getTermId();

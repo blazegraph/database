@@ -53,8 +53,8 @@ import com.bigdata.btree.AbstractTuple;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.MockTermIdFactory;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.StatementEnum;
 
@@ -81,23 +81,34 @@ public class TestSPOTupleSerializer extends TestCase2 {
         super(arg0);
     }
 
-    private TermId _1, _2, _3, _4;
+    private IV<?,?> _1, _2, _3, _4;
     
     private MockTermIdFactory factory;
     
     protected void setUp() throws Exception {
+
         super.setUp();
+        
         factory = new MockTermIdFactory();
+        
         _1 = tid(1); _2 = tid(2); _3 = tid(3); _4 = tid(4);
+        
     }
 
     protected void tearDown() throws Exception {
+        
         super.tearDown();
+        
         factory = null;
+        
+        _1 = _2 = _3 = _4 = null;
+        
     }
     
-    private TermId tid(long tidIsIgnored) {
+    private IV<?,?> tid(final long tidIsIgnored) {
+        
         return factory.newTermId(VTE.URI);
+        
     }
 
     public void test_statementOrder() {

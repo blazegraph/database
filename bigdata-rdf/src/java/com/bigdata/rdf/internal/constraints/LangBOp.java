@@ -40,10 +40,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
@@ -60,7 +57,6 @@ public class LangBOp extends IVValueExpression<IV>
 	private static final long serialVersionUID = 7391999162162545704L;
 	
 	private static final transient Logger log = Logger.getLogger(LangBOp.class);
-	
 
 	public interface Annotations extends BOp.Annotations {
 
@@ -139,8 +135,8 @@ public class LangBOp extends IVValueExpression<IV>
 	    	
 	    	if (langIV == null) {
 	    		
-//	    		langIV = new TermId(VTE.LITERAL, TermId.NULL);
 	    		langIV = TermId.mockIV(VTE.LITERAL);
+
 	    		lang.setIV(langIV);
 		    	
 	    	}

@@ -9,8 +9,8 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.TermsWriteProc.TermsWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataValue;
@@ -343,8 +343,8 @@ public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
 					final BigdataValue value = a[i].obj;
 
 					// Rebuild the IV.
-					final TermId<?> iv = new TermId(VTE.valueOf(value), value
-							.hashCode(), (byte) counter);
+					final BlobIV<?> iv = new BlobIV(VTE.valueOf(value), value
+							.hashCode(), (short) counter);
 
 					// assign the term identifier.
 					value.setIV(iv);

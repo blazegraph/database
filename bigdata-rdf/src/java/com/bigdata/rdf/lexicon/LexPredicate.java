@@ -152,12 +152,12 @@ public class LexPredicate extends Predicate<BigdataValue> {
     }
     
     /**
-     * Return the {@link IV} at index position {@value LexiconKeyOrder#SLOT_ID}.
+     * Return the {@link IV} at index position {@value LexiconKeyOrder#SLOT_IV}.
      */
     @SuppressWarnings("unchecked")
     final public IVariableOrConstant<IV> iv() {
         
-        return (IVariableOrConstant<IV>) get(LexiconKeyOrder.SLOT_ID);
+        return (IVariableOrConstant<IV>) get(LexiconKeyOrder.SLOT_IV);
         
     }
     

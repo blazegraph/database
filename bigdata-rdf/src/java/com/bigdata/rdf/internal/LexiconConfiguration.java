@@ -38,6 +38,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 
+import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -61,6 +62,16 @@ public class LexiconConfiguration<V extends BigdataValue>
     private static final Logger log = 
         Logger.getLogger(LexiconConfiguration.class);
 
+//    /**
+//     * The maximum character length of an RDF {@link Value} before it will be
+//     * inserted into the {@link LexiconKeyOrder#BLOBS} index rather than the
+//     * {@link LexiconKeyOrder#TERM2ID} and {@link LexiconKeyOrder#ID2TERM}
+//     * indices.
+//     * 
+//     * @see AbstractTripleStore.Options#BLOBS_THRESHOLD
+//     */
+//    private final int blobsThreshold;
+    
 	/**
 	 * <code>true</code> if xsd primitive and numeric xsd datatype literals will
 	 * be inlined.
@@ -94,7 +105,7 @@ public class LexiconConfiguration<V extends BigdataValue>
     private final boolean inlineBNodes;
     
 	/**
-	 * @see AbstractTripleStore.Options#INLINE_BNODES
+	 * @see AbstractTripleStore.Options#INLINE_DATE_TIMES
 	 */
 	private final boolean inlineDateTimes;
     
@@ -187,6 +198,7 @@ public class LexiconConfiguration<V extends BigdataValue>
     }
     
     public LexiconConfiguration(//
+//            final int blobsThreshold,
             final boolean inlineXSDDatatypeLiterals,//
             final boolean inlineTextLiterals,//
             final int maxInlineTextLength,//
@@ -196,13 +208,17 @@ public class LexiconConfiguration<V extends BigdataValue>
             final IExtensionFactory xFactory,//
             final Vocabulary vocab//
             ) {
-        
+
+//        if (blobsThreshold < 0)
+//            throw new IllegalArgumentException();
+
         if (maxInlineTextLength < 0)
             throw new IllegalArgumentException();
 
         if (vocab == null)
             throw new IllegalArgumentException();
 
+//        this.blobsThreshold = blobsThreshold;
         this.inlineXSDDatatypeLiterals = inlineXSDDatatypeLiterals;
         this.inlineTextLiterals = inlineTextLiterals;
         this.maxInlineTextLength = maxInlineTextLength;

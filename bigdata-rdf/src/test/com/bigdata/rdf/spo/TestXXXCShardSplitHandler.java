@@ -75,13 +75,19 @@ public class TestXXXCShardSplitHandler extends AbstractTestSegSplitter {
     private MockTermIdFactory factory;
     
     protected void setUp() throws Exception {
+
         super.setUp();
+        
         factory = new MockTermIdFactory();
+        
     }
 
     protected void tearDown() throws Exception {
+
         super.tearDown();
+
         factory = null;
+        
     }
 
     /**

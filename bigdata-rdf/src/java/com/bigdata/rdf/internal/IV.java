@@ -119,18 +119,9 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
     DTE getDTE();
 
 	/**
-	 * <code>true</code> iff the RDF value is represented by a {@link TermId}.
-	 * When an RDF Value is represented as a {@link TermId}, it must be resolved
-	 * against the <code>TERMS</code> index.
-	 * 
-	 * @see #isInline()
-	 */
-    boolean isTermId();
-
-	/**
 	 * <code>true</code> iff the {@link IV} represents a <em>null</em>
 	 * {@link IV} reference. <code>null</code> {@link IV}s are somewhat special.
-	 * They get used as wildcards for the keys in the justifications index and
+	 * They get used as wild cards for the keys in the justifications index and
 	 * perhaps (?) in a few other locations.
 	 */
     boolean isNullIV();
@@ -150,11 +141,7 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
     /**
      * <code>true</code> iff the RDF value is directly represented inline. When
      * an RDF Value is "inline" its value can be directly decoded from its
-     * representation in the keys of the statement indices. This is in contrast
-     * to having to resolve a term identifier to its value using the
-     * <code>ID2TERM</code> index.
-     * 
-     * @see #isTermId()
+     * representation in the keys of the statement indices. 
      */
     boolean isInline();
 
