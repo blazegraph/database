@@ -8,7 +8,7 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.NumericBNodeIV;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.UUIDBNodeIV;
 import com.bigdata.rdf.internal.UUIDLiteralIV;
 import com.bigdata.rdf.internal.XSDBooleanIV;
@@ -95,7 +95,7 @@ public class TestIVCache extends AbstractTripleStoreTestCase {
 	}
 
     /**
-     * Variant used *except* for {@link TermId}s.
+     * Variant used *except* for {@link BlobIV}s.
      * @param lex
      * @param iv
      */
@@ -127,8 +127,8 @@ public class TestIVCache extends AbstractTripleStoreTestCase {
 		 * else).
 		 */
 		final BigdataValue val;
-		if(iv.isTermId()) {
-			((TermId)iv).setValue(val = given);
+		if(!iv.isInline()) {
+			((BlobIV)iv).setValue(val = given);
 		} else {
 			val = iv.asValue(lex);
 		}

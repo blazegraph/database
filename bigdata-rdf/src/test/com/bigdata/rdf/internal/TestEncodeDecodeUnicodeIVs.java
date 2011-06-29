@@ -404,7 +404,7 @@ public class TestEncodeDecodeUnicodeIVs extends
      */
     public void test_encodeDecode_NonInline_URI_with_NamespaceIV() {
 
-        final TermId<?> namespaceIV = newTermId(VTE.URI);
+        final IV<?,?> namespaceIV = newTermId(VTE.URI);
         
         final IV<?, ?>[] e = {//
                 new URINamespaceIV<BigdataURI>(
@@ -433,8 +433,8 @@ public class TestEncodeDecodeUnicodeIVs extends
      */
     public void test_encodeDecode_NonInline_Literal_with_DatatypeIV() {
 
-        final TermId<?> datatypeIV = newTermId(VTE.URI);
-        final TermId<?> datatypeIV2 = newTermId(VTE.URI);
+        final IV<?,?> datatypeIV = newTermId(VTE.URI);
+        final IV<?,?> datatypeIV2 = newTermId(VTE.URI);
 
         final IV<?, ?>[] e = {//
                 new LiteralDatatypeIV<BigdataLiteral>(

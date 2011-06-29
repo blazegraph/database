@@ -34,19 +34,16 @@ import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rdf.internal.AbstractIV;
+import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.TermsWriteTask.TermsWriteProcResultHandler;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -72,10 +69,7 @@ public class TestTermsIndex extends TestCase2 {
 
 	/**
 	 * Unit test for generation of sort keys from {@link BigdataValue}s to be
-	 * represented as {@link TermId}s.
-	 * 
-	 * TODO This also needs to be tested when the hash collision counter rolls
-	 * over 128 (and over 255 if we support that).
+	 * represented as {@link BlobIV}s.
 	 */
 	public void test_generateSortKeys() {
 		
@@ -143,7 +137,7 @@ public class TestTermsIndex extends TestCase2 {
 						counter);
 
 				// Wrap as a TermId,
-				final TermId<?> iv = (TermId<?>) IVUtility.decodeFromOffset(
+				final BlobIV<?> iv = (BlobIV<?>) IVUtility.decodeFromOffset(
 						key, 0/* offset */);
 				//new TermId(key);
 
@@ -153,7 +147,7 @@ public class TestTermsIndex extends TestCase2 {
 
 				// Verify the the VTE encoding is consistent in the other
 				// direction as well.
-				assertEquals(TermId.toFlags(VTE.valueOf(kvo.obj)), KeyBuilder
+				assertEquals(BlobIV.toFlags(VTE.valueOf(kvo.obj)), KeyBuilder
 						.decodeByte(key[0]));
 
 				// Verify VTE was correctly encoded.
@@ -163,7 +157,7 @@ public class TestTermsIndex extends TestCase2 {
 				assertEquals(kvo.obj.hashCode(), iv.hashCode());
 				
 				// Verify we can decode the String value of the TermIV.
-				assertEquals(iv, TermId.fromString(iv.toString()));
+				assertEquals(iv, BlobIV.fromString(iv.toString()));
 				
 			}
 
@@ -171,55 +165,55 @@ public class TestTermsIndex extends TestCase2 {
 
 	}
 	
-	/**
-	 * Unit test for creating the TERMS index.
-	 */
-	public void test_termsIndex_create() {
-
-		final IRawStore store = new SimpleMemoryRawStore();
-		
-		try {
-			
-		    final String namespace = getName();
-		    
-			final BTree ndx = createTermsIndex(store, namespace);
-
-			final TermsIndexHelper h = new TermsIndexHelper();
-			
-			final IKeyBuilder keyBuilder = h.newKeyBuilder();
-			
-	        for (VTE vte : VTE.values()) {
-	            
-                // Each VTE has an associated NullIV (mapped to a [null]).
-                assertNull(ndx.lookup(TermId.mockIV(vte).encode(
-                        keyBuilder.reset()).getKey()));
-	            
-	        }
-			
-            // Should be one entry for each type of NullIV.
-            assertEquals(4L, ndx.rangeCount());
-
-            // Verify we visit each of those NullIVs.
-	        final ITupleIterator<BigdataValue> itr = ndx.rangeIterator();
-
-	        while(itr.hasNext()) {
-	            
-	            final ITuple<BigdataValue> tuple = itr.next();
-	            
-	            assertTrue(tuple.isNull());
-	            
-	            // The tuple is deserialized as a [null] reference.
-                assertNull(tuple.getObject());
-
-	        }
-	        
-		} finally {
-			
-			store.destroy();
-			
-		}
-		
-	}
+//	/**
+//	 * Unit test for creating the TERMS index.
+//	 */
+//	public void test_termsIndex_create() {
+//
+//		final IRawStore store = new SimpleMemoryRawStore();
+//		
+//		try {
+//			
+//		    final String namespace = getName();
+//		    
+//			final BTree ndx = createTermsIndex(store, namespace);
+//
+////			final TermsIndexHelper h = new TermsIndexHelper();
+////			
+////			final IKeyBuilder keyBuilder = h.newKeyBuilder();
+////			
+////	        for (VTE vte : VTE.values()) {
+////	            
+////                // Each VTE has an associated NullIV (mapped to a [null]).
+////                assertNull(ndx.lookup(BlobIV.mockIV(vte).encode(
+////                        keyBuilder.reset()).getKey()));
+////	            
+////	        }
+////			
+////            // Should be one entry for each type of NullIV.
+////            assertEquals(4L, ndx.rangeCount());
+////
+////            // Verify we visit each of those NullIVs.
+////	        final ITupleIterator<BigdataValue> itr = ndx.rangeIterator();
+////
+////	        while(itr.hasNext()) {
+////	            
+////	            final ITuple<BigdataValue> tuple = itr.next();
+////	            
+////	            assertTrue(tuple.isNull());
+////	            
+////	            // The tuple is deserialized as a [null] reference.
+////                assertNull(tuple.getObject());
+////
+////	        }
+//	        
+//		} finally {
+//			
+//			store.destroy();
+//			
+//		}
+//		
+//	}
 
     /**
      * Return the {@link IndexMetadata} for the TERMS index.
@@ -291,36 +285,29 @@ public class TestTermsIndex extends TestCase2 {
 
         final BTree ndx = BTree.create(store, metadata);
 
-        /*
-         * Insert a tuple for each kind of VTE having a ZERO hash code and a
-         * ZERO counter and thus qualifying it as a NullIV. Each of these tuples
-         * is mapped to a null value in the index. This reserves the possible
-         * distinct NullIV keys so they can not be assigned to real Values.
-         * 
-         * Note: The hashCode of "" is ZERO, so an empty Literal would otherwise
-         * be assigned the same key as mockIV(VTE.LITERAL).
-         */
-
-        final IKeyBuilder keyBuilder = new TermsIndexHelper().newKeyBuilder();
-
-        final byte[][] keys = new byte[][] {
-            TermId.mockIV(VTE.URI).encode(keyBuilder.reset()).getKey(), //
-            TermId.mockIV(VTE.BNODE).encode(keyBuilder.reset()).getKey(), //
-            TermId.mockIV(VTE.LITERAL).encode(keyBuilder.reset()).getKey(), //
-            TermId.mockIV(VTE.STATEMENT).encode(keyBuilder.reset()).getKey(), //
-        };
-        final byte[][] vals = new byte[][] { null, null, null, null };
-        
-        // submit the task and wait for it to complete.
-        ndx.submit(0/* fromIndex */, keys.length/* toIndex */, keys, vals,
-                BatchInsertConstructor.RETURN_NO_VALUES, null/* aggregator */);
-
-//        for (VTE vte : VTE.values()) {
+//        /*
+//         * Insert a tuple for each kind of VTE having a ZERO hash code and a
+//         * ZERO counter and thus qualifying it as a NullIV. Each of these tuples
+//         * is mapped to a null value in the index. This reserves the possible
+//         * distinct NullIV keys so they can not be assigned to real Values.
+//         * 
+//         * Note: The hashCode of "" is ZERO, so an empty Literal would otherwise
+//         * be assigned the same key as mockIV(VTE.LITERAL).
+//         */
+//
+//        final IKeyBuilder keyBuilder = new TermsIndexHelper().newKeyBuilder();
+//
+//        final byte[][] keys = new byte[][] {
+//            BlobIV.mockIV(VTE.URI).encode(keyBuilder.reset()).getKey(), //
+//            BlobIV.mockIV(VTE.BNODE).encode(keyBuilder.reset()).getKey(), //
+//            BlobIV.mockIV(VTE.LITERAL).encode(keyBuilder.reset()).getKey(), //
+//            BlobIV.mockIV(VTE.STATEMENT).encode(keyBuilder.reset()).getKey(), //
+//        };
+//        final byte[][] vals = new byte[][] { null, null, null, null };
 //        
-//            ndx.insert(TermId.mockIV(vte).encode(keyBuilder.reset())
-//                    .getKey(), null/* value */);
-//            
-//        }        
+//        // submit the task and wait for it to complete.
+//        ndx.submit(0/* fromIndex */, keys.length/* toIndex */, keys, vals,
+//                BatchInsertConstructor.RETURN_NO_VALUES, null/* aggregator */);
 
         return ndx;
 
@@ -382,6 +369,8 @@ public class TestTermsIndex extends TestCase2 {
 				final BigdataURI uri1 = vf
 						.createURI("http://www.bigdata.com/testTerm");
 
+                // Note: These three literals wind up with the same hash code.
+                // The hash code of the literal is based only on its label.
 				final BigdataLiteral lit1 = vf.createLiteral("bigdata");
 
 				final BigdataLiteral lit2 = vf.createLiteral("bigdata", "en");
@@ -730,8 +719,8 @@ public class TestTermsIndex extends TestCase2 {
                     assertNotNull(ivs1[i]);
                     assertNotNull(ivs2[i]);
                     assertNotSame(ivs1[i], ivs2[i]);
-                    assertNotNull(h.lookup(ndx, (TermId<?>)ivs1[i], keyBuilder));
-                    assertNotNull(h.lookup(ndx, (TermId<?>)ivs2[i], keyBuilder));
+                    assertNotNull(h.lookup(ndx, (BlobIV<?>)ivs1[i], keyBuilder));
+                    assertNotNull(h.lookup(ndx, (BlobIV<?>)ivs2[i], keyBuilder));
 //					assertNotNull(ndx.lookup(ivs1[i]));
 //					assertNotNull(ndx.lookup(ivs2[i]));
                 }

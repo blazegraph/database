@@ -139,7 +139,7 @@ public class TestInlining extends AbstractTripleStoreTestCase {
                 
                 for (IV id : ids.keySet()) {
 
-                    assertTrue(id.isTermId());
+                    assertFalse(id.isInline());
                     
                     assertEquals("Id mapped to a different term? : termId="
                             + id, ids.get(id), ids2.get(id));

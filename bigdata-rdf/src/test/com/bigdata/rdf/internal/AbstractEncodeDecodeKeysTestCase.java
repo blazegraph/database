@@ -177,20 +177,28 @@ public abstract class AbstractEncodeDecodeKeysTestCase extends TestCase2 {
     }
 
     protected void setUp() throws Exception {
-    	super.setUp();
-    	termIdFactory = new MockTermIdFactory();
+    	
+        super.setUp();
+    	
+        termIdFactory = new MockTermIdFactory();
+        
     }
 
     protected void tearDown() throws Exception {
-    	super.tearDown();
+    	
+        super.tearDown();
+        
     	termIdFactory = null;
+    	
     }
 
     /**
-     * Factory for {@link TermId}s.
+     * Factory for mock {@link IV}s.
      */
-    protected TermId newTermId(final VTE vte) {
+    protected IV<?,?> newTermId(final VTE vte) {
+
         return termIdFactory.newTermId(vte);
+        
     }
 
     /**

@@ -136,4 +136,15 @@ public class TestLexAccessPatternEnum extends TestCase2 {
 
     }
 
+    public void test_other_indices() {
+
+        /*
+         * FIXME Look at how we form the lexicon predicate and the handling of
+         * the namespace for index in the lexicon joins. MikeP will have to fix
+         * the lexicon join pipeline to hit both the ID2TERM and BLOBS indices.
+         */
+        fail("Make sure that we are testing all indices");
+        
+    }
+    
 }

@@ -38,7 +38,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.MockTermIdFactory;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.TermsIndexHelper;
 

@@ -143,7 +143,7 @@ public class TestAccessPaths extends AbstractTripleStoreTestCase {
 
             }
 
-            fail("write tests for access paths");
+            fail("write tests for access paths (ID2TERM, BLOBS)");
             
         } finally {
 

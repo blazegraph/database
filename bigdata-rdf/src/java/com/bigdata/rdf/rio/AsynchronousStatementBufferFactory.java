@@ -88,7 +88,7 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -2759,8 +2759,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                 	final BigdataValue value = chunk[i].obj;
                 	
 					// Rebuild the IV.
-					final TermId<?> iv = new TermId(VTE.valueOf(value), value
-							.hashCode(), (byte) counter);
+					final BlobIV<?> iv = new BlobIV(VTE.valueOf(value), value
+							.hashCode(), (short) counter);
 
                     // assign the term identifier.
                     value.setIV(iv);
@@ -2906,7 +2906,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             this.valSer = r.getValueFactory().getValueSerializer();
             
             this.tupleSer = (TermsTupleSerializer) r.getIndex(
-                    LexiconKeyOrder.TERMS).getIndexMetadata()
+                    LexiconKeyOrder.BLOBS).getIndexMetadata()
                     .getTupleSerializer();
 
             this.src = src;

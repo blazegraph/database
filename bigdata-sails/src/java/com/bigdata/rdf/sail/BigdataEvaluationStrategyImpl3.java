@@ -114,7 +114,6 @@ import com.bigdata.rdf.internal.constraints.IsURIBOp;
 import com.bigdata.rdf.internal.constraints.LangBOp;
 import com.bigdata.rdf.internal.constraints.LangMatchesBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
-import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
@@ -124,6 +123,7 @@ import com.bigdata.rdf.internal.constraints.SameTermBOp;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
 import com.bigdata.rdf.internal.constraints.StrBOp;
 import com.bigdata.rdf.internal.constraints.TrueBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
@@ -142,7 +142,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.rdf.store.BigdataOpenRDFBindingSetsResolverator;
-import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -161,7 +160,6 @@ import com.bigdata.search.IHit;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.DistinctFilter;
-import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -2096,7 +2094,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	if (left instanceof Constant) {
     		
     		final IV iv = ((Constant<? extends IV>) left).get();
-            if (iv.isTermId() && iv.isNullIV()) {
+            if (!iv.isInline() && iv.isNullIV()) {
 //    		if (iv.isTermId() && iv.getTermId() == TermId.NULL) {
     			
     			if (iv.isURI() && !(right instanceof DatatypeBOp)) {
@@ -2117,7 +2115,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	if (right instanceof Constant) {
     		
     		final IV iv = ((Constant<? extends IV>) right).get();
-            if (iv.isTermId() && iv.isNullIV()) {
+            if (!iv.isInline() && iv.isNullIV()) {
 //    		if (iv.isTermId() && iv.getTermId() == TermId.NULL) {
     			
     			if (iv.isURI() && !(left instanceof DatatypeBOp)) {

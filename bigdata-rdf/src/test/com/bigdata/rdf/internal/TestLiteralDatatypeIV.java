@@ -21,59 +21,61 @@ public class TestLiteralDatatypeIV extends TestCase2 {
 	private MockTermIdFactory termIdFactory;
 	
 	protected void setUp() throws Exception {
-		super.setUp();
-		termIdFactory = new MockTermIdFactory();
+		
+	    super.setUp();
+		
+	    termIdFactory = new MockTermIdFactory();
+	    
 	}
 
 	protected void tearDown() throws Exception {
-		super.tearDown();
-		termIdFactory = null;
+		
+	    super.tearDown();
+
+	    termIdFactory = null;
+	    
 	}
 
     /**
-     * Factory for {@link TermId}s.
+     * Factory for mock {@link IV}s.
      */
-    private TermId newTermId(final VTE vte) {
+    private IV<?,?> newTermId(final VTE vte) {
+       
         return termIdFactory.newTermId(vte);
+        
     }
 
 	public void test_LiteralDatatypeIV() {
 
-		final TermId<?> datatypeIV = newTermId(VTE.URI);
+		final IV<?,?> datatypeIV = newTermId(VTE.URI);
 
 		doTest(new LiteralDatatypeIV<BigdataLiteral>(
-				new InlineLiteralIV<BigdataLiteral>(""), datatypeIV),//
-				false//isInline
+				new InlineLiteralIV<BigdataLiteral>(""), datatypeIV)//
 				);
 
 		doTest(new LiteralDatatypeIV<BigdataLiteral>(
-				new InlineLiteralIV<BigdataLiteral>("abc"), datatypeIV),//
-				false//isInline
+				new InlineLiteralIV<BigdataLiteral>("abc"), datatypeIV)//
 				);
 
 		doTest(new LiteralDatatypeIV<BigdataLiteral>(
-				new InlineLiteralIV<BigdataLiteral>(" "), datatypeIV),//
-				false//isInline
+				new InlineLiteralIV<BigdataLiteral>(" "), datatypeIV)//
 				);
 
 		doTest(new LiteralDatatypeIV<BigdataLiteral>(
-				new InlineLiteralIV<BigdataLiteral>("1"), datatypeIV),//
-				false//isInline
+				new InlineLiteralIV<BigdataLiteral>("1"), datatypeIV)//
 				);
 
 		doTest(new LiteralDatatypeIV<BigdataLiteral>(
-				new InlineLiteralIV<BigdataLiteral>("12"), datatypeIV),//
-				false//isInline
+				new InlineLiteralIV<BigdataLiteral>("12"), datatypeIV)//
 				);
 
 	}
 
-	private void doTest(final LiteralDatatypeIV<BigdataLiteral> iv,
-			final boolean isInline) {
+	private void doTest(final LiteralDatatypeIV<BigdataLiteral> iv) {
 
 		assertEquals(VTE.LITERAL, iv.getVTE());
 		
-		assertEquals(isInline, iv.isInline());
+		assertFalse(iv.isInline());
 		
 		assertTrue(iv.isExtension());
 
@@ -110,7 +112,7 @@ public class TestLiteralDatatypeIV extends TestCase2 {
 			final AbstractIV<?, ?> expectedDelegateIV = (AbstractIV<?, ?>) iv
 					.getDelegate();
 
-			final AbstractIV<?, ?> actualDelegateIV = ((AbstractExtensionIV<?, ?>) actual)
+			final AbstractIV<?, ?> actualDelegateIV = ((AbstractNonInlineExtensionIVWithDelegateIV<?, ?>) actual)
 					.getDelegate();
 
 			assertEquals(expectedDelegateIV, actualDelegateIV);

@@ -59,7 +59,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 import com.bigdata.journal.TestHelper;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -441,7 +441,7 @@ abstract public class AbstractTestCase
         /**
          * Dumps the term:id index.
          */
-        for( Iterator<TermId> itr = store.getLexiconRelation().termsIndexScan(); itr.hasNext(); ) {
+        for( Iterator<BlobIV> itr = store.getLexiconRelation().termsIndexScan(); itr.hasNext(); ) {
             
             System.err.println("term->id : "+itr.next());
             

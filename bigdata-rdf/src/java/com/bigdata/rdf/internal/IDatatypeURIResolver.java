@@ -44,7 +44,7 @@ import com.bigdata.rdf.model.BigdataURI;
 public interface IDatatypeURIResolver {
 
     /**
-     * Returns a fully resolved datatype URI with the {@link TermId} set.
+     * Returns a fully resolved datatype URI with the {@link BlobIV} set.
      * {@link IExtension}s will handle encoding and decoding of inline literals
      * for custom datatypes, however to do so they will need the term identifier
      * for the custom datatype.  By passing an instance of this interface to

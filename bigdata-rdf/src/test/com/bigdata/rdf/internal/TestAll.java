@@ -66,8 +66,11 @@ public class TestAll extends TestCase {
         // test suite for DTE.
         suite.addTestSuite(TestDTE.class);
 
-        // basic test suite for TermId.
-        suite.addTestSuite(TestTermId.class);
+        // basic test suite for TermIV.
+        suite.addTestSuite(TestTermIV.class);
+
+        // basic test suite for BlobIV.
+        suite.addTestSuite(TestBlobIV.class);
 
         // unit tests for fully inline literals.
         suite.addTestSuite(TestInlineLiteralIV.class);
