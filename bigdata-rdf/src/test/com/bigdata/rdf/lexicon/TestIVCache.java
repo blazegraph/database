@@ -5,6 +5,7 @@ import java.math.BigInteger;
 import java.util.UUID;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.rdf.internal.AbstractIV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.NumericBNodeIV;
@@ -111,7 +112,8 @@ public class TestIVCache extends AbstractTripleStoreTestCase {
 	 * @param iv
 	 * @param given
 	 */
-	private void doTest(final LexiconRelation lex, final IV iv,
+	@SuppressWarnings("unchecked")
+    private void doTest(final LexiconRelation lex, final IV iv,
 			final BigdataValue given) {
 
 		// not found in the cache.
@@ -128,7 +130,7 @@ public class TestIVCache extends AbstractTripleStoreTestCase {
 		 */
 		final BigdataValue val;
 		if(!iv.isInline()) {
-			((BlobIV)iv).setValue(val = given);
+			((AbstractIV<BigdataValue, ?>)iv).setValue(val = given);
 		} else {
 			val = iv.asValue(lex);
 		}
@@ -137,7 +139,7 @@ public class TestIVCache extends AbstractTripleStoreTestCase {
 		assertTrue(val == iv.getValue());
 
 		// round-trip (de-)serialization.
-		final IV iv2 = (IV) SerializerUtil.deserialize(SerializerUtil
+		final IV<?,?> iv2 = (IV<?,?>) SerializerUtil.deserialize(SerializerUtil
 				.serialize(iv));
 
 		// this is a distinct IV instance.

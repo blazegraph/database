@@ -58,15 +58,15 @@ import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
  * the terms being inserted. The results will always be fully consistent if the
  * rules of the road are observed since (a) unisolated operations are
  * single-threaded; and (b) {@link IV}s are assigned in an unisolated atomic
- * operation by {@link TermsWriteProc}.
+ * operation by {@link BlobsWriteProc}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: Term2IdWriteProc.java 4582 2011-05-31 19:12:53Z thompsonbry $
  */
-public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
+public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure implements
         IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure {
     
-    private static final Logger log = Logger.getLogger(TermsWriteProc.class);
+    private static final Logger log = Logger.getLogger(BlobsWriteProc.class);
     
     /**
      * 
@@ -100,11 +100,11 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
     /**
      * De-serialization constructor.
      */
-    public TermsWriteProc() {
+    public BlobsWriteProc() {
         
     }
     
-	protected TermsWriteProc(final IRabaCoder keySer, final IRabaCoder valSer,
+	protected BlobsWriteProc(final IRabaCoder keySer, final IRabaCoder valSer,
 			final int fromIndex, final int toIndex, final byte[][] keys,
 			final byte[][] vals, final boolean readOnly,
 			final boolean storeBlankNodes) {
@@ -118,7 +118,7 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 	}
 
 	public static class TermsWriteProcConstructor extends
-			AbstractKeyArrayIndexProcedureConstructor<TermsWriteProc> {
+			AbstractKeyArrayIndexProcedureConstructor<BlobsWriteProc> {
 
 		private final boolean readOnly;
 		private final boolean toldBNodes;
@@ -138,14 +138,14 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         }
 
-        public TermsWriteProc newInstance(final IRabaCoder keySer,
+        public BlobsWriteProc newInstance(final IRabaCoder keySer,
                 final IRabaCoder valSer, final int fromIndex,
                 final int toIndex, final byte[][] keys, final byte[][] vals) {
 
             if(log.isInfoEnabled())
 				log.info("ntuples=" + (toIndex - fromIndex));
 
-			return new TermsWriteProc(keySer, valSer, fromIndex, toIndex, keys,
+			return new BlobsWriteProc(keySer, valSer, fromIndex, toIndex, keys,
 					vals, readOnly, toldBNodes);
 
         }
@@ -176,7 +176,7 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
         assert numTerms > 0 : "numTerms="+numTerms;
 
 		// Helper class for index operations.
-		final TermsIndexHelper helper = new TermsIndexHelper();
+		final BlobsIndexHelper helper = new BlobsIndexHelper();
 		
 		// used to format the keys for the TERMS index.
 		final IKeyBuilder keyBuilder = helper.newKeyBuilder();
@@ -189,10 +189,10 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
          * the hash collision counter).
          */
         final byte[] baseKey = new byte[keyBuilder.capacity()
-                - TermsIndexHelper.SIZEOF_COUNTER];
+                - BlobsIndexHelper.SIZEOF_COUNTER];
 
         // Temporary buffer used to format the [toKey] for the bucket scan.
-        final byte[] tmp = new byte[TermsIndexHelper.SIZEOF_PREFIX_KEY];
+        final byte[] tmp = new byte[BlobsIndexHelper.SIZEOF_PREFIX_KEY];
         
 //        // Used to report the size of each collision bucket.
 //        final AtomicInteger bucketSize = new AtomicInteger(0);
@@ -202,13 +202,15 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
         
         // The size of the largest collision bucket.
         int maxBucketSize = 0;
-        
+
+        final DataOutputBuffer kbuf = new DataOutputBuffer(
+                0/* existingDataLength */, baseKey);
+
         for (int i = 0; i < numTerms; i++) {
 
             // Copy key into reused buffer to reduce allocation.
 //            final byte[] baseKey = getKey(i);
-			getKeys().copy(i,
-					new DataOutputBuffer(0/* existingDataLength */, baseKey));
+			getKeys().copy(i, kbuf.reset());
 
 			// decode the VTE from the flags.
 			final VTE vte = AbstractIV
@@ -233,7 +235,7 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
                 if (readOnly) {
                 
                     // blank nodes can not be resolved by the index.
-                    counter = TermsIndexHelper.NOT_FOUND;
+                    counter = BlobsIndexHelper.NOT_FOUND;
 
                     /*
                      * FIXME Use this to track down people who pass in a blank
@@ -285,7 +287,7 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 
 			counters[i] = counter;
 
-			if (counter != TermsIndexHelper.NOT_FOUND) {
+			if (counter != BlobsIndexHelper.NOT_FOUND) {
 
 				/*
 				 * TODO This does not update the bucketSize when the Value was
@@ -423,7 +425,7 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
                 
 				final short tmp = ShortPacker.unpackShort(in);
 
-				counters[i] = tmp == Short.MAX_VALUE ? TermsIndexHelper.NOT_FOUND
+				counters[i] = tmp == Short.MAX_VALUE ? BlobsIndexHelper.NOT_FOUND
 						: tmp;
                 
             }
@@ -459,7 +461,7 @@ public class TermsWriteProc extends AbstractKeyArrayIndexProcedure implements
 
 				final int c = counters[i];
 
-				final short tmp = c == TermsIndexHelper.NOT_FOUND ? Short.MAX_VALUE
+				final short tmp = c == BlobsIndexHelper.NOT_FOUND ? Short.MAX_VALUE
 						: (short) c;
 
 				ShortPacker.packShort(out, tmp);

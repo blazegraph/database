@@ -501,7 +501,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                 
                 cxn.commit();
                 
-                String query = 
+                final String query = 
                     "select ?s "+
                     "where { " +
                     "  ?s <"+RDF.TYPE+"> <"+person+"> . " +
@@ -509,7 +509,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                     "  FILTER REGEX(?label, 'Mi*', 'i')" +
                     "}";
                 
-                { // evalute it once so i can see it
+                { // Evaluate it once so i can see it
                     
                     final StringWriter sw = new StringWriter();
                     
@@ -532,7 +532,8 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                     
                     final TupleQueryResult result = tupleQuery.evaluate();
                     
-                    Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                    final Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                    
                     answer.add(createBindingSet(
                             new BindingImpl("s", mike)));
                     

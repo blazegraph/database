@@ -197,7 +197,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
             store.addTerms(terms);
 
 			if (log.isInfoEnabled()) {
-				log.info(new TermsIndexHelper()
+				log.info(new BlobsIndexHelper()
 						.dump(store.getLexiconRelation()));
             }
 
@@ -488,7 +488,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
             store.addTerms(terms);
 
 			if (log.isInfoEnabled()) {
-				log.info(new TermsIndexHelper()
+				log.info(new BlobsIndexHelper()
 						.dump(store.getLexiconRelation()));
 			}
 

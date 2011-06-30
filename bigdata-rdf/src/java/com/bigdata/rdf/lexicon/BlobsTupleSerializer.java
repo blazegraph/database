@@ -60,7 +60,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValue> {
+public class BlobsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValue> {
 
     /**
      * 
@@ -101,7 +101,7 @@ public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValu
     /**
      * De-serialization ctor.
      */
-    public TermsTupleSerializer() {
+    public BlobsTupleSerializer() {
 
         super();
         
@@ -113,12 +113,12 @@ public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValu
      *            A factory that does not support unicode and has an
      *            initialCapacity of {@value Bytes#SIZEOF_LONG}.
      */
-    public TermsTupleSerializer(final String namespace,
+    public BlobsTupleSerializer(final String namespace,
             final BigdataValueFactory valueFactory) {
         
         super(//
                 new ASCIIKeyBuilderFactory(
-                        TermsIndexHelper.TERMS_INDEX_KEY_SIZE),//
+                        BlobsIndexHelper.TERMS_INDEX_KEY_SIZE),//
                 getDefaultLeafKeysCoder(),//
                 // getDefaultValuesCoder()
                 SimpleRabaCoder.INSTANCE);

@@ -23,9 +23,9 @@ import com.bigdata.service.jini.JiniClient;
  * 
  * @author thompsonbry
  */
-public class DumpTermsIndex {
+public class DumpLexicon {
 
-	private DumpTermsIndex() {
+	private DumpLexicon() {
 	}
 
 	private static void usage() {
@@ -206,8 +206,8 @@ public class DumpTermsIndex {
 
 			w.flush();
 			
-			new TermsIndexHelper().dump(w, showTuples, namespace, lex
-					.getTermsIndex());
+			new BlobsIndexHelper().dump(w, showTuples, namespace, lex
+					.getBlobsIndex());
 
 		} catch (RuntimeException ex) {
 
@@ -257,4 +257,148 @@ public class DumpTermsIndex {
 
 	}
 
+//  /**
+//  * Dumps the lexicon in a variety of ways (test suites only).
+//  */
+// public StringBuilder dumpTerms() {
+//
+//     final StringBuilder sb = new StringBuilder(Bytes.kilobyte32 * 4);
+//
+//     /**
+//      * Dumps the terms in term order.
+//      */
+//     sb.append("---- terms in term order ----\n");
+//     for( Iterator<Value> itr = termIterator(); itr.hasNext(); ) {
+//         
+//         final Value val = itr.next();
+//         
+//         if (val == null) {
+//             sb.append("NullIV");
+//         } else {
+//             sb.append(val.toString());
+//         }
+//         
+//         sb.append("\n");
+//         
+//     }
+//     
+//     return sb;
+//     
+// }
+    
+//    /**
+//     * Dumps the lexicon in a variety of ways.
+//     * 
+//     * @param store
+//     */
+//    protected void dumpTerms(final AbstractTripleStore store) {
+
+        /*
+         * Note: it is no longer true that all terms are stored in the reverse
+         * index (BNodes are not). Also, statement identifiers are stored in the
+         * forward index, so we can't really write the following assertion
+         * anymore.
+         */
+//        // Same #of terms in the forward and reverse indices.
+//        assertEquals("#terms", store.getIdTermIndex().rangeCount(null, null),
+//                store.getTermIdIndex().rangeCount(null, null));
+        
+//        /**
+//         * Dumps the forward mapping.
+//         */
+//        {
+//
+//            System.err.println("terms index (forward mapping).");
+//
+//            final IIndex ndx = store.getLexiconRelation().getTerm2IdIndex();
+//
+//            final ITupleIterator itr = ndx.rangeIterator(null, null);
+//
+//            while (itr.hasNext()) {
+//
+//                final ITuple tuple = itr.next();
+//                
+////                // the term identifier.
+////                Object val = itr.next();
+//
+//                /*
+//                 * The sort key for the term. This is not readily decodable. See
+//                 * RdfKeyBuilder for specifics.
+//                 */
+//                final byte[] key = tuple.getKey();
+//
+//                /*
+//                 * deserialize the term identifier (packed long integer).
+//                 */
+//                final long id;
+//                
+//                try {
+//
+//                    id = tuple.getValueStream().readLong();
+////                    id = tuple.getValueStream().unpackLong();
+//
+//                } catch (IOException ex) {
+//
+//                    throw new RuntimeException(ex);
+//
+//                }
+//
+//                System.err.println(BytesUtil.toString(key) + ":" + id);
+//
+//            }
+//
+//        }
+
+//        /**
+//         * Dumps the reverse mapping.
+//         */
+//        {
+//
+//            System.err.println("ids index (reverse mapping).");
+//
+//            final IIndex ndx = store.getLexiconRelation().getId2TermIndex();
+//
+//            final ITupleIterator<BigdataValue> itr = ndx.rangeIterator(null, null);
+//
+//            while (itr.hasNext()) {
+//
+//                final ITuple<BigdataValue> tuple = itr.next();
+//                
+//                final BigdataValue term = tuple.getObject();
+//                
+//                System.err.println(term.getIV()+ ":" + term);
+//
+//            }
+//
+//        }
+        
+//        /**
+//         * Dumps the term:id index.
+//         */
+//        for( Iterator<BlobIV> itr = store.getLexiconRelation().termsIndexScan(); itr.hasNext(); ) {
+//            
+//            System.err.println("term->id : "+itr.next());
+//            
+//        }
+
+//        /**
+//         * Dumps the id:term index.
+//         */
+//        for( Iterator<Value> itr = store.getLexiconRelation().idTermIndexScan(); itr.hasNext(); ) {
+//            
+//            System.err.println("id->term : "+itr.next());
+//            
+//        }
+
+//        /**
+//         * Dumps the terms in term order.
+//         */
+//        for( Iterator<Value> itr = store.getLexiconRelation().termIterator(); itr.hasNext(); ) {
+//            
+//            System.err.println("termOrder : "+itr.next());
+//            
+//        }
+//        
+//    }
+    
 }

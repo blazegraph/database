@@ -51,7 +51,7 @@ import com.bigdata.io.compression.UnicodeHelper;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
-import com.bigdata.rdf.lexicon.TermsIndexHelper;
+import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -713,11 +713,11 @@ public class IVUtility {
 
                     final int hashCode = KeyBuilder.decodeInt(key, o);
                     
-                    o += TermsIndexHelper.SIZEOF_HASH;
+                    o += BlobsIndexHelper.SIZEOF_HASH;
                     
                     final short counter = KeyBuilder.decodeShort(key, o);
                     
-                    o += TermsIndexHelper.SIZEOF_COUNTER;
+                    o += BlobsIndexHelper.SIZEOF_COUNTER;
                     
                     final BlobIV<?> iv = new BlobIV(flags, hashCode, counter);
 

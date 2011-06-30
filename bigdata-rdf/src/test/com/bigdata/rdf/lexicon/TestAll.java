@@ -67,10 +67,12 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestLexAccessPatternEnum.class);
 
         // Unit tests for operations on the TERMS index.
-        suite.addTestSuite(TestTermsIndex.class);
+        suite.addTestSuite(TestBlobsIndex.class);
 
         suite.addTestSuite(TestComparators.class);
 
+        suite.addTestSuite(TestLexiconKeyBuilder.class);
+        
         suite.addTestSuite(TestSerialization.class);
 
         suite.addTestSuite(TestTermIdEncoder.class);

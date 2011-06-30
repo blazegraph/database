@@ -38,7 +38,6 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 
-import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -429,7 +428,11 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         try {
 
-            return xFactory.createIV(value);
+            @SuppressWarnings("unchecked")
+            final AbstractInlineIV<BigdataLiteral, ?> iv = xFactory
+                    .createIV(value);
+
+            return iv;
 
         } catch (Throwable t) {
 
@@ -476,20 +479,11 @@ public class LexiconConfiguration<V extends BigdataValue>
     private AbstractInlineIV<BigdataLiteral, ?> createInlineUnicodeLiteral(
             final Literal value) {
 
-        final String label = value.getLabel();
-
-        final int datatypeLength = value.getDatatype() == null ? 0 : value
-                .getDatatype().stringValue().length();
-
-        final int languageLength = value.getLanguage() == null ? 0 : value
-                .getLanguage().length();
-
-        final long totalLength = label.length() + datatypeLength
-                + languageLength;
+        final long totalLength = LexiconRelation.getStringLength(value);
 
         if (totalLength <= maxInlineTextLength) {
 
-            return new InlineLiteralIV<BigdataLiteral>(label, value
+            return new InlineLiteralIV<BigdataLiteral>(value.getLabel(), value
                     .getLanguage(), value.getDatatype());
 
         }

@@ -32,7 +32,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.rdf.lexicon.TermsIndexHelper;
+import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.model.BigdataURI;
 
 /**
@@ -49,11 +49,11 @@ public class TestBlobIV extends TestCase2 {
 		super(name);
 	}
 
-	private TermsIndexHelper helper;
+	private BlobsIndexHelper helper;
 	
 	protected void setUp() throws Exception {
 		super.setUp();
-		helper = new TermsIndexHelper();
+		helper = new BlobsIndexHelper();
 	}
 
 	protected void tearDown() throws Exception {

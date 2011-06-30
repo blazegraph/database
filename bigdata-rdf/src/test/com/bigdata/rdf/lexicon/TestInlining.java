@@ -122,7 +122,7 @@ public class TestInlining extends AbstractTripleStoreTestCase {
 //            terms.add(f.createBNode());
 //            terms.add(f.createBNode("a"));
 
-            final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
+            final Map<IV<?,?>, BigdataValue> ids = doAddTermsTest(store, terms);
 
             if (store.isStable()) {
                 
@@ -132,12 +132,14 @@ public class TestInlining extends AbstractTripleStoreTestCase {
 
                 // verify same reverse mappings.
 
-                final Map<IV, BigdataValue> ids2 = store.getLexiconRelation()
+                final Map<IV<?,?>, BigdataValue> ids2 = store.getLexiconRelation()
                         .getTerms(ids.keySet());
 
                 assertEquals(ids.size(),ids2.size());
                 
-                for (IV id : ids.keySet()) {
+                for (Map.Entry<IV<?, ?>, BigdataValue> e : ids.entrySet()) {
+
+                    final IV<?, ?> id = e.getKey();
 
                     assertFalse(id.isInline());
                     
@@ -219,7 +221,7 @@ public class TestInlining extends AbstractTripleStoreTestCase {
             terms.add(b4);
             terms.add(b5);
 
-            final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
+            final Map<IV<?,?>, BigdataValue> ids = doAddTermsTest(store, terms);
 
             assertTrue(b1.getIV().isInline());
             assertFalse(b01.getIV().isInline());
@@ -236,12 +238,14 @@ public class TestInlining extends AbstractTripleStoreTestCase {
 
                 // verify same reverse mappings.
 
-                final Map<IV, BigdataValue> ids2 = store.getLexiconRelation()
+                final Map<IV<?,?>, BigdataValue> ids2 = store.getLexiconRelation()
                         .getTerms(ids.keySet());
 
                 assertEquals(ids.size(),ids2.size());
                 
-                for (IV iv : ids.keySet()) {
+                for (Map.Entry<IV<?, ?>, BigdataValue> e : ids.entrySet()) {
+
+                    final IV<?, ?> iv = e.getKey();
 
                     if(log.isInfoEnabled()) log.info(iv);
                     
@@ -311,7 +315,7 @@ public class TestInlining extends AbstractTripleStoreTestCase {
 //            terms.add(l3);
             terms.add(datatype);
 
-            final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
+            final Map<IV<?,?>, BigdataValue> ids = doAddTermsTest(store, terms);
 
             assertTrue(l1.getIV().isInline());
             assertTrue(l2.getIV().isInline());
@@ -331,12 +335,14 @@ public class TestInlining extends AbstractTripleStoreTestCase {
 
                 // verify same reverse mappings.
 
-                final Map<IV, BigdataValue> ids2 = store.getLexiconRelation()
+                final Map<IV<?,?>, BigdataValue> ids2 = store.getLexiconRelation()
                         .getTerms(ids.keySet());
 
                 assertEquals(ids.size(),ids2.size());
                 
-                for (IV iv : ids.keySet()) {
+                for (Map.Entry<IV<?, ?>, BigdataValue> e : ids.entrySet()) {
+
+                    final IV<?, ?> iv = e.getKey();
 
                     if(log.isInfoEnabled()) log.info(iv);
                     
@@ -410,7 +416,7 @@ public class TestInlining extends AbstractTripleStoreTestCase {
             terms.add(l5);
             terms.add(datatype);
 
-            final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
+            final Map<IV<?,?>, BigdataValue> ids = doAddTermsTest(store, terms);
 
             assertTrue(l1.getIV().isInline());
             assertTrue(l2.getIV().isInline());
@@ -438,17 +444,20 @@ public class TestInlining extends AbstractTripleStoreTestCase {
 
                 // verify same reverse mappings.
 
-                final Map<IV, BigdataValue> ids2 = store.getLexiconRelation()
+                final Map<IV<?,?>, BigdataValue> ids2 = store.getLexiconRelation()
                         .getTerms(ids.keySet());
 
                 assertEquals(ids.size(),ids2.size());
                 
-                for (IV iv : ids.keySet()) {
+                for (Map.Entry<IV<?, ?>, BigdataValue> e : ids.entrySet()) {
 
-                    if(log.isInfoEnabled()) log.info(iv);
-                    
-                    assertEquals("Id mapped to a different term? : iv="
-                            + iv, ids.get(iv), ids2.get(iv));
+                    final IV<?, ?> iv = e.getKey();
+
+                    if (log.isInfoEnabled())
+                        log.info(iv);
+
+                    assertEquals("Id mapped to a different term? : iv=" + iv,
+                            ids.get(iv), ids2.get(iv));
 
                 }
 
@@ -467,7 +476,7 @@ public class TestInlining extends AbstractTripleStoreTestCase {
      * @param terms
      * @return
      */
-    private Map<IV, BigdataValue> doAddTermsTest(
+    private Map<IV<?,?>, BigdataValue> doAddTermsTest(
             final AbstractTripleStore store,
             final Collection<BigdataValue> terms) {
 
@@ -481,7 +490,7 @@ public class TestInlining extends AbstractTripleStoreTestCase {
                 .addTerms(a, size, false/* readOnly */);
 
         // populate map w/ the assigned term identifiers.
-        final Collection<IV> ids = new ArrayList<IV>();
+        final Collection<IV<?,?>> ids = new ArrayList<IV<?, ?>>();
 
         for(BigdataValue t : a) {
             
@@ -492,7 +501,7 @@ public class TestInlining extends AbstractTripleStoreTestCase {
         /*
          * Resolve the assigned term identifiers against the lexicon.
          */
-        final Map<IV, BigdataValue> tmp = store.getLexiconRelation()
+        final Map<IV<?,?>, BigdataValue> tmp = store.getLexiconRelation()
                 .getTerms(ids);
         
         assertEquals(size,tmp.size());
@@ -557,7 +566,7 @@ public class TestInlining extends AbstractTripleStoreTestCase {
             terms.add(f.createLiteral("2007-12-25T00:00:00", f
                     .createURI(XSD.DATETIME.toString())));
 
-            final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
+            final Map<IV<?,?>, BigdataValue> ids = doAddTermsTest(store, terms);
 
             if (store.isStable()) {
                 
@@ -567,16 +576,21 @@ public class TestInlining extends AbstractTripleStoreTestCase {
 
                 // verify same reverse mappings.
 
-                final Map<IV, BigdataValue> ids2 = store.getLexiconRelation()
+                final Map<IV<?,?>, BigdataValue> ids2 = store.getLexiconRelation()
                         .getTerms(ids.keySet());
 
                 assertEquals(ids.size(),ids2.size());
                 
-                for (IV id : ids.keySet()) {
+                for (Map.Entry<IV<?, ?>, BigdataValue> e : ids.entrySet()) {
 
-                	if(log.isInfoEnabled()) log.info(ids.get(id));
-                	if(log.isInfoEnabled()) log.info(ids2.get(id));
-                	
+                    final IV<?, ?> id = e.getKey();
+
+                    if (log.isInfoEnabled())
+                        log.info(ids.get(id));
+
+                    if (log.isInfoEnabled())
+                        log.info(ids2.get(id));
+
                     assertEquals("Id mapped to a different term? : termId="
                             + id, ids.get(id), ids2.get(id));
 

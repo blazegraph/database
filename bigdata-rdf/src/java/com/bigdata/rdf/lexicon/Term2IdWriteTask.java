@@ -116,7 +116,7 @@ public class Term2IdWriteTask implements
                 b = generateSortKeys(tupleSer.getLexiconKeyBuilder(), terms,
                         numTerms);
 
-                stats.keyGenTime = System.currentTimeMillis() - _begin;
+                stats.keyGenTime.add(System.currentTimeMillis() - _begin);
 
             }
 
@@ -130,7 +130,7 @@ public class Term2IdWriteTask implements
 
                 Arrays.sort(b);
 
-                stats.keySortTime += System.currentTimeMillis() - _begin;
+                stats.keySortTime.add(System.currentTimeMillis() - _begin);
 
             }
 
@@ -220,14 +220,15 @@ public class Term2IdWriteTask implements
                         new Term2IdWriteProcResultHandler(a, readOnly,
                                 stats.nunknown));
 
-                stats.indexTime = stats.forwardIndexTime = System.currentTimeMillis()
-                        - _begin;
+                stats.indexTime.addAndGet(stats.forwardIndexTime = System
+                        .currentTimeMillis()
+                        - _begin);
 
             }
 
         }
-        
-        stats.ndistinct = ndistinct;
+
+        stats.ndistinct.addAndGet(ndistinct);
 
         return KVO.dense(a, ndistinct);
         

@@ -61,9 +61,9 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 /**
  * Helper class for operations on the TERMS index.
  */
-public class TermsIndexHelper {
+public class BlobsIndexHelper {
 
-    private static final Logger log = Logger.getLogger(TermsIndexHelper.class);
+    private static final Logger log = Logger.getLogger(BlobsIndexHelper.class);
 
     public static final transient int SIZEOF_HASH = Bytes.SIZEOF_INT;
 
@@ -222,7 +222,7 @@ public class TermsIndexHelper {
      *            byte[] will be allocated if this is <code>null</code>, but the
      *            same byte[] can be reused for multiple invocations. The buffer
      *            MUST be dimensioned to
-     *            {@link TermsIndexHelper#SIZEOF_PREFIX_KEY}.
+     *            {@link BlobsIndexHelper#SIZEOF_PREFIX_KEY}.
      * @param bucketSize
      *            The size of the collision bucket is reported as a side-effect
      *            (optional).
@@ -242,8 +242,8 @@ public class TermsIndexHelper {
 			final byte[] baseKey, final byte[] val, final byte[] tmp,
 			final AtomicInteger bucketSize) {
 
-        assert baseKey.length == TermsIndexHelper.SIZEOF_PREFIX_KEY : "Expecting "
-                + TermsIndexHelper.SIZEOF_PREFIX_KEY
+        assert baseKey.length == BlobsIndexHelper.SIZEOF_PREFIX_KEY : "Expecting "
+                + BlobsIndexHelper.SIZEOF_PREFIX_KEY
                 + " bytes, not "
                 + baseKey.length;
 
@@ -443,7 +443,7 @@ public class TermsIndexHelper {
      *            byte[] will be allocated if this is <code>null</code>, but the
      *            same byte[] can be reused for multiple invocations. The buffer
      *            MUST be dimensioned to
-     *            {@link TermsIndexHelper#SIZEOF_PREFIX_KEY}.
+     *            {@link BlobsIndexHelper#SIZEOF_PREFIX_KEY}.
      * 
      * @return The collision counter.
      * 
@@ -667,7 +667,7 @@ public class TermsIndexHelper {
      *            byte[] will be allocated if this is <code>null</code>, but the
      *            same byte[] can be reused for multiple invocations. The buffer
      *            MUST be dimensioned to
-     *            {@link TermsIndexHelper#TERMS_INDEX_KEY_SIZE}.
+     *            {@link BlobsIndexHelper#TERMS_INDEX_KEY_SIZE}.
      *            
      * @return The toKey.
      */
@@ -730,7 +730,7 @@ public class TermsIndexHelper {
 		
 		w.append("\n");
 		
-		dump(w, true/*showEntries*/, r.getNamespace(), r.getTermsIndex());
+		dump(w, true/*showEntries*/, r.getNamespace(), r.getBlobsIndex());
 		
 		return w.getBuffer();
 
