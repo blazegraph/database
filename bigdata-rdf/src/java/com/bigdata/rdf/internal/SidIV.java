@@ -159,10 +159,14 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
 	}
 
     /**
-     * Using the {@link BigInteger} class to create a unique bnode id based on
-     * the <code>unsigned byte[]</code> key of the inline {@link SPO}.
+     * {@inheritDoc}
+     * <p>
+     * This implementation uses the {@link BigInteger} class to create a unique
+     * blank node ID based on the <code>unsigned byte[]</code> key of the inline
+     * {@link SPO}.
      */
-	private String bnodeId() {
+	@Override
+	public String bnodeId() {
 //		// just use the hash code.  can result in collisions
 //		return String.valueOf(hashCode());
 		

@@ -49,12 +49,19 @@ abstract public class AbstractBNodeIV<V extends BigdataBNode, T> extends
      */
     private static final long serialVersionUID = -4560216387427028030L;
     
-    public AbstractBNodeIV(DTE dte) {
+    public AbstractBNodeIV(final DTE dte) {
 
         super(VTE.BNODE, dte);
 
     }
 
+    @Override
+    public String bnodeId() {
+        
+        return stringValue();
+        
+    }
+    
 	public V asValue(final LexiconRelation lex) {
 		
 		V bnode = getValueCache();

@@ -170,7 +170,7 @@ public class LexiconKeyBuilder implements ITermIndexCodes {
     //            
     // }
 
-    public byte[] blankNode2Key(String id) {
+    public byte[] blankNode2Key(final String id) {
 
         return keyBuilder.reset().append(TERM_CODE_BND).append(id).getKey();
 

@@ -3,7 +3,7 @@ package com.bigdata.rdf.internal;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.rdf.lexicon.TermsIndexHelper;
+import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
@@ -81,7 +81,7 @@ public class TestLiteralDatatypeIV extends TestCase2 {
 
 		assertEquals(DTE.XSDString, iv.getDTE());
 		
-		final TermsIndexHelper h = new TermsIndexHelper();
+		final BlobsIndexHelper h = new BlobsIndexHelper();
 		
 		final IKeyBuilder keyBuilder = h.newKeyBuilder();
 		

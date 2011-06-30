@@ -125,18 +125,6 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
 	 * perhaps (?) in a few other locations.
 	 */
     boolean isNullIV();
-    
-//	/**
-//	 * Return the term identifier.
-//	 * 
-//	 * @return The term identifier.
-//	 * 
-//	 * @throws UnsupportedOperationException
-//	 *             unless the RDF value is represented by a term identifier.
-//	 * 
-//	 * @deprecated termIds no longer exist as of the TERMS refactor.
-//	 */
-//    long getTermId() throws UnsupportedOperationException;
 
     /**
      * <code>true</code> iff the RDF value is directly represented inline. When
@@ -202,5 +190,14 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      * <code>true</code> for xsd:float, xsd:double, and xsd:decimal
      */
     boolean isFloatingPointNumeric();
+
+    /**
+     * Return the blank node ID for this {@link IV}.
+     * 
+     * @throws UnsupportedOperationException
+     *             if this {@link IV} does not represent a blank node.
+     * @return
+     */
+    String bnodeId();
 
 }

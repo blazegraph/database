@@ -32,7 +32,8 @@ public class BigdataSolutionResolverator
         extends
         AbstractChunkedResolverator<ISolution, IBindingSet, AbstractTripleStore> {
 
-    final private static Logger log = Logger.getLogger(BigdataSolutionResolverator.class);
+    final private static Logger log = Logger
+            .getLogger(BigdataSolutionResolverator.class);
 
     /**
      * 
@@ -81,7 +82,7 @@ public class BigdataSolutionResolverator
          * chunk.
          */
         
-        final Collection<IV> ids = new HashSet<IV>(chunk.length
+        final Collection<IV<?, ?>> ids = new HashSet<IV<?, ?>>(chunk.length
                 * state.getSPOKeyArity());
 
         for (ISolution solution : chunk) {
@@ -97,7 +98,7 @@ public class BigdataSolutionResolverator
 
                 final Map.Entry<IVariable, IConstant> entry = itr.next();
 
-                final IV iv = (IV) entry.getValue().get();
+                final IV<?,?> iv = (IV<?,?>) entry.getValue().get();
 
                 if (iv == null) {
 
@@ -116,7 +117,7 @@ public class BigdataSolutionResolverator
             log.info("Resolving " + ids.size() + " term identifiers");
 
         // batch resolve term identifiers to terms.
-        final Map<IV, BigdataValue> terms = state.getLexiconRelation()
+        final Map<IV<?,?>, BigdataValue> terms = state.getLexiconRelation()
                 .getTerms(ids);
 
         /*
@@ -158,15 +159,9 @@ public class BigdataSolutionResolverator
      * @throws IllegalStateException
      *             if the {@link IBindingSet} was not materialized with the
      *             {@link ISolution}.
-     * 
-     * @todo this points out a problem where we would be better off strongly
-     *       typing the term identifiers with their own class rather than using
-     *       {@link Long} since we can not distinguish a {@link Long}
-     *       materialized by a join against some non-RDF relation from a
-     *       {@link Long} that is a term identifier.
      */
     private IBindingSet getBindingSet(final ISolution solution,
-            final Map<IV, BigdataValue> terms) {
+            final Map<IV<?,?>, BigdataValue> terms) {
 
         if (solution == null)
             throw new IllegalArgumentException();
@@ -191,13 +186,13 @@ public class BigdataSolutionResolverator
 
             final Object boundValue = entry.getValue().get();
 
-            if (!(boundValue instanceof IV)) {
+            if (!(boundValue instanceof IV<?, ?>)) {
 
                 continue;
 
             }
 
-            final IV iv = (IV) boundValue;
+            final IV<?,?> iv = (IV<?,?>) boundValue;
 
             final BigdataValue value = terms.get(iv);
 

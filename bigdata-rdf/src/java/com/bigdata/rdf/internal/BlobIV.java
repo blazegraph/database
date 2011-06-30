@@ -28,7 +28,7 @@ import org.openrdf.model.BNode;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.rdf.lexicon.TermsIndexHelper;
+import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.model.BigdataValue;
 import com.sun.org.apache.xerces.internal.util.URI;
 
@@ -283,7 +283,7 @@ public class BlobIV<V extends BigdataValue> extends
     
     final public int byteLength() {
 
-        return TermsIndexHelper.TERMS_INDEX_KEY_SIZE;
+        return BlobsIndexHelper.TERMS_INDEX_KEY_SIZE;
         
     }
 
@@ -366,8 +366,12 @@ public class BlobIV<V extends BigdataValue> extends
 //	}
 
     /**
-     * Create a unique bnode id based on the {@link BlobIV}'s internal data.
+     * {@inheritDoc}
+     * <p>
+     * Creates a unique blank node ID based on the {@link BlobIV}'s internal
+     * data.
      */
+    @Override
     public String bnodeId() {
 
         final long id = ((long) flags()) << 56/* hash:int + counter:short */

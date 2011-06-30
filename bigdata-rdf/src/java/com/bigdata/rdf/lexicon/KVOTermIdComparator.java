@@ -25,8 +25,8 @@ public class KVOTermIdComparator implements Comparator<KVO<BigdataValue>> {
     public int compare(final KVO<BigdataValue> term1,
             final KVO<BigdataValue> term2) {
 
-        final IV iv1 = term1.obj.getIV();
-        final IV iv2 = term2.obj.getIV();
+        final IV<?,?> iv1 = term1.obj.getIV();
+        final IV<?,?> iv2 = term2.obj.getIV();
 
         return iv1.compareTo(iv2);
 

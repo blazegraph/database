@@ -177,5 +177,9 @@ public class WrappedIV implements IV {
 	public boolean isFloatingPointNumeric() {
 		return iv.isFloatingPointNumeric();
 	}
+
+	public String bnodeId() {
+	    return iv.bnodeId();
+	}
 	
 }

@@ -34,7 +34,7 @@ import junit.framework.TestCase2;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.lexicon.TermsIndexHelper;
+import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 
@@ -332,7 +332,7 @@ public class TestTermIV extends TestCase2 {
     
     public void test_NullIV_decode_as_null_reference() {
         
-        final TermsIndexHelper h = new TermsIndexHelper();
+        final BlobsIndexHelper h = new BlobsIndexHelper();
         
         final IV<?,?> iv = TermId.NullIV;
         

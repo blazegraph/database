@@ -45,7 +45,7 @@ import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.lexicon.TermsWriteTask.TermsWriteProcResultHandler;
+import com.bigdata.rdf.lexicon.BlobsWriteTask.TermsWriteProcResultHandler;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -58,12 +58,12 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
  * 
  * @author thompsonbry
  */
-public class TestTermsIndex extends TestCase2 {
+public class TestBlobsIndex extends TestCase2 {
 
-	public TestTermsIndex() {
+	public TestBlobsIndex() {
 	}
 
-	public TestTermsIndex(final String name) {
+	public TestBlobsIndex(final String name) {
 		super(name);
 	}
 
@@ -73,7 +73,7 @@ public class TestTermsIndex extends TestCase2 {
 	 */
 	public void test_generateSortKeys() {
 		
-		final TermsIndexHelper h = new TermsIndexHelper();
+		final BlobsIndexHelper h = new BlobsIndexHelper();
 		
 		final String namespace = getName();
 
@@ -263,7 +263,7 @@ public class TestTermsIndex extends TestCase2 {
 //      // Note: You need to give sufficient heap for this option!
 //      metadata.setWriteRetentionQueueCapacity(q);
 
-        metadata.setTupleSerializer(new TermsTupleSerializer(namespace,
+        metadata.setTupleSerializer(new BlobsTupleSerializer(namespace,
                 valueFactory));
 
         return metadata;
@@ -357,7 +357,7 @@ public class TestTermsIndex extends TestCase2 {
 			final BigdataValueFactory vf = BigdataValueFactoryImpl
 					.getInstance(namespace);
 			
-			final TermsIndexHelper h = new TermsIndexHelper();
+			final BlobsIndexHelper h = new BlobsIndexHelper();
 
 			/*
 			 * Generate Values that we will use to read and write on the TERMS
@@ -408,7 +408,7 @@ public class TestTermsIndex extends TestCase2 {
 				final boolean readOnly = true;
 				final WriteTaskStats stats = new WriteTaskStats();
 
-				final TermsWriteProc.TermsWriteProcConstructor ctor = new TermsWriteProc.TermsWriteProcConstructor(
+				final BlobsWriteProc.TermsWriteProcConstructor ctor = new BlobsWriteProc.TermsWriteProcConstructor(
 						readOnly, toldBNodes);
 
 				ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
@@ -432,7 +432,7 @@ public class TestTermsIndex extends TestCase2 {
 				final boolean readOnly = false;
 				final WriteTaskStats stats = new WriteTaskStats();
 
-				final TermsWriteProc.TermsWriteProcConstructor ctor = new TermsWriteProc.TermsWriteProcConstructor(
+				final BlobsWriteProc.TermsWriteProcConstructor ctor = new BlobsWriteProc.TermsWriteProcConstructor(
 						readOnly, toldBNodes);
 
 				ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
@@ -532,7 +532,7 @@ public class TestTermsIndex extends TestCase2 {
 				final boolean readOnly = true;
 				final WriteTaskStats stats = new WriteTaskStats();
 
-				final TermsWriteProc.TermsWriteProcConstructor ctor = new TermsWriteProc.TermsWriteProcConstructor(
+				final BlobsWriteProc.TermsWriteProcConstructor ctor = new BlobsWriteProc.TermsWriteProcConstructor(
 						readOnly, toldBNodes);
 
 				ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
@@ -602,7 +602,7 @@ public class TestTermsIndex extends TestCase2 {
             final BigdataValueFactory vf = BigdataValueFactoryImpl
                     .getInstance(namespace);
 
-            final TermsIndexHelper h = new TermsIndexHelper();
+            final BlobsIndexHelper h = new BlobsIndexHelper();
 
             // Write on the TERMS index, obtaining IVs for those BNodes.
             final IV[] ivs1;
@@ -636,7 +636,7 @@ public class TestTermsIndex extends TestCase2 {
                 final boolean readOnly = false;
                 final WriteTaskStats stats = new WriteTaskStats();
 
-                final TermsWriteProc.TermsWriteProcConstructor ctor = new TermsWriteProc.TermsWriteProcConstructor(
+                final BlobsWriteProc.TermsWriteProcConstructor ctor = new BlobsWriteProc.TermsWriteProcConstructor(
                         readOnly, storeBlankNodes);
 
                 ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
@@ -686,7 +686,7 @@ public class TestTermsIndex extends TestCase2 {
                 final boolean readOnly = false;
                 final WriteTaskStats stats = new WriteTaskStats();
 
-                final TermsWriteProc.TermsWriteProcConstructor ctor = new TermsWriteProc.TermsWriteProcConstructor(
+                final BlobsWriteProc.TermsWriteProcConstructor ctor = new BlobsWriteProc.TermsWriteProcConstructor(
                         readOnly, storeBlankNodes);
 
                 ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
@@ -944,7 +944,7 @@ public class TestTermsIndex extends TestCase2 {
 
     /**
      * Create a TERMS index, put some data into it, and verify that we can use
-     * the {@link TermsTupleSerializer} to access that data, including handling
+     * the {@link BlobsTupleSerializer} to access that data, including handling
      * of the NullIV.
      */
     public void test_TermsTupleSerializer() {
@@ -957,7 +957,7 @@ public class TestTermsIndex extends TestCase2 {
 
             final BTree ndx = createTermsIndex(store, namespace);
 
-            final TermsIndexHelper h = new TermsIndexHelper();
+            final BlobsIndexHelper h = new BlobsIndexHelper();
 
             final BigdataValueFactory vf = BigdataValueFactoryImpl
                     .getInstance(namespace);
@@ -1008,7 +1008,7 @@ public class TestTermsIndex extends TestCase2 {
                 final boolean storeBlankNodes = true;
                 final WriteTaskStats stats = new WriteTaskStats();
 
-                final TermsWriteProc.TermsWriteProcConstructor ctor = new TermsWriteProc.TermsWriteProcConstructor(
+                final BlobsWriteProc.TermsWriteProcConstructor ctor = new BlobsWriteProc.TermsWriteProcConstructor(
                         readOnly, storeBlankNodes);
 
                 ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
@@ -1022,7 +1022,7 @@ public class TestTermsIndex extends TestCase2 {
              */
             {
                 
-                final TermsTupleSerializer tupSer = (TermsTupleSerializer) ndx
+                final BlobsTupleSerializer tupSer = (BlobsTupleSerializer) ndx
                         .getIndexMetadata().getTupleSerializer();
                 
                 for(BigdataValue value : values) {

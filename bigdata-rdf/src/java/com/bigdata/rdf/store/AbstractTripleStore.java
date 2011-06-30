@@ -1999,7 +1999,7 @@ abstract public class AbstractTripleStore extends
 
         rangeCount += getLexiconRelation().getTerm2IdIndex().rangeCount();
 
-        rangeCount += getLexiconRelation().getTermsIndex().rangeCount();
+        rangeCount += getLexiconRelation().getBlobsIndex().rangeCount();
 
         return rangeCount;
 
@@ -2010,11 +2010,17 @@ abstract public class AbstractTripleStore extends
         long rangeCount = 0L;
         {
 
-            final byte[] fromKey = new byte[] { KeyBuilder
-                    .encodeByte(ITermIndexCodes.TERM_CODE_URI) };
+            final byte[] fromKey = new byte[] { 
+//                    KeyBuilder.encodeByte(
+                            ITermIndexCodes.TERM_CODE_URI
+//                            )
+                    };
 
-            final byte[] toKey = new byte[] { KeyBuilder
-                    .encodeByte((byte) (ITermIndexCodes.TERM_CODE_URI + 1)) };
+            final byte[] toKey = new byte[] {
+//                    KeyBuilder.encodeByte(
+                            (byte) (ITermIndexCodes.TERM_CODE_URI + 1)
+//                            ) 
+                            };
 
             rangeCount += getLexiconRelation().getTerm2IdIndex().rangeCount(
                     fromKey, toKey);
@@ -2028,7 +2034,7 @@ abstract public class AbstractTripleStore extends
 
             final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-            rangeCount += getLexiconRelation().getTermsIndex().rangeCount(
+            rangeCount += getLexiconRelation().getBlobsIndex().rangeCount(
                     fromKey, toKey);
 
         }
@@ -2042,16 +2048,23 @@ abstract public class AbstractTripleStore extends
         long rangeCount = 0L;
         {
             // Note: the first of the kinds of literals (plain).
-            final byte[] fromKey = new byte[] { KeyBuilder
-                    .encodeByte(ITermIndexCodes.TERM_CODE_LIT) };
+            final byte[] fromKey = new byte[] { 
+//                    KeyBuilder.encodeByte(
+                            ITermIndexCodes.TERM_CODE_LIT
+//                            )
+                            };
 
             // Note: spans the last of the kinds of literals.
-            final byte[] toKey = new byte[] { KeyBuilder
-                    .encodeByte((byte) (ITermIndexCodes.TERM_CODE_DTL + 1)) };
+            final byte[] toKey = new byte[] { 
+//                    KeyBuilder.encodeByte(
+                    (byte) (ITermIndexCodes.TERM_CODE_DTL + 1)
+//                    ))
+                    };
 
             rangeCount += getLexiconRelation().getTerm2IdIndex().rangeCount(
                     fromKey, toKey);
         }
+
         {
             final byte[] fromKey = new byte[] {//
             KeyBuilder.encodeByte(BlobIV.toFlags(VTE.LITERAL)) //
@@ -2059,7 +2072,7 @@ abstract public class AbstractTripleStore extends
 
             final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-            rangeCount += getLexiconRelation().getTermsIndex().rangeCount(
+            rangeCount += getLexiconRelation().getBlobsIndex().rangeCount(
                     fromKey, toKey);
         }
  
@@ -2075,14 +2088,23 @@ abstract public class AbstractTripleStore extends
      */
     final public long getBNodeCount() {
 
+        if (!getLexiconRelation().isStoreBlankNodes())
+            return 0L;
+        
         long rangeCount = 0L;
         {
 
-            final byte[] fromKey = new byte[] { KeyBuilder
-                    .encodeByte(ITermIndexCodes.TERM_CODE_BND) };
+            final byte[] fromKey = new byte[] { 
+//                    KeyBuilder.encodeByte(
+                            ITermIndexCodes.TERM_CODE_BND
+//                            ) 
+                            };
 
-            final byte[] toKey = new byte[] { KeyBuilder
-                    .encodeByte((byte) (ITermIndexCodes.TERM_CODE_BND + 1)) };
+            final byte[] toKey = new byte[] { 
+//                    KeyBuilder.encodeByte(
+                            (byte) (ITermIndexCodes.TERM_CODE_BND + 1)
+//                            )
+                            };
 
             rangeCount += getLexiconRelation().getTerm2IdIndex().rangeCount(
                     fromKey, toKey);
@@ -2096,7 +2118,7 @@ abstract public class AbstractTripleStore extends
 
             final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-            rangeCount += getLexiconRelation().getTermsIndex().rangeCount(
+            rangeCount += getLexiconRelation().getBlobsIndex().rangeCount(
                     fromKey, toKey);
 
         }
@@ -2109,10 +2131,6 @@ abstract public class AbstractTripleStore extends
      * term index
      */
 
-    /**
-     * This method delegates to the batch API, but it is extremely inefficient
-     * for scale-out as it does one RMI per request!
-     */
     public IV addTerm(final Value value) {
 
         final BigdataValue[] terms = new BigdataValue[] {//
@@ -2363,10 +2381,13 @@ abstract public class AbstractTripleStore extends
         return hasStatement(s, p, o, null/* c */);
 
     }
-    
+
     /**
-     * This method is extremely inefficient for scale-out as it does one RMI per
-     * request!
+     * {@inheritDoc}
+     * <p>
+     * This method is extremely inefficient for scale-out as it does multiple
+     * RMIs per request (one for each Value and one or more for the statement
+     * indices)!
      */
     final public boolean hasStatement(Resource s, URI p, Value o, Resource c) {
 
@@ -2516,7 +2537,7 @@ abstract public class AbstractTripleStore extends
         /*
          * Use batch API to resolve the term identifiers.
          */
-        final List<IV> ivs = new ArrayList<IV>(4);
+        final List<IV<?,?>> ivs = new ArrayList<IV<?,?>>(4);
         
         ivs.add(spo.s());
         
@@ -2524,7 +2545,7 @@ abstract public class AbstractTripleStore extends
         
         ivs.add(spo.o());
 
-        final IV c = spo.c();
+        final IV<?,?> c = spo.c();
         
         if (c != null) {
 
@@ -2532,7 +2553,7 @@ abstract public class AbstractTripleStore extends
 
         }
 
-        final Map<IV, BigdataValue> terms = getLexiconRelation()
+        final Map<IV<?,?>, BigdataValue> terms = getLexiconRelation()
                 .getTerms(ivs);
 
         /*

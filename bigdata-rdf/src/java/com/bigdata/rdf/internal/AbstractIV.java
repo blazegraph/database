@@ -818,6 +818,16 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         return null;
     }
 
+    public String bnodeId() {
+
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    /*
+     * RDF Value cache.
+     */
+    
     /**
      * Value cache (transient, but overridden serialization is used to send this
      * anyway for various purposes).
@@ -875,6 +885,10 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 		return this.cache != null;
 		
 	}
+	
+	/*
+	 * Serialization.
+	 */
 	
     /**
      * Override default serialization to send the cached {@link BigdataValue}.

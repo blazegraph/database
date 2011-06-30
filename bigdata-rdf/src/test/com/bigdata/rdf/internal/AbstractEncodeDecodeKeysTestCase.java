@@ -33,7 +33,7 @@ import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.rdf.lexicon.TermsIndexHelper;
+import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 
 import junit.framework.TestCase2;
 
@@ -208,7 +208,7 @@ public abstract class AbstractEncodeDecodeKeysTestCase extends TestCase2 {
      */
     protected static void doComparatorTest(final IV<?,?>[] e) {
     
-        final TermsIndexHelper h = new TermsIndexHelper();
+        final BlobsIndexHelper h = new BlobsIndexHelper();
         
         final IKeyBuilder keyBuilder = h.newKeyBuilder();
         

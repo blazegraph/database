@@ -12,7 +12,7 @@ import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.lexicon.TermsWriteProc.TermsWriteProcConstructor;
+import com.bigdata.rdf.lexicon.BlobsWriteProc.TermsWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.service.Split;
@@ -26,9 +26,9 @@ import com.bigdata.service.ndx.pipeline.KVOList;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: Term2IdWriteTask.java 3408 2010-08-04 18:53:35Z thompsonbry $
  */
-public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
+public class BlobsWriteTask implements Callable<KVO<BigdataValue>[]> {
 
-    private static transient final Logger log = Logger.getLogger(TermsWriteTask.class);
+    private static transient final Logger log = Logger.getLogger(BlobsWriteTask.class);
             
 //    private final LexiconRelation r;
     final IIndex ndx;
@@ -39,8 +39,8 @@ public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
     private final BigdataValue[] terms;
     private final WriteTaskStats stats;
     
-    public TermsWriteTask(final IIndex ndx, final BigdataValueFactory valueFactory,
-            final boolean readOnly,
+    public BlobsWriteTask(final IIndex ndx,
+            final BigdataValueFactory valueFactory, final boolean readOnly,
             final boolean storeBlankNodes, final int numTerms,
             final BigdataValue[] terms, final WriteTaskStats stats) {
 
@@ -122,13 +122,12 @@ public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
              */
             {
 
-                long _begin = System.currentTimeMillis();
+                final long _begin = System.currentTimeMillis();
                 
-                // may contain duplicates and/or terms with pre-assigned term identifiers.
-                b = new TermsIndexHelper().generateKVOs(valueFactory
+                b = new BlobsIndexHelper().generateKVOs(valueFactory
                         .getValueSerializer(), terms, numTerms);
 
-                stats.keyGenTime = System.currentTimeMillis() - _begin;
+                stats.keyGenTime.add(System.currentTimeMillis() - _begin);
 
             }
 
@@ -142,7 +141,7 @@ public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
 
                 Arrays.sort(b);
 
-                stats.keySortTime += System.currentTimeMillis() - _begin;
+                stats.keySortTime.add(System.currentTimeMillis() - _begin);
 
             }
 
@@ -154,7 +153,8 @@ public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
              * already assigned are dropped out in this step.
              * 
              * FIXME Caller SHOULD first remove any duplicates, which is what we
-             * are doing here.
+             * are doing here [Since LexiconRelation guarantees that we do not
+             * have to do this here.]
              */
             {
 
@@ -234,14 +234,15 @@ public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
                         vals, ctor, new TermsWriteProcResultHandler(a,
                                 readOnly, stats));
 
-                stats.indexTime = stats.termsIndexTime = System.currentTimeMillis()
-                        - _begin;
+                stats.indexTime.addAndGet(stats.termsIndexTime = System
+                        .currentTimeMillis()
+                        - _begin);
 
             }
 
         }
         
-        stats.ndistinct = ndistinct;
+        stats.ndistinct.addAndGet( ndistinct );
 
         return KVO.dense(a, ndistinct);
         
@@ -263,7 +264,7 @@ public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
      * @version $Id: Term2IdWriteTask.java 3408 2010-08-04 18:53:35Z thompsonbry $
      */
 	static class TermsWriteProcResultHandler implements
-			IResultHandler<TermsWriteProc.Result, Void> {
+			IResultHandler<BlobsWriteProc.Result, Void> {
 
         private final KVO<BigdataValue>[] a;
         private final boolean readOnly;
@@ -305,7 +306,7 @@ public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
          * Copy the assigned / discovered term identifiers onto the
          * corresponding elements of the terms[].
          */
-        public void aggregate(final TermsWriteProc.Result result,
+        public void aggregate(final BlobsWriteProc.Result result,
                 final Split split) {
 
 			stats.totalBucketSize.add(result.totalBucketSize);
@@ -330,7 +331,7 @@ public class TermsWriteTask implements Callable<KVO<BigdataValue>[]> {
 
                 final int counter = result.counters[j];
 
-                if (counter == TermsIndexHelper.NOT_FOUND) {
+                if (counter == BlobsIndexHelper.NOT_FOUND) {
 
                     if (!readOnly)
                         throw new AssertionError();

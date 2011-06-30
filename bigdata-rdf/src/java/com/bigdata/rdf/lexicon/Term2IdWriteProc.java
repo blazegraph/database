@@ -269,7 +269,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
      * @return The {@link Result}, which contains the discovered / assigned
      *         term identifiers.
      * 
-     * @todo no point sending bnodes when readOnly.
+     * TODO no point sending bnodes when readOnly.
      */
     public Object apply(final IIndex ndx) {
         
@@ -292,15 +292,19 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 		final TermIdEncoder encoder = readOnly ? null : new TermIdEncoder(
 				scaleOutTermIdBitsToReverse);
         
+//        final DataOutputBuffer kbuf = new DataOutputBuffer(128);
+
         // #of new terms (#of writes on the index).
         int nnew = 0;
         for (int i = 0; i < numTerms; i++) {
 
-            // @todo copy key into reused buffer to reduce allocation.
+            // Note: Copying the key into a buffer does not help since we need
+            // it in its own byte[] to do lookup against the index.
+//          getKeys().copy(i, kbuf.reset());
             final byte[] key = getKey(i);
 
             // this byte encodes the kind of term (URI, Literal, BNode, etc.)
-            final byte code = KeyBuilder.decodeByte(key[0]);
+            final byte code = key[0];//KeyBuilder.decodeByte(key[0]);
             
             if (!storeBlankNodes && code == ITermIndexCodes.TERM_CODE_BND) {
 
@@ -532,15 +536,15 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
             return VTE.URI;
         case ITermIndexCodes.TERM_CODE_BND:
             return VTE.BNODE;
-        case ITermIndexCodes.TERM_CODE_STMT:
-            return VTE.STATEMENT;
+//        case ITermIndexCodes.TERM_CODE_STMT:
+//            return VTE.STATEMENT;
         case ITermIndexCodes.TERM_CODE_DTL:
 //        case ITermIndexCodes.TERM_CODE_DTL2:
         case ITermIndexCodes.TERM_CODE_LCL:
         case ITermIndexCodes.TERM_CODE_LIT:
             return VTE.LITERAL;
         default:
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("code=" + code);
         }
         
     }

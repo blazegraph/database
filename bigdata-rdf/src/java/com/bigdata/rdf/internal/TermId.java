@@ -216,10 +216,14 @@ public class TermId<V extends BigdataValue>
         return keyBuilder;
         
     }
-    
+
     /**
-     * Create a unique bnode id based on the {@link TermId}'s internal data.
+     * {@inheritDoc}
+     * <p>
+     * Creates a unique blank node ID based on the {@link TermId}'s internal
+     * data.
      */
+    @Override
     public String bnodeId() {
 
         return Long.toString(termId);
