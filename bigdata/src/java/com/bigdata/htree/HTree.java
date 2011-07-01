@@ -29,6 +29,7 @@ package com.bigdata.htree;
 
 import java.io.PrintStream;
 import java.lang.ref.Reference;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -496,7 +497,11 @@ public class HTree extends AbstractHTree
 	 *         method signature to pass an insert enum {ALLDUPS,DUPKEYS,NODUPS}.
 	 */
 	public byte[] insert(final byte[] key, final byte[] value) {
-		
+
+        if (log.isInfoEnabled())
+            log.info("key=" + BytesUtil.toString(key) + ", value="
+                    + Arrays.toString(value));
+
 		if (key == null)
 			throw new IllegalArgumentException();
 		
@@ -512,7 +517,7 @@ public class HTree extends AbstractHTree
 		while (true) {
 
 			// skip prefixLength bits and then extract globalDepth bits. 
-			final int hashBits = current.getLocalHashCode(key, prefixLength);
+		    final int hashBits = current.getLocalHashCode(key, prefixLength);
 			
 			// find the child directory page or bucket page.
 			final AbstractPage child = current.getChild(hashBits, buddyOffset);
@@ -523,7 +528,7 @@ public class HTree extends AbstractHTree
 				 * Found the bucket page, update it.
 				 */
 
-				final BucketPage bucketPage = (BucketPage) child;
+			    final BucketPage bucketPage = (BucketPage) child;
 				
 				// Attempt to insert the tuple into the bucket.
                 if (!bucketPage.insert(key, value, current/* parent */,
@@ -535,47 +540,13 @@ public class HTree extends AbstractHTree
 
                         /*
                          * There is only one buddy hash bucket on the page.
-                         * 
-                         * To split the page, we have to introduce a new
-                         * directory page above it and then introduce a sibling
-                         * bucket page and finally re-index the tuples in the
-                         * bucket page such that they are either the original
-                         * bucket page or its new sibling bucket page.
-                         * 
-                         * TODO This code path is to introduce new directory
-                         * page if sole buddy bucket is full. However, we might
-                         * also need a code path to split the buddy hash table
-                         * in the directory. The way things are falling out
-                         * right now I do not see how this would happen as the
-                         * global depth of a directory is always the same as
-                         * address bits, but maybe I am missing something....
-                         * 
-                         * TODO If all keys on the page are duplicates then we
-                         * can not split the page. Instead we must let the page
-                         * "overflow." I think we will handle an overflow simply
-                         * by doubling the address space of the child, but that
-                         * could run into complications with [addressBits] no
-                         * longer being the same for all leaves of the tree.
-                         * 
-                         * FIXME Adding a level could cause [current] to become
-                         * mutable, at which point we would need to obtain the
-                         * new reference that page for use in splitAndReindex().
-                         * This will have to be rediscovered by a re-descent
-                         * from the root (we can not recursively enter insert()
-                         * yet because the tree is not yet consistent).
+                         * Either we can split a directory page which is a
+                         * parent of that bucket or we have to add a new level
+                         * below the root on the path to that bucket.
                          */
 
-                        // Add a level.
-                        addLevel(root/* parent */, buddyOffset, splitBits);// ,bucketPage);
-
-                        // Split the full bucket page and re-index it's tuples.
-                        splitAndReindexFullBucketPage(current/* parent */,
-                                buddyOffset, prefixLength, bucketPage);
-
-                        // The structure of the index has changed so we have to
-                        // restart the search from the root.
-                        return insert(key, value); // recursive call.
-                       
+                        return innerInsertFullBucket(key, value, current, bucketPage);
+					    
 					}
 
 					// globalDepth >= localDepth
@@ -612,6 +583,238 @@ public class HTree extends AbstractHTree
 
 	} // insert()
 
+    /**
+     * Handle an insert when the target {@link BucketPage} is full (a single
+     * buddy hash bucket) but can be split (not all keys in the buckets are
+     * duplicates).
+     * 
+     * @param key
+     * @param value
+     * @param current
+     * @param bucketPage
+     * @return
+     */
+    private byte[] innerInsertFullBucket(final byte[] key, final byte[] value,
+            final DirectoryPage current, final BucketPage bucketPage) {
+
+        /*
+         * Run up the parent references back to the root. If we find a directory
+         * page whose local depth is LT its parent's global depth then we will
+         * split that directory. Otherwise, we will have to add a new level.
+         */
+        if(splitDirectoryOnPathToFullBucket(key)) {
+            
+            /*
+             * Recursion through the top-level insert().
+             */
+
+            return insert(key, value);
+
+        }
+
+        /*
+         * To split the page, we have to introduce a new directory page above it
+         * and then introduce a sibling bucket page and finally re-index the
+         * tuples in the bucket page such that they are either the original
+         * bucket page or its new sibling bucket page.
+         * 
+         * Note: If all keys on the page are duplicates then we can not split
+         * the page. Instead we must let the page "overflow."
+         * BucketPage.insert() handles this condition for us by allowing the
+         * page to overflow rather than telling us to split the page.
+         * 
+         * TODO Unit test this to make sure that it is introducing the new level
+         * along the path to the full bucket page (rather than some other path).
+         */
+
+        // hash bits for the root directory.
+        final int hashBitsForRoot = current
+                .getLocalHashCode(key, 0/* prefixLengthForRootIsZero */);
+
+        // find the child of the root directory page.
+        final AbstractPage childOfRoot = current
+                .getChild(hashBitsForRoot, 0/* buddyOffsetOfRootIsZero */);
+
+        final int buddyOffsetInChild = HTreeUtil
+                .getBuddyOffset(hashBitsForRoot, root.globalDepth,
+                        childOfRoot.globalDepth/* localDepthOfChild */);
+
+        // Add a level.
+        addLevel(root/* parent */, buddyOffsetInChild, splitBits);
+
+        return insertAfterAddLevel(key, value);
+
+	}
+
+    /**
+     * Search the tree along the path to a full {@link BucketPage} (a single
+     * buddy bucket in which at least one key is not a duplicate of the rest).
+     * If we find a {@link DirectoryPage} which can be split (its depth is LT
+     * its parent's depth), then split that {@link DirectoryPage} and return
+     * <code>true</code>. Otherwise return <code>false</code>.
+     * 
+     * @param key
+     *            The original key.
+     * 
+     * @return <code>true</code> if a {@link DirectoryPage} along the path to
+     *         the full {@link BucketPage} was split such that the insert()
+     *         operation can be retried. <code>false</code> if a new level must
+     *         be added instead.
+     */
+    private boolean splitDirectoryOnPathToFullBucket(final byte[] key) {
+
+        if (log.isInfoEnabled())
+            log.info("key=" + BytesUtil.toString(key));
+
+        if (key == null)
+            throw new IllegalArgumentException();
+
+        // the current directory page.
+        DirectoryPage current = getRoot(); // start at the root.
+
+        // #of prefix bits already consumed.
+        int prefixLength = 0;// prefix length of the root is always zero.
+
+        // buddyOffset into [current].
+        int buddyOffset = 0; // buddyOffset of the root is always zero.
+
+        while (true) {
+
+            // skip prefixLength bits and then extract globalDepth bits.
+            final int hashBits = current.getLocalHashCode(key, prefixLength);
+
+            // find the child directory page or bucket page.
+            final AbstractPage child = current.getChild(hashBits, buddyOffset);
+
+            if (child.isLeaf()) {
+
+                // No directory page can be split.
+                return false;
+
+            }
+
+            if (child.globalDepth < current.globalDepth) {
+
+                splitDirectoryPage(current/* parent */, buddyOffset,
+                        (DirectoryPage) child);
+
+                return true;
+
+            }
+
+            /*
+             * Recursive descent into a child directory page. We have to update
+             * the prefixLength and compute the offset of the buddy hash table
+             * within the child before descending into the child.
+             */
+
+            // increase prefix length by the #of address bits consumed by the
+            // buddy hash table in the current directory page as we descend.
+            prefixLength = prefixLength + current.globalDepth;
+
+            // find the offset of the buddy hash table in the child.
+            buddyOffset = HTreeUtil
+                    .getBuddyOffset(hashBits, current.globalDepth,
+                            child.globalDepth/* localDepthOfChild */);
+
+            // update current so we can search in the child.
+            current = (DirectoryPage) child;
+
+        }
+
+    }
+
+    /**
+     * Handle an insert after introducing a new level in the tree because a full
+     * {@link BucketPage} could not otherwise be split. This method is
+     * responsible for re-indexing the tuples in that full {@link BucketPage}.
+     * It will then retry the insert (recursively entering the top level insert
+     * method).
+     * 
+     * @param key
+     * @param value
+     * @return
+     */
+	private byte[] insertAfterAddLevel(final byte[] key, final byte[] value) {
+
+        if (log.isInfoEnabled())
+            log.info("key=" + BytesUtil.toString(key) + ", value="
+                    + Arrays.toString(value));
+
+        if (key == null)
+            throw new IllegalArgumentException();
+        
+        // the current directory page.
+        DirectoryPage current = getRoot(); // start at the root.
+        
+        // #of prefix bits already consumed.
+        int prefixLength = 0;// prefix length of the root is always zero.
+        
+        // buddyOffset into [current].
+        int buddyOffset = 0; // buddyOffset of the root is always zero.
+        
+        while (true) {
+
+            // skip prefixLength bits and then extract globalDepth bits. 
+            final int hashBits = current.getLocalHashCode(key, prefixLength);
+            
+            // find the child directory page or bucket page.
+            final AbstractPage child = current.getChild(hashBits, buddyOffset);
+            
+            if (child.isLeaf()) {
+
+                /*
+                 * Found the bucket page, update it.
+                 */
+
+                final BucketPage bucketPage = (BucketPage) child;
+
+                /*
+                 * FIXME This is adding [addressBits] to the [prefixLength] for
+                 * this call. Verify that this is always the right thing to do.
+                 * This is based on some experience with a unit test working
+                 * through a detailed example (insert 1,2,3,4,5) but I have not
+                 * generalized this to a clear rule yet.
+                 */
+                splitAndReindexFullBucketPage(current/* parent */, buddyOffset,
+                        prefixLength + addressBits, bucketPage/* oldBucket */);
+
+                /*
+                 * Outer insert.
+                 * 
+                 * Note: We MUST NOT recursively enter insert() if the sole
+                 * buddy bucket on the page consists entirely of tuples having
+                 * the same key (all duplicate keys). BucketPage.insert()
+                 * handles this condition for us by allowing the page to
+                 * overflow rather than telling us to split the page.
+                 */
+                return insert(key, value);
+                
+            }
+
+            /*
+             * Recursive descent into a child directory page. We have to update
+             * the prefixLength and compute the offset of the buddy hash table
+             * within the child before descending into the child.
+             */
+            
+            // increase prefix length by the #of address bits consumed by the
+            // buddy hash table in the current directory page as we descend.
+            prefixLength = prefixLength + current.globalDepth;
+            
+            // find the offset of the buddy hash table in the child.
+            buddyOffset = HTreeUtil
+                    .getBuddyOffset(hashBits, current.globalDepth,
+                            child.globalDepth/* localDepthOfChild */);
+            
+            // update current so we can search in the child.
+            current = (DirectoryPage) child;
+            
+        }
+
+    } // insertAfterAddLevel()
+
+	
 	public byte[] remove(final byte[] key) {
 		// TODO Remove 1st match, returning value.
 		throw new UnsupportedOperationException();
@@ -682,7 +885,7 @@ public class HTree extends AbstractHTree
 		
 		if (log.isDebugEnabled())
 			log.debug("parent=" + parent.toShortString() + ", buddyOffset="
-					+ buddyOffset + ", child=" + oldChild);
+					+ buddyOffset + ", child=" + oldChild.toShortString());
 
 		final int oldDepth = oldChild.globalDepth;
 		final int newDepth = oldDepth + 1;
@@ -746,7 +949,8 @@ public class HTree extends AbstractHTree
 		final int npointers = 1 << (parent.globalDepth - oldDepth);
 		
 		// Must be at least two slots since we will change at least one.
-		assert slotsPerBuddy > 1 : "slotsPerBuddy=" + slotsPerBuddy;
+        if (slotsPerBuddy <= 1)
+            throw new AssertionError("slotsPerBuddy=" + slotsPerBuddy);
 
 		// Must be at least two pointers since we will change at least one.
 		assert npointers > 1 : "npointers=" + npointers;
@@ -988,7 +1192,7 @@ public class HTree extends AbstractHTree
 		}
 
 	}
-	
+
     /**
      * Adds a new {@link DirectoryPage} when we need to split a child but
      * <code>globalDepth == localDepth</code>. The caller must retry the insert
@@ -1088,9 +1292,9 @@ public class HTree extends AbstractHTree
      * therefore introduced an additional parameter on the {@link HTree} for
      * this purpose.
      * 
-     * @param oldParent
+     * @param oldParentIsAlwaysRoot
      *            The parent {@link DirectoryPage}.
-     * @param buddyOffset
+     * @param buddyOffsetInChild
      *            The buddyOffset within the <i>parent</i>. This identifies
      *            which buddy hash table in the parent must be its pointers
      *            updated such that it points to both the original child and new
@@ -1111,12 +1315,22 @@ public class HTree extends AbstractHTree
      * @throws IllegalStateException
      *             if the parent of the <i>oldBucket</i> is not the given
      *             <i>parent</i>.
+     * 
+     *             FIXME [oldParent] is not required if this is always invoked
+     *             with [root] as the [oldParent]. However, we do need to know
+     *             which path through the tree is being increased so we can
+     *             update the appropriate pointers in the root. This is the
+     *             [buddyOffset] of the direct child of the root on the path to
+     *             the {@link BucketPage} which which needs to be split.
      */
     // Note: package private for unit tests.
-    void addLevel(final DirectoryPage oldParent, final int buddyOffset,
-            final int splitBits) { //, final AbstractPage child) {
+    void addLevel(final DirectoryPage oldParentIsAlwaysRoot,
+            final int buddyOffsetInChild, final int splitBits) {
+        //, final AbstractPage child) {
         
-        if (oldParent == null)
+        if (oldParentIsAlwaysRoot == null)
+            throw new IllegalArgumentException();
+        if (oldParentIsAlwaysRoot != root)
             throw new IllegalArgumentException();
 //        if (childIsUnused == null)
 //            throw new IllegalArgumentException();
@@ -1127,9 +1341,9 @@ public class HTree extends AbstractHTree
 //             */
 //            throw new IllegalStateException();
 //        }
-        if (buddyOffset < 0)
+        if (buddyOffsetInChild < 0)
             throw new IllegalArgumentException();
-        if (buddyOffset >= (1 << addressBits)) {
+        if (buddyOffsetInChild >= (1 << addressBits)) {
             /*
              * Note: This check is against the maximum possible slot index. The
              * actual max buddyOffset depends on parent.globalBits also since
@@ -1143,7 +1357,7 @@ public class HTree extends AbstractHTree
             throw new IllegalArgumentException();
         if (splitBits > addressBits)
             throw new IllegalArgumentException();
-        if ((buddyOffset + splitBits) >= (1 << addressBits)) {
+        if ((buddyOffsetInChild + splitBits) >= (1 << addressBits)) {
             /*
              * [buddyOffset] is the slot index of the first slot for the buddy
              * hash table in the parent. [splitBits] is the #of address bits to
@@ -1152,7 +1366,7 @@ public class HTree extends AbstractHTree
              */
             throw new IllegalArgumentException();
         }
-        if (oldParent.isReadOnly()) // must be mutable.
+        if (oldParentIsAlwaysRoot.isReadOnly()) // must be mutable.
             throw new IllegalStateException();
 //        if (childIsUnused.isReadOnly()) // must be mutable.
 //            throw new IllegalStateException();
@@ -1160,14 +1374,14 @@ public class HTree extends AbstractHTree
 //            throw new IllegalStateException();
 
         if (log.isDebugEnabled())
-            log.debug("parent=" + oldParent.toShortString() + ", buddyOffset="
-                    + buddyOffset);// + ", child=" + childIsUnused);
+            log.debug("parent=" + oldParentIsAlwaysRoot.toShortString() + ", buddyOffset="
+                    + buddyOffsetInChild);// + ", child=" + childIsUnused);
 
         // Allocate a new directory page. .
         final DirectoryPage newParent = new DirectoryPage(this, splitBits/* globalDepth */);
 
         // Set the parent Reference on the new dir page to the old dir page.
-        newParent.parent = (Reference) oldParent.self;
+        newParent.parent = (Reference) oldParentIsAlwaysRoot.self;
 
         // One more directory page.
         nnodes++;
@@ -1199,14 +1413,14 @@ public class HTree extends AbstractHTree
          * with the current pointer from the outer loop.
          */
         {
-            final int lastSrc = (buddyOffset + nbuddies);
+            final int lastSrc = (buddyOffsetInChild + nbuddies);
             
             // for each pointer to be copied from the parent.
             int dst = 0; // target slot in the new directory page.
-            for (int src = buddyOffset; src < lastSrc; src++) {
+            for (int src = buddyOffsetInChild; src < lastSrc; src++) {
 
                 // pointer to be copied.
-                final Reference<AbstractPage> ref = oldParent.childRefs[src];
+                final Reference<AbstractPage> ref = oldParentIsAlwaysRoot.childRefs[src];
 
                 // fill the buddy hash table on the new parent with that ptr.
                 for (int i = 0; i < nslots; i++) {
@@ -1223,9 +1437,9 @@ public class HTree extends AbstractHTree
              * Replace the pointer to the child page in the old parent with the
              * pointer to the new directory page.
              */
-            for (int src = buddyOffset; src < lastSrc; src++) {
+            for (int src = buddyOffsetInChild; src < lastSrc; src++) {
 
-                oldParent.childRefs[src] = (Reference) newParent.self;
+                oldParentIsAlwaysRoot.childRefs[src] = (Reference) newParent.self;
 
             }
 
@@ -1327,7 +1541,7 @@ public class HTree extends AbstractHTree
 
         if (parent == null)
             throw new IllegalArgumentException();
-        if (oldBucket== null)
+        if (oldBucket == null)
             throw new IllegalArgumentException();
         if (buddyOffset < 0)
             throw new IllegalArgumentException();
@@ -1361,7 +1575,8 @@ public class HTree extends AbstractHTree
 
         if (log.isDebugEnabled())
             log.debug("parent=" + parent.toShortString() + ", buddyOffset="
-                    + buddyOffset + ", oldBucket=" + oldBucket);
+                    + buddyOffset + ", prefixLength=" + prefixLength
+                    + ", oldBucket=" + oldBucket.toShortString());
 
         /*
          * Note: We can not validate that the caller's bucket page has only a
@@ -1443,6 +1658,12 @@ public class HTree extends AbstractHTree
         if (b.parent.get() != parent)
             throw new IllegalStateException();
 
+        if (log.isDebugEnabled())
+            log.debug("parent=" + parent.toShortString() + ", buddyOffset="
+                    + buddyOffset + ", prefixLength=" + prefixLength
+                    + ", oldChild=" + a.toShortString() + ", newChild="
+                    + b.toShortString());
+
         // Setup [t] as a temporary page with [a]'s data and clear [a]'s data.
         final BucketPage t = new BucketPage(this, a.globalDepth);
         {
@@ -1455,18 +1676,6 @@ public class HTree extends AbstractHTree
          * Visit each tuple which was in [a], figure out which of the two bucket
          * pages it needs to be in, and insert the tuple into the appropriate
          * bucket page.
-         * 
-         * Note: Regardless of the apparent globalDepth of [a] and [b], each of
-         * these bucket pages is treated as a "full" bucket page consisting of a
-         * single buddy bucket. They will be reported as "full" pages (single
-         * buddy bucket) after the addLevel() + splitAndReindex() operation is
-         * complete.
-         * 
-         * FIXME ^^^ This is incorrect. They should be treated as having their
-         * stated depth for the purposes of inserting data into the buddy
-         * buckets. The caller needs to make sure that this depth is properly
-         * set on the bucket pages. However, we need to visit the tuples in
-         * [a]'s data without regard to buddy bucket boundaries.
          */
         
         // #of slots in [a]'s data.
@@ -1617,7 +1826,7 @@ public class HTree extends AbstractHTree
         
         if (log.isDebugEnabled())
             log.debug("parent=" + parent.toShortString() + ", buddyOffset="
-                    + buddyOffset + ", child=" + oldChild);
+                    + buddyOffset + ", child=" + oldChild.toShortString());
 
         final int oldDepth = oldChild.globalDepth;
         final int newDepth = oldDepth + 1;
@@ -1966,6 +2175,13 @@ public class HTree extends AbstractHTree
 	implements //IAbstractNode?,
 			IAbstractNodeData {
 
+	    @Override
+	    public String toShortString() {
+            
+	        return super.toShortString() + "{d=" + globalDepth + "}";
+	        
+	    }
+	    
 	    /**
 	     * The HTree.
 	     * 
@@ -2724,17 +2940,20 @@ public class HTree extends AbstractHTree
 				return false;
 			}
 
-			/*
-			 * Since the page is full, we need to grow the page (or chain an
-			 * overflow page) rather than splitting the page.
-			 * 
-			 * TODO Maybe the easiest thing to do is just double the target #of
-			 * slots on the page. We would rely on keys.capacity() in this case
-			 * rather than #slots. In fact, we could just reenter the method
-			 * above after doubling as long as we rely on keys.capacity() in the
-			 * case where nbuddies==1. [Unit test for this case.]
-			 */
-        	throw new UnsupportedOperationException();
+            /*
+             * Since the page is full, we need to grow the page (or chain an
+             * overflow page) rather than splitting the page.
+             * 
+             * TODO Maybe the easiest thing to do is just double the target #of
+             * slots on the page. We would rely on keys.capacity() in this case
+             * rather than #slots. In fact, we could just reenter the method
+             * above after doubling as long as we rely on keys.capacity() in the
+             * case where nbuddies==1. [Unit test for this case.]
+             */
+
+			throw new UnsupportedOperationException(
+                    "Must overflow since all keys on full buddy bucket are duplicates.");
+            
         }
 
 	    /**
