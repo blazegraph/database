@@ -35,7 +35,7 @@ public class ExtensionIV<V extends BigdataLiteral>
     
     public ExtensionIV(final AbstractLiteralIV delegate, final IV datatype) {
         
-        super(VTE.LITERAL, true, delegate.getDTE());
+        super(VTE.LITERAL, true/*extension*/, delegate.getDTE());
         
         if (datatype == null)
             throw new IllegalArgumentException();

@@ -35,39 +35,42 @@ import junit.framework.TestCase2;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.rdf.internal.TermIVComparator;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.model.TermIVComparator;
 
 /**
+ * Test suite for {@link TermIVComparator}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestComparators extends TestCase2 {
+public class TestTermIVComparator extends TestCase2 {
 
     /**
      * 
      */
-    public TestComparators() {
+    public TestTermIVComparator() {
     }
 
     /**
      * @param name
      */
-    public TestComparators(String name) {
+    public TestTermIVComparator(String name) {
         super(name);
     }
 
     public void test_termIdComparator() {
 
-        final TermId<?> lmin = new TermId(VTE.URI, Long.MIN_VALUE);
-        final TermId<?> lm1 = new TermId(VTE.URI, -1L);
-        final TermId<?> l0 = new TermId(VTE.URI, 0L);
-        final TermId<?> lp1 = new TermId(VTE.URI, 1L);
-        final TermId<?> lmax = new TermId(VTE.URI, Long.MAX_VALUE);
+        final TermId<?> lmin = new TermId<BigdataURI>(VTE.URI, Long.MIN_VALUE);
+        final TermId<?> lm1 = new TermId<BigdataURI>(VTE.URI, -1L);
+        final TermId<?> l0 = new TermId<BigdataURI>(VTE.URI, 0L);
+        final TermId<?> lp1 = new TermId<BigdataURI>(VTE.URI, 1L);
+        final TermId<?> lmax = new TermId<BigdataURI>(VTE.URI, Long.MAX_VALUE);
 
         final BigdataValueFactory f = BigdataValueFactoryImpl
                 .getInstance(getName()/*namespace*/);
@@ -78,10 +81,10 @@ public class TestComparators extends TestCase2 {
         final BigdataValue vp1  = f.createLiteral("d"); vp1 .setIV( lp1 );
         final BigdataValue vmax = f.createLiteral("e"); vmax.setIV( lmax);
 
-        // ids out of order.
-        final TermId[] actualIds = new TermId[] { lm1, lmax, l0, lp1, lmin };
-        // ids in order.
-        final TermId[] expectedIds = new TermId[] { lmin, lm1, l0, lp1, lmax };
+        // IVs out of order.
+        final TermId<?>[] actualIds = new TermId[] { lm1, lmax, l0, lp1, lmin };
+        // IVs in order.
+        final TermId<?>[] expectedIds = new TermId[] { lmin, lm1, l0, lp1, lmax };
         
         // values out of order.
         final BigdataValue[] terms = new BigdataValue[] { vmax, vm1, vmin, v0, vp1 };

@@ -36,9 +36,12 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
+ * Test suite for {@link Id2TermTupleSerializer}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -64,20 +67,19 @@ public class TestId2TermTupleSerializer extends TestCase2 {
         final Id2TermTupleSerializer fixture = new Id2TermTupleSerializer(
                 namespace, BigdataValueFactoryImpl.getInstance(namespace));
 
-        TermId id1 = new TermId(VTE.URI, -1);
-        TermId id2 = new TermId(VTE.URI, 0);
-        TermId id3 = new TermId(VTE.URI, 1);
+        final TermId<?> id1 = new TermId<BigdataURI>(VTE.URI, -1);
+        final TermId<?> id2 = new TermId<BigdataURI>(VTE.URI, 0);
+        final TermId<?> id3 = new TermId<BigdataURI>(VTE.URI, 1);
 
-        byte[] k1 = fixture.id2key(id1);
-        byte[] k2 = fixture.id2key(id2);
-        byte[] k3 = fixture.id2key(id3);
+        final byte[] k1 = fixture.id2key(id1);
+        final byte[] k2 = fixture.id2key(id2);
+        final byte[] k3 = fixture.id2key(id3);
 
-        System.err
-                .println("k1(termId:" + id1 + ") = " + BytesUtil.toString(k1));
-        System.err
-                .println("k2(termId:" + id2 + ") = " + BytesUtil.toString(k2));
-        System.err
-                .println("k3(termId:" + id3 + ") = " + BytesUtil.toString(k3));
+        if (log.isInfoEnabled()) {
+            log.info("k1(termId:" + id1 + ") = " + BytesUtil.toString(k1));
+            log.info("k2(termId:" + id2 + ") = " + BytesUtil.toString(k2));
+            log.info("k3(termId:" + id3 + ") = " + BytesUtil.toString(k3));
+        }
 
         /*
          * Verify that ids assigned in sequence result in an order for the
