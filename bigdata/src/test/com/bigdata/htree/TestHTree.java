@@ -33,7 +33,6 @@ import org.apache.log4j.Level;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.data.ILeafData;
-import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.htree.HTree.BucketPage;
 import com.bigdata.htree.HTree.DirectoryPage;
@@ -789,7 +788,7 @@ public class TestHTree extends TestCase2 {
              * <pre>
              * root := [2] (d,d,b,b)     //
              * d    := [1]   (a,a;c,c)   // added new level below the root.  
-             * a    := [0]     (1;2;3;4) // local depth now 0. NB: (a) MUST BE SPLIT NEXT!!! FIXME INCONSISTENT if d(a)==0 then can not index all buddies.
+             * a    := [0]     (1;2;3;4) // local depth now 0. NB: inconsistent intermediate state!!!
              * c    := [0]     (-;-;-;-) // local depth now 0.
              * b    := [1]   (-,-;-,-)   //
              * </pre>
@@ -849,8 +848,9 @@ public class TestHTree extends TestCase2 {
              */
 
             // split (a) into (a,e).
-            htree.splitBucketsOnPage(d/* parent */, 0/* buddyOffset */, a/* oldChild */);
-            
+            htree.splitAndReindexFullBucketPage(d/* parent */,
+                    0/* buddyOffset */, 4 /* prefixLength */, a/* oldBucket */);
+
             assertEquals("nnodes", 2, htree.getNodeCount()); // unchanged.
             assertEquals("nleaves", 4, htree.getLeafCount());
             assertEquals("nentries", 4, htree.getEntryCount()); // unchanged
@@ -883,7 +883,7 @@ public class TestHTree extends TestCase2 {
                             v1, v2, v3, v4 })),//
                     a);
             assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyKeysRaba(0, new byte[][] { // keys
+                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
                             null, null, null, null }),//
                     new ReadOnlyValuesRaba(0, new byte[][] { // vals
                             null, null, null, null})),//

@@ -212,6 +212,21 @@ public class HTreeUtil {
 //				+ globalDepth + ", npointers=" + npointers + ", x=" + x
 //				+ ", localDepth=" + i);
 		
+// Alternative code from Martyn. We have not compared performance.  I suspect
+// that the relatively "closed" form solution above will do better, but this
+// should be tested.
+//		      
+// npointers == 2^(g-i)
+// 2^i = (2^g)/npointers
+// need to find nb st 2^nb == npointers
+// then 2^i == 2^g / 2^nb = 2^(g-nb)
+// and i == g-nb
+//  
+//  int nb = 0;
+//  while (npointers != (1 << nb)) ++nb;
+//  
+//  return globalDepth - nb;
+		        
 		return i;
 		
     }
