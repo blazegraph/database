@@ -525,21 +525,22 @@ public class HTree extends AbstractHTree
 
 				final BucketPage bucketPage = (BucketPage) child;
 				
-				// attempt to insert the tuple into the bucket.
-				
-				if(!bucketPage.insert(key, value, current, buddyOffset)) {
-				
+				// Attempt to insert the tuple into the bucket.
+                if (!bucketPage.insert(key, value, current/* parent */,
+                        buddyOffset)) {
+
 					// TODO if(parent.isReadOnly()) parent = copyOnWrite();
 					
 					if (current.globalDepth == child.globalDepth) {
 
                         /*
-                         * There is only one buddy hash bucket on the page. To
-                         * split the page, we have to introduce a new directory
-                         * page above it and then introduce a sibling bucket
-                         * page and finally re-index the tuples in the bucket
-                         * page such that they are either the original bucket
-                         * page or its new sibling bucket page.
+                         * There is only one buddy hash bucket on the page.
+                         * 
+                         * To split the page, we have to introduce a new
+                         * directory page above it and then introduce a sibling
+                         * bucket page and finally re-index the tuples in the
+                         * bucket page such that they are either the original
+                         * bucket page or its new sibling bucket page.
                          * 
                          * TODO This code path is to introduce new directory
                          * page if sole buddy bucket is full. However, we might
@@ -548,12 +549,26 @@ public class HTree extends AbstractHTree
                          * right now I do not see how this would happen as the
                          * global depth of a directory is always the same as
                          * address bits, but maybe I am missing something....
+                         * 
+                         * TODO If all keys on the page are duplicates then we
+                         * can not split the page. Instead we must let the page
+                         * "overflow." I think we will handle an overflow simply
+                         * by doubling the address space of the child, but that
+                         * could run into complications with [addressBits] no
+                         * longer being the same for all leaves of the tree.
+                         * 
+                         * FIXME Adding a level could cause [current] to become
+                         * mutable, at which point we would need to obtain the
+                         * new reference that page for use in splitAndReindex().
+                         * This will have to be rediscovered by a re-descent
+                         * from the root (we can not recursively enter insert()
+                         * yet because the tree is not yet consistent).
                          */
 
-                        // add a level.
-                        addLevel(current, buddyOffset, splitBits, bucketPage);
+                        // Add a level.
+                        addLevel(root/* parent */, buddyOffset, splitBits);// ,bucketPage);
 
-                        // split the full bucket page and re-index it's tuples.
+                        // Split the full bucket page and re-index it's tuples.
                         splitAndReindexFullBucketPage(current/* parent */,
                                 buddyOffset, prefixLength, bucketPage);
 
@@ -727,7 +742,7 @@ public class HTree extends AbstractHTree
 		// #of address slots in the parent buddy hash table.
 		final int slotsPerBuddy = (1 << parent.globalDepth);
 
-		// #of pointers in the parent buddy hash table to the old bucket.
+		// #of pointers in the parent buddy hash table to the old child.
 		final int npointers = 1 << (parent.globalDepth - oldDepth);
 		
 		// Must be at least two slots since we will change at least one.
@@ -742,15 +757,15 @@ public class HTree extends AbstractHTree
 		// The last slot in the buddy hash table in the parent.
 		final int lastSlot = buddyOffset + slotsPerBuddy;
 
-		/*
-		 * Count pointers to the old bucket page. There should be
-		 * [npointers] of them and they should be contiguous.
-		 * 
-		 * Note: We can test References here rather than comparing addresses
-		 * because we know that the parent and the old bucket are both
-		 * mutable. This means that their childRef is defined and their
-		 * storage address is NULL.
-		 */
+        /*
+         * Count pointers to the old child page. There should be [npointers] of
+         * them and they should be contiguous.
+         * 
+         * Note: We can test References here rather than comparing addresses
+         * because we know that the parent and the old child are both mutable.
+         * This means that their childRef is defined and their storage address
+         * is NULL.
+         */
 		int firstPointer = -1;
 		int nfound = 0;
 		boolean discontiguous = false;
@@ -1080,9 +1095,6 @@ public class HTree extends AbstractHTree
      *            which buddy hash table in the parent must be its pointers
      *            updated such that it points to both the original child and new
      *            child.
-     * @param childIsUnused
-     *            The child, which can be a {@link DirectoryPage} or a
-     *            {@link BucketPage}.
      * 
      * @throws IllegalArgumentException
      *             if any argument is <code>null</code>.
@@ -1102,19 +1114,19 @@ public class HTree extends AbstractHTree
      */
     // Note: package private for unit tests.
     void addLevel(final DirectoryPage oldParent, final int buddyOffset,
-            final int splitBits, final AbstractPage childIsUnused) {
+            final int splitBits) { //, final AbstractPage child) {
         
         if (oldParent == null)
             throw new IllegalArgumentException();
-        if (childIsUnused == null)
-            throw new IllegalArgumentException();
-        if (childIsUnused.globalDepth != oldParent.globalDepth) {
-            /*
-             * We only create a new directory page when the global and local
-             * depth are equal.
-             */
-            throw new IllegalStateException();
-        }
+//        if (childIsUnused == null)
+//            throw new IllegalArgumentException();
+//        if (childIsUnused.globalDepth != oldParent.globalDepth) {
+//            /*
+//             * We only create a new directory page when the global and local
+//             * depth are equal.
+//             */
+//            throw new IllegalStateException();
+//        }
         if (buddyOffset < 0)
             throw new IllegalArgumentException();
         if (buddyOffset >= (1 << addressBits)) {
@@ -1142,14 +1154,14 @@ public class HTree extends AbstractHTree
         }
         if (oldParent.isReadOnly()) // must be mutable.
             throw new IllegalStateException();
-        if (childIsUnused.isReadOnly()) // must be mutable.
-            throw new IllegalStateException();
-        if (childIsUnused.parent != oldParent.self) // must be same Reference.
-            throw new IllegalStateException();
+//        if (childIsUnused.isReadOnly()) // must be mutable.
+//            throw new IllegalStateException();
+//        if (childIsUnused.parent != oldParent.self) // must be same Reference.
+//            throw new IllegalStateException();
 
         if (log.isDebugEnabled())
             log.debug("parent=" + oldParent.toShortString() + ", buddyOffset="
-                    + buddyOffset + ", child=" + childIsUnused);
+                    + buddyOffset);// + ", child=" + childIsUnused);
 
         // Allocate a new directory page. .
         final DirectoryPage newParent = new DirectoryPage(this, splitBits/* globalDepth */);
@@ -1338,7 +1350,7 @@ public class HTree extends AbstractHTree
              */
             throw new IllegalArgumentException();
         }
-        if (prefixLength <= 0)
+        if (prefixLength < 0)
             throw new IllegalArgumentException();
         if (parent.isReadOnly()) // must be mutable.
             throw new IllegalStateException();
@@ -1708,7 +1720,7 @@ public class HTree extends AbstractHTree
             // upper half of target page.
             final int lastDstBuddyIndex = newBuddyCount;
 
-            // work backwards over buddy buckets to avoid stomping data!
+            // work backwards over buddies to avoid stomping data!
             for (int srcBuddyIndex = lastSrcBuddyIndex - 1, dstBuddyIndex = lastDstBuddyIndex - 1; //
             srcBuddyIndex >= firstSrcBuddyIndex; //
             srcBuddyIndex--, dstBuddyIndex--//
@@ -1729,12 +1741,11 @@ public class HTree extends AbstractHTree
                                 + dstBuddyIndex + ")" + ", slot(" + srcSlot
                                 + "=>" + dstSlot + ")");
 
-                    // Copy the data for that slot
-                    dstAddrs[dstSlot] = srcAddrs[srcSlot];
-                    dstRefs[dstSlot] = srcRefs[srcSlot];
-                    // 2nd copy of data for that slot.
-                    dstAddrs[dstSlot + 1] = srcAddrs[srcSlot];
-                    dstRefs[dstSlot + 1] = srcRefs[srcSlot];
+                    for (int i = 0; i < 2; i++) {
+                        // Copy data to slot
+                        dstAddrs[dstSlot + i] = srcAddrs[srcSlot];
+                        dstRefs[dstSlot + i] = srcRefs[srcSlot];
+                    }
 
                 }
 
@@ -1773,7 +1784,9 @@ public class HTree extends AbstractHTree
              * 
              * Note: Unlike with a BucketPage, we have to spread out the data in
              * the slots of the first buddy hash table on the lower half of the
-             * page as well to fill in the uncovered slots.
+             * page as well to fill in the uncovered slots. This means that we
+             * have to work backwards over the slots in each source buddy table
+             * to avoid stomping our data.
              */
             for (int srcBuddyIndex = lastSrcBuddyIndex - 1, dstBuddyIndex = lastDstBuddyIndex - 1; //
             srcBuddyIndex >= firstSrcBuddyIndex; // 
@@ -1784,9 +1797,11 @@ public class HTree extends AbstractHTree
 
                 final int lastSrcSlot = (srcBuddyIndex + 1) * slotsPerOldBuddy;
 
-                final int firstDstSlot = dstBuddyIndex * slotsPerNewBuddy;
+//                final int firstDstSlot = dstBuddyIndex * slotsPerNewBuddy;
 
-                for (int srcSlot = firstSrcSlot, dstSlot = firstDstSlot; srcSlot < lastSrcSlot; srcSlot++, dstSlot += 2) {
+                final int lastDstSlot = (dstBuddyIndex + 1) * slotsPerNewBuddy;
+
+                for (int srcSlot = lastSrcSlot-1, dstSlot = lastDstSlot-1; srcSlot >= firstSrcSlot; srcSlot--, dstSlot -= 2) {
 
                     if (log.isTraceEnabled())
                         log.trace("moving: page(" + srcPage.toShortString()
@@ -1795,13 +1810,12 @@ public class HTree extends AbstractHTree
                                 + dstBuddyIndex + ")" + ", slot(" + srcSlot
                                 + "=>" + dstSlot + ")");
 
-                    // Copy data for that slot.
-                    dstAddrs[dstSlot] = srcAddrs[srcSlot];
-                    dstRefs[dstSlot] = srcRefs[srcSlot];
-                    // 2nd copy of data for that slot.
-                    dstAddrs[dstSlot + 1] = srcAddrs[srcSlot];
-                    dstRefs[dstSlot + 1] = srcRefs[srcSlot];
-
+                    for (int i = 0; i < 2; i++) {
+                        // Copy data to slot.
+                        dstAddrs[dstSlot - i] = srcAddrs[srcSlot];
+                        dstRefs[dstSlot - i] = srcRefs[srcSlot];
+                    }
+                    
                 }
 
             }
@@ -2639,11 +2653,9 @@ public class HTree extends AbstractHTree
              * the entire buddy bucket to find an open slot (or just to count
              * the #of slots which are currently in use).
              * 
-             * FIXME The current raba coders assume that the keys and values are
-             * compact. That assumption is violate for an htree since the buddy
-             * buckets are inherently sparse. We can not really compact a bucket
-             * page unless we change its coding to indicate the run length of
-             * the non-null tuples within each buddy bucket.
+             * TODO Cache the location of the last known empty slot. If it is in
+             * the same buddy bucket then we can use it immediately. Otherwise
+             * we can scan for the first empty slot in the given buddy bucket.
              */
             final MutableKeyBuffer keys = (MutableKeyBuffer) getKeys();
             final MutableValueBuffer vals = (MutableValueBuffer) getValues();
