@@ -53,18 +53,18 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestTermsWriteTask extends TestCase2 {
+public class TestBlobsWriteTask extends TestCase2 {
 
     /**
      * 
      */
-    public TestTermsWriteTask() {
+    public TestBlobsWriteTask() {
     }
 
     /**
      * @param name
      */
-    public TestTermsWriteTask(String name) {
+    public TestBlobsWriteTask(String name) {
         super(name);
     }
 
