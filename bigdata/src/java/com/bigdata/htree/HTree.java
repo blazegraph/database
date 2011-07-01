@@ -51,10 +51,10 @@ import com.bigdata.btree.data.DefaultLeafCoder;
 import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.raba.IRaba;
-import com.bigdata.htree.raba.MutableKeyBuffer;
-import com.bigdata.btree.raba.MutableValueBuffer;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.htree.data.IDirectoryData;
+import com.bigdata.htree.raba.MutableKeyBuffer;
+import com.bigdata.htree.raba.MutableValueBuffer;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.IRawStore;
@@ -533,26 +533,34 @@ public class HTree extends AbstractHTree
 					
 					if (current.globalDepth == child.globalDepth) {
 
-						/*
-						 * There is only one buddy hash bucket on the page. To
-						 * split the page, we have to introduce a new directory
-						 * page above it.
-						 * 
-						 * TODO This code path is to introduce new directory
-						 * page if sole buddy bucket is full. However, we might
-						 * also need a code path to split the buddy hash table
-						 * in the directory. The way things are falling out
-						 * right now I do not see how this would happen as the
-						 * global depth of a directory is always the same as
-						 * address bits, but maybe I am missing something....
-						 */
-                        addLevel(current, buddyOffset, splitBits,
-                                bucketPage);
+                        /*
+                         * There is only one buddy hash bucket on the page. To
+                         * split the page, we have to introduce a new directory
+                         * page above it and then introduce a sibling bucket
+                         * page and finally re-index the tuples in the bucket
+                         * page such that they are either the original bucket
+                         * page or its new sibling bucket page.
+                         * 
+                         * TODO This code path is to introduce new directory
+                         * page if sole buddy bucket is full. However, we might
+                         * also need a code path to split the buddy hash table
+                         * in the directory. The way things are falling out
+                         * right now I do not see how this would happen as the
+                         * global depth of a directory is always the same as
+                         * address bits, but maybe I am missing something....
+                         */
 
-						// The children of [current] have changed so we will
-						// search current again.
-						continue;
-						
+                        // add a level.
+                        addLevel(current, buddyOffset, splitBits, bucketPage);
+
+                        // split the full bucket page and re-index it's tuples.
+                        splitAndReindexFullBucketPage(current/* parent */,
+                                buddyOffset, prefixLength, bucketPage);
+
+                        // The structure of the index has changed so we have to
+                        // restart the search from the root.
+                        return insert(key, value); // recursive call.
+                       
 					}
 
 					// globalDepth >= localDepth
@@ -1089,7 +1097,7 @@ public class HTree extends AbstractHTree
      * @throws IllegalStateException
      *             if the <i>oldBucket</i> is read-only.
      * @throws IllegalStateException
-     *             if the parent of the <oldBucket</i> is not the given
+     *             if the parent of the <i>oldBucket</i> is not the given
      *             <i>parent</i>.
      */
     // Note: package private for unit tests.
@@ -1268,6 +1276,258 @@ public class HTree extends AbstractHTree
 
     }
 
+    /**
+     * Allocate a sibling bucket of a full bucket page (one buddy bucket) and
+     * index the tuples in the caller's bucket between the old bucket and the
+     * new bucket. This method MUST be invoked immediately after a new level has
+     * been added to the {@link HTree} in order to bring the {@link HTree} into
+     * an internally consistent state.
+     * 
+     * @param parent
+     *            The parent {@link DirectoryPage}.
+     * @param buddyOffset
+     *            The buddyOffset within the <i>parent</i>. This identifies
+     *            which buddy hash table in the parent must be its pointers
+     *            updated such that it points to both the original child and new
+     *            child.
+     * @param prefixLength
+     *            The bit length of the MSB prefix to the <i>parent</i>
+     *            {@link DirectoryPage}.
+     * @param oldBucket
+     *            The child {@link BucketPage} to be re-indexed.
+     * 
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>.
+     * @throws IllegalStateException
+     *             if the <i>parent<i/> is read-only.
+     * @throws IllegalStateException
+     *             if the <i>oldBucket</i> is read-only.
+     * @throws IllegalStateException
+     *             if the parent of the <i>oldBucket</i> is not the given
+     *             <i>parent</i>.
+     * 
+     * @see #addLevel(DirectoryPage, int, int, AbstractPage)
+     */
+    // Note: package private for unit tests.
+    void splitAndReindexFullBucketPage(final DirectoryPage parent,
+            final int buddyOffset, final int prefixLength,
+            final BucketPage oldBucket) {
+
+        if (parent == null)
+            throw new IllegalArgumentException();
+        if (oldBucket== null)
+            throw new IllegalArgumentException();
+        if (buddyOffset < 0)
+            throw new IllegalArgumentException();
+        if (buddyOffset >= (1 << addressBits)) {
+            /*
+             * Note: This check is against the maximum possible slot index. The
+             * actual max buddyOffset depends on parent.globalBits also since
+             * (1<<parent.globalBits) gives the #of slots per buddy and the
+             * allowable buddyOffset values must fall on an buddy hash table
+             * boundary.
+             */
+            throw new IllegalArgumentException();
+        }
+        if ((buddyOffset + splitBits) >= (1 << addressBits)) {
+            /*
+             * [buddyOffset] is the slot index of the first slot for the buddy
+             * hash table in the parent. [splitBits] is the #of address bits to
+             * copy into the new directory page. Therefore, [buddyOffset +
+             * splitBits] must be GTE ZERO (0) and LT [addressBits].
+             */
+            throw new IllegalArgumentException();
+        }
+        if (prefixLength <= 0)
+            throw new IllegalArgumentException();
+        if (parent.isReadOnly()) // must be mutable.
+            throw new IllegalStateException();
+        if (oldBucket.isReadOnly()) // must be mutable.
+            throw new IllegalStateException();
+        if (oldBucket.parent != parent.self) // must be same Reference.
+            throw new IllegalStateException();
+
+        if (log.isDebugEnabled())
+            log.debug("parent=" + parent.toShortString() + ", buddyOffset="
+                    + buddyOffset + ", oldBucket=" + oldBucket);
+
+        /*
+         * Note: We can not validate that the caller's bucket page has only a
+         * single buddy bucket because this method is invoked immediately after
+         * addLevel() and the hash tree is not internally consistent until we
+         * have gone through the reindex of the tuples in the old bucket,
+         * placing them into either the old bucket or the new bucket. At the
+         * moment when this method is invoked, the old bucket will actually
+         * appear to have the local depth which applies to the post-condition of
+         * the total addLevel() + reindexBucket() operation (this is because
+         * addLevel() will give us multiple pointers to the old bucket page in
+         * the parent). We rely on that to set the local depth on the sibling
+         * bucket.
+         * 
+         * TODO Javadoc update.
+         */
+
+        final int oldDepth = oldBucket.globalDepth;
+        final int newDepth = oldDepth + 1;
+
+        // Allocate a new bucket page (globalDepth is increased by one).
+        final BucketPage newBucket = new BucketPage(this, newDepth);
+
+        assert newBucket.isDirty();
+        
+        // Set the parent reference on the new bucket.
+        newBucket.parent = (Reference) parent.self;
+        
+        // Increase global depth on the old page also.
+        oldBucket.globalDepth = newDepth;
+
+        nleaves++; // One more bucket page in the hash tree. 
+
+        // update the pointers in the parent.
+        updatePointersInParent(parent, buddyOffset, oldDepth, oldBucket,
+                newBucket);
+
+        // reindex the tuples.
+        reindexTuples(parent, buddyOffset, prefixLength, oldBucket, newBucket);
+
+    }
+
+    /**
+     * Re-index the tuples in (a), distributing them between (a) and (b)
+     * according to the hash bits which are in play at that level of the
+     * {@link HTree}.
+     * 
+     * @param parent
+     *            The parent {@link DirectoryPage}.
+     * @param buddyOffset
+     *            The buddyOffset within the <i>parent</i>. This identifies
+     *            which buddy hash table in the parent must be its pointers
+     *            updated such that it points to both the original child and new
+     *            child.
+     * @param prefixLength
+     *            The bit length of the MSB prefix to the <i>parent</i>
+     *            {@link DirectoryPage}.
+     * @param a
+     *            The original bucket.
+     * @param b
+     *            The new sibling bucket.
+     */
+    private void reindexTuples(final DirectoryPage parent,
+            final int buddyOffset, final int prefixLength, final BucketPage a,
+            final BucketPage b) {
+
+        if (parent == null)
+            throw new IllegalArgumentException();
+        if (a == null)
+            throw new IllegalArgumentException();
+        if (b == null)
+            throw new IllegalArgumentException();
+        if (a.isReadOnly())
+            throw new IllegalStateException();
+        if (b.isReadOnly())
+            throw new IllegalStateException();
+        if (a.parent.get() != parent)
+            throw new IllegalStateException();
+        if (b.parent.get() != parent)
+            throw new IllegalStateException();
+
+        // Setup [t] as a temporary page with [a]'s data and clear [a]'s data.
+        final BucketPage t = new BucketPage(this, a.globalDepth);
+        {
+            final ILeafData tmp = a.data;
+            a.data = t.data;
+            t.data = tmp;
+        }
+
+        /*
+         * Visit each tuple which was in [a], figure out which of the two bucket
+         * pages it needs to be in, and insert the tuple into the appropriate
+         * bucket page.
+         * 
+         * Note: Regardless of the apparent globalDepth of [a] and [b], each of
+         * these bucket pages is treated as a "full" bucket page consisting of a
+         * single buddy bucket. They will be reported as "full" pages (single
+         * buddy bucket) after the addLevel() + splitAndReindex() operation is
+         * complete.
+         * 
+         * FIXME ^^^ This is incorrect. They should be treated as having their
+         * stated depth for the purposes of inserting data into the buddy
+         * buckets. The caller needs to make sure that this depth is properly
+         * set on the bucket pages. However, we need to visit the tuples in
+         * [a]'s data without regard to buddy bucket boundaries.
+         */
+        
+        // #of slots in [a]'s data.
+        final IRaba keys = t.data.getKeys();
+        final IRaba vals = t.data.getValues();
+        final int m = 1 << addressBits;
+        assert m == keys.capacity();
+        // #of tuples inserted into [a] and [b] respectively.
+        int na = 0, nb = 0;
+        for (int sourceIndex = 0; sourceIndex < m; sourceIndex++) {
+
+            // Since the bucket is full, no entry should be null.
+            assert !keys.isNull(sourceIndex);
+
+            /*
+             * Re-insert the tuple
+             * 
+             * Note: A re-insert via the top-level entry point is logically
+             * correct. However, it will: (a) cause the raw record to be
+             * materialized and written onto the backing store a second time
+             * (which is wasteful in the extreme); (b) have a side-effect on the
+             * revision timestamps (if we support them); and (c) cause deleted
+             * tuples to "reappear" (if we support delete markers). For all of
+             * these reasons, we need to handle the "re-insert" of the tuples
+             * at a much lower level in the API.
+             */
+
+            // materialize the key.
+            final byte[] key = keys.get(sourceIndex);
+
+            /*
+             * Figure out whether the tuple would be directed into (a) or (b) by
+             * the parent. Then figure out which buddy bucket on the target page
+             * will get that tuple.
+             */
+            final int hashBitsParent = parent.getLocalHashCode(key, prefixLength);
+
+            // Find the child which will get this tuple.
+            final AbstractPage child = parent.getChild(hashBitsParent, buddyOffset);
+            
+            // The child must be a bucket page.
+            assert child.isLeaf(); 
+            
+            // The child be one of the two bucket pages we are working with.
+            assert (child == a || child == b);
+
+            // True if the tuple is re-indexed back into (a).
+            final boolean isA = child == a;
+            
+            final BucketPage x = (BucketPage) child;
+            
+            // The index in the child where we will write the tuple.
+            final int targetIndex = isA ? na : nb;
+
+            // Copy the key.
+            x.data.getKeys().set(targetIndex, key);
+            
+            // Copy the value.
+            if (!vals.isNull(sourceIndex))
+                x.data.getValues().set(targetIndex, vals.get(sourceIndex));
+
+            // TODO copy versionTimestamp and delete marker metadata too.
+
+            // Increment the index of the next target tuple in this child.
+            if (isA)
+                na++;
+            else
+                nb++;
+            
+        }
+
+    }
+    
     /**
      * Handle split if localDepth LT globalDepth (so there is more than one
      * buddy directory on the page) but we need to increase the prefix bit
@@ -2177,7 +2437,7 @@ public class HTree extends AbstractHTree
 			super(htree, true/* dirty */, globalDepth);
             
             data = new MutableBucketData(//
-            		(1<<htree.addressBits), // fan-out
+                    (1 << htree.addressBits), // fan-out
                     htree.versionTimestamps,//
                     htree.deleteMarkers,//
                     htree.rawRecords//

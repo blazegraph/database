@@ -64,6 +64,9 @@ public class TestAll extends TestCase {
         // test mutable key buffer.
         suite.addTestSuite(TestMutableKeyBuffer.class);
 
+        // test mutable values buffer
+        suite.addTestSuite(TestMutableValueBuffer.class);
+
 //        // test key search routines on the key buffer implementations.
 //        suite.addTestSuite(TestKeyBufferSearch.class);
 //

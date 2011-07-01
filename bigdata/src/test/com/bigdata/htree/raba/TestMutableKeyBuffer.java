@@ -57,6 +57,76 @@ public class TestMutableKeyBuffer extends TestCase2 {
     }
 
     /**
+     * Unit tests for constructor accepting only the capacity of the buffer.
+     */
+    public void test_ctor_capacity() {
+        
+        // Capacity must be positive and a power of two.
+        try {
+            new MutableKeyBuffer(0);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            // ignored.
+        }
+        try {
+            new MutableKeyBuffer(-1);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            // ignored.
+        }
+        try {
+            new MutableKeyBuffer(3);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            // ignored.
+        }
+        try {
+            new MutableKeyBuffer(17);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            // ignored.
+        }
+        /*
+         * These are legal invocations.
+         */
+        new MutableKeyBuffer(2);
+        new MutableKeyBuffer(4);
+        new MutableKeyBuffer(8);
+        new MutableKeyBuffer(16);
+
+        /*
+         * Check the post-conditions for a legal invocation of the constructor.
+         */
+        final int m = 2;
+        final MutableKeyBuffer t = new MutableKeyBuffer(m);
+        assertEquals(0, t.size());
+        assertEquals(m, t.capacity());
+        assertNotNull(t.keys);
+        assertEquals(m, t.keys.length);
+        for (int i = 0; i < m; i++) {
+            assertNull(t.keys[i]);
+        }
+
+    }
+    
+    /*
+     * FIXME unit test constructor wrapping the caller's data.
+     */
+    public void test_ctor_wrap() {
+//        public MutableKeyBuffer(final int nkeys, final byte[][] keys)
+        fail("write test");
+    }
+    
+    /*
+     * FIXME unit test the copy constructor.
+     * 
+     * public MutableKeyBuffer(final MutableKeyBuffer src)
+     */
+    public void test_ctor_copy() {
+        fail("write test");
+    }
+
+    /**
      * The keys of the {@link HTree} do not have any of the requirements of the
      * B+Tree keys. The keys in a bucket page may contain duplicates and
      * <code>null</code>s and are not searchable (only scannable, and then only
