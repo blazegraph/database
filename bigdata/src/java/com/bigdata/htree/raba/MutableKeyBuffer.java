@@ -69,6 +69,17 @@ public class MutableKeyBuffer implements IRaba {
     final public byte[][] keys;
 
     /**
+     * Must be <code>2^n</code> where <code>n</code> GT ZERO (0).
+     */
+    private static void checkCapacity(final int capacity) {
+     
+        if (capacity <= 1 || (capacity & -capacity) != capacity)
+            throw new IllegalArgumentException(
+                    "capacity must be 2^n where n is positive, not " + capacity);
+
+    }
+    
+    /**
      * Allocate a mutable key buffer capable of storing <i>capacity</i> keys.
      * 
      * @param capacity
@@ -76,11 +87,7 @@ public class MutableKeyBuffer implements IRaba {
      */
     public MutableKeyBuffer(final int capacity) {
 
-        if (capacity <= 0)
-            throw new IllegalArgumentException();
-
-        if ((capacity & -capacity) != capacity) // e.g., not a power of 2.
-            throw new IllegalArgumentException();
+        checkCapacity(capacity);
 
         nkeys = 0;
         
@@ -98,10 +105,14 @@ public class MutableKeyBuffer implements IRaba {
      */
     public MutableKeyBuffer(final int nkeys, final byte[][] keys) {
 
-        assert keys != null;
+        if (keys == null)
+            throw new IllegalArgumentException();
 
-        assert keys.length == nkeys;
+        if (nkeys < 0 || nkeys > keys.length)
+            throw new IllegalArgumentException();
 
+        checkCapacity(keys.length);
+        
         this.nkeys = nkeys;
 
         this.keys = keys;
@@ -109,23 +120,26 @@ public class MutableKeyBuffer implements IRaba {
     }
 
     /**
-     * Creates a new instance using a new array of keys but sharing the key
-     * references with the provided {@link MutableKeyBuffer}.
+     * Creates a new instance using a new byte[][] but sharing the byte[]
+     * references with the caller's buffer.
      * 
      * @param src
      *            An existing instance.
      */
     public MutableKeyBuffer(final MutableKeyBuffer src) {
 
-        assert src != null;
-
+        if(src == null)
+            throw new IllegalArgumentException();
+        
+        checkCapacity(src.capacity());
+        
         this.nkeys = src.nkeys;
 
         // note: dimension to the capacity of the source.
         this.keys = new byte[src.keys.length][];
 
         // copy the keys.
-        for (int i = 0; i < keys.length; i++) { // FIXME Unit test this ctor!
+        for (int i = 0; i < keys.length; i++) {
 
             // Note: copies the reference.
             this.keys[i] = src.keys[i];
@@ -154,12 +168,12 @@ public class MutableKeyBuffer implements IRaba {
         if (src == null)
             throw new IllegalArgumentException();
 
+        checkCapacity(capacity);
+        
         if (capacity < src.capacity())
             throw new IllegalArgumentException();
         
         nkeys = src.size();
-
-        assert nkeys >= 0;
 
         keys = new byte[capacity][];
 
