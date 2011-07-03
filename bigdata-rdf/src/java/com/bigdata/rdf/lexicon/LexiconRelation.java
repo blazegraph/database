@@ -1809,6 +1809,61 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         // create a new index.
         textIndexer.create();
 
+        // TermIVs
+        {
+            // The index to scan for the RDF Literals.
+            final IIndex terms = getId2TermIndex();
+
+            // used to decode the
+            final ITupleSerializer tupSer = terms.getIndexMetadata()
+                    .getTupleSerializer();
+
+            /*
+             * Visit all plain, language code, and datatype literals in the
+             * lexicon.
+             * 
+             * Note: This uses a filter on the ITupleIterator in order to filter
+             * out non-literal terms before they are shipped from a remote index
+             * shard.
+             */
+            final Iterator<BigdataValue> itr = new Striterator(terms
+                    .rangeIterator(null/* fromKey */, null/* toKey */,
+                            0/* capacity */, IRangeQuery.DEFAULT,
+                            new TupleFilter<BigdataValue>() {
+                                private static final long serialVersionUID = 1L;
+
+                                protected boolean isValid(
+                                        final ITuple<BigdataValue> obj) {
+                                    final IV iv = (IV) tupSer
+                                            .deserializeKey(obj);
+                                    if (iv != null && iv.isLiteral()) {
+                                        return true;
+                                    }
+                                    return false;
+                                }
+                            })).addFilter(new Resolver() {
+                private static final long serialVersionUID = 1L;
+
+                protected Object resolve(final Object obj) {
+                    final BigdataLiteral lit = (BigdataLiteral) tupSer
+                            .deserialize((ITuple) obj);
+                    // System.err.println("lit: "+lit);
+                    return lit;
+                }
+            });
+
+            final int capacity = 10000;
+
+            while (itr.hasNext()) {
+
+                textIndexer.index(capacity, itr);
+
+            }
+
+        }
+
+        // BlobIVs
+        {
         // the index to scan for the RDF Literals.
         final IIndex terms = getBlobsIndex();
 
@@ -1852,6 +1907,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             textIndexer.index(capacity, itr);
 
+        }
+        
         }
 
     }

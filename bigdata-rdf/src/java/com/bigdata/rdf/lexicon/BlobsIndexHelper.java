@@ -27,8 +27,6 @@
 package com.bigdata.rdf.lexicon;
 
 import java.io.IOException;
-import java.io.StringWriter;
-import java.io.Writer;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
@@ -50,16 +48,14 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.INonInlineExtensionCodes;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Helper class for operations on the TERMS index.
+ * Helper class for operations on the BLOBS index.
  */
 public class BlobsIndexHelper {
 
@@ -713,183 +709,6 @@ public class BlobsIndexHelper {
     }
 
 	/**
-	 * Dump the TERMS index.
-	 * 
-	 * @param r
-	 *            The lexicon relation.
-	 *            
-	 * @return The dump.
-	 */
-	public Appendable dump(final LexiconRelation r) {
-
-		final StringWriter w = new StringWriter(//
-				100 * Bytes.kilobyte32// initialCapacity
-		);
-
-		w.append(r.getLexiconConfiguration().toString());
-		
-		w.append("\n");
-		
-		dump(w, true/*showEntries*/, r.getNamespace(), r.getBlobsIndex());
-		
-		return w.getBuffer();
-
-	}
-
-	/**
-	 * Dump the TERMS index.
-	 * 
-	 * @param namespace
-	 * @param ndx
-	 * @return
-	 */
-	public Appendable dump(final String namespace, final IIndex ndx) {
-		
-		final StringWriter w = new StringWriter(//
-				100 * Bytes.kilobyte32// initialCapacity
-		);
-		
-		dump(w, true/*showEntries*/, namespace, ndx);
-		
-		return w.getBuffer();
-		
-	}
-
-	/**
-	 * Core implementation
-	 * 
-	 * @param w
-	 *            Where to write the data.
-	 * @param showEntries
-	 *            When <code>true</code> the individual entries in the TERMS
-	 *            index will be reported. When <code>false</code> only metadata
-	 *            about the scanned entries will be reported.
-	 * @param namespace
-	 *            The namespace of the {@link LexiconRelation}.
-	 * @param ndx
-	 *            The TERMS index for that {@link LexiconRelation}.
-	 */
-	public void dump(final Writer w, final boolean showEntries,
-			final String namespace, final IIndex ndx) {
-
-		final int BIN_SIZE = 256;
-
-        final int NBINS = (MAX_COUNTER + 1) / BIN_SIZE;
-
-		try {
-
-			int maxCollisionCounter = 0;
-
-            /*
-             * An array of bins reporting the #of TERMS having the #of collision
-             * counters for that bin. The bins are each BIN_SIZE wide. There are
-             * NBINS bins. For a given counter value, the bin is selected by
-             * floor(counter/binSize).
-             * 
-             * TODO It would be much more useful to use a sparse array so we can
-             * report on the distribution at the lower end of the hash collision
-             * counter range, which is where most of the collisions will be
-             * found.
-             */
-			final long[] bins = new long[NBINS];
-
-			final BigdataValueFactory vf = BigdataValueFactoryImpl
-					.getInstance(namespace);
-
-			final BigdataValueSerializer<BigdataValue> valSer = vf
-					.getValueSerializer();
-
-			// Used to decode the Values.
-			final StringBuilder tmp = new StringBuilder();
-
-			w.append("fastRangeCount=" + ndx.rangeCount()+"\n");
-			
-			@SuppressWarnings("unchecked")
-			final ITupleIterator<BlobIV<?>> itr = ndx.rangeIterator();
-
-			long nvisited = 0L;
-			
-			while (itr.hasNext()) {
-
-				final ITuple<BlobIV<?>> tuple = itr.next();
-				
-				nvisited++;
-
-				if (tuple.isNull()) {
-
-					if (showEntries) {
-						w.append("NullIV: key=");
-						w.append(BytesUtil.toString(tuple.getKey()));
-						w.append("\n");
-					}
-
-				} else {
-
-					final BlobIV<?> iv = (BlobIV<?>) IVUtility
-							.decodeFromOffset(tuple.getKeyBuffer().array(), 0/* offset */);
-					// new TermId(tuple.getKey());
-
-					final BigdataValue value = valSer.deserialize(tuple
-							.getValueStream(), tmp);
-
-					if (showEntries) {
-						w.append(iv.toString());
-						w.append(" => ");
-						w.append(value.toString());
-						w.append("\n");
-					}
-
-					final int counter = iv.counter();
-
-					if (counter > maxCollisionCounter) {
-
-						maxCollisionCounter = counter;
-
-					}
-					
-					final int bin = (int) (counter / BIN_SIZE);
-					
-					bins[bin]++;
-
-				}
-
-			}
-
-			w.append("nvisited=" + nvisited+"\n");
-			
-			w.append("binSize=" + BIN_SIZE+"\n");
-
-			w.append("nbins=" + NBINS + "\n");
-
-			// #of non-zero bins.
-			int nnzero = 0;
-			
-			for (int bin = 0; bin < NBINS; bin++) {
-
-				final long numberInBin = bins[bin];
-
-				if (numberInBin == 0)
-					continue;
-
-				w.append("bins[" + bin + "]=" + numberInBin + "\n");
-
-				nnzero++;
-				
-			}
-			
-			w.append("numNonZeroBins=" + nnzero + "\n");
-			
-			w.append("maxCollisionCounter=" + maxCollisionCounter + "\n");
-
-		} catch (IOException e) {
-		
-			throw new RuntimeException(e);
-			
-		}
-
-    }
-
-    /**
      * Exception thrown if the maximum size of the collision bucket would be
      * exceeded for some {@link BigdataValue}.
      * 

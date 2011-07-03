@@ -985,7 +985,7 @@ abstract public class AbstractTripleStore extends
 		 * the full text index does not play well with inlining large literals
 		 * into the statement indices.
 		 */
-        String DEFAULT_MAX_INLINE_STRING_LENGTH = "16";
+        String DEFAULT_MAX_INLINE_STRING_LENGTH = "0";
         
         /**
          * Set up database to inline bnodes directly into the statement indices 
