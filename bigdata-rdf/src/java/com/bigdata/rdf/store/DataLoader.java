@@ -47,6 +47,7 @@ import java.util.zip.ZipInputStream;
 import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.RWStrategy;
@@ -610,12 +611,15 @@ public class DataLoader {
             long beginCommit = System.currentTimeMillis();
             
             database.commit();
-
+            
             totals.commitTime.add(System.currentTimeMillis() - beginCommit);
 
             if (log.isInfoEnabled())
                 log.info("commit: latency="+totals.commitTime+"ms");
 
+			if (log.isInfoEnabled() && false)
+				logCounters(database);
+			
         }
 
         if (log.isInfoEnabled())
@@ -1076,6 +1080,9 @@ public class DataLoader {
                 if (log.isInfoEnabled())
                     log.info("commit: latency=" + stats.commitTime + "ms");
 
+                if (log.isInfoEnabled() && false)
+    				logCounters(database);
+    			
             }
 
             stats.totalTime.set(System.currentTimeMillis() - begin);
@@ -1146,6 +1153,40 @@ public class DataLoader {
         }
 
     }
+    
+    private void logCounters(final AbstractTripleStore database) {
+
+		if (!log.isInfoEnabled())
+			return;
+    	
+		final IIndexManager store = database.getIndexManager();
+		
+    	if (!(store instanceof Journal))
+			return;
+		
+		if (!(((Journal) store).getBufferStrategy() instanceof RWStrategy))
+			return;
+
+		final StringBuilder sb = new StringBuilder("\n");
+
+		((RWStrategy) ((Journal) store).getBufferStrategy()).getRWStore()
+				.getStorageStats().showStats(sb);
+
+    	log.info(sb.toString());
+
+    	if(true) {
+			/*
+			 * FIXME Remove this. It assumes that the journal has only one
+			 * triple store.
+			 */
+			final long extent = ((Journal)store).getBufferStrategy().getExtent();
+			final long stmts = database.getStatementCount();
+			final long bytesPerStmt = stmts==0?0:(extent/stmts);
+			log.info("extent=" + extent + ", stmts=" + stmts + ", bytes/stat="
+					+ bytesPerStmt);
+    	}
+    	
+	}
     
     /**
      * Compute closure as configured. If {@link ClosureEnum#None} was selected
@@ -1472,16 +1513,18 @@ public class DataLoader {
 								.getLocalBTreeBytesWritten(new StringBuilder())
 								.toString());
 
-				if (jnl.getBufferStrategy() instanceof RWStrategy) {
-
-					final StringBuilder sb = new StringBuilder();
-
-					((RWStrategy) jnl.getBufferStrategy()).getRWStore()
-							.showAllocators(sb);
-
-					System.out.println(sb);
-
-				}
+				if(log.isInfoEnabled())
+					dataLoader.logCounters(dataLoader.database);
+//				if (jnl.getBufferStrategy() instanceof RWStrategy) {
+//
+//					final StringBuilder sb = new StringBuilder();
+//
+//					((RWStrategy) jnl.getBufferStrategy()).getRWStore()
+//							.showAllocators(sb);
+//
+//					System.out.println(sb);
+//
+//				}
 
 			}
 
