@@ -555,6 +555,22 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         
     }
 
+    /**
+     * TODO AbstractTripleStore#getBNodeCount() is not well behaved. For at
+     * least the BLOBS index we will have lots of bnode values in the index if a
+     * lot of bnodes have been inserted (this can only occur for large bnode IDs
+     * so it is a bit of an odd case). However, getBNodeCount() is documented as
+     * returning 0L if we are not in told bnodes mode.
+     * <p>
+     * I need to check the situation with the TERM2ID index and see if we are
+     * storing blank nodes there as well even when we are NOT in told bnodes
+     * mode. Finally, getTermCount() is reporting everything in TERM2ID + BLOBS.
+     * That's Ok except that we should not be including the bnodes when we are
+     * not in told bnodes mode.... TestTripleStore currently fails on this
+     * issue.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/327
+     */
     public void test_rangeCounts_standardBNodes() {
         
         final Properties properties = super.getProperties();
