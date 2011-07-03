@@ -43,10 +43,10 @@ public enum VTE {
     URI((byte) 0x00),
     
     /** A blank node. */
-    BNODE((byte) 0x02),// was 0x01
+    BNODE((byte) 0x01),
     
     /** A literal. */
-    LITERAL((byte) 0x01), // was 0x02
+    LITERAL((byte) 0x02),
 
     /** A statement identifier. */
     STATEMENT((byte) 0x03);
@@ -84,9 +84,9 @@ public enum VTE {
         switch (b & 0x03) { // mask off everything but the low 2 bits.
         case 0x00:
             return URI;
-        case 0x02: // was 0x01
+        case 0x01:
             return BNODE;
-        case 0x01: // was 0x02
+        case 0x02:
             return LITERAL;
         case 0x03:
             return STATEMENT;
