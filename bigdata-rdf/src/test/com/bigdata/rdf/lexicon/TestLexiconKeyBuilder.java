@@ -559,9 +559,10 @@ public class TestLexiconKeyBuilder extends TestCase2 {
 
         final Value oldValue = fixture.deserialize(oldValBytes);
 
-        System.err.println("new=" + newValue);
-
-        System.err.println("old=" + oldValue);
+        if (log.isInfoEnabled()) {
+            log.info("new=" + newValue);
+            log.info("old=" + oldValue);
+        }
 
         /*
          * Note: This uses the default Locale and the implied Unicode collation

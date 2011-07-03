@@ -221,7 +221,7 @@ public class TestId2TermTupleSerializer extends TestCase2 {
             this.version = version;
             this.namespace = namespace;
             this.valueFactoryClass = valueFactoryClass;
-            System.err.println("read: " + this);
+            if(log.isInfoEnabled()) log.info("read: " + this);
         }
 
         public void writeExternal(ObjectOutput out) throws IOException {
@@ -239,7 +239,7 @@ public class TestId2TermTupleSerializer extends TestCase2 {
             default:
                 throw new AssertionError();
             }
-            System.err.println("wrote: "+this);
+            if(log.isInfoEnabled()) log.info("wrote: "+this);
         }
 
         public String toString() {

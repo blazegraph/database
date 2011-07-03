@@ -49,8 +49,8 @@ import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.lexicon.DumpLexicon;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -222,7 +222,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 //            store.commit();
     
             if(log.isInfoEnabled()) {
-				log.info(new BlobsIndexHelper()
+				log.info(DumpLexicon
 						.dump(store.getLexiconRelation()));
             }
             
@@ -282,7 +282,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             doAddTermTest(store, new LiteralImpl("abc", XMLSchema.DECIMAL));
     
             if(log.isInfoEnabled()) {
-				log.info(new BlobsIndexHelper()
+				log.info(DumpLexicon
 						.dump(store.getLexiconRelation()));
             }
             
@@ -369,7 +369,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             }
 
             if(log.isInfoEnabled()) {
-				log.info(new BlobsIndexHelper()
+				log.info(DumpLexicon
 						.dump(store.getLexiconRelation()));
             }
             
@@ -720,7 +720,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                     log.info("#bnds=" + store.getBNodeCount());
                     log.info("#vals=" + store.getTermCount());
                     log.info("\n"
-                            + new BlobsIndexHelper().dump(store
+                            + DumpLexicon.dumpBlobs(store
                                     .getLexiconRelation().getNamespace(), store
                                     .getLexiconRelation().getBlobsIndex()));
                 }

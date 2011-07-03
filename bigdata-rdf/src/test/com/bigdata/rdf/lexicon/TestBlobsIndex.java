@@ -491,7 +491,7 @@ public class TestBlobsIndex extends TestCase2 {
 					// Verify BigdataValues are equal()
 					if (!expected.equals(actual)) {
 					
-						log.error(h.dump(namespace, ndx));
+						log.error(DumpLexicon.dumpBlobs(namespace, ndx));
 						
 						fail("Expected=" + expected + "(" + iv + "), actual="
 								+ actual + "(" + actual.getIV() + ")");
