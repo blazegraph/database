@@ -325,21 +325,26 @@ abstract public class AbstractHTree {
         return sb.toString();
         
     }
-    
+
     /**
-	 * @param store
-	 *            The persistence store.
-	 * @param nodeFactory
-	 *            Object that provides a factory for node and leaf objects.
-	 * @param readOnly
-	 *            <code>true</code> IFF it is <em>known</em> that the
-	 *            {@link AbstractBTree} is read-only.
-	 * @param metadata
-	 *            The {@link IndexMetadata} object for this B+Tree.
-	 * @param recordCompressorFactory
-	 *            Object that knows how to (de-)compress the serialized data
-	 *            records.
-	 */
+     * @param store
+     *            The persistence store.
+     * @param nodeFactory
+     *            Object that provides a factory for node and leaf objects.
+     * @param readOnly
+     *            <code>true</code> IFF it is <em>known</em> that the
+     *            {@link AbstractBTree} is read-only.
+     * @param metadata
+     *            The {@link IndexMetadata} object for this B+Tree.
+     * @param recordCompressorFactory
+     *            Object that knows how to (de-)compress the serialized data
+     *            records.
+     * 
+     * @throws IllegalArgumentException
+     *             if addressBits is LT ONE (1).
+     * @throws IllegalArgumentException
+     *             if addressBits is GT (16).
+     */
     protected AbstractHTree(//
             final IRawStore store,//
 //            final INodeFactory nodeFactory,//
@@ -358,8 +363,15 @@ abstract public class AbstractHTree {
         if (addressBits <= 0)
             throw new IllegalArgumentException();
 
-        if (addressBits > 32)
+        if (addressBits > 16) {
+            /*
+             * NB: 1<<32 overflows an int32. However, 2^16 is 65536 which is a
+             * pretty large page. 2^20 is 1,048,576. It is pretty difficult to
+             * imagine use cases where the fan out for the HTree should be that
+             * large.
+             */
             throw new IllegalArgumentException();
+        }
 
 //        if (nodeFactory == null)
 //            throw new IllegalArgumentException();

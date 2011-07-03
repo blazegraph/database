@@ -46,11 +46,19 @@ import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.journal.Journal;
+import com.bigdata.journal.RWStrategy;
 import com.bigdata.rdf.load.RDFFilenameFilter;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.store.DataLoader;
 
 /**
+ * Sample code for loading RDF data using the {@link BigdataSail} and the
+ * openrdf API.
+ * 
+ * @see DataLoader
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -93,11 +101,12 @@ public class LoadNamedGraphs extends SampleCode {
 //                "64");
 
         // instantiate a sail
-        BigdataSail sail = new BigdataSail(properties);
-        Repository repo = new BigdataSailRepository(sail);
+        final BigdataSail sail = new BigdataSail(properties);
+        try {
+        final Repository repo = new BigdataSailRepository(sail);
         repo.initialize();
 
-        RepositoryConnection cxn = repo.getConnection();
+        final RepositoryConnection cxn = repo.getConnection();
         cxn.setAutoCommit(false);
         try {
             final long stmtsBefore =
@@ -110,19 +119,21 @@ public class LoadNamedGraphs extends SampleCode {
 					|| file.getName().endsWith(".ZIP")) {
 
 				// then process the sample data files one at a time
-				InputStream is = new FileInputStream(file);
-				ZipInputStream zis = new ZipInputStream(
+				final InputStream is = new FileInputStream(file);
+				try {
+				final ZipInputStream zis = new ZipInputStream(
 						new BufferedInputStream(is));
+				try {
 				ZipEntry ze = null;
 				while ((ze = zis.getNextEntry()) != null) {
 					if (ze.isDirectory()) {
 						continue;
 					}
-					String name = ze.getName();
+					final String name = ze.getName();
 					if (log.isInfoEnabled())
 						log.info(name);
-					ByteArrayOutputStream baos = new ByteArrayOutputStream();
-					byte[] bytes = new byte[4096];
+					final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+					final byte[] bytes = new byte[4096];
 					int count;
 					while ((count = zis.read(bytes, 0, 4096)) != -1) {
 						baos.write(bytes, 0, count);
@@ -130,25 +141,31 @@ public class LoadNamedGraphs extends SampleCode {
 					baos.close();
 					final Reader reader = new InputStreamReader(
 							new ByteArrayInputStream(baos.toByteArray()));
-					String baseIRI = file.toURI() + "/" + name;
+					final String baseIRI = file.toURI() + "/" + name;
 
 					cxn.add(reader, baseIRI, RDFFormat.forFileName(name));
 
 					// note: due to buffering, this reports stmts flush to the
 					// db
 					// not stmts added to the cxn.
-					long elapsed = System.currentTimeMillis() - start;
+					final long elapsed = System.currentTimeMillis() - start;
 	                // fast range count!
-	                long stmtsAfter = sail.getDatabase().getStatementCount();
+	                final long stmtsAfter = sail.getDatabase().getStatementCount();
 //					long stmtsAfter = cxn.size();
-					long stmtsAdded = stmtsAfter - stmtsBefore;
-					int throughput = (int) ((double) stmtsAdded
+					final long stmtsAdded = stmtsAfter - stmtsBefore;
+					final int throughput = (int) ((double) stmtsAdded
 							/ (double) elapsed * 1000d);
 					System.err.println("loaded: " + name + " : " + stmtsAdded
 							+ " stmts in " + elapsed + " millis: " + throughput
 							+ " stmts/sec");
+					logCounters(sail);
 				}
+				} finally {
 				zis.close();
+				}
+				} finally {
+					is.close();
+				}
 				
 			} else if(file.isDirectory()) {
 				
@@ -168,6 +185,8 @@ public class LoadNamedGraphs extends SampleCode {
 										new FileInputStream(f))
 										: new FileInputStream(f)));
 
+						try {
+						
 						final String baseIRI = file.toURI().toString();
 
 						cxn.add(reader, baseIRI, RDFFormat.forFileName(f
@@ -186,12 +205,12 @@ public class LoadNamedGraphs extends SampleCode {
                          * satisfy the Sesame semantics.  You can get the fast
                          * range count from the bigdata APIs.
                          */
-						long elapsed = System.currentTimeMillis() - start;
+						final long elapsed = System.currentTimeMillis() - start;
 		                // fast range count!
-						long stmtsAfter = sail.getDatabase().getStatementCount();
+						final long stmtsAfter = sail.getDatabase().getStatementCount();
 //						long stmtsAfter = cxn.size();
-						long stmtsAdded = stmtsAfter - stmtsBefore;
-						int throughput = (int) ((double) stmtsAdded
+						final long stmtsAdded = stmtsAfter - stmtsBefore;
+						final int throughput = (int) ((double) stmtsAdded
 								/ (double) elapsed * 1000d);
 
                         nloaded++;
@@ -201,8 +220,11 @@ public class LoadNamedGraphs extends SampleCode {
 						        +" in " + elapsed + " millis" + 
 						        " : "+ throughput + " stmts/sec"+
 								", nloaded="+nloaded);
+						logCounters(sail);
 
+						} finally {
 						reader.close();
+						}
 						
 					}
 					
@@ -212,7 +234,7 @@ public class LoadNamedGraphs extends SampleCode {
 				
 				final Reader reader = new InputStreamReader(
 						new FileInputStream(file));
-
+				try {
 				final String baseIRI = file.toURI().toString();
 
 				cxn.add(reader, baseIRI, RDFFormat.forFileName(file
@@ -220,18 +242,20 @@ public class LoadNamedGraphs extends SampleCode {
 
 				// note: due to buffering, this reports stmts flush to the
 				// db not stmts added to the cxn.
-				long elapsed = System.currentTimeMillis() - start;
+				final long elapsed = System.currentTimeMillis() - start;
 //				long stmtsAfter = cxn.size();
-				long stmtsAfter = sail.getDatabase().getStatementCount();
-				long stmtsAdded = stmtsAfter - stmtsBefore;
-				int throughput = (int) ((double) stmtsAdded
+				final long stmtsAfter = sail.getDatabase().getStatementCount();
+				final long stmtsAdded = stmtsAfter - stmtsBefore;
+				final int throughput = (int) ((double) stmtsAdded
 						/ (double) elapsed * 1000d);
 
 				System.err.println("loaded: " + file + " : " + stmtsAdded
 						+ " stmts in " + elapsed + " millis: " + throughput
 						+ " stmts/sec");
-
+	            logCounters(sail);
+				} finally {
 				reader.close();
+				}
 				
 			} else {
 				
@@ -243,14 +267,15 @@ public class LoadNamedGraphs extends SampleCode {
             cxn.commit();
 
             // gather statistics
-            long elapsed = System.currentTimeMillis() - start;
+            final long elapsed = System.currentTimeMillis() - start;
 //            long stmtsAfter = cxn.size();
-            long stmtsAfter = sail.getDatabase().getStatementCount();
-            long stmtsAdded = stmtsAfter - stmtsBefore;
-            int throughput = (int) ((double) stmtsAdded / (double) elapsed * 1000d);
+            final long stmtsAfter = sail.getDatabase().getStatementCount();
+            final long stmtsAdded = stmtsAfter - stmtsBefore;
+            final int throughput = (int) ((double) stmtsAdded / (double) elapsed * 1000d);
             System.err.println("statements after: " + stmtsAfter);
             System.err.println("loaded: " + stmtsAdded + " in " + elapsed + " millis: "
                     + throughput + " stmts/sec");
+            logCounters(sail);
 
         } catch (Exception ex) {
             cxn.rollback();
@@ -258,11 +283,32 @@ public class LoadNamedGraphs extends SampleCode {
         } finally {
             // close the repository connection
             cxn.close();
+        }
+        } finally {
             sail.shutDown();
         }
 
     }
 
+    private void logCounters(final BigdataSail sail) {
+
+    	if (!(sail.getDatabase().getIndexManager() instanceof Journal))
+			return;
+		
+    	if (!(((Journal) sail.getDatabase().getIndexManager())
+				.getBufferStrategy() instanceof RWStrategy))
+			return;
+		
+    	final StringBuilder sb = new StringBuilder();
+    	
+    	((RWStrategy) ((Journal) sail.getDatabase()
+				.getIndexManager()).getBufferStrategy()).getRWStore()
+				.getStorageStats().showStats(sb);
+    	
+    	System.err.println(sb.toString());
+
+	}
+    
 	/**
 	 * Loads a bunch of data from a file, zip file, or directory
 	 * (non-recursive). You can use <code>quad.properties</code> as the
