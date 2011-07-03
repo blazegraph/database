@@ -187,6 +187,10 @@ public class HTree extends AbstractHTree
      *            <code>1024</code> child references. Given an overhead of
      *            <code>8</code> bytes per child address, that would result in
      *            an expected page size of 8k before compression.
+     * @throws IllegalArgumentException
+     *             if addressBits is LT ONE (1).
+     * @throws IllegalArgumentException
+     *             if addressBits is GT (16) (fan out of 65536).
      */
     public HTree(final IRawStore store, final int addressBits) {
         this(store, addressBits, true/* rawRecords */);

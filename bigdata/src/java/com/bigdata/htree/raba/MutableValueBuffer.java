@@ -65,6 +65,16 @@ public class MutableValueBuffer implements IRaba {
     public final byte[][] values;
 
     /**
+     * Must be <code>2^n</code> where <code>n</code> GT ZERO (0).
+     */
+    private static void checkCapacity(final int capacity) {
+     
+        if (capacity <= 1 || (capacity & -capacity) != capacity)
+            throw new IllegalArgumentException();
+
+    }
+    
+    /**
      * Allocate a mutable value buffer capable of storing <i>capacity</i>
      * values.
      * 
@@ -73,11 +83,7 @@ public class MutableValueBuffer implements IRaba {
      */
     public MutableValueBuffer(final int capacity) {
 
-        if (capacity <= 0)
-            throw new IllegalArgumentException();
-
-        if ((capacity & -capacity) != capacity) // e.g., not a power of 2.
-            throw new IllegalArgumentException();
+        checkCapacity(capacity);
 
         nvalues = 0;
         
@@ -95,11 +101,13 @@ public class MutableValueBuffer implements IRaba {
      */
     public MutableValueBuffer(final int nvalues, final byte[][] values) {
 
-        assert nvalues >= 0;
+        if (values == null)
+            throw new IllegalArgumentException();
 
-        assert values != null;
+        if (nvalues < 0 || nvalues > values.length)
+            throw new IllegalArgumentException();
 
-        assert values.length == nvalues;
+        checkCapacity(values.length);
 
         this.nvalues = nvalues;
 
@@ -116,7 +124,10 @@ public class MutableValueBuffer implements IRaba {
      */
     public MutableValueBuffer(final MutableValueBuffer src) {
 
-        assert src != null;
+        if(src == null)
+            throw new IllegalArgumentException();
+        
+        checkCapacity(src.capacity());
 
         this.nvalues = src.nvalues;
 
@@ -124,7 +135,7 @@ public class MutableValueBuffer implements IRaba {
         this.values = new byte[src.values.length][];
 
         // copy the values.
-        for (int i = 0; i < src.values.length; i++) {
+        for (int i = 0; i < values.length; i++) {
 
             // Note: copies the reference.
             this.values[i] = src.values[i];
@@ -153,12 +164,12 @@ public class MutableValueBuffer implements IRaba {
         if (src == null)
             throw new IllegalArgumentException();
 
+        checkCapacity(capacity);
+        
         if (capacity < src.capacity())
             throw new IllegalArgumentException();
         
         nvalues = src.size();
-
-        assert nvalues >= 0;
 
         values = new byte[capacity][];
 

@@ -107,10 +107,11 @@ public class TestHTree extends TestCase2 {
 			}
 		}
 
+		// address bits is too large.
 		{
 			final IRawStore store = new SimpleMemoryRawStore();
 			try {
-				new HTree(store, 33/* addressBits */);
+				new HTree(store, 17/* addressBits */);
 				fail("Expecting: " + IllegalArgumentException.class);
 			} catch (IllegalArgumentException ex) {
 				if (log.isInfoEnabled())
@@ -127,7 +128,7 @@ public class TestHTree extends TestCase2 {
 		{
 			final IRawStore store = new SimpleMemoryRawStore();
 			new HTree(store, 1/* addressBits */); // min addressBits
-			new HTree(store, 32/* addressBits */); // max addressBits
+			new HTree(store, 16/* addressBits */); // max addressBits
 		}
 
     }
