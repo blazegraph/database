@@ -46,12 +46,12 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.NullOutputStream;
-import com.bigdata.io.compression.BOCU1Compressor;
+import com.bigdata.io.compression.NoCompressor;
 import com.bigdata.io.compression.UnicodeHelper;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
-import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
+import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -76,9 +76,9 @@ public class IVUtility {
 	 * Helper instance for compression/decompression of Unicode string data.
 	 */
 	static UnicodeHelper un = new UnicodeHelper(
-	        new BOCU1Compressor()
+//	        new BOCU1Compressor()
 //          new SCSUCompressor()
-//	        new NoCompressor()
+	        new NoCompressor()
 	        );
 
     /**

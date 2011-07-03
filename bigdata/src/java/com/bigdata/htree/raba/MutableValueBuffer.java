@@ -34,39 +34,35 @@ import com.bigdata.htree.HTree;
 
 /**
  * A flyweight mutable implementation for an {@link HTree} bucket page using a
- * backing <code>byte[][]</code>. Unlike the keys in a B+Tree, the {@link HTree}
- * keys are NOT ordered and need not be dense. Further, each bucket page is
+ * backing <code>byte[][]</code>. Unlike the values in a B+Tree, the
+ * {@link HTree} values need not be dense. Further, each bucket page is
  * logically divided into a set of buddy hash buckets. All operations therefore
  * take place within a buddy bucket. The buddy bucket is identified by its
  * offset and its extent is identified by the global depth of the bucket page.
  * <p>
- * While the total #of non-null keys is reported by {@link #size()}, this is the
- * value for the bucket page as a whole. The {@link HTree} must explicitly
- * examine a buddy hash bucket and count the non-<code>null</code> keys in order
- * to know the "size" of a given buddy hash bucket.
- * <p>
  * Note: Because the slots are divided logically among the buddy buckets any
- * slot may have a non-<code>null</code> key and the {@link IRaba} methods as
+ * slot may have a non-<code>null</code> value and the {@link IRaba} methods as
  * implemented by this class DO NOT range check the index against
  * {@link #size()}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ *          TODO Test suite. This should be pretty much a clone of the test
+ *          suite for the {@link MutableKeyBuffer} in this package.
  */
-public class MutableKeyBuffer implements IRaba {
+public class MutableValueBuffer implements IRaba {
 
     /**
-     * The #of defined keys across the entire bucket page. The caller must
-     * explicitly scan a buddy hash bucket in order to learn the #of non-
-     * <code>null</code> keys (free slots) in that buddy hash bucket.
+     * The #of defined values across the entire bucket page. 
      */
-    public int nkeys;
+    public int nvalues;
 
     /**
-     * An array containing the keys. The size of the array is the maximum
-     * capacity of the key buffer, which is <code>2^addressBits</code>.
+     * An array containing the values. The size of the array is the maximum
+     * capacity of the value buffer, which is <code>2^addressBits</code>.
      */
-    final public byte[][] keys;
+    public final byte[][] values;
 
     /**
      * Must be <code>2^n</code> where <code>n</code> GT ZERO (0).
@@ -74,82 +70,82 @@ public class MutableKeyBuffer implements IRaba {
     private static void checkCapacity(final int capacity) {
      
         if (capacity <= 1 || (capacity & -capacity) != capacity)
-            throw new IllegalArgumentException(
-                    "capacity must be 2^n where n is positive, not " + capacity);
+            throw new IllegalArgumentException();
 
     }
     
     /**
-     * Allocate a mutable key buffer capable of storing <i>capacity</i> keys.
+     * Allocate a mutable value buffer capable of storing <i>capacity</i>
+     * values.
      * 
      * @param capacity
-     *            The capacity of the key buffer.
+     *            The capacity of the value buffer.
      */
-    public MutableKeyBuffer(final int capacity) {
+    public MutableValueBuffer(final int capacity) {
 
         checkCapacity(capacity);
 
-        nkeys = 0;
+        nvalues = 0;
         
-        keys = new byte[capacity][];
+        values = new byte[capacity][];
         
     }
 
     /**
      * Constructor wraps an existing byte[][].
      * 
-     * @param nkeys
-     *            The #of defined keys in the array.
-     * @param keys
-     *            The array of keys.
+     * @param nvalues
+     *            The #of defined values in the array.
+     * @param values
+     *            The array of values.
      */
-    public MutableKeyBuffer(final int nkeys, final byte[][] keys) {
+    public MutableValueBuffer(final int nvalues, final byte[][] values) {
 
-        if (keys == null)
+        if (values == null)
             throw new IllegalArgumentException();
 
-        if (nkeys < 0 || nkeys > keys.length)
+        if (nvalues < 0 || nvalues > values.length)
             throw new IllegalArgumentException();
 
-        checkCapacity(keys.length);
-        
-        this.nkeys = nkeys;
+        checkCapacity(values.length);
 
-        this.keys = keys;
+        this.nvalues = nvalues;
+
+        this.values = values;
 
     }
 
     /**
-     * Creates a new instance using a new byte[][] but sharing the byte[]
-     * references with the caller's buffer.
+     * Creates a new instance using a new array of values but sharing the value
+     * references with the provided {@link MutableValueBuffer}.
      * 
      * @param src
      *            An existing instance.
      */
-    public MutableKeyBuffer(final MutableKeyBuffer src) {
+    public MutableValueBuffer(final MutableValueBuffer src) {
 
         if(src == null)
             throw new IllegalArgumentException();
         
         checkCapacity(src.capacity());
-        
-        this.nkeys = src.nkeys;
+
+        this.nvalues = src.nvalues;
 
         // note: dimension to the capacity of the source.
-        this.keys = new byte[src.keys.length][];
+        this.values = new byte[src.values.length][];
 
-        // copy the keys.
-        for (int i = 0; i < keys.length; i++) {
+        // copy the values.
+        for (int i = 0; i < values.length; i++) {
 
             // Note: copies the reference.
-            this.keys[i] = src.keys[i];
+            this.values[i] = src.values[i];
 
         }
 
     }
 
     /**
-     * Builds a mutable key buffer.
+     * Builds a mutable value buffer.
      * 
      * @param capacity
      *            The capacity of the new instance (this is based on the
@@ -163,7 +159,7 @@ public class MutableKeyBuffer implements IRaba {
      * @throws IllegalArgumentException
      *             if the source is <code>null</code>.
      */
-    public MutableKeyBuffer(final int capacity, final IRaba src) {
+    public MutableValueBuffer(final int capacity, final IRaba src) {
 
         if (src == null)
             throw new IllegalArgumentException();
@@ -173,14 +169,14 @@ public class MutableKeyBuffer implements IRaba {
         if (capacity < src.capacity())
             throw new IllegalArgumentException();
         
-        nkeys = src.size();
+        nvalues = src.size();
 
-        keys = new byte[capacity][];
+        values = new byte[capacity][];
 
         int i = 0;
         for (byte[] a : src) {
 
-            keys[i++] = a;
+            values[i++] = a;
 
         }
         
@@ -193,17 +189,17 @@ public class MutableKeyBuffer implements IRaba {
     }
 
     /**
-     * Returns a reference to the key at that index.
+     * Returns a reference to the value at that index.
      */
     final public byte[] get(final int index) {
 
-        return keys[index];
+        return values[index];
 
     }
 
     final public int length(final int index) {
 
-        final byte[] tmp = keys[index];
+        final byte[] tmp = values[index];
 
         if (tmp == null)
             throw new NullPointerException();
@@ -214,7 +210,7 @@ public class MutableKeyBuffer implements IRaba {
     
     final public int copy(final int index, final OutputStream out) {
 
-        final byte[] tmp = keys[index];
+        final byte[] tmp = values[index];
 
         try {
             
@@ -233,43 +229,43 @@ public class MutableKeyBuffer implements IRaba {
     /**
      * {@inheritDoc}
      * 
-     * @return <code>true</code> iff the key at that index is <code>null</code>.
+     * @return <code>true</code> iff the value at that index is <code>null</code>.
      */
     final public boolean isNull(final int index) {
         
-        return keys[index] == null;
+        return values[index] == null;
                 
     }
     
     final public boolean isEmpty() {
         
-        return nkeys == 0;
+        return nvalues == 0;
         
     }
 
     /**
      * {@inheritDoc}
      * <p>
-     * Note: This is the #of keys in the bucket page (across all buddy buckets
+     * Note: This is the #of values in the bucket page (across all buddy buckets
      * on that page). Unless there is only one buddy bucket on the page, you
-     * MUST explicitly scan a buddy bucket to determine the #of keys in a buddy
-     * bucket on the page.
+     * MUST explicitly scan a buddy bucket to determine the #of values in a
+     * buddy bucket on the page.
      */
     final public int size() {
 
-        return nkeys;
+        return nvalues;
 
     }
 
     final public int capacity() {
 
-        return keys.length;
+        return values.length;
         
     }
 
     final public boolean isFull() {
         
-        return nkeys == keys.length;
+        return nvalues == values.length;
         
     }
     
@@ -297,7 +293,7 @@ public class MutableKeyBuffer implements IRaba {
     /**
      * {@inheritDoc}
      * <p>
-     * This iterator visits all keys on the bucket page, including
+     * This iterator visits all values on the bucket page, including
      * <code>null</code>s.
      */
     public Iterator<byte[]> iterator() {
@@ -323,72 +319,70 @@ public class MutableKeyBuffer implements IRaba {
     }
 
     /*
-     * Mutation api. The contents of individual keys are never modified. 
+     * Mutation api. The contents of individual values are never modified. 
      */
     
-    final public void set(final int index, final byte[] key) {
+    final public void set(final int index, final byte[] value) {
 
-        assert key != null;
-        assert keys[index] == null;
-        assert nkeys < keys.length;
+        assert value != null;
+        assert values[index] == null;
+        assert nvalues < values.length;
         
-        keys[index] = key;
+        values[index] = value;
         
-        nkeys++;
+        nvalues++;
         
     }
 
     /**
-     * Remove a key in the buffer at the specified index, decrementing the #of
-     * keys in the buffer by one.
+     * Remove a value in the buffer at the specified index, decrementing the #of
+     * value in the buffer by one.
      * 
      * @param index
      *            The index in [0:{@link #capacity()}-1].
-     * @param key
-     *            The key.
      * 
-     * @return The #of keys in the buffer.
+     * @return The #of values in the buffer.
      */
     final public int remove(final int index) {
 
-        assert keys[index] != null;
-        assert nkeys > 0;
+        assert values[index] != null;
+        assert nvalues > 0;
         
-        keys[index] = null;
+        values[index] = null;
         
-        return --nkeys;
+        return --nvalues;
       
     }
     
     /**
-     * This method is not supported. Keys must be inserted into a specific buddy
-     * bucket. This requires the caller to specify the index at which the key
+     * This method is not supported. Values must be inserted into a specific buddy
+     * bucket. This requires the caller to specify the index at which the value
      * will be stored using {@link #set(int, byte[])}.
      * 
      * @throws UnsupportedOperationException
      */
-    final public int add(final byte[] key) {
+    final public int add(final byte[] value) {
 
         throw new UnsupportedOperationException();
 
     }
 
     /**
-     * This method is not supported. Keys must be inserted into a specific buddy
-     * bucket. This requires the caller to specify the index at which the key
+     * This method is not supported. Values must be inserted into a specific buddy
+     * bucket. This requires the caller to specify the index at which the value
      * will be stored using {@link #set(int, byte[])}.
      * 
      * @throws UnsupportedOperationException
      */
-    final public int add(byte[] key, int off, int len) {
+    final public int add(byte[] value, int off, int len) {
 
         throw new UnsupportedOperationException();
 
     }
 
     /**
-     * This method is not supported. Keys must be inserted into a specific buddy
-     * bucket. This requires the caller to specify the index at which the key
+     * This method is not supported. Values must be inserted into a specific buddy
+     * bucket. This requires the caller to specify the index at which the value
      * will be stored using {@link #set(int, byte[])}.
      * 
      * @throws UnsupportedOperationException
@@ -400,10 +394,7 @@ public class MutableKeyBuffer implements IRaba {
     }
 
     /**
-     * This method is not supported. The keys in a buddy hash table are neither
-     * ordered, dense, nor unique (duplicate keys are permitted). Search must be
-     * performed by a scan of the non-<code>null</code> keys in a specific buddy
-     * bucket and there can be multiple "matches" for a given key.
+     * This method is not supported. 
      * 
      * @throws UnsupportedOperationException
      */
