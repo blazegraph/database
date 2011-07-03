@@ -59,6 +59,7 @@ import org.openrdf.model.Value;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
@@ -2572,11 +2573,69 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     }
 
     /**
-     * {@link LexiconKeyOrder#BLOBS} is always returned.
+     * {@inheritDoc}
+     * <p>
+     * This implementation examines the predicate, looking at the
+     * {@link LexiconKeyOrder#SLOT_IV} and {@link LexiconKeyOrder#SLOT_TERM}
+     * slots and chooses the appropriate index based on the {@link IV} and/or
+     * {@link Value} which it founds bound. When both slots are bound it prefers
+     * the index for the {@link IV} => {@link Value} mapping as that index will
+     * be faster (ID2TERM has a shorter key and higher fan-out than TERM2ID).
      */
     public IKeyOrder<BigdataValue> getKeyOrder(final IPredicate<BigdataValue> p) {
 
-        return LexiconKeyOrder.BLOBS;
+        /*
+         * Examine the IV slot first. Reverse lookup (IV => Value). This is
+         * always our fastest and most common access path.
+         */        
+        {
+
+            @SuppressWarnings("unchecked")
+            final IVariableOrConstant<IV<?, ?>> t = (IVariableOrConstant<IV<?, ?>>) p
+                    .get(LexiconKeyOrder.SLOT_IV);
+
+            if (t != null) {
+
+                final IV<?, ?> iv = t.get();
+
+                if (iv instanceof TermId<?>)
+                    return LexiconKeyOrder.ID2TERM;
+
+                if (iv instanceof BlobIV<?>)
+                    return LexiconKeyOrder.BLOBS;
+
+                throw new UnsupportedOperationException(p.toString());
+
+            }
+        }
+
+        /*
+         * Examine the Value slot next. This is used for forward lookup (Value
+         * => IV).
+         */
+        {
+
+            @SuppressWarnings("unchecked")
+            final IVariableOrConstant<BigdataValue> v = (IVariableOrConstant<BigdataValue>) p
+                    .get(LexiconKeyOrder.SLOT_TERM);
+
+            if (v != null) {
+
+                final BigdataValue value = v.get();
+
+                if (isBlob(value)) {
+
+                    return LexiconKeyOrder.BLOBS;
+
+                }
+
+                return LexiconKeyOrder.TERM2ID;
+
+            }
+
+        }
+
+        throw new UnsupportedOperationException(p.toString());
 
     }
 
@@ -2666,12 +2725,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 return new EmptyAccessPath<BigdataValue>();
                 
             }
-            
-            if(val.hashCode()!=iv.hashCode()) {
+
+            if (val.hashCode() != iv.hashCode()) {
 
                 /*
                  * The hashCode is not consistent so the access path is
-                 * proveably empty.
+                 * provably empty.
                  */
                 
                 return new EmptyAccessPath<BigdataValue>();

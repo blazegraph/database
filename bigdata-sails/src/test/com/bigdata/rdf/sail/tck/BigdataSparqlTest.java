@@ -77,7 +77,7 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
     
     /**
      * We cannot use inlining for these test because we do normalization on
-     * numeric values and these tests test for syntatic differences, i.e.
+     * numeric values and these tests test for syntactic differences, i.e.
      * 01 != 1.
      */
     static final Collection<String> cannotInlineTests = Arrays.asList(new String[] {

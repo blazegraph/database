@@ -96,6 +96,7 @@ public class DumpLexicon {
                  * A bigdata federation.
                  */
 
+                @SuppressWarnings("unchecked")
                 final JiniClient<?> jiniClient = new JiniClient(
                         new String[] { propertyFile });
 

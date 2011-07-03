@@ -47,10 +47,8 @@ import com.bigdata.rdf.vocab.NoVocabulary;
 
 public class TestLexJoinOps extends QuadsTestCase {
 
-    protected static final Logger log = Logger.getLogger(TestLexJoinOps.class);
+    private static final Logger log = Logger.getLogger(TestLexJoinOps.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
-    
     @Override
     public Properties getProperties() {
         
