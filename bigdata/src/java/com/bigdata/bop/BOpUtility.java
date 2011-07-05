@@ -39,6 +39,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp.Annotations;
+import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.AbstractNode;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -422,7 +423,8 @@ public class BOpUtility {
                     throw new DuplicateBOpIdException("duplicate id=" + id
                             + " for " + conflict + " and " + t);
             }
-            if (!distinct.add(t) && !(t instanceof IValueExpression<?>)) {
+            if (!distinct.add(t) && !(t instanceof IValueExpression<?>)
+                    && !(t instanceof Constraint)) {
                 /*
                  * BOp appears more than once. This is only allowed for
                  * constants and variables to reduce the likelihood of operator

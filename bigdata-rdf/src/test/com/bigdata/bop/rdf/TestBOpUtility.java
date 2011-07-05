@@ -37,6 +37,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
@@ -53,8 +54,8 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.internal.constraints.IVValueExpression;
+import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.store.BD;
 
 /**
@@ -117,18 +118,19 @@ public class TestBOpUtility extends TestCase2 {
 
     	final IValueExpression<?> a = Var.var("a");
 
-    	System.err.println("depth, millis");
+    	if(log.isInfoEnabled())
+    	    log.info("depth, millis");
 		final int ntrials = 2000;
 		for (int count = 1; count < ntrials; count++) {
 			final BOp bop = generateBOp(count, a);
 			final long begin = System.currentTimeMillis();
-			System.err.print(count);
+			if(log.isInfoEnabled())
+			    log.info(count);
 			eatData(BOpUtility.preOrderIterator(bop));
 			final long elapsed = System.currentTimeMillis() - begin;
-			System.err.print(", ");
-			System.err.print(elapsed);
-			System.err.print("\n");
-		}
+            if (log.isInfoEnabled())
+                log.info(", " + elapsed);
+        }
 
 //        System.err.println("preOrderIteratorWithAnnotations");
 //        eatData(BOpUtility.preOrderIteratorWithAnnotations(bop));
@@ -196,7 +198,9 @@ public class TestBOpUtility extends TestCase2 {
     		
     		final TupleQueryResult result = tupleQuery.evaluate();
     		while (result.hasNext()) {
-    			System.err.println(result.next());
+    		    final BindingSet tmp = result.next();
+    			if(log.isInfoEnabled())
+    			    log.info(tmp.toString());
     		}
     		
     		
