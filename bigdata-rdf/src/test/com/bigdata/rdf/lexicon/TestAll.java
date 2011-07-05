@@ -63,15 +63,30 @@ public class TestAll extends TestCase {
 
         // TODO Unit tests for LexPredicate.
         
-        // Unit tests for recognizing TERMS index access patterns.
+        // Unit tests for recognizing access patterns for the lexicon indices.
         suite.addTestSuite(TestLexAccessPatternEnum.class);
 
-        // Unit tests for operations on the TERMS index.
-        suite.addTestSuite(TestTermsIndex.class);
+        /*
+         * Tests related to BlobIVs and the BLOBS index.
+         */
         
-        // Unit tests for the TermsWriteTask.
-        suite.addTestSuite(TestTermsWriteTask.class);
+        // Unit tests for operations on the BLOBS index.
+        suite.addTestSuite(TestBlobsIndex.class);
 
+        // Unit tests for the TermsWriteTask.
+        suite.addTestSuite(TestBlobsWriteTask.class);
+
+        /*
+         * Tests related TermIVs and the TERM2ID and TERMS indices.
+         */
+        
+        suite.addTestSuite(TestLexiconKeyBuilder.class);
+        
+        suite.addTestSuite(TestId2TermTupleSerializer.class);
+
+        // Test for encoding transform for TermIVs used in scale-out.
+        suite.addTestSuite(TestTermIdEncoder.class);
+        
         // integration tests for adding terms to the lexicon.
         suite.addTestSuite(TestAddTerms.class);
         

@@ -27,8 +27,6 @@
 package com.bigdata.rdf.lexicon;
 
 import java.io.IOException;
-import java.io.StringWriter;
-import java.io.Writer;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
@@ -47,36 +45,78 @@ import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.BlobIV;
+import com.bigdata.rdf.internal.INonInlineExtensionCodes;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Helper class for operations on the TERMS index.
+ * Helper class for operations on the BLOBS index.
  */
-public class TermsIndexHelper {
+public class BlobsIndexHelper {
 
-    private static final Logger log = Logger.getLogger(TermsIndexHelper.class);
+    private static final Logger log = Logger.getLogger(BlobsIndexHelper.class);
 
-	public static final transient int SIZEOF_HASH = Bytes.SIZEOF_INT;
-	public static final transient int SIZEOF_COUNTER = Bytes.SIZEOF_BYTE;
+    public static final transient int SIZEOF_HASH = Bytes.SIZEOF_INT;
 
-	/**
-	 * The size of a key in the TERMS index.
-	 * <P>
-	 * Note: The key is size is ONE (1) byte for the [flags] byte, FOUR (4)
-	 * bytes for the hash code, plus a ONE (1) byte counter (to break ties
-	 * within a collision bucket).
-	 */
-	public static final transient int TERMS_INDEX_KEY_SIZE = 1 + SIZEOF_HASH
-			+ SIZEOF_COUNTER;
+    /**
+     * The size of the hash collision counter.
+     */
+    public static final transient int SIZEOF_COUNTER = Bytes.SIZEOF_SHORT;
 
+    /** The maximum value of the hash collision counter (unsigned short). */
+    public static final transient int MAX_COUNTER = (2 ^ 16) - 1;
+
+    /** The offset at which the counter occurs in the key. */
+    public static final transient int OFFSET_COUNTER = 1/* flags */+ 1/* extension */+ SIZEOF_HASH /* hashCode */;
+
+    /** The size of a prefix key (a key without a hash collision counter). */
+    public static final transient int SIZEOF_PREFIX_KEY = OFFSET_COUNTER;
+
+    /**
+     * The size of a key in the TERMS index.
+     * <P>
+     * Note: The key is size is ONE (1) byte for the [flags] byte, ONE (1) for
+     * the extension byte (which describes what kind of non-inline IV this is),
+     * FOUR (4) bytes for the hash code, plus a TWO (2) byte counter (to break
+     * ties within a collision bucket).
+     * <p>
+     * Note: The counter size was increased when the design purpose of this
+     * index was changed to handling large RDF {@link Value}s only. In practice,
+     * the hash codes of the RDF {@link Value} are well distributed and
+     * collisions within a hash bucket (same hash code) are rare. A ONE (1) byte
+     * counter is probably all the distinctions that we could require and
+     * permits up to 256 hash collisions. However, when operating in scale-out
+     * the TWO (2) byte (aka short) counter provides additional confidence that
+     * hash collisions will not result in a hash bucket overflow. Given that the
+     * terms index will be used only with larger RDF {@link Value}s and the
+     * necessity for the "extension" byte, it seems a small added cost to have
+     * the TWO (2) byte counter and provides additional peace of mind. However,
+     * note that scanning large collision buckets is expensive. But by allowing
+     * for large collision buckets, we will pay that cost only when the hash
+     * codes have an unusual distribution for some specific value.
+     * <p>
+     * The total key size is only 8 bytes. Since only large values are being
+     * stored under the TERMS index, they will always be written as raw records
+     * on the backing store. This means that we have an 8 byte key paired with
+     * an 8 byte address. That allows for practical branching factors of between
+     * 512 and 1024 to obtain an expected average page sizes of ~ 8k (after
+     * prefix compression, etc.).
+     */
+    public static final transient int TERMS_INDEX_KEY_SIZE = 1 + 1
+            + SIZEOF_HASH + SIZEOF_COUNTER;
+
+    /**
+     * Arbitrary threshold for the collision counter for a given hash code at
+     * which we will log @ WARN. This provides notice when there are large hash
+     * collision buckets which can effect performance.
+     */
+    public static final transient int LOG_WARN_COUNTER_THRESHOLD = 127; 
+    
 	/**
 	 * Used to signal that the {@link Value} was not found on a read-only
 	 * request.
@@ -85,7 +125,7 @@ public class TermsIndexHelper {
 	
 	/**
 	 * Generate the sort keys for {@link BigdataValue}s to be represented as
-	 * {@link TermId}s. The sort key is formed from the {@link VTE} of the
+	 * {@link BlobIV}s. The sort key is formed from the {@link VTE} of the
 	 * {@link BigdataValue} followed by the hashCode of the {@link BigdataValue}
 	 * . Note that the sort key formed in this manner is only a prefix key for
 	 * the TERMS index. The fully formed key also includes a counter to breaks
@@ -116,25 +156,42 @@ public class TermsIndexHelper {
 
 		final KVO<BigdataValue>[] a = new KVO[numTerms];
 
-		final IKeyBuilder keyBuilder = newKeyBuilder();
+        final IKeyBuilder keyBuilder = newKeyBuilder();
 
-		final DataOutputBuffer out = new DataOutputBuffer();
+        final ByteArrayBuffer tmp = new ByteArrayBuffer();
 
-		final ByteArrayBuffer tmp = new ByteArrayBuffer();
+        final DataOutputBuffer out = new DataOutputBuffer();
 
-		for (int i = 0; i < numTerms; i++) {
+        try {
 
-			final BigdataValue term = terms[i];
+            for (int i = 0; i < numTerms; i++) {
 
-			final VTE vte = VTE.valueOf(term);
+                final BigdataValue term = terms[i];
 
-			final int hashCode = term.hashCode();
-			
-			final byte[] key = makePrefixKey(keyBuilder.reset(), vte, hashCode);
+                final VTE vte = VTE.valueOf(term);
 
-			final byte[] val = valSer.serialize(term, out.reset(), tmp);
+                final int hashCode = term.hashCode();
 
-			a[i] = new KVO<BigdataValue>(key, val, term);
+                final byte[] key = makePrefixKey(keyBuilder.reset(), vte,
+                        hashCode);
+
+                final byte[] val = valSer.serialize(term, out.reset(), tmp);
+
+                a[i] = new KVO<BigdataValue>(key, val, term);
+
+            }
+
+        } finally {
+
+            try {
+                /*
+                 * Note: Both the outer and inner try/catch are just to please
+                 * find bugs. DataOutputStream.close() is a NOP.
+                 */
+                out.close();
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
 
 		}
 
@@ -142,41 +199,47 @@ public class TermsIndexHelper {
 
 	}
 
-	/**
-	 * Resolve an existing record in the TERMS index and insert the record if
-	 * none is found.
-	 * 
-	 * @param termsIndex
-	 *            The TERMS index.
-	 * @param readOnly
-	 *            <code>true</code> iff the operation is read only.
-	 * @param keyBuilder
-	 *            The buffer will be reset as necessary.
-	 * @param baseKey
-	 *            The base key for the hash code (without the counter suffix).
-	 * @param val
-	 *            The (serialized and compressed) RDF Value.
-	 * @param bucketSize
-	 *            The size of the collision bucket is reported as a side-effect
-	 *            (optional).
-	 * 
-	 * @return The collision counter for the key under which the {@link Value}
-	 *         was found (if pre-existing), the collision counter assigned to
-	 *         the {@link Value} iff the value was not found and the operation
-	 *         permitted writes -or- {@link Integer#MIN_VALUE} iff the
-	 *         {@link Value} is not in the index and the operation is read-only.
-	 * 
-	 * @throws CollisionBucketSizeException
-	 *             if an attempt is made to insert a {@link Value} into a
-	 *             collision bucket which is full.
-	 */
+    /**
+     * Resolve an existing record in the TERMS index and insert the record if
+     * none is found.
+     * 
+     * @param termsIndex
+     *            The TERMS index.
+     * @param readOnly
+     *            <code>true</code> iff the operation is read only.
+     * @param keyBuilder
+     *            The buffer will be reset as necessary.
+     * @param baseKey
+     *            The base key for the hash code (without the counter suffix).
+     * @param val
+     *            The (serialized and compressed) RDF Value.
+     * @param tmp
+     *            The buffer used to format the <i>toKey</i> (optional). A new
+     *            byte[] will be allocated if this is <code>null</code>, but the
+     *            same byte[] can be reused for multiple invocations. The buffer
+     *            MUST be dimensioned to
+     *            {@link BlobsIndexHelper#SIZEOF_PREFIX_KEY}.
+     * @param bucketSize
+     *            The size of the collision bucket is reported as a side-effect
+     *            (optional).
+     * 
+     * @return The collision counter for the key under which the {@link Value}
+     *         was found (if pre-existing), the collision counter assigned to
+     *         the {@link Value} iff the value was not found and the operation
+     *         permitted writes -or- {@link Integer#MIN_VALUE} iff the
+     *         {@link Value} is not in the index and the operation is read-only.
+     * 
+     * @throws CollisionBucketSizeException
+     *             if an attempt is made to insert a {@link Value} into a
+     *             collision bucket which is full.
+     */
 	public int resolveOrAddValue(final IIndex termsIndex,
 			final boolean readOnly, final IKeyBuilder keyBuilder,
-			final byte[] baseKey, final byte[] val,
+			final byte[] baseKey, final byte[] val, final byte[] tmp,
 			final AtomicInteger bucketSize) {
 
-        assert baseKey.length == TermsIndexHelper.TERMS_INDEX_KEY_SIZE - 1 : "Expecting "
-                + (TermsIndexHelper.TERMS_INDEX_KEY_SIZE - 1)
+        assert baseKey.length == BlobsIndexHelper.SIZEOF_PREFIX_KEY : "Expecting "
+                + BlobsIndexHelper.SIZEOF_PREFIX_KEY
                 + " bytes, not "
                 + baseKey.length;
 
@@ -221,10 +284,7 @@ public class TermsIndexHelper {
 		final byte[] fromKey = baseKey;
 
         // key strictly LT any successor of the hash code of this val.
-		//
-		// TODO This would be more efficient if we reuse the caller's fixed
-		// length buffer for this for each call in a batch.
-        final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
+        final byte[] toKey = makeToKey(fromKey, tmp);
 
 		// fast range count. this tells us how many collisions there are.
 		// this is an exact collision count since we are not deleting tuples
@@ -241,15 +301,11 @@ public class TermsIndexHelper {
             
         }
         
-        if (rangeCount >= 255/* unsigned byte */) {
+        if (rangeCount >= MAX_COUNTER) {
 
             /*
              * Impose a hard limit on the #of hash collisions we will accept in
              * this utility.
-             * 
-             * TODO We do not need to have a hard limit if we use BigInteger for
-             * the counter, but the performance will go through the floor if we
-             * have to scan 32k entries on a hash collision!
              */
 
 			throw new CollisionBucketSizeException(rangeCount);
@@ -310,46 +366,43 @@ public class TermsIndexHelper {
             // raw bytes TODO More efficient if we can compare without
             // materializing the tuple's value, or compare reusing a temporary
             // buffer either from the caller or for the iterator.
-            final byte[] tmp = tuple.getValue();
+            final byte[] tmp2 = tuple.getValue();
 
 			// Note: Compares the compressed values ;-)
-			if(BytesUtil.bytesEqual(val, tmp)) {
-
-				// Offset at which the counter occurs in the key.
-				final int offset = 1/* flags */+ Bytes.SIZEOF_INT;
+			if(BytesUtil.bytesEqual(val, tmp2)) {
 
 				// Already in the index.
-				final byte asFoundCounter = KeyBuilder.decodeByte(tuple
-						.getKeyBuffer().array()[offset]);
+                final short asFoundCounter = KeyBuilder.decodeShort(tuple
+                        .getKeyBuffer().array(), OFFSET_COUNTER);
 
 				return asFoundCounter;
-				
-			}
-			
+
+            }
+
+        }
+
+        if (readOnly) {
+
+            // Not found.
+            return NOT_FOUND;
+
+        }
+
+        /*
+         * Hash collision.
+         */
+
+        final byte[] key = makeKey(keyBuilder.reset(), baseKey,
+                (int) rangeCount);
+
+        // Insert into the index.
+        if (termsIndex.insert(key, val) != null) {
+
+            throw new AssertionError();
+
 		}
-		
-		if(readOnly) {
 
-			// Not found.
-			return NOT_FOUND;
-			
-		}
-		
-		/*
-		 * Hash collision.
-		 */
-
-		final byte[] key = makeKey(keyBuilder.reset(), baseKey,
-				(int) rangeCount);
-
-		// Insert into the index.
-		if (termsIndex.insert(key, val) != null) {
-
-			throw new AssertionError();
-
-		}
-
-		if (rangeCount >= 127) { // arbitrary limit to log @ WARN.
+		if (rangeCount >= LOG_WARN_COUNTER_THRESHOLD) {
 
 			log.warn("Collision: hashCode=" + BytesUtil.toString(key)
 					+ ", collisionBucketSize=" + rangeCount);
@@ -381,6 +434,12 @@ public class TermsIndexHelper {
      *            The base key for the hash code (without the counter suffix).
      * @param val
      *            The (serialized and compressed) RDF {@link BNode}.
+     * @param tmp
+     *            The buffer used to format the <i>toKey</i> (optional). A new
+     *            byte[] will be allocated if this is <code>null</code>, but the
+     *            same byte[] can be reused for multiple invocations. The buffer
+     *            MUST be dimensioned to
+     *            {@link BlobsIndexHelper#SIZEOF_PREFIX_KEY}.
      * 
      * @return The collision counter.
      * 
@@ -389,7 +448,7 @@ public class TermsIndexHelper {
      *             collision bucket which is full.
      */
     public int addBNode(final IIndex ndx, final IKeyBuilder keyBuilder,
-            final byte[] baseKey, final byte[] val) {
+            final byte[] baseKey, final byte[] val, final byte[] tmp) {
 
         /*
          * The fromKey is strictly LT any full key for the hash code of this val
@@ -399,22 +458,18 @@ public class TermsIndexHelper {
         final byte[] fromKey = baseKey;
 
         // key strictly LT any successor of the hash code of this val.
-        final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
+        final byte[] toKey = makeToKey(fromKey, tmp);
 
         // fast range count. this tells us how many collisions there are.
         // this is an exact collision count since we are not deleting tuples
         // from the TERMS index.
         final long rangeCount = ndx.rangeCount(fromKey, toKey);
 
-        if (rangeCount >= 255/* unsigned byte */) {
+        if (rangeCount >= MAX_COUNTER) {
 
             /*
              * Impose a hard limit on the #of hash collisions we will accept in
              * this utility.
-             * 
-             * TODO We do not need to have a hard limit if we use BigInteger for
-             * the counter, but the performance will go through the floor if we
-             * have to scan 32k entries on a hash collision!
              */
 
             throw new CollisionBucketSizeException(rangeCount);
@@ -435,7 +490,7 @@ public class TermsIndexHelper {
 
         }
 
-        if (rangeCount >= 127) { // arbitrary limit to log @ WARN.
+        if (rangeCount >= LOG_WARN_COUNTER_THRESHOLD) {
 
             log.warn("Collision: hashCode=" + BytesUtil.toString(key)
                     + ", collisionBucketSize=" + rangeCount);
@@ -447,7 +502,7 @@ public class TermsIndexHelper {
     }
 
 	/**
-	 * Return the value associated with the {@link TermId} in the TERMS index.
+	 * Return the value associated with the {@link BlobIV} in the TERMS index.
 	 * <p>
 	 * Note: The returned <code>byte[]</code> may be decoded using the
 	 * {@link BigdataValueSerializer} associated with the
@@ -465,7 +520,7 @@ public class TermsIndexHelper {
 	 * @return The byte[] value -or- <code>null</code> if there is no entry for
 	 *         that {@link IV} in the index.
 	 */
-	public byte[] lookup(final IIndex ndx, final TermId<?> iv,
+	public byte[] lookup(final IIndex ndx, final BlobIV<?> iv,
 			final IKeyBuilder keyBuilder) {
 
 		final byte[] key = iv.encode(keyBuilder.reset()).getKey();
@@ -491,7 +546,12 @@ public class TermsIndexHelper {
 	public byte[] makeKey(final IKeyBuilder keyBuilder, final byte[] baseKey,
 			final int counter) {
 
-		return keyBuilder.append(baseKey).appendSigned((byte) counter).getKey();
+        final byte[] key = keyBuilder.append(baseKey).append((short) counter)
+                .getKey();
+        
+        assert key.length == TERMS_INDEX_KEY_SIZE;
+        
+        return key;
 
 	}
 	
@@ -511,22 +571,29 @@ public class TermsIndexHelper {
 	 *            
 	 * @return The fully formed key.
 	 */
-	public byte[] makeKey(final IKeyBuilder keyBuilder, final VTE vte,
-			final int hashCode, final int counter) {
+	// Note: Only used by the unit tests.
+    public byte[] makeKey(final IKeyBuilder keyBuilder, final VTE vte,
+            final int hashCode, final int counter) {
 
 		/*
 		 * Note: This MUST agree with TermId#encode().
 		 */
 		
-		keyBuilder.appendSigned(TermId.toFlags(vte)); // flags byte
+		keyBuilder.appendSigned(BlobIV.toFlags(vte)); // flags byte
+		
+		keyBuilder.appendSigned(INonInlineExtensionCodes.BlobIV); // extension byte.
 		
 		keyBuilder.append(hashCode); // hashCode
 		
-		keyBuilder.appendSigned((byte) counter); // hash collision counter.
+		keyBuilder.append((short) counter); // hash collision counter.
 
-		return keyBuilder.getKey();
+		final byte[] key = keyBuilder.getKey();
 		
-	}
+        assert key.length == TERMS_INDEX_KEY_SIZE;
+        
+        return key;
+
+    }
 
 	/**
 	 * Create a prefix key for the TERMS index from the {@link VTE} and hashCode
@@ -549,11 +616,20 @@ public class TermsIndexHelper {
 		 * Note: This MUST agree with TermId#encode().
 		 */
 
-		keyBuilder.appendSigned(TermId.toFlags(vte)); // flags byte
+	    // flags byte
+	    keyBuilder.appendSigned(BlobIV.toFlags(vte));
 		
-		keyBuilder.append(hashCode); // hashCode
+	    // extension byte.
+	    keyBuilder.appendSigned(INonInlineExtensionCodes.BlobIV);
+
+	    // hashCode
+	    keyBuilder.append(hashCode);
 		
-		return keyBuilder.getKey();
+		final byte[] prefixKey = keyBuilder.getKey();
+		
+        assert prefixKey.length == SIZEOF_PREFIX_KEY;
+        
+        return prefixKey;
 		
 	}
 
@@ -578,6 +654,49 @@ public class TermsIndexHelper {
     }
 
     /**
+     * Generate the successor of the fromKey.
+     * 
+     * @param fromKey
+     *            The fromKey.
+     * @param tmp
+     *            The buffer used to format the <i>toKey</i> (optional). A new
+     *            byte[] will be allocated if this is <code>null</code>, but the
+     *            same byte[] can be reused for multiple invocations. The buffer
+     *            MUST be dimensioned to
+     *            {@link BlobsIndexHelper#TERMS_INDEX_KEY_SIZE}.
+     *            
+     * @return The toKey.
+     */
+    byte[] makeToKey(final byte[] fromKey, final byte[] tmp) {
+
+        assert fromKey.length == SIZEOF_PREFIX_KEY;
+        
+        final byte[] toKey;
+
+        if (tmp == null) {
+            // Allocate a temporary buffer.
+            toKey = new byte[SIZEOF_PREFIX_KEY];
+        } else if (tmp.length != SIZEOF_PREFIX_KEY) {
+            // Caller's buffer is the wrong size.
+            throw new IllegalArgumentException();
+        } else {
+            // Use the caller's buffer.
+            toKey = tmp;
+        }
+        
+        // Copy the fromKey into the temporary buffer.
+        System.arraycopy(fromKey, 0/* srcPos */, toKey/* dest */, 0/* destPos */,
+                SIZEOF_PREFIX_KEY/* length */);
+        
+        // Form the successor (side-effect on the toKey buffer).
+        SuccessorUtil.successor(toKey);
+        
+        // Return the successor of the fromKey.
+        return tmp;
+        
+    }
+
+    /**
      * Return a new {@link IKeyBuilder} suitable for formatting keys for the
      * TERMS index.
      * 
@@ -590,178 +709,6 @@ public class TermsIndexHelper {
     }
 
 	/**
-	 * Dump the TERMS index.
-	 * 
-	 * @param r
-	 *            The lexicon relation.
-	 *            
-	 * @return The dump.
-	 */
-	public Appendable dump(final LexiconRelation r) {
-
-		final StringWriter w = new StringWriter(//
-				100 * Bytes.kilobyte32// initialCapacity
-		);
-
-		w.append(r.getLexiconConfiguration().toString());
-		
-		w.append("\n");
-		
-		dump(w, true/*showEntries*/, r.getNamespace(), r.getTermsIndex());
-		
-		return w.getBuffer();
-
-	}
-
-	/**
-	 * Dump the TERMS index.
-	 * 
-	 * @param namespace
-	 * @param ndx
-	 * @return
-	 */
-	public Appendable dump(final String namespace, final IIndex ndx) {
-		
-		final StringWriter w = new StringWriter(//
-				100 * Bytes.kilobyte32// initialCapacity
-		);
-		
-		dump(w, true/*showEntries*/, namespace, ndx);
-		
-		return w.getBuffer();
-		
-	}
-
-	/**
-	 * Core implementation
-	 * 
-	 * @param w
-	 *            Where to write the data.
-	 * @param showEntries
-	 *            When <code>true</code> the individual entries in the TERMS
-	 *            index will be reported. When <code>false</code> only metadata
-	 *            about the scanned entries will be reported.
-	 * @param namespace
-	 *            The namespace of the {@link LexiconRelation}.
-	 * @param ndx
-	 *            The TERMS index for that {@link LexiconRelation}.
-	 */
-	public void dump(final Writer w, final boolean showEntries,
-			final String namespace, final IIndex ndx) {
-
-		final int BIN_SIZE = 8;
-
-		final int NBINS = 256 / BIN_SIZE;
-
-		try {
-
-			int maxCollisionCounter = 0;
-
-			/*
-			 * An array of bins reporting the #of TERMS having the #of collision
-			 * counters for that bin. The bins are each BIN_SIZE wide. There are
-			 * NBINS bins. For a given counter value, the bin is selected by
-			 * floor(counter/binSize).
-			 */
-			final long[] bins = new long[NBINS];
-
-			final BigdataValueFactory vf = BigdataValueFactoryImpl
-					.getInstance(namespace);
-
-			final BigdataValueSerializer<BigdataValue> valSer = vf
-					.getValueSerializer();
-
-			// Used to decode the Values.
-			final StringBuilder tmp = new StringBuilder();
-
-			w.append("fastRangeCount=" + ndx.rangeCount()+"\n");
-			
-			@SuppressWarnings("unchecked")
-			final ITupleIterator<TermId<?>> itr = ndx.rangeIterator();
-
-			long nvisited = 0L;
-			
-			while (itr.hasNext()) {
-
-				final ITuple<TermId<?>> tuple = itr.next();
-				
-				nvisited++;
-
-				if (tuple.isNull()) {
-
-					if (showEntries) {
-						w.append("NullIV: key=");
-						w.append(BytesUtil.toString(tuple.getKey()));
-						w.append("\n");
-					}
-
-				} else {
-
-					final TermId<?> iv = (TermId<?>) IVUtility
-							.decodeFromOffset(tuple.getKeyBuffer().array(), 0/* offset */);
-					// new TermId(tuple.getKey());
-
-					final BigdataValue value = valSer.deserialize(tuple
-							.getValueStream(), tmp);
-
-					if (showEntries) {
-						w.append(iv.toString());
-						w.append(" => ");
-						w.append(value.toString());
-						w.append("\n");
-					}
-
-					final int counter = iv.counter();
-
-					if (counter > maxCollisionCounter) {
-
-						maxCollisionCounter = counter;
-
-					}
-					
-					final int bin = (int) (counter / BIN_SIZE);
-					
-					bins[bin]++;
-
-				}
-
-			}
-
-			w.append("nvisited=" + nvisited+"\n");
-			
-			w.append("binSize=" + BIN_SIZE+"\n");
-
-			w.append("nbins=" + NBINS + "\n");
-
-			// #of non-zero bins.
-			int nnzero = 0;
-			
-			for (int bin = 0; bin < NBINS; bin++) {
-
-				final long numberInBin = bins[bin];
-
-				if (numberInBin == 0)
-					continue;
-
-				w.append("bins[" + bin + "]=" + numberInBin + "\n");
-
-				nnzero++;
-				
-			}
-			
-			w.append("numNonZeroBins=" + nnzero + "\n");
-			
-			w.append("maxCollisionCounter=" + maxCollisionCounter + "\n");
-
-		} catch (IOException e) {
-		
-			throw new RuntimeException(e);
-			
-		}
-
-    }
-
-    /**
      * Exception thrown if the maximum size of the collision bucket would be
      * exceeded for some {@link BigdataValue}.
      * 

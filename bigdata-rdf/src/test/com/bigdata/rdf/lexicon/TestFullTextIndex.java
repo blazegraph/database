@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.lexicon;
 
+import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
@@ -45,6 +46,7 @@ import com.bigdata.rdf.spo.TestSPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.BigdataValueIteratorImpl;
+import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.search.Hit;
 import com.bigdata.search.Hiterator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
@@ -55,9 +57,6 @@ import com.bigdata.striterator.Striterator;
 /**
  * Test of adding terms with the full text index enabled and of lookup of terms
  * by tokens which appear within those terms.
- * 
- * @todo test XML literal indexing (strip out CDATA and index the tokens found
- *       therein).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -88,31 +87,31 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 //
 //    }
     
-    /**
-     * Test helper verifies that the term is not in the lexicon, adds the term
-     * to the lexicon, verifies that the term can be looked up by its assigned
-     * term identifier, verifies that the term is now in the lexicon, and
-     * verifies that adding the term again returns the same term identifier.
-     * 
-     * @param term
-     *            The term.
-     */
-    protected void doAddTermTest(final AbstractTripleStore store,
-            final BigdataValue term) {
-
-        assertEquals(NULL, store.getIV(term));
-
-        final IV<?,?> id = store.addTerm(term);
-
-        assertNotSame(NULL, id);
-
-        assertEquals(id, store.getIV(term));
-
-        assertEquals(term, store.getTerm(id));
-
-        assertEquals(id, store.addTerm(term));
-
-    }
+//    /**
+//     * Test helper verifies that the term is not in the lexicon, adds the term
+//     * to the lexicon, verifies that the term can be looked up by its assigned
+//     * term identifier, verifies that the term is now in the lexicon, and
+//     * verifies that adding the term again returns the same term identifier.
+//     * 
+//     * @param term
+//     *            The term.
+//     */
+//    protected void doAddTermTest(final AbstractTripleStore store,
+//            final BigdataValue term) {
+//
+//        assertEquals(NULL, store.getIV(term));
+//
+//        final IV<?,?> id = store.addTerm(term);
+//
+//        assertNotSame(NULL, id);
+//
+//        assertEquals(id, store.getIV(term));
+//
+//        assertEquals(term, store.getTerm(id));
+//
+//        assertEquals(id, store.addTerm(term));
+//
+//    }
 
     private void assertExpectedHits(final AbstractTripleStore store,
             final String query, final String languageCode, 
@@ -167,6 +166,9 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
         
     }
 
+    /**
+     * TODO Must also verify text index over blobs.
+     */
     public void test_fullTextIndex01() throws InterruptedException {
 
         AbstractTripleStore store = getStore();
@@ -197,7 +199,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
             store.addTerms(terms);
 
 			if (log.isInfoEnabled()) {
-				log.info(new TermsIndexHelper()
+				log.info(DumpLexicon
 						.dump(store.getLexiconRelation()));
             }
 
@@ -323,7 +325,12 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
                 AbstractTripleStore.Options.MAX_INLINE_TEXT_LENGTH,
                 "0");
 
-        AbstractTripleStore store = getStore();
+        // We do not need any vocabulary to test this.
+        properties.setProperty(
+                AbstractTripleStore.Options.VOCABULARY_CLASS,
+                NoVocabulary.class.getName());
+
+        AbstractTripleStore store = getStore(properties);
 
         try {
 
@@ -343,7 +350,10 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
             };
 
             store.addTerms(terms);
-
+            
+            if (log.isInfoEnabled())
+                log.info(DumpLexicon.dump(store.getLexiconRelation()));
+            
             assertExpectedHits(store, "brown", "en", //
                     0f, // minCosine,
                     new BigdataValue[] {//
@@ -400,7 +410,12 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
                 AbstractTripleStore.Options.MAX_INLINE_TEXT_LENGTH,
                 "256");
 
-        AbstractTripleStore store = getStore();
+        // We do not need any vocabulary to test this.
+        properties.setProperty(
+                AbstractTripleStore.Options.VOCABULARY_CLASS,
+                NoVocabulary.class.getName());
+
+        AbstractTripleStore store = getStore(properties);
 
         try {
 
@@ -457,6 +472,8 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
     /**
      * Unit test for {@link LexiconRelation#rebuildTextIndex()}.
+     * 
+     * TODO Must also test rebuild of text index over blobs.
      */
     public void test_rebuildIndex() {
         
@@ -488,7 +505,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
             store.addTerms(terms);
 
 			if (log.isInfoEnabled()) {
-				log.info(new TermsIndexHelper()
+				log.info(DumpLexicon
 						.dump(store.getLexiconRelation()));
 			}
 

@@ -1,6 +1,7 @@
 package com.bigdata.rdf.lexicon;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.counters.CAT;
 
@@ -15,22 +16,28 @@ public class WriteTaskStats {
     /**
      * The #of distinct terms lacking a pre-assigned term identifier in [a].
      */
-    int ndistinct;
+    final AtomicInteger ndistinct = new AtomicInteger();
 
     /** time to convert unicode terms to byte[] sort keys. */
-    long keyGenTime = 0;
+    final CAT keyGenTime = new CAT();
 
     /** time to sort terms by assigned byte[] keys. */
-    long keySortTime = 0;
+    final CAT keySortTime = new CAT();
 
     /** time to insert terms into indices. */
-    long indexTime = 0;
+    final AtomicLong indexTime = new AtomicLong();
+
+    /** time on the forward index. */
+    long forwardIndexTime;
+
+    /** time on the reverse index. */
+    long reverseIndexTime;
 
     /** time on the terms index. */
     long termsIndexTime;
 
     /** time to insert terms into the text indexer. */
-    long fullTextIndexTime;
+    final AtomicLong fullTextIndexTime = new AtomicLong();
 
     /** The total size of all hash collisions buckets examined). */
     final CAT totalBucketSize = new CAT();
@@ -43,18 +50,20 @@ public class WriteTaskStats {
 
     public String toString() {
     	final StringBuilder sb = new StringBuilder();
-    	sb.append(getClass().getSimpleName());
-    	sb.append("{ndistinct="+ndistinct);
-    	sb.append(",keyGenTime="+keyGenTime+"ms");
-    	sb.append(",keySortTime="+keySortTime+"ms");
-    	sb.append(",indexTime="+indexTime+"ms");
-    	sb.append(",termsIndexTime="+termsIndexTime+"ms");
-    	sb.append(",fullTextIndexTime="+fullTextIndexTime+"ms");
-    	sb.append(",totalBucketSize="+totalBucketSize);
-    	sb.append(",maxBucketSize="+maxBucketSize);
-    	sb.append(",nunknown="+nunknown);
-    	sb.append("}");
-    	return sb.toString();
+        sb.append(getClass().getSimpleName());
+        sb.append("{ndistinct=" + ndistinct);
+        sb.append(",keyGenTime=" + keyGenTime + "ms");
+        sb.append(",keySortTime=" + keySortTime + "ms");
+        sb.append(",indexTime=" + indexTime + "ms");
+        sb.append(",t2idIndexTime=" + forwardIndexTime + "ms");
+        sb.append(",id2tIndexTime=" + reverseIndexTime + "ms");
+        sb.append(",termsIndexTime=" + termsIndexTime + "ms");
+        sb.append(",fullTextIndexTime=" + fullTextIndexTime + "ms");
+        sb.append(",totalBucketSize=" + totalBucketSize);
+        sb.append(",maxBucketSize=" + maxBucketSize);
+        sb.append(",nunknown=" + nunknown);
+        sb.append("}");
+        return sb.toString();
     }
-    
+
 }

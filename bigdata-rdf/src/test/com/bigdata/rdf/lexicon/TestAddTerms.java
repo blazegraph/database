@@ -30,19 +30,17 @@ package com.bigdata.rdf.lexicon;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Properties;
 
 import org.openrdf.model.vocabulary.RDF;
 
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -74,82 +72,6 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
        
     }
 
-	/**
-	 * Verify that a {@link TermId#NullIV} was entered into the TERMS index when
-	 * the lexicon was created.
-	 */
-	public void test_NullIV() {
-    
-        final Properties properties = getProperties();
-        
-        // test w/o predefined vocab.
-        properties.setProperty(Options.VOCABULARY_CLASS, NoVocabulary.class
-                .getName());
-
-        // test w/o axioms - they imply a predefined vocab.
-        properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
-        
-        // test w/o the full text index.
-        properties.setProperty(Options.TEXT_INDEX, "false");
-
-		// test w/o date time inlining (since this causes xsd:dateTime to be
-		// inserted into the TERMS index).
-        properties.setProperty(Options.INLINE_DATE_TIMES, "false");
-
-        // test w/o unicode inlining (since this causes xsd:string to be
-		// inserted into the TERMS index).
-        properties.setProperty(Options.MAX_INLINE_TEXT_LENGTH, "0");
-
-        final AbstractTripleStore store = getStore(properties);
-        
-        try {
-        	
-        	final TermsIndexHelper helper = new TermsIndexHelper();
-
-        	final IKeyBuilder keyBuilder = helper.newKeyBuilder();
-        	
-        	final IIndex ndx = store.getLexiconRelation().getTermsIndex();
-
-			if (log.isInfoEnabled())
-				log
-						.info("dump:\n"
-								+ helper.dump(store.getLexiconRelation()
-										.getNamespace(), ndx));
-
-        	for (VTE vte : VTE.values()) {
-                
-                // Each VTE has an associated NullIV (mapped to a [null]).
-                assertNull(ndx.lookup(TermId.mockIV(vte).encode(
-                        keyBuilder.reset()).getKey()));
-                
-            }
-            
-            // Should be one entry for each type of NullIV.
-            assertEquals(4L, ndx.rangeCount());
-
-            // Verify we visit each of those NullIVs.
-            @SuppressWarnings("unchecked")
-            final ITupleIterator<BigdataValue> itr = ndx.rangeIterator();
-
-            while(itr.hasNext()) {
-                
-                final ITuple<BigdataValue> tuple = itr.next();
-                
-                assertTrue(tuple.isNull());
-                
-                // The tuple is deserialized as a [null] reference.
-                assertNull(tuple.getObject());
-
-            }
-			
-        } finally {
-        	
-        	store.__tearDownUnitTest();
-        	
-        }
-    	
-    }
-    
     public void test_addTerms() {
 
         final Properties properties = getProperties();
@@ -178,8 +100,12 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
 
             terms.add(f.asValue(RDF.TYPE));
             terms.add(f.asValue(RDF.PROPERTY));
+            terms.add(f.createURI(getVeryLargeURI()));
+            
             terms.add(f.createLiteral("test"));
             terms.add(f.createLiteral("test", "en"));
+            terms.add(f.createLiteral(getVeryLargeLiteral()));
+
             terms.add(f.createLiteral("10", f
                     .createURI("http://www.w3.org/2001/XMLSchema#int")));
 
@@ -202,9 +128,11 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
 	             */
 				terms.add(f.createBNode());
 				terms.add(f.createBNode("a"));
+	            terms.add(f.createBNode(getVeryLargeLiteral()));
+
 			}
 
-			final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
+			final Map<IV<?,?>, BigdataValue> ids = doAddTermsTest(store, terms);
 
 			if (store.isStable()) {
 
@@ -214,13 +142,15 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
 
 				// verify same reverse mappings.
 
-                final Map<IV, BigdataValue> ids2 = store.getLexiconRelation()
+                final Map<IV<?,?>, BigdataValue> ids2 = store.getLexiconRelation()
                         .getTerms(ids.keySet());
 
-                assertEquals(ids.size(),ids2.size());
-                
-                for (IV id : ids.keySet()) {
+                assertEquals(ids.size(), ids2.size());
 
+                for (Map.Entry<IV<?,?>, BigdataValue> e : ids2.entrySet()) {
+
+                    final IV<?,?> id = e.getKey();
+                    
                     assertEquals("Id mapped to a different term? : termId="
                             + id, ids.get(id), ids2.get(id));
 
@@ -282,7 +212,7 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
             terms.add(f.createBNode());
             terms.add(f.createBNode("a"));
 
-            final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
+            final Map<IV<?,?>, BigdataValue> ids = doAddTermsTest(store, terms);
 
             if (store.isStable()) {
                 
@@ -292,13 +222,225 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
 
                 // verify same reverse mappings.
 
-                final Map<IV, BigdataValue> ids2 = store.getLexiconRelation()
+                final Map<IV<?,?>, BigdataValue> ids2 = store.getLexiconRelation()
                         .getTerms(ids.keySet());
 
                 assertEquals(ids.size(),ids2.size());
                 
-                for (IV id : ids.keySet()) {
+                for (Map.Entry<IV<?, ?>, BigdataValue> e : ids.entrySet()) {
 
+                    final IV<?, ?> id = e.getKey();
+
+                    assertEquals("Id mapped to a different term? : termId="
+                            + id, ids.get(id), ids2.get(id));
+
+                }
+
+            }
+
+        } finally {
+            
+            store.__tearDownUnitTest();
+            
+        }
+
+    }
+    
+    /**
+     * Unit test for addTerms() when the {@link BigdataValue}[] contains
+     * multiple instances of a given reference.
+     */
+    public void test_duplicates_same_reference() {
+
+        final Properties properties = getProperties();
+        
+        // test w/o predefined vocab.
+        properties.setProperty(Options.VOCABULARY_CLASS, NoVocabulary.class
+                .getName());
+
+        // test w/o axioms - they imply a predefined vocab.
+        properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        // test w/o the full text index.
+        properties.setProperty(Options.TEXT_INDEX, "false");
+
+        // test w/o xsd inlining
+        properties.setProperty(Options.INLINE_XSD_DATATYPE_LITERALS, "false");
+
+        AbstractTripleStore store = getStore(properties);
+        
+        try {
+
+            // Note: List allows duplicates!
+            final Collection<BigdataValue> terms = new LinkedList<BigdataValue>();
+
+            // lookup/add some values.
+            final BigdataValueFactory f = store.getValueFactory();
+
+            // Add two instances of the same reference.
+            final BigdataURI type = f.asValue(RDF.TYPE);
+            terms.add(type);
+            terms.add(type);
+            assertEquals(2,terms.size());
+            
+            // Add two instances of the same reference.
+            final BigdataURI largeURI = f.createURI(getVeryLargeURI());
+            terms.add(largeURI);
+            terms.add(largeURI);
+            assertEquals(4,terms.size());
+
+            // Add two instances of the same reference.
+            final BigdataLiteral lit1 = f.createLiteral("test");
+            final BigdataLiteral lit2 = f.createLiteral("test","en");
+            final BigdataLiteral lit3 = f.createLiteral(getVeryLargeLiteral());
+            terms.add(lit1);
+            terms.add(lit1);
+            terms.add(lit2);
+            terms.add(lit2);
+            terms.add(lit3);
+            terms.add(lit3);
+            assertEquals(10,terms.size());
+
+            if (store.getLexiconRelation().isStoreBlankNodes()) {
+
+                /*
+                 * Note: Blank nodes will not round trip through the lexicon unless
+                 * the "told bnodes" is enabled.
+                 */
+                final BigdataBNode bnode1 = f.createBNode(); 
+                final BigdataBNode bnode2 = f.createBNode("a"); 
+                final BigdataBNode bnode3 = f.createBNode(getVeryLargeLiteral()); 
+                terms.add(bnode1);
+                terms.add(bnode1);
+                terms.add(bnode2);
+                terms.add(bnode2);
+                terms.add(bnode3);
+                terms.add(bnode3);
+                assertEquals(16,terms.size());
+
+            }
+
+            final Map<IV<?,?>, BigdataValue> ids = doAddTermsTest(store, terms);
+
+            if (store.isStable()) {
+
+                store.commit();
+
+                store = reopenStore(store);
+
+                // verify same reverse mappings.
+
+                final Map<IV<?,?>, BigdataValue> ids2 = store.getLexiconRelation()
+                        .getTerms(ids.keySet());
+
+                assertEquals(ids.size(), ids2.size());
+
+                for (Map.Entry<IV<?,?>, BigdataValue> e : ids2.entrySet()) {
+
+                    final IV<?,?> id = e.getKey();
+                    
+                    assertEquals("Id mapped to a different term? : termId="
+                            + id, ids.get(id), ids2.get(id));
+
+                }
+
+            }
+
+        } finally {
+            
+            store.__tearDownUnitTest();
+            
+        }
+
+    }
+
+    /**
+     * Unit test for addTerms() when the {@link BigdataValue}[] contains
+     * distinct instances of {@link BigdataValue}s which are equals().
+     */
+    public void test_duplicates_distinct_references() {
+
+        final Properties properties = getProperties();
+        
+        // test w/o predefined vocab.
+        properties.setProperty(Options.VOCABULARY_CLASS, NoVocabulary.class
+                .getName());
+
+        // test w/o axioms - they imply a predefined vocab.
+        properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        // test w/o the full text index.
+        properties.setProperty(Options.TEXT_INDEX, "false");
+
+        // test w/o xsd inlining
+        properties.setProperty(Options.INLINE_XSD_DATATYPE_LITERALS, "false");
+
+        AbstractTripleStore store = getStore(properties);
+        
+        try {
+
+            // Note: List allows duplicates!
+            final Collection<BigdataValue> terms = new LinkedList<BigdataValue>();
+
+            // lookup/add some values.
+            final BigdataValueFactory f = store.getValueFactory();
+
+            // Add two distinct instances of the same Value.
+            terms.add(f.asValue(RDF.TYPE));
+            terms.add(f.asValue(RDF.TYPE));
+            assertEquals(2,terms.size());
+            
+            // Add two distinct instances of the same Value.
+            terms.add(f.createURI(getVeryLargeURI()));
+            terms.add(f.createURI(getVeryLargeURI()));
+            assertEquals(4,terms.size());
+
+            // Add two distinct instances of the same Value.
+            terms.add(f.createLiteral("test"));
+            terms.add(f.createLiteral("test"));
+            terms.add(f.createLiteral("test","en"));
+            terms.add(f.createLiteral("test","en"));
+            terms.add(f.createLiteral(getVeryLargeLiteral()));
+            terms.add(f.createLiteral(getVeryLargeLiteral()));
+            assertEquals(10,terms.size());
+
+            if (store.getLexiconRelation().isStoreBlankNodes()) {
+
+                /*
+                 * Note: Blank nodes will not round trip through the lexicon unless
+                 * the "told bnodes" is enabled.
+                 */
+
+                // Add two distinct instances of the same Value.
+                terms.add(f.createBNode());
+                terms.add(f.createBNode());
+                terms.add(f.createBNode("a"));
+                terms.add(f.createBNode("a"));
+                terms.add(f.createBNode(getVeryLargeLiteral()));
+                terms.add(f.createBNode(getVeryLargeLiteral()));
+                assertEquals(16,terms.size());
+
+            }
+
+            final Map<IV<?,?>, BigdataValue> ids = doAddTermsTest(store, terms);
+
+            if (store.isStable()) {
+
+                store.commit();
+
+                store = reopenStore(store);
+
+                // verify same reverse mappings.
+
+                final Map<IV<?,?>, BigdataValue> ids2 = store.getLexiconRelation()
+                        .getTerms(ids.keySet());
+
+                assertEquals(ids.size(), ids2.size());
+
+                for (Map.Entry<IV<?,?>, BigdataValue> e : ids2.entrySet()) {
+
+                    final IV<?,?> id = e.getKey();
+                    
                     assertEquals("Id mapped to a different term? : termId="
                             + id, ids.get(id), ids2.get(id));
 
@@ -319,7 +461,7 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
      * @param terms
      * @return
      */
-    private Map<IV, BigdataValue> doAddTermsTest(
+    private Map<IV<?,?>, BigdataValue> doAddTermsTest(
             final AbstractTripleStore store,
             final Collection<BigdataValue> terms) {
 
@@ -327,27 +469,21 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
 
         final BigdataValue[] a = terms.toArray(new BigdataValue[size]);
         
-        // resolve term ids.
-        store
-                .getLexiconRelation()
-                .addTerms(a, size, false/* readOnly */);
+        // Resolve/add IVs.
+        store.getLexiconRelation().addTerms(a, size, false/* readOnly */);
 
-        // populate map w/ the assigned term identifiers.
-        final Collection<IV> ids = new ArrayList<IV>();
+        // Collect the assigned IVs.
+        final Collection<IV<?,?>> ids = new ArrayList<IV<?,?>>();
 
-        for(BigdataValue t : a) {
-            
+        for(BigdataValue t : a)
             ids.add(t.getIV());
-            
-        }
         
-        /*
-         * Resolve the assigned term identifiers against the lexicon.
-         */
-        final Map<IV, BigdataValue> tmp = store.getLexiconRelation()
+        // Resolve assigned IVs against the lexicon.
+        final Map<IV<?,?>, BigdataValue> tmp = store.getLexiconRelation()
                 .getTerms(ids);
-        
-        assertEquals(size,tmp.size());
+  
+        // Note: This is not true if there are duplicates.
+//        assertEquals(size, tmp.size());
 
         /*
          * Verify that the lexicon reports the same RDF Values for those term
@@ -356,19 +492,18 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
          */
         for(BigdataValue expected : a) {
 
-            assertNotSame("Did not assign term identifier? : " + expected,
-                    null, expected.getIV());
+            assertNotNull("Did not assign IV? : " + expected, expected.getIV());
 
             final BigdataValue actual = tmp.get(expected.getIV());
 
             if (actual == null) {
 
-                fail("Lexicon does not have value: termId="
-                        + expected.getIV() + ", term=" + expected);
+                fail("Lexicon does not have value: iv=" + expected.getIV()
+                        + ", expected=" + expected);
                 
             }
             
-            assertEquals("Id mapped to a different term? id="
+            assertEquals("Id mapped to a different term? iv="
                     + expected.getIV(), expected, actual);
 
         }
@@ -377,4 +512,44 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
 
     }
         
+    private String getVeryLargeURI() {
+
+        final int len = 1024000;
+
+        final StringBuilder sb = new StringBuilder(len + 20);
+
+        sb.append("http://www.bigdata.com/");
+        
+        for (int i = 0; i < len; i++) {
+
+            sb.append(Character.toChars('A' + (i % 26)));
+
+        }
+
+
+        final String s = sb.toString();
+        
+        return s;
+        
+    }
+    
+    private String getVeryLargeLiteral() {
+
+        final int len = 1024000;
+
+        final StringBuilder sb = new StringBuilder(len);
+
+        for (int i = 0; i < len; i++) {
+
+            sb.append(Character.toChars('A' + (i % 26)));
+
+        }
+
+
+        final String s = sb.toString();
+        
+        return s;
+        
+    }
+
 }

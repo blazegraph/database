@@ -49,9 +49,9 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
             
             final MockTermIdFactory f = new MockTermIdFactory();
             
-            final IV s = f.newTermId(VTE.URI);
-            final IV p = f.newTermId(VTE.URI);
-            final IV o = f.newTermId(VTE.URI);
+            final IV<?,?> s = f.newTermId(VTE.URI);
+            final IV<?,?> p = f.newTermId(VTE.URI);
+            final IV<?,?> o = f.newTermId(VTE.URI);
 
             // add the statement.
             store.addStatements(new SPO[] { //
@@ -129,9 +129,9 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
 
         final MockTermIdFactory f = new MockTermIdFactory();
         
-        final IV s = f.newTermId(VTE.URI);
-        final IV p = f.newTermId(VTE.URI);
-        final IV o = f.newTermId(VTE.URI);
+        final IV<?,?> s = f.newTermId(VTE.URI);
+        final IV<?,?> p = f.newTermId(VTE.URI);
+        final IV<?,?> o = f.newTermId(VTE.URI);
 
         class AbortException extends RuntimeException {
             private static final long serialVersionUID = 1L;

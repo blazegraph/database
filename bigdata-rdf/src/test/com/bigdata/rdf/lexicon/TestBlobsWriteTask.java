@@ -41,30 +41,30 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
- * Test suite for the {@link TermsWriteTask}.
+ * Test suite for the {@link BlobsWriteTask}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestTermsWriteTask extends TestCase2 {
+public class TestBlobsWriteTask extends TestCase2 {
 
     /**
      * 
      */
-    public TestTermsWriteTask() {
+    public TestBlobsWriteTask() {
     }
 
     /**
      * @param name
      */
-    public TestTermsWriteTask(String name) {
+    public TestBlobsWriteTask(String name) {
         super(name);
     }
 
@@ -120,7 +120,7 @@ public class TestTermsWriteTask extends TestCase2 {
     /**
      * Note: Blank nodes are NOT included in this test since the test helper is
      * not smart enough to verify the blank nodes will not be unified when using
-     * standard bnode semantics. However, {@link TestTermsIndex} does verify
+     * standard bnode semantics. However, {@link TestBlobsIndex} does verify
      * both standard and told bnode semantics.
      */
     public void test_add_various_standardBNodes() {
@@ -161,7 +161,7 @@ public class TestTermsWriteTask extends TestCase2 {
             
         }
         
-        final TermsIndexHelper h = new TermsIndexHelper();
+        final BlobsIndexHelper h = new BlobsIndexHelper();
 
         final BigdataValueFactory vf = BigdataValueFactoryImpl
                 .getInstance(getName());
@@ -170,7 +170,7 @@ public class TestTermsWriteTask extends TestCase2 {
 
         try {
 
-            final BTree ndx = TestTermsIndex.createTermsIndex(store, getName());
+            final BTree ndx = TestBlobsIndex.createTermsIndex(store, getName());
 
             /*
              * Point test the TERMS index for each Value. It should not be
@@ -347,7 +347,7 @@ public class TestTermsWriteTask extends TestCase2 {
      * @param ndx
      * @return
      */
-    private IV getTermIV(final Value value, final TermsIndexHelper h,
+    private IV getTermIV(final Value value, final BlobsIndexHelper h,
             final BigdataValueFactory vf, final IIndex ndx) {
 
         final IKeyBuilder keyBuilder = h.newKeyBuilder();
@@ -358,10 +358,10 @@ public class TestTermsWriteTask extends TestCase2 {
 
         final byte[] val = vf.getValueSerializer().serialize(asValue);
 
-		final int counter = h.resolveOrAddValue(ndx, true/* readOnly */,
-				keyBuilder, baseKey, val, null/* bucketSize */);
+        final int counter = h.resolveOrAddValue(ndx, true/* readOnly */,
+                keyBuilder, baseKey, val, null/* tmp */, null/* bucketSize */);
 
-        if (counter == TermsIndexHelper.NOT_FOUND) {
+        if (counter == BlobsIndexHelper.NOT_FOUND) {
 
             // Not found.
             return null;
@@ -370,15 +370,15 @@ public class TestTermsWriteTask extends TestCase2 {
 
 //        final TermId<?> iv = (TermId<?>) IVUtility.decode(key);
 
-		final TermId<?> iv = new TermId<BigdataValue>(VTE.valueOf(asValue),
-				asValue.hashCode(), (byte) counter);
+		final BlobIV<?> iv = new BlobIV<BigdataValue>(VTE.valueOf(asValue),
+				asValue.hashCode(), (short) counter);
 
         return iv;
 
     }
 
     /**
-     * Thin wrapper for the {@link TermsWriteTask} as invoked by the
+     * Thin wrapper for the {@link BlobsWriteTask} as invoked by the
      * {@link LexiconRelation}. This can be used to unify the {@link IV}s for
      * the caller's {@link BigdataValue} with those in the TERMS index and
      * (optionally) to assign new {@link IV}s (when read-only is
@@ -397,7 +397,7 @@ public class TestTermsWriteTask extends TestCase2 {
 
         final WriteTaskStats stats = new WriteTaskStats();
 
-        final TermsWriteTask task = new TermsWriteTask(ndx, vf, readOnly,
+        final BlobsWriteTask task = new BlobsWriteTask(ndx, vf, readOnly,
                 toldBNodes, values.length, values, stats);
 
         try {

@@ -13,7 +13,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
  * @param <V>
  */
 public class LiteralDatatypeIV<V extends BigdataLiteral> extends
-        AbstractExtensionIV<V, Literal> {
+        AbstractNonInlineExtensionIVWithDelegateIV<V, Literal> {
 
 	public LiteralDatatypeIV(final AbstractIV delegate, final IV datatype) {
 
@@ -31,6 +31,13 @@ public class LiteralDatatypeIV<V extends BigdataLiteral> extends
                 + String.valueOf(getVTE().getCharCode()) + ", localName="
                 + getDelegate() + ")";
 
+    }
+
+    @Override
+    final public byte getExtensionByte() {
+     
+        return INonInlineExtensionCodes.LiteralDatatypeIV;
+        
     }
 
 }

@@ -35,7 +35,8 @@ public class BigdataStatementIteratorImpl
         AbstractChunkedResolverator<ISPO, BigdataStatement, AbstractTripleStore>
         implements BigdataStatementIterator {
 
-    final private static Logger log = Logger.getLogger(BigdataStatementIteratorImpl.class);
+    final private static Logger log = Logger
+            .getLogger(BigdataStatementIteratorImpl.class);
 
     /**
      * An optional map of known blank node term identifiers and the
@@ -109,23 +110,16 @@ public class BigdataStatementIteratorImpl
         /*
          * Create a collection of the distinct term identifiers used in this
          * chunk.
-         * 
-         * @todo Long.valueOf(long) is a hot spot here. However, I probably need
-         * to drive the native long hash map awareness into
-         * getTerms(Collection<Long>) in order for the use of the
-         * LongOpenHashMap here to be of benefit.
          */
-
-//        final LongOpenHashSet ids = new LongOpenHashSet(chunk.length*4);
         
-        final Collection<IV> ivs = new LinkedHashSet<IV>(chunk.length
-                * state.getSPOKeyArity());
+        final Collection<IV<?, ?>> ivs = new LinkedHashSet<IV<?, ?>>(
+                chunk.length * state.getSPOKeyArity());
 
         for (ISPO spo : chunk) {
 
             {
                 
-                final IV s = spo.s();
+                final IV<?,?> s = spo.s();
 
                 if (bnodes == null || !bnodes.containsKey(s))
                     ivs.add(s);
@@ -136,7 +130,7 @@ public class BigdataStatementIteratorImpl
 
             {
 
-                final IV o = spo.o();
+                final IV<?,?> o = spo.o();
 
                 if (bnodes == null || !bnodes.containsKey(o))
                     ivs.add(o);
@@ -145,7 +139,7 @@ public class BigdataStatementIteratorImpl
 
             {
              
-                final IV c = spo.c();
+                final IV<?,?> c = spo.c();
 
                 if (c != null
                         && (bnodes == null || !bnodes.containsKey(c)))
@@ -163,7 +157,8 @@ public class BigdataStatementIteratorImpl
          * map that will be used to resolve term identifiers to terms for
          * this chunk.
          */
-        final Map<IV, BigdataValue> terms = state.getLexiconRelation().getTerms(ivs);
+        final Map<IV<?, ?>, BigdataValue> terms = state.getLexiconRelation()
+                .getTerms(ivs);
 
         final BigdataValueFactory valueFactory = state.getValueFactory();
         
@@ -188,7 +183,7 @@ public class BigdataStatementIteratorImpl
 //                throw ex;
 //            }
             final BigdataValue o = resolve(terms, spo.o());
-            final IV _c = spo.c();
+            final IV<?,?> _c = spo.c();
             final BigdataResource c;
             if (_c != null) {
                 /*
@@ -198,7 +193,8 @@ public class BigdataStatementIteratorImpl
                  * BigdataSolutionResolverator.
                  */
                 final BigdataResource tmp = (BigdataResource) resolve(terms, _c);
-                if(tmp.equals(BD.NULL_GRAPH)) {
+                if (tmp instanceof BigdataURI
+                        && ((BigdataURI) tmp).equals(BD.NULL_GRAPH)) {
                     /*
                      * Strip off the "nullGraph" context.
                      */
@@ -241,8 +237,8 @@ public class BigdataStatementIteratorImpl
      *            
      * @return The {@link BigdataValue}.
      */
-    private BigdataValue resolve(final Map<IV, BigdataValue> terms,
-            final IV iv) {
+    private BigdataValue resolve(final Map<IV<?,?>, BigdataValue> terms,
+            final IV<?,?> iv) {
 
         BigdataValue v = null;
 

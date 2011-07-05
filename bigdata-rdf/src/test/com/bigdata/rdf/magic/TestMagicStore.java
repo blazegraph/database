@@ -44,7 +44,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.MockTermIdFactory;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.rules.AbstractInferenceEngineTestCase;
 import com.bigdata.rdf.rules.RuleRdfs11;
@@ -100,12 +100,12 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
     final org.deri.iris.api.basics.IPredicate TRIPLE = BASIC.createPredicate("triple", 3);
 
     /**
-     * Factory for mock {@link MagicTuple}s based on mock {@link TermId}s.
+     * Factory for mock {@link MagicTuple}s based on mock {@link BlobIV}s.
      * @param terms
      * @return
      */
-    static private MagicTuple newMagicTuple(MockTermIdFactory f, int... terms) {
-        IV[] ivs = new IV[terms.length];
+    static private MagicTuple newMagicTuple(final MockTermIdFactory f, int... terms) {
+        final IV[] ivs = new IV[terms.length];
         for (int i = 0; i < terms.length; i++) {
             ivs[i] = f.newTermId(VTE.URI, terms[i]);
         }
@@ -130,13 +130,19 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
     private MockTermIdFactory f;
     
     protected void setUp() throws Exception {
+        
         super.setUp();
+        
         f = new MockTermIdFactory();
+        
     }
 
     protected void tearDown() throws Exception {
+        
         super.tearDown();
+        
         f = null;
+        
     }
 
     public void testMagicStore() {

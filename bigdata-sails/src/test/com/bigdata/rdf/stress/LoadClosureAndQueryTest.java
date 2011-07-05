@@ -358,7 +358,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
      */
     public static void showLexiconIndexDetails(BigdataSail sail) {
         
-        IIndex ndx = sail.getDatabase().getLexiconRelation().getTermsIndex();
+        IIndex ndx = sail.getDatabase().getLexiconRelation().getBlobsIndex();
         IndexMetadata md = ndx.getIndexMetadata();
         
         System.out.println("Lexicon:");

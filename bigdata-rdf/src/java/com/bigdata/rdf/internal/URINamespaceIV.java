@@ -13,11 +13,11 @@ import com.bigdata.rdf.model.BigdataURI;
  * @param <V>
  */
 public class URINamespaceIV<V extends BigdataURI> extends
-        AbstractExtensionIV<V, URI> {
+        AbstractNonInlineExtensionIVWithDelegateIV<V, URI> {
 
 	public URINamespaceIV(final AbstractIV delegate, final IV datatype) {
 
-		super(VTE.URI, delegate, datatype);
+        super(VTE.URI, delegate, datatype);
 
     }
 
@@ -31,6 +31,13 @@ public class URINamespaceIV<V extends BigdataURI> extends
                 + String.valueOf(getVTE().getCharCode()) + ", localName="
                 + getDelegate() + ")";
 
+    }
+
+    @Override
+    final public byte getExtensionByte() {
+     
+        return INonInlineExtensionCodes.URINamespaceIV;
+        
     }
 
 }

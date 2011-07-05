@@ -135,11 +135,12 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
         return v;
         
     }
-    
+
     /**
-     * Creates a buffer with an initial capacity of <code>1024</code> bytes.
-     * The position and the read limit will zero. The capacity of the buffer
-     * will be automatically extended as required.
+     * Creates a buffer with an initial capacity of
+     * {@value #DEFAULT_INITIAL_CAPACITY} bytes. The position and the read limit
+     * will zero. The capacity of the buffer will be automatically extended as
+     * required.
      */
     public ByteArrayBuffer() {
         

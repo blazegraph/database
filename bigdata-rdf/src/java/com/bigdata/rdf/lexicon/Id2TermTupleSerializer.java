@@ -52,20 +52,17 @@ import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Encapsulates key and value formation for the TERMS index.  The keys are
- * {@link TermId}s.  The values are {@link BigdataValue}s serialized using the
- * {@link BigdataValueSerializer}.  Large values are converted to raw records
- * and must be materialized before they can be deserialized.
+ * Encapsulates key and value formation for the reverse lexicon index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValue> {
+public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataValue> {
 
     /**
      * 
      */
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 4841769875819006615L;
 
     /**
      * The namespace of the owning {@link LexiconRelation}.
@@ -78,13 +75,15 @@ public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValu
      */
     transient private BigdataValueSerializer<BigdataValue> valueSer;
 
+    private static transient final int INITIAL_CAPACITY = 128;
+    
     /**
      * Used to serialize RDF {@link Value}s.
      * <p>
      * Note: While this object is not thread-safe, the mutable B+Tree is
      * restricted to a single writer so it does not have to be thread-safe.
      */
-    final transient private DataOutputBuffer buf = new DataOutputBuffer(Bytes.SIZEOF_LONG);
+    final transient private DataOutputBuffer buf = new DataOutputBuffer(INITIAL_CAPACITY);
 
     /**
      * Used to serialize RDF {@link Value}s.
@@ -92,14 +91,14 @@ public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValu
      * Note: While this object is not thread-safe, the mutable B+Tree is
      * restricted to a single writer so it does not have to be thread-safe.
      */
-    final transient private ByteArrayBuffer tbuf = new ByteArrayBuffer();
+    final transient private ByteArrayBuffer tbuf = new ByteArrayBuffer(INITIAL_CAPACITY);
 
     transient private BigdataValueFactory valueFactory;
 
     /**
      * De-serialization ctor.
      */
-    public TermsTupleSerializer() {
+    public Id2TermTupleSerializer() {
 
         super();
         
@@ -111,7 +110,7 @@ public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValu
      *            A factory that does not support unicode and has an
      *            initialCapacity of {@value Bytes#SIZEOF_LONG}.
      */
-    public TermsTupleSerializer(final String namespace,
+    public Id2TermTupleSerializer(final String namespace,
             final BigdataValueFactory valueFactory) {
         
         super(//
@@ -119,47 +118,45 @@ public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValu
                 getDefaultLeafKeysCoder(),//
 //                getDefaultValuesCoder()
                 SimpleRabaCoder.INSTANCE
-//                CanonicalHuffmanRabaCoder.INSTANCE
-//                new ConditionalRabaCoder(//
-//                        SimpleRabaCoder.INSTANCE, // small
-//                        CanonicalHuffmanRabaCoder.INSTANCE, // large
-//                        33/*btreeBranchingFactor+1*/
-//                        )
         );
 
         if (namespace == null)
             throw new IllegalArgumentException();
-        
+
         this.namespace = namespace;
         this.valueFactory = valueFactory;
         this.valueSer = this.valueFactory.getValueSerializer();
 
     }
-
-//    /**
-//     * Converts a {@link TermId} into a key suitable for use with the TERMS
-//     * index.
-//     * 
-//     * @param tid
-//     *            The {@link TermId}.
-//     * 
-//     * @return The encoded {@link TermId}.
-//     */
-//    public byte[] id2key(final TermId tid) {
-//        
-//        return tid.encode(getKeyBuilder().reset()).getKey();
-//        
-//    }
     
     /**
-     * Decodes the key to a {@link TermId}.
+     * Generates an unsigned byte[] key from a {@link TermId}.
+     * <p>
+     * Note: The code that handles efficient batch insertion of terms into the
+     * database replicates the logic for encoding the term identifier as an
+     * unsigned long integer.
+     * 
+     * @param id
+     *            The term identifier.
+     * 
+     * @return The id expressed as an unsigned byte[] key of length 8.
+     * 
+     * @see #key2Id()
+     */
+    public byte[] id2key(final TermId<?> tid) {
+        
+        return tid.encode(getKeyBuilder().reset()).getKey();
+        
+    }
+    
+    /**
+     * Decodes the term identifier key to a term identifier.
      * 
      * @param key
-     *            The key for an entry in the TERMS index.
+     *            The key for an entry in the id:term index.
      * 
-     * @return The {@link TermId}.
+     * @return The term identifier.
      */
-    @Override
     public IV deserializeKey(final ITuple tuple) {
 
         final byte[] key = tuple.getKeyBuffer().array();
@@ -169,33 +166,27 @@ public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValu
     }
 
     /**
-     * Return the unsigned byte[] key for a {@link TermId}.
+     * Return the unsigned byte[] key for a term identifier.
      * 
      * @param obj
-     *            The {@link TermId}.
+     *            The term identifier as a {@link TermId}.
      */
-    @Override
     public byte[] serializeKey(final Object obj) {
 
-    	final TermId<?> iv = (TermId<?>)obj;
-    	
-        return iv.encode(getKeyBuilder().reset()).getKey();
-
+        return id2key((TermId<?>) obj);
+        
     }
 
     /**
-     * Return the byte[] value, which is the serialization of an RDF
-     * {@link Value} using the {@link BigdataValueSerializer}.
+     * Return the <code>byte[]</code> value, which is the serialization of an
+     * RDF {@link Value}.
      * 
      * @param obj
      *            An RDF {@link Value}.
      */
-    @Override
     public byte[] serializeVal(final BigdataValue obj) {
         
-        buf.reset();
-        
-        return valueSer.serialize(obj, buf, tbuf);
+        return valueSer.serialize(obj, buf.reset(), tbuf);
 
     }
 
@@ -204,18 +195,10 @@ public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValu
      * the term identifier extracted from the unsigned byte[] key, and sets
      * the appropriate {@link BigdataValueFactoryImpl} reference on that object.
      */
-    @Override
     public BigdataValue deserialize(final ITuple tuple) {
 
-        if(tuple.isNull()) {
-            /*
-             * Note: The NullIV does not have a value in the index.
-             */
-            return null;
-        }
-        
-        final IV iv = deserializeKey(tuple);
-        
+        final IV<?,?> iv = deserializeKey(tuple);
+
         final BigdataValue tmp = valueSer.deserialize(tuple.getValueStream(),
                 new StringBuilder());
 
@@ -224,7 +207,7 @@ public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValu
         return tmp;
 
     }
-
+    
     /**
      * <pre>
      * valueFactoryClass:UTF
@@ -235,8 +218,7 @@ public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValu
 
     private static final transient byte VERSION = VERSION0;
 
-    public void readExternal(final ObjectInput in) throws IOException,
-            ClassNotFoundException {
+    public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
         super.readExternal(in);
         final byte version = in.readByte();
         final String namespace;
@@ -272,7 +254,7 @@ public class TermsTupleSerializer extends DefaultTupleSerializer<IV, BigdataValu
         }
         valueSer = this.valueFactory.getValueSerializer();
     }
-
+    
     public void writeExternal(final ObjectOutput out) throws IOException {
         super.writeExternal(out);
         out.writeByte(VERSION);

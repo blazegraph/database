@@ -63,15 +63,13 @@ import com.bigdata.striterator.IChunkedIterator;
  * Wraps an iterator that visits term identifiers and exposes each visited term
  * identifier as a {@link BigdataValue} (batch API).
  * 
- * @todo The resolution of term identifiers to terms should happen during
- *       asynchronous read-ahead for even better performance.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class BigdataValueIteratorImpl implements BigdataValueIterator {
 
-    final protected static Logger log = Logger.getLogger(BigdataValueIteratorImpl.class);
+    final private static Logger log = Logger
+            .getLogger(BigdataValueIteratorImpl.class);
 
     /**
      * The database whose lexicon will be used to resolve term identifiers to
@@ -93,13 +91,13 @@ public class BigdataValueIteratorImpl implements BigdataValueIterator {
     /**
      * The current chunk from the source iterator and initially <code>null</code>.
      */
-    private IV[] chunk = null;
+    private IV<?,?>[] chunk = null;
 
     /**
      * The map that will be used to resolve term identifiers to terms for the
      * current {@link #chunk} and initially <code>null</code>.
      */
-    private Map<IV, BigdataValue> terms = null;
+    private Map<IV<?,?>, BigdataValue> terms = null;
 
     /**
      * 
@@ -145,28 +143,27 @@ public class BigdataValueIteratorImpl implements BigdataValueIterator {
         if (lastIndex == -1 || lastIndex + 1 == chunk.length) {
 
             log.info("Fetching next chunk");
-            
+
             // fetch the next chunk of SPOs.
             chunk = src.nextChunk();
 
-            if(log.isInfoEnabled())
-            log.info("Fetched chunk: size="+chunk.length);
+            if (log.isInfoEnabled())
+                log.info("Fetched chunk: size=" + chunk.length);
 
             /*
-             * Create a collection of the distinct term identifiers used in this
-             * chunk.
+             * Create a collection of the distinct IVs used in this chunk.
              */
 
-            final Collection<IV> ivs = new HashSet<IV>(chunk.length);
+            final Collection<IV<?,?>> ivs = new HashSet<IV<?,?>>(chunk.length);
 
-            for (IV id : chunk) {
+            for (IV<?,?> id : chunk) {
 
                 ivs.add(id);
 
             }
 
-            if(log.isInfoEnabled())
-            log.info("Resolving "+ivs.size()+" term identifiers");
+            if (log.isInfoEnabled())
+                log.info("Resolving " + ivs.size() + " term identifiers");
             
             // batch resolve term identifiers to terms.
             terms = db.getLexiconRelation().getTerms(ivs);
@@ -181,17 +178,18 @@ public class BigdataValueIteratorImpl implements BigdataValueIterator {
             
         }
 
-        if(log.isDebugEnabled()) {
-            
-            log.debug("lastIndex="+lastIndex+", chunk.length="+chunk.length);
-            
-        }
-        
-        // the current term identifier.
-        final IV iv = chunk[lastIndex];
+//        if (log.isDebugEnabled()) {
+//
+//            log.debug("lastIndex=" + lastIndex + ", chunk.length="
+//                    + chunk.length);
+//
+//        }
 
-        if (log.isDebugEnabled())
-            log.debug("iv=" + iv);
+        // the current term identifier.
+        final IV<?,?> iv = chunk[lastIndex];
+
+//        if (log.isDebugEnabled())
+//            log.debug("iv=" + iv);
                 
         /*
          * Resolve term identifiers to terms using the map populated when we
@@ -205,11 +203,8 @@ public class BigdataValueIteratorImpl implements BigdataValueIterator {
 
         }
         
-        if(log.isDebugEnabled()) {
-            
-            log.debug("termId=" + iv + ", value=" + val);
-
-        }
+//        if(log.isDebugEnabled())
+//            log.debug("iv=" + iv + ", value=" + val);
 
         return val;
         
@@ -229,8 +224,6 @@ public class BigdataValueIteratorImpl implements BigdataValueIterator {
     
     public void close() {
     
-        log.info("");
-        
         src.close();
 
         chunk = null;

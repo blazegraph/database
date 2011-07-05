@@ -33,7 +33,6 @@ import java.io.ObjectOutput;
 import java.util.UUID;
 
 import com.bigdata.btree.IndexMetadata;
-import com.sun.org.apache.xml.internal.utils.Hashtree2Node;
 
 /**
  * Configuration options.

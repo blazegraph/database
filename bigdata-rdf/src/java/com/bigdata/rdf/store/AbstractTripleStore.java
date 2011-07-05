@@ -89,16 +89,18 @@ import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.inf.IJustificationIterator;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.JustificationIterator;
+import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.DefaultExtensionFactory;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.IExtensionFactory;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSDStringExtension;
 import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
+import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.ITextIndexer;
+import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -479,6 +481,68 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_STORE_BLANK_NODES = "false";
 
         /**
+         * Option effects how evenly distributed the assigned term identifiers
+         * which has a pronounced effect on the ID2TERM and statement indices
+         * for <em>scale-out deployments</em>. The default for a scale-out
+         * deployment is {@value #DEFAULT_TERMID_BITS_TO_REVERSE}, but the
+         * default for a scale-up deployment is ZERO(0).
+         * <p>
+         * For the scale-out triple store, the term identifiers are formed by
+         * placing the index partition identifier in the high word and the local
+         * counter for the index partition into the low word. In addition, the
+         * sign bit is "stolen" from each value such that the low two bits are
+         * left open for bit flags which encode the type (URI, Literal, BNode or
+         * SID) of the term. The effect of this option is to cause the low N
+         * bits of the local counter value to be reversed and written into the
+         * high N bits of the term identifier (the other bits are shifted down
+         * to make room for this). Regardless of the configured value for this
+         * option, all bits (except the sign bit) of the both the partition
+         * identifier and the local counter are preserved.
+         * <p>
+         * Normally, the low bits of a sequential counter will vary the most
+         * rapidly. By reversing the localCounter and placing some of the
+         * reversed bits into the high bits of the term identifier we cause the
+         * term identifiers to be uniformly (but not randomly) distributed. This
+         * is much like using hash function without collisions or a random
+         * number generator that does not produce duplicates. When ZERO (0) no
+         * bits are reversed so the high bits of the term identifiers directly
+         * reflect the partition identifier and the low bits are assigned
+         * sequentially by the local counter within each TERM2ID index
+         * partition.
+         * <p>
+         * The use of a non-zero value for this option can easily cause the
+         * write load on the index partitions for the ID2TERM and statement
+         * indices to be perfectly balanced. However, using too many bits has
+         * some negative consequences on locality of operations <em>within</em>
+         * an index partition (since the distribution of the keys be
+         * approximately uniform distribution, leading to poor cache
+         * performance, more copy-on-write for the B+Tree, and both more IO and
+         * faster growth in the journal for writes (since there will be more
+         * leaves made dirty on average by each bulk write)).
+         * <p>
+         * The use of a non-zero value for this option also directly effects the
+         * degree of scatter for bulk read or write operations. As more bits are
+         * used, it becomes increasingly likely that each bulk read or write
+         * operation will on average touch all index partitions. This is because
+         * #of low order local counter bits reversed and rotated into the high
+         * bits of the term identifier places an approximate bound on the #of
+         * index partitions of the ID2TERM or a statement index that will be
+         * touched by a scattered read or write. However, that number will
+         * continue to grow slowly over time as new partition identifiers are
+         * introduced (the partition identifiers appear next in the encoded term
+         * identifier and therefore determine the degree of locality or scatter
+         * once the quickly varying high bits have had their say).
+         * <p>
+         * The "right" value really depends on the expected scale of the
+         * knowledge base. If you estimate that you will have 50 x 200M index
+         * partitions for the statement indices, then SQRT(50) =~ 7 would be a
+         * good choice.
+         */
+        String TERMID_BITS_TO_REVERSE = AbstractTripleStore.class.getName() + ".termIdBitsToReverse";
+
+        String DEFAULT_TERMID_BITS_TO_REVERSE = "6";
+
+        /**
          * Integer option whose value is the capacity of the term cache. This
          * cache provides fast lookup of frequently used RDF {@link Value}s by
          * their term identifier.
@@ -826,6 +890,31 @@ abstract public class AbstractTripleStore extends
          * Inlining options.
          */
 
+        /**
+         * The threshold (in character length) at which an RDF {@link Value}
+         * will be inserted into the {@link LexiconKeyOrder#BLOBS} index rather
+         * than the {@link LexiconKeyOrder#TERM2ID} and
+         * {@link LexiconKeyOrder#ID2TERM} indices (default
+         * {@value #DEFAULT_BLOBS_THRESHOLD}).
+         * <p>
+         * The {@link LexiconKeyOrder#BLOBS} index is capable of storing very
+         * large literals but has more IO scatter due to the hash code component
+         * of the key for that index. Therefore smaller RDF {@link Value}s
+         * should be inserted into the {@link LexiconKeyOrder#TERM2ID} and
+         * {@link LexiconKeyOrder#ID2TERM} indices while very large RDF
+         * {@link Value}s MUST be inserted into the
+         * {@link LexiconKeyOrder#BLOBS} index.
+         * <p>
+         * The {@link LexiconKeyOrder#TERM2ID} index keys are Unicode sort codes
+         * based on the RDF {@link Value}s. This threshold essentially limits
+         * the maximum length of the keys in the {@link LexiconKeyOrder#TERM2ID}
+         * index.
+         */
+        String BLOBS_THRESHOLD = AbstractTripleStore.class.getName()
+                + ".blobsThreshold";
+
+        String DEFAULT_BLOBS_THRESHOLD = "256";
+		
 		/**
 		 * Set up database to inline XSD datatype literals corresponding to
 		 * primitives (boolean) and numerics (byte, short, int, etc) directly
@@ -896,7 +985,7 @@ abstract public class AbstractTripleStore extends
 		 * the full text index does not play well with inlining large literals
 		 * into the statement indices.
 		 */
-        String DEFAULT_MAX_INLINE_STRING_LENGTH = "16";
+        String DEFAULT_MAX_INLINE_STRING_LENGTH = "0";
         
         /**
          * Set up database to inline bnodes directly into the statement indices 
@@ -1875,7 +1964,10 @@ abstract public class AbstractTripleStore extends
     }
 
     /**
-     * MUST be extended to perform commit for impls with live indices.
+     * {@inheritDoc}
+     * <p>
+     * Note: This method MUST be extended to perform commit for implementations
+     * with live indices.
      * 
      * @throws IllegalStateException
      *             if the view is read only.
@@ -1885,143 +1977,106 @@ abstract public class AbstractTripleStore extends
         if (isReadOnly())
             throw new IllegalStateException();
 
-//        /*
-//         * Clear the reference since it was as of the last commit point.
-//         */
-//        readCommittedRef = null;
-        return 0l;
+        return 0L;
+
     }
-    
-//    /**
-//     * A factory returning a read-committed view of the database.
-//     * <p>
-//     * Note: There is a distinct instance <i>per commit time</i>. If an
-//     * intervening commit has occurred, then you will get back a new instance
-//     * providing a read-consistent view as of the now most recent commit point.
-//     * 
-//     * FIXME The [per commit time] constraint is actually a function of the
-//     * {@link ITx#READ_COMMITTED} semantics as implemented by the
-//     * {@link IIndexManager}. If the indices are {@link IClientIndex}s then
-//     * the instances remain valid since all requests are delegated through the
-//     * {@link DataService} layer. However, if they are {@link BTree}s, then the
-//     * instances are NOT valid.
-//     * <p>
-//     * Perhaps the best way to deal with this is to have a ReadCommittedBTree or
-//     * to modify BTree to intrinsically understand read-committed semantics and
-//     * to reload from the most recent checkpoint after each commit. That way the
-//     * index references would always remain valid.
-//     * <p>
-//     * However, we have to be much more careful about read-consistent (choose a
-//     * timestamp corresponding to the last commit point or the last closure
-//     * point) vs read-committed (writes become immediately visible once they are
-//     * committed).
-//     */
-//    final public AbstractTripleStore asReadCommittedView() {
-//
-//        if (getTimestamp() == ITx.READ_COMMITTED) {
-//            
-//            return this;
-//            
-//        }
-//
-//        synchronized(this) {
-//        
-//            AbstractTripleStore view = readCommittedRef == null ? null
-//                    : readCommittedRef.get();
-//            
-//            if(view == null) {
-//                
-//                view = (AbstractTripleStore) getIndexManager().getResourceLocator()
-//                        .locate(getNamespace(), ITx.READ_COMMITTED);
-//                
-//                readCommittedRef = new SoftReference<AbstractTripleStore>(view);
-//                
-//            }
-//            
-//            return view; 
-//        
-//        }
-//        
-//    }
-//    private SoftReference<AbstractTripleStore> readCommittedRef;
     
     final public long getJustificationCount() {
 
         if (justify) {
 
-            return getSPORelation().getJustificationIndex().rangeCount(null,
-                    null);
+            return getSPORelation().getJustificationIndex().rangeCount();
 
         }
 
-        return 0;
+        return 0L;
 
     }
 
     final public long getTermCount() {
 
-//        final byte[] fromKey = new byte[] { KeyBuilder
-//                .encodeByte(ITermIndexCodes.TERM_CODE_URI) };
-//
-//        /*
-//         * Note: the term count deliberately excludes the statement identifiers
-//         * which follow the bnodes in the lexicon.
-//         */
-//        final byte[] toKey = new byte[] { KeyBuilder
-//                .encodeByte((byte) (ITermIndexCodes.TERM_CODE_BND + 1)) };
-//
-//        return getLexiconRelation().getTermsIndex()
-//                .rangeCount(fromKey, toKey);
-        
-        // Report everything except the NullIVs.
-        return getLexiconRelation().getTermsIndex().rangeCount() - 4;
+        long rangeCount = 0L;
+
+        rangeCount += getLexiconRelation().getTerm2IdIndex().rangeCount();
+
+        rangeCount += getLexiconRelation().getBlobsIndex().rangeCount();
+
+        return rangeCount;
 
     }
 
     final public long getURICount() {
 
-//        final byte[] fromKey = new byte[] { KeyBuilder
-//                .encodeByte(ITermIndexCodes.TERM_CODE_URI) };
-//
-//        final byte[] toKey = new byte[] { KeyBuilder
-//                .encodeByte((byte) (ITermIndexCodes.TERM_CODE_URI + 1)) };
+        long rangeCount = 0L;
+        {
 
-		final byte[] fromKey = new byte[] {//
-		KeyBuilder.encodeByte(TermId.toFlags(VTE.URI)) //
-		};
+            final byte[] fromKey = new byte[] { 
+//                    KeyBuilder.encodeByte(
+                            ITermIndexCodes.TERM_CODE_URI
+//                            )
+                    };
 
-        final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
+            final byte[] toKey = new byte[] {
+//                    KeyBuilder.encodeByte(
+                            (byte) (ITermIndexCodes.TERM_CODE_URI + 1)
+//                            ) 
+                            };
 
-        /*
-         * Subtract out ONE for the NullIV.
-         */
-        return getLexiconRelation().getTermsIndex().rangeCount(fromKey, toKey) - 1;
+            rangeCount += getLexiconRelation().getTerm2IdIndex().rangeCount(
+                    fromKey, toKey);
+        }
+
+        {
+
+            final byte[] fromKey = new byte[] {//
+            KeyBuilder.encodeByte(BlobIV.toFlags(VTE.URI)) //
+            };
+
+            final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
+
+            rangeCount += getLexiconRelation().getBlobsIndex().rangeCount(
+                    fromKey, toKey);
+
+        }
+
+        return rangeCount;
 
     }
 
     final public long getLiteralCount() {
 
-//        // Note: the first of the kinds of literals (plain).
-//        final byte[] fromKey = new byte[] { KeyBuilder
-//                .encodeByte(ITermIndexCodes.TERM_CODE_LIT) };
-//
-//        // Note: spans the last of the kinds of literals.
-//        final byte[] toKey = new byte[] { KeyBuilder
-//                .encodeByte((byte) (ITermIndexCodes.TERM_CODE_DTL + 1)) };
-//
-//        return getLexiconRelation().getTerm2IdIndex()
-//                .rangeCount(fromKey, toKey);
+        long rangeCount = 0L;
+        {
+            // Note: the first of the kinds of literals (plain).
+            final byte[] fromKey = new byte[] { 
+//                    KeyBuilder.encodeByte(
+                            ITermIndexCodes.TERM_CODE_LIT
+//                            )
+                            };
 
-		final byte[] fromKey = new byte[] {//
-				KeyBuilder.encodeByte(TermId.toFlags(VTE.LITERAL)) //
-				};
+            // Note: spans the last of the kinds of literals.
+            final byte[] toKey = new byte[] { 
+//                    KeyBuilder.encodeByte(
+                    (byte) (ITermIndexCodes.TERM_CODE_DTL + 1)
+//                    ))
+                    };
 
-        final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
+            rangeCount += getLexiconRelation().getTerm2IdIndex().rangeCount(
+                    fromKey, toKey);
+        }
 
-        /*
-         * Subtract out ONE for the NullIV.
-         */
-        return getLexiconRelation().getTermsIndex().rangeCount(fromKey, toKey) - 1;
+        {
+            final byte[] fromKey = new byte[] {//
+            KeyBuilder.encodeByte(BlobIV.toFlags(VTE.LITERAL)) //
+            };
+
+            final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
+
+            rangeCount += getLexiconRelation().getBlobsIndex().rangeCount(
+                    fromKey, toKey);
+        }
+ 
+        return rangeCount;
 
     }
 
@@ -2032,26 +2087,43 @@ abstract public class AbstractTripleStore extends
      * is <code>false</code>.
      */
     final public long getBNodeCount() {
+
+        if (!getLexiconRelation().isStoreBlankNodes())
+            return 0L;
         
-//        final byte[] fromKey = new byte[] { KeyBuilder
-//                .encodeByte(ITermIndexCodes.TERM_CODE_BND) };
-//
-//        final byte[] toKey = new byte[] { KeyBuilder
-//                .encodeByte((byte) (ITermIndexCodes.TERM_CODE_BND + 1)) };
-//
-//        return getLexiconRelation().getTerm2IdIndex()
-//                .rangeCount(fromKey, toKey);
+        long rangeCount = 0L;
+        {
 
-		final byte[] fromKey = new byte[] {//
-				KeyBuilder.encodeByte(TermId.toFlags(VTE.BNODE)) //
-				};
+            final byte[] fromKey = new byte[] { 
+//                    KeyBuilder.encodeByte(
+                            ITermIndexCodes.TERM_CODE_BND
+//                            ) 
+                            };
 
-        final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
+            final byte[] toKey = new byte[] { 
+//                    KeyBuilder.encodeByte(
+                            (byte) (ITermIndexCodes.TERM_CODE_BND + 1)
+//                            )
+                            };
 
-        /*
-         * Subtract out ONE for the NullIV.
-         */
-        return getLexiconRelation().getTermsIndex().rangeCount(fromKey, toKey) - 1;
+            rangeCount += getLexiconRelation().getTerm2IdIndex().rangeCount(
+                    fromKey, toKey);
+        
+        }
+        {
+        
+            final byte[] fromKey = new byte[] {//
+            KeyBuilder.encodeByte(BlobIV.toFlags(VTE.BNODE)) //
+            };
+
+            final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
+
+            rangeCount += getLexiconRelation().getBlobsIndex().rangeCount(
+                    fromKey, toKey);
+
+        }
+
+        return rangeCount;
 
     }
 
@@ -2059,10 +2131,6 @@ abstract public class AbstractTripleStore extends
      * term index
      */
 
-    /**
-     * This method delegates to the batch API, but it is extremely inefficient
-     * for scale-out as it does one RMI per request!
-     */
     public IV addTerm(final Value value) {
 
         final BigdataValue[] terms = new BigdataValue[] {//
@@ -2313,10 +2381,13 @@ abstract public class AbstractTripleStore extends
         return hasStatement(s, p, o, null/* c */);
 
     }
-    
+
     /**
-     * This method is extremely inefficient for scale-out as it does one RMI per
-     * request!
+     * {@inheritDoc}
+     * <p>
+     * This method is extremely inefficient for scale-out as it does multiple
+     * RMIs per request (one for each Value and one or more for the statement
+     * indices)!
      */
     final public boolean hasStatement(Resource s, URI p, Value o, Resource c) {
 
@@ -2466,7 +2537,7 @@ abstract public class AbstractTripleStore extends
         /*
          * Use batch API to resolve the term identifiers.
          */
-        final List<IV> ivs = new ArrayList<IV>(4);
+        final List<IV<?,?>> ivs = new ArrayList<IV<?,?>>(4);
         
         ivs.add(spo.s());
         
@@ -2474,7 +2545,7 @@ abstract public class AbstractTripleStore extends
         
         ivs.add(spo.o());
 
-        final IV c = spo.c();
+        final IV<?,?> c = spo.c();
         
         if (c != null) {
 
@@ -2482,7 +2553,7 @@ abstract public class AbstractTripleStore extends
 
         }
 
-        final Map<IV, BigdataValue> terms = getLexiconRelation()
+        final Map<IV<?,?>, BigdataValue> terms = getLexiconRelation()
                 .getTerms(ivs);
 
         /*

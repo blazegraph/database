@@ -6,7 +6,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.rdf.lexicon.TermsIndexHelper;
+import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
@@ -63,7 +63,7 @@ public class TestInlineLiteralIV extends TestCase2 {
 
 		assertEquals(DTE.XSDString, iv.getDTE());
 		
-		final TermsIndexHelper h = new TermsIndexHelper();
+		final BlobsIndexHelper h = new BlobsIndexHelper();
 		
 		final IKeyBuilder keyBuilder = h.newKeyBuilder();
 		

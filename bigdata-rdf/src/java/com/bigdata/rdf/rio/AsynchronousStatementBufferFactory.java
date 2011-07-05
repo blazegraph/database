@@ -88,15 +88,15 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.lexicon.TermsIndexHelper;
-import com.bigdata.rdf.lexicon.TermsTupleSerializer;
-import com.bigdata.rdf.lexicon.TermsWriteProc;
-import com.bigdata.rdf.lexicon.TermsWriteProc.TermsWriteProcConstructor;
-import com.bigdata.rdf.lexicon.TermsWriteTask.AssignTermId;
+import com.bigdata.rdf.lexicon.BlobsIndexHelper;
+import com.bigdata.rdf.lexicon.BlobsTupleSerializer;
+import com.bigdata.rdf.lexicon.BlobsWriteProc;
+import com.bigdata.rdf.lexicon.BlobsWriteProc.TermsWriteProcConstructor;
+import com.bigdata.rdf.lexicon.BlobsWriteTask.AssignTermId;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataResource;
@@ -422,7 +422,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         }
 
         final AsynchronousIndexWriteConfiguration config = tripleStore
-                .getLexiconRelation().getTermsIndex().getIndexMetadata()
+                .getLexiconRelation().getBlobsIndex().getIndexMetadata()
                 .getAsynchronousIndexWriteConfiguration();
         
 //        if(true||BigdataStatics.debug)
@@ -450,7 +450,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
         }
         
-        buffer_terms = ((IScaleOutClientIndex) lexiconRelation.getTermsIndex())
+        buffer_terms = ((IScaleOutClientIndex) lexiconRelation.getBlobsIndex())
                 .newWriteBuffer(
                         new TermsWriteProcAsyncResultHandler(false/* readOnly */),
                         new DefaultDuplicateRemover<BigdataValue>(true/* testRefs */),
@@ -2696,7 +2696,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
     /**
      * Class applies the term identifiers assigned by the
-     * {@link TermsWriteProc} to the {@link BigdataValue} references in the
+     * {@link BlobsWriteProc} to the {@link BigdataValue} references in the
      * {@link KVO} correlated with each {@link Split} of data processed by that
      * procedure.
      * <p>
@@ -2710,14 +2710,14 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      */
     static private class TermsWriteProcAsyncResultHandler
             implements
-            IAsyncResultHandler<TermsWriteProc.Result, Void, BigdataValue, KVO<BigdataValue>> {
+            IAsyncResultHandler<BlobsWriteProc.Result, Void, BigdataValue, KVO<BigdataValue>> {
 
         private final boolean readOnly;
 
         /**
          * 
          * @param readOnly
-         *            if readOnly was specified for the {@link TermsWriteProc}
+         *            if readOnly was specified for the {@link BlobsWriteProc}
          *            .
          */
         public TermsWriteProcAsyncResultHandler(final boolean readOnly) {
@@ -2730,9 +2730,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
          * NOP
          * 
          * @see #aggregateAsync(KVO[],
-         *      com.bigdata.rdf.lexicon.TermsWriteProc.Result, Split)
+         *      com.bigdata.rdf.lexicon.BlobsWriteProc.Result, Split)
          */
-        public void aggregate(final TermsWriteProc.Result result,
+        public void aggregate(final BlobsWriteProc.Result result,
                 final Split split) {
 
         }
@@ -2742,13 +2742,13 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
          * corresponding elements of the terms[].
          */
         public void aggregateAsync(final KVO<BigdataValue>[] chunk,
-                final TermsWriteProc.Result result, final Split split) {
+                final BlobsWriteProc.Result result, final Split split) {
 
             for (int i = 0; i < chunk.length; i++) {
 
                 final int counter = result.counters[i];
 
-                if (counter == TermsIndexHelper.NOT_FOUND) {
+                if (counter == BlobsIndexHelper.NOT_FOUND) {
 
                     if (!readOnly)
                         throw new AssertionError();
@@ -2759,8 +2759,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                 	final BigdataValue value = chunk[i].obj;
                 	
 					// Rebuild the IV.
-					final TermId<?> iv = new TermId(VTE.valueOf(value), value
-							.hashCode(), (byte) counter);
+					final BlobIV<?> iv = new BlobIV(VTE.valueOf(value), value
+							.hashCode(), (short) counter);
 
                     // assign the term identifier.
                     value.setIV(iv);
@@ -2870,7 +2870,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
         private final BigdataValueSerializer valSer;
         
-        private final TermsTupleSerializer tupleSer;
+        private final BlobsTupleSerializer tupleSer;
 
         private final IChunkedIterator<BigdataValue> src;
 
@@ -2905,8 +2905,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
             this.valSer = r.getValueFactory().getValueSerializer();
             
-            this.tupleSer = (TermsTupleSerializer) r.getIndex(
-                    LexiconKeyOrder.TERMS).getIndexMetadata()
+            this.tupleSer = (BlobsTupleSerializer) r.getIndex(
+                    LexiconKeyOrder.BLOBS).getIndexMetadata()
                     .getTupleSerializer();
 
             this.src = src;
@@ -2922,7 +2922,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         public Void call() throws Exception {
 
             // This is thread-safe (stateless).
-            final TermsIndexHelper h = new TermsIndexHelper();
+            final BlobsIndexHelper h = new BlobsIndexHelper();
 
             /*
              * These are thread-local instances, which is why we defer obtaining

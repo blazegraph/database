@@ -1819,7 +1819,6 @@ public class Rule2BOpUtility {
      */
     final private static transient IConstant<IV> fakeTermId = new Constant<IV>(
             TermId.mockIV(VTE.URI)
-//            new TermId(VTE.URI, -1L)
             );
 
 }
