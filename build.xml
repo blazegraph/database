@@ -112,6 +112,45 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
 		<mkdir dir="${build.dir}/lib" />
 	</target>
 
+	<target name="buildinfo"
+		description="Generate a BuildInfo.java file with metadata about this build.">
+		<property name="buildinfo.file" 
+			value="${bigdata.dir}\bigdata\src\java\com\bigdata\BuildInfo.java"/>
+		<loadfile property="svn.revision" srcFile="./.svn/entries">
+			<filterchain>
+				<headfilter lines="1" skip="3"/>
+				 <striplinebreaks/>
+			</filterchain>
+		</loadfile>
+		<loadfile property="svn.url" srcFile="./.svn/entries">
+			<filterchain>
+				<headfilter lines="1" skip="4"/>
+				 <striplinebreaks/>
+			</filterchain>
+		</loadfile>
+		<tstamp>
+		    <format property="TODAY" pattern="yyyy/MM/dd HH:mm:ss z" locale="en,US" />
+		</tstamp>
+		<property environment="env" />
+		<echo file="${buildinfo.file}">
+package com.bigdata;
+public class BuildInfo {
+    public static final String buildVersion="${build.ver}";
+    public static final String buildVersionOSGI="${build.ver.osgi}";
+	public static final String svnRevision="${svn.revision}";
+    public static final String svnURL="${svn.url}";
+	public static final String buildTimestamp="${TODAY}";
+	public static final String buildUser="${user.name}";
+	public static final String buildHost="${env.COMPUTERNAME}";
+	public static final String osArch="${os.arch}";
+	public static final String osName="${os.name}";
+	public static final String osVersion="${os.version}";
+}
+</echo>
+	<loadfile property="buildinfo" srcFile="${buildinfo.file}"/>
+	<echo message="${buildinfo}"/>
+	</target>
+		
 	<!-- Note: javac error results often if verbose is disabled. -->
 	<!-- I was able to perform a build with 1.6.0_07. -->
 	<!-- I set the target to 1.5 to support deployment on non-1.6 JVMs. -->
