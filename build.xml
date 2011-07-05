@@ -129,7 +129,7 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
 			</filterchain>
 		</loadfile>
 		<tstamp>
-		    <format property="TODAY" pattern="yyyy/MM/dd HH:mm:ss z" locale="en,US" />
+		    <format property="build.timestamp" pattern="yyyy/MM/dd HH:mm:ss z" locale="en,US" />
 		</tstamp>
 		<property environment="env" />
 		<echo file="${buildinfo.file}">
@@ -139,7 +139,7 @@ public class BuildInfo {
     public static final String buildVersionOSGI="${build.ver.osgi}";
 	public static final String svnRevision="${svn.revision}";
     public static final String svnURL="${svn.url}";
-	public static final String buildTimestamp="${TODAY}";
+	public static final String buildTimestamp="${build.timestamp}";
 	public static final String buildUser="${user.name}";
 	public static final String buildHost="${env.COMPUTERNAME}";
 	public static final String osArch="${os.arch}";
