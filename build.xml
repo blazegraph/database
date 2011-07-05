@@ -374,7 +374,7 @@ public class BuildInfo {
 		  	<!-- jars which are not currently used. -->
 		  	<exclude name="iris*.jar"/>
 		  	<exclude name="jgrapht*.jar"/>
-		  	<exclude name="tuprolog*.jar"/>
+		  	<exclude name="2p-*.jar"/>
 		  	<!-- test suite stuff is not needed. -->
 		  	<exclude name="junit*.jar"/>
 		  	<exclude name="sesame*testsuite*.jar"/>
@@ -384,24 +384,9 @@ public class BuildInfo {
 	  		<exclude name="jetty*.jar"/>
 	  		<exclude name="servlet-api*.jar"/>
 		  	<!-- zookeeper only used in scale-out. -->
-	  		<exclude name="zookeeper*.jar"/>
+	  		<exclude name="apache/zookeeper*.jar"/>
 	  		<!-- jini only used in scale-out. -->
-		  	<exclude name="jini*.jar"/>
-		  	<exclude name="jsk*.jar"/>
-		  	<exclude name="mahalo*.jar"/>
-		  	<exclude name="mercury*.jar"/>
-		  	<exclude name="norm*.jar"/>
-		  	<exclude name="outrigger*.jar"/>
-		  	<exclude name="phoenix*.jar"/>
-		  	<exclude name="reggie*.jar"/>
-		  	<exclude name="sdm*.jar"/>
-		  	<exclude name="start*.jar"/>
-		  	<exclude name="sun-util*.jar"/>
-		  	<exclude name="tools*.jar"/>
-		  	<exclude name="browser*.jar"/>
-		  	<exclude name="classserver*.jar"/>
-		  	<exclude name="fiddler*.jar"/>
-		  	<exclude name="group*.jar"/>
+		  	<exclude name="jini/**.jar"/>
 		  </lib>
 		  <classes file="bigdata-war/src/resources/log4j.properties"/>
 		</war>
