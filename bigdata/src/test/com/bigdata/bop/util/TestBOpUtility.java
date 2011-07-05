@@ -151,7 +151,8 @@ public class TestBOpUtility extends TestCase2 {
         final Iterator<BOp> itr = BOpUtility.preOrderIterator(root);
         while (itr.hasNext()) {
             final BOp t = itr.next();
-            System.out.println(i + " : " + t);
+            if (log.isInfoEnabled())
+                log.info(i + " : " + t);
             assertTrue("index=" + i + ", expected=" + expected[i] + ", actual="
                     + t, expected[i].equals(t));
             i++;
@@ -184,7 +185,8 @@ public class TestBOpUtility extends TestCase2 {
         final Iterator<BOp> itr = BOpUtility.postOrderIterator(root);
         while (itr.hasNext()) {
             final BOp t = itr.next();
-            System.out.println(i + " : " + t);
+            if (log.isInfoEnabled())
+                log.info(i + " : " + t);
             assertTrue("index=" + i + ", expected=" + expected[i] + ", actual="
                     + t, expected[i].equals(t));
             i++;
@@ -254,7 +256,8 @@ public class TestBOpUtility extends TestCase2 {
             final Iterator<BOp> itr = BOpUtility.annotationOpIterator(op);
             while (itr.hasNext()) {
                 final BOp t = itr.next();
-                System.out.println(i + " : " + t);
+                if(log.isInfoEnabled())
+                    log.info(i + " : " + t);
                 assertTrue("index=" + i + ", expected=" + expected[i]
                         + ", actual=" + t, expected[i].equals(t));
                 i++;
@@ -368,7 +371,8 @@ public class TestBOpUtility extends TestCase2 {
                 .preOrderIteratorWithAnnotations(root);
         while (itr.hasNext()) {
             final BOp t = itr.next();
-            System.out.println(i + " : " + t);
+            if(log.isInfoEnabled())
+                log.info(i + " : " + t);
             assertTrue("index=" + i + ", expected=" + expected[i] + ", actual="
                     + t, expected[i].equals(t));
             i++;
@@ -418,7 +422,8 @@ public class TestBOpUtility extends TestCase2 {
                 .getSpannedVariables(root);
         while (itr.hasNext()) {
             final BOp t = itr.next();
-            System.out.println(i + " : " + t);
+            if(log.isInfoEnabled())
+                log.info(i + " : " + t);
             assertTrue("index=" + i + ", expected=" + expected[i] + ", actual="
                     + t, expected[i].equals(t));
             i++;
