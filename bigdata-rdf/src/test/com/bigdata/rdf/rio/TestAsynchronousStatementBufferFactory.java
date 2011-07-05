@@ -37,9 +37,9 @@ import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.lexicon.DumpLexicon;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.lexicon.TermsIndexHelper;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -143,7 +143,7 @@ public class TestAsynchronousStatementBufferFactory extends
             final String pname = com.bigdata.config.Configuration
                     .getOverrideProperty(namespace + "."
                             + LexiconRelation.NAME_LEXICON_RELATION + "."
-                            + LexiconKeyOrder.TERMS,
+                            + LexiconKeyOrder.BLOBS,
                             IndexMetadata.Options.SINK_IDLE_TIMEOUT_NANOS);
 
             final String pval = "" + TimeUnit.SECONDS.toNanos(1);
@@ -319,7 +319,7 @@ public class TestAsynchronousStatementBufferFactory extends
                 log.debug("dumping store...");
                 
 				log.debug("LEXICON:\n"
-								+ new TermsIndexHelper().dump(store
+								+ DumpLexicon.dump(store
 										.getLexiconRelation()));
 
                 // raw statement indices.

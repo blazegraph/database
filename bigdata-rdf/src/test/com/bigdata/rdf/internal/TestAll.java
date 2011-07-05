@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal;
 
+import com.bigdata.rdf.lexicon.TestTermIVComparator;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -66,8 +68,14 @@ public class TestAll extends TestCase {
         // test suite for DTE.
         suite.addTestSuite(TestDTE.class);
 
-        // basic test suite for TermId.
-        suite.addTestSuite(TestTermId.class);
+        // basic test suite for TermIV.
+        suite.addTestSuite(TestTermIV.class);
+
+        // test suite for putting BigdataValues in TermIV order.
+        suite.addTestSuite(TestTermIVComparator.class);
+
+        // basic test suite for BlobIV.
+        suite.addTestSuite(TestBlobIV.class);
 
         // unit tests for fully inline literals.
         suite.addTestSuite(TestInlineLiteralIV.class);

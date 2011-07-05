@@ -66,11 +66,15 @@ public class NumericBNodeIV<V extends BigdataBNode> extends
 
     @Override
     public String stringValue() {
-        return 'i'+String.valueOf(id);
+        
+        return 'i' + String.valueOf(id);
+
     }
 
     final public Integer getInlineValue() {
-        return id;
+        
+        return Integer.valueOf(id);
+        
     }
 
     public boolean equals(Object o) {

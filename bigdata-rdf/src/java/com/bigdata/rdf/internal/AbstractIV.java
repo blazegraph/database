@@ -487,18 +487,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
     /**
      * {@inheritDoc}
      * <p>
-     * This implementation based on the <code>inline</code> bit flag. This can
-     * be overridden in many derived classes which have compile time knowledge
-     * of whether the RDF value is inline or not.
-     */
-    public boolean isTermId() {
-        return !isInline();
-    }
-    
-    /**
-     * {@inheritDoc}
-     * <p>
-     * This implementation returns <code>false</code>. it is overridden by
+     * This implementation returns <code>false</code>. It is overridden by
      * {@link TermId}.
      */
     public boolean isNullIV() {
@@ -622,10 +611,12 @@ public abstract class AbstractIV<V extends BigdataValue, T>
                  * 
                  * {datatypeIV,label} literals.
                  */
-                final AbstractExtensionIV<?, ?> t = (AbstractExtensionIV<?, ?>) this;
-                // add the extension IV.
+                final AbstractNonInlineExtensionIVWithDelegateIV<?, ?> t = (AbstractNonInlineExtensionIVWithDelegateIV<?, ?>) this;
+                // Add the extension byte.
+                keyBuilder.appendSigned(t.getExtensionByte());
+                // Add the extension IV.
                 IVUtility.encode(keyBuilder, t.getExtensionIV());
-                // add the delegate IV.
+                // Add the delegate IV.
                 IVUtility.encode(keyBuilder, t.getDelegate());
                 return keyBuilder;
             }
@@ -827,6 +818,16 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         return null;
     }
 
+    public String bnodeId() {
+
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    /*
+     * RDF Value cache.
+     */
+    
     /**
      * Value cache (transient, but overridden serialization is used to send this
      * anyway for various purposes).
@@ -884,6 +885,10 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 		return this.cache != null;
 		
 	}
+	
+	/*
+	 * Serialization.
+	 */
 	
     /**
      * Override default serialization to send the cached {@link BigdataValue}.

@@ -373,7 +373,6 @@ public class BigdataValueReplacer {
                      * can not simply fail the query since an OPTIONAL or UNION
                      * might have solutions even though this Value is not known.
                      */
-//                    val2.setIV(DummyIV.INSTANCE);
                     val2.setIV(TermId.mockIV(VTE.valueOf(val)));
                 }
                 

@@ -64,11 +64,15 @@ public class UUIDBNodeIV<V extends BigdataBNode> extends
 
     @Override
     public String stringValue() {
-        return 'u'+id.toString();
+        
+        return 'u' + id.toString();
+        
     }
 
     final public UUID getInlineValue() {
+     
         return id;
+        
     }
 
     public boolean equals(Object o) {

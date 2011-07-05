@@ -32,9 +32,10 @@ public class BigdataBindingSetResolverator
         extends
         AbstractChunkedResolverator<IBindingSet, IBindingSet, AbstractTripleStore> {
 
-    final private static Logger log = Logger.getLogger(BigdataBindingSetResolverator.class);
+    final private static Logger log = Logger
+            .getLogger(BigdataBindingSetResolverator.class);
 
-	private final IVariable[] required;
+    private final IVariable[] required;
 
     /**
      * 
@@ -95,7 +96,7 @@ public class BigdataBindingSetResolverator
          * chunk.
          */
         
-        final Collection<IV> ids = new HashSet<IV>(chunk.length
+        final Collection<IV<?, ?>> ids = new HashSet<IV<?, ?>>(chunk.length
                 * state.getSPOKeyArity());
 
         for (IBindingSet solution : chunk) {
@@ -115,7 +116,7 @@ public class BigdataBindingSetResolverator
 	
 	                final Map.Entry<IVariable, IConstant> entry = itr.next();
 	                
-	                final IV iv = (IV) entry.getValue().get();
+	                final IV<?,?> iv = (IV<?,?>) entry.getValue().get();
 	
 	                if (iv == null) {
 	
@@ -138,7 +139,7 @@ public class BigdataBindingSetResolverator
             			continue;
             		}
             		
-            		final IV iv = (IV) c.get();
+            		final IV<?,?> iv = (IV<?,?>) c.get();
 	            	
 	                if (iv == null) {
 	
@@ -161,7 +162,7 @@ public class BigdataBindingSetResolverator
             log.info("Resolving " + ids.size() + " term identifiers");
 
         // batch resolve term identifiers to terms.
-        final Map<IV, BigdataValue> terms = state.getLexiconRelation()
+        final Map<IV<?,?>, BigdataValue> terms = state.getLexiconRelation()
                 .getTerms(ids);
 
         /*
@@ -203,15 +204,9 @@ public class BigdataBindingSetResolverator
      * @throws IllegalStateException
      *             if the {@link IBindingSet} was not materialized with the
      *             {@link ISolution}.
-     * 
-     * @todo this points out a problem where we would be better off strongly
-     *       typing the term identifiers with their own class rather than using
-     *       {@link Long} since we can not distinguish a {@link Long}
-     *       materialized by a join against some non-RDF relation from a
-     *       {@link Long} that is a term identifier.
      */
     private IBindingSet getBindingSet(final IBindingSet solution,
-            final Map<IV, BigdataValue> terms) {
+            final Map<IV<?,?>, BigdataValue> terms) {
 
         if (solution == null)
             throw new IllegalArgumentException();
@@ -241,13 +236,13 @@ public class BigdataBindingSetResolverator
 
             final Object boundValue = entry.getValue().get();
 
-            if (!(boundValue instanceof IV)) {
+            if (!(boundValue instanceof IV<?,?>)) {
 
                 continue;
 
             }
 
-            final IV iv = (IV) boundValue;
+            final IV<?,?> iv = (IV<?,?>) boundValue;
 
             final BigdataValue value = terms.get(iv);
 
@@ -267,8 +262,6 @@ public class BigdataBindingSetResolverator
                     value));
             
         }
-	        
-//        System.err.println(bindingSet);
         
         return bindingSet;
 

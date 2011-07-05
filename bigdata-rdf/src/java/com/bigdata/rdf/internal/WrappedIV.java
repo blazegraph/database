@@ -138,10 +138,6 @@ public class WrappedIV implements IV {
 		return iv.getDTE();
 	}
 
-	public boolean isTermId() {
-		return iv.isTermId();
-	}
-
 	public boolean isNullIV() {
 		return iv.isNullIV();
 	}
@@ -180,6 +176,10 @@ public class WrappedIV implements IV {
 
 	public boolean isFloatingPointNumeric() {
 		return iv.isFloatingPointNumeric();
+	}
+
+	public String bnodeId() {
+	    return iv.bnodeId();
 	}
 	
 }

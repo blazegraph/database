@@ -44,7 +44,6 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.MockTermIdFactory;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -72,16 +71,22 @@ public class TestSPOKeyOrder extends TestCase2 {
     private MockTermIdFactory factory;
     
     protected void setUp() throws Exception {
+        
         super.setUp();
+        
         factory = new MockTermIdFactory();
+        
     }
 
     protected void tearDown() throws Exception {
+
         super.tearDown();
+        
         factory = null;
+        
     }
 
-    private TermId tid(long tidIsIgnored) {
+    private IV<?,?> tid(final long tidIsIgnored) {
         
         return factory.newTermId(VTE.URI);
         
@@ -111,7 +116,7 @@ public class TestSPOKeyOrder extends TestCase2 {
 
         final KeyBuilder keyBuilder = new KeyBuilder(4 * Bytes.SIZEOF_LONG);
         
-        final IV S = tid(1), P = tid(2), O = tid(3), C = tid(4);
+        final IV<?,?> S = tid(1), P = tid(2), O = tid(3), C = tid(4);
         
         final SPO expected = new SPO(S, P, O, C);
 
@@ -136,7 +141,7 @@ public class TestSPOKeyOrder extends TestCase2 {
 
         final KeyBuilder keyBuilder = new KeyBuilder(4 * Bytes.SIZEOF_LONG);
 
-        final IV S = tid(1), P = tid(2), O = tid(3), C = tid(4);
+        final IV<?,?> S = tid(1), P = tid(2), O = tid(3), C = tid(4);
 
         final SPO expected = new SPO(S, P, O, C);
 
@@ -203,7 +208,7 @@ public class TestSPOKeyOrder extends TestCase2 {
      */
     public void test_getFromKey_getToKey_quads() {
 
-        final IV P = tid(1);
+        final IV<?,?> P = tid(1);
 
         final SPOPredicate pred = new SPOPredicate(new BOp[]{
                 Var.var("s"), new Constant<IV>(P), Var.var("o"), Var.var("c")},
@@ -244,7 +249,7 @@ public class TestSPOKeyOrder extends TestCase2 {
      */
     public void test_getFromKey_getToKey_triples() {
 
-        final IV P = tid(1);
+        final IV<?,?> P = tid(1);
 
         final SPOPredicate pred = new SPOPredicate(new BOp[] { Var.var("s"),
                 new Constant<IV>(P), Var.var("o") }, new NV(

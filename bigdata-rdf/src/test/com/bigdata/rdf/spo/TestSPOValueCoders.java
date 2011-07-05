@@ -41,8 +41,8 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.FixedByteArrayBuffer;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.MockTermIdFactory;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.StatementEnum;
 
@@ -75,29 +75,38 @@ public class TestSPOValueCoders extends TestCase2 {
     }
 
     protected void setUp() throws Exception {
+
         super.setUp();
+        
         factory = new MockTermIdFactory();
+        
         r = new Random();
+        
     }
 
     protected void tearDown() throws Exception {
+
         super.tearDown();
-        factory = null;
-        r = null;
-    }
-    private Random r;
-    private MockTermIdFactory factory;
-    
-    private TermId getTermId() {
         
-        return factory.newTermId(VTE.URI);
+        factory = null;
+        
+        r = null;
         
     }
 
-    private TermId getTermId(long tidIsIgnored) {
-        
+    private Random r;
+    private MockTermIdFactory factory;
+
+    private IV<?, ?> getTermId() {
+
         return factory.newTermId(VTE.URI);
-        
+
+    }
+
+    private IV<?, ?> getTermId(final long tidIsIgnored) {
+
+        return factory.newTermId(VTE.URI);
+
     }
     
     /**
@@ -197,7 +206,7 @@ public class TestSPOValueCoders extends TestCase2 {
      */
     public void test_FastRDFValueCoder2_001() {
 
-        final TermId _0 = getTermId(0);
+        final IV<?,?> _0 = getTermId(0);
 
         doRoundTripTest(new SPO[] { new SPO(_0, _0, _0, StatementEnum.Axiom) },
                 new FastRDFValueCoder2(), false);

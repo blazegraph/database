@@ -47,7 +47,7 @@ import com.bigdata.rdf.model.BigdataValue;
  * data type is actually inlined is a configuration option for the lexicon.
  * <p>
  * If a data type is not inlined, then the representation of the value must be
- * materialized. Non-inline values are {@link TermId}s and are materialized by
+ * materialized. Non-inline values are {@link BlobIV}s and are materialized by
  * looking {@link IV} in the TERMS index. More recently, we are also permitting
  * indirection from the TERMS index. For example, very large objects may be
  * stored in the file system, in S3, etc. In those cases, you must still resolve

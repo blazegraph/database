@@ -29,11 +29,9 @@ package com.bigdata.rdf.internal;
 
 import java.util.Random;
 
-import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.rdf.lexicon.TermsIndexHelper;
-
 /**
- * A factory to mock {@link TermId}s.
+ * A factory for mock {@link IV}s.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -43,38 +41,35 @@ public class MockTermIdFactory {
      * 
      */
     public MockTermIdFactory() {
-        helper = new TermsIndexHelper();
+//        helper = new TermsIndexHelper();
     }
 
-    final private TermsIndexHelper helper;
+//    final private TermsIndexHelper helper;
     final private Random r = new Random();
-    private int nextHashCode = 1;
+//    private int nextHashCode = 1;
+    private long nextTermId = 1L;
     
     /**
-     * Factory for {@link TermId}s.
+     * Factory for {@link IV}s.
      */
-    public TermId newTermId(final VTE vte) {
+    public IV<?,?> newTermId(final VTE vte) {
 
-        final int hashCode = nextHashCode++;
-        
-        // the math here is just to mix up the counter values a bit.
-        final byte counter = (byte) ((nextHashCode + 12) % 7);
-        
-//        final IKeyBuilder keyBuilder = helper.newKeyBuilder();
-//
-//        final byte[] key = helper.makeKey(keyBuilder, vte, hashCode, counter);
+//        final int hashCode = nextHashCode++;
 //        
-//        return new TermId(key);
+//        // the math here is just to mix up the counter values a bit.
+//        final byte counter = (byte) ((nextHashCode + 12) % 7);
+//
+//        return new BlobIV(vte, hashCode, counter);
         
-		return new TermId(vte, hashCode, counter);
+        return new TermId(vte, nextTermId++);
         
     }
 
     /**
      * Random distribution of different {@link VTE} types.
      */
-    public TermId newTermId() {
-        
+    public IV<?,?> newTermId() {
+
         final VTE vte;
         switch (r.nextInt(3)) {
         case 0:
@@ -100,8 +95,8 @@ public class MockTermIdFactory {
     /**
      * Random distribution without SIDs.
      */
-    public TermId newTermIdNoSids() {
-        
+    public IV<?,?> newTermIdNoSids() {
+
         final VTE vte;
         switch (r.nextInt(2)) {
         case 0:
@@ -125,26 +120,22 @@ public class MockTermIdFactory {
     }
 
     /**
-     * {@link TermId} having the specified hash code and a fixed counter value.
-     * This is useful when you want to control the distribution of the
-     * {@link TermId}s. There is no guarantee that the {@link TermId} is unique.
+     * {@link TermId} having the termId. This is useful when you want to control
+     * the distribution of the {@link IV}s. There is no guarantee that the
+     * {@link TermIV} is unique.
      * 
      * @param vte
-     * @param hashCode
+     * @param termId
      * @return
      */
-    public TermId newTermId(final VTE vte, final int hashCode) {
+    public IV<?,?> newTermId(final VTE vte, final long termId) {
 
-        final byte counter = 0;
-
-//        final IKeyBuilder keyBuilder = helper.newKeyBuilder();
-//
-//        final byte[] key = helper.makeKey(keyBuilder, vte, hashCode, counter);
+//        final byte counter = 0;
 //        
-//        return new TermId(key);
-        
-        return new TermId(vte,hashCode,counter);
+//        return new BlobIV(vte, hashCode, counter);
 
+        return new TermId(vte, termId);
+        
     }
 
 }

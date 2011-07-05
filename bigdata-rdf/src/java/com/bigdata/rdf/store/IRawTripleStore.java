@@ -59,10 +59,13 @@ public interface IRawTripleStore extends ITripleStore {
      * The constant <code>NULL</code>.
      */
     String NULLSTR = "NULL";
-    
+
     /**
      * Add a term into the term:id index and the id:term index, returning the
      * assigned term identifier (non-batch API).
+     * <p>
+     * Note: This method delegates to the batch API, but it is extremely
+     * inefficient for scale-out as it does one RMI per request!
      * 
      * @param value
      *            The term.

@@ -263,7 +263,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         // the bloom filter instance before serialization.
         IBloomFilter bloomFilter = builder2.bloomFilter;
         
-        // false positive tests (should succeed with resonable errorRate).
+        // false positive tests (should succeed with reasonable errorRate).
         assertTrue("3",bloomFilter.contains(i2k(3)));
         assertTrue("5",bloomFilter.contains(i2k(5)));
         assertTrue("7",bloomFilter.contains(i2k(7)));

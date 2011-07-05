@@ -31,7 +31,6 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
@@ -59,7 +58,6 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 import com.bigdata.journal.TestHelper;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -349,121 +347,6 @@ abstract public class AbstractTestCase
             }
             
         }
-        
-    }
-    
-    /**
-     * Dumps the lexicon in a variety of ways.
-     * 
-     * @param store
-     */
-    protected void dumpTerms(final AbstractTripleStore store) {
-
-        /*
-         * Note: it is no longer true that all terms are stored in the reverse
-         * index (BNodes are not). Also, statement identifiers are stored in the
-         * forward index, so we can't really write the following assertion
-         * anymore.
-         */
-//        // Same #of terms in the forward and reverse indices.
-//        assertEquals("#terms", store.getIdTermIndex().rangeCount(null, null),
-//                store.getTermIdIndex().rangeCount(null, null));
-        
-//        /**
-//         * Dumps the forward mapping.
-//         */
-//        {
-//
-//            System.err.println("terms index (forward mapping).");
-//
-//            final IIndex ndx = store.getLexiconRelation().getTerm2IdIndex();
-//
-//            final ITupleIterator itr = ndx.rangeIterator(null, null);
-//
-//            while (itr.hasNext()) {
-//
-//                final ITuple tuple = itr.next();
-//                
-////                // the term identifier.
-////                Object val = itr.next();
-//
-//                /*
-//                 * The sort key for the term. This is not readily decodable. See
-//                 * RdfKeyBuilder for specifics.
-//                 */
-//                final byte[] key = tuple.getKey();
-//
-//                /*
-//                 * deserialize the term identifier (packed long integer).
-//                 */
-//                final long id;
-//                
-//                try {
-//
-//                    id = tuple.getValueStream().readLong();
-////                    id = tuple.getValueStream().unpackLong();
-//
-//                } catch (IOException ex) {
-//
-//                    throw new RuntimeException(ex);
-//
-//                }
-//
-//                System.err.println(BytesUtil.toString(key) + ":" + id);
-//
-//            }
-//
-//        }
-
-//        /**
-//         * Dumps the reverse mapping.
-//         */
-//        {
-//
-//            System.err.println("ids index (reverse mapping).");
-//
-//            final IIndex ndx = store.getLexiconRelation().getId2TermIndex();
-//
-//            final ITupleIterator<BigdataValue> itr = ndx.rangeIterator(null, null);
-//
-//            while (itr.hasNext()) {
-//
-//                final ITuple<BigdataValue> tuple = itr.next();
-//                
-//                final BigdataValue term = tuple.getObject();
-//                
-//                System.err.println(term.getIV()+ ":" + term);
-//
-//            }
-//
-//        }
-        
-        /**
-         * Dumps the term:id index.
-         */
-        for( Iterator<TermId> itr = store.getLexiconRelation().termsIndexScan(); itr.hasNext(); ) {
-            
-            System.err.println("term->id : "+itr.next());
-            
-        }
-
-//        /**
-//         * Dumps the id:term index.
-//         */
-//        for( Iterator<Value> itr = store.getLexiconRelation().idTermIndexScan(); itr.hasNext(); ) {
-//            
-//            System.err.println("id->term : "+itr.next());
-//            
-//        }
-
-//        /**
-//         * Dumps the terms in term order.
-//         */
-//        for( Iterator<Value> itr = store.getLexiconRelation().termIterator(); itr.hasNext(); ) {
-//            
-//            System.err.println("termOrder : "+itr.next());
-//            
-//        }
         
     }
     
@@ -1058,11 +941,11 @@ abstract public class AbstractTestCase
              */
             {
                 
-                final HashSet<IV> ivs  = new HashSet<IV>(termSet.size());
+                final HashSet<IV<?,?>> ivs  = new HashSet<IV<?,?>>(termSet.size());
                 
                 for(BigdataValue term : termSet.values()) {
                     
-                    final IV iv = term.getIV();
+                    final IV<?,?> iv = term.getIV();
                     
                     if (iv == null || iv.isNullIV()) {
 
@@ -1076,11 +959,12 @@ abstract public class AbstractTestCase
                 }
 
                 // batch resolve ids to terms.
-                final Map<IV,BigdataValue> reverseMap = db.getLexiconRelation().getTerms(ivs);
-                
+                final Map<IV<?, ?>, BigdataValue> reverseMap = db
+                        .getLexiconRelation().getTerms(ivs);
+
                 for(BigdataValue expectedTerm : termSet.values()) {
                     
-                    final IV iv = expectedTerm.getIV();
+                    final IV<?,?> iv = expectedTerm.getIV();
                     
                     if (iv == null) {
 

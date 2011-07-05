@@ -43,8 +43,8 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.FixedByteArrayBuffer;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.MockTermIdFactory;
-import com.bigdata.rdf.internal.TermId;
 
 /**
  * Test suite for approaches to key compression for statement indices (keys are
@@ -77,19 +77,25 @@ public class TestSPOKeyCoders extends TestCase2 {
     private MockTermIdFactory factory;
     
     protected void setUp() throws Exception {
+
         super.setUp();
+        
         factory = new MockTermIdFactory();
+        
     }
 
     protected void tearDown() throws Exception {
+
         super.tearDown();
+
         factory = null;
+        
     }
   
     /**
-     * Random {@link TermId}.
+     * Random non-SID {@link IV}.
      */
-    protected TermId getTermId() {
+    protected IV<?,?> getTermId() {
 
         /*
          * FIXME This does not exercise the case with SIDs support enabled.

@@ -46,11 +46,11 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.NullOutputStream;
-import com.bigdata.io.compression.BOCU1Compressor;
+import com.bigdata.io.compression.NoCompressor;
 import com.bigdata.io.compression.UnicodeHelper;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
+import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -76,9 +76,9 @@ public class IVUtility {
 	 * Helper instance for compression/decompression of Unicode string data.
 	 */
 	static UnicodeHelper un = new UnicodeHelper(
-	        new BOCU1Compressor()
+//	        new BOCU1Compressor()
 //          new SCSUCompressor()
-//	        new NoCompressor()
+	        new NoCompressor()
 	        );
 
     /**
@@ -675,65 +675,70 @@ public class IVUtility {
                 /*
                  * Handle non-inline URI or Literal. 
                  */
-                
-                // Decode the extension IV.
-				final IV extensionIV = IVUtility.decodeFromOffset(key, o);
-                
-                // skip over the extension IV.
-                o += extensionIV.byteLength();
 
-                // Decode the inline component.
-                final AbstractIV delegate = (AbstractIV) IVUtility
-                        .decodeFromOffset(key, o);
+                final byte extensionByte = KeyBuilder.decodeByte(key[o++]); 
 
-                switch (AbstractIV.getInternalValueTypeEnum(flags)) {
-                case URI:
-                    return new URINamespaceIV<BigdataURI>(delegate, extensionIV);
-                case LITERAL:
-                    return new LiteralDatatypeIV<BigdataLiteral>(delegate, extensionIV);
-                default:
-                    throw new AssertionError();
+                if (extensionByte < 0) {
+
+                    // Decode the extension IV.
+                    final IV extensionIV = IVUtility.decodeFromOffset(key, o);
+
+                    // skip over the extension IV.
+                    o += extensionIV.byteLength();
+
+                    // Decode the inline component.
+                    final AbstractIV delegate = (AbstractIV) IVUtility
+                            .decodeFromOffset(key, o);
+
+                    // TODO Should really be switch((int)extensionByte).
+                    switch (AbstractIV.getInternalValueTypeEnum(flags)) {
+                    case URI:
+                        return new URINamespaceIV<BigdataURI>(delegate,
+                                extensionIV);
+                    case LITERAL:
+                        return new LiteralDatatypeIV<BigdataLiteral>(delegate,
+                                extensionIV);
+                    default:
+                        throw new AssertionError();
+                    }
+                    
+                } else {
+                    
+                    /*
+                     * Handle a BlobIV.
+                     * 
+                     * Note: This MUST be consistent with
+                     * TermsIndexHelper#makeKey() and BlobIV.
+                     */
+
+                    final int hashCode = KeyBuilder.decodeInt(key, o);
+                    
+                    o += BlobsIndexHelper.SIZEOF_HASH;
+                    
+                    final short counter = KeyBuilder.decodeShort(key, o);
+                    
+                    o += BlobsIndexHelper.SIZEOF_COUNTER;
+                    
+                    final BlobIV<?> iv = new BlobIV(flags, hashCode, counter);
+
+                    return iv;
+                    
                 }
-
+                
             } else {
 
 				/*
 				 * Handle a TermId, including a NullIV.
-				 * 
-				 * Note: This MUST be consistent with TermsIndexHelper#makeKey()
-				 * and TermId.
 				 */ 
-
-//            	o--; // back up one byte to the flags byte.
-//                final byte[] termIdKey = Arrays.copyOfRange(//
-//                        // The unsigned byte[] key.
-//                        key,
-//                        // from: inclusive lower bound.
-//                        o,
-//                        // to : exclusive upper bound.
-//                        o + TermsIndexHelper.TERMS_INDEX_KEY_SIZE //+ 1//
-//                        );
-//
-//                final TermId<?> iv = new TermId(termIdKey);
-
-            	final int hashCode = KeyBuilder.decodeInt(key, o);
-				o += Bytes.SIZEOF_INT;
-            	final byte counter = KeyBuilder.decodeByte(key[o++]);
-				final TermId<?> iv = new TermId(flags, hashCode, counter);
-            	
-                if (iv.isNullIV())
-                    return null;
-
-                return iv;
 				
-//				// decode the term identifier.
-//                final long termId = KeyBuilder.decodeLong(key, o);
-//
-//                if (termId == TermId.NULL)
-//                    return null;
-//                else
-//                    return new TermId(flags, termId);
+				// decode the term identifier.
+                final long termId = KeyBuilder.decodeLong(key, o);
 
+                if (termId == TermId.NULL)
+                    return null;
+                else
+                    return new TermId(flags, termId);
+                
             }
 
         }
@@ -1101,7 +1106,7 @@ public class IVUtility {
 
 	/**
 	 * Decode an IV from its string representation as encoded by
-	 * {@link TermId#toString()} and {@link AbstractInlineIV#toString()} (this
+	 * {@link BlobIV#toString()} and {@link AbstractInlineIV#toString()} (this
 	 * is used by the prototype IRIS integration.)
 	 * 
 	 * @param s
@@ -1109,8 +1114,10 @@ public class IVUtility {
 	 * @return the IV
 	 */
     public static final IV fromString(final String s) {
-        if (s.startsWith("TermId")) {
-        	return TermId.fromString(s);
+        if (s.startsWith("TermIV")) {
+            return TermId.fromString(s);
+        } else if (s.startsWith("BlobIV")) {
+                return BlobIV.fromString(s);
         } else {
             final String type = s.substring(0, s.indexOf('(')); 
             final String val = s.substring(s.indexOf('('), s.length()-1);

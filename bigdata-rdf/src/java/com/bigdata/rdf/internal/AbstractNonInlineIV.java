@@ -52,7 +52,7 @@ abstract public class AbstractNonInlineIV<V extends BigdataValue, T> extends
         super(vte, false/* inline */, extension, dte);
 
     }
-    
+
     /**
      * Callers must explicitly populate the value cache.
      * <p>

@@ -36,12 +36,13 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
- * Class used to expand a {@link StatementPattern} involving a
- * {@link BD#SEARCH} magic predicate into the set of subjects having any of the
- * tokens in the query.
+ * Class used to expand a {@link StatementPattern} involving a {@link BD#SEARCH}
+ * magic predicate into the set of subjects having any of the tokens in the
+ * query.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: FreeTextSearchExpander.java 4697 2011-06-10 23:20:14Z
+ *          thompsonbry $
  */
 public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
     
@@ -54,6 +55,7 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
 
     /**
      * FIXME This reference is NOT {@link Serializable}, but the expander is.
+     * This needs to be fixed to support search in scale-out.
      */
     private final AbstractTripleStore database;
     
@@ -151,7 +153,12 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
         private Hiterator<IHit> getHiterator() {
 
             if (hiterator == null) {
-                
+
+                /*
+                 * TODO This should be done in using the namespace and
+                 * timestamp for the view. This is how the BOPContext handles
+                 * things and is compatible with scale-out.
+                 */
                 @SuppressWarnings("unchecked")
                 final ITextIndexer<IHit> textNdx = (ITextIndexer) 
                 	database.getLexiconRelation().getSearchEngine();
@@ -231,9 +238,26 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
             if (graphs == null) {
                 return itr3;
             }
-            
-            /* 
+
+            /**
              * Here we filter results for named graphs.
+             * 
+             * TODO The BigdataValue should be resolved outside of the iterator
+             * setup and passed into the constructor.
+             * 
+             * TODO The database reference should be resolved from the namespace
+             * and timestamp of the view, which is how we do it for BOPContext
+             * and is compatible with scale-out.
+             * 
+             * TODO When we refactor the full text search to use a key
+             * 
+             * <pre>
+             * [token, S, P, O, [C]]
+             * </pre>
+             * 
+             * then this operation can be turned into a filter on the iterator.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/321
              */
             final IChunkedOrderedIterator<ISPO> itr4 = 
                 new ChunkedOrderedStriterator<IChunkedOrderedIterator<ISPO>, ISPO>(itr3).

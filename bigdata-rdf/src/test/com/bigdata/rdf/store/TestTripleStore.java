@@ -49,8 +49,8 @@ import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.lexicon.DumpLexicon;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.lexicon.TermsIndexHelper;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -222,7 +222,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 //            store.commit();
     
             if(log.isInfoEnabled()) {
-				log.info(new TermsIndexHelper()
+				log.info(DumpLexicon
 						.dump(store.getLexiconRelation()));
             }
             
@@ -282,7 +282,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             doAddTermTest(store, new LiteralImpl("abc", XMLSchema.DECIMAL));
     
             if(log.isInfoEnabled()) {
-				log.info(new TermsIndexHelper()
+				log.info(DumpLexicon
 						.dump(store.getLexiconRelation()));
             }
             
@@ -369,7 +369,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             }
 
             if(log.isInfoEnabled()) {
-				log.info(new TermsIndexHelper()
+				log.info(DumpLexicon
 						.dump(store.getLexiconRelation()));
             }
             
@@ -555,6 +555,22 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         
     }
 
+    /**
+     * TODO AbstractTripleStore#getBNodeCount() is not well behaved. For at
+     * least the BLOBS index we will have lots of bnode values in the index if a
+     * lot of bnodes have been inserted (this can only occur for large bnode IDs
+     * so it is a bit of an odd case). However, getBNodeCount() is documented as
+     * returning 0L if we are not in told bnodes mode.
+     * <p>
+     * I need to check the situation with the TERM2ID index and see if we are
+     * storing blank nodes there as well even when we are NOT in told bnodes
+     * mode. Finally, getTermCount() is reporting everything in TERM2ID + BLOBS.
+     * That's Ok except that we should not be including the bnodes when we are
+     * not in told bnodes mode.... TestTripleStore currently fails on this
+     * issue.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/327
+     */
     public void test_rangeCounts_standardBNodes() {
         
         final Properties properties = super.getProperties();
@@ -647,13 +663,13 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
         try {
 
-//            final boolean storeBlankNodes = store.getLexiconRelation()
-//                    .isStoreBlankNodes();
+            final boolean storeBlankNodes = store.getLexiconRelation()
+                    .isStoreBlankNodes();
 
             /*
-             * Declare 8 URIs.
+             * Declare URIs.
              */
-            final int nuris = 8;
+            final int nuris = 9;
             final URI x = new URIImpl("http://www.foo.org/x");
             final URI y = new URIImpl("http://www.foo.org/y");
             final URI z = new URIImpl("http://www.foo.org/z");
@@ -662,28 +678,31 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             final URI C = new URIImpl("http://www.foo.org/C");
             final URI rdfType = RDF.TYPE;
             final URI rdfsSubClassOf = RDFS.SUBCLASSOF;
+            final URI big = new URIImpl(getVeryLargeURI());
 
             /*
-             * Declare 3 literals.
+             * Declare literals.
              */
-            final int nliterals = 3;
+            final int nliterals = 4;
             final Literal lit1 = new LiteralImpl("abc");
             final Literal lit2 = new LiteralImpl("abc", A);
             final Literal lit3 = new LiteralImpl("abc", "en");
+            final Literal lit5 = new LiteralImpl(getVeryLargeLiteral());
 
             /*
-             * Declare two blank nodes.
+             * Declare blank nodes.
              */
-            final int nbnodes = 2;
+            final int nbnodes = 3;
             final BNode bn1 = new BNodeImpl(UUID.randomUUID().toString());
             final BNode bn2 = new BNodeImpl("a12");
+            final BNode bn3 = new BNodeImpl(getVeryLargeLiteral());
 
             // Create an array of those Value objects.
             final Value[] values = new Value[] {//
-                    x, y, z, A, B, C,
+                    x, y, z, A, B, C, big,//
                     rdfsSubClassOf, rdfType,//
-                    lit1, lit2, lit3,//
-                    bn1, bn2,//
+                    lit1, lit2, lit3, lit5,//
+                    bn1, bn2, bn3 //
             };
 
             /*
@@ -691,9 +710,12 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
              * side-effect.
              */
             final BigdataValue[] terms = new BigdataValue[values.length];
+
             for (int i = 0; i < values.length; i++) {
+            
                 terms[i] = store.getLexiconRelation().getValueFactory()
                         .asValue(values[i]);
+            
             }
 
             /*
@@ -714,9 +736,9 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                     log.info("#bnds=" + store.getBNodeCount());
                     log.info("#vals=" + store.getTermCount());
                     log.info("\n"
-                            + new TermsIndexHelper().dump(store
+                            + DumpLexicon.dumpBlobs(store
                                     .getLexiconRelation().getNamespace(), store
-                                    .getLexiconRelation().getTermsIndex()));
+                                    .getLexiconRelation().getBlobsIndex()));
                 }
 
                 assertEquals("#uris", nuris, store.getURICount());
@@ -732,9 +754,14 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                  * semantics, we will unify the blank node with the same blank
                  * node in the lexicon.
                  */
-                assertEquals("#bnodes", nbnodes, store.getBNodeCount());
+                if(storeBlankNodes) {
+                    assertEquals("#bnodes", nbnodes, store.getBNodeCount());
+                } else {
+                    assertEquals("#bnodes", 0L, store.getBNodeCount());
+                }
                 
-                final int nterms = nuris + nliterals + nbnodes;
+                final int nterms = nuris + nliterals
+                        + (storeBlankNodes ? nbnodes : 0);
 
                 assertEquals("#terms", nterms, store.getTermCount());
 
@@ -1420,6 +1447,46 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
         }
 
+    }
+
+    private String getVeryLargeURI() {
+
+        final int len = 1024000;
+
+        final StringBuilder sb = new StringBuilder(len + 20);
+
+        sb.append("http://www.bigdata.com/");
+        
+        for (int i = 0; i < len; i++) {
+
+            sb.append(Character.toChars('A' + (i % 26)));
+
+        }
+
+
+        final String s = sb.toString();
+        
+        return s;
+        
+    }
+    
+    private String getVeryLargeLiteral() {
+
+        final int len = 1024000;
+
+        final StringBuilder sb = new StringBuilder(len);
+
+        for (int i = 0; i < len; i++) {
+
+            sb.append(Character.toChars('A' + (i % 26)));
+
+        }
+
+
+        final String s = sb.toString();
+        
+        return s;
+        
     }
     
 }

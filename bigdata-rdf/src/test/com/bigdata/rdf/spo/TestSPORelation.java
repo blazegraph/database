@@ -30,6 +30,7 @@ package com.bigdata.rdf.spo;
 
 import java.util.Map;
 import java.util.Properties;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
@@ -48,7 +49,6 @@ import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlanFactory2;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.MockTermIdFactory;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.RuleContextEnum;
@@ -143,7 +143,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 //        return new TermId(VTE.URI, in);
 //    }
 
-    private TermId uriId(long ignored) {
+    private IV<?,?> uriId(long ignored) {
         return factory.newTermId(VTE.URI);
     }
 

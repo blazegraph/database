@@ -1,6 +1,7 @@
 package com.bigdata.rdf.lexicon;
 
 import java.io.Serializable;
+
 import com.bigdata.rdf.internal.IV;
 
 /**

@@ -92,7 +92,7 @@ public class UnicodeBNodeIV<V extends BigdataBNode> extends
     @Override
     protected int _compareTo(final IV o) {
          
-        final String id2 = ((UnicodeBNodeIV) o).id;
+        final String id2 = ((UnicodeBNodeIV<?>) o).id;
         
         return id.compareTo(id2);
 //        return id == id2 ? 0 : id < id2 ? -1 : 1;
@@ -100,14 +100,21 @@ public class UnicodeBNodeIV<V extends BigdataBNode> extends
     }
     
     public int hashCode() {
+       
         return id.hashCode();
+        
     }
 
     public int byteLength() {
+
         if (byteLength == 0) {
+        
             byteLength = 1/* flags */+ IVUtility.byteLengthUnicode(id);
+            
         }
+        
         return byteLength;
+        
     }
 
     final public void setByteLength(final int byteLength) {
