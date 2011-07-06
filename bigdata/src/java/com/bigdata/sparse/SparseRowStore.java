@@ -1071,7 +1071,7 @@ public class SparseRowStore implements IRowStoreConstants {
         /**
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/107
          */
-        String DEFAULT_SCHEMA_NAME_UNICODE_CLEAN = "false";
+        String DEFAULT_SCHEMA_NAME_UNICODE_CLEAN = "true";
         
         /**
          * The primary key was originally written using a Unicode sort key.
