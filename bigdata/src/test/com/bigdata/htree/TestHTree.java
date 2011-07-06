@@ -741,10 +741,10 @@ public class TestHTree extends TestCase2 {
              * this test. The post-condition of this insert sequence is:
              * 
              * <pre>
-             * root := [2] (a,c,b,b)   //
-             * a    := [2]   (1,2,3,4) // Note: depth(root) == depth(a) !
-             * c    := [2]   (-,-,-,-) //
-             * b    := [1]   (-,-;-,-) //
+             * root := [2] ######## (a,c,b,b)   //
+             * a    := [2] 00######  (1,2,3,4) // Note: depth(root) == depth(a) !
+             * c    := [2] 01######  (-,-,-,-) //
+             * b    := [1] 1#######  (-,-;-,-) //
              * </pre>
              */
             htree.insert(k1, v1);
@@ -805,11 +805,11 @@ public class TestHTree extends TestCase2 {
              * to split (a).
              * 
              * <pre>
-             * root := [2] (d,d,b,b)     //
-             * d    := [1]   (a,a;c,c)   // added new level below the root.  
-             * a    := [0]     (1;2;3;4) // local depth now 0. NB: inconsistent intermediate state!!!
-             * c    := [0]     (-;-;-;-) // local depth now 0.
-             * b    := [1]   (-,-;-,-)   //
+             * root := [2] ######## (d,d,b,b)     //
+             * d    := [1] 0#######   (a,a;c,c)   // added new level below the root.  
+             * a    := [0] ########     (1;2;3;4) // local depth now 0. NB: inconsistent intermediate state!!!
+             * c    := [0] ########     (-;-;-;-) // local depth now 0.
+             * b    := [1] 1#######   (-,-;-,-)   //
              * </pre>
              */
 
@@ -862,25 +862,26 @@ public class TestHTree extends TestCase2 {
             // verify that [a] will not accept an insert.
             assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
             
-            /** FIXME This step breaks lookup for 3/4 !!!
+            /**
              * Split (a), creating a new bucket page (e) and re-index the tuples
              * from (a) into (a,e). In this case, they all wind up back in (a)
              * so (a) remains full (no free slots). The local depth of (a) and
              * (e) are now (1).
              * 
              * <pre>
-             * root := [2] (d,d,b,b)     //
-             * d    := [1]   (a,e;c,c)   // 
-             * a    := [1]     (1,2;3,4) // local depth now 1. 
-             * e    := [1]     (-,-;-,-) // local depth now 1 (new sibling)
-             * c    := [0]     (-;-;-;-) // 
-             * b    := [1]   (-,-;-,-)   //
+             * root := [2] ######## (d,d,b,b)     //
+             * d    := [1] 0#######   (a,e;c,c)   // 
+             * a    := [1] 00######     (1,2;3,4) // local depth now 1. 
+             * e    := [1] 01######     (-,-;-,-) // local depth now 1 (new sibling)
+             * c    := [0] ########     (-;-;-;-) // 
+             * b    := [1] ########   (-,-;-,-)   //
              * </pre>
              */
 
+            // FIXME This now fails since it correctly rejects the reindex!
             // split (a) into (a,e), re-indexing the tuples.
-            htree.splitAndReindexFullBucketPage(d/* parent */,
-                    0/* buddyOffset */, 4 /* prefixLength */, a/* oldBucket */);
+            assertTrue(htree.splitAndReindexFullBucketPage(d/* parent */,
+                    0/* buddyOffset */, 4 /* prefixLength */, a/* oldBucket */));
 
             assertEquals("nnodes", 2, htree.getNodeCount()); // unchanged.
             assertEquals("nleaves", 4, htree.getLeafCount());
