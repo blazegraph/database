@@ -780,8 +780,12 @@ public class HTree extends AbstractHTree
                  * through a detailed example (insert 1,2,3,4,5) but I have not
                  * generalized this to a clear rule yet.
                  */
-                splitAndReindexFullBucketPage(current/* parent */, buddyOffset,
-                        prefixLength + addressBits, bucketPage/* oldBucket */);
+                if(!splitAndReindexFullBucketPage(current/* parent */, buddyOffset,
+                        prefixLength + addressBits, bucketPage/* oldBucket */)) {
+                    
+                    throw new AssertionError("Reindex of full bucket fails");
+                    
+                }
 
                 /*
                  * Outer insert.
@@ -1512,6 +1516,22 @@ public class HTree extends AbstractHTree
      * new bucket. This method MUST be invoked immediately after a new level has
      * been added to the {@link HTree} in order to bring the {@link HTree} into
      * an internally consistent state.
+     * <p>
+     * If the operation can not succeed because the tuples can not be reindexed
+     * into the original {@link BucketPage} and a new {@link BucketPage} given
+     * the depth of their common parent then this method will return
+     * <code>false</code> and the structure of the {@link HTree} WILL NOT be
+     * modified. This contract makes it possible to use this method to decide
+     * when incremental structural changes (via add level and split directory)
+     * have introduced sufficient distinctions to split a full
+     * {@link BucketPage}.
+     * <p>
+     * While this method is "safe" in the sense described above, the
+     * {@link HTree} is NOT in a consistent state following an add level
+     * operation until the full {@link BucketPage} has been successfully split
+     * using this method. The caller is responsible for executing sufficient add
+     * level and/or split directory operations such that the full
+     * {@link BucketPage} can be split successfully by this method.
      * 
      * @param parent
      *            The parent {@link DirectoryPage}.
@@ -1526,6 +1546,10 @@ public class HTree extends AbstractHTree
      * @param oldBucket
      *            The child {@link BucketPage} to be re-indexed.
      * 
+     * @return <code>true</code> iff the operation could be carried out without
+     *         causing any buddy bucket in either the old {@link BucketPage} or
+     *         the new {@link BucketPage} to overflow.
+     * 
      * @throws IllegalArgumentException
      *             if any argument is <code>null</code>.
      * @throws IllegalStateException
@@ -1539,7 +1563,7 @@ public class HTree extends AbstractHTree
      * @see #addLevel(DirectoryPage, int, int, AbstractPage)
      */
     // Note: package private for unit tests.
-    void splitAndReindexFullBucketPage(final DirectoryPage parent,
+    boolean splitAndReindexFullBucketPage(final DirectoryPage parent,
             final int buddyOffset, final int prefixLength,
             final BucketPage oldBucket) {
 
@@ -1582,22 +1606,6 @@ public class HTree extends AbstractHTree
                     + buddyOffset + ", prefixLength=" + prefixLength
                     + ", oldBucket=" + oldBucket.toShortString());
 
-        /*
-         * Note: We can not validate that the caller's bucket page has only a
-         * single buddy bucket because this method is invoked immediately after
-         * addLevel() and the hash tree is not internally consistent until we
-         * have gone through the reindex of the tuples in the old bucket,
-         * placing them into either the old bucket or the new bucket. At the
-         * moment when this method is invoked, the old bucket will actually
-         * appear to have the local depth which applies to the post-condition of
-         * the total addLevel() + reindexBucket() operation (this is because
-         * addLevel() will give us multiple pointers to the old bucket page in
-         * the parent). We rely on that to set the local depth on the sibling
-         * bucket.
-         * 
-         * TODO Javadoc update.
-         */
-
         final int oldDepth = oldBucket.globalDepth;
         final int newDepth = oldDepth + 1;
 
@@ -1609,6 +1617,21 @@ public class HTree extends AbstractHTree
         // Set the parent reference on the new bucket.
         newBucket.parent = (Reference) parent.self;
         
+        // attempt to reindex the tuples.
+        if (!reindexTuples(parent, buddyOffset, prefixLength, oldBucket,
+                newBucket)) {
+            /*
+             * Reindex failed. Return immediately. NO SIDE EFFECTS ON THE HTREE.
+             */
+            return false;
+        }
+
+        /*
+         * Structural modifications put the remaining side-effects into place
+         * now that we have successfully re-indexed the tuples in the full
+         * bucket page between it and a sibling bucket page.
+         */
+        
         // Increase global depth on the old page also.
         oldBucket.globalDepth = newDepth;
 
@@ -1618,9 +1641,8 @@ public class HTree extends AbstractHTree
         updatePointersInParent(parent, buddyOffset, oldDepth, oldBucket,
                 newBucket);
 
-        // reindex the tuples.
-        reindexTuples(parent, buddyOffset, prefixLength, oldBucket, newBucket);
-
+        return true;
+        
     }
 
     /**
@@ -1642,8 +1664,17 @@ public class HTree extends AbstractHTree
      *            The original bucket.
      * @param b
      *            The new sibling bucket.
+     * 
+     *            TODO Handle case where the original {@link BucketPage} will
+     *            have more than buddy bucket after reindexing (that is, the
+     *            parent has a depth LT addressBits).
+     * 
+     *            TODO This method should return <code>true</code> iff the
+     *            indexing operation was successful and should not have a side
+     *            effect if the operation could not be completed (because some
+     *            buddy bucket would have overflowed).
      */
-    private void reindexTuples(final DirectoryPage parent,
+    private boolean reindexTuples(final DirectoryPage parent,
             final int buddyOffset, final int prefixLength, final BucketPage a,
             final BucketPage b) {
 
@@ -1668,6 +1699,25 @@ public class HTree extends AbstractHTree
                     + ", oldChild=" + a.toShortString() + ", newChild="
                     + b.toShortString());
 
+        // #of buddy tables on a page (post-condition for both bucket pages).
+        final int nbuddies = (1 << addressBits) / (1 << parent.globalDepth);
+
+        // #of address slots in each buddy hash table (post-condition).
+        final int slotsPerBuddy = (1 << parent.globalDepth);
+
+        // The #of hash bucket buddies across both bucket pages.
+        final int nbins = nbuddies<<1;
+
+        /**
+         * A counter per buddy hash bucket. The index into [bins] is the
+         * <code>page * nbuddies</code>, where the original page is page:=0 and
+         * the new page is page:=1. If any counter exceeds <i>slotsPerBuddy</i>
+         * then the reindex operation will fail since the corresponding buddy
+         * bucket would overflow. The counter is incremented before we copy the
+         * tuple to the target page so we detect an overflow before it occurs.
+         */
+        final int[] bins = new int[nbins];
+        
         // Setup [t] as a temporary page with [a]'s data and clear [a]'s data.
         final BucketPage t = new BucketPage(this, a.globalDepth);
         {
@@ -1687,8 +1737,8 @@ public class HTree extends AbstractHTree
         final IRaba vals = t.data.getValues();
         final int m = 1 << addressBits;
         assert m == keys.capacity();
-        // #of tuples inserted into [a] and [b] respectively.
-        int na = 0, nb = 0;
+//        // #of tuples inserted into [a] and [b] respectively.
+//        int na = 0, nb = 0;
         for (int sourceIndex = 0; sourceIndex < m; sourceIndex++) {
 
             // Since the bucket is full, no entry should be null.
@@ -1729,27 +1779,65 @@ public class HTree extends AbstractHTree
             // True if the tuple is re-indexed back into (a).
             final boolean isA = child == a;
             
+            // The page index component into [bins].
+            final int page = isA ? 0 : 1;
+
             final BucketPage x = (BucketPage) child;
+
+            // find the offset of the buddy hash table in the child.
+            final int targetBuddyOffset = HTreeUtil
+                    .getBuddyOffset(hashBitsParent, parent.globalDepth,
+                            child.globalDepth/* localDepthOfChild */);
+
+            // next free slot in the target buddy bucket.
+            final int targetSlotInBuddy = bins[page * nbuddies
+                    + targetBuddyOffset]++;
+
+            if (targetSlotInBuddy >= slotsPerBuddy) {
+
+                /*
+                 * The buddy hash table has overflowed.
+                 * 
+                 * Note: Undo the changes to the original bucket page such that
+                 * this method does not have a side effect if the index fails.
+                 */
+
+                log.warn("Buddy bucket overflow: page=" + page
+                        + ", targetBuddyOffset=" + targetBuddyOffset
+                        + ", bins=" + Arrays.toString(bins));
+
+                // restore the data for the original page.
+                a.data = t.data;
+                
+                return false;
+                
+            }
             
             // The index in the child where we will write the tuple.
-            final int targetIndex = isA ? na : nb;
+            final int targetIndexOnPage = targetBuddyOffset * slotsPerBuddy
+                    + targetSlotInBuddy;
 
+            assert x.data.getKeys().isNull(targetIndexOnPage);
+            
             // Copy the key.
-            x.data.getKeys().set(targetIndex, key);
+            x.data.getKeys().set(targetIndexOnPage, key);
             
             // Copy the value.
             if (!vals.isNull(sourceIndex))
-                x.data.getValues().set(targetIndex, vals.get(sourceIndex));
+                x.data.getValues().set(targetIndexOnPage, vals.get(sourceIndex));
 
             // TODO copy versionTimestamp and delete marker metadata too.
 
-            // Increment the index of the next target tuple in this child.
-            if (isA)
-                na++;
-            else
-                nb++;
+//            // Increment the index of the next target tuple in this child.
+//            if (isA)
+//                na++;
+//            else
+//                nb++;
             
         }
+        
+        // Success
+        return true;
 
     }
     
