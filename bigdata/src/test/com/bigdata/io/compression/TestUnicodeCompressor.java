@@ -68,19 +68,19 @@ public class TestUnicodeCompressor extends TestCase2 {
         super(name);
     }
 
-    /** Note: You MUST be linked with the icu4j-charset.jar for BOCU-1 support. */
-    public void test_BOCU_available() {
-        
-        Charset.forName("BOCU-1");
-        
-    }
-
-    /** Note: You MUST be linked with the icu4j-charset.jar for SCSU support. */
-    public void test_SCSU_available() {
-        
-        Charset.forName("SCSU");
-        
-    }
+//    /** Note: You MUST be linked with the icu4j-charset.jar for BOCU-1 support. */
+//    public void test_BOCU_available() {
+//        
+//        Charset.forName("BOCU-1");
+//        
+//    }
+//
+//    /** Note: You MUST be linked with the icu4j-charset.jar for SCSU support. */
+//    public void test_SCSU_available() {
+//        
+//        Charset.forName("SCSU");
+//        
+//    }
 
     /**
      * {@link NoCompressor} encoding / decoding stress test.
@@ -91,23 +91,23 @@ public class TestUnicodeCompressor extends TestCase2 {
 
     }
 
-    /**
-     * BOCU-1 encoding / decoding stress test.
-     */
-    public void test_BOCU() {
-
-        doTest(new BOCU1Compressor());
-
-    }
-
-    /**
-     * SCSU encoding / decoding stress test.
-     */
-    public void test_SCSU() {
-
-        doTest(new SCSUCompressor());
-
-    }
+//    /**
+//     * BOCU-1 encoding / decoding stress test.
+//     */
+//    public void test_BOCU() {
+//
+//        doTest(new BOCU1Compressor());
+//
+//    }
+//
+//    /**
+//     * SCSU encoding / decoding stress test.
+//     */
+//    public void test_SCSU() {
+//
+//        doTest(new SCSUCompressor());
+//
+//    }
 
     private void doTest(final IUnicodeCompressor c) {
 
