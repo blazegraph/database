@@ -65,6 +65,9 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestHTree.class);
 
+        // Unit test for a simple add level scenario.
+        suite.addTestSuite(TestHTree_addLevel_x10_x11_x20_x21_x22.class);
+        
         // Test suite for re-indexing tuples when splitting a full buddy bucket.
         suite.addTestSuite(TestHTreeReindexFullBucket.class);
 
