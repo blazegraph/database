@@ -101,11 +101,6 @@ public class TestHTree_addLevel_x10_x11_x20_x21_x22 extends TestCase2 {
             htree.insert(k3, v3);
             htree.insert(k4, v4);
 
-            assertEquals(v1, htree.lookupFirst(k1));
-            assertEquals(v2, htree.lookupFirst(k2));
-            assertEquals(v3, htree.lookupFirst(k3));
-            assertEquals(v4, htree.lookupFirst(k4));
-
             assertTrue(root == htree.getRoot());
             final BucketPage a = (BucketPage) root.childRefs[0].get();
             final BucketPage c = (BucketPage) root.childRefs[1].get();
@@ -121,7 +116,6 @@ public class TestHTree_addLevel_x10_x11_x20_x21_x22 extends TestCase2 {
             assertEquals(4, a.getKeyCount());
             assertEquals(0, c.getKeyCount());
             assertEquals(0, b.getKeyCount());
-
             assertSameBucketData(new MockBucketData(//
                     new ReadOnlyValuesRaba(4, new byte[][] { // keys
                             k1, k2, k3, k4 }),//
@@ -140,6 +134,10 @@ public class TestHTree_addLevel_x10_x11_x20_x21_x22 extends TestCase2 {
                     new ReadOnlyValuesRaba(0, new byte[][] { // vals
                             null, null, null, null })),//
                     b);
+            assertEquals(v1, htree.lookupFirst(k1));
+            assertEquals(v2, htree.lookupFirst(k2));
+            assertEquals(v3, htree.lookupFirst(k3));
+            assertEquals(v4, htree.lookupFirst(k4));
 
             // verify that [a] will not accept an insert.
             assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
@@ -264,9 +262,9 @@ public class TestHTree_addLevel_x10_x11_x20_x21_x22 extends TestCase2 {
                     a);
             assertSameBucketData(new MockBucketData(//
                     new ReadOnlyValuesRaba(2, new byte[][] { // keys
-                            k1, k2, null, null }),//
+                            k3, k4, null, null }),//
                     new ReadOnlyValuesRaba(2, new byte[][] { // vals
-                            v1, v2, null, null})),//
+                            v3, v4, null, null})),//
                     e);
             assertSameBucketData(new MockBucketData(//
                     new ReadOnlyValuesRaba(0, new byte[][] { // keys
