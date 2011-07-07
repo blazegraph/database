@@ -231,7 +231,7 @@ public class TestHTree_addLevel_x10_x11_x20_x21_x22 extends TestCase2 {
 
             // split (a) into (a,e), re-indexing the tuples.
             assertTrue(htree.splitAndReindexFullBucketPage(d/* parent */,
-                    0/* buddyOffset */, 3 /* prefixLengthOfParent */, a/* oldBucket */));
+                    0/* buddyOffset */, 2 /* prefixLengthToParent */, a/* oldBucket */));
 
             assertEquals("nnodes", 2, htree.getNodeCount()); // unchanged.
             assertEquals("nleaves", 4, htree.getLeafCount());
