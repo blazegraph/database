@@ -1613,7 +1613,7 @@ public class HTree extends AbstractHTree
         final Reference<AbstractPage>[] savedChildRefs;
         final IDirectoryData savedData;
         {
-            
+            // Note: This is no longer "free" since is allocating a copy of the parent's data.
             savedChildRefs = new Reference[parent.childRefs.length];
 
             System.arraycopy(parent.childRefs/* src */, 0/* srcPos */,
