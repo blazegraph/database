@@ -2393,6 +2393,43 @@ public class HTree extends AbstractHTree
 			final int slotsPerBuddy = (1 << globalDepth);
 			return slotsPerBuddy;
 		}
+		
+		/**
+		 * Total bit resolution is defined by the addressBits per directory multiplied
+		 * by the number of levels.
+		 * 
+		 * @return
+		 */
+		final public int getBitResolution() {
+			// return getLevel() * htree.addressBits;
+			int ret = 0;
+			
+			DirectoryPage dp = parent != null ? parent.get() : null;
+			while (dp != null) {
+				ret += dp.globalDepth;
+				
+				dp = dp.parent != null ? dp.parent.get() : null;
+			}
+			
+			return ret;
+		}
+
+		/**
+		 * Computed by recursing to the root and counting the levels.
+		 * 
+		 * @return the level in the HTree
+		 */
+		final public int getLevel() {
+			int ret = 0;
+			
+			DirectoryPage dp = parent != null ? parent.get() : null;
+			while (dp != null) {
+				ret++;
+				dp = dp.parent != null ? dp.parent.get() : null;
+			}
+			
+			return ret;
+		}
 
 		/**
 		 * Return the bits from the key which are relevant to the current
@@ -3134,6 +3171,48 @@ public class HTree extends AbstractHTree
 	        return ok;
 	        
 		}
+	    
+	    /**
+	     * From the current bit resolution, determines how many extra bits are
+	     * required to ensure the current set of bucket values can be split.
+	     * 
+	     * The additional complexity of determining whether the page can really be
+	     * split is left to the parent.  A new directory, covering the required
+	     * prefixBits would inititally be created with depth 1.  But if the
+	     * specified bit is discriminated within buddy buckets AND other bits do not
+	     * further separate the buckets then the depth of the directory will need to
+	     * be increased before the bucket page can be split.
+	     * 
+	     * @return bit depth increase from current offset required 
+	     */
+	    int distinctBitsRequired() {
+	    	final int currentResolution = getBitResolution(); // start offset of this page
+	    	int testPrefix = currentResolution;
+	    	
+	    	IRaba keys = data.getKeys();
+	    	final int nkeys = keys.size();
+	    	
+	    	int maxPrefix = 0;
+	    	for (int t = 1; t < nkeys; t++) {
+	    		final int klen = keys.get(t).length;
+	    		maxPrefix = maxPrefix > klen ? maxPrefix : klen;
+	    	}
+	    	maxPrefix *= 8; // convert max bytes to max bits
+	    	
+	    	assert nkeys > 1;
+	    	
+	    	while (testPrefix < maxPrefix) {
+	    		boolean bitset = BytesUtil.getBit(keys.get(0), testPrefix);
+		    	for (int t = 1; t < nkeys; t++) {
+		    		if (bitset != BytesUtil.getBit(keys.get(t), testPrefix)) {
+		    			return testPrefix - currentResolution;
+		    		}
+		    	}
+		    	testPrefix++;
+	    	}
+	    	
+	    	return -1;
+	    }
 
     } // class BucketPage
 	
