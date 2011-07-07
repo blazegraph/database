@@ -1694,6 +1694,73 @@ public class TestHTree extends TestCase2 {
         
     }
     
+    public void test_distinctBits() {
+
+        final int addressBits = 2;
+        
+        final IRawStore store = new SimpleMemoryRawStore();
+
+        try {
+
+            final byte[] k1 = new byte[]{0x01};
+            final byte[] k2 = new byte[]{0x02};
+            final byte[] k3 = new byte[]{0x03};
+            final byte[] k4 = new byte[]{0x04};
+            final byte[] k5 = new byte[]{0x05};
+            final byte[] k6 = new byte[]{0x06};
+            final byte[] k8 = new byte[]{0x08};
+
+            final byte[] v1 = new byte[]{0x01};
+            final byte[] v2 = new byte[]{0x02};
+            final byte[] v3 = new byte[]{0x03};
+            final byte[] v4 = new byte[]{0x04};
+            final byte[] v5 = new byte[]{0x05};
+            final byte[] v6 = new byte[]{0x06};
+            final byte[] v8 = new byte[]{0x08};
+            
+            final HTree htree = new HTree(store, addressBits, false/*rawRecords*/);
+
+            // Verify initial conditions.
+            assertTrue("store", store == htree.getStore());
+            assertEquals("addressBits", addressBits, htree.getAddressBits());
+
+            // Note: The test is assumes splitBits := 1.
+            assertEquals("splitBits", 1, htree.splitBits);
+
+            final DirectoryPage root = htree.getRoot();
+
+            htree.insert(k1, v1);
+            htree.insert(k2, v2);
+
+            assertEquals(v1, htree.lookupFirst(k1));
+            assertEquals(v2, htree.lookupFirst(k2));
+
+            assertTrue(root == htree.getRoot());
+            final BucketPage a = (BucketPage) root.childRefs[0].get();
+            
+            System.out.println("1#: Bit resolution: " + a.getBitResolution() + ", additional bits required: " + a.distinctBitsRequired());
+            assertTrue(a.distinctBitsRequired() == 4);
+            
+            htree.insert(k3, v3);
+            htree.insert(k8, v8);
+            
+            System.out.println("2#: Bit resolution: " + a.getBitResolution() + ", additional bits required: " + a.distinctBitsRequired());
+            assertTrue(a.distinctBitsRequired() == 2);
+
+            // insert extra level
+            htree.insert(k4, v4);
+            
+            System.out.println("3#: Bit resolution: " + a.getBitResolution() + ", additional bits required: " + a.distinctBitsRequired());
+            assertTrue(a.distinctBitsRequired() == 2);
+            
+        } finally {
+            
+            store.destroy();
+            
+        }
+        
+    }
+    
     /*
      * TODO This might need to be modified to verify the sets of tuples in each
      * buddy bucket without reference to their ordering within the buddy bucket.
