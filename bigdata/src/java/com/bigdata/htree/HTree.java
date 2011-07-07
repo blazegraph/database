@@ -1553,7 +1553,7 @@ public class HTree extends AbstractHTree
      * @throws IllegalArgumentException
      *             if any argument is <code>null</code>.
      * @throws IllegalStateException
-     *             if the <i>parent<i/> is read-only.
+     *             if the <i>parent</i> is read-only.
      * @throws IllegalStateException
      *             if the <i>oldBucket</i> is read-only.
      * @throws IllegalStateException
@@ -1600,7 +1600,7 @@ public class HTree extends AbstractHTree
             throw new IllegalStateException();
         if (oldBucket.parent != parent.self) // must be same Reference.
             throw new IllegalStateException();
-
+        // TODO There must be ONE (1) reference to the old bucket in the parent.
         if (log.isDebugEnabled())
             log.debug("parent=" + parent.toShortString() + ", buddyOffset="
                     + buddyOffset + ", prefixLength=" + prefixLength
@@ -1608,7 +1608,23 @@ public class HTree extends AbstractHTree
 
         final int oldDepth = oldBucket.globalDepth;
         final int newDepth = oldDepth + 1;
+        
+        // Save a copy of the parent's state.
+        final Reference<AbstractPage>[] savedChildRefs;
+        final IDirectoryData savedData;
+        {
+            
+            savedChildRefs = new Reference[parent.childRefs.length];
 
+            System.arraycopy(parent.childRefs/* src */, 0/* srcPos */,
+                    savedChildRefs/* dest */, 0/* destPos */,
+                    parent.childRefs.length/* length */);
+
+            savedData = new MutableDirectoryPageData(addressBits,
+                    parent.data);
+
+        }
+        
         // Allocate a new bucket page (globalDepth is increased by one).
         final BucketPage newBucket = new BucketPage(this, newDepth);
 
@@ -1617,29 +1633,42 @@ public class HTree extends AbstractHTree
         // Set the parent reference on the new bucket.
         newBucket.parent = (Reference) parent.self;
         
+        // Increase global depth on the old page also.
+        oldBucket.globalDepth = newDepth;
+
+        // One more bucket page in the hash tree.
+        nleaves++; 
+
+        // update the pointers in the parent.
+        updatePointersInParent(parent, buddyOffset, oldDepth, oldBucket,
+                newBucket);
+
         // attempt to reindex the tuples.
         if (!reindexTuples(parent, buddyOffset, prefixLength, oldBucket,
                 newBucket)) {
             /*
              * Reindex failed. Return immediately. NO SIDE EFFECTS ON THE HTREE.
              */
+            {
+
+                // Restore child reference[].
+                System.arraycopy(savedChildRefs/* src */, 0/* srcPos */,
+                        parent.childRefs/* dest */, 0/* destPos */,
+                        parent.childRefs.length/* length */);
+
+                // Restore the persistent data record on the parent.
+                ((MutableDirectoryPageData)parent.data).copyFrom(savedData);
+                
+                // Restore bucket depth.
+                oldBucket.globalDepth = oldDepth;
+                
+                // Restore #of leaves in the HTree.
+                nleaves--;
+
+            }
+            
             return false;
         }
-
-        /*
-         * Structural modifications put the remaining side-effects into place
-         * now that we have successfully re-indexed the tuples in the full
-         * bucket page between it and a sibling bucket page.
-         */
-        
-        // Increase global depth on the old page also.
-        oldBucket.globalDepth = newDepth;
-
-        nleaves++; // One more bucket page in the hash tree. 
-
-        // update the pointers in the parent.
-        updatePointersInParent(parent, buddyOffset, oldDepth, oldBucket,
-                newBucket);
 
         return true;
         
@@ -1706,7 +1735,7 @@ public class HTree extends AbstractHTree
         final int slotsPerBuddy = (1 << parent.globalDepth);
 
         // The #of hash bucket buddies across both bucket pages.
-        final int nbins = nbuddies<<1;
+        final int nbins = nbuddies << 1;
 
         /**
          * A counter per buddy hash bucket. The index into [bins] is the
@@ -1719,7 +1748,7 @@ public class HTree extends AbstractHTree
         final int[] bins = new int[nbins];
         
         // Setup [t] as a temporary page with [a]'s data and clear [a]'s data.
-        final BucketPage t = new BucketPage(this, a.globalDepth);
+        final BucketPage t = new BucketPage(this, a.globalDepth);//Note: the depth of the temporary BucketPage does not really matter. It could be addressBits since it is ignored by this code.
         {
             final ILeafData tmp = a.data;
             a.data = t.data;
@@ -1735,7 +1764,7 @@ public class HTree extends AbstractHTree
         // #of slots in [a]'s data.
         final IRaba keys = t.data.getKeys();
         final IRaba vals = t.data.getValues();
-        final int m = 1 << addressBits;
+        final int m = 1 << addressBits; // aka fan-out or branching factor.
         assert m == keys.capacity();
 //        // #of tuples inserted into [a] and [b] respectively.
 //        int na = 0, nb = 0;
@@ -2395,7 +2424,7 @@ public class HTree extends AbstractHTree
 		}
 		
 		/**
-		 * Total bit resolution is defined by the addressBits per directory multiplied
+		 * Total bit resolution is defined by the depth per directory multiplied
 		 * by the number of levels.
 		 * 
 		 * @return
@@ -3171,25 +3200,28 @@ public class HTree extends AbstractHTree
 	        return ok;
 	        
 		}
-	    
-	    /**
-	     * From the current bit resolution, determines how many extra bits are
-	     * required to ensure the current set of bucket values can be split.
-	     * 
-	     * The additional complexity of determining whether the page can really be
-	     * split is left to the parent.  A new directory, covering the required
-	     * prefixBits would inititally be created with depth 1.  But if the
-	     * specified bit is discriminated within buddy buckets AND other bits do not
-	     * further separate the buckets then the depth of the directory will need to
-	     * be increased before the bucket page can be split.
-	     * 
-	     * @return bit depth increase from current offset required 
-	     */
+
+        /**
+         * From the current bit resolution, determines how many extra bits are
+         * required to ensure the current set of bucket values can be split.
+         * <p>
+         * The additional complexity of determining whether the page can really
+         * be split is left to the parent. A new directory, covering the
+         * required prefixBits would inititally be created with depth 1. But if
+         * the specified bit is discriminated within buddy buckets AND other
+         * bits do not further separate the buckets then the depth of the
+         * directory will need to be increased before the bucket page can be
+         * split.
+         * 
+         * @return bit depth increase from current offset required -or-
+         *         <code>-1</code> if it is not possible to split the page no
+         *         matter how many bits we have.
+         */
 	    int distinctBitsRequired() {
 	    	final int currentResolution = getBitResolution(); // start offset of this page
 	    	int testPrefix = currentResolution+1;
 	    	
-	    	IRaba keys = data.getKeys();
+	    	final IRaba keys = data.getKeys();
 	    	final int nkeys = keys.size();
 	    	
 	    	int maxPrefix = 0;
@@ -3202,7 +3234,7 @@ public class HTree extends AbstractHTree
 	    	assert nkeys > 1;
 	    	
 	    	while (testPrefix < maxPrefix) {
-	    		boolean bitset = BytesUtil.getBit(keys.get(0), testPrefix);
+	    	    final boolean bitset = BytesUtil.getBit(keys.get(0), testPrefix);
 		    	for (int t = 1; t < nkeys; t++) {
 		    		if (bitset != BytesUtil.getBit(keys.get(t), testPrefix)) {
 		    			return testPrefix - currentResolution;

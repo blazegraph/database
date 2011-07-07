@@ -139,8 +139,12 @@ public class TestHTree_addLevel_x10_x11_x20_x21_x22 extends TestCase2 {
             assertEquals(v3, htree.lookupFirst(k3));
             assertEquals(v4, htree.lookupFirst(k4));
 
+            assertTrue(a.distinctBitsRequired() == 1);
+            
             // verify that [a] will not accept an insert.
             assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
+            
+            assertTrue(a.distinctBitsRequired() == 1);
             
             /**
              * Add a directory level.
@@ -218,8 +222,8 @@ public class TestHTree_addLevel_x10_x11_x20_x21_x22 extends TestCase2 {
              * <pre>
              * root := [2] ######## (d,d,b,b)     //
              * d    := [1] 0#######   (a,e;c,c)   // 
-             * a    := [1] 00######     (x10,x12;_,_) // local depth now 1. 
-             * e    := [1] 01######     (x20,x21;-,-) // local depth now 1 (new sibling)
+             * a    := [1] 000#####     (x10,x12;_,_) // local depth now 1. 
+             * e    := [1] 001#####     (x20,x21;-,-) // local depth now 1 (new sibling)
              * c    := [0] ########     (-;-;-;-) // 
              * b    := [1] ########   (-,-;-,-)   //
              * </pre>
@@ -227,7 +231,7 @@ public class TestHTree_addLevel_x10_x11_x20_x21_x22 extends TestCase2 {
 
             // split (a) into (a,e), re-indexing the tuples.
             assertTrue(htree.splitAndReindexFullBucketPage(d/* parent */,
-                    0/* buddyOffset */, 3 /* prefixLength */, a/* oldBucket */));
+                    0/* buddyOffset */, 3 /* prefixLengthOfParent */, a/* oldBucket */));
 
             assertEquals("nnodes", 2, htree.getNodeCount()); // unchanged.
             assertEquals("nleaves", 4, htree.getLeafCount());
@@ -249,8 +253,8 @@ public class TestHTree_addLevel_x10_x11_x20_x21_x22 extends TestCase2 {
             assertEquals(1, e.globalDepth);
             assertEquals(0, c.globalDepth);
             assertEquals(1, b.globalDepth);
-            assertEquals(4, a.getKeyCount());
-            assertEquals(0, e.getKeyCount());
+            assertEquals(2, a.getKeyCount());
+            assertEquals(2, e.getKeyCount());
             assertEquals(0, c.getKeyCount());
             assertEquals(0, b.getKeyCount());
 
