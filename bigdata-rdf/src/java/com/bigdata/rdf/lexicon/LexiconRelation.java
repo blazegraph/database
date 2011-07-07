@@ -288,32 +288,30 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         {
 
-            final String defaultValue;
             if (indexManager instanceof IBigdataFederation<?>
                     && ((IBigdataFederation<?>) indexManager).isScaleOut()) {
 
-                defaultValue = AbstractTripleStore.Options.DEFAULT_TERMID_BITS_TO_REVERSE;
+                final String defaultValue = AbstractTripleStore.Options.DEFAULT_TERMID_BITS_TO_REVERSE;
+
+                termIdBitsToReverse = Integer.parseInt(getProperty(
+                        AbstractTripleStore.Options.TERMID_BITS_TO_REVERSE,
+                        defaultValue));
+
+                if (termIdBitsToReverse < 0 || termIdBitsToReverse > 31) {
+
+                    throw new IllegalArgumentException(
+                            AbstractTripleStore.Options.TERMID_BITS_TO_REVERSE
+                                    + "=" + termIdBitsToReverse);
+
+                }
 
             } else {
 
-                // false unless this is a scale-out deployment.
-                defaultValue = "0";
+                // Note: Not used in standalone.
+                termIdBitsToReverse = 0;
 
             }
 
-            termIdBitsToReverse = Integer
-                    .parseInt(getProperty(
-                            AbstractTripleStore.Options.TERMID_BITS_TO_REVERSE,
-                            defaultValue));
-            
-            if (termIdBitsToReverse < 0 || termIdBitsToReverse > 31) {
-
-                throw new IllegalArgumentException(
-                        AbstractTripleStore.Options.TERMID_BITS_TO_REVERSE
-                                + "=" + termIdBitsToReverse);
-                
-            }
-            
         }
 
         {

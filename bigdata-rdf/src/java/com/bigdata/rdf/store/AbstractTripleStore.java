@@ -102,6 +102,7 @@ import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.lexicon.TermIdEncoder;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
@@ -484,19 +485,16 @@ abstract public class AbstractTripleStore extends
          * Option effects how evenly distributed the assigned term identifiers
          * which has a pronounced effect on the ID2TERM and statement indices
          * for <em>scale-out deployments</em>. The default for a scale-out
-         * deployment is {@value #DEFAULT_TERMID_BITS_TO_REVERSE}, but the
-         * default for a scale-up deployment is ZERO(0).
+         * deployment is {@value #DEFAULT_TERMID_BITS_TO_REVERSE}. This option
+         * is ignored for a standalone deployment.
          * <p>
          * For the scale-out triple store, the term identifiers are formed by
          * placing the index partition identifier in the high word and the local
-         * counter for the index partition into the low word. In addition, the
-         * sign bit is "stolen" from each value such that the low two bits are
-         * left open for bit flags which encode the type (URI, Literal, BNode or
-         * SID) of the term. The effect of this option is to cause the low N
-         * bits of the local counter value to be reversed and written into the
-         * high N bits of the term identifier (the other bits are shifted down
-         * to make room for this). Regardless of the configured value for this
-         * option, all bits (except the sign bit) of the both the partition
+         * counter for the index partition into the low word. The effect of this
+         * option is to cause the low N bits of the local counter value to be
+         * reversed and written into the high N bits of the term identifier (the
+         * other bits are shifted down to make room for this). Regardless of the
+         * configured value for this option, all bits of the both the partition
          * identifier and the local counter are preserved.
          * <p>
          * Normally, the low bits of a sequential counter will vary the most
@@ -504,11 +502,11 @@ abstract public class AbstractTripleStore extends
          * reversed bits into the high bits of the term identifier we cause the
          * term identifiers to be uniformly (but not randomly) distributed. This
          * is much like using hash function without collisions or a random
-         * number generator that does not produce duplicates. When ZERO (0) no
-         * bits are reversed so the high bits of the term identifiers directly
-         * reflect the partition identifier and the low bits are assigned
-         * sequentially by the local counter within each TERM2ID index
-         * partition.
+         * number generator that does not produce duplicates. When the value of
+         * this option is ZERO (0), no bits are reversed so the high bits of the
+         * term identifiers directly reflect the partition identifier and the
+         * low bits are assigned sequentially by the local counter within each
+         * TERM2ID index partition.
          * <p>
          * The use of a non-zero value for this option can easily cause the
          * write load on the index partitions for the ID2TERM and statement
@@ -537,6 +535,8 @@ abstract public class AbstractTripleStore extends
          * knowledge base. If you estimate that you will have 50 x 200M index
          * partitions for the statement indices, then SQRT(50) =~ 7 would be a
          * good choice.
+         * 
+         * @see TermIdEncoder
          */
         String TERMID_BITS_TO_REVERSE = AbstractTripleStore.class.getName() + ".termIdBitsToReverse";
 
