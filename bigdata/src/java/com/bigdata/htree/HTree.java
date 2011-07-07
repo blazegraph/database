@@ -3187,7 +3187,7 @@ public class HTree extends AbstractHTree
 	     */
 	    int distinctBitsRequired() {
 	    	final int currentResolution = getBitResolution(); // start offset of this page
-	    	int testPrefix = currentResolution;
+	    	int testPrefix = currentResolution+1;
 	    	
 	    	IRaba keys = data.getKeys();
 	    	final int nkeys = keys.size();
