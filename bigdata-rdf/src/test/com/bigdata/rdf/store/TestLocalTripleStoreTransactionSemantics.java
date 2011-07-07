@@ -10,9 +10,6 @@ import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.MockTermIdFactory;
-import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -42,25 +39,42 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
 
     }
 
+    /*
+     * Note: This does not test much. 
+     */
     public void test_commit1() {
 
         final LocalTripleStore store = (LocalTripleStore) getStore();
+        
         try {
             
-            final MockTermIdFactory f = new MockTermIdFactory();
+            final BigdataValueFactory f = store.getValueFactory();
+
+            final BigdataValue s = f.createURI("http://www.bigdata.com/s");
+            final BigdataValue p = f.createURI("http://www.bigdata.com/p");
+            final BigdataValue o = f.createURI("http://www.bigdata.com/o");
+
+            final BigdataValue[] values = new BigdataValue[]{s,p,o};
             
-            final IV<?,?> s = f.newTermId(VTE.URI);
-            final IV<?,?> p = f.newTermId(VTE.URI);
-            final IV<?,?> o = f.newTermId(VTE.URI);
+            store.getLexiconRelation()
+                    .addTerms(values, values.length, false/* readOnly */);
+
+            assertFalse(store.hasStatement(s.getIV(), p.getIV(), o.getIV()));
 
             // add the statement.
             store.addStatements(new SPO[] { //
-                    new SPO(s, p, o, StatementEnum.Explicit) //
+                    new SPO(s.getIV(), p.getIV(), o.getIV(), StatementEnum.Explicit) //
                     },//
                     1);
+
+            assertTrue(store.hasStatement(s.getIV(), p.getIV(), o.getIV()));
+
         } finally {
+    
             store.__tearDownUnitTest();
+            
         }
+
     }
     
 //    /**
@@ -127,15 +141,17 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
      */
     public void test_abort() {
 
-        final MockTermIdFactory f = new MockTermIdFactory();
-        
-        final IV<?,?> s = f.newTermId(VTE.URI);
-        final IV<?,?> p = f.newTermId(VTE.URI);
-        final IV<?,?> o = f.newTermId(VTE.URI);
+//        final MockTermIdFactory f = new MockTermIdFactory();
+//        
+//        final IV<?,?> s = f.newTermId(VTE.URI);
+//        final IV<?,?> p = f.newTermId(VTE.URI);
+//        final IV<?,?> o = f.newTermId(VTE.URI);
 
         class AbortException extends RuntimeException {
             private static final long serialVersionUID = 1L;
         }
+
+        BigdataValue s = null, p = null, o = null;
 
         final LocalTripleStore store = (LocalTripleStore) getStore();
 
@@ -144,14 +160,25 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
             // Should be a nop.
             store.abort();
 
+            final BigdataValueFactory f = store.getValueFactory();
+
+            s = f.createURI("http://www.bigdata.com/s"); 
+            p = f.createURI("http://www.bigdata.com/p"); 
+            o = f.createURI("http://www.bigdata.com/o"); 
+            
+            final BigdataValue[] values = new BigdataValue[]{s,p,o};
+            
+            store.getLexiconRelation()
+                    .addTerms(values, values.length, false/* readOnly */);
+            
             // add the statement.
             store.addStatements(new SPO[] { //
-                    new SPO(s, p, o, StatementEnum.Explicit) //
+                    new SPO(s.getIV(), p.getIV(), o.getIV(), StatementEnum.Explicit) //
                     },//
                     1);
 
             // visible in the repo.
-            assertTrue(store.hasStatement(s, p, o));
+            assertTrue(store.hasStatement(s.getIV(), p.getIV(), o.getIV()));
 
             throw new AbortException();
 
@@ -161,7 +188,7 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
             store.abort();
 
             // no longer visible in the repo.
-            assertFalse(store.hasStatement(s, p, o));
+            assertFalse(store.hasStatement(s.getIV(), p.getIV(), o.getIV()));
 
         } catch (Throwable t) {
 
