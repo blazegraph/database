@@ -17,6 +17,8 @@ import com.bigdata.rawstore.IRawStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: MutableNodeData.java 2265 2009-10-26 12:51:06Z thompsonbry $
+ * 
+ * FIXME Unit tests for this class, including constructors.
  */
 public class MutableDirectoryPageData implements IDirectoryData {
 
@@ -124,36 +126,42 @@ public class MutableDirectoryPageData implements IDirectoryData {
 
 		childAddr = new long[1 << addressBits];
 
-//		childEntryCounts = new int[branchingFactor + 1];
+        this.hasVersionTimestamps = src.hasVersionTimestamps();
 
-		final int nchildren = src.getChildCount();
-
-//		int sum = 0;
-
-		for (int i = 0; i < nchildren; i++) {
-
-			childAddr[i] = src.getChildAddr(i);
-
-//			final int tmp = childEntryCounts[i] = src.getChildEntryCount(i);
-
-//			sum += tmp;
-
-		}
-
-		this.hasVersionTimestamps = src.hasVersionTimestamps();
-
-		if (src.hasVersionTimestamps()) {
-
-			minimumVersionTimestamp = src.getMinimumVersionTimestamp();
-
-			maximumVersionTimestamp = src.getMaximumVersionTimestamp();
-
-		}
-
-//		assert sum == nentries;
-
+		copyFrom(src);
+		
 	}
 
+	void copyFrom(final IDirectoryData src) {
+
+//	     childEntryCounts = new int[branchingFactor + 1];
+
+        final int nchildren = src.getChildCount();
+
+//      int sum = 0;
+
+        for (int i = 0; i < nchildren; i++) {
+
+            childAddr[i] = src.getChildAddr(i);
+
+//          final int tmp = childEntryCounts[i] = src.getChildEntryCount(i);
+
+//          sum += tmp;
+
+        }
+
+        if (src.hasVersionTimestamps()) {
+
+            minimumVersionTimestamp = src.getMinimumVersionTimestamp();
+
+            maximumVersionTimestamp = src.getMaximumVersionTimestamp();
+
+        }
+
+//      assert sum == nentries;
+
+	}
+	
 	/**
 	 * Ctor based on just the "data" -- used by unit tests.
 	 * 
