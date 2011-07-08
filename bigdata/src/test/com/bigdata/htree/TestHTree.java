@@ -880,11 +880,11 @@ public class TestHTree extends TestCase2 {
 
             // FIXME This now fails since it correctly rejects the reindex!
             // split (a) into (a,e), re-indexing the tuples.
-            assertTrue(htree.splitAndReindexFullBucketPage(d/* parent */,
+            assertFalse(htree.splitAndReindexFullBucketPage(d/* parent */,
                     0/* buddyOffset */, 4 /* prefixLength */, a/* oldBucket */));
 
             assertEquals("nnodes", 2, htree.getNodeCount()); // unchanged.
-            assertEquals("nleaves", 4, htree.getLeafCount());
+            assertEquals("nleaves", 3, htree.getLeafCount());
             assertEquals("nentries", 4, htree.getEntryCount()); // unchanged
 
             assertTrue(root == htree.getRoot());
@@ -1645,6 +1645,7 @@ public class TestHTree extends TestCase2 {
 
             final HTree htree = new HTree(store, addressBits, false/* rawRecords */);
 
+            try {
             // Verify initial conditions.
             assertTrue("store", store == htree.getStore());
             assertEquals("addressBits", addressBits, htree.getAddressBits());
@@ -1693,6 +1694,11 @@ public class TestHTree extends TestCase2 {
              * the iterator!
              */
 //            assertSameIteratorAnyOrder(keys, htree.iterator());
+            } catch (Error ae) {
+            	System.err.print("Pretty Print:" + htree.PP());
+            	
+            	throw ae;
+            }
             
         } finally {
 

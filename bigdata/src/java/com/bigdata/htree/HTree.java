@@ -2453,6 +2453,17 @@ public class HTree extends AbstractHTree
 	        
 	    }
 	    
+	    static final String s_inset="...................."; // 20 dots
+	    String insetStr() {
+	    	int dots = getBitResolution();
+	    	
+	    	String ret = s_inset.substring(0, dots % 20);
+	    	while ((dots -= 20) > 0)
+	    		ret = ret + s_inset;
+	    	
+	    	return ret;
+	    }
+	    
 	    /**
 	     * The HTree.
 	     * 
@@ -2804,6 +2815,10 @@ public class HTree extends AbstractHTree
 		 */
 		abstract protected boolean dump(Level level, PrintStream out,
 				int height, boolean recursive, boolean materialize);
+
+		public void PP(StringBuilder sb) {
+			
+		}
 
 	} // class AbstractPage
 
@@ -3269,7 +3284,19 @@ public class HTree extends AbstractHTree
             
         }
 
-	    /**
+
+		public void PP(StringBuilder sb) {
+			sb.append("B[" + globalDepth + "]\n");
+			String inset = insetStr();
+			IRaba raba = getKeys();
+			for (int r = 0; r < raba.size(); r++) {
+				sb.append(inset);
+				byte[] b = raba.get(r);
+				sb.append("L{" + (b == null ? "" : b[0]) + "}\n");
+			}
+		}
+
+		/**
 	     * Human readable representation of the {@link ILeafData} plus transient
 	     * information associated with the {@link BucketPage}.
 	     */
@@ -3984,6 +4011,19 @@ public class HTree extends AbstractHTree
 
 	    }
 
+		public void PP(StringBuilder sb) {
+			sb.append("D[" + globalDepth + "]\n");
+			String inset = insetStr();
+			for (int c = 0; c < childRefs.length; c++) {
+				
+				sb.append(inset);
+				if (childRefs[c] == null)
+					sb.append("[]\n");
+				else
+					childRefs[c].get().PP(sb);
+			}
+		}
+
     } // class DirectoryPage
 
     /**
@@ -4149,5 +4189,11 @@ public class HTree extends AbstractHTree
 	    
 	}
 
-	
+	String PP() {
+		StringBuilder sb = new StringBuilder();
+		
+		root.PP(sb);
+		
+		return sb.toString();
+	}
 }
