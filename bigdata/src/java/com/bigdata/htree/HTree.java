@@ -353,7 +353,7 @@ public class HTree extends AbstractHTree
 			 * the prefixLength and compute the offset of the buddy hash table
 			 * within the child before descending into the child.
 			 */
-			prefixLength = prefixLength + child.globalDepth;
+			prefixLength = prefixLength + current.globalDepth;
 			buddyOffset = HTreeUtil
 					.getBuddyOffset(hashBits, current.globalDepth,
 							child.globalDepth/* localDepthOfChild */);
@@ -467,7 +467,7 @@ public class HTree extends AbstractHTree
 			 * the prefixLength and compute the offset of the buddy hash table
 			 * within the child before descending into the child.
 			 */
-			prefixLength = prefixLength + child.globalDepth;
+			prefixLength = prefixLength + current.globalDepth;
 			buddyOffset = HTreeUtil
 					.getBuddyOffset(hashBits, current.globalDepth,
 							child.globalDepth/* localDepthOfChild */);

@@ -997,4 +997,22 @@ public class TestBytesUtil extends TestCase2 {
 
     }
 
+    public void testMaskOffLSB() {
+        final int v1 = 0x07;
+        
+        assertTrue(BytesUtil.maskOffLSB(v1, 0) == 0);
+        assertTrue(BytesUtil.maskOffLSB(v1, 1) == 0x01);
+        assertTrue(BytesUtil.maskOffLSB(v1, 2) == 0x03);
+        assertTrue(BytesUtil.maskOffLSB(v1, 3) == 0x07);
+        assertTrue(BytesUtil.maskOffLSB(v1, 4) == 0x07);
+        
+        final int v2 = 0x70;
+        
+        assertTrue(BytesUtil.maskOffLSB(v2, 4) == 0);
+        assertTrue(BytesUtil.maskOffLSB(v2, 5) == 0x10);
+        assertTrue(BytesUtil.maskOffLSB(v2, 6) == 0x30);
+        assertTrue(BytesUtil.maskOffLSB(v2, 7) == 0x70);
+        assertTrue(BytesUtil.maskOffLSB(v2, 8) == 0x70);
+    }
+
 }

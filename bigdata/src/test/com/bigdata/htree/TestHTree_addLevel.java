@@ -29,7 +29,6 @@ package com.bigdata.htree;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.htree.HTree.BucketPage;
@@ -44,21 +43,28 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestHTree_addLevel_x10_x11_x20_x21_x22 extends TestCase2 {
+public class TestHTree_addLevel extends TestCase2 {
 
     /**
      * 
      */
-    public TestHTree_addLevel_x10_x11_x20_x21_x22() {
+    public TestHTree_addLevel() {
     }
 
     /**
      * @param name
      */
-    public TestHTree_addLevel_x10_x11_x20_x21_x22(String name) {
+    public TestHTree_addLevel(String name) {
         super(name);
     }
 
+    /**
+     * Unit test which inserts <code>
+     * x10, x11, x20, x21</code> and then works through
+     * addLevel() and splitAndReindex(). For that sequence of keys, we can get
+     * by with a single addLevel() and then immediately split and reindex the
+     * full bucket page.
+     */
     public void test_addLevel() {
 
         final int addressBits = 2;
@@ -295,6 +301,10 @@ public class TestHTree_addLevel_x10_x11_x20_x21_x22 extends TestCase2 {
             //	two buddies both filling their two available slots.
             
             assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
+
+            /*
+             * This looks ahead a bit but does not prove anything in depth.
+             */
             
             htree.insert(k5, v5);
             
@@ -303,6 +313,7 @@ public class TestHTree_addLevel_x10_x11_x20_x21_x22 extends TestCase2 {
             htree.insert(k6, v6);
             
             assertEquals(v5, htree.lookupFirst(k5));
+            assertEquals(v6, htree.lookupFirst(k6));
             
 
         } finally {
@@ -312,24 +323,6 @@ public class TestHTree_addLevel_x10_x11_x20_x21_x22 extends TestCase2 {
         }
     }
     
-    public void testMaskOffLSB() {
-    	final int v1 = 0x07;
-    	
-    	assertTrue(BytesUtil.maskOffLSB(v1, 0) == 0);
-    	assertTrue(BytesUtil.maskOffLSB(v1, 1) == 0x01);
-    	assertTrue(BytesUtil.maskOffLSB(v1, 2) == 0x03);
-    	assertTrue(BytesUtil.maskOffLSB(v1, 3) == 0x07);
-    	assertTrue(BytesUtil.maskOffLSB(v1, 4) == 0x07);
-    	
-    	final int v2 = 0x70;
-    	
-    	assertTrue(BytesUtil.maskOffLSB(v2, 4) == 0);
-    	assertTrue(BytesUtil.maskOffLSB(v2, 5) == 0x10);
-    	assertTrue(BytesUtil.maskOffLSB(v2, 6) == 0x30);
-    	assertTrue(BytesUtil.maskOffLSB(v2, 7) == 0x70);
-    	assertTrue(BytesUtil.maskOffLSB(v2, 8) == 0x70);
-    }
-
     static void assertSameBucketData(ILeafData expected, ILeafData actual) {
 
         TestHTree.assertSameBucketData(expected, actual);
