@@ -880,11 +880,11 @@ public class TestHTree extends TestCase2 {
 
             // FIXME This now fails since it correctly rejects the reindex!
             // split (a) into (a,e), re-indexing the tuples.
-            assertFalse(htree.splitAndReindexFullBucketPage(d/* parent */,
+            assertTrue(htree.splitAndReindexFullBucketPage(d/* parent */,
                     0/* buddyOffset */, 4 /* prefixLength */, a/* oldBucket */));
 
             assertEquals("nnodes", 2, htree.getNodeCount()); // unchanged.
-            assertEquals("nleaves", 3, htree.getLeafCount());
+            assertEquals("nleaves", 4, htree.getLeafCount());
             assertEquals("nentries", 4, htree.getEntryCount()); // unchanged
 
             assertTrue(root == htree.getRoot());
@@ -1668,6 +1668,8 @@ public class TestHTree extends TestCase2 {
 
                         final byte[] b = keys[j];
                         System.out.println("verifying: " + j);
+                        if (j == 2 && i == 5)
+                            System.out.println("debug point");
                         assertEquals(b, htree.lookupFirst(b));
                         
                     }
@@ -1677,9 +1679,9 @@ public class TestHTree extends TestCase2 {
             }
 
             // Verify all tuples are found.
-            for (int i = firstKey; i < limit; i++) {
+            for (int i = firstKey; i <= limit; i++) {
 
-                final byte[] key = keyBuilder.reset().append(i).getKey();
+                final byte[] key = keys[i];
 
                 assertEquals(key, htree.lookupFirst(key));
 
@@ -1689,9 +1691,9 @@ public class TestHTree extends TestCase2 {
 
             /*
              * FIXME Verify the iterator visits all of the tuples in an
-             * arbitrary order. E.g., assertSameIteratorAnyOrder(). This needs
-             * to use an appropriate resolver pattern and we need to implement
-             * the iterator!
+             * arbitrary order. E.g., assertSameIteratorAnyOrder(). This
+             * needs to use an appropriate resolver pattern and we need to
+             * implement the iterator!
              */
 //            assertSameIteratorAnyOrder(keys, htree.iterator());
             } catch (Error ae) {
