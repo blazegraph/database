@@ -26,7 +26,7 @@ code will build automatically under eclipse.  You can also build the code using
 the ant script.  The cluster installer requires the use of the ant script.  You
 can checkout this release from the following URL:
 
-https://bigdata.svn.sourceforge.net/svnroot/bigdata/branches/BIGDATA_RELEASE_1_0_0
+https://bigdata.svn.sourceforge.net/svnroot/bigdata/tags/BIGDATA_RELEASE_1_0_0
 
 New features:
 
