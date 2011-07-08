@@ -1635,6 +1635,8 @@ public class TestHTree extends TestCase2 {
         // validate against ground truth even N inserts.
         final int validateInterval = 1;
         
+        final int firstKey = 1;
+        
         final int addressBits = 2;
 
         final IRawStore store = new SimpleMemoryRawStore();
@@ -1651,7 +1653,7 @@ public class TestHTree extends TestCase2 {
             
             final byte[][] keys = new byte[limit][];
 
-            for (int i = 1; i < limit; i++) {
+            for (int i = firstKey; i < limit; i++) {
 
                 final byte[] key = keyBuilder.reset().append((byte)i).getKey();
 
@@ -1659,16 +1661,22 @@ public class TestHTree extends TestCase2 {
                 System.err.println("i="+i);
                 htree.insert(key, key);
 
-                if (i % validateInterval == 0) {
+                if ((i % validateInterval) == 0) {
 
-//                    for(int j=0; j<i) // FIXME Verify lookup and iterator scan.
+                    for (int j = firstKey; j <= i; j++) {
+
+                        final byte[] b = keys[j];
+                        System.out.println("verifying: " + j);
+                        assertEquals(b, htree.lookupFirst(b));
+                        
+                    }
                     
                 }
                 
             }
 
             // Verify all tuples are found.
-            for (int i = 0; i < limit; i++) {
+            for (int i = firstKey; i < limit; i++) {
 
                 final byte[] key = keyBuilder.reset().append(i).getKey();
 
