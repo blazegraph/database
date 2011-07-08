@@ -1827,7 +1827,6 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
      * Mutable counter.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class Counter implements ICounter {
 
@@ -1835,7 +1834,8 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
         
         public Counter(final BTree btree) {
             
-            assert btree != null;
+            if (btree == null)
+                throw new IllegalArgumentException();
             
             this.btree = btree;
             
@@ -1863,11 +1863,10 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
                 
             }
                 
-            if (counter == Long.MAX_VALUE) {
+            if (counter == 0L) {
 
                 /*
-                 * Actually, the counter would overflow on the next call but
-                 * this eager error makes the test for overflow atomic.
+                 * The counter has wrapped back to ZERO.
                  */
                 
                 throw new RuntimeException("Counter overflow");
@@ -1878,7 +1877,7 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
             
         }
         
-    }
+    } // class Counter
 
     /**
      * Places the counter values into a namespace formed by the partition
@@ -1887,12 +1886,13 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
      * int32 word.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class PartitionedCounter implements ICounter {
 
         private final int partitionId;
         private final ICounter src;
+
+        private static final long MAX_LOCAL_COUNTER = 1L << 32;
         
         public PartitionedCounter(final int partitionId, final ICounter src) {
 
@@ -1904,7 +1904,7 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
             this.src = src;
             
         }
-        
+
         /**
          * Range checks the source counter (it must fit in the lower 32-bit
          * word) and then jambs the partition identifier into the high word.
@@ -1916,24 +1916,27 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
          * 
          * @throws RuntimeException
          *             if the source counter has overflowed.
+         * 
+         * @see TermIdEncoder#combine(pid,ctr), which performs the same
+         *      operation and MUST be consistent with this method.
          */
         private long wrap(final long tmp) {
             
-            if (tmp > Integer.MAX_VALUE) {
+            if (tmp >= MAX_LOCAL_COUNTER) {
 
                 throw new RuntimeException("Counter overflow");
-
+                
             }
 
-            /*
-             * Place the partition identifier into the high int32 word and place
-             * the truncated counter value into the low int32 word.
-             * 
-             * Note: You MUST cast [partitionId] to a long or left-shifting
-             * 32-bits will always clear it to zero.
-             */
+            return combine(partitionId, (int) tmp);
             
-            return (((long)partitionId) << 32) | (int) tmp;
+//            /*
+//             * Place the partition identifier into the high int32 word and place
+//             * the truncated counter value into the low int32 word.
+//             */
+//            
+////            return (((long)partitionId) << 32) | (int) tmp;
+//            return ((long) partitionId) << 32 | (0xFFFFFFFFL & (long) tmp);
             
         }
         
@@ -1944,12 +1947,58 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
         }
 
         public long incrementAndGet() {
-            
-            return wrap( src.incrementAndGet() );
+
+            return wrap(src.incrementAndGet());
 
         }
         
-    }
+        /**
+         * Return the partition identifier from the high word of a partitioned
+         * counter.
+         * 
+         * @param v
+         *            The partitioned counter.
+         * 
+         * @return The high word.
+         */
+        public static int getPartitionId(final long v) {
+
+            return (int) (v >>> 32);
+
+        }
+
+        /**
+         * Return the local counter from the low word of a partitioned counter.
+         * 
+         * @param v
+         *            The partitioned counter.
+         * 
+         * @return The low word.
+         */
+        public static int getLocalCounter(final long v) {
+
+            return (int) v;
+
+        }
+
+        /**
+         * Combines the partition identifier and the local counter using the same
+         * logic as the {@link PartitionedCounter}.
+         * 
+         * @param pid
+         *            The partition identifier.
+         * @param ctr
+         *            The local counter.
+         * 
+         * @return The long counter assembled from those values.
+         */
+        public static long combine(final int pid, final int ctr) {
+
+            return ((long) pid) << 32 | (0xFFFFFFFFL & (long) ctr);
+
+        }
+
+    } // class PartitionedCounter
 
     /**
      * Returns ONE (1).
