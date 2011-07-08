@@ -970,9 +970,9 @@ public class BytesUtil {
 	static {
 
 		// Populate the array of masking values.
-		masks32 = new int[32];
+		masks32 = new int[33];
 
-		for (int i = 0; i < 32; i++)
+		for (int i = 0; i < 33; i++)
 			masks32[i] = getMSBMask(i);
 
 	}
@@ -1055,7 +1055,7 @@ public class BytesUtil {
 		if (nbits < 0 || nbits > 32)
 			throw new IllegalArgumentException();
 
-		final int v = h & ~masks32[nbits];
+		final int v = h & ~masks32[32-nbits];
 
 		return v;
 
