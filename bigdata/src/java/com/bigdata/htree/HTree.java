@@ -549,8 +549,18 @@ public class HTree extends AbstractHTree
                          * below the root on the path to that bucket.
                          */
 
-                        return innerInsertFullBucket(key, value, prefixLength,
-                                current, bucketPage);
+                        if (child.globalDepth == addressBits) {
+
+                            return innerInsertFullBucket(key, value,
+                                    prefixLength, current, bucketPage);
+                            
+                        } else {
+
+                            splitDirectoryPage(
+                                    current.getParentDirectory()/* parent */,
+                                    buddyOffset, current/* oldChild */);
+
+					    }
 
 					}
 
@@ -1478,8 +1488,8 @@ public class HTree extends AbstractHTree
         
         if (oldParentIsAlwaysRoot == null)
             throw new IllegalArgumentException();
-        if (oldParentIsAlwaysRoot != root)
-            throw new IllegalArgumentException();
+//        if (oldParentIsAlwaysRoot != root)
+//            throw new IllegalArgumentException();
 //        if (childIsUnused == null)
 //            throw new IllegalArgumentException();
 //        if (childIsUnused.globalDepth != oldParent.globalDepth) {
