@@ -1656,7 +1656,7 @@ public class TestHTree extends TestCase2 {
                 final byte[] key = keyBuilder.reset().append((byte)i).getKey();
 
                 keys[i] = key;
-                
+                System.err.println("i="+i);
                 htree.insert(key, key);
 
                 if (i % validateInterval == 0) {
