@@ -29,6 +29,7 @@ package com.bigdata.htree;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.htree.HTree.BucketPage;
@@ -71,12 +72,14 @@ public class TestHTree_addLevel_x10_x11_x20_x21_x22 extends TestCase2 {
             final byte[] k3 = new byte[] { 0x20 };
             final byte[] k4 = new byte[] { 0x21 };
             final byte[] k5 = new byte[] { 0x12 };
+            final byte[] k6 = new byte[] { 0x13 };
 
             final byte[] v1 = new byte[] { 0x10 };
             final byte[] v2 = new byte[] { 0x11 };
             final byte[] v3 = new byte[] { 0x20 };
             final byte[] v4 = new byte[] { 0x21 };
             final byte[] v5 = new byte[] { 0x12 };
+            final byte[] v6 = new byte[] { 0x13 };
 
             final HTree htree = new HTree(store, addressBits, false/* rawRecords */);
 
@@ -231,7 +234,7 @@ public class TestHTree_addLevel_x10_x11_x20_x21_x22 extends TestCase2 {
 
             // split (a) into (a,e), re-indexing the tuples.
             assertTrue(htree.splitAndReindexFullBucketPage(d/* parent */,
-                    0/* buddyOffset */, 2 /* prefixLengthToParent */, a/* oldBucket */));
+                    0/* buddyOffset */, 2 /* prefixLengthOfParent */, a/* oldBucket */));
 
             assertEquals("nnodes", 2, htree.getNodeCount()); // unchanged.
             assertEquals("nleaves", 4, htree.getLeafCount());
@@ -288,14 +291,43 @@ public class TestHTree_addLevel_x10_x11_x20_x21_x22 extends TestCase2 {
             assertEquals(v3, htree.lookupFirst(k3));
             assertEquals(v4, htree.lookupFirst(k4));
             
-            // verify that [a] will now accept an insert.
-            assertTrue(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
+            // verify that [a] still will not accept an insert since the split has created
+            //	two buddies both filling their two available slots.
+            
+            assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
+            
+            htree.insert(k5, v5);
+            
+            assertEquals(v5, htree.lookupFirst(k5));
+            
+            htree.insert(k6, v6);
+            
+            assertEquals(v5, htree.lookupFirst(k5));
+            
 
         } finally {
 
             store.destroy();
 
         }
+    }
+    
+    public void testMaskOffLSB() {
+    	final int v1 = 0x07;
+    	
+    	assertTrue(BytesUtil.maskOffLSB(v1, 0) == 0);
+    	assertTrue(BytesUtil.maskOffLSB(v1, 1) == 0x01);
+    	assertTrue(BytesUtil.maskOffLSB(v1, 2) == 0x03);
+    	assertTrue(BytesUtil.maskOffLSB(v1, 3) == 0x07);
+    	assertTrue(BytesUtil.maskOffLSB(v1, 4) == 0x07);
+    	
+    	final int v2 = 0x70;
+    	
+    	assertTrue(BytesUtil.maskOffLSB(v2, 4) == 0);
+    	assertTrue(BytesUtil.maskOffLSB(v2, 5) == 0x10);
+    	assertTrue(BytesUtil.maskOffLSB(v2, 6) == 0x30);
+    	assertTrue(BytesUtil.maskOffLSB(v2, 7) == 0x70);
+    	assertTrue(BytesUtil.maskOffLSB(v2, 8) == 0x70);
     }
 
     static void assertSameBucketData(ILeafData expected, ILeafData actual) {
