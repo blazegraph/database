@@ -1904,7 +1904,7 @@ ${postInstallMessage}</echo>
       	     haltonfailure="no"
 	     logfailedtests="true"
 	     showoutput="true"
-      	     fork="yes"
+      	     fork="no"
       	     forkmode="once"
       	     clonevm="true"
       	>
