@@ -63,8 +63,8 @@ public class TestAll extends TestCase {
         // vocabulary test suite (w/o triple store)
         suite.addTest( com.bigdata.rdf.vocab.TestAll.suite() );
 
-        // axioms test suite (w/o triple store)
-        suite.addTest( com.bigdata.rdf.axioms.TestAll.suite() );
+        // axioms test suite (w/o triple store) [Note: axioms test suite is now proxied.]
+        //suite.addTest( com.bigdata.rdf.axioms.TestAll.suite() );
 
         // test suite for RDF specific operators.
         suite.addTest( com.bigdata.bop.rdf.TestAll.suite() );
