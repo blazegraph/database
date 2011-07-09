@@ -14,8 +14,6 @@ import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.BlobIV;
-import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataValueIterator;
@@ -81,14 +79,13 @@ public class HitConvertor implements
                             @Override
                             protected Object resolve(final Object arg0) {
 
-                                final IHit hit = (IHit) arg0;
+                                final IHit<?> hit = (IHit<?>) arg0;
 
-                                /*
-                                 * FIXME TERMS REFACTOR : The hit will directly
-                                 * give us the IV (or a byte[] for that IV). We
-                                 * just need to return that IV here.
-                                 */
-                                throw new UnsupportedOperationException();
+								/*
+								 * The hit gives us the IV (or a byte[] for that
+								 * IV). We just need to return that IV here.
+								 */
+                                return (IV<?,?>) hit.getDocId();
 //                                return new TermId(VTE.LITERAL, hit.getDocId());
                             }
 
