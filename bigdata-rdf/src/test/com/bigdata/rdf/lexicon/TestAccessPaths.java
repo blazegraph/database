@@ -30,19 +30,23 @@ package com.bigdata.rdf.lexicon;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Properties;
 
 import org.openrdf.model.vocabulary.RDF;
 
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
+import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.vocab.NoVocabulary;
+import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -99,7 +103,9 @@ public class TestAccessPaths extends AbstractTripleStoreTestCase {
             // lookup/add some values.
             final BigdataValueFactory f = store.getValueFactory();
 
-            terms.add(f.asValue(RDF.TYPE));
+            final BigdataValue rdfType;
+            final BigdataValue largeLiteral;
+            terms.add(rdfType=f.asValue(RDF.TYPE));
             terms.add(f.asValue(RDF.PROPERTY));
             terms.add(f.createLiteral("test"));
             terms.add(f.createLiteral("test", "en"));
@@ -117,6 +123,8 @@ public class TestAccessPaths extends AbstractTripleStoreTestCase {
 
             terms.add(f.createLiteral("12.00", f
                     .createURI("http://www.w3.org/2001/XMLSchema#float")));
+            
+            terms.add(largeLiteral=f.createLiteral(TestAddTerms.getVeryLargeLiteral()));
 
             if (store.getLexiconRelation().isStoreBlankNodes()) {
                 /*
@@ -143,8 +151,12 @@ public class TestAccessPaths extends AbstractTripleStoreTestCase {
 
             }
 
-            fail("write tests for access paths (ID2TERM, BLOBS)");
+            // Test id2terms for reverse lookup.
+
+            doAccessPathTest(rdfType, LexiconKeyOrder.ID2TERM, store);
             
+            doAccessPathTest(largeLiteral, LexiconKeyOrder.BLOBS, store);
+			
         } finally {
 
             store.__tearDownUnitTest();
@@ -153,4 +165,47 @@ public class TestAccessPaths extends AbstractTripleStoreTestCase {
 
     }
 
+	/**
+	 * Test the access path.
+	 * 
+	 * @param expected
+	 *            The {@link BigdataValue} with its {@link IV}.
+	 * @param expectedKeyOrder
+	 *            The keyorder to be used.
+	 * @param store
+	 *            The store.
+	 */
+	private void doAccessPathTest(final BigdataValue expected,
+			final IKeyOrder<BigdataValue> expectedKeyOrder,
+			final AbstractTripleStore store) {
+
+		assertNotNull(expected.getIV());
+
+		final LexiconRelation r = store.getLexiconRelation();
+
+		final IPredicate<BigdataValue> predicate = LexPredicate
+				.reverseInstance(r.getNamespace(), ITx.UNISOLATED,
+						new Constant<IV>(expected.getIV()));
+
+		final IKeyOrder<BigdataValue> keyOrder = r.getKeyOrder(predicate);
+
+		assertEquals(expectedKeyOrder, keyOrder);
+
+		final IAccessPath<BigdataValue> ap = r.newAccessPath(
+				store.getIndexManager(), predicate, keyOrder);
+
+		assertEquals(1, ap.rangeCount(false/* exact */));
+		assertEquals(1, ap.rangeCount(true/* exact */));
+
+		final Iterator<BigdataValue> itr = ap.iterator();
+		assertTrue(itr.hasNext());
+		final BigdataValue actual = itr.next();
+		assertFalse(itr.hasNext());
+
+		assertEquals(expected, actual);
+
+		assertEquals(expected.getIV(), actual.getIV());
+
+	}
+    
 }

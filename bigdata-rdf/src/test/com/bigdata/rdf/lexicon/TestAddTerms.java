@@ -512,7 +512,7 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
 
     }
         
-    private String getVeryLargeURI() {
+    static String getVeryLargeURI() {
 
         final int len = 1024000;
 
@@ -533,7 +533,7 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
         
     }
     
-    private String getVeryLargeLiteral() {
+    static String getVeryLargeLiteral() {
 
         final int len = 1024000;
 
