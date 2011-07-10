@@ -2464,8 +2464,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             storeCounters.ntruncate++;
             
-            if(WARN)
-                log.warn("newLength=" + cf.format(newExtent) + ", file="
+            if(log.isInfoEnabled())
+                log.info("newLength=" + cf.format(newExtent) + ", file="
                                 + file);
             
             if(log.isInfoEnabled())
