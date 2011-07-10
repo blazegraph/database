@@ -2143,8 +2143,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
             }
 
-            if (WARN)
-                log.warn("newLength=" + cf.format(newExtent) + ", file="+ file);
+            if (log.isInfoEnabled())
+                log.info("newLength=" + cf.format(newExtent) + ", file="+ file);
 
             if (log.isInfoEnabled())
                 log.info(getCounters().toString());
