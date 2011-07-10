@@ -315,6 +315,17 @@ public class CounterSetBTree extends BTree {
             
         }
 
+		/**
+		 * Overridden to serialize just {@link Entry#value} as the value
+		 * component of the B+Tree tuple.
+		 */
+        @Override
+        public byte[] serializeVal(final Entry value) {
+
+			return SerializerUtil.serialize(value.value);
+
+        }
+        
         public Entry deserialize(final ITuple tuple) {
 
             final byte[] key = tuple.getKey();
@@ -389,7 +400,7 @@ public class CounterSetBTree extends BTree {
                 
                 final byte[] key = tupleSer.serializeKey(entry);
                 
-                final byte[] val = tupleSer.serializeVal(entry);//.value);
+                final byte[] val = tupleSer.serializeVal(entry);
                 
                 v.add(new KVO<Entry>(key, val, entry));
                 
