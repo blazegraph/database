@@ -151,7 +151,7 @@ public class TestUnicodeHelper extends TestCase2 {
 
     public void test_encodeDecode2() throws IOException {
         
-        doEncodeDecodeTest(new UnicodeHelper(new BOCU1Compressor()),
+        doEncodeDecodeTest(new UnicodeHelper(getUnicodeCompressor()),
                 new String[] { //
             "en", "bigdata" //
             });
