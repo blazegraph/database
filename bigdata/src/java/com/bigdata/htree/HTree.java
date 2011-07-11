@@ -31,12 +31,14 @@ import java.io.PrintStream;
 import java.lang.ref.Reference;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractNode;
 import com.bigdata.btree.AbstractTuple;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
@@ -59,6 +61,12 @@ import com.bigdata.htree.raba.MutableValueBuffer;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.IRawStore;
+
+import cutthecrap.utils.striterators.Expander;
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.SingleValueIterator;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * An mutable persistence capable extensible hash tree.
@@ -89,6 +97,7 @@ public class HTree extends AbstractHTree
 //	implements 
 //	IIndex, 
 //  ISimpleBTree//, IAutoboxBTree, ILinearList, IBTreeStatistics, ILocalBTreeView
+//  IRangeQuery
 {
 
     private static final transient Logger log = Logger.getLogger(HTree.class);
@@ -474,7 +483,7 @@ public class HTree extends AbstractHTree
 			current = (DirectoryPage) child;
 		}
 	}
-	
+
     public void insert(final Object obj) {
         insert(obj.hashCode(), SerializerUtil.serialize(obj));
     }
@@ -665,12 +674,45 @@ public class HTree extends AbstractHTree
                  * Add a level; increases prefixLength to bucketPage by one.
                  */
 
-                final int buddyOffset = getBuddyOffsetOfDirectoryPageOnPathToFullBucket(
-                        key, bucketPage.parent.get());
+//                final int buddyOffset = getBuddyOffsetOfDirectoryPageOnPathToFullBucket(
+//                        key, bucketPage.parent.get());
+//
+//                addLevel(bucketPage.parent.get()/* oldParentIsAlwaysRoot */,
+//                        buddyOffset, splitBits);
 
-                addLevel(bucketPage.parent.get()/* oldParentIsAlwaysRoot */,
-                        buddyOffset, splitBits);
+				/*
+				 * To split the page, we have to introduce a new directory page
+				 * above it and then introduce a sibling bucket page and finally
+				 * re-index the tuples in the bucket page such that they are
+				 * either the original bucket page or its new sibling bucket
+				 * page.
+				 * 
+				 * Note: If all keys on the page are duplicates then we can not
+				 * split the page. Instead we must let the page "overflow."
+				 * BucketPage.insert() handles this condition for us by allowing
+				 * the page to overflow rather than telling us to split the
+				 * page.
+				 * 
+				 * TODO Unit test this to make sure that it is introducing the
+				 * new level along the path to the full bucket page (rather than
+				 * some other path).
+				 */
 
+				// hash bits for the root directory.
+				final int hashBitsForRoot = root
+						.getLocalHashCode(key, 0/* prefixLengthForRootIsZero */);
+
+				// find the child of the root directory page.
+				final AbstractPage childOfRoot = root.getChild(
+						hashBitsForRoot, 0/* buddyOffsetOfRootIsZero */);
+
+				final int buddyOffsetInChild = HTreeUtil.getBuddyOffset(
+						hashBitsForRoot, root.globalDepth,
+						childOfRoot.globalDepth/* localDepthOfChild */);
+
+				// Add a level.
+				addLevel(root/* parent */, buddyOffsetInChild, splitBits);
+            	
             } else {
 
                 /*
@@ -987,6 +1029,10 @@ public class HTree extends AbstractHTree
      * the new child will be the same as the then current depth of the original
      * child. Note that this doubles the size of each buddy bucket, thus always
      * creating room for additional tuples.
+     * <p>
+     * Note: This is really just doubling the address space for the buddy buckets
+     * on the page.  Since each buddy bucket now has twice as many slots, we have
+     * to move 1/2 of the buddy buckets to a new bucket page.
      * 
      * @param parent
      *            The parent {@link DirectoryPage}.
@@ -2816,10 +2862,9 @@ public class HTree extends AbstractHTree
 		abstract protected boolean dump(Level level, PrintStream out,
 				int height, boolean recursive, boolean materialize);
 
-		public void PP(StringBuilder sb) {
-			
-		}
-
+		/** Pretty print the page and any materialized children. */
+		abstract void PP(StringBuilder sb);
+		
 	} // class AbstractPage
 
 	/**
@@ -3284,18 +3329,19 @@ public class HTree extends AbstractHTree
             
         }
 
-
-		public void PP(StringBuilder sb) {
-			sb.append("B[" + globalDepth + "]\n");
-			String inset = insetStr();
-			IRaba raba = getKeys();
+		@Override
+		public void PP(final StringBuilder sb) {
+			sb.append("B#" + (hashCode() % 100) + "[" + globalDepth + "]{");
+			final IRaba raba = getKeys();
 			for (int r = 0; r < raba.size(); r++) {
-				sb.append(inset);
-				byte[] b = raba.get(r);
-				sb.append("L{" + (b == null ? "" : b[0]) + "}\n");
+				final byte[] b = raba.get(r);
+				if (r != 0)
+					sb.append(",");
+				sb.append((b == null ? "-" : b[0]));
 			}
+			sb.append("}\n");
 		}
-
+		
 		/**
 	     * Human readable representation of the {@link ILeafData} plus transient
 	     * information associated with the {@link BucketPage}.
@@ -3641,6 +3687,126 @@ public class HTree extends AbstractHTree
 
         }
 
+		/**
+		 * Iterator visits children recursively expanding each child with a
+		 * post-order traversal of its children and finally visits this node
+		 * itself.
+		 */
+		@SuppressWarnings("unchecked")
+		public Iterator<AbstractPage> postOrderIterator() {
+
+			/*
+			 * Iterator append this node to the iterator in the post-order
+			 * position.
+			 */
+
+			return new Striterator(postOrderIterator2())
+					.append(new SingleValueIterator(this));
+
+		}
+	    
+	    /**
+	     * Visits the children (recursively) using post-order traversal, but does
+	     * NOT visit this node.
+	     */
+	    @SuppressWarnings("unchecked")
+	    private Iterator<AbstractPage> postOrderIterator2() {
+
+	        /*
+	         * Iterator visits the direct children, expanding them in turn with a
+	         * recursive application of the post-order iterator.
+	         * 
+	         * The iterator must touch the node in order to guarentee that a node
+	         * will still be dirty by the time that the caller visits it. This
+	         * places the node onto the hard reference queue and increments its
+	         * reference counter. Evictions do NOT cause IO when the reference is
+	         * non-zero, so the node will not be made persistent as a result of
+	         * other node touches. However, the node can still be made persistent if
+	         * the caller explicitly writes the node onto the store.
+	         */
+
+	        // BTree.log.debug("node: " + this);
+	        return new Striterator(childIterator())
+	                .addFilter(new Expander() {
+
+	                    private static final long serialVersionUID = 1L;
+
+	                    /*
+	                     * Expand each child in turn.
+	                     */
+	                    protected Iterator expand(final Object childObj) {
+
+	                        /*
+	                         * A child of this node.
+	                         */
+
+	                        final AbstractPage child = (AbstractPage) childObj;
+
+	                        if (!child.isLeaf()) {
+
+	                            /*
+	                             * The child is a Node (has children).
+	                             * 
+	                             * Visit the children (recursive post-order
+	                             * traversal).
+	                             */
+
+	                            // BTree.log.debug("child is node: " + child);
+	                            final Striterator itr = new Striterator(
+	                                    ((DirectoryPage) child).postOrderIterator2());
+
+	                            // append this node in post-order position.
+	                            itr.append(new SingleValueIterator(child));
+
+	                            return itr;
+
+	                        } else {
+
+	                            /*
+	                             * The child is a leaf.
+	                             */
+
+	                            // BTree.log.debug("child is leaf: " + child);
+	                            
+	                            // Visit the leaf itself.
+	                            return new SingleValueIterator(child);
+
+	                        }
+	                    }
+	                });
+
+	    }
+	    
+	    /**
+	     * Iterator visits the direct child nodes in the external key ordering.
+	     */
+	    private Iterator<AbstractNode> childIterator() {
+
+	        return new ChildIterator();
+
+	    }
+
+	    private class ChildIterator implements Iterator<AbstractNode> {
+
+	    	private int slotsPerBuddy;
+	    	private int slot;
+	    	
+			public boolean hasNext() {
+				// TODO Auto-generated method stub
+				return false;
+			}
+
+			public AbstractNode next() {
+				// TODO Auto-generated method stub
+				return null;
+			}
+
+			public void remove() {
+				throw new UnsupportedOperationException();
+			}
+	    	
+	    }
+	    
 	    /**
 	     * Human readable representation of the {@link Node}.
 	     */
@@ -4011,11 +4177,12 @@ public class HTree extends AbstractHTree
 
 	    }
 
-		public void PP(StringBuilder sb) {
-			sb.append("D[" + globalDepth + "]\n");
-			String inset = insetStr();
+		@Override
+		public void PP(final StringBuilder sb) {
+			sb.append("D#" + (hashCode() % 100) + "[" + globalDepth + "]\n");
+			final String inset = insetStr();
 			for (int c = 0; c < childRefs.length; c++) {
-				
+
 				sb.append(inset);
 				if (childRefs[c] == null)
 					sb.append("[]\n");
@@ -4023,7 +4190,7 @@ public class HTree extends AbstractHTree
 					childRefs[c].get().PP(sb);
 			}
 		}
-
+	    
     } // class DirectoryPage
 
     /**
@@ -4189,11 +4356,153 @@ public class HTree extends AbstractHTree
 	    
 	}
 
+	/**
+	 * Pretty print the {@link HTree}.
+	 */
 	String PP() {
-		StringBuilder sb = new StringBuilder();
+		
+		final StringBuilder sb = new StringBuilder();
 		
 		root.PP(sb);
 		
 		return sb.toString();
+	
 	}
+
+	public long rangeCount() {
+	
+		return nentries;
+	
+	}
+
+	/**
+	 * Simple iterator visits all tuples in the {@link HTree} in key order.
+	 * Since the key is typically a hash of some fields in the associated
+	 * application data record, this will normally visit application data
+	 * records in what appears to be an arbitrary order.
+	 * <p>
+	 * Note: The {@link HTree} does not currently maintain metadata about
+	 * the #of spanned tuples in a {@link DirectoryPage}.  Without that we 
+	 * can not provide fast range counts, linear list indexing, etc.
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public ITupleIterator rangeIterator() {
+		
+		return new BucketPageTupleIterator(this,
+				IRangeQuery.DEFAULT/* flags */, new Striterator(
+						root.postOrderIterator()).addFilter(new Filter() {
+					private static final long serialVersionUID = 1L;
+					public boolean isValid(final Object obj) {
+						return ((AbstractPage) obj).isLeaf();
+					}
+				}));
+	
+	}
+
+	/**
+	 * Visits the values stored in the {@link HTree}.
+	 * <p>
+	 * Note: This allocates a new byte[] for each visited value. It is more
+	 * efficient to reuse a buffer for each visited {@link Tuple}.  This can
+	 * be done using {@link #rangeIterator()}.
+	 * 
+	 * TODO Must resolve references to raw records.
+	 */
+	@SuppressWarnings("unchecked")
+	public Iterator<byte[]> values() {
+		
+		return new Striterator(rangeIterator()).addFilter(new Resolver(){
+			private static final long serialVersionUID = 1L;
+			protected Object resolve(final Object obj) {
+				return ((ITuple<?>)obj).getValue();
+			}});
+		
+	}
+
+	/**
+	 * Visits the non-empty tuples in each {@link BucketPage} visited by the
+	 * source iterator.
+	 */
+	private static class BucketPageTupleIterator<E> implements
+			ITupleIterator<E> {
+
+		private final Iterator<BucketPage> src;
+		private BucketPage currentBucketPage = null;
+		private int nextNonEmptySlot = -1;
+
+		private final Tuple<E> tuple;
+
+		BucketPageTupleIterator(final HTree htree, final int flags,
+				final Iterator<BucketPage> src) {
+
+			if (htree == null)
+				throw new IllegalArgumentException();
+
+			if(src == null)
+				throw new IllegalArgumentException();
+			
+			this.tuple = new Tuple<E>(htree,flags);
+			
+			this.src = src;
+			
+		}
+		
+		/**
+		 * Scan to the next non-empty slot in the current {@link BucketPage}.
+		 * 
+		 * @return <code>true</code> iff there is a non-empty slot on the
+		 *         current {@link BucketPage}.
+		 */
+		private boolean findNextSlot() {
+			if (currentBucketPage == null)
+				throw new IllegalStateException();
+			final int slotsPerPage = 1 << currentBucketPage.htree.addressBits;
+			final IRaba keys = currentBucketPage.getKeys();
+			while (nextNonEmptySlot < slotsPerPage) {
+				nextNonEmptySlot++;
+				if (keys.isNull(nextNonEmptySlot))
+					continue;
+				return true;
+			}
+			// The current page is exhausted.  We need to fetch another page.
+			currentBucketPage = null;
+			return false;
+		}
+		
+		public boolean hasNext() {
+			if(currentBucketPage != null) {
+				return true;
+			}
+			// Scan for the next bucket page having a visitable tuple.
+			while(src.hasNext()) {
+				currentBucketPage = src.next();
+				nextNonEmptySlot = -1;
+				if (!findNextSlot())
+					continue;
+				return true;
+			}
+			return false;
+		}
+
+		public ITuple<E> next() {
+			if (!hasNext())
+				throw new NoSuchElementException();
+			// Copy the data for the current tuple into the Tuple buffer.
+			tuple.copy(nextNonEmptySlot, currentBucketPage);
+			/*
+			 * Advance to the next slot on the current page. if there is non,
+			 * then the current page reference will be cleared and we will need
+			 * to fetch a new page in hasNext() on the next invocation.
+			 */
+			findNextSlot();
+			// Return the Tuple buffer.
+			return tuple;
+		}
+		
+		public void remove() {
+			throw new UnsupportedOperationException();
+		}
+
+	}
+	
 }

@@ -272,7 +272,9 @@ public class TestHTree extends TestCase2 {
                     new byte[][] { v1 }, htree.lookupAll(k1));
             AbstractBTreeTestCase.assertSameIterator(//
                     new byte[][] {}, htree.lookupAll(unused));
-
+            //assertSameIterator(new AbstractPage[]{a}); // TODO Verify the direct and recursive iterators.
+            assertSameIterator(new byte[][]{v1}, htree.values());
+            
             /**
              * 2. Insert a tuple (0x02). Since the root directory is only paying
              * attention to the 2 MSB bits, this will be hashed into the same
@@ -332,7 +334,8 @@ public class TestHTree extends TestCase2 {
                     .lookupAll(k2));
             AbstractBTreeTestCase.assertSameIterator(new byte[][] {}, htree
                     .lookupAll(unused));
-
+            assertSameIterator(new byte[][]{v1,v2}, htree.values());
+            
             /**
              * 3. Insert 0x03. This forces another split.
              * <pre> 
@@ -398,7 +401,8 @@ public class TestHTree extends TestCase2 {
                     .lookupAll(k3));
             AbstractBTreeTestCase.assertSameIterator(new byte[][] {}, htree
                     .lookupAll(unused));
-
+            assertSameIterator(new byte[][]{v1,v2,v3}, htree.values());
+            
             /**
              * 4. Insert 0x04. This goes into the same buddy bucket. The buddy
              * bucket is now full again. It is only the only buddy bucket on the
@@ -474,7 +478,8 @@ public class TestHTree extends TestCase2 {
                     .lookupAll(k4));
             AbstractBTreeTestCase.assertSameIterator(new byte[][] {}, htree
                     .lookupAll(unused));
-
+            assertSameIterator(new byte[][]{v1,v2,v3,v4}, htree.values());
+            
         } finally {
 
             store.destroy();
@@ -792,6 +797,9 @@ public class TestHTree extends TestCase2 {
                             null, null, null, null})),//
                     b);
 
+            if(log.isInfoEnabled())
+            	log.info(htree.PP());
+            
             // verify that [a] will not accept an insert.
             assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
 
@@ -805,11 +813,11 @@ public class TestHTree extends TestCase2 {
              * to split (a).
              * 
              * <pre>
-             * root := [2] ######## (d,d,b,b)     //
-             * d    := [1] 0#######   (a,a;c,c)   // added new level below the root.  
-             * a    := [0] ########     (1;2;3;4) // local depth now 0. NB: inconsistent intermediate state!!!
-             * c    := [0] ########     (-;-;-;-) // local depth now 0.
-             * b    := [1] 1#######   (-,-;-,-)   //
+             * root := [2]  (d,d,b,b)     //
+             * d    := [1]    (a,a;c,c)   // added new level below the root.  
+             * a    := [0]      (1;2;3;4) // local depth now 0. NB: inconsistent intermediate state!!!
+             * c    := [0]      (-;-;-;-) // local depth now 0.
+             * b    := [1]    (-,-;-,-)   //
              * </pre>
              */
 
@@ -859,143 +867,56 @@ public class TestHTree extends TestCase2 {
                             null, null, null, null})),//
                     b);
 
+            if(log.isInfoEnabled())
+            	log.info(htree.PP());
+            
             // verify that [a] will not accept an insert.
             assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
             
             /**
-             * Split (a), creating a new bucket page (e) and re-index the tuples
-             * from (a) into (a,e). In this case, they all wind up back in (a)
-             * so (a) remains full (no free slots). The local depth of (a) and
-             * (e) are now (1).
+             * Split the parent directory.
+             * 
+             * Note: We need to continue with split directory and/or add level
+             * until we the prefix length is long enough to create a distinction
+             * which allows us to split and reindex the bucket page.
              * 
              * <pre>
-             * root := [2] ######## (d,d,b,b)     //
-             * d    := [1] 0#######   (a,e;c,c)   // 
-             * a    := [1] 00######     (1,2;3,4) // local depth now 1. 
-             * e    := [1] 01######     (-,-;-,-) // local depth now 1 (new sibling)
-             * c    := [0] ########     (-;-;-;-) // 
-             * b    := [1] ########   (-,-;-,-)   //
-             * </pre>
-             */
-
-            // FIXME This now fails since it correctly rejects the reindex!
-            // split (a) into (a,e), re-indexing the tuples.
-            assertTrue(htree.splitAndReindexFullBucketPage(d/* parent */,
-                    0/* buddyOffset */, 4 /* prefixLength */, a/* oldBucket */));
-
-            assertEquals("nnodes", 2, htree.getNodeCount()); // unchanged.
-            assertEquals("nleaves", 4, htree.getLeafCount());
-            assertEquals("nentries", 4, htree.getEntryCount()); // unchanged
-
-            assertTrue(root == htree.getRoot());
-            final BucketPage e = (BucketPage) d.childRefs[1].get();
-            assertTrue(d == root.childRefs[0].get());
-            assertTrue(d == root.childRefs[1].get());
-            assertTrue(b == root.childRefs[2].get());
-            assertTrue(b == root.childRefs[3].get());
-            assertTrue(a == d.childRefs[0].get());
-            assertTrue(e == d.childRefs[1].get());
-            assertTrue(c == d.childRefs[2].get());
-            assertTrue(c == d.childRefs[3].get());
-            assertEquals(2, root.globalDepth);
-            assertEquals(1, d.globalDepth);
-            assertEquals(1, a.globalDepth);
-            assertEquals(1, e.globalDepth);
-            assertEquals(0, c.globalDepth);
-            assertEquals(1, b.globalDepth);
-            assertEquals(4, a.getKeyCount());
-            assertEquals(0, e.getKeyCount());
-            assertEquals(0, c.getKeyCount());
-            assertEquals(0, b.getKeyCount());
-
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(4, new byte[][] { // keys
-                            k1, k2, k3, k4 }),//
-                    new ReadOnlyValuesRaba(4, new byte[][] { // vals
-                            v1, v2, v3, v4 })),//
-                    a);
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
-                            null, null, null, null }),//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
-                            null, null, null, null})),//
-                    e);
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
-                            null, null, null, null }),//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
-                            null, null, null, null})),//
-                    c);
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
-                            null, null, null, null }),//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
-                            null, null, null, null})),//
-                    b);
-
-            assertEquals(v1, htree.lookupFirst(k1));
-            assertEquals(v2, htree.lookupFirst(k2));
-            assertEquals(v3, htree.lookupFirst(k3));
-            assertEquals(v4, htree.lookupFirst(k4));
-            
-            // verify that [a] will not accept an insert (still full).
-            assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
-
-            /**
-             * We still can not insert (5) since it would be insert into a buddy
-             * bucket on (a) which is full. So, we need to split (a). However,
-             * depth(a) == depth(a.parent) so we have to split the parent first.
-             * In this case, (d) is not a single buddy hash table so we can
-             * split it without adding a new level. This doubles the #of
-             * pointers to each child that was linked from (d). The
-             * post-condition is:
-             * 
-             * <pre>
-             * root := [2] (d,f,b,b)     //
-             * d    := [2]   (a,a,e,e)   // local depth += 1. 
-             * f    := [2]   (c,c,c,c)   // local depth same as (d).
-             * a    := [1]     (1,2;3,4) // unchanged 
-             * e    := [1]     (-,-;-,-) // unchanged
-             * c    := [0]     (-,-,-,-) // unchanged 
+             * root := [2] (d,e,b,b)     //
+             * d    := [2]   (a,a,a,a)   // split directory page, increases depth by 1. 
+             * e    := [2]   (c,c,c,c)   // new directory page @ same depth
+             * a    := [0]     (1;2;3;4) // local depth now 0. NB: inconsistent intermediate state!!!
+             * c    := [0]     (-;-;-;-) // local depth now 0.
              * b    := [1]   (-,-;-,-)   //
              * </pre>
-             * 
-             * Note that the local depth of (a), (e), and (c) DO NOT change.
-             * When we double the #of pointers to those nodes this exactly
-             * offsets the increased in the depth of (d) resulting in NO change
-             * in the depth of (a,e,c).
              */
+
+            htree.splitDirectoryPage(root/*parent*/, 0/*buddyOffset*/, d/*oldChild*/);
             
-            htree
-                    .splitDirectoryPage(root/* parent */, 0/* buddyOffset */, d/* oldChild */);
-            
-            assertEquals("nnodes", 3, htree.getNodeCount()); 
-            assertEquals("nleaves", 4, htree.getLeafCount()); // unchanged.
+            assertEquals("nnodes", 3, htree.getNodeCount());
+            assertEquals("nleaves", 3, htree.getLeafCount()); // unchanged
             assertEquals("nentries", 4, htree.getEntryCount()); // unchanged
 
             assertTrue(root == htree.getRoot());
-            final DirectoryPage f = (DirectoryPage) root.childRefs[1].get();
+            final DirectoryPage e = (DirectoryPage) root.childRefs[1].get();
             assertTrue(d == root.childRefs[0].get());
-            assertTrue(f == root.childRefs[1].get());
+            assertTrue(e == root.childRefs[1].get());
             assertTrue(b == root.childRefs[2].get());
             assertTrue(b == root.childRefs[3].get());
             assertTrue(a == d.childRefs[0].get());
             assertTrue(a == d.childRefs[1].get());
-            assertTrue(e == d.childRefs[2].get());
-            assertTrue(e == d.childRefs[3].get());
-            assertTrue(c == f.childRefs[0].get());
-            assertTrue(c == f.childRefs[1].get());
-            assertTrue(c == f.childRefs[2].get());
-            assertTrue(c == f.childRefs[3].get());
+            assertTrue(a == d.childRefs[2].get());
+            assertTrue(a == d.childRefs[3].get());
+            assertTrue(c == e.childRefs[0].get());
+            assertTrue(c == e.childRefs[1].get());
+            assertTrue(c == e.childRefs[2].get());
+            assertTrue(c == e.childRefs[3].get());
             assertEquals(2, root.globalDepth);
             assertEquals(2, d.globalDepth);
-            assertEquals(2, f.globalDepth);
-            assertEquals(1, a.globalDepth);
-            assertEquals(1, e.globalDepth);
+            assertEquals(2, e.globalDepth);
+            assertEquals(0, a.globalDepth);
             assertEquals(0, c.globalDepth);
             assertEquals(1, b.globalDepth);
             assertEquals(4, a.getKeyCount());
-            assertEquals(0, e.getKeyCount());
             assertEquals(0, c.getKeyCount());
             assertEquals(0, b.getKeyCount());
 
@@ -1010,12 +931,6 @@ public class TestHTree extends TestCase2 {
                             null, null, null, null }),//
                     new ReadOnlyValuesRaba(0, new byte[][] { // vals
                             null, null, null, null})),//
-                    e);
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
-                            null, null, null, null }),//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
-                            null, null, null, null})),//
                     c);
             assertSameBucketData(new MockBucketData(//
                     new ReadOnlyValuesRaba(0, new byte[][] { // keys
@@ -1024,237 +939,71 @@ public class TestHTree extends TestCase2 {
                             null, null, null, null})),//
                     b);
 
-            // verify that [a] will not accept an insert (still full).
+            if(log.isInfoEnabled())
+            	log.info(htree.PP());
+            
+            // verify that [a] will not accept an insert.
             assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
 
             /**
-             * Split (a).
+             * Add a new level.
+             * 
+             * Note: We need to continue with split directory and/or add level
+             * until we the prefix length is long enough to create a distinction
+             * which allows us to split and reindex the bucket page.
              * 
              * <pre>
-             * root := [2] (d,f,b,b)     //
-             * d    := [2]   (a,g,e,e)   //  
-             * f    := [2]   (c,c,c,c)   // 
-             * a    := [2]     (1,2,_,_) // local depth += 1. 
-             * g    := [2]     (3,4,_,_) // local depth same as (a). 
-             * e    := [1]     (-,-;-,-) // 
-             * c    := [0]     (-,-,-,-) //  
-             * b    := [1]   (-,-;-,-)   //
+             * root := [2] (f,f,b,b)       //
+             * f    := [1]   (d,d,e,e)     // new level @ depth 1.
+             * d    := [0]     (a,a,a,a)   // 
+             * e    := [0]     (c,c,c,c)   // 
+             * a    := [0]       (1;2;3;4) // local depth now 0. NB: inconsistent intermediate state!!!
+             * c    := [0]       (-;-;-;-) // local depth now 0.
+             * b    := [1]   (-,-;-,-)     //
              * </pre>
              */
 
-            htree
-                    .splitBucketsOnPage(d/* parent */, 0/* buddyOffset */, a/* oldChild */);
+            htree.addLevel(htree.root/*oldParent*/, 0/*buddyOffset*/, htree.splitBits);
             
-            assertEquals("nnodes", 3, htree.getNodeCount());  // unchanged.
-            assertEquals("nleaves", 5, htree.getLeafCount());
+            assertEquals("nnodes", 4, htree.getNodeCount());
+            assertEquals("nleaves", 3, htree.getLeafCount()); // unchanged
             assertEquals("nentries", 4, htree.getEntryCount()); // unchanged
 
             assertTrue(root == htree.getRoot());
-            assertTrue(d == root.childRefs[0].get());
+            final DirectoryPage f = (DirectoryPage) root.childRefs[1].get();
+            assertTrue(f == root.childRefs[0].get());
             assertTrue(f == root.childRefs[1].get());
             assertTrue(b == root.childRefs[2].get());
             assertTrue(b == root.childRefs[3].get());
-            final BucketPage g = (BucketPage) d.childRefs[1].get();
+            assertTrue(d == f.childRefs[0].get());
+            assertTrue(d == f.childRefs[1].get());
+            assertTrue(e == f.childRefs[2].get());
+            assertTrue(e == f.childRefs[3].get());
             assertTrue(a == d.childRefs[0].get());
-            assertTrue(g == d.childRefs[1].get());
-            assertTrue(e == d.childRefs[2].get());
-            assertTrue(e == d.childRefs[3].get());
-            assertTrue(c == f.childRefs[0].get());
-            assertTrue(c == f.childRefs[1].get());
-            assertTrue(c == f.childRefs[2].get());
-            assertTrue(c == f.childRefs[3].get());
+            assertTrue(a == d.childRefs[1].get());
+            assertTrue(a == d.childRefs[2].get());
+            assertTrue(a == d.childRefs[3].get());
+            assertTrue(c == e.childRefs[0].get());
+            assertTrue(c == e.childRefs[1].get());
+            assertTrue(c == e.childRefs[2].get());
+            assertTrue(c == e.childRefs[3].get());
             assertEquals(2, root.globalDepth);
-            assertEquals(2, d.globalDepth);
-            assertEquals(2, f.globalDepth);
-            assertEquals(2, a.globalDepth);
-            assertEquals(2, g.globalDepth);
-            assertEquals(1, e.globalDepth);
-            assertEquals(0, c.globalDepth);
-            assertEquals(1, b.globalDepth);
-            assertEquals(2, a.getKeyCount());
-            assertEquals(2, g.getKeyCount());
-            assertEquals(0, e.getKeyCount());
-            assertEquals(0, c.getKeyCount());
-            assertEquals(0, b.getKeyCount());
-
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(2, new byte[][] { // keys
-                            k1, k2, null, null }),//
-                    new ReadOnlyValuesRaba(2, new byte[][] { // vals
-                            v1, v2, null, null })),//
-                    a);
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(2, new byte[][] { // keys
-                            k3, k4, null, null }),//
-                    new ReadOnlyValuesRaba(2, new byte[][] { // vals
-                            v3, v4, null, null})),//
-                    g);
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
-                            null, null, null, null }),//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
-                            null, null, null, null})),//
-                    e);
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
-                            null, null, null, null }),//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
-                            null, null, null, null})),//
-                    c);
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
-                            null, null, null, null }),//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
-                            null, null, null, null})),//
-                    b);
-
-            /**
-             * Insert (5).
-             * 
-             * <pre>
-             * root := [2] (d,f,b,b)     //
-             * d    := [2]   (a,g,e,e)   //  
-             * f    := [2]   (c,c,c,c)   // 
-             * a    := [2]     (1,2,5,_) //  
-             * g    := [2]     (3,4,_,_) //  
-             * e    := [1]     (-,-;-,-) // 
-             * c    := [0]     (-,-,-,-) //  
-             * b    := [1]   (-,-;-,-)   //
-             * </pre>
-             */
-
-            htree.insert(k5, v5);
-            
-            assertEquals("nnodes", 3, htree.getNodeCount()); // unchanged.
-            assertEquals("nleaves", 5, htree.getLeafCount());// unchanged
-            assertEquals("nentries", 5, htree.getEntryCount());
-
-            assertTrue(root == htree.getRoot());
-            assertTrue(d == root.childRefs[0].get());
-            assertTrue(f == root.childRefs[1].get());
-            assertTrue(b == root.childRefs[2].get());
-            assertTrue(b == root.childRefs[3].get());
-            assertTrue(a == d.childRefs[0].get());
-            assertTrue(g == d.childRefs[1].get());
-            assertTrue(e == d.childRefs[2].get());
-            assertTrue(e == d.childRefs[3].get());
-            assertTrue(c == f.childRefs[0].get());
-            assertTrue(c == f.childRefs[1].get());
-            assertTrue(c == f.childRefs[2].get());
-            assertTrue(c == f.childRefs[3].get());
-            assertEquals(2, root.globalDepth);
-            assertEquals(2, d.globalDepth);
-            assertEquals(2, f.globalDepth);
-            assertEquals(2, a.globalDepth);
-            assertEquals(2, g.globalDepth);
-            assertEquals(1, e.globalDepth);
-            assertEquals(0, c.globalDepth);
-            assertEquals(1, b.globalDepth);
-            assertEquals(3, a.getKeyCount());
-            assertEquals(2, g.getKeyCount());
-            assertEquals(0, e.getKeyCount());
-            assertEquals(0, c.getKeyCount());
-            assertEquals(0, b.getKeyCount());
-
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(3, new byte[][] { // keys
-                            k1, k2, k5, null }),//
-                    new ReadOnlyValuesRaba(3, new byte[][] { // vals
-                            v1, v2, v5, null })),//
-                    a);
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(2, new byte[][] { // keys
-                            k3, k4, null, null }),//
-                    new ReadOnlyValuesRaba(2, new byte[][] { // vals
-                            v3, v4, null, null})),//
-                    g);
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
-                            null, null, null, null }),//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
-                            null, null, null, null})),//
-                    e);
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
-                            null, null, null, null }),//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
-                            null, null, null, null})),//
-                    c);
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
-                            null, null, null, null }),//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
-                            null, null, null, null})),//
-                    b);
-
-            /**
-             * Insert (6).
-             * 
-             * There are no structural changes required for this insert.
-             * 
-             * <pre>
-             * root := [2] (d,f,b,b)     //
-             * d    := [2]   (a,g,e,e)   //  
-             * f    := [2]   (c,c,c,c)   // 
-             * a    := [2]     (1,2,5,6) //  
-             * g    := [2]     (3,4,_,_) //  
-             * e    := [1]     (-,-;-,-) // 
-             * c    := [0]     (-,-,-,-) //  
-             * b    := [1]   (-,-;-,-)   //
-             * </pre>
-             */
-
-            htree.insert(k6, v6);
-
-            assertEquals("nnodes", 3, htree.getNodeCount());
-            assertEquals("nleaves", 5, htree.getLeafCount());
-            assertEquals("nentries", 6, htree.getEntryCount());
-
-            assertTrue(root == htree.getRoot());
-            assertTrue(d == root.childRefs[0].get());
-            assertTrue(f == root.childRefs[1].get());
-            assertTrue(b == root.childRefs[2].get());
-            assertTrue(b == root.childRefs[3].get());
-            assertTrue(a == d.childRefs[0].get());
-            assertTrue(g == d.childRefs[1].get());
-            assertTrue(e == d.childRefs[2].get());
-            assertTrue(e == d.childRefs[3].get());
-            assertTrue(c == f.childRefs[0].get());
-            assertTrue(c == f.childRefs[1].get());
-            assertTrue(c == f.childRefs[2].get());
-            assertTrue(c == f.childRefs[3].get());
-            assertEquals(2, root.globalDepth);
-            assertEquals(2, d.globalDepth);
-            assertEquals(2, f.globalDepth);
-            assertEquals(2, a.globalDepth);
-            assertEquals(2, g.globalDepth);
-            assertEquals(1, e.globalDepth);
+            assertEquals(1, f.globalDepth);
+            assertEquals(0, d.globalDepth);
+            assertEquals(0, e.globalDepth);
+            assertEquals(0, a.globalDepth);
             assertEquals(0, c.globalDepth);
             assertEquals(1, b.globalDepth);
             assertEquals(4, a.getKeyCount());
-            assertEquals(2, g.getKeyCount());
-            assertEquals(0, e.getKeyCount());
             assertEquals(0, c.getKeyCount());
             assertEquals(0, b.getKeyCount());
 
             assertSameBucketData(new MockBucketData(//
                     new ReadOnlyValuesRaba(4, new byte[][] { // keys
-                            k1, k2, k5, k6 }),//
+                            k1, k2, k3, k4 }),//
                     new ReadOnlyValuesRaba(4, new byte[][] { // vals
-                            v1, v2, v5, v6})),//
+                            v1, v2, v3, v4 })),//
                     a);
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(2, new byte[][] { // keys
-                            k3, k4, null, null }),//
-                    new ReadOnlyValuesRaba(2, new byte[][] { // vals
-                            v3, v4, null, null})),//
-                    g);
-            assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
-                            null, null, null, null }),//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
-                            null, null, null, null})),//
-                    e);
             assertSameBucketData(new MockBucketData(//
                     new ReadOnlyValuesRaba(0, new byte[][] { // keys
                             null, null, null, null }),//
@@ -1268,51 +1017,223 @@ public class TestHTree extends TestCase2 {
                             null, null, null, null})),//
                     b);
 
+            if(log.isInfoEnabled())
+            	log.info(htree.PP());
+            
+            // verify that [a] will not accept an insert.
+            assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
+
             /**
-             * Insert (7).
+             * Split a directory page (top-most with less than addressBits depth).
              * 
-             * The insert would be directed into (a), but (a) is full and can
-             * not be split since depth(a) == depth(d). Also, we can not split
-             * (d) since depth(d) == depth(root).
-             * 
-             * The first step is to add a new level under the root on the path
-             * to (a). The post-condition for that step is:
+             * Note: We need to continue with split directory and/or add level
+             * until we the prefix length is long enough to create a distinction
+             * which allows us to split and reindex the bucket page.
              * 
              * <pre>
-             * root := [2] (h,h,b,b)       //
-             * h    := [1]   (d,d,f,f)     // new level @ depth := 1. 
-             * d    := [0]     (a,g,e,e)   // local depth is changed.  
-             * f    := [0]     (c,c,c,c)   // local depth is changed.
-             * a    := [2]       (1,2,5,6) //  
-             * g    := [2]       (3,4,_,_) //  
-             * e    := [1]       (-,-;-,-) // 
-             * c    := [0]       (-,-,-,-) //  
+             * root := [2] (f,f,b,b)       //
+             * f    := [1]   (d,d,e,e)     // new level @ depth 1.
+             * d    := [0]     (a,a,a,a)   // 
+             * e    := [0]     (c,c,c,c)   // 
+             * a    := [0]       (1;2;3;4) // local depth now 0. NB: inconsistent intermediate state!!!
+             * c    := [0]       (-;-;-;-) // local depth now 0.
              * b    := [1]   (-,-;-,-)     //
              * </pre>
              */
-//            htree.addLevel(root, 0/* buddyOffsetInChild */, htree.splitBits);
+
+//            /**
+//             * Split (a), creating a new bucket page (e) and re-index the tuples
+//             * from (a) into (a,e). In this case, they all wind up back in (a)
+//             * so (a) remains full (no free slots). The local depth of (a) and
+//             * (e) are now (1).
+//             * 
+//             * <pre>
+//             * root := [2] ######## (d,d,b,b)     //
+//             * d    := [1] 0#######   (a,e;c,c)   // 
+//             * a    := [1] 00######     (1,2;3,4) // local depth now 1. 
+//             * e    := [1] 01######     (-,-;-,-) // local depth now 1 (new sibling)
+//             * c    := [0] ########     (-;-;-;-) // 
+//             * b    := [1] ########   (-,-;-,-)   //
+//             * </pre>
+//             */
 //
-//            // FIXME At least one dir split will be necessary as well.
-////            htree.splitDirectoryPage(d/*parent*/, 0/*buddyOffset*/, oldChild);
-//            
+//            // FIXME This now fails since it correctly rejects the reindex!
 //            // split (a) into (a,e), re-indexing the tuples.
-//            htree.splitAndReindexFullBucketPage(d/* parent */,
-//                    0/* buddyOffset */, 4 /* prefixLength */, a/* oldBucket */);
+//            assertTrue(htree.splitAndReindexFullBucketPage(d/* parent */,
+//                    0/* buddyOffset */, 4 /* prefixLength */, a/* oldBucket */));
 //
-//            assertEquals("nnodes", 4, htree.getNodeCount());
-//            assertEquals("nleaves", 5, htree.getLeafCount());
-//            assertEquals("nentries", 6, htree.getEntryCount());
+//            assertEquals("nnodes", 2, htree.getNodeCount()); // unchanged.
+//            assertEquals("nleaves", 4, htree.getLeafCount());
+//            assertEquals("nentries", 4, htree.getEntryCount()); // unchanged
 //
 //            assertTrue(root == htree.getRoot());
-//            final DirectoryPage h = (DirectoryPage) root.childRefs[0].get();
-//            assertTrue(h == root.childRefs[0].get());
-//            assertTrue(h == root.childRefs[1].get());
+//            final BucketPage e = (BucketPage) d.childRefs[1].get();
+//            assertTrue(d == root.childRefs[0].get());
+//            assertTrue(d == root.childRefs[1].get());
 //            assertTrue(b == root.childRefs[2].get());
 //            assertTrue(b == root.childRefs[3].get());
-//            assertTrue(d == h.childRefs[0].get());
-//            assertTrue(d == h.childRefs[1].get());
-//            assertTrue(f == h.childRefs[2].get());
-//            assertTrue(f == h.childRefs[3].get());
+//            assertTrue(a == d.childRefs[0].get());
+//            assertTrue(e == d.childRefs[1].get());
+//            assertTrue(c == d.childRefs[2].get());
+//            assertTrue(c == d.childRefs[3].get());
+//            assertEquals(2, root.globalDepth);
+//            assertEquals(1, d.globalDepth);
+//            assertEquals(1, a.globalDepth);
+//            assertEquals(1, e.globalDepth);
+//            assertEquals(0, c.globalDepth);
+//            assertEquals(1, b.globalDepth);
+//            assertEquals(4, a.getKeyCount());
+//            assertEquals(0, e.getKeyCount());
+//            assertEquals(0, c.getKeyCount());
+//            assertEquals(0, b.getKeyCount());
+//
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(4, new byte[][] { // keys
+//                            k1, k2, k3, k4 }),//
+//                    new ReadOnlyValuesRaba(4, new byte[][] { // vals
+//                            v1, v2, v3, v4 })),//
+//                    a);
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+//                            null, null, null, null }),//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
+//                            null, null, null, null})),//
+//                    e);
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+//                            null, null, null, null }),//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
+//                            null, null, null, null})),//
+//                    c);
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+//                            null, null, null, null }),//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
+//                            null, null, null, null})),//
+//                    b);
+//
+//            assertEquals(v1, htree.lookupFirst(k1));
+//            assertEquals(v2, htree.lookupFirst(k2));
+//            assertEquals(v3, htree.lookupFirst(k3));
+//            assertEquals(v4, htree.lookupFirst(k4));
+//            
+//            // verify that [a] will not accept an insert (still full).
+//            assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
+//
+//            /**
+//             * We still can not insert (5) since it would be insert into a buddy
+//             * bucket on (a) which is full. So, we need to split (a). However,
+//             * depth(a) == depth(a.parent) so we have to split the parent first.
+//             * In this case, (d) is not a single buddy hash table so we can
+//             * split it without adding a new level. This doubles the #of
+//             * pointers to each child that was linked from (d). The
+//             * post-condition is:
+//             * 
+//             * <pre>
+//             * root := [2] (d,f,b,b)     //
+//             * d    := [2]   (a,a,e,e)   // local depth += 1. 
+//             * f    := [2]   (c,c,c,c)   // local depth same as (d).
+//             * a    := [1]     (1,2;3,4) // unchanged 
+//             * e    := [1]     (-,-;-,-) // unchanged
+//             * c    := [0]     (-,-,-,-) // unchanged 
+//             * b    := [1]   (-,-;-,-)   //
+//             * </pre>
+//             * 
+//             * Note that the local depth of (a), (e), and (c) DO NOT change.
+//             * When we double the #of pointers to those nodes this exactly
+//             * offsets the increased in the depth of (d) resulting in NO change
+//             * in the depth of (a,e,c).
+//             */
+//            
+//            htree
+//                    .splitDirectoryPage(root/* parent */, 0/* buddyOffset */, d/* oldChild */);
+//            
+//            assertEquals("nnodes", 3, htree.getNodeCount()); 
+//            assertEquals("nleaves", 4, htree.getLeafCount()); // unchanged.
+//            assertEquals("nentries", 4, htree.getEntryCount()); // unchanged
+//
+//            assertTrue(root == htree.getRoot());
+//            final DirectoryPage f = (DirectoryPage) root.childRefs[1].get();
+//            assertTrue(d == root.childRefs[0].get());
+//            assertTrue(f == root.childRefs[1].get());
+//            assertTrue(b == root.childRefs[2].get());
+//            assertTrue(b == root.childRefs[3].get());
+//            assertTrue(a == d.childRefs[0].get());
+//            assertTrue(a == d.childRefs[1].get());
+//            assertTrue(e == d.childRefs[2].get());
+//            assertTrue(e == d.childRefs[3].get());
+//            assertTrue(c == f.childRefs[0].get());
+//            assertTrue(c == f.childRefs[1].get());
+//            assertTrue(c == f.childRefs[2].get());
+//            assertTrue(c == f.childRefs[3].get());
+//            assertEquals(2, root.globalDepth);
+//            assertEquals(2, d.globalDepth);
+//            assertEquals(2, f.globalDepth);
+//            assertEquals(1, a.globalDepth);
+//            assertEquals(1, e.globalDepth);
+//            assertEquals(0, c.globalDepth);
+//            assertEquals(1, b.globalDepth);
+//            assertEquals(4, a.getKeyCount());
+//            assertEquals(0, e.getKeyCount());
+//            assertEquals(0, c.getKeyCount());
+//            assertEquals(0, b.getKeyCount());
+//
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(4, new byte[][] { // keys
+//                            k1, k2, k3, k4 }),//
+//                    new ReadOnlyValuesRaba(4, new byte[][] { // vals
+//                            v1, v2, v3, v4 })),//
+//                    a);
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+//                            null, null, null, null }),//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
+//                            null, null, null, null})),//
+//                    e);
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+//                            null, null, null, null }),//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
+//                            null, null, null, null})),//
+//                    c);
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+//                            null, null, null, null }),//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
+//                            null, null, null, null})),//
+//                    b);
+//
+//            // verify that [a] will not accept an insert (still full).
+//            assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
+//
+//            /**
+//             * Split (a).
+//             * 
+//             * <pre>
+//             * root := [2] (d,f,b,b)     //
+//             * d    := [2]   (a,g,e,e)   //  
+//             * f    := [2]   (c,c,c,c)   // 
+//             * a    := [2]     (1,2,_,_) // local depth += 1. 
+//             * g    := [2]     (3,4,_,_) // local depth same as (a). 
+//             * e    := [1]     (-,-;-,-) // 
+//             * c    := [0]     (-,-,-,-) //  
+//             * b    := [1]   (-,-;-,-)   //
+//             * </pre>
+//             */
+//
+//            htree
+//                    .splitBucketsOnPage(d/* parent */, 0/* buddyOffset */, a/* oldChild */);
+//            
+//            assertEquals("nnodes", 3, htree.getNodeCount());  // unchanged.
+//            assertEquals("nleaves", 5, htree.getLeafCount());
+//            assertEquals("nentries", 4, htree.getEntryCount()); // unchanged
+//
+//            assertTrue(root == htree.getRoot());
+//            assertTrue(d == root.childRefs[0].get());
+//            assertTrue(f == root.childRefs[1].get());
+//            assertTrue(b == root.childRefs[2].get());
+//            assertTrue(b == root.childRefs[3].get());
+//            final BucketPage g = (BucketPage) d.childRefs[1].get();
 //            assertTrue(a == d.childRefs[0].get());
 //            assertTrue(g == d.childRefs[1].get());
 //            assertTrue(e == d.childRefs[2].get());
@@ -1322,7 +1243,166 @@ public class TestHTree extends TestCase2 {
 //            assertTrue(c == f.childRefs[2].get());
 //            assertTrue(c == f.childRefs[3].get());
 //            assertEquals(2, root.globalDepth);
-//            assertEquals(1, h.globalDepth);
+//            assertEquals(2, d.globalDepth);
+//            assertEquals(2, f.globalDepth);
+//            assertEquals(2, a.globalDepth);
+//            assertEquals(2, g.globalDepth);
+//            assertEquals(1, e.globalDepth);
+//            assertEquals(0, c.globalDepth);
+//            assertEquals(1, b.globalDepth);
+//            assertEquals(2, a.getKeyCount());
+//            assertEquals(2, g.getKeyCount());
+//            assertEquals(0, e.getKeyCount());
+//            assertEquals(0, c.getKeyCount());
+//            assertEquals(0, b.getKeyCount());
+//
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(2, new byte[][] { // keys
+//                            k1, k2, null, null }),//
+//                    new ReadOnlyValuesRaba(2, new byte[][] { // vals
+//                            v1, v2, null, null })),//
+//                    a);
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(2, new byte[][] { // keys
+//                            k3, k4, null, null }),//
+//                    new ReadOnlyValuesRaba(2, new byte[][] { // vals
+//                            v3, v4, null, null})),//
+//                    g);
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+//                            null, null, null, null }),//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
+//                            null, null, null, null})),//
+//                    e);
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+//                            null, null, null, null }),//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
+//                            null, null, null, null})),//
+//                    c);
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+//                            null, null, null, null }),//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
+//                            null, null, null, null})),//
+//                    b);
+//
+//            /**
+//             * Insert (5).
+//             * 
+//             * <pre>
+//             * root := [2] (d,f,b,b)     //
+//             * d    := [2]   (a,g,e,e)   //  
+//             * f    := [2]   (c,c,c,c)   // 
+//             * a    := [2]     (1,2,5,_) //  
+//             * g    := [2]     (3,4,_,_) //  
+//             * e    := [1]     (-,-;-,-) // 
+//             * c    := [0]     (-,-,-,-) //  
+//             * b    := [1]   (-,-;-,-)   //
+//             * </pre>
+//             */
+//
+//            htree.insert(k5, v5);
+//            
+//            assertEquals("nnodes", 3, htree.getNodeCount()); // unchanged.
+//            assertEquals("nleaves", 5, htree.getLeafCount());// unchanged
+//            assertEquals("nentries", 5, htree.getEntryCount());
+//
+//            assertTrue(root == htree.getRoot());
+//            assertTrue(d == root.childRefs[0].get());
+//            assertTrue(f == root.childRefs[1].get());
+//            assertTrue(b == root.childRefs[2].get());
+//            assertTrue(b == root.childRefs[3].get());
+//            assertTrue(a == d.childRefs[0].get());
+//            assertTrue(g == d.childRefs[1].get());
+//            assertTrue(e == d.childRefs[2].get());
+//            assertTrue(e == d.childRefs[3].get());
+//            assertTrue(c == f.childRefs[0].get());
+//            assertTrue(c == f.childRefs[1].get());
+//            assertTrue(c == f.childRefs[2].get());
+//            assertTrue(c == f.childRefs[3].get());
+//            assertEquals(2, root.globalDepth);
+//            assertEquals(2, d.globalDepth);
+//            assertEquals(2, f.globalDepth);
+//            assertEquals(2, a.globalDepth);
+//            assertEquals(2, g.globalDepth);
+//            assertEquals(1, e.globalDepth);
+//            assertEquals(0, c.globalDepth);
+//            assertEquals(1, b.globalDepth);
+//            assertEquals(3, a.getKeyCount());
+//            assertEquals(2, g.getKeyCount());
+//            assertEquals(0, e.getKeyCount());
+//            assertEquals(0, c.getKeyCount());
+//            assertEquals(0, b.getKeyCount());
+//
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(3, new byte[][] { // keys
+//                            k1, k2, k5, null }),//
+//                    new ReadOnlyValuesRaba(3, new byte[][] { // vals
+//                            v1, v2, v5, null })),//
+//                    a);
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(2, new byte[][] { // keys
+//                            k3, k4, null, null }),//
+//                    new ReadOnlyValuesRaba(2, new byte[][] { // vals
+//                            v3, v4, null, null})),//
+//                    g);
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+//                            null, null, null, null }),//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
+//                            null, null, null, null})),//
+//                    e);
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+//                            null, null, null, null }),//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
+//                            null, null, null, null})),//
+//                    c);
+//            assertSameBucketData(new MockBucketData(//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+//                            null, null, null, null }),//
+//                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
+//                            null, null, null, null})),//
+//                    b);
+//
+//            /**
+//             * Insert (6).
+//             * 
+//             * There are no structural changes required for this insert.
+//             * 
+//             * <pre>
+//             * root := [2] (d,f,b,b)     //
+//             * d    := [2]   (a,g,e,e)   //  
+//             * f    := [2]   (c,c,c,c)   // 
+//             * a    := [2]     (1,2,5,6) //  
+//             * g    := [2]     (3,4,_,_) //  
+//             * e    := [1]     (-,-;-,-) // 
+//             * c    := [0]     (-,-,-,-) //  
+//             * b    := [1]   (-,-;-,-)   //
+//             * </pre>
+//             */
+//
+//            htree.insert(k6, v6);
+//
+//            assertEquals("nnodes", 3, htree.getNodeCount());
+//            assertEquals("nleaves", 5, htree.getLeafCount());
+//            assertEquals("nentries", 6, htree.getEntryCount());
+//
+//            assertTrue(root == htree.getRoot());
+//            assertTrue(d == root.childRefs[0].get());
+//            assertTrue(f == root.childRefs[1].get());
+//            assertTrue(b == root.childRefs[2].get());
+//            assertTrue(b == root.childRefs[3].get());
+//            assertTrue(a == d.childRefs[0].get());
+//            assertTrue(g == d.childRefs[1].get());
+//            assertTrue(e == d.childRefs[2].get());
+//            assertTrue(e == d.childRefs[3].get());
+//            assertTrue(c == f.childRefs[0].get());
+//            assertTrue(c == f.childRefs[1].get());
+//            assertTrue(c == f.childRefs[2].get());
+//            assertTrue(c == f.childRefs[3].get());
+//            assertEquals(2, root.globalDepth);
 //            assertEquals(2, d.globalDepth);
 //            assertEquals(2, f.globalDepth);
 //            assertEquals(2, a.globalDepth);
@@ -1366,6 +1446,105 @@ public class TestHTree extends TestCase2 {
 //                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
 //                            null, null, null, null})),//
 //                    b);
+//
+//            /**
+//             * Insert (7).
+//             * 
+//             * The insert would be directed into (a), but (a) is full and can
+//             * not be split since depth(a) == depth(d). Also, we can not split
+//             * (d) since depth(d) == depth(root).
+//             * 
+//             * The first step is to add a new level under the root on the path
+//             * to (a). The post-condition for that step is:
+//             * 
+//             * <pre>
+//             * root := [2] (h,h,b,b)       //
+//             * h    := [1]   (d,d,f,f)     // new level @ depth := 1. 
+//             * d    := [0]     (a,g,e,e)   // local depth is changed.  
+//             * f    := [0]     (c,c,c,c)   // local depth is changed.
+//             * a    := [2]       (1,2,5,6) //  
+//             * g    := [2]       (3,4,_,_) //  
+//             * e    := [1]       (-,-;-,-) // 
+//             * c    := [0]       (-,-,-,-) //  
+//             * b    := [1]   (-,-;-,-)     //
+//             * </pre>
+//             */
+////            htree.addLevel(root, 0/* buddyOffsetInChild */, htree.splitBits);
+////
+////            // FIXME At least one dir split will be necessary as well.
+//////            htree.splitDirectoryPage(d/*parent*/, 0/*buddyOffset*/, oldChild);
+////            
+////            // split (a) into (a,e), re-indexing the tuples.
+////            htree.splitAndReindexFullBucketPage(d/* parent */,
+////                    0/* buddyOffset */, 4 /* prefixLength */, a/* oldBucket */);
+////
+////            assertEquals("nnodes", 4, htree.getNodeCount());
+////            assertEquals("nleaves", 5, htree.getLeafCount());
+////            assertEquals("nentries", 6, htree.getEntryCount());
+////
+////            assertTrue(root == htree.getRoot());
+////            final DirectoryPage h = (DirectoryPage) root.childRefs[0].get();
+////            assertTrue(h == root.childRefs[0].get());
+////            assertTrue(h == root.childRefs[1].get());
+////            assertTrue(b == root.childRefs[2].get());
+////            assertTrue(b == root.childRefs[3].get());
+////            assertTrue(d == h.childRefs[0].get());
+////            assertTrue(d == h.childRefs[1].get());
+////            assertTrue(f == h.childRefs[2].get());
+////            assertTrue(f == h.childRefs[3].get());
+////            assertTrue(a == d.childRefs[0].get());
+////            assertTrue(g == d.childRefs[1].get());
+////            assertTrue(e == d.childRefs[2].get());
+////            assertTrue(e == d.childRefs[3].get());
+////            assertTrue(c == f.childRefs[0].get());
+////            assertTrue(c == f.childRefs[1].get());
+////            assertTrue(c == f.childRefs[2].get());
+////            assertTrue(c == f.childRefs[3].get());
+////            assertEquals(2, root.globalDepth);
+////            assertEquals(1, h.globalDepth);
+////            assertEquals(2, d.globalDepth);
+////            assertEquals(2, f.globalDepth);
+////            assertEquals(2, a.globalDepth);
+////            assertEquals(2, g.globalDepth);
+////            assertEquals(1, e.globalDepth);
+////            assertEquals(0, c.globalDepth);
+////            assertEquals(1, b.globalDepth);
+////            assertEquals(4, a.getKeyCount());
+////            assertEquals(2, g.getKeyCount());
+////            assertEquals(0, e.getKeyCount());
+////            assertEquals(0, c.getKeyCount());
+////            assertEquals(0, b.getKeyCount());
+////
+////            assertSameBucketData(new MockBucketData(//
+////                    new ReadOnlyValuesRaba(4, new byte[][] { // keys
+////                            k1, k2, k5, k6 }),//
+////                    new ReadOnlyValuesRaba(4, new byte[][] { // vals
+////                            v1, v2, v5, v6})),//
+////                    a);
+////            assertSameBucketData(new MockBucketData(//
+////                    new ReadOnlyValuesRaba(2, new byte[][] { // keys
+////                            k3, k4, null, null }),//
+////                    new ReadOnlyValuesRaba(2, new byte[][] { // vals
+////                            v3, v4, null, null})),//
+////                    g);
+////            assertSameBucketData(new MockBucketData(//
+////                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+////                            null, null, null, null }),//
+////                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
+////                            null, null, null, null})),//
+////                    e);
+////            assertSameBucketData(new MockBucketData(//
+////                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+////                            null, null, null, null }),//
+////                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
+////                            null, null, null, null})),//
+////                    c);
+////            assertSameBucketData(new MockBucketData(//
+////                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+////                            null, null, null, null }),//
+////                    new ReadOnlyValuesRaba(0, new byte[][] { // vals
+////                            null, null, null, null})),//
+////                    b);
 
         } finally {
 
@@ -1672,6 +1851,11 @@ public class TestHTree extends TestCase2 {
                             System.out.println("debug point");
                         assertEquals(b, htree.lookupFirst(b));
                         
+//                        // TODO Verify the iterator.
+//                        final byte[][] tmp = new byte[i][];
+//                        System.arraycopy(keys/*src*/, 0/*srcOff*/, tmp/*src*/, 0/*dstOff*/, tmp.length/*length*/);
+//                        assertSameIteratorAnyOrder(tmp/*expected*/, htree.values());
+
                     }
                     
                 }
@@ -1689,13 +1873,9 @@ public class TestHTree extends TestCase2 {
             
             assertEquals(limit, htree.getEntryCount());
 
-            /*
-             * FIXME Verify the iterator visits all of the tuples in an
-             * arbitrary order. E.g., assertSameIteratorAnyOrder(). This
-             * needs to use an appropriate resolver pattern and we need to
-             * implement the iterator!
-             */
-//            assertSameIteratorAnyOrder(keys, htree.iterator());
+            // Verify the iterator visits all of the tuples.
+            assertSameIteratorAnyOrder(keys, htree.values());
+            
             } catch (Error ae) {
             	System.err.print("Pretty Print:" + htree.PP());
             	
