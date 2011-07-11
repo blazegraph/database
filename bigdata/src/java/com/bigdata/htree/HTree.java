@@ -2851,8 +2851,20 @@ public class HTree extends AbstractHTree
 		abstract protected boolean dump(Level level, PrintStream out,
 				int height, boolean recursive, boolean materialize);
 
-		/** Pretty print the page and any materialized children. */
+		/** Pretty print the tree from this level on down. */
 		abstract void PP(StringBuilder sb);
+		
+		/** Return a very short id used by {@link #PP()}. */
+		protected String PPID() {
+
+			final int hash = hashCode() % 100;
+
+			// Note: fixes up the string if hash is only one digit.
+			final String hashStr = "#" + (hash < 10 ? "0" : "") + hash;
+
+			return (isLeaf() ? "B" : "D") + hashStr;
+		
+		}
 		
 	} // class AbstractPage
 
@@ -3320,17 +3332,66 @@ public class HTree extends AbstractHTree
 
 		@Override
 		public void PP(final StringBuilder sb) {
-			sb.append(indent(getLevel())+"B#" + (hashCode() % 100) + "[" + globalDepth + "]{");
-			final IRaba raba = getKeys();
-			for (int r = 0; r < raba.size(); r++) {
-				final byte[] b = raba.get(r);
-				if (r != 0)
-					sb.append(",");
-				sb.append((b == null ? "-" : b[0]));
+
+			sb.append(PPID() + " [" + globalDepth + "] " + indent(getLevel()));
+			
+
+			sb.append("("); // start of address map.
+
+			// #of buddy tables on a page.
+			final int nbuddies = (1 << htree.addressBits) / (1 << globalDepth);
+
+			// #of address slots in each buddy hash table.
+			final int slotsPerBuddy = (1 << globalDepth);
+
+			for (int i = 0; i < nbuddies; i++) {
+
+				if (i > 0) // buddy boundary marker
+					sb.append(";");
+
+				for (int j = 0; j < slotsPerBuddy; j++) {
+
+					if (j > 0) // slot boundary marker.
+						sb.append(",");
+
+					final int slot = i * slotsPerBuddy + j;
+
+					sb.append(PPVAL(slot));
+					
+				}
+
 			}
-			sb.append("}\n");
-		}
+
+			sb.append(")"); // end of tuples			
 		
+			sb.append("\n");
+
+		}
+
+		/**
+		 * Pretty print a value from the tuple at the specified slot on the
+		 * page.
+		 * 
+		 * @param index
+		 *            The slot on the page.
+		 * 
+		 * @return The pretty print representation of the value associated with
+		 *         the tuple at that slot.
+		 * 
+		 *         TODO Either indirect for raw records or write out the addr of
+		 *         the raw record.
+		 */
+		private String PPVAL(final int index) {
+
+			if (getKeys().isNull(index))
+				return "-";
+			
+			final byte[] value = getValues().get(index);
+			
+			return BytesUtil.toString(value);
+		
+		}
+
 		/**
 	     * Human readable representation of the {@link ILeafData} plus transient
 	     * information associated with the {@link BucketPage}.
@@ -3511,6 +3572,30 @@ public class HTree extends AbstractHTree
 			// index of the slot in the buddy hash table for the given hash
 			// bits.
 			final int index = tableOffset + hashBits;
+
+			return getChild(index);
+			
+		}
+
+		/**
+		 * Return the child at the specified index in the {@link DirectoryPage}.
+		 * 
+		 * @param index
+		 *            The index of the slot in the {@link DirectoryPage}. If the
+		 *            child must be materialized, the buddyOffset will be
+		 *            computed based on the globalDepth and the #of pointers to
+		 *            that child will be computed so its depth may be set.
+		 *            
+		 * @return The child at that index.
+		 */
+		private AbstractPage getChild(final int index) {
+
+			// width of a buddy hash table (#of pointer slots).
+			final int tableWidth = 1 << globalDepth;
+
+			// offset in [0:nbuddies-1] to the start of the buddy spanning that
+			// index.
+			final int tableOffset = index / tableWidth;
 
 			/*
 			 * Look at the entry in the buddy hash table. If there is a
@@ -3701,93 +3786,119 @@ public class HTree extends AbstractHTree
 	    @SuppressWarnings("unchecked")
 	    private Iterator<AbstractPage> postOrderIterator2() {
 
-	        /*
-	         * Iterator visits the direct children, expanding them in turn with a
-	         * recursive application of the post-order iterator.
-	         * 
-	         * The iterator must touch the node in order to guarentee that a node
-	         * will still be dirty by the time that the caller visits it. This
-	         * places the node onto the hard reference queue and increments its
-	         * reference counter. Evictions do NOT cause IO when the reference is
-	         * non-zero, so the node will not be made persistent as a result of
-	         * other node touches. However, the node can still be made persistent if
-	         * the caller explicitly writes the node onto the store.
-	         */
+			/*
+			 * Iterator visits the direct children, expanding them in turn with
+			 * a recursive application of the post-order iterator.
+			 */
 
-	        // BTree.log.debug("node: " + this);
-	        return new Striterator(childIterator())
-	                .addFilter(new Expander() {
+			return new Striterator(childIterator()).addFilter(new Expander() {
 
-	                    private static final long serialVersionUID = 1L;
+				private static final long serialVersionUID = 1L;
 
-	                    /*
-	                     * Expand each child in turn.
-	                     */
-	                    protected Iterator expand(final Object childObj) {
+				/*
+				 * Expand each child in turn.
+				 */
+				protected Iterator expand(final Object childObj) {
 
-	                        /*
-	                         * A child of this node.
-	                         */
+					/*
+					 * A child of this node.
+					 */
 
-	                        final AbstractPage child = (AbstractPage) childObj;
+					final AbstractPage child = (AbstractPage) childObj;
 
-	                        if (!child.isLeaf()) {
+					if (!child.isLeaf()) {
 
-	                            /*
-	                             * The child is a Node (has children).
-	                             * 
-	                             * Visit the children (recursive post-order
-	                             * traversal).
-	                             */
+						/*
+						 * The child is a Node (has children).
+						 * 
+						 * Visit the children (recursive post-order traversal).
+						 */
 
-	                            // BTree.log.debug("child is node: " + child);
-	                            final Striterator itr = new Striterator(
-	                                    ((DirectoryPage) child).postOrderIterator2());
+						// BTree.log.debug("child is node: " + child);
+						final Striterator itr = new Striterator(
+								((DirectoryPage) child).postOrderIterator2());
 
-	                            // append this node in post-order position.
-	                            itr.append(new SingleValueIterator(child));
+						// append this node in post-order position.
+						itr.append(new SingleValueIterator(child));
 
-	                            return itr;
+						return itr;
 
-	                        } else {
+					} else {
 
-	                            /*
-	                             * The child is a leaf.
-	                             */
+						/*
+						 * The child is a leaf.
+						 */
 
-	                            // BTree.log.debug("child is leaf: " + child);
-	                            
-	                            // Visit the leaf itself.
-	                            return new SingleValueIterator(child);
+						// BTree.log.debug("child is leaf: " + child);
 
-	                        }
-	                    }
-	                });
+						// Visit the leaf itself.
+						return new SingleValueIterator(child);
 
-	    }
+					}
+				}
+			});
+
+		}
 	    
 	    /**
 	     * Iterator visits the direct child nodes in the external key ordering.
 	     */
-	    private Iterator<AbstractNode> childIterator() {
+	    private Iterator<AbstractPage> childIterator() {
 
 	        return new ChildIterator();
 
 	    }
 
-	    private class ChildIterator implements Iterator<AbstractNode> {
+	    /**
+	     * Visit the distinct children exactly once (if there are multiple
+	     * pointers to a given child, that child is visited just once).
+	     */
+	    private class ChildIterator implements Iterator<AbstractPage> {
 
-	    	private int slotsPerBuddy;
-	    	private int slot;
+	    	final private int slotsPerPage = 1<<globalDepth;
+	    	private int slot = 0;
+	    	private AbstractPage child = null;
+	    	
+	    	private ChildIterator() {
+	    		nextChild(); // materialize the first child.
+	    	}
+
+			/**
+			 * Advance to the next distinct child. The first time, this will
+			 * always return the child in slot zero on the page. Thereafter, it
+			 * will skip over pointers to the same child and return the next
+			 * distinct child.
+			 * 
+			 * @return <code>true</code> iff there is another distinct child
+			 *         reference.
+			 */
+	    	private boolean nextChild() {
+				for (; slot < slotsPerPage; slot++) {
+					final AbstractPage tmp = getChild(slot);
+					if (tmp != child) {
+						child = tmp;
+						return true;
+					}
+				}
+				return false;
+	    	}
 	    	
 			public boolean hasNext() {
-				// TODO Auto-generated method stub
-				return false;
+				/*
+				 * Return true if there is another child to be visited.
+				 * 
+				 * Note: This depends on nextChild() being invoked by the
+				 * constructor and by next().
+				 */
+				return slot < slotsPerPage;
 			}
 
-			public AbstractNode next() {
-				// TODO Auto-generated method stub
-				return null;
+			public AbstractPage next() {
+				if (!hasNext())
+					throw new NoSuchElementException();
+				final AbstractPage tmp = child;
+				nextChild(); // advance to the next child (if any).
+				return tmp;
 			}
 
 			public void remove() {
@@ -4168,13 +4279,51 @@ public class HTree extends AbstractHTree
 
 		@Override
 		public void PP(final StringBuilder sb) {
-			sb.append(indent(getLevel())+"D#" + (hashCode() % 100) + "[" + globalDepth + "]\n");
-			for (int c = 0; c < childRefs.length; c++) {
-				if (childRefs[c] == null)
-					sb.append(indent(getLevel()+1)+"[]\n");
-				else
-					childRefs[c].get().PP(sb);
+			
+			sb.append(PPID() + " [" + globalDepth + "] " + indent(getLevel()) );
+			
+			sb.append("("); // start of address map.
+
+			// #of buddy tables on a page.
+			final int nbuddies = (1 << htree.addressBits) / (1 << globalDepth);
+
+			// #of address slots in each buddy hash table.
+			final int slotsPerBuddy = (1 << globalDepth);
+
+			for (int i = 0; i < nbuddies; i++) {
+
+				if (i > 0) // buddy boundary marker
+					sb.append(";");
+
+				for (int j = 0; j < slotsPerBuddy; j++) {
+
+					if (j > 0) // slot boundary marker.
+						sb.append(",");
+
+					final int slot = i * slotsPerBuddy + j;
+
+					final AbstractPage child = getChild(slot);
+
+					sb.append(child.PPID());
+
+				}
+
 			}
+
+			sb.append(")"); // end of address map.
+
+			sb.append("\n");
+
+			final Iterator<AbstractPage> itr = childIterator();
+			
+			while(itr.hasNext()) {
+			
+				final AbstractPage child = itr.next();
+				
+				child.PP(sb);
+		
+			}
+
 		}
 	    
     } // class DirectoryPage
@@ -4362,14 +4511,15 @@ public class HTree extends AbstractHTree
 	}
 
 	/**
-	 * Simple iterator visits all tuples in the {@link HTree} in key order.
-	 * Since the key is typically a hash of some fields in the associated
-	 * application data record, this will normally visit application data
-	 * records in what appears to be an arbitrary order.
+	 * Simple iterator visits all tuples in the {@link HTree} in order by the
+	 * effective prefix of their keys. Since the key is typically a hash of some
+	 * fields in the associated application data record, this will normally
+	 * visit application data records in what appears to be an arbitrary order.
+	 * Tuples within a buddy hash bucket will be delivered in a random order.
 	 * <p>
-	 * Note: The {@link HTree} does not currently maintain metadata about
-	 * the #of spanned tuples in a {@link DirectoryPage}.  Without that we 
-	 * can not provide fast range counts, linear list indexing, etc.
+	 * Note: The {@link HTree} does not currently maintain metadata about the
+	 * #of spanned tuples in a {@link DirectoryPage}. Without that we can not
+	 * provide fast range counts, linear list indexing, etc.
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public ITupleIterator rangeIterator() {
@@ -4386,11 +4536,15 @@ public class HTree extends AbstractHTree
 	}
 
 	/**
-	 * Visits the values stored in the {@link HTree}.
+	 * Visits the values stored in the {@link HTree} in order by the effective
+	 * prefix of their keys. Since the key is typically a hash of some fields in
+	 * the associated application data record, this will normally visit
+	 * application data records in what appears to be an arbitrary order. Tuples
+	 * within a buddy hash bucket will be delivered in a random order.
 	 * <p>
 	 * Note: This allocates a new byte[] for each visited value. It is more
-	 * efficient to reuse a buffer for each visited {@link Tuple}.  This can
-	 * be done using {@link #rangeIterator()}.
+	 * efficient to reuse a buffer for each visited {@link Tuple}. This can be
+	 * done using {@link #rangeIterator()}.
 	 * 
 	 * TODO Must resolve references to raw records.
 	 */
@@ -4414,7 +4568,7 @@ public class HTree extends AbstractHTree
 
 		private final Iterator<BucketPage> src;
 		private BucketPage currentBucketPage = null;
-		private int nextNonEmptySlot = -1;
+		private int nextNonEmptySlot = 0;
 
 		private final Tuple<E> tuple;
 
@@ -4444,8 +4598,7 @@ public class HTree extends AbstractHTree
 				throw new IllegalStateException();
 			final int slotsPerPage = 1 << currentBucketPage.htree.addressBits;
 			final IRaba keys = currentBucketPage.getKeys();
-			while (nextNonEmptySlot < slotsPerPage) {
-				nextNonEmptySlot++;
+			for (; nextNonEmptySlot < slotsPerPage; nextNonEmptySlot++) {
 				if (keys.isNull(nextNonEmptySlot))
 					continue;
 				return true;
@@ -4462,10 +4615,9 @@ public class HTree extends AbstractHTree
 			// Scan for the next bucket page having a visitable tuple.
 			while(src.hasNext()) {
 				currentBucketPage = src.next();
-				nextNonEmptySlot = -1;
-				if (!findNextSlot())
-					continue;
-				return true;
+				nextNonEmptySlot = 0;
+				if (findNextSlot())
+					return true;
 			}
 			return false;
 		}
@@ -4480,7 +4632,8 @@ public class HTree extends AbstractHTree
 			 * then the current page reference will be cleared and we will need
 			 * to fetch a new page in hasNext() on the next invocation.
 			 */
-			findNextSlot();
+			nextNonEmptySlot++; // skip past the current tuple.
+			findNextSlot(); // find the next non-null slot (next tuple).
 			// Return the Tuple buffer.
 			return tuple;
 		}

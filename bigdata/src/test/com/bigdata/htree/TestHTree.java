@@ -27,12 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.htree;
 
-import junit.framework.TestCase2;
-
 import org.apache.log4j.Level;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
-import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
@@ -52,7 +49,7 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  *          bucket page or directory page because nothing has been inserted into
  *          that part of the address space.
  */
-public class TestHTree extends TestCase2 {
+public class TestHTree extends AbstractHTreeTestCase {
 
     /**
      * 
@@ -1954,18 +1951,6 @@ public class TestHTree extends TestCase2 {
             store.destroy();
             
         }
-        
-    }
-    
-    /*
-     * TODO This might need to be modified to verify the sets of tuples in each
-     * buddy bucket without reference to their ordering within the buddy bucket.
-     * If so, then we will need to pass in the global depth of the bucket page
-     * and clone and write new logic for the comparison of the leaf data state.
-     */
-    static void assertSameBucketData(ILeafData expected, ILeafData actual) {
-        
-        AbstractBTreeTestCase.assertSameLeafData(expected, actual);
         
     }
     
