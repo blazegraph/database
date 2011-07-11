@@ -462,6 +462,8 @@ public class TestHTree_addLevel extends TestCase2 {
                             null, null, null, null})),//
                     b);
 
+            System.err.println(htree.PP());
+            
             assertEquals(v1, htree.lookupFirst(k1));
             assertEquals(v2, htree.lookupFirst(k2));
             assertEquals(v3, htree.lookupFirst(k3));

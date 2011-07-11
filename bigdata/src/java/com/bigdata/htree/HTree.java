@@ -2499,17 +2499,6 @@ public class HTree extends AbstractHTree
 	        
 	    }
 	    
-	    static final String s_inset="...................."; // 20 dots
-	    String insetStr() {
-	    	int dots = getBitResolution();
-	    	
-	    	String ret = s_inset.substring(0, dots % 20);
-	    	while ((dots -= 20) > 0)
-	    		ret = ret + s_inset;
-	    	
-	    	return ret;
-	    }
-	    
 	    /**
 	     * The HTree.
 	     * 
@@ -3331,7 +3320,7 @@ public class HTree extends AbstractHTree
 
 		@Override
 		public void PP(final StringBuilder sb) {
-			sb.append("B#" + (hashCode() % 100) + "[" + globalDepth + "]{");
+			sb.append(indent(getLevel())+"B#" + (hashCode() % 100) + "[" + globalDepth + "]{");
 			final IRaba raba = getKeys();
 			for (int r = 0; r < raba.size(); r++) {
 				final byte[] b = raba.get(r);
@@ -4179,13 +4168,10 @@ public class HTree extends AbstractHTree
 
 		@Override
 		public void PP(final StringBuilder sb) {
-			sb.append("D#" + (hashCode() % 100) + "[" + globalDepth + "]\n");
-			final String inset = insetStr();
+			sb.append(indent(getLevel())+"D#" + (hashCode() % 100) + "[" + globalDepth + "]\n");
 			for (int c = 0; c < childRefs.length; c++) {
-
-				sb.append(inset);
 				if (childRefs[c] == null)
-					sb.append("[]\n");
+					sb.append(indent(getLevel()+1)+"[]\n");
 				else
 					childRefs[c].get().PP(sb);
 			}
