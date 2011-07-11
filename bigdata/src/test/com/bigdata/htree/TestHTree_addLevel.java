@@ -27,9 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.htree;
 
-import junit.framework.TestCase2;
-
-import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.htree.HTree.BucketPage;
 import com.bigdata.htree.HTree.DirectoryPage;
@@ -43,7 +40,7 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestHTree_addLevel extends TestCase2 {
+public class TestHTree_addLevel extends AbstractHTreeTestCase {
 
     /**
      * 
@@ -148,6 +145,9 @@ public class TestHTree_addLevel extends TestCase2 {
             assertEquals(v3, htree.lookupFirst(k3));
             assertEquals(v4, htree.lookupFirst(k4));
 
+			assertSameIteratorAnyOrder(new byte[][] { v1, v2, v3, v4 },
+					htree.values());
+
             assertTrue(a.distinctBitsRequired() == 1);
             
             // verify that [a] will not accept an insert.
@@ -219,7 +219,10 @@ public class TestHTree_addLevel extends TestCase2 {
                             null, null, null, null})),//
                     b);
 
-            // verify that [a] will not accept an insert.
+			assertSameIteratorAnyOrder(new byte[][] { v1, v2, v3, v4 },
+					htree.values());
+
+			// verify that [a] will not accept an insert.
             assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
             
             /**
@@ -297,9 +300,11 @@ public class TestHTree_addLevel extends TestCase2 {
             assertEquals(v3, htree.lookupFirst(k3));
             assertEquals(v4, htree.lookupFirst(k4));
             
+			assertSameIteratorAnyOrder(new byte[][] { v1, v2, v3, v4 },
+					htree.values());
+
             // verify that [a] still will not accept an insert since the split has created
-            // two buddies both filling their two available slots.
-            
+            // two buddies both filling their two available slots.            
             assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
 
             /**
@@ -377,10 +382,12 @@ public class TestHTree_addLevel extends TestCase2 {
             assertEquals(v2, htree.lookupFirst(k2));
             assertEquals(v3, htree.lookupFirst(k3));
             assertEquals(v4, htree.lookupFirst(k4));
-            
+
+			assertSameIteratorAnyOrder(new byte[][] { v1, v2, v3, v4 },
+					htree.values());
+
             // verify that [a] still will not accept an insert since the split has created
-            // two buddies both filling their two available slots.
-            
+            // two buddies both filling their two available slots.            
             assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
 
             /**
@@ -469,7 +476,10 @@ public class TestHTree_addLevel extends TestCase2 {
             assertEquals(v3, htree.lookupFirst(k3));
             assertEquals(v4, htree.lookupFirst(k4));
 
-            /**
+			assertSameIteratorAnyOrder(new byte[][] { v1, v2, v3, v4 },
+					htree.values());
+
+			/**
              * Insert the key (0x12).
              * 
              * <pre>
@@ -553,6 +563,9 @@ public class TestHTree_addLevel extends TestCase2 {
             assertEquals(v4, htree.lookupFirst(k4));
             assertEquals(v5, htree.lookupFirst(k5));
             
+			assertSameIteratorAnyOrder(new byte[][] { v1, v2, v3, v4, v5 },
+					htree.values());
+
 //            htree.insert(k6, v6);
 //            
 //            assertEquals(v5, htree.lookupFirst(k5));
@@ -566,10 +579,4 @@ public class TestHTree_addLevel extends TestCase2 {
         }
     }
     
-    static void assertSameBucketData(ILeafData expected, ILeafData actual) {
-
-        TestHTree.assertSameBucketData(expected, actual);
-
-    }
-
 }
