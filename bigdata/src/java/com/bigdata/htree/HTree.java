@@ -1733,7 +1733,7 @@ public class HTree extends AbstractHTree
      *            The parent {@link DirectoryPage}.
      * @param buddyOffset
      *            The buddyOffset within the <i>parent</i>. This identifies
-     *            which buddy hash table in the parent must be its pointers
+     *            which buddy hash table in the parent must have its pointers
      *            updated such that it points to both the original child and new
      *            child.
      * @param prefixLength
@@ -1899,7 +1899,7 @@ public class HTree extends AbstractHTree
      *            effect if the operation could not be completed (because some
      *            buddy bucket would have overflowed).
      */
-    private boolean reindexTuples(final DirectoryPage parent,
+    /*private*/ boolean reindexTuples(final DirectoryPage parent,
             final int buddyOffset, final int prefixLength, final BucketPage a,
             final BucketPage b) {
 
@@ -3386,10 +3386,33 @@ public class HTree extends AbstractHTree
 			if (getKeys().isNull(index))
 				return "-";
 			
-			final byte[] value = getValues().get(index);
+			final byte[] key = getKeys().get(index);
 			
-			return BytesUtil.toString(value);
-		
+			final String keyStr = BytesUtil.toString(key) + "(" + BytesUtil.toBitString(key)
+					+ ")";
+			
+			final String valStr;
+
+			if (false/*showValues*/) {
+			
+				final byte[] value = getValues().get(index);
+				
+				valStr = BytesUtil.toString(value);
+			
+			} else {
+				
+				valStr = null;
+				
+			}
+
+			if(valStr == null) {
+
+				return keyStr;
+			
+			}
+
+			return keyStr + "=>" + valStr;
+
 		}
 
 		/**
