@@ -2403,13 +2403,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * IRangeQuery
      */
 
-    /**
-     * Return the exact tuple count for the half-open key range.
-     * <p>
-     * Note: When the index uses delete markers this requires a key-range scan.
-     * If delete markers are not being used, then the cost is equal to the cost
-     * of {@link #rangeCount(byte[], byte[])}.
-     */
     final public long rangeCountExact(final byte[] fromKey, final byte[] toKey) {
 
         if (!metadata.getDeleteMarkers()) {
@@ -2480,6 +2473,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
     
     /**
+     * {@inheritDoc}
+     * <p>
      * This method computes the #of entries in the half-open range using
      * {@link AbstractNode#indexOf(Object)}. Since it does not scan the tuples
      * it can not differentiate between deleted and undeleted tuples for an
@@ -2678,29 +2673,30 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
-    /**
-     * Core implementation.
-     * <p>
-     * Note: If {@link IRangeQuery#CURSOR} is specified the returned iterator
-     * supports traversal with concurrent modification by a single-threaded
-     * process (the {@link BTree} is NOT thread-safe for writers). Write are
-     * permitted iff {@link AbstractBTree} allows writes.
-     * <p>
-     * Note: {@link IRangeQuery#REVERSE} is handled here by wrapping the
-     * underlying {@link ITupleCursor}.
-     * <p>
-     * Note: {@link IRangeQuery#REMOVEALL} is handled here by wrapping the
-     * iterator.
-     * <p>
-     * Note:
-     * {@link FusedView#rangeIterator(byte[], byte[], int, int, IFilter)}
-     * is also responsible for constructing an {@link ITupleIterator} in a
-     * manner similar to this method. If you are updating the logic here, then
-     * check the logic in that method as well!
-     * 
-     * @todo add support to the iterator construct for filtering by a tuple
-     *       revision timestamp range.
-     */
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * Core implementation.
+	 * <p>
+	 * Note: If {@link IRangeQuery#CURSOR} is specified the returned iterator
+	 * supports traversal with concurrent modification by a single-threaded
+	 * process (the {@link BTree} is NOT thread-safe for writers). Write are
+	 * permitted iff {@link AbstractBTree} allows writes.
+	 * <p>
+	 * Note: {@link IRangeQuery#REVERSE} is handled here by wrapping the
+	 * underlying {@link ITupleCursor}.
+	 * <p>
+	 * Note: {@link IRangeQuery#REMOVEALL} is handled here by wrapping the
+	 * iterator.
+	 * <p>
+	 * Note: {@link FusedView#rangeIterator(byte[], byte[], int, int, IFilter)}
+	 * is also responsible for constructing an {@link ITupleIterator} in a
+	 * manner similar to this method. If you are updating the logic here, then
+	 * check the logic in that method as well!
+	 * 
+	 * @todo add support to the iterator construct for filtering by a tuple
+	 *       revision timestamp range.
+	 */
     public ITupleIterator rangeIterator(//
             final byte[] fromKey,//
             final byte[] toKey,//
