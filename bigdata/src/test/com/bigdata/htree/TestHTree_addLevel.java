@@ -107,7 +107,10 @@ public class TestHTree_addLevel extends AbstractHTreeTestCase {
             htree.insert(k3, v3);
             htree.insert(k4, v4);
 
-            assertTrue(root == htree.getRoot());
+			if (log.isInfoEnabled())
+				log.info("\n" + htree.PP());
+
+			assertTrue(root == htree.getRoot());
             final BucketPage a = (BucketPage) root.childRefs[0].get();
             final BucketPage c = (BucketPage) root.childRefs[1].get();
             final BucketPage b = (BucketPage) root.childRefs[2].get();
@@ -154,29 +157,30 @@ public class TestHTree_addLevel extends AbstractHTreeTestCase {
             assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
             
             assertTrue(a.distinctBitsRequired() == 1);
-            
-            /**
-             * Add a directory level.
-             * 
-             * Note: Since depth(root) EQ depth(a) we can not split (a).
-             * Instead, we have to add a level which decreases depth(d) and
-             * makes it possible to split (a).  There will be two references
-             * to (a) in the post-condition, at which point it will be possible
-             * to split-and-reindex (a) into (a,e).
-             * 
-             * <pre>
-             * root := [2] (d,d,b,b)     //
-             * d    := [1]   (a,a;c,c)   // added new level below the root.  
-             * a    := [-]     (x10;x11;x20;x21) // local depth now 0. NB: inconsistent intermediate state!!!
-             * c    := [0]     (-;-;-;-) // local depth now 0.
-             * b    := [1]   (-,-;-,-)   //
-             * </pre>
-             */
+
+			/**
+			 * Add a directory level.
+			 * 
+			 * Note: Since depth(root) EQ depth(a) we can not split (a).
+			 * Instead, we have to add levels and split directory pages until we
+			 * have enough prefix bits to split the tuples in (a) across (a,e).
+			 * 
+			 * <pre>
+			 * root := [2] (d,d,b,b)     //
+			 * d    := [1]   (a,a;c,c)   // added new level below the root.  
+			 * a    := [-]     (x10;x11;x20;x21) // local depth now 0. NB: inconsistent intermediate state!!!
+			 * c    := [0]     (-;-;-;-) // local depth now 0.
+			 * b    := [1]   (-,-;-,-)   //
+			 * </pre>
+			 */
 
             // Add a new level below the root in the path to the full child.
             htree
                     .addLevel(root/* oldParent */, 0/* buddyOffset */, 1/* splitBits */);
             
+			if (log.isInfoEnabled())
+				log.info("\n" + htree.PP());
+
             assertEquals("nnodes", 2, htree.getNodeCount());
             assertEquals("nleaves", 3, htree.getLeafCount()); // unchanged
             assertEquals("nentries", 4, htree.getEntryCount()); // unchanged
@@ -224,26 +228,27 @@ public class TestHTree_addLevel extends AbstractHTreeTestCase {
 
 			// verify that [a] will not accept an insert.
             assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
-            
-            /**
-             * Split (a), creating a new bucket page (e) and re-index the tuples
-             * from (a) into (a,e). In this case, they all wind up back in (a)
-             * so (a) remains full (no free slots). The local depth of (a) and
-             * (e) are now (1).
-             * 
-             * <pre>
-             * root := [2] (d,d,b,b)     //
-             * d    := [1]   (a,e;c,c)   // 
-             * a    := [1]     (x10,x11;_,_) // local depth now 1. 
-             * e    := [1]     (x20,x21;-,-) // local depth now 1 (new sibling)
-             * c    := [0]     (-;-;-;-) // 
-             * b    := [1]   (-,-;-,-)   //
-             * </pre>
-             */
+
+			/**
+			 * Split (a), creating a new bucket page (e) and re-index the tuples
+			 * from (a) into (a,e).
+			 * 
+			 * <pre>
+			 * root := [2] (d,d,b,b)     //
+			 * d    := [1]   (a,e;c,c)   // 
+			 * a    := [1]     (x10,x11;_,_) // local depth now 1. 
+			 * e    := [1]     (x20,x21;-,-) // local depth now 1 (new sibling)
+			 * c    := [0]     (-;-;-;-) // 
+			 * b    := [1]   (-,-;-,-)   //
+			 * </pre>
+			 */
 
             // split (a) into (a,e), re-indexing the tuples.
             assertTrue(htree.splitAndReindexFullBucketPage(d/* parent */,
                     0/* buddyOffset */, 2 /* prefixLengthOfParent */, a/* oldBucket */));
+
+			if (log.isInfoEnabled())
+				log.info("\n" + htree.PP());
 
             assertEquals("nnodes", 2, htree.getNodeCount()); // unchanged.
             assertEquals("nleaves", 4, htree.getLeafCount());
@@ -323,7 +328,12 @@ public class TestHTree_addLevel extends AbstractHTreeTestCase {
 
             htree.splitDirectoryPage(root/*parent*/, 0/*buddyOffset*/, d/*oldChild*/);
 
-            assertEquals("nnodes", 3, htree.getNodeCount()); 
+//            htree.reindexTuples(d/*parent*/, 0/*buddyOffset*/, 2/*prefixLengthOfParent*/, a, e);
+            
+			if (log.isInfoEnabled())
+				log.info("\n" + htree.PP());
+
+			assertEquals("nnodes", 3, htree.getNodeCount()); 
             assertEquals("nleaves", 4, htree.getLeafCount()); // unchanged.
             assertEquals("nentries", 4, htree.getEntryCount()); // unchanged
 
@@ -407,7 +417,10 @@ public class TestHTree_addLevel extends AbstractHTreeTestCase {
 
             htree.splitBucketsOnPage(d/*parent*/, 0/*buddyOffset*/, a/*oldChild*/);
             
-            assertEquals("nnodes", 3, htree.getNodeCount());  // unchanged.
+			if (log.isInfoEnabled())
+				log.info("\n" + htree.PP());
+
+			assertEquals("nnodes", 3, htree.getNodeCount());  // unchanged.
             assertEquals("nleaves", 5, htree.getLeafCount());
             assertEquals("nentries", 4, htree.getEntryCount()); // unchanged
 
@@ -469,7 +482,7 @@ public class TestHTree_addLevel extends AbstractHTreeTestCase {
                             null, null, null, null})),//
                     b);
 
-            System.err.println(htree.PP());
+//            System.err.println(htree.PP());
             
             assertEquals(v1, htree.lookupFirst(k1));
             assertEquals(v2, htree.lookupFirst(k2));
@@ -496,6 +509,9 @@ public class TestHTree_addLevel extends AbstractHTreeTestCase {
             
             htree.insert(k5, v5);
             
+			if (log.isInfoEnabled())
+				log.info("\n" + htree.PP());
+
             assertEquals("nnodes", 3, htree.getNodeCount());  // unchanged.
             assertEquals("nleaves", 5, htree.getLeafCount()); // unchanged
             assertEquals("nentries", 5, htree.getEntryCount());
@@ -571,7 +587,6 @@ public class TestHTree_addLevel extends AbstractHTreeTestCase {
 //            assertEquals(v5, htree.lookupFirst(k5));
 //            assertEquals(v6, htree.lookupFirst(k6));
             
-
         } finally {
 
             store.destroy();
