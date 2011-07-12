@@ -42,6 +42,7 @@ import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.BooleanLiteralImpl;
 
 import com.bigdata.cache.WeakValueCache;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.util.CanonicalFactory;
 
@@ -456,8 +457,20 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
         if (v instanceof BigdataValueImpl
                 && ((BigdataValueImpl) v).getValueFactory() == this) {
 
-            // a value from the same value factory.
-            return (BigdataValue) v;
+			final BigdataValueImpl v1 = (BigdataValueImpl) v;
+
+			final IV<?, ?> iv = v1.getIV();
+
+			if (iv == null || !iv.isNullIV()) {
+
+				/*
+				 * A value from the same value factory whose IV is either
+				 * unknown or defined (but not a NullIV or DummyIV).
+				 */
+
+				return (BigdataValue) v;
+
+			}
 
         }
 
