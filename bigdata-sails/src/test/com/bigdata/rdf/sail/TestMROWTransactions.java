@@ -6,16 +6,10 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.openrdf.model.BNode;
-import org.openrdf.model.Resource;
-import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
-import org.openrdf.model.Value;
-import org.openrdf.model.impl.BNodeImpl;
-import org.openrdf.model.impl.ContextStatementImpl;
-import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.counters.CAT;
@@ -87,17 +81,17 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 		return new URIImpl(BD.NAMESPACE + s);
 	}
 
-	private BNode bnode(String id) {
-		return new BNodeImpl(id);
-	}
-
-	private Statement stmt(Resource s, URI p, Value o) {
-		return new StatementImpl(s, p, o);
-	}
-
-	private Statement stmt(Resource s, URI p, Value o, Resource c) {
-		return new ContextStatementImpl(s, p, o, c);
-	}
+//	private BNode bnode(String id) {
+//		return new BNodeImpl(id);
+//	}
+//
+//	private Statement stmt(Resource s, URI p, Value o) {
+//		return new StatementImpl(s, p, o);
+//	}
+//
+//	private Statement stmt(Resource s, URI p, Value o, Resource c) {
+//		return new ContextStatementImpl(s, p, o, c);
+//	}
 
 //	public void test_multiple_transaction() throws Exception {
 //
@@ -227,6 +221,8 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 		final CAT writes = new CAT();
 		final CAT reads = new CAT();
 		final AtomicReference<Throwable> failex = new AtomicReference<Throwable>(null);
+		// Set [true] iff there are no failures by the time we cancel the running tasks.
+		final AtomicBoolean success = new AtomicBoolean(false);
         final BigdataSail sail = getSail();
 		try {
 
@@ -372,11 +368,18 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                 	if (failex.get() != null)
                 		break;
                 }
+				if (failex.get() == null) {
+					/*
+					 * Note whether or not there are failures before we
+					 * interrupt the running tasks.
+					 */
+                	success.set(true);
+                }
                 writers.shutdownNow();
                 readers.shutdownNow();
                 writers.awaitTermination(5, TimeUnit.SECONDS);
                 readers.awaitTermination(5, TimeUnit.SECONDS);
-                {
+				if (!success.get()) {
                     final Throwable ex = failex.get();
                     if (ex != null) {
                         fail("Test failed: firstCause=" + ex, ex);
