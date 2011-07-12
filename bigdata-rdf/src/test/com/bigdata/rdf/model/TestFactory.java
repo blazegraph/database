@@ -63,7 +63,23 @@ public class TestFactory extends TestCase2 {
         super(name);
     }
 
-    final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance(getName());
+    private BigdataValueFactory vf;
+    
+    protected void setUp() throws Exception {
+
+    	super.setUp();
+    	
+    	vf = BigdataValueFactoryImpl.getInstance(getName());
+    
+    }
+    
+    protected void tearDown() throws Exception {
+
+    	vf = null;
+    	
+    	super.tearDown();
+    	
+    }
 
     public void test_create_literal_xsdInt() {
         
