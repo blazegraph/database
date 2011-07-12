@@ -64,6 +64,9 @@ public class TestAll extends TestCase {
         // value factory test suite.
         suite.addTestSuite(TestFactory.class);
 
+        // test suite for Value.equals()
+        suite.addTestSuite(TestEquals.class);
+
         // test suite for serialization semantics.
         suite.addTestSuite(TestBigdataValueSerialization.class);
 

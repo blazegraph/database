@@ -32,6 +32,7 @@ import java.io.IOException;
 import com.bigdata.bop.IElement;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.TermId;
 
 /**
  * Abstract base class for {@link BigdataValue} implementations.
@@ -101,6 +102,18 @@ public abstract class BigdataValueImpl implements BigdataValue {
 
         iv = null;
         
+    }
+
+    final public boolean isRealIV() {
+
+    	if (iv == null)
+			return false;
+		
+    	if (iv.isNullIV())
+			return false;
+		
+    	return true;
+
     }
 
     final public IV getIV() {

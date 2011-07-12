@@ -108,6 +108,13 @@ public interface BigdataValue extends Value, IElement {//, Comparable<BigdataVal
      */
     public void setIV(IV iv);
     
+	/**
+	 * Return <code>true</code> if the {@link IV} is either is set to a "real"
+	 * IV. Return <code>false</code> if the {@link IV} is either not set or is
+	 * set to a "mock" or "dummy" {@link IV}.
+	 */
+    public boolean isRealIV();
+    
     /**
      * Clears the internal value to null.
      */
