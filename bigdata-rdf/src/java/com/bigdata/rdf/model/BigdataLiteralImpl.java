@@ -175,8 +175,8 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
             return false;
 
 		if ((o instanceof BigdataValue) //
-				&& getIV() != null//
-				&& ((BigdataValue) o).getIV() != null//
+				&& isRealIV()
+				&& ((BigdataValue)o).isRealIV()
 				&& ((BigdataValue) o).getValueFactory() == getValueFactory()) {
 
 			return getIV().equals(((BigdataValue) o).getIV());
