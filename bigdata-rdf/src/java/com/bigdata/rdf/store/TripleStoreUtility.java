@@ -207,9 +207,10 @@ public class TripleStoreUtility {
 
     }
 
-    public static void log(String s) {
+    public static void log(final String s) {
 
-        System.err.println(s);
+    	if(log.isInfoEnabled())
+    		log.info(s);
 
     }
 
