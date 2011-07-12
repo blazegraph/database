@@ -36,7 +36,11 @@ import junit.framework.TestCase2;
 import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
 
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSD;
+import com.sun.jdi.Value;
 
 /**
  * Unit tests for {@link BigdataValueFactoryImpl}.
@@ -126,4 +130,32 @@ public class TestFactory extends TestCase2 {
 
     }
 
+	/**
+	 * Unit test verifies that a new {@link BigdataValue} instance is returned
+	 * when {@link BigdataValueFactory#asValue(org.openrdf.model.Value)} is
+	 * invoked with a {@link BigdataValue} whose {@link IV} is a "dummmy" IV
+	 * (aka a "mock" IV). A "dummy" or "mock" {@link IV} is an {@link IV} which
+	 * stands in for a "null" and is used to hold the place for an RDF
+	 * {@link Value} which is not known to the database.
+	 * 
+	 * @see https://sourceforge.net/apps/trac/bigdata/ticket/348
+	 */
+    public void test_asValue_mockIV() {
+    	
+    	final BigdataValue v1 = vf.createURI("http://www.bigdata.com");
+    	
+    	final BigdataValue v2 = vf.asValue(v1);
+    	
+    	v1.setIV(TermId.mockIV(VTE.URI));
+
+    	final BigdataValue v3 = vf.asValue(v1);
+    	
+    	// same BigdataValue
+    	assertTrue(v2 == v1);
+    	
+    	// distinct BigdataValue
+    	assertTrue(v3 != v1);
+    	
+    }
+    
 }
