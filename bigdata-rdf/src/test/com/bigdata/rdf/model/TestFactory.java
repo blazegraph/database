@@ -34,13 +34,13 @@ import javax.xml.datatype.XMLGregorianCalendar;
 import junit.framework.TestCase2;
 
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSD;
-import com.sun.jdi.Value;
 
 /**
  * Unit tests for {@link BigdataValueFactoryImpl}.
