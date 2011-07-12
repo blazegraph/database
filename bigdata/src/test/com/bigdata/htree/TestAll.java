@@ -57,19 +57,14 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("HTree");
 
-        suite.addTestSuite(TestHTreeUtil.class);
-
+        // htree specific raba unit tests.
         suite.addTest(com.bigdata.htree.raba.TestAll.suite());
 
+        // htree specific data record tests.
         suite.addTest(com.bigdata.htree.data.TestAll.suite());
 
-        suite.addTestSuite(TestHTree.class);
-
-        // Unit test for a simple add level scenario.
-        suite.addTestSuite(TestHTree_addLevel.class);
-        
-        // Test suite for re-indexing tuples when splitting a full buddy bucket.
-        suite.addTestSuite(TestHTreeReindexFullBucket.class);
+        // htree data structure tests.
+        suite.addTest(com.bigdata.htree.TestAll_HTree.suite());
 
 		return suite;
 

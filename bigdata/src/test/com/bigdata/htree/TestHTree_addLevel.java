@@ -333,6 +333,8 @@ public class TestHTree_addLevel extends AbstractHTreeTestCase {
 			if (log.isInfoEnabled())
 				log.info("\n" + htree.PP());
 
+			fail("Must reindex (a) and (e) since prefix length to those bucket pages has increased");
+			
 			assertEquals("nnodes", 3, htree.getNodeCount()); 
             assertEquals("nleaves", 4, htree.getLeafCount()); // unchanged.
             assertEquals("nentries", 4, htree.getEntryCount()); // unchanged

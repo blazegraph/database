@@ -202,11 +202,53 @@ public class HTree extends AbstractHTree
      *             if addressBits is GT (16) (fan out of 65536).
      */
     public HTree(final IRawStore store, final int addressBits) {
-        this(store, addressBits, true/* rawRecords */);
+
+    	this(store, addressBits, true/* rawRecords */);
+
     }
 
     public HTree(final IRawStore store, final int addressBits,
             final boolean rawRecords) {
+
+		this(store, addressBits, rawRecords, 0/* rootPrefixLength */,
+				addressBits/* externalPageDepth */, addressBits/* rootDepth */);
+
+    }
+
+	/**
+	 * 
+	 * 
+	 * @param store
+	 *            The backing store.
+	 * @param addressBits
+	 *            The #of bits in the address map for a directory bucket. The
+	 *            #of children for a directory is <code>2^addressBits</code>.
+	 *            For example, a value of <code>10</code> means a
+	 *            <code>10</code> bit address space in the directory. Such a
+	 *            directory would provide direct addressing for
+	 *            <code>1024</code> child references. Given an overhead of
+	 *            <code>8</code> bytes per child address, that would result in
+	 *            an expected page size of 8k before compression.
+	 * @param rawRecords
+	 *            <code>true</code> if raw records are in use.
+	 * @param rootPrefixLength
+	 *            The prefix length to the root {@link DirectoryPage}. This is
+	 *            ZERO (0) for a normal {@link HTree}.
+	 * @param externalPageDepth
+	 *            The depth of the parent of the root {@link DirectoryPage}.
+	 *            This is <i>addressBits</i> for a normal {@link HTree}.
+	 * @param rootPageDepth
+	 *            The depth of the root {@link DirectoryPage}. This is
+	 *            <i>addressBits</i> for a normal {@link HTree}.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if addressBits is LT ONE (1).
+	 * @throws IllegalArgumentException
+	 *             if addressBits is GT (16) (fan out of 65536).
+	 */
+	private HTree(final IRawStore store, final int addressBits,
+			final boolean rawRecords, final int rootPrefixLength,
+			final int externalPageDepth, final int rootPageDepth) {
 
 //    	super(store, nodeFactory, readOnly, addressBits, metadata, recordCompressorFactory);
 		super(store, false/*readOnly*/, addressBits);
@@ -1899,7 +1941,7 @@ public class HTree extends AbstractHTree
      *            effect if the operation could not be completed (because some
      *            buddy bucket would have overflowed).
      */
-    /*private*/ boolean reindexTuples(final DirectoryPage parent,
+    private boolean reindexTuples(final DirectoryPage parent,
             final int buddyOffset, final int prefixLength, final BucketPage a,
             final BucketPage b) {
 
@@ -2351,6 +2393,152 @@ public class HTree extends AbstractHTree
     }
 
 	/**
+	 * Reindex all tuples spanned by a {@link DirectoryPage}. This method is
+	 * used when the prefixLength is changed, whether by adding a new level or
+	 * by splitting a directory. Both actions can cause the tuples below that
+	 * point in the tree to shift from one buddy bucket to another since a new
+	 * distinction has been introduced in the {@link DirectoryPage}.
+	 * <p>
+	 * This implementation builds a new {@link HTree} sharing the same backing
+	 * store whose root is a {@link DirectoryPage} having the same depth as the
+	 * given {@link DirectoryPage}. The {@link BucketPage}s below the given
+	 * {@link DirectoryPage} are visited and each tuple is inserted into the new
+	 * htree root.
+	 * <p>
+	 * Unlike a normal {@link HTree}, the {@link HTree} into which the tuples
+	 * are being inserted may have a root {@link DirectoryPage} whose depth is
+	 * less than <i>addressBits</i>. This means that we must determine the buddy
+	 * hash table on the root {@link DirectoryPage} into which the key would be
+	 * inserted. This requires us to note the prefixLength to the given
+	 * {@link DirectoryPage} and to compute the buddyOffset into the root
+	 * {@link DirectoryPage} based on that prefix length and the depth of the
+	 * parent of the source {@link DirectoryPage}. Those values can then be
+	 * passed into an appropriate insert() method (they are ZERO(s) for a normal
+	 * {@link HTree}).
+	 * <p>
+	 * A post-order iterator is used to visit the pages spanned by the given
+	 * {@link DirectoryPage}. Each page is released (freed) on the backing store
+	 * after it has been processed.
+	 * <p>
+	 * Note: When more than one add level and/or split directory operation is
+	 * required to transform a tree such that it can accept a new key, all such
+	 * transforms should be carried out and the resulting tree reindexed using
+	 * this method as an after action in order to minimize the amount of work
+	 * required to bring the index back into an internally consistent state.
+	 * 
+	 * @param d
+	 *            The {@link DirectoryPage}.
+	 */
+    void reindexDirectory(final DirectoryPage d) {
+
+		if (log.isInfoEnabled()) {
+			log.info("directoryPage=" + d.toShortString());
+		}
+    	
+    	assert d.isDirty(); // must be mutable (not persistent).
+
+		/*
+		 * Setup a temporary HTree backed by the same persistence store. The
+		 * root of the temporary HTree will be at the same depth as the
+		 * directory page to be reindexed.
+		 * 
+		 * FIXME We need an alternative constructor for the HTree which accepts
+		 * [prefixLength], the depth of the parent of the given directory page,
+		 * and the depth of the given directory page. Those can be stored on
+		 * fields named [rootPrefixLength] (zero for a normal HTree),
+		 * [externalGlobalDepth] (addressBits for a normal HTree), and
+		 * [rootGlobalDepth] (addressBits for a normal HTree).
+		 * 
+		 * FIXME Modify insert(key,val) to use those new fields. It will
+		 * initialize its [prefixLength] from [rootPrefixLength]. It will need
+		 * to compute the [buddyOffset] from the depth of the root (the given
+		 * directory) and the depth of the external parent of the root (the
+		 * parent of the given directory).
+		 * 
+		 * FIXME Update the addLevels() unit test to invoke reindexDirectory()
+		 * after the splitDirectory() call where things are going wrong now. If
+		 * this improves matters, then write more unit tests for
+		 * reindexDirectory().
+		 */
+		final HTree tmp;
+		{
+
+			final int rootPrefixLength = d.getBitResolution();
+
+			final int externalPageDepth = d.getParentDirectory().globalDepth;
+
+			final int rootPageDepth = d.globalDepth;
+
+			tmp = new HTree(store, addressBits/* addressBits */, rawRecords,
+					rootPrefixLength, externalPageDepth, rootPageDepth);
+		}
+    	
+    	final Iterator<AbstractPage> itr = d.postOrderIterator();
+    	
+    	while(itr.hasNext()) {
+    		
+    		final AbstractPage page = itr.next();
+    		
+    		if(page.isLeaf()) {
+
+				/*
+				 * Insert into the temporary HTree.
+				 * 
+				 * Note: In order to avoid materializing raw records this needs
+				 * to operate against the actual byte[] value stored in the
+				 * leaf. Going through a higher level API, such as ITuple, will
+				 * cause a raw record to be materialized from the backing
+				 * store!!!
+				 * 
+				 * FIXME If we support additional metadata (version timestamps
+				 * or delete markers) then those need to be handled here as
+				 * well.
+				 */
+    			
+    			final BucketPage bucketPage = (BucketPage)page;
+    			
+    			final IRaba keys = bucketPage.getKeys();
+
+    			final IRaba vals = bucketPage.getValues();
+    			
+				final int slotsPerPage = 1 << addressBits;
+
+				for (int i = 0; i < slotsPerPage; i++) {
+
+					if (keys.isNull(i))
+						continue;
+
+					final byte[] key = keys.get(i);
+					
+					final byte[] val = vals.get(i);
+					
+					tmp.insert(key, val);
+
+				}
+    			
+    		}
+    		
+			if (page.isPersistent()) {
+
+				// delete the source page.
+				store.delete(page.getIdentity());
+
+			}
+
+    	}
+    	
+		/*
+		 * Steal the data for the root of the temporary htree.
+		 */
+
+    	d.data = tmp.root.data;
+		
+    	System.arraycopy(tmp.root.childRefs/* src */, 0/* srcOff */,
+				d.childRefs/* dst */, 0/* dstOff */, tmp.root.childRefs.length/* length */);
+
+    }
+    
+	/**
 	 * Validate pointers in buddy hash table in the parent against the global
 	 * depth as self-reported by the child. By definition, the global depth of
 	 * the child is based on the global depth of the parent and the #of pointers
@@ -2618,42 +2806,54 @@ public class HTree extends AbstractHTree
 			final int slotsPerBuddy = (1 << globalDepth);
 			return slotsPerBuddy;
 		}
-		
+
 		/**
-		 * Total bit resolution is defined by the depth per directory multiplied
-		 * by the number of levels.
+		 * Return the prefix length of the page (the #of bits of the key which
+		 * have been consumed by the parent directory pages before reaching this
+		 * page).
 		 * 
-		 * @return
+		 *         TODO Rename as getPrefixLength().
 		 */
 		final public int getBitResolution() {
-			// return getLevel() * htree.addressBits;
+
 			int ret = 0;
 			
 			DirectoryPage dp = parent != null ? parent.get() : null;
+			
 			while (dp != null) {
+			
 				ret += dp.globalDepth;
 				
 				dp = dp.parent != null ? dp.parent.get() : null;
+			
 			}
 			
 			return ret;
+		
 		}
 
 		/**
-		 * Computed by recursing to the root and counting the levels.
+		 * Computed by recursing to the root and counting the levels. The root
+		 * is at depth ZERO (0).
 		 * 
-		 * @return the level in the HTree
+		 * @return The level in the {@link HTree}.
 		 */
 		final public int getLevel() {
+
 			int ret = 0;
 			
 			DirectoryPage dp = parent != null ? parent.get() : null;
+			
 			while (dp != null) {
+			
 				ret++;
+				
 				dp = dp.parent != null ? dp.parent.get() : null;
+
 			}
 			
 			return ret;
+
 		}
 
 		/**
@@ -3330,6 +3530,90 @@ public class HTree extends AbstractHTree
             
         }
 
+		/**
+		 * Return an iterator visiting all the non-deleted, non-empty tuples
+		 * on this {@link BucketPage}.
+		 */
+		private ITupleIterator tuples() {
+
+			return new InnerBucketPageTupleIterator(IRangeQuery.DEFAULT);
+		
+		}
+
+		/**
+		 * Visits the non-empty tuples in each {@link BucketPage} visited by the
+		 * source iterator.
+		 */
+		private class InnerBucketPageTupleIterator<E> implements
+				ITupleIterator<E> {
+
+			private final int slotsPerPage = 1 << htree.addressBits;
+
+			private int nextNonEmptySlot = 0;
+
+			private final Tuple<E> tuple;
+
+			InnerBucketPageTupleIterator(final int flags) {
+
+				// look for the first slot.
+				if (findNextSlot()) {
+
+					this.tuple = new Tuple<E>(htree, flags);
+
+				} else {
+
+					// Nothing will be visited.
+					this.tuple = null;
+					
+				}
+				
+			}
+			
+			/**
+			 * Scan to the next non-empty slot in the current {@link BucketPage}.
+			 * 
+			 * @return <code>true</code> iff there is a non-empty slot on the
+			 *         current {@link BucketPage}.
+			 */
+			private boolean findNextSlot() {
+				final IRaba keys = getKeys();
+				for (; nextNonEmptySlot < slotsPerPage; nextNonEmptySlot++) {
+					if (keys.isNull(nextNonEmptySlot))
+						continue;
+					return true;
+				}
+				// The current page is exhausted.
+				return false;
+			}
+
+			public boolean hasNext() {
+
+				return nextNonEmptySlot < slotsPerPage;
+
+			}
+
+			public ITuple<E> next() {
+				if (!hasNext())
+					throw new NoSuchElementException();
+				// Copy the data for the current tuple into the Tuple buffer.
+				tuple.copy(nextNonEmptySlot, BucketPage.this);
+				/*
+				 * Advance to the next slot on the current page. if there is non,
+				 * then the current page reference will be cleared and we will need
+				 * to fetch a new page in hasNext() on the next invocation.
+				 */
+				nextNonEmptySlot++; // skip past the current tuple.
+				findNextSlot(); // find the next non-null slot (next tuple).
+				// Return the Tuple buffer.
+				return tuple;
+			}
+			
+			public void remove() {
+				throw new UnsupportedOperationException();
+			}
+
+		}
+		
 		@Override
 		public void PP(final StringBuilder sb) {
 
@@ -4585,6 +4869,10 @@ public class HTree extends AbstractHTree
 	/**
 	 * Visits the non-empty tuples in each {@link BucketPage} visited by the
 	 * source iterator.
+	 * 
+	 * TODO This might be reworked as an expander and an iterator visiting the
+	 * tuples on a single bucket page.  That could provide more reuse.  See
+	 * {@link BucketPage#tuples()}
 	 */
 	private static class BucketPageTupleIterator<E> implements
 			ITupleIterator<E> {
