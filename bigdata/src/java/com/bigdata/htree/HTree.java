@@ -2464,8 +2464,8 @@ public class HTree extends AbstractHTree
 		{
 
 			final int rootPrefixLength = d.getBitResolution();
-
-			final int externalPageDepth = d.getParentDirectory().globalDepth;
+			final DirectoryPage pd = d.getParentDirectory();
+			final int externalPageDepth = pd == null ? 0 : pd.globalDepth;
 
 			final int rootPageDepth = d.globalDepth;
 
@@ -2535,7 +2535,13 @@ public class HTree extends AbstractHTree
 		
     	System.arraycopy(tmp.root.childRefs/* src */, 0/* srcOff */,
 				d.childRefs/* dst */, 0/* dstOff */, tmp.root.childRefs.length/* length */);
-
+    	
+    	/*
+    	 * link any childRefs to point to new parent
+    	 */
+     	for (int i = 0; i < d.childRefs.length; i++) {
+    		d.childRefs[i].get().parent = (Reference<DirectoryPage>) d.self;
+    	}
     }
     
 	/**
