@@ -43,6 +43,9 @@ Bug fixes:
  - https://sourceforge.net/apps/trac/bigdata/ticket/348 (BigdataValueFactory.asValue()
    must return new instance when DummyIV is used).
 
+ - https://sourceforge.net/apps/trac/bigdata/ticket/351 (SPOs not serializable
+   in scale-out).
+
 New features in 1.0.x release:
 
 - Single machine data storage to ~50B triples/quads (RWStore);
