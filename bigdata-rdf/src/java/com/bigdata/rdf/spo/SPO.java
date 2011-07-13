@@ -54,7 +54,12 @@ import com.bigdata.util.Bits;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPO implements ISPO {
+public class SPO implements ISPO, java.io.Serializable {
+    
+    /**
+	 * Note: Serializable for interchange of {@link SidIV}s.
+	 */
+	private static final long serialVersionUID = 1L;
     
     /** The internal value for the subject position. */
     public final IV s;

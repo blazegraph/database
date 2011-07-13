@@ -29,6 +29,13 @@ package com.bigdata.rdf.spo;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.io.SerializerUtil;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.StatementEnum;
+
 /**
  * Test suite for the {@link SPO} class.
  * 
@@ -54,4 +61,50 @@ public class TestSPO extends TestCase2 {
     	// TODO: write tests for SPO
     }
 
+    public void test_serializable() {
+
+    	final IV<?,?> s = new TermId<BigdataURI>(VTE.URI, 1);
+    	final IV<?,?> p = new TermId<BigdataURI>(VTE.URI, 2);
+    	final IV<?,?> o = new TermId<BigdataURI>(VTE.URI, 3);
+    	
+    	final SPO expected = new SPO(s, p, o);
+    	
+    	doRoundTripTest(expected);
+    	
+    }
+    
+    public void test_serializable_sidIV() {
+
+    	final IV<?,?> s = new TermId<BigdataURI>(VTE.URI, 1);
+    	final IV<?,?> p = new TermId<BigdataURI>(VTE.URI, 2);
+    	final IV<?,?> o = new TermId<BigdataURI>(VTE.URI, 3);
+    	
+    	final SPO expected = new SPO(s, p, o, StatementEnum.Explicit);
+    	
+    	doRoundTripTest(expected);
+
+    	expected.setStatementIdentifier(true);
+    	
+    	doRoundTripTest(expected);
+
+    	final IV<?,?> p1 = new TermId<BigdataURI>(VTE.URI, 4);
+    	final IV<?,?> o1 = new TermId<BigdataURI>(VTE.URI, 5);
+    	
+		final SPO expected2 = new SPO(expected.c(), p1, o1,
+				StatementEnum.Explicit);
+
+    	doRoundTripTest(expected2);
+
+    }
+    
+    private void doRoundTripTest(final SPO expected) {
+    	
+    	final byte[] b = SerializerUtil.serialize(expected);
+    	
+    	final SPO actual = (SPO)SerializerUtil.deserialize(b);
+
+		assertEquals(expected, actual);
+    	
+    }
+    
 }
