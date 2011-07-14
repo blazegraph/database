@@ -712,48 +712,50 @@ public class HTree extends AbstractHTree
             
             if (pp == null) {
 
-                /*
-                 * Add a level; increases prefixLength to bucketPage by one.
-                 */
-
-//                final int buddyOffset = getBuddyOffsetOfDirectoryPageOnPathToFullBucket(
-//                        key, bucketPage.parent.get());
+//                /*
+//                 * Add a level; increases prefixLength to bucketPage by one.
+//                 */
 //
-//                addLevel(bucketPage.parent.get()/* oldParentIsAlwaysRoot */,
-//                        buddyOffset, splitBits);
-
-				/*
-				 * To split the page, we have to introduce a new directory page
-				 * above it and then introduce a sibling bucket page and finally
-				 * re-index the tuples in the bucket page such that they are
-				 * either the original bucket page or its new sibling bucket
-				 * page.
-				 * 
-				 * Note: If all keys on the page are duplicates then we can not
-				 * split the page. Instead we must let the page "overflow."
-				 * BucketPage.insert() handles this condition for us by allowing
-				 * the page to overflow rather than telling us to split the
-				 * page.
-				 * 
-				 * TODO Unit test this to make sure that it is introducing the
-				 * new level along the path to the full bucket page (rather than
-				 * some other path).
-				 */
-
-				// hash bits for the root directory.
-				final int hashBitsForRoot = root
-						.getLocalHashCode(key, 0/* prefixLengthForRootIsZero */);
-
-				// find the child of the root directory page.
-				final AbstractPage childOfRoot = root.getChild(
-						hashBitsForRoot, 0/* buddyOffsetOfRootIsZero */);
-
-				final int buddyOffsetInChild = HTreeUtil.getBuddyOffset(
-						hashBitsForRoot, root.globalDepth,
-						childOfRoot.globalDepth/* localDepthOfChild */);
-
-				// Add a level.
-				addLevel(root/* parent */, buddyOffsetInChild, splitBits);
+////                final int buddyOffset = getBuddyOffsetOfDirectoryPageOnPathToFullBucket(
+////                        key, bucketPage.parent.get());
+////
+////                addLevel(bucketPage.parent.get()/* oldParentIsAlwaysRoot */,
+////                        buddyOffset, splitBits);
+//
+//				/*
+//				 * To split the page, we have to introduce a new directory page
+//				 * above it and then introduce a sibling bucket page and finally
+//				 * re-index the tuples in the bucket page such that they are
+//				 * either the original bucket page or its new sibling bucket
+//				 * page.
+//				 * 
+//				 * Note: If all keys on the page are duplicates then we can not
+//				 * split the page. Instead we must let the page "overflow."
+//				 * BucketPage.insert() handles this condition for us by allowing
+//				 * the page to overflow rather than telling us to split the
+//				 * page.
+//				 * 
+//				 * TODO Unit test this to make sure that it is introducing the
+//				 * new level along the path to the full bucket page (rather than
+//				 * some other path).
+//				 */
+//
+//				// hash bits for the root directory.
+//				final int hashBitsForRoot = root
+//						.getLocalHashCode(key, 0/* prefixLengthForRootIsZero */);
+//
+//				// find the child of the root directory page.
+//				final AbstractPage childOfRoot = root.getChild(
+//						hashBitsForRoot, 0/* buddyOffsetOfRootIsZero */);
+//
+//				final int buddyOffsetInChild = HTreeUtil.getBuddyOffset(
+//						hashBitsForRoot, root.globalDepth,
+//						childOfRoot.globalDepth/* localDepthOfChild */);
+//
+//				// Add a level.
+//				addLevel(root/* parent */, buddyOffsetInChild, splitBits);
+            	
+            	addLevel2(bucketPage);
             	
             } else {
 
@@ -762,11 +764,17 @@ public class HTree extends AbstractHTree
                  * one.
                  */
 
-                final int buddyOffset = getBuddyOffsetOfDirectoryPageOnPathToFullBucket(
-                        key, p);
+//                final int buddyOffset = getBuddyOffsetOfDirectoryPageOnPathToFullBucket(
+//                        key, p);
+//
+//                splitDirectoryPage(p.parent.get(), buddyOffset, p/*oldChild*/);
 
-                splitDirectoryPage(p.parent.get(), buddyOffset, p/*oldChild*/);
-
+            	/*
+            	 * Expectation is that we will always have directory pages at
+            	 * depth := addressBits.
+            	 */
+            	throw new UnsupportedOperationException();
+            	
             }    
           
             n++;
