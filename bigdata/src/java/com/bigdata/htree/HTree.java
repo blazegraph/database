@@ -1439,6 +1439,121 @@ public class HTree extends AbstractHTree
 
 	}
 
+	/**
+	 * Adds a new level above a full {@link BucketPage}. The {@link BucketPage}
+	 * must be at depth==addressBits (i.e., one buddy bucket on the page and one
+	 * pointer from the parent into the {@link BucketPage}). Two new
+	 * {@link BucketPage}s and a new {@link DirectoryPage} are recruited. The
+	 * new {@link DirectoryPage} is initialized with pointers to the two
+	 * {@link BucketPage}s and linked into the parent of the original
+	 * {@link BucketPage}. The new {@link DirectoryPage} will be at maximum
+	 * depth since it takes the place of the old {@link BucketPage} which was
+	 * already at maximum depth. The tuples from the old {@link BucketPage} are
+	 * reindexed, which distributes them between the two new {@link BucketPage}
+	 * s.
+	 * 
+	 * @param oldPage
+	 *            The full {@link BucketPage}.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if any argument is <code>null</code>.
+	 * @throws IllegalStateException
+	 *             if the <i>oldPage</i> is not at maximum depth.
+	 * @throws IllegalStateException
+	 *             if the parent of the <i>oldPage</i> is not mutable.
+	 */
+	void addLevel2(final BucketPage oldPage) {
+		
+		if (oldPage == null)
+			throw new IllegalArgumentException();
+
+		if (oldPage.globalDepth != addressBits)
+			throw new IllegalStateException();
+
+		if (!oldPage.getParentDirectory().isDirty())
+			throw new IllegalStateException(); // parent must be mutable.
+		
+		final DirectoryPage newParent = new DirectoryPage(this, addressBits/* globalDepth */);
+		nnodes++;
+		
+		// #of slots on a page.
+		final int slotsPerPage = 1 << addressBits;
+
+		// replace the ptr to the oldPage in the parent with the new dir page.
+		{
+			final DirectoryPage pp = oldPage.getParentDirectory();
+			boolean found = false;
+			for (int i = 0; i < slotsPerPage; i++) {
+				if (pp.childRefs[i] != null && pp.childRefs[i].get() == oldPage) {
+					pp.childRefs[i] = (Reference) newParent.self;
+					found = true;
+					break;
+				}
+			}
+			if (!found)
+				throw new AssertionError();
+		}
+
+		// 1/2 of the slots will point to each of the new bucket pages.
+		final int npointers = slotsPerPage >> 1;
+
+		// The local depth of the new bucket pages.
+		final int localDepth = HTreeUtil.getLocalDepth(addressBits,
+				newParent.globalDepth, npointers);
+
+		final BucketPage a = new BucketPage(this, localDepth);
+		final BucketPage b = new BucketPage(this, localDepth);
+		nleaves++; // Note: only +1 since we will delete the oldPage.
+
+		// Set the parent references on the new pages.
+		newParent.parent = oldPage.parent;
+		a.parent = (Reference) newParent.self;
+		b.parent = (Reference) newParent.self;
+
+		// Link the new bucket pages into the new parent directory page.
+		for (int i = 0; i < slotsPerPage; i++) {
+
+			newParent.childRefs[i] = (Reference) (i < npointers ? a.self
+					: b.self);
+
+		}
+
+		/*
+		 * Reindex the tuples in the old bucket page
+		 * 
+		 * Note: This MUST be done as a low level operation in order to avoid
+		 * duplicating raw records and in order to preserve per-tuple metadata,
+		 * including version timestamps and deleted tuple markers.
+		 */
+		reindexTuples(oldPage, a, b);
+//		{
+//			
+//			final IRaba keys = oldPage.getKeys();
+//
+//			final IRaba vals = oldPage.getValues();
+//
+//			for (int i = 0; i < slotsPerPage; i++) {
+//
+//				if (keys.isNull(i))
+//					continue;
+//
+//				final byte[] key = keys.get(i);
+//
+//				final byte[] val = vals.get(i);
+//
+//				insert(key, val);
+//
+//			}
+//			
+//		}
+
+		if (oldPage.isPersistent()) {
+			// delete oldPage.
+			store.delete(oldPage.getIdentity());
+		}
+		
+	}
+	
     /**
      * Adds a new {@link DirectoryPage} when we need to split a child but
      * <code>globalDepth == localDepth</code>. The caller must retry the insert
@@ -1568,6 +1683,8 @@ public class HTree extends AbstractHTree
      *             update the appropriate pointers in the root. This is the
      *             [buddyOffset] of the direct child of the root on the path to
      *             the {@link BucketPage} which which needs to be split.
+     *             
+     *             @deprecated by the new implementation.
      */
     // Note: package private for unit tests.
     void addLevel(final DirectoryPage oldParentIsAlwaysRoot,
@@ -1940,6 +2057,8 @@ public class HTree extends AbstractHTree
      *            indexing operation was successful and should not have a side
      *            effect if the operation could not be completed (because some
      *            buddy bucket would have overflowed).
+     *            
+     *            @deprecated by the alternative implementation.
      */
     private boolean reindexTuples(final DirectoryPage parent,
             final int buddyOffset, final int prefixLength, final BucketPage a,
@@ -2106,6 +2225,180 @@ public class HTree extends AbstractHTree
         // Success
         return true;
 
+    }
+
+	/**
+	 * Re-index the tuples in an old {@link BucketPage}, distributing them
+	 * between (a) and (b) according to the hash bits which are in play at that
+	 * level of the {@link HTree}.
+	 * 
+	 * @param oldPage
+	 *            The old {@link BucketPage} whose tuples will be reindexed.
+	 * @param a
+	 *            The original bucket.
+	 * @param b
+	 *            The new sibling bucket.
+	 */
+	private void reindexTuples(final BucketPage oldPage, final BucketPage a,
+			final BucketPage b) {
+
+        if (a == null)
+            throw new IllegalArgumentException();
+        if (b == null)
+            throw new IllegalArgumentException();
+        if (a.isReadOnly())
+            throw new IllegalStateException();
+        if (b.isReadOnly())
+            throw new IllegalStateException();
+		if (b.globalDepth != a.globalDepth) {
+			/*
+			 * Must be at the same depth (these are newly created bucket pages
+			 * of a common parent).
+			 */
+			throw new IllegalStateException();
+		}
+        final DirectoryPage parent = a.getParentDirectory();
+        if (a.parent.get() != parent)
+            throw new IllegalStateException();
+        if (b.parent.get() != parent)
+            throw new IllegalStateException();
+		if (parent.globalDepth != addressBits) {
+			/*
+			 * The parent must be a directory with depth=addressBits, which is a
+			 * precondition of the method which invokes this (addLevel()).
+			 * Hence, the buddyOffset in the parent will be ZERO (0) since there
+			 * is only one buddy in the parent when its depth := addressBits.
+			 */
+			throw new IllegalStateException();
+		}
+		// prefixLength to the parent directory page.
+		final int prefixLength = parent.getPrefixLength();
+		// Note: buddyOffset in parent will be zero per above.
+		final int buddyOffset = 0; // since depth==addressBits, only 1 buddy.
+		
+		if (log.isDebugEnabled())
+			log.debug("oldPage=" + oldPage.toShortString() + ", buddyOffset="
+					+ buddyOffset + ", prefixLength=" + prefixLength + ", a="
+					+ a.toShortString() + ", b=" + b.toShortString());
+
+        // #of buddy buckets on a page (post-condition for both bucket pages).
+        final int nbuddies = (1 << addressBits) / (1 << a.globalDepth);
+
+        // #of address slots in each buddy hash bucket (post-condition).
+        final int slotsPerBuddy = (1 << a.globalDepth);
+
+        // The #of hash bucket buddies across both bucket pages.
+        final int nbins = nbuddies << 1;
+
+        /**
+         * A counter per buddy hash bucket. The index into [bins] is the
+         * <code>page * nbuddies</code>, where the original page is page:=0 and
+         * the new page is page:=1. If any counter exceeds <i>slotsPerBuddy</i>
+         * then the reindex operation will fail since the corresponding buddy
+         * bucket would overflow. The counter is incremented before we copy the
+         * tuple to the target page so we detect an overflow before it occurs.
+         */
+        final int[] bins = new int[nbins];
+        
+        final BucketPage t = oldPage;
+
+		/*
+		 * Visit each tuple which was in [oldPage], figure out which of the two
+		 * bucket pages it needs to be in, and insert the tuple into the
+		 * appropriate bucket page.
+		 */
+        
+        final IRaba keys = t.data.getKeys();
+        final IRaba vals = t.data.getValues();
+        final int m = 1 << addressBits; // aka fan-out or branching factor.
+        assert m == keys.capacity();
+
+        for (int sourceIndex = 0; sourceIndex < m; sourceIndex++) {
+
+            // Since the bucket is full, no entry should be null.
+            assert !keys.isNull(sourceIndex);
+
+            /*
+             * Re-insert the tuple
+             * 
+             * Note: A re-insert via the top-level entry point is logically
+             * correct. However, it will: (a) cause the raw record to be
+             * materialized and written onto the backing store a second time
+             * (which is wasteful in the extreme); (b) have a side-effect on the
+             * revision timestamps (if we support them); and (c) cause deleted
+             * tuples to "reappear" (if we support delete markers). For all of
+             * these reasons, we need to handle the "re-insert" of the tuples
+             * at a much lower level in the API.
+             */
+
+            // materialize the key.
+            final byte[] key = keys.get(sourceIndex);
+
+			/*
+			 * Figure out whether the tuple would be directed into (a) or (b) by
+			 * the parent. Then figure out which buddy bucket on the target page
+			 * will get that tuple.
+			 */
+			final int hashBitsParent = parent.getLocalHashCode(key,
+					prefixLength);
+
+			// Find the child which will get this tuple.
+			final AbstractPage child = parent.getChild(hashBitsParent,
+					buddyOffset);
+
+			// The child must be a bucket page.
+			assert child.isLeaf();
+
+			// The child be one of the two bucket pages we are working with.
+            assert (child == a || child == b);
+
+            // True if the tuple is re-indexed back into (a).
+            final boolean isA = child == a;
+            
+//            // The page index component into [bins].
+//            final int page = isA ? 0 : 1;
+
+            final BucketPage x = (BucketPage) child;
+
+            // find the offset of the buddy hash table in the child.
+            final int targetBuddyOffset = HTreeUtil
+                    .getBuddyOffset(hashBitsParent, parent.globalDepth,
+                            child.globalDepth/* localDepthOfChild */);
+
+            // next free slot in the target buddy bucket.
+            final int targetSlotInBuddy = bins[targetBuddyOffset]++;
+
+            if (targetSlotInBuddy >= slotsPerBuddy) {
+
+                /*
+                 * The buddy hash table has overflowed.
+                 * 
+                 * Note: Undo the changes to the original bucket page such that
+                 * this method does not have a side effect if the index fails.
+                 */
+
+				throw new RuntimeException("Buddy bucket overflow: page="
+						+ (isA?"a":"b") + ", targetBuddyOffset=" + targetBuddyOffset
+						+ ", bins=" + Arrays.toString(bins));
+
+            }
+            
+            // The index in the child where we will write the tuple.
+            final int targetIndexOnPage = targetBuddyOffset;
+
+            assert x.data.getKeys().isNull(targetIndexOnPage);
+            
+            // Copy the key.
+            x.data.getKeys().set(targetIndexOnPage, key);
+            
+            // Copy the value.
+            if (!vals.isNull(sourceIndex))
+                x.data.getValues().set(targetIndexOnPage, vals.get(sourceIndex));
+
+            // TODO copy versionTimestamp and delete marker metadata too.
+
+        }
+        
     }
     
     /**
@@ -2463,7 +2756,7 @@ public class HTree extends AbstractHTree
 		final HTree tmp;
 		{
 
-			final int rootPrefixLength = d.getBitResolution();
+			final int rootPrefixLength = d.getPrefixLength();
 			final DirectoryPage pd = d.getParentDirectory();
 			final int externalPageDepth = pd == null ? 0 : pd.globalDepth;
 
@@ -2817,10 +3110,8 @@ public class HTree extends AbstractHTree
 		 * Return the prefix length of the page (the #of bits of the key which
 		 * have been consumed by the parent directory pages before reaching this
 		 * page).
-		 * 
-		 *         TODO Rename as getPrefixLength().
 		 */
-		final public int getBitResolution() {
+		final public int getPrefixLength() {
 
 			int ret = 0;
 			
@@ -3809,7 +4100,7 @@ public class HTree extends AbstractHTree
          *         matter how many bits we have.
          */
 	    int distinctBitsRequired() {
-	    	final int currentResolution = getBitResolution(); // start offset of this page
+	    	final int currentResolution = getPrefixLength(); // start offset of this page
 	    	int testPrefix = currentResolution+1;
 	    	
 	    	final IRaba keys = data.getKeys();

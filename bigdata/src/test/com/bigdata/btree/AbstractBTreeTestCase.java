@@ -138,6 +138,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         /*
          * Verifies that the keys are in sort order.
          */
+        if(expected.isKeys()) {
         final int nkeys = expected.size();
         for (int i = 1; i < nkeys; i++) {
 
@@ -155,6 +156,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             }
 
+        }
         }
 
     }
