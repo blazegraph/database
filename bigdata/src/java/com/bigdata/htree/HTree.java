@@ -2383,8 +2383,8 @@ public class HTree extends AbstractHTree
 
             }
             
-            // The index in the child where we will write the tuple.
-            final int targetIndexOnPage = targetBuddyOffset;
+			// The index in the child where we will write the tuple.
+			final int targetIndexOnPage = targetBuddyOffset + targetSlotInBuddy;
 
             assert x.data.getKeys().isNull(targetIndexOnPage);
             
