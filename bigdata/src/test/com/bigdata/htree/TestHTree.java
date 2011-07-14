@@ -1931,19 +1931,19 @@ public class TestHTree extends AbstractHTreeTestCase {
             assertTrue(root == htree.getRoot());
             final BucketPage a = (BucketPage) root.childRefs[0].get();
             
-            System.out.println("1#: Bit resolution: " + a.getBitResolution() + ", additional bits required: " + a.distinctBitsRequired());
+            System.out.println("1#: Bit resolution: " + a.getPrefixLength() + ", additional bits required: " + a.distinctBitsRequired());
             assertTrue(a.distinctBitsRequired() == 4);
             
             htree.insert(k3, v3);
             htree.insert(k8, v8);
             
-            System.out.println("2#: Bit resolution: " + a.getBitResolution() + ", additional bits required: " + a.distinctBitsRequired());
+            System.out.println("2#: Bit resolution: " + a.getPrefixLength() + ", additional bits required: " + a.distinctBitsRequired());
             assertTrue(a.distinctBitsRequired() == 2);
 
             // insert extra level
             htree.insert(k4, v4);
             
-            System.out.println("3#: Bit resolution: " + a.getBitResolution() + ", additional bits required: " + a.distinctBitsRequired());
+            System.out.println("3#: Bit resolution: " + a.getPrefixLength() + ", additional bits required: " + a.distinctBitsRequired());
             assertTrue(a.distinctBitsRequired() == 2);
             
         } finally {
