@@ -168,7 +168,7 @@ public class TestHTree_addLevel extends AbstractHTreeTestCase {
 			 * d    := [2]   (e,e;f,f)   // replace (a) with (d).  
 			 * e    := [1]     (-,-;x10,x11) // new bucket page child of (d)
 			 * f    := [1]     (x20,x21;-,-) // new bucket page child of (d)
-			 * c    := [2]     (-,-,-,-) // unchanged
+			 * c    := [2]   (-,-,-,-)   // unchanged
 			 * b    := [1]   (-,-;-,-)   // unchanged
 			 * </pre>
 			 */

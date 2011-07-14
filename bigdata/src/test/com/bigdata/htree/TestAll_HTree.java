@@ -63,9 +63,6 @@ public class TestAll_HTree extends TestCase {
 
         // Unit test for a simple add level scenario.
         suite.addTestSuite(TestHTree_addLevel.class);
-        
-        // Test suite for re-indexing tuples when splitting a full buddy bucket.
-        suite.addTestSuite(TestHTreeReindexFullBucket.class);
 
 		return suite;
 
