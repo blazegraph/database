@@ -600,7 +600,8 @@ public class HTree extends AbstractHTree
 					}
 
 					// globalDepth >= localDepth
-					splitBucketsOnPage(current, buddyOffset, bucketPage);
+					// splitBucketsOnPage(current, buddyOffset, bucketPage);
+					current.split(bucketPage);
 					
 					// Try again. The children have changed.
 					continue;
@@ -1585,7 +1586,8 @@ public class HTree extends AbstractHTree
 	 * @throws IllegalStateException
 	 *             if the parent of the <i>oldPage</i> is not mutable.
 	 */
-	void addLevel2(final BucketPage oldPage) {
+	DirectoryPage addLevel2(final BucketPage oldPage) {
+		final DirectoryPage newParent;
 		
 		if (oldPage == null)
 			throw new IllegalArgumentException();
@@ -1615,7 +1617,7 @@ public class HTree extends AbstractHTree
 			final int localDepth = HTreeUtil.getLocalDepth(addressBits,
 					addressBits/* globalDepth(newParent) */, npointers);
 
-			final DirectoryPage newParent = new DirectoryPage(this, addressBits/* globalDepth */);
+			newParent = new DirectoryPage(this, addressBits/* globalDepth */);
 			nnodes++;
 
 			final BucketPage a = new BucketPage(this, localDepth);
@@ -1677,11 +1679,17 @@ public class HTree extends AbstractHTree
 		 * keys).
 		 */
 		// reindexTuples(oldPage, a, b);
+		IRaba okeys = oldPage.getKeys();
+		IRaba ovals = oldPage.getValues();
 		for (int i = 0; i < slotsPerPage; i++) {
 
-			insertRawTuple(oldPage, i);
+			// insertRawTuple(oldPage, i);
+			if (okeys.get(i) != null)
+				newParent.insertRawTuple(okeys.get(i), ovals.get(i), 0);
 
 		}
+		
+		return newParent;
 
 	}
 	
@@ -3504,6 +3512,8 @@ public class HTree extends AbstractHTree
 		
 		}
 		
+		abstract void insertRawTuple(final byte[] key, final byte[] val, final int buddy);
+
 	} // class AbstractPage
 
 	/**
@@ -4408,7 +4418,8 @@ public class HTree extends AbstractHTree
 	    	
 	    	int maxPrefix = 0;
 	    	for (int t = 1; t < nkeys; t++) {
-	    		final int klen = keys.get(t).length;
+	    		final byte[] k = keys.get(t);
+	    		final int klen = k == null ? 0 : k.length;
 	    		maxPrefix = maxPrefix > klen ? maxPrefix : klen;
 	    	}
 	    	maxPrefix *= 8; // convert max bytes to max bits
@@ -4418,7 +4429,8 @@ public class HTree extends AbstractHTree
 	    	while (testPrefix < maxPrefix) {
 	    	    final boolean bitset = BytesUtil.getBit(keys.get(0), testPrefix);
 		    	for (int t = 1; t < nkeys; t++) {
-		    		if (bitset != BytesUtil.getBit(keys.get(t), testPrefix)) {
+		    		final byte[] k = keys.get(t);
+		    		if (bitset != (k == null ? false : BytesUtil.getBit(keys.get(t), testPrefix))) {
 		    			return testPrefix - currentResolution;
 		    		}
 		    	}
@@ -4427,6 +4439,65 @@ public class HTree extends AbstractHTree
 	    	
 	    	return -1;
 	    }
+
+	    /**
+	     * To insert in a BucketPage must handle split
+	     * 
+	     * @see com.bigdata.htree.HTree.AbstractPage#insertRawTuple(byte[], byte[], int)
+	     */
+		void insertRawTuple(final byte[] key, final byte[] val, final int buddy) {
+			final int slotsPerBuddy = (1 << htree.addressBits);
+            final MutableKeyBuffer keys = (MutableKeyBuffer) getKeys();
+            final MutableValueBuffer vals = (MutableValueBuffer) getValues();
+			
+			if (true) {
+				// just fit somewhere in page
+				for (int i = 0; i < slotsPerBuddy; i++) {
+					if (keys.isNull(i)) {
+						keys.nkeys++;
+						keys.keys[i] = key;
+						vals.nvalues++;
+						vals.values[i] = val;
+						// TODO deleteMarker:=false
+						// TODO versionTimestamp:=...
+						// do not increment on raw insert, since this is only ever (for now) a re-organisation
+						// ((HTree)htree).nentries++;
+						// insert Ok.
+						return;
+					}
+				}				
+			} else { // if mapping buddy explicitly
+				final int buddyStart = buddy * slotsPerBuddy;
+				final int lastSlot = buddyStart + slotsPerBuddy;
+				
+				for (int i = buddyStart; i < lastSlot; i++) {
+					if (keys.isNull(i)) {
+						keys.nkeys++;
+						keys.keys[i] = key;
+						vals.nvalues++;
+						vals.values[i] = val;
+						// TODO deleteMarker:=false
+						// TODO versionTimestamp:=...
+						((HTree)htree).nentries++;
+						// insert Ok.
+						return;
+					}
+				}
+			}
+			
+			// unable to insert
+			 if (globalDepth == htree.addressBits) {
+				 // max depth so add level
+				 DirectoryPage np = ((HTree) htree).addLevel2(this);
+             	
+				 np.insertRawTuple(key, val, 0);
+			 } else {
+				 // otherwise split page by asking parent to split and re-inserting values
+				 
+				 final DirectoryPage parent = getParentDirectory();
+				 parent.split(this);
+			 }
+		}
 
     } // class BucketPage
 	
@@ -4479,6 +4550,52 @@ public class HTree extends AbstractHTree
 
 			return getChild(index);
 			
+		}
+
+		/**
+		 * Locate original references, halving number of references to new pages
+		 * @param bucketPage - original bucket
+		 */
+		public void split(final BucketPage bucketPage) {
+			int start = 0;
+			for (int s = 0; s < this.getChildCount(); s++) {
+				if (bucketPage == getChild(s)) {
+					start = s;
+					break;
+				}
+			}
+			int last = start;			
+			for (int s = start+1; s < this.getChildCount(); s++) {
+				if (bucketPage == getChild(s)) {
+					last++;
+				} else {
+					break;
+				}
+			}
+			final int orig = last - start + 1;
+			
+			assert orig > 1;
+			assert orig % 2 == 0;
+			
+			final int crefs = orig >> 1; // half references for each new child
+			
+			final BucketPage a = new BucketPage((HTree) htree, bucketPage.globalDepth+1);
+			a.parent = (Reference<DirectoryPage>) self;
+			for (int s = start; s < start + crefs; s++) {
+				childRefs[s] = (Reference<AbstractPage>) a.self;
+			}
+			final BucketPage b = new BucketPage((HTree) htree, bucketPage.globalDepth+1);
+			b.parent = (Reference<DirectoryPage>) self;
+			for (int s = start+crefs; s < start + orig; s++) {
+				childRefs[s] = (Reference<AbstractPage>) b.self;
+			}
+			
+			// Now insert raw values from original page
+			final ITupleIterator tuples = bucketPage.tuples();
+			while (tuples.hasNext()) {
+				ITuple tuple = tuples.next();
+				insertRawTuple(tuple.getKey(), tuple.getValue(), 0);
+			}
 		}
 
 		/**
@@ -5229,6 +5346,33 @@ public class HTree extends AbstractHTree
 			}
 
 		}
+		
+		/*
+		 * All directories are at max depth, so we just need to determine prefix
+		 * and test key to locate child page o accept value 
+		 */
+		void insertRawTuple(final byte[] key, final byte[] val, final int buddy) {
+			
+			assert buddy == 0;
+			
+			final int pl = getPrefixLength();
+			final int hbits = BytesUtil.getBits(key, pl, htree.addressBits);
+			AbstractPage cp = getChild(hbits);
+			
+			cp.insertRawTuple(key, val, getChildBuddy(hbits));
+		}
+
+		/*
+		 * Checks child buddies, looking for previous references and incrementing
+		 */
+		private int getChildBuddy(int hbits) {
+			int cbuddy = 0;
+			final AbstractPage cp= getChild(hbits);
+			while (hbits > 0 && cp == getChild(--hbits))
+				cbuddy++;
+			
+			return cbuddy;
+		}
 	    
     } // class DirectoryPage
 
@@ -5401,6 +5545,8 @@ public class HTree extends AbstractHTree
 	String PP() {
 		
 		final StringBuilder sb = new StringBuilder();
+		
+		sb.append("Total Entries: " + nentries + "\n");
 		
 		root.PP(sb);
 		
