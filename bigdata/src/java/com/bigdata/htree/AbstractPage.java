@@ -399,7 +399,13 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 	abstract void insertRawTuple(final byte[] key, final byte[] val,
 			final int buddy);
 
-	/**
+	final public Iterator<AbstractPage> postOrderNodeIterator() {
+
+		return postOrderNodeIterator(false/* dirtyNodesOnly */, false/* nodesOnly */);
+
+	}
+
+    /**
 	 * Post-order traversal of nodes and leaves in the tree. For any given node,
 	 * its children are always visited before the node itself (hence the node
 	 * occurs in the post-order position in the traversal). The iterator is NOT

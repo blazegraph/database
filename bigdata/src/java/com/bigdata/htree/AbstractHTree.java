@@ -820,13 +820,10 @@ abstract public class AbstractHTree implements ICounterSetAccess {
         // show the copyright banner during startup.
         Banner.banner();
 
-        if (store == null)
-            throw new IllegalArgumentException();
-
         if (nodeFactory == null)
             throw new IllegalArgumentException();
 
-        // Note: MAY be null (implies a transient BTree).
+        // Note: MAY be null (implies a transient HTree).
 //        assert store != null;
 
         if (metadata == null)
