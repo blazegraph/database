@@ -131,24 +131,24 @@ public class TestHTree_stressInsert extends AbstractHTreeTestCase {
 				if (log.isInfoEnabled())
 					log.info("after key=" + i + "\n" + htree.PP());
 
-                if ((i % validateInterval) == 0) {
-
-                    for (int j = 0; j <= i; j++) {
-
-                        final byte[] b = keys[j];
-                        if (log.isDebugEnabled()) {
-                        	log.debug("verifying: " + j);
-                        }
-                        assertEquals(b, htree.lookupFirst(b));
-                        
-//                        // TODO Verify the iterator.
-//                        final byte[][] tmp = new byte[i][];
-//                        System.arraycopy(keys/*src*/, 0/*srcOff*/, tmp/*src*/, 0/*dstOff*/, tmp.length/*length*/);
-//                        assertSameIteratorAnyOrder(tmp/*expected*/, htree.values());
-
-                    }
-                    
-                }
+//                if ((i % validateInterval) == 0) {
+//
+//                    for (int j = 0; j <= i; j++) {
+//
+//                        final byte[] b = keys[j];
+//                        if (log.isDebugEnabled()) {
+//                        	log.debug("verifying: " + j);
+//                        }
+//                        assertEquals(b, htree.lookupFirst(b));
+//                        
+////                        // TODO Verify the iterator.
+////                        final byte[][] tmp = new byte[i][];
+////                        System.arraycopy(keys/*src*/, 0/*srcOff*/, tmp/*src*/, 0/*dstOff*/, tmp.length/*length*/);
+////                        assertSameIteratorAnyOrder(tmp/*expected*/, htree.values());
+//
+//                    }
+//                    
+//                }
                 
             }
 
