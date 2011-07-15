@@ -133,6 +133,9 @@ import com.bigdata.rdf.sail.sop.SOpTree;
 import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
 import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
+import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.SOp2ASTUtility;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
@@ -969,8 +972,17 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 			final AtomicInteger idFactory = new AtomicInteger(0);
 
 			// Convert the step to a bigdata operator tree.
-			query = SOp2BOpUtility.convert(sopTree, idFactory, database,
-					queryEngine, queryHints);
+//			query = SOp2BOpUtility.convert(sopTree, idFactory, database,
+//					queryEngine, queryHints);
+			
+			final com.bigdata.rdf.sparql.ast.QueryRoot ast = 
+					SOp2ASTUtility.convert(sopTree);
+			
+			if (log.isInfoEnabled())
+				log.info("\n"+ast);
+
+			query = AST2BOpUtility.convert(ast, 
+					new AST2BOpContext(idFactory, database, queryEngine, queryHints));
 
 			if (log.isInfoEnabled())
 				log.info("\n"+BOpUtility.toString2(query));
