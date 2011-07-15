@@ -44,6 +44,7 @@ import org.apache.system.SystemUtil;
 import com.bigdata.LRUNexus;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.counters.linux.StatisticsCollectorForLinux;
+import com.bigdata.counters.osx.StatisticsCollectorForOSX;
 import com.bigdata.counters.win.StatisticsCollectorForWindows;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.Bytes;
@@ -568,15 +569,24 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
             throw new IllegalArgumentException(
                     "Required option not specified: " + Options.PROCESS_NAME);
         
-        final String osname = System.getProperty("os.name").toLowerCase();
-        
-        if(osname.equalsIgnoreCase("linux")) {
+//        final String osname = System.getProperty("os.name").toLowerCase();
+//        
+//        if(osname.equalsIgnoreCase("linux")) {
+        if(SystemUtil.isLinux()) {
             
             return new StatisticsCollectorForLinux(interval, processName);
             
-        } else if(osname.contains("windows")) {
+//        } else if(osname.contains("windows")) {
+            
+        } else if(SystemUtil.isWindows()) {
             
             return new StatisticsCollectorForWindows(interval);
+            
+//        } else if(osname.contains("os x")) {
+            
+        } else if(SystemUtil.isOSX()) {
+
+        	return new StatisticsCollectorForOSX(interval, processName);
             
         } else {
             
@@ -641,7 +651,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
         if (count < 0)
             throw new RuntimeException("count must be non-negative");
 
-        Properties properties = new Properties(System.getProperties());
+        final Properties properties = new Properties(System.getProperties());
         
         if (nargs != 0) {
             

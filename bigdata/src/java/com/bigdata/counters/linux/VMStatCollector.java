@@ -103,7 +103,6 @@ public class VMStatCollector extends AbstractProcessCollector implements
      * Double precision counter with scaling factor.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     class DI extends I<Double> {
 
@@ -139,7 +138,7 @@ public class VMStatCollector extends AbstractProcessCollector implements
      * are paths into the {@link CounterSet}. The values are the data most
      * recently read from <code>vmstat</code>.
      */
-    private Map<String, Object> vals = new HashMap<String, Object>();
+    final private Map<String, Object> vals = new HashMap<String, Object>();
     
     /**
      * The timestamp associated with the most recently collected values.
@@ -193,90 +192,84 @@ public class VMStatCollector extends AbstractProcessCollector implements
     /**
      * Declares the counters that we will collect
      */
-    /*synchronized*/ public CounterSet getCounters() {
-        
-//        if(root == null) {
-        
-        final CounterSet root = new CounterSet();
-            
-            inst = new LinkedList<I>();
-            
-            /*
-             * Note: Counters are all declared as Double to facilitate
-             * aggregation.
-             */
+	public CounterSet getCounters() {
 
-            /*
-             * Note: [si] is "the #of blocks swapped in per second."
-             */
-            inst.add(new DI(IRequiredHostCounters.Memory_majorFaultsPerSecond,
-                    1d));
+		final CounterSet root = new CounterSet();
 
-            /*
-             * Note: [swpd] is "the amount of virtual memory used". The counter
-             * is reported in 1024 byte blocks, so we convert to bytes using a
-             * scaling factor.
-             * 
-             * @todo where do I get the amount of swap space available?
-             */
-            inst.add(new DI(IHostCounters.Memory_SwapBytesUsed, 1024d));
+		inst = new LinkedList<I>();
 
-            /*
-             * Note: [free] is "the amount of idle memory". The counter is
-             * reported in 1024 byte blocks, so we convert to bytes using a
-             * scaling factor.
-             */
-            inst.add(new DI(IHostCounters.Memory_Bytes_Free, 1024d));
+		/*
+		 * Note: Counters are all declared as Double to facilitate aggregation.
+		 */
 
-            /*
-             * Note: [bi] is "the blocks received from a device / second". The
-             * counter is reported in 1024 byte blocks, so we convert to bytes
-             * using a scaling factor.
-             */
-            inst.add(new DI(IRequiredHostCounters.PhysicalDisk_BytesReadPerSec,
-                    1024d));
-            
-            /*
-             * Note: [bo] is "the blocks sent to a device / second". The counter
-             * is reported in 1024 byte blocks, so we convert to bytes using a
-             * scaling factor.
-             */
-            inst.add(new DI(IRequiredHostCounters.PhysicalDisk_BytesWrittenPerSec,
-                    1024d));
-            
-            if (cpuStats) {
+		/*
+		 * Note: [si] is "the #of blocks swapped in per second."
+		 */
+		inst.add(new DI(IRequiredHostCounters.Memory_majorFaultsPerSecond, 1d));
 
-                /*
-                 * Note: vmstat reports percentages in [0:100] so we convert
-                 * them to [0:1] using a scaling factor.
-                 */
+		/*
+		 * Note: [swpd] is "the amount of virtual memory used". The counter is
+		 * reported in 1024 byte blocks, so we convert to bytes using a scaling
+		 * factor.
+		 * 
+		 * @todo where do I get the amount of swap space available?
+		 */
+		inst.add(new DI(IHostCounters.Memory_SwapBytesUsed, 1024d));
 
-                // Note: processor time = (100-idle), converted to [0:1].
-                inst.add(new DI(IRequiredHostCounters.CPU_PercentProcessorTime,.01d));
-                // Note: column us
-                inst.add(new DI(IHostCounters.CPU_PercentUserTime, .01d));
-                // Note: column sy
-                inst.add(new DI(IHostCounters.CPU_PercentSystemTime, .01d));
-                // Note: column wa
-                inst.add(new DI(IHostCounters.CPU_PercentIOWait, .01d));
-                
-            }
-            
-            for(Iterator<I> itr = inst.iterator(); itr.hasNext(); ) {
-                
-                final I i = itr.next();
-                
-                root.addCounter(i.getPath(), i);
-                
-            }
-            
-//        }
-        
-        return root;
-        
-    }
-    private List<I> inst = null;
-//    private CounterSet root = null;
+		/*
+		 * Note: [free] is "the amount of idle memory". The counter is reported
+		 * in 1024 byte blocks, so we convert to bytes using a scaling factor.
+		 */
+		inst.add(new DI(IHostCounters.Memory_Bytes_Free, 1024d));
+
+		/*
+		 * Note: [bi] is "the blocks received from a device / second". The
+		 * counter is reported in 1024 byte blocks, so we convert to bytes using
+		 * a scaling factor.
+		 */
+		inst.add(new DI(IRequiredHostCounters.PhysicalDisk_BytesReadPerSec,
+				1024d));
+
+		/*
+		 * Note: [bo] is "the blocks sent to a device / second". The counter is
+		 * reported in 1024 byte blocks, so we convert to bytes using a scaling
+		 * factor.
+		 */
+		inst.add(new DI(IRequiredHostCounters.PhysicalDisk_BytesWrittenPerSec,
+				1024d));
+
+		if (cpuStats) {
+
+			/*
+			 * Note: vmstat reports percentages in [0:100] so we convert them to
+			 * [0:1] using a scaling factor.
+			 */
+
+			// Note: processor time = (100-idle), converted to [0:1].
+			inst.add(new DI(IRequiredHostCounters.CPU_PercentProcessorTime,
+					.01d));
+			// Note: column us
+			inst.add(new DI(IHostCounters.CPU_PercentUserTime, .01d));
+			// Note: column sy
+			inst.add(new DI(IHostCounters.CPU_PercentSystemTime, .01d));
+			// Note: column wa
+			inst.add(new DI(IHostCounters.CPU_PercentIOWait, .01d));
+
+		}
+
+		for (Iterator<I> itr = inst.iterator(); itr.hasNext();) {
+
+			final I i = itr.next();
+
+			root.addCounter(i.getPath(), i);
+
+		}
+
+		return root;
+
+	}
+
+	private List<I> inst = null;
 
     public AbstractProcessReader getProcessReader() {
         
@@ -300,7 +293,6 @@ public class VMStatCollector extends AbstractProcessCollector implements
      * </pre>
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private class VMStatReader extends ProcessReaderHelper {
         
@@ -319,10 +311,6 @@ public class VMStatCollector extends AbstractProcessCollector implements
             
         }
 
-        /**
-         * 
-         * @see TestParsing#test_vmstat_header_and_data_parse()
-         */
         @Override
         protected void readProcess() throws Exception {
             

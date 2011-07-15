@@ -9,22 +9,23 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
+import org.apache.system.SystemUtil;
 
 /**
- * Reports on the kernel version for a linux host.
+ * Reports on the kernel version for a linux (or OSX) host.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
  *         Thompson</a>
  * @version $Id$
  * 
- * @todo there is more information lurking in the kernel version.
+ * @todo there is more information lurking in the kernel version (under linux).
  * 
  * @see http://en.wikipedia.org/wiki/Linux_kernel for a summary of linux
  *      kernel versioning.
  */
 public class KernelVersion {
     
-    static protected final Logger log = Logger.getLogger(KernelVersion.class);
+    static private final Logger log = Logger.getLogger(KernelVersion.class);
 
     public final int version;
     public final int major;
@@ -48,6 +49,13 @@ public class KernelVersion {
         minor   = Integer.parseInt(m.group(3));
         
     }
+
+    public String toString() {
+
+		return "{version=" + version + ", major=" + major + ", minor=" + minor
+				+ "}";
+
+    }
     
     /**
      * Return the version of the Linux kernel as reported by
@@ -66,11 +74,27 @@ public class KernelVersion {
         
         try {
         
-            commands.add("/bin/uname");
+			if (SystemUtil.isLinux()) {
+
+				commands.add("/bin/uname");
+
+			} else if (SystemUtil.isOSX()) {
+
+				commands.add("/usr/bin/uname");
+
+        	} else {
+
+				/*
+				 * Attempt uname -r at with this path, but this is an unknown
+				 * OS.
+				 */
+				commands.add("/bin/uname");
+        		
+        	}
             
             commands.add("-r");
             
-            ProcessBuilder pb = new ProcessBuilder(commands);
+            final ProcessBuilder pb = new ProcessBuilder(commands);
             
             pr = pb.start();
             
@@ -117,11 +141,25 @@ public class KernelVersion {
             
         } else {
             
-            throw new RuntimeException("Could not get PID: exitValue="
-                    + pr.exitValue());
+			throw new RuntimeException(
+					"Could not get kernal version: exitValue=" + pr.exitValue());
             
         }
 
     }
 
+	/**
+	 * Prints the data reported by {@link KernelVersion#get()}.
+	 * 
+	 * @param args
+	 *            ignored.
+	 */
+    public static void main(final String[] args) {
+    	
+    	final KernelVersion kver = KernelVersion.get();
+
+    	System.out.println("kernel version: "+kver);
+    	
+    }
+    
 }

@@ -59,21 +59,21 @@ public interface IHostCounters extends IRequiredHostCounters {
 
     /**
      * Percentage of the time the processor is not idle that it is executing
-     * at the user level (normalized to 100% in single CPU and SMP
+     * at the user level in [0:1] (normalized to 100% in single CPU and SMP
      * environments).
      */
     String CPU_PercentUserTime = CPU + ps + "% User Time";
 
-    /**
-     * Percentage of the time the processor is not idle that it is executing
-     * at the system (aka kernel) level (normalized to 100% in single CPU
-     * and SMP environments).
-     */
+	/**
+	 * Percentage of the time the processor is not idle that it is executing at
+	 * the system (aka kernel) level in [0:1] (normalized to 100% in single CPU
+	 * and SMP environments).
+	 */
     String CPU_PercentSystemTime = CPU + ps + "% System Time";
 
     /**
      * Percentage of the time the CPU(s) were idle while the system had an
-     * outstanding IO.
+     * outstanding IO in [0:1].
      * <p>
      * Note: The Windows platform does not appear to be able to report this
      * counter. If it did I would move this into the "required" category. The
@@ -135,5 +135,18 @@ public interface IHostCounters extends IRequiredHostCounters {
     /** #of disk write operations per second. */
     String PhysicalDisk_WritesPerSec = PhysicalDisk + ps
             + "Writes Per Second";
+
+	/**
+	 * Disk bytes per second for the host (total of bytes read per second and
+	 * bytes written per second).
+	 */
+	String PhysicalDisk_BytesPerSec = PhysicalDisk + ps + "Bytes Per Second";
+
+	/**
+	 * Disk operations per second for the host (total of disk reads per second
+	 * and disk writes per second).
+	 */
+	String PhysicalDisk_TransfersPerSec = PhysicalDisk + ps
+			+ "Transfers Per Second";
 
 }
